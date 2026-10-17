@@ -21559,3 +21559,38 @@ Empreintes : `effectif_par_categorie.dart` `FBA5B1DF`, `sync_engine.dart` `15AE5
 **Ce qui n'a PAS été vérifié.** Vrai serveur de bout en bout (`sync_reel_test` non lancé, aucun `php artisan serve`) : le push 15.40 n'a été simulé que par un modèle écrit à la main (motifs, eux, vérifiés contre le PHP) ; la sérialisation réelle de `/sync/pull` des 18 clés (lue, et testée côté Laravel par 15.39) ; MySQL (chaînes numériques simulées) ; production et données réelles de la ferme (aucune bande n'a encore de départ : le rapport à blanc n'a pas été lancé) ; volume (cascade et resynchronisation complète sur une vraie ferme) ; fuseaux autres que celui du poste de développement ; rendu (aucun écran) ; `flutter build windows` ; Laravel Feature non relancé (non touché). Audit indépendant (`suivi-rigoureux`) : non lancé par moi, l'outil de lancement d'agent n'étant pas disponible dans cette session.
 
 **Décisions client ouvertes.** D5 (qui déverrouille un départ erroné), D6 (bandes déjà saisies sur le web), D15 (« Porc Marchand » / « Jeune porc »), confirmation de D2/D8/D9/D12 ; mise en service SIMULTANÉE poste/serveur et calendrier de F0.96/F0.97 vu le constat (1) ; validation de mes deux initiatives : resynchronisation f095 conditionnée au serveur à jour, et ventilation rendue inconnue quand le formulaire actuel change un total.
+
+---
+
+## Ticket 15.43 (Laravel) + F0.98 (Flutter) : « EFFECTIF TOTAL VIVANT » FAUX APRÈS SAISIE D'UNE FICHE JOURNALIÈRE — CASCADE UNIQUE PARTOUT (17/10/2026, monorepo `massenon/agrierp`)
+
+**Signalement de l'exploitant.** Après création d'une bande de reproduction puis saisie dans la fiche journalière, « Effectif Total Vivant » devient faux.
+
+### 1. Cause (reproduite par test, rouge avant correctif)
+- `FicheReproducteurs`, `FichePondeuses`, `FicheEscargots` (`saveDay`) : `current_quantity` = effectif final du jour ÉDITÉ. Une fiche antérieure à la dernière ramenait la bande à ce jour-là ; les fiches suivantes n'étaient jamais recalculées. Porcs et Lapins passaient déjà par la cascade (15.42).
+- `EnregistrerSujets::saveEntry` : une NOUVELLE fiche partait de `current_quantity` (l'effectif d'aujourd'hui) même pour une date passée, puis `increment()` sans cascade.
+- Poste : `FicheJournaliereRepository.enregistrer` écrivait aussi l'effectif du jour édité.
+
+### 2. Correctif
+Les quatre écrans web et le repository du poste appellent la cascade unique (`RecordSaleOnFicheElevageAction::recalculerEnCascade` / `FicheJournaliereRepository.recalculerEnCascade`) : jours suivants recalculés, bande = DERNIÈRE fiche. `EnregistrerSujets` part de `previousEffectif()` et écrit fiche + cascade dans une transaction.
+
+### 3. Tests (valeurs calculées à la main, épreuve de mutation faite)
+- `tests/Feature/EffectifTotalVivantCascadeTest.php` : 4 tests, **4 rouges sans le correctif** (KPI 255 au lieu de 265), 4 verts avec.
+- `test/fiche_journaliere_test.dart` : 1 test, rouge sans le correctif (46 au lieu de 39), vert avec.
+
+### 4. Corrections annexes
+- `sync_engine.dart` ne compilait pas avec Dart 3.13 (Flutter stable 3.47.7, autorisé par `pubspec.yaml`) : promotion de nullité d'une variable capturée par la transaction. Copie finale locale `annoncees`, aucune règle changée.
+- `database/data/plan-comptable-syscohada-revise.csv` : le premier commit du monorepo l'avait converti en LF ; rétabli en CRLF (empreinte du client `4103f4ef…`), protégé par `-text` dans `.gitattributes`.
+
+### Mesures
+- Laravel : suite Feature 1 574 tests ; 11 échecs constatés au premier passage, tous d'environnement (9 manifeste Vite absent, 1 lien `public/storage` absent, 1 CSV ci-dessus) ; les 11 repassés verts après `npm run build`, `storage:link` et la correction du CSV.
+- Flutter (SDK 3.47.7 / Dart 3.13.5) : `flutter analyze` sans problème ; `flutter test` 1 953 verts, 32 sautés, 3 échecs PRÉEXISTANTS dans `export_comptabilite_test.dart` (chemins absolus `C:/laragon/...` et `C:/Projects/.../prototype_html` introuvables hors du poste du développeur — A7 du plan).
+
+### Ce qui n'a PAS été vérifié
+- La fiche Escargots n'a pas de test dédié (même modification que Pondeuses/Reproducteurs).
+- La parité exécutée PHP ↔ Dart de la cascade a été sautée (test `cascade_categories_test.dart` : dépôt Laravel non trouvé par le chemin attendu).
+- Aucun test Dusk, aucun essai sur la base de production.
+- ⚠️ La seconde copie de ce journal (`C:\Projects\agrierp_laravel\README_SPRINT0.md`) n'est pas dans le monorepo : à resynchroniser à la main.
+
+### Décisions OUVERTES (voir `PLAN_FINALISATION.md`)
+A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucun transfert entre bandes n'existe), A3 (« Don » reçu soustrait par la formule), A4 (Transformation hors fiche, effacée par la cascade suivante), A5 (`saveDay()` sans `authorize()` sur les cinq fiches).

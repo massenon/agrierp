@@ -249,6 +249,45 @@ void main() {
     expect(relue.currentQuantity, 33);
   });
 
+  /// ⚠️⚠️ CORRECTIF « EFFECTIF TOTAL VIVANT ». Une fiche ANTÉRIEURE saisie après coup ramenait
+  /// la bande à l'effectif de son propre jour et laissait les jours suivants faux.
+  /// Bande de 40 : le 19/08, 6 nés → 46 ; puis le 18/08, 7 morts → 33 ; le 19/08 recalculé
+  /// = 33 + 6 = 39 ; bande = 39 (dernière fiche), jamais 33. Littéraux calculés à la main.
+  test(
+    'une fiche anterieure recalcule les jours suivants et la bande suit la derniere',
+    () async {
+      await depot.enregistrer(
+        lotId: bande,
+        jour: DateTime(2026, 8, 19),
+        achat: 0,
+        ne: 6,
+        mort: 0,
+        don: 0,
+      );
+      await depot.enregistrer(
+        lotId: bande,
+        jour: DateTime(2026, 8, 18),
+        achat: 0,
+        ne: 0,
+        mort: 7,
+        don: 0,
+      );
+
+      expect(
+        (await depot.chargerJour(bande, DateTime(2026, 8, 18)))!.effectifFinal,
+        33,
+      );
+      expect(
+        (await depot.chargerJour(bande, DateTime(2026, 8, 19)))!.effectifFinal,
+        39,
+      );
+      final relue = await (db.select(
+        db.livestockLots,
+      )..where((t) => t.id.equals(bande))).getSingle();
+      expect(relue.currentQuantity, 39);
+    },
+  );
+
   /// ⚠️ LES GRAMMAGES VIENNENT DU SERVEUR, jamais du code : ils sont
   /// éditables depuis l'écran Paramètres > Élevage.
   test('les rations sont lues depuis le referentiel synchronise', () async {

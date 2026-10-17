@@ -3,6 +3,7 @@
 namespace App\Livewire\Elevage;
 
 use App\Actions\RecordEggProductionStockAction;
+use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -290,7 +291,13 @@ class FichePondeuses extends Component
             ]
         );
 
-        $lot->update(['current_quantity' => $effectifFinal]);
+        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+        // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
+        // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
+        // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
+        // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
+        // recalculés, bande = DERNIÈRE fiche.
+        app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
 
         // ⚠️ Ajustement de stock appliqué uniquement à la création de la fiche
         // du jour, jamais à sa modification — bug préexistant découvert

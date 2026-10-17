@@ -224,8 +224,13 @@ class FicheJournaliereRepository {
 
     // L'effectif courant de la bande suit la fiche : sans cela, l'écran de
     // caisse continuerait de proposer des sujets déjà morts ou vendus.
-    await (_db.update(_db.livestockLots)..where((t) => t.id.equals(lotId)))
-        .write(LivestockLotsCompanion(currentQuantity: Value(effectif)));
+    //
+    // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+    // Saisir ou corriger une fiche antérieure à la dernière la ramenait à l'effectif de CE jour,
+    // sans recalculer les fiches suivantes. Même défaut que les fiches web Reproducteurs /
+    // Pondeuses / Escargots, corrigé des deux côtés : cascade unique (F0.95), jours suivants
+    // recalculés, bande = DERNIÈRE fiche.
+    await recalculerEnCascade(lotId, date);
 
     return (await chargerJour(lotId, date))!;
   }

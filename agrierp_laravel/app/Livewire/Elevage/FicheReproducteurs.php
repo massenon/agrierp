@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
@@ -301,7 +302,13 @@ class FicheReproducteurs extends Component
         // rattachée à un produit, l'Action ne fait rien.
         app(SyncLotProductionStockAction::class)->execute($entree, $etatAvant);
 
-        $this->selectedLot->update(['current_quantity' => $effectifFinal]);
+        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+        // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
+        // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
+        // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
+        // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
+        // recalculés, bande = DERNIÈRE fiche.
+        app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');
