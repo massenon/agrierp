@@ -1,6 +1,10 @@
 # Normalisation des fins de ligne : LF dans le dépôt, quel que soit l'OS
 * text=auto eol=lf
 
+# Fichiers de référence du client, vérifiés octet pour octet (empreinte SHA-256 dans
+# ImportPlanSyscohadaTest) : JAMAIS de conversion de fin de ligne. Le CSV d'origine est en CRLF.
+agrierp_laravel/database/data/*.csv -text
+
 # Scripts Windows
 *.bat  text eol=crlf
 *.cmd  text eol=crlf

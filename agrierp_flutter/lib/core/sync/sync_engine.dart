@@ -1389,6 +1389,11 @@ class SyncEngine {
       }
     }
 
+    // ⚠️ Copie FINALE : la variable `actives`, capturée par la transaction, n'est pas promue
+    // en non-nulle par le compilateur Dart 3.13 (le build Windows échouait sur un SDK stable
+    // récent). Aucune règle changée : même valeur, même test de nullité.
+    final annoncees = actives;
+
     // ── Application, en une transaction ─────────────────────────────────────
     String? avertissementVidage;
     await _db.transaction(() async {
@@ -1409,7 +1414,7 @@ class SyncEngine {
         await _db.into(_db.accountingEntryLines).insert(c);
       }
 
-      if (actives != null) {
+      if (annoncees != null) {
         final locales = [
           for (final e in await _db.select(_db.accountingEntries).get()) e.id,
         ];
@@ -1417,7 +1422,7 @@ class SyncEngine {
         // F0.84-bis — écritures annoncées actives et toujours absentes du poste : l'appelant relance
         // UNE fois le journal complet (voir `_tirer`).
         final presentes = locales.toSet();
-        _journalManquants = actives.difference(presentes).length;
+        _journalManquants = annoncees.difference(presentes).length;
 
         // ⚠️⚠️ F0.84-bis — UNE LISTE VIDE N'EST PAS CRUE AU PREMIER TIRAGE. Un 200 avec
         // `accounting_entry_ids: []` peut venir d'un serveur branché sur une base vide ; l'avaler
@@ -1426,7 +1431,7 @@ class SyncEngine {
         // par une seconde annonce vide. Aucune règle comptable : seule la prudence sur une
         // suppression irréversible.
         var purger = true;
-        if (actives.isEmpty && locales.isNotEmpty) {
+        if (annoncees.isEmpty && locales.isNotEmpty) {
           if (await _lireReglage(cleJournalVidageAttendu) == null) {
             purger = false;
             await _ecrireReglage(cleJournalVidageAttendu, '1');
@@ -1445,7 +1450,7 @@ class SyncEngine {
 
         final retirees = [
           for (final id in locales)
-            if (!actives.contains(id)) id,
+            if (!annoncees.contains(id)) id,
         ];
         for (final morceau in _morceaux(retirees)) {
           await (_db.delete(
