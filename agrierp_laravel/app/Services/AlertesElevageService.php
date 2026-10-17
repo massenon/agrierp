@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CompanySetting;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockReproductionEvent;
 use App\Models\Notification;
@@ -21,9 +22,21 @@ use Illuminate\Support\Collection;
  *  - stock : `stock_qty <= alert_threshold` (Seuils d'Alerte, badge « Urgence », tableau de bord) ;
  *  - mortalité : pire jour des 7 derniers jours ≥ 5 % (tableau de bord, règle de `gestion-elevage.html`, F0.32 ;
  *    la divergence de formule avec le cumul hebdomadaire reste un ARBITRAGE CLIENT ouvert) ;
- *  - soins : calendrier vétérinaire, événement « planifié » daté d'ici `JOURS_RAPPEL_SOINS` jours, ou dépassé ;
+ *  - soins : règle R-SOINS-01 ci-dessous ;
  *  - reproduction : cycle passé en « échec » (palpation négative), compté par l'indicateur « Alertes Réforme /
  *    Pertes ».
+ *
+ * ═══ RÈGLE R-SOINS-01 — RAPPEL DES SOINS PLANIFIÉS (rédigée le 17/10/2026) ═══
+ * Tout soin du calendrier vétérinaire au statut « planifié », rattaché à une bande vivante, est signalé à
+ * l'animalier dans la cloche :
+ *  1. « Soin à venir » (sévérité moyenne) dès qu'il reste N jours ou moins avant sa date planifiée ;
+ *  2. « Soin en retard » (sévérité critique) dès que la date est dépassée sans que le soin ait été réalisé
+ *     ou replanifié ;
+ *  3. N = délai de rappel réglé par l'exploitant (Paramètres Élevage > Prophylaxie,
+ *     `company_settings.rappel_soins_jours`, 0 à 30 jours, 3 par défaut) ; N = 0 : rappel le jour même seulement ;
+ *  4. une alerte par soin et par jour ; aucune nouvelle alerte dès que le soin n'est plus « planifié »
+ *     (réalisé, annulé) ou que sa bande n'est plus vivante.
+ *
  * ⚠️ Une alerte n'est émise qu'UNE fois par objet et par jour (même `type` + même `link_url`), comme
  * `RaiseFeedAutonomyAlertAction` : relancer la tâche ne réempile rien.
  */
@@ -31,12 +44,14 @@ class AlertesElevageService
 {
     public const SEUIL_MORTALITE_JOUR = 5.0;
 
-    /**
-     * Fenêtre du rappel des soins planifiés. ⚠️ Aucune durée n'est fixée par la maquette ni par la documentation :
-     * 3 jours, comme le seuil d'autonomie de provende (`RaiseFeedAutonomyAlertAction::SEUIL_JOURS`), à confirmer
-     * par l'exploitant (consigné au ticket 15.49).
-     */
+    /** R-SOINS-01 — délai par défaut, quand aucun réglage n'existe encore. */
     public const JOURS_RAPPEL_SOINS = 3;
+
+    /** R-SOINS-01 — délai de rappel réglé par l'exploitant (jours). */
+    public function joursRappelSoins(): int
+    {
+        return (int) (CompanySetting::query()->value('rappel_soins_jours') ?? self::JOURS_RAPPEL_SOINS);
+    }
 
     /** @return Collection<int, Product> produits actifs au seuil d'alerte ou en dessous */
     public function produitsSousSeuil(): Collection
@@ -70,7 +85,7 @@ class AlertesElevageService
     {
         return VeterinaryCalendarEvent::with('lot')
             ->where('status', 'planned')
-            ->whereDate('scheduled_date', '<=', now()->addDays(self::JOURS_RAPPEL_SOINS)->toDateString())
+            ->whereDate('scheduled_date', '<=', now()->addDays($this->joursRappelSoins())->toDateString())
             ->whereHas('lot', fn ($q) => $q->vivantes())
             ->orderBy('scheduled_date')
             ->get();

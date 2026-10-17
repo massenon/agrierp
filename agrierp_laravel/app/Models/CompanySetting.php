@@ -21,6 +21,8 @@ class CompanySetting extends Model
         'data_reset_at',
         // Ticket 15.51 — assistant de démarrage marqué terminé.
         'onboarding_completed_at',
+        // Règle R-SOINS-01 — délai du rappel des soins planifiés (jours).
+        'rappel_soins_jours',
         'company_name', 'promoter_name', 'address', 'phone', 'email', 'ifu', 'rccm',
         'smtp_host', 'smtp_port', 'smtp_security', 'smtp_user', 'smtp_password_encrypted',
         'logo_path', 'favicon_path',
@@ -41,6 +43,7 @@ class CompanySetting extends Model
             'payroll_settings_edited_at' => 'datetime',
             'data_reset_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
+            'rappel_soins_jours' => 'integer',
         ];
     }
 

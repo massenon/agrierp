@@ -3,11 +3,13 @@
 namespace App\Livewire\Elevage;
 
 use App\Models\AuditLog;
+use App\Models\CompanySetting;
 use App\Models\ElevageNumberingSetting;
 use App\Models\FeedRationStandard;
 use App\Models\FeedType;
 use App\Models\LivestockSpecies;
 use App\Models\ProphylaxisScheduleStandard;
+use App\Services\AlertesElevageService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -85,12 +87,31 @@ class ParametresElevage extends Component
     // --- Numérotation ---
     public array $numbering = [];
 
+    /** Règle R-SOINS-01 — délai du rappel des soins planifiés (jours). */
+    public int $rappelSoinsJours = AlertesElevageService::JOURS_RAPPEL_SOINS;
+
     public function mount(): void
     {
         $this->numbering = ElevageNumberingSetting::current()->only([
             'bande_format', 'lapine_prefix', 'male_prefix', 'truie_prefix',
             'verrat_prefix', 'portee_prefix', 'volaille_prefix', 'parc_prefix', 'escargot_prefix',
         ]);
+        $this->rappelSoinsJours = app(AlertesElevageService::class)->joursRappelSoins();
+    }
+
+    /** Règle R-SOINS-01 — l'exploitant règle le délai du rappel des soins planifiés. */
+    public function saveRappelSoins(): void
+    {
+        $this->authorize('manage-elevage');
+
+        $this->validate(['rappelSoinsJours' => ['required', 'integer', 'min:0', 'max:30']], [], [
+            'rappelSoinsJours' => 'délai de rappel',
+        ]);
+
+        CompanySetting::current()->update(['rappel_soins_jours' => $this->rappelSoinsJours]);
+
+        AuditLog::record('rappel_soins.updated', 'elevage');
+        $this->dispatch('toast', message: 'Délai de rappel des soins enregistré.', type: 'success');
     }
 
     // ===================== RATIONNEMENT =====================

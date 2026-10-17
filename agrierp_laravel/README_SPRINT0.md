@@ -21799,3 +21799,24 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 
 ### Non fait
 - ⚠️ `build_windows.bat` n'a PAS été exécuté : il exige Windows, Visual Studio 2022 et Inno Setup. À valider sur le poste de compilation (plan, D2).
+
+---
+
+## Ticket 15.52 — Règle R-SOINS-01 : rappel des soins planifiés, rédigée et réglable (17/10/2026)
+
+### Décision client
+« Il faut rédiger la règle » (17/10/2026) : la fenêtre de 3 jours du ticket 15.49 était une valeur sans source.
+
+### Règle R-SOINS-01
+Tout soin du calendrier vétérinaire au statut « planifié », rattaché à une bande vivante, est signalé à l'animalier dans la cloche :
+1. « Soin à venir » (sévérité moyenne) dès qu'il reste N jours ou moins avant sa date planifiée ;
+2. « Soin en retard » (sévérité critique) dès que la date est dépassée sans réalisation ni replanification ;
+3. N = délai réglé par l'exploitant dans Paramètres Élevage > Prophylaxie (0 à 30 jours, 3 par défaut) ; N = 0 : le jour même seulement ;
+4. une alerte par soin et par jour ; plus aucune dès que le soin n'est plus « planifié » ou que sa bande n'est plus vivante.
+
+### Corrections
+- Migration `2026_10_18_000005` : `company_settings.rappel_soins_jours` (défaut 3). `AlertesElevageService::joursRappelSoins()` remplace la constante dans la requête ; la règle est écrite en tête du service.
+- Paramètres Élevage > Prophylaxie : champ « Rappel des soins planifiés (jours avant la date) », `manage-elevage`, validé 0–30, journalisé.
+
+### Mesures
+- `AlertesClocheTest` : +3 (délai 0 et 11 appliqués, défaut 3, réglage validé et refusé au caissier).

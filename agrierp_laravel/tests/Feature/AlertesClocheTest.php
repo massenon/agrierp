@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\DailyElevageAlertsJob;
+use App\Models\CompanySetting;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockReproductionEvent;
@@ -133,6 +134,49 @@ class AlertesClocheTest extends TestCase
             'Soin en retard — Déparasitage' => 'critique',
             'Soin à venir — Vaccin RHD' => 'moyen',
         ], $titres);
+    }
+
+    /** R-SOINS-01 — le délai vient du réglage de l'exploitant, plus d'une constante. */
+    public function test_le_delai_de_rappel_regle_par_l_exploitant_est_applique(): void
+    {
+        foreach ([['Vaccin RHD', '2026-10-15'], ['Vitamines', '2026-10-25'], ['Pesée', '2026-10-14']] as [$tache, $date]) {
+            VeterinaryCalendarEvent::create(['lot_id' => $this->bande->id, 'task_type' => $tache, 'scheduled_date' => $date, 'status' => 'planned']);
+        }
+
+        CompanySetting::create(['company_name' => 'Ferme', 'rappel_soins_jours' => 0]);
+        $this->assertSame(['Pesée'], app(AlertesElevageService::class)->soinsAVenir()->pluck('task_type')->all(),
+            '0 jour : le jour même seulement');
+
+        CompanySetting::query()->update(['rappel_soins_jours' => 11]);
+        $this->assertSame(['Pesée', 'Vaccin RHD', 'Vitamines'],
+            app(AlertesElevageService::class)->soinsAVenir()->pluck('task_type')->all(), '11 jours : jusqu\'au 25/10');
+    }
+
+    public function test_sans_reglage_le_delai_par_defaut_est_de_trois_jours(): void
+    {
+        $this->assertSame(3, app(AlertesElevageService::class)->joursRappelSoins());
+    }
+
+    public function test_le_delai_se_regle_dans_parametres_elevage_entre_0_et_30_jours(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $compte = fn (string $role) => tap(\App\Models\User::create([
+            'name' => $role, 'username' => $role, 'email' => $role.'@olouwachegoun.bj',
+            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]), fn ($u) => $u->assignRole($role));
+        CompanySetting::create(['company_name' => 'Ferme']);
+
+        $this->actingAs($compte('animalier'));
+        \Livewire\Livewire::test(\App\Livewire\Elevage\ParametresElevage::class)
+            ->assertSet('rappelSoinsJours', 3)
+            ->set('rappelSoinsJours', 31)->call('saveRappelSoins')->assertHasErrors('rappelSoinsJours')
+            ->set('rappelSoinsJours', 7)->call('saveRappelSoins')->assertHasNoErrors();
+        $this->assertSame(7, CompanySetting::first()->rappel_soins_jours);
+
+        $this->actingAs($compte('caissier'));
+        \Livewire\Livewire::test(\App\Livewire\Elevage\ParametresElevage::class)
+            ->set('rappelSoinsJours', 1)->call('saveRappelSoins')->assertForbidden();
+        $this->assertSame(7, CompanySetting::first()->rappel_soins_jours);
     }
 
     public function test_un_echec_de_reproduction_est_signale_une_seule_fois(): void
