@@ -1,0 +1,18 @@
+# Fichiers système et éditeurs (les règles propres à chaque projet
+# vivent dans agrierp_laravel/.gitignore et agrierp_flutter/.gitignore)
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+.fleet/
+.zed/
+
+# Python (outils/ et manuel/build.py)
+__pycache__/
+*.pyc
+
+# Sorties générées du manuel
+/manuel/*.pdf

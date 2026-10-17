@@ -1,0 +1,27 @@
+# Normalisation des fins de ligne : LF dans le dépôt, quel que soit l'OS
+* text=auto eol=lf
+
+# Scripts Windows
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binaires
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.pdf  binary
+*.zip  binary
+
+# Fichiers générés : repliés dans les diffs GitHub et exclus des statistiques de langage
+agrierp_flutter/lib/core/database/app_database.g.dart linguist-generated=true
+agrierp_flutter/pubspec.lock     linguist-generated=true
+agrierp_laravel/composer.lock    linguist-generated=true
+agrierp_laravel/package-lock.json linguist-generated=true
+database/*.sql                   linguist-generated=true
