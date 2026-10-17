@@ -229,6 +229,7 @@ void main() {
         "WORKFLOW RÉCOLTE & STOCK D'ŒUFS (COMBINE LES FICHES OFFICIELLES DE LA FERME)",
       ),
       y(tester, 'MORTS PAR CATÉGORIE'),
+      y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
@@ -247,21 +248,21 @@ void main() {
       positions,
       equals(trie),
       reason:
-          'ordre : Œufs, Morts, Effectif, Rationnement, '
+          'ordre : Œufs, Morts, Dons, Effectif, Rationnement, '
           'Pesée, Prophylaxie, Attribution',
     );
   });
 
-  // 🔁 F0.99 — catégories des morts du WEB (`fiche-pondeuses.blade.php`), et aucun bloc Dons (le web n'en a pas).
-  testWidgets('les trois catégories de morts sont celles du web, sans bloc Dons', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-pondeuses.blade.php`), Dons sur les mêmes catégories (15.56).
+  testWidgets('les trois catégories du web portent les morts ET les dons', (
     tester,
   ) async {
     await afficher(tester);
 
     for (final stade in ['PONDEUSE / REPRO', 'POULETTE', 'POUSSIN']) {
-      expect(find.text(stade), findsOneWidget, reason: stade);
+      expect(find.text(stade), findsNWidgets(2), reason: '$stade : Morts et Dons');
     }
-    expect(find.text('DONS PAR CATÉGORIE'), findsNothing);
+    expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
     expect(find.text('POUSSIN PONTE'), findsNothing);
   });
 
@@ -382,5 +383,18 @@ void main() {
       find.textContaining('Aucune bande active au stade Ponte'),
       findsOneWidget,
     );
+  });
+
+  // 🔁 15.56 — un don fait quitter le sujet : l'effectif final baisse aussitôt, comme sur le web.
+  testWidgets('un don saisi réduit aussitôt l effectif final', (tester) async {
+    await afficher(tester);
+
+    final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+    await tester.ensureVisible(find.byKey(const Key('pas-don-Poulette-1')));
+    await tester.tap(find.byKey(const Key('pas-don-Poulette-1')));
+    await tester.pumpAndSettle();
+    final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+
+    expect(int.parse(apres!), int.parse(avant!) - 1);
   });
 }

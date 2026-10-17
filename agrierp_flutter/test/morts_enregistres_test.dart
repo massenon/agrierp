@@ -10,7 +10,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.99 — LES MORTS D'UN JOUR RECHARGÉ SONT CONSERVÉS (web 15.47 Pondeuses / Escargots, 15.55
+/// Tickets F0.99 / 15.56 — LES MORTS ET LES DONS D'UN JOUR RECHARGÉ SONT CONSERVÉS (web 15.47 Pondeuses / Escargots, 15.55
 /// Reproducteurs).
 ///
 /// 🔴 Avant : les trois fiches remettaient leurs compteurs de morts à 0 au chargement — la répartition
@@ -53,7 +53,8 @@ void main() {
         lotId: bandeId,
         entryDate: DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day),
         mort: const Value(3),
-        effectifFinal: const Value(47),
+        don: const Value(2),
+        effectifFinal: const Value(45),
       ),
     );
   }
@@ -68,17 +69,20 @@ void main() {
 
     expect(find.byKey(const Key('morts-enregistres')), findsOneWidget);
     expect(find.textContaining('3 mort(s) déjà enregistré(s) ce jour'), findsOneWidget);
+    // 🔁 15.56 — les dons suivent la même règle.
+    expect(find.byKey(const Key('dons-enregistres')), findsOneWidget);
+    expect(find.textContaining('2 don(s) déjà enregistré(s) ce jour'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Enregistrer ce Jour'));
     await tester.tap(find.text('Enregistrer ce Jour'));
     await tester.pumpAndSettle();
 
     final fiche = await db.select(db.livestockDailyEntries).getSingle();
-    // Recalcul indépendant : 50 au départ − 3 morts.
-    expect([fiche.mort, fiche.effectifFinal], [3, 47]);
+    // Recalcul indépendant : 50 au départ − 3 morts − 2 dons.
+    expect([fiche.mort, fiche.don, fiche.effectifFinal], [3, 2, 45]);
   }
 
-  testWidgets('Pondeuses : les 3 morts du jour survivent au ré-enregistrement', (tester) async {
+  testWidgets('Pondeuses : les morts et dons du jour survivent au ré-enregistrement', (tester) async {
     await bandeEtFiche(espece: 'aviculture', stade: 'ponte');
     await afficherEtEnregistrer(
       tester,
@@ -90,12 +94,12 @@ void main() {
     );
   });
 
-  testWidgets('Escargots : les 3 morts du jour survivent au ré-enregistrement', (tester) async {
+  testWidgets('Escargots : les morts et dons du jour survivent au ré-enregistrement', (tester) async {
     await bandeEtFiche(espece: 'helico', stade: 'engraissement');
     await afficherEtEnregistrer(tester, FicheEscargotsScreen(depot: depot, soins: soins));
   });
 
-  testWidgets('Reproducteurs : les 3 morts du jour survivent au ré-enregistrement', (tester) async {
+  testWidgets('Reproducteurs : les morts et dons du jour survivent au ré-enregistrement', (tester) async {
     await bandeEtFiche(espece: 'aviculture', stade: 'reproduction');
     await afficherEtEnregistrer(tester, FicheReproducteursScreen(depot: depot, soins: soins));
   });

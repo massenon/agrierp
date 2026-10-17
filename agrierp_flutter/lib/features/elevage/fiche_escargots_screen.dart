@@ -18,7 +18,7 @@ import 'soins_repository.dart';
 ///   4. **Pondoirs** : Œufs Récoltés (Pondoirs terre) · Naissains Nés
 ///      (Éclosion jour) · Taux d'Éclosion Naissains (%) ;
 ///   5. Morts par catégorie — Bordé · Engraissement · Naissain ;
-///   6. (🔁 F0.99) pas de bloc Dons : le web n'en a pas et enregistre `don = 0` ;
+///   6. Dons par catégorie — mêmes catégories que les morts (🔁 15.56, décision client du 17/10/2026) ;
 ///   7. Effectif Final du Jour + Taux de Mortalité du Jour ;
 ///   8. Rationnement ;
 ///   9. Pesée (en grammes) ;
@@ -87,9 +87,15 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   int _naissainsNes = 0;
 
   final _morts = <String, int>{for (final c in _categories) c: 0};
+
+  /// 🔁 15.56 — dons par catégorie (mêmes catégories que les morts), comme le web.
+  final _dons = <String, int>{for (final c in _categories) c: 0};
   /// 🔁 F0.99 — morts déjà enregistrés pour le jour rechargé (web 15.47 / 15.55) : la répartition n'est pas
   /// stockée, seul le total l'est. Sans lui, ré-enregistrer le jour remettait ses morts à zéro.
   int? _mortEnregistre;
+
+  /// 🔁 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que [_mortEnregistre]).
+  int? _donEnregistre;
 
   List<FeedRationStandard> _rations = const [];
 
@@ -166,8 +172,10 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       _observations.clear();
       for (final cle in _categories) {
         _morts[cle] = 0;
+        _dons[cle] = 0;
       }
       _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
+      _donEnregistre = (fiche?.don ?? 0) > 0 ? fiche!.don : null;
       _chargement = false;
     });
   }
@@ -180,14 +188,20 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
     return saisis > 0 ? saisis : (_mortEnregistre ?? 0);
   }
 
+  /// 🔁 15.56 — dons du jour : la répartition saisie, sinon le total déjà enregistré (`donDuJour` du web).
+  /// Un don réduit l'effectif ; le serveur le sort du stock du produit de la bande à la réception.
+  int get _totalDons {
+    final saisis = _dons.values.fold(0, (a, b) => a + b);
+    return saisis > 0 ? saisis : (_donEnregistre ?? 0);
+  }
+
   int get _effectifFinal => FicheJournaliereRepository.calculerEffectifFinal(
     effectifPrecedent: _effectifPrecedent,
     achat: _achat,
     ne: _naissainsNes,
     mort: _totalMorts,
     vente: _vente,
-    // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
-      don: 0,
+    don: _totalDons,
     transfertEntree: _transfertEntree,
     transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
@@ -264,6 +278,31 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
+                    ),
+                    const SizedBox(height: AgriSpacing.md),
+                    if (_donEnregistre != null) ...[
+                      Container(
+                        key: const Key('dons-enregistres'),
+                        padding: const EdgeInsets.all(AgriSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          '$_donEnregistre don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
+                          "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+                          style: const TextStyle(fontSize: 11, color: AgriColors.brandForest),
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                    ],
+                    _blocCategories(
+                      titre: 'Dons par catégorie',
+                      icone: Icons.card_giftcard,
+                      couleur: AgriColors.brandEmerald,
+                      fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
+                      valeurs: _dons,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
@@ -915,7 +954,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
                   ),
                 ),
                 const Text(
-                  '= Effectif (J-1) + Achats/Naissains − Morts',
+                  '= Effectif (J-1) + Achats/Naissains − (Morts + Dons)',
                   style: TextStyle(fontSize: 10, color: AgriColors.outline),
                 ),
                 const SizedBox(height: 4),
@@ -1554,6 +1593,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       _poidsTotalPese = 0;
       for (final cle in _categories) {
         _morts[cle] = 0;
+        _dons[cle] = 0;
       }
     });
   }
@@ -1571,8 +1611,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       // récolte d'œufs pour des naissances.
       ne: _naissainsNes,
       mort: _totalMorts,
-      // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
-      don: 0,
+      don: _totalDons,
       ponteTotal: _oeufsTerre,
       poidsMoyen: _poidsMoyen,
     );

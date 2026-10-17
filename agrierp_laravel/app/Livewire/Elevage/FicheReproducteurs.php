@@ -68,6 +68,18 @@ class FicheReproducteurs extends Component
 
     public int $mortPoussin = 0;
 
+    public int $donRepro = 0;
+
+    public int $donPoulet = 0;
+
+    public int $donPoussin = 0;
+
+    /**
+     * Ticket 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que `mortEnregistre`) : la répartition
+     * n'est pas stockée, seul le total l'est ; il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $donEnregistre = null;
+
     /**
      * Ticket 15.55 — morts déjà enregistrés pour le jour rechargé (miroir de 15.47, Pondeuses et Escargots). La
      * répartition Repro / Poulet / Poussin n'est pas stockée : `loadDay` ne rechargeait AUCUN mort (ceux d'un
@@ -215,11 +227,23 @@ class FicheReproducteurs extends Component
         return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
     }
 
+    /**
+     * Ticket 15.56 — dons du jour : la répartition saisie, sinon le total déjà enregistré. Un don fait QUITTER le
+     * sujet de l'exploitation : il réduit l'effectif et sort du stock du produit de la bande
+     * (`SyncLotProductionStockAction`, ticket 14.37).
+     */
+    private function donDuJour(): int
+    {
+        $saisis = $this->donRepro + $this->donPoulet + $this->donPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->donEnregistre ?? 0);
+    }
+
     public function getEffectifFinalCalcProperty(): int
     {
         $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->poussinsNes, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->poussinsNes, $mort, $this->venteDuJour, $this->donDuJour(), $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
@@ -256,13 +280,14 @@ class FicheReproducteurs extends Component
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 
-        $this->reset(['mortRepro', 'mortPoulet', 'mortPoussin', 'mortEnregistre']);
+        $this->reset(['mortRepro', 'mortPoulet', 'mortPoussin', 'mortEnregistre', 'donRepro', 'donPoulet', 'donPoussin', 'donEnregistre']);
 
         if ($entry) {
             $this->achat = $entry->achat;
             $this->oeufsCouves = $entry->ponte_total ?? 0;
             $this->poussinsNes = $entry->ne;
             $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
+            $this->donEnregistre = (int) ($entry->don ?? 0) > 0 ? (int) $entry->don : null;
             // Le TOTAL pese se reconstitue depuis la moyenne stockee.
             $effectifFiche = (int) ($entry->effectif_final ?? 0);
             $this->peseeTotal = $entry->weight_sample_avg_g && $effectifFiche > 0
@@ -311,7 +336,7 @@ class FicheReproducteurs extends Component
                 'ne' => $this->poussinsNes,
                 'mort' => $mort,
                 'vente' => $this->venteDuJour,
-                'don' => 0,
+                'don' => $this->donDuJour(),
                 'effectif_final' => $effectifFinal,
                 'ponte_total' => $this->oeufsCouves,
                 // 🔴→✅ TICKET 14.63 — LA COLONNE PORTE LE POIDS **MOYEN PAR

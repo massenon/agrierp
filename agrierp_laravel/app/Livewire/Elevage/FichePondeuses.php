@@ -4,6 +4,7 @@ namespace App\Livewire\Elevage;
 
 use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RecordEggProductionStockAction;
+use App\Actions\SyncLotProductionStockAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
 use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
@@ -62,6 +63,18 @@ class FichePondeuses extends Component
 
     public int $mortPoussin = 0;
 
+    public int $donRepro = 0;
+
+    public int $donPoulette = 0;
+
+    public int $donPoussin = 0;
+
+    /**
+     * Ticket 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que `mortEnregistre`) : la répartition
+     * n'est pas stockée, seul le total l'est ; il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $donEnregistre = null;
+
     public int $oeufsRecoltes = 0;
 
     public int $oeufsCasses = 0;
@@ -116,6 +129,18 @@ class FichePondeuses extends Component
         $saisis = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
 
         return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
+    }
+
+    /**
+     * Ticket 15.56 — dons du jour : la répartition saisie, sinon le total déjà enregistré. Un don fait QUITTER le
+     * sujet de l'exploitation : il réduit l'effectif et sort du stock du produit de la bande
+     * (`SyncLotProductionStockAction`, ticket 14.37).
+     */
+    private function donDuJour(): int
+    {
+        $saisis = $this->donRepro + $this->donPoulette + $this->donPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->donEnregistre ?? 0);
     }
 
     private function speciesCode(): string
@@ -263,7 +288,7 @@ class FichePondeuses extends Component
     {
         $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $this->donDuJour(), $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
@@ -324,12 +349,13 @@ class FichePondeuses extends Component
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 
-        $this->reset(['mortRepro', 'mortPoulette', 'mortPoussin', 'mortEnregistre']);
+        $this->reset(['mortRepro', 'mortPoulette', 'mortPoussin', 'mortEnregistre', 'donRepro', 'donPoulette', 'donPoussin', 'donEnregistre']);
 
         if ($entry) {
             $this->achat = $entry->achat;
             $this->ne = $entry->ne;
             $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
+            $this->donEnregistre = (int) ($entry->don ?? 0) > 0 ? (int) $entry->don : null;
             $this->oeufsRecoltes = $entry->ponte_total ?? 0;
             $this->oeufsCasses = $entry->ponte_casses ?? 0;
         } else {
@@ -351,6 +377,13 @@ class FichePondeuses extends Component
         $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;
 
+        // Ticket 15.56 — état AVANT enregistrement : naissances, morts et dons ne sortent du stock du produit de la
+        // bande que par ÉCART (`SyncLotProductionStockAction`), comme sur les quatre autres fiches.
+        $ficheAvant = LivestockDailyEntry::where('lot_id', $lot->id)->whereDate('entry_date', $this->selectedDate)->first();
+        $etatAvant = $ficheAvant
+            ? ['ne' => (int) $ficheAvant->ne, 'mort' => (int) $ficheAvant->mort, 'don' => (int) ($ficheAvant->don ?? 0)]
+            : [];
+
         $dailyEntry = LivestockDailyEntry::updateOrCreate(
             ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
             [
@@ -358,7 +391,7 @@ class FichePondeuses extends Component
                 'ne' => $this->ne,
                 'mort' => $mort,
                 'vente' => $this->venteDuJour,
-                'don' => 0,
+                'don' => $this->donDuJour(),
                 'effectif_final' => $effectifFinal,
                 'ponte_total' => $this->oeufsRecoltes,
                 'ponte_casses' => $this->oeufsCasses,
@@ -387,6 +420,9 @@ class FichePondeuses extends Component
         if ($dailyEntry->wasRecentlyCreated) {
             app(RecordEggProductionStockAction::class)->execute($dailyEntry);
         }
+
+        // Ticket 15.56 — la bande rattachée à un produit voit ses naissances, morts et DONS répercutés au stock.
+        app(SyncLotProductionStockAction::class)->execute($dailyEntry, $etatAvant);
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');

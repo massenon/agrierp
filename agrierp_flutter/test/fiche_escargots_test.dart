@@ -97,6 +97,7 @@ void main() {
       y(tester, 'ACHATS DU JOUR'),
       y(tester, 'ŒUFS RÉCOLTÉS (PONDOIRS TERRE)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
+      y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
       y(
@@ -113,21 +114,21 @@ void main() {
       positions,
       equals([...positions]..sort()),
       reason:
-          'ordre : Entrées, Pondoirs, Morts, Effectif, '
+          'ordre : Entrées, Pondoirs, Morts, Dons, Effectif, '
           'Pesée, Soins, Attribution',
     );
   });
 
-  // 🔁 F0.99 — catégories des morts du WEB (`fiche-escargots.blade.php`), et aucun bloc Dons (le web n'en a pas).
-  testWidgets('les trois catégories de morts sont celles du web, sans bloc Dons', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-escargots.blade.php`), Dons sur les mêmes catégories (15.56).
+  testWidgets('les trois catégories du web portent les morts ET les dons', (
     tester,
   ) async {
     await afficher(tester);
 
     for (final categorie in ['REPRODUCTEUR (BORDÉ)', 'ENGRAISSEMENT', 'NAISSAIN']) {
-      expect(find.text(categorie), findsOneWidget, reason: categorie);
+      expect(find.text(categorie), findsNWidgets(2), reason: '$categorie : Morts et Dons');
     }
-    expect(find.text('DONS PAR CATÉGORIE'), findsNothing);
+    expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
   });
 
   // ── Le barème manquant ─────────────────────────────────────────────────
@@ -308,4 +309,17 @@ void main() {
       );
     },
   );
+
+  // 🔁 15.56 — un don fait quitter le sujet : l'effectif final baisse aussitôt, comme sur le web.
+  testWidgets('un don saisi réduit aussitôt l effectif final', (tester) async {
+    await afficher(tester);
+
+    final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+    await tester.ensureVisible(find.byKey(const Key('pas-don-Naissain-1')));
+    await tester.tap(find.byKey(const Key('pas-don-Naissain-1')));
+    await tester.pumpAndSettle();
+    final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+
+    expect(int.parse(apres!), int.parse(avant!) - 1);
+  });
 }

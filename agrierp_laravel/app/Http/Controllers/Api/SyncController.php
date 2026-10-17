@@ -8,6 +8,7 @@ use App\Actions\TransferBetweenLotsAction;
 use App\Actions\VerifySaleDateAction;
 use App\Exceptions\SaleDateRefusedException;
 use App\Actions\RecordPurchaseAction;
+use App\Actions\SyncLotProductionStockAction;
 use App\Actions\FlagSaleUnderWithdrawalAction;
 use App\Actions\RecordEggProductionStockAction;
 use App\Actions\RecordStockAdjustmentEntryAction;
@@ -1635,6 +1636,11 @@ class SyncController extends Controller
                     continue;
                 }
 
+                // 🔴→✅ Ticket 15.56 — état AVANT écriture, pour répercuter au stock l'ÉCART des naissances, morts et dons.
+                $etatAvant = $existant
+                    ? ['ne' => (int) $existant->ne, 'mort' => (int) $existant->mort, 'don' => (int) ($existant->don ?? 0)]
+                    : [];
+
                 $record = $existant ?? new LivestockDailyEntry();
                 $record->id = $validated['id'];
                 // ⚠️⚠️ `effectif_final` N'EST JAMAIS REPRIS DU CLIENT. Le poste
@@ -1678,6 +1684,11 @@ class SyncController extends Controller
                 if ($existant === null) {
                     app(RecordEggProductionStockAction::class)->execute($record->fresh());
                 }
+
+                // 🔴→✅ Ticket 15.56 — UN DON SAISI AU POSTE SORT DU STOCK. Les fiches du web appellent cette action
+                // depuis 14.37 ; la synchronisation ne l'appelait pas : naissances, morts et dons saisis hors ligne
+                // ne touchaient jamais le stock du produit de la bande. Calcul par écart : un renvoi n'ajoute rien.
+                app(SyncLotProductionStockAction::class)->execute($record->fresh(), $etatAvant);
 
                 $issues[$rang] = ['ok' => $validated['id']];
 

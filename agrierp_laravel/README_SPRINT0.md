@@ -21876,3 +21876,24 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 
 ### Non fait
 - Écarts de STRUCTURE (sections présentes d'un seul côté) : consignés en A13 du plan, à trancher.
+
+---
+
+## Ticket 15.56 — Le don existe sur toutes les fiches, et il sort du stock (17/10/2026)
+
+### Décision client
+« Le bloc Don ne doit pas être retiré ; implémenter la logique sur toutes les fiches : un don est retiré du stock » (17/10/2026). Elle annule le retrait des Dons du poste fait en F0.99.
+
+### Constat
+- Web : Pondeuses, Escargots et Reproducteurs n'avaient AUCUN bloc Dons et enregistraient `don = 0` en dur — un don saisi au poste était même effacé au prochain enregistrement web du jour.
+- Web Pondeuses : `SyncLotProductionStockAction` (naissances − morts − dons au stock du produit de la bande, 14.37) n'était pas appelé.
+- 🔴 Serveur : une fiche reçue du poste ne passait PAS par `SyncLotProductionStockAction` : naissances, morts et dons saisis hors ligne ne touchaient jamais le stock.
+
+### Corrections
+- Web, trois fiches : « Dons par catégorie » (mêmes catégories que les morts), `donEnregistre` conservé au rechargement (même règle que `mortEnregistre`), don compté dans l'effectif final et enregistré ; formules affichées « − (Morts + Ventes + Dons) » / « − (Morts + Dons) ». Pondeuses : `SyncLotProductionStockAction` par écart, comme les quatre autres fiches.
+- Serveur, `pushDailyEntries` : `SyncLotProductionStockAction` avec l'état d'avant écriture ; un renvoi identique ne bouge rien, une correction ne sort que l'écart.
+- Poste, trois fiches : bloc Dons rétabli sur les catégories du web, dons déjà enregistrés conservés (bandeau), don compté dans l'effectif et envoyé. Le stock du produit de la bande est recalculé par le serveur à la réception (le poste ne le recalcule pas localement : point de passage unique, doctrine § 5.4).
+
+### Mesures
+- `DonsToutesFichesTest` (7) : trois fiches × (effectif 60 − 3 = 57, stock 10 − 3 = 7) ; rechargement sans double retrait ; push 10 − 1 − 2 = 7, renvoi identique 7, correction 4 dons → 5. Suite Feature : 1 673 verts.
+- Poste : dons rétablis dans les tests des trois fiches, « un don saisi réduit aussitôt l'effectif final » (3), `morts_enregistres_test` étendu aux dons. Suite : 2 042 verts, 16 sautés, 0 rouge.

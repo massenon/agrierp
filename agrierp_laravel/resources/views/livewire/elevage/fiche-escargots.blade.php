@@ -118,6 +118,40 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.56 — dons par catégorie : un don réduit l'effectif et sort du stock du produit de la bande. --}}
+            <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
+                <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">redeem</span>Dons par catégorie</p>
+                @if($donEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
+                <div class="grid grid-cols-3 gap-sm">
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur (Bordé)</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donBorde', {{ max(0, $donBorde - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donBorde" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donBorde', {{ $donBorde + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Engraissement</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donEngraissement', {{ max(0, $donEngraissement - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donEngraissement" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donEngraissement', {{ $donEngraissement + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Naissain</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donNaissain', {{ max(0, $donNaissain - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donNaissain" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donNaissain', {{ $donNaissain + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-3 gap-sm">
                 <div>
                     <label class="block text-[9px] text-outline font-bold uppercase mb-xs">Naissains</label>
@@ -136,7 +170,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final du Jour</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − Morts</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − (Morts + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>

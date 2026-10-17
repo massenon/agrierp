@@ -63,6 +63,18 @@ class FicheEscargots extends Component
 
     public int $mortNaissain = 0;
 
+    public int $donBorde = 0;
+
+    public int $donEngraissement = 0;
+
+    public int $donNaissain = 0;
+
+    /**
+     * Ticket 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que `mortEnregistre`) : la répartition
+     * n'est pas stockée, seul le total l'est ; il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $donEnregistre = null;
+
     public int $effectifNaissains = 0;
 
     public int $effectifEngraissement = 0;
@@ -122,6 +134,18 @@ class FicheEscargots extends Component
         $saisis = $this->mortBorde + $this->mortEngraissement + $this->mortNaissain;
 
         return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
+    }
+
+    /**
+     * Ticket 15.56 — dons du jour : la répartition saisie, sinon le total déjà enregistré. Un don fait QUITTER le
+     * sujet de l'exploitation : il réduit l'effectif et sort du stock du produit de la bande
+     * (`SyncLotProductionStockAction`, ticket 14.37).
+     */
+    private function donDuJour(): int
+    {
+        $saisis = $this->donBorde + $this->donEngraissement + $this->donNaissain;
+
+        return $saisis > 0 ? $saisis : (int) ($this->donEnregistre ?? 0);
     }
 
     public function getLotsProperty()
@@ -261,7 +285,7 @@ class FicheEscargots extends Component
     {
         $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->naissainsNes, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->naissainsNes, $mort, $this->venteDuJour, $this->donDuJour(), $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
@@ -280,10 +304,11 @@ class FicheEscargots extends Component
     {
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
-        $this->reset(['mortBorde', 'mortEngraissement', 'mortNaissain', 'mortEnregistre']);
+        $this->reset(['mortBorde', 'mortEngraissement', 'mortNaissain', 'mortEnregistre', 'donBorde', 'donEngraissement', 'donNaissain', 'donEnregistre']);
 
         if ($entry) {
             $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
+            $this->donEnregistre = (int) ($entry->don ?? 0) > 0 ? (int) $entry->don : null;
             $this->achat = $entry->achat;
             $this->oeufsTerre = $entry->ponte_total ?? 0;
             $this->naissainsNes = $entry->ne;
@@ -333,7 +358,7 @@ class FicheEscargots extends Component
                 'ne' => $this->naissainsNes,
                 'mort' => $mort,
                 'vente' => $this->venteDuJour,
-                'don' => 0,
+                'don' => $this->donDuJour(),
                 'effectif_final' => $effectifFinal,
                 'ponte_total' => $this->oeufsTerre,
                 'effectif_m' => $this->effectifNaissains,
