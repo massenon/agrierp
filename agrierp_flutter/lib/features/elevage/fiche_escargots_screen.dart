@@ -18,7 +18,7 @@ import 'soins_repository.dart';
 ///   4. **Pondoirs** : Œufs Récoltés (Pondoirs terre) · Naissains Nés
 ///      (Éclosion jour) · Taux d'Éclosion Naissains (%) ;
 ///   5. Morts par catégorie — Bordé · Engraissement · Naissain ;
-///   6. Dons par catégorie — les mêmes trois ;
+///   6. (🔁 F0.99) pas de bloc Dons : le web n'en a pas et enregistre `don = 0` ;
 ///   7. Effectif Final du Jour + Taux de Mortalité du Jour ;
 ///   8. Rationnement ;
 ///   9. Pesée (en grammes) ;
@@ -67,7 +67,8 @@ class FicheEscargotsScreen extends StatefulWidget {
 
 class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   /// Catégories de la maquette, dans SON ordre.
-  static const _categories = ['Bordé', 'Engraissement', 'Naissain'];
+  /// 🔁 F0.99 — catégories des MORTS du web (`fiche-escargots.blade.php`), libellés et ordre exacts.
+  static const _categories = ['Reproducteur (Bordé)', 'Engraissement', 'Naissain'];
 
   List<LivestockLot> _bandes = const [];
   LivestockLot? _bande;
@@ -86,7 +87,9 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   int _naissainsNes = 0;
 
   final _morts = <String, int>{for (final c in _categories) c: 0};
-  final _dons = <String, int>{for (final c in _categories) c: 0};
+  /// 🔁 F0.99 — morts déjà enregistrés pour le jour rechargé (web 15.47 / 15.55) : la répartition n'est pas
+  /// stockée, seul le total l'est. Sans lui, ré-enregistrer le jour remettait ses morts à zéro.
+  int? _mortEnregistre;
 
   List<FeedRationStandard> _rations = const [];
 
@@ -163,16 +166,19 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       _observations.clear();
       for (final cle in _categories) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
+      _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
       _chargement = false;
     });
   }
 
   // ── Calculs ───────────────────────────────────────────────────────────────
 
-  int get _totalMorts => _morts.values.fold(0, (a, b) => a + b);
-  int get _totalDons => _dons.values.fold(0, (a, b) => a + b);
+  /// Morts du jour : la répartition saisie, sinon le total déjà enregistré (`mortDuJour` du web).
+  int get _totalMorts {
+    final saisis = _morts.values.fold(0, (a, b) => a + b);
+    return saisis > 0 ? saisis : (_mortEnregistre ?? 0);
+  }
 
   int get _effectifFinal => FicheJournaliereRepository.calculerEffectifFinal(
     effectifPrecedent: _effectifPrecedent,
@@ -180,7 +186,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
     ne: _naissainsNes,
     mort: _totalMorts,
     vente: _vente,
-    don: _totalDons,
+    // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
     transfertEntree: _transfertEntree,
     transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
@@ -234,20 +241,29 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _pondoirs(),
                     const SizedBox(height: AgriSpacing.md),
+                    if (_mortEnregistre != null) ...[
+                      Container(
+                        key: const Key('morts-enregistres'),
+                        padding: const EdgeInsets.all(AgriSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          '$_mortEnregistre mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
+                          "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+                          style: const TextStyle(fontSize: 11, color: AgriColors.brandForest),
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                    ],
                     _blocCategories(
                       titre: 'Morts par catégorie',
                       icone: Icons.dangerous_outlined,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
-                    ),
-                    const SizedBox(height: AgriSpacing.md),
-                    _blocCategories(
-                      titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
-                      couleur: AgriColors.brandEmerald,
-                      fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
-                      valeurs: _dons,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
@@ -492,7 +508,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
           },
         ),
         const ColonneMensuelle(
-          libelle: 'Entretien & Hygrométrie',
+          libelle: 'Traitements & Prophylaxie',
           largeur: 2.4,
           // ⚠️ Le relevé d'entretien vit dans une autre table : le rattacher
           // jour par jour demanderait une requête par ligne. Signalé.
@@ -899,7 +915,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
                   ),
                 ),
                 const Text(
-                  '= Effectif (J-1) + Achats/Nés − (Morts + Ventes + Dons)',
+                  '= Effectif (J-1) + Achats/Naissains − Morts',
                   style: TextStyle(fontSize: 10, color: AgriColors.outline),
                 ),
                 const SizedBox(height: 4),
@@ -1538,7 +1554,6 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       _poidsTotalPese = 0;
       for (final cle in _categories) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
     });
   }
@@ -1556,7 +1571,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       // récolte d'œufs pour des naissances.
       ne: _naissainsNes,
       mort: _totalMorts,
-      don: _totalDons,
+      // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
       ponteTotal: _oeufsTerre,
       poidsMoyen: _poidsMoyen,
     );

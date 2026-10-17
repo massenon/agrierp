@@ -103,18 +103,38 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 | Paramètres | Administrateur « M. Olouchègoun », `contact@fermeolouwachegoun.com`. Le poste pointe par défaut sur `https://agrierp.fermeolouwachegoun.com`. |
 | Seeders | Les bandes de démonstration lapins et porcs suivent la chaîne par catégorie (départ déduit, mouvements ventilés, sevrage). Recalcul indépendant : 0 anomalie, « Effectif Total Vivant » = 263 à l'écran comme en base. |
 
-### A11 🔧 Fiches Pondeuses et Escargots à plusieurs bandes
+### A11 ✅ Fiches Pondeuses et Escargots à plusieurs bandes
+
+- ✅ Livré au ticket 15.48 (sélecteur de bande web, 17/10/2026).
 
 - Le tableau mensuel réunit **toutes** les bandes, indexées par date : deux bandes saisies le même jour s'écrasent à l'écran.
 - `saveDay()` enregistre toujours sur la **première** bande.
 - **Proposition :** sélecteur de bande, comme les fiches Lapins et Porcs (ticket 15.41).
 
-### A12 ⚠️ Poste : glossaire du 17/10/2026 à porter AVANT de déployer le serveur
+### A12 ✅ Poste : glossaire du 17/10/2026 à porter AVANT de déployer le serveur
+
+- ✅ Livré aux tickets F0.96 / F0.97 (17/10/2026).
 
 - La migration `2026_10_17_000001` renomme le barème lapins (« Jeune » = 60 g, « Sous-mères » = 30 g).
 - Le poste (`categorie_ration_lapin.dart`) lit encore « Jeune » comme la catégorie à 30 g.
 - Les rations d'une bande en engraissement restent justes (repli à 60 g), mais les libellés et `cleDuStade()` doivent suivre. Cela touche plus de 25 tests du poste.
 - **À livrer avec F0.96**, en mise en service simultanée (3.F4).
+
+### A13 🔧 Fiches hors lapins : écarts de STRUCTURE restants (audit F0.99, 17/10/2026)
+
+Le glossaire (libellés, catégories, règle des rations porcines, morts conservés) est aligné au ticket F0.99. Restent des sections présentes d'un seul côté. Article 0 : le web est le maître ; chaque ligne est à retirer du poste **ou** à ajouter au web, sur décision.
+
+| Fiche | Écart | Côté web | Côté poste |
+| --- | --- | --- | --- |
+| Porcs | Effectif de départ par catégorie + bandeau des anciens effectifs | présent | absent de l'écran (le dépôt le calcule) |
+| Porcs | Saisie Verrats / Truies gestantes / Porcelets / Engraissement (QC5) | présente | absente |
+| Pondeuses | Rationnement par stade, Pesée (variante B) | absents | présents |
+| Escargots | Effectifs saisis Naissains / Engraissement / Bordés | présents | absents |
+| Reproducteurs | Rationnement par stade (barème sans ligne « reproducteur » : total 0) | absent | présent |
+| Tous | Colonnes par catégorie du tableau mensuel (`effectif_m/f/sevres/smeres`) | remplies | « — » (non synchronisées) |
+| Tous | Casse des sous-en-têtes du tableau mensuel | casse mixte | MAJUSCULES (`TableauMensuel`) |
+
+- **Web, incohérences internes signalées :** « Porc marchand » / « Porc Marchand » dans `fiche-porcs.blade.php` (invisible, CSS `uppercase`) ; `CategorieRationPorc::LIBELLES` jamais lu ; transferts « Sous-mères / Porcelet » dans la vue mais libellés par espèce dans le composant.
 
 ## Sprint 3 — Finalisation Élevage (web ↔ poste)
 

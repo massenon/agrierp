@@ -92,4 +92,43 @@ class FicheReproducteursEclosionTest extends TestCase
             ->set('poussinsNes', 0)
             ->assertSet('eclosionRateCalc', 0.0);
     }
+
+    /**
+     * 🔴 Ticket 15.55 — les morts d'un jour rechargé sont conservés. `loadDay` ne les rechargeait pas : ré-enregistrer
+     * le jour les remettait à zéro (ou y mettait ceux d'un autre jour affiché).
+     */
+    public function test_les_morts_du_jour_recharge_sont_conserves_au_reenregistrement(): void
+    {
+        $bande = LivestockLot::where('code', 'AVI-REP-01')->sole();
+        \App\Models\LivestockDailyEntry::create([
+            'lot_id' => $bande->id, 'entry_date' => now()->toDateString(),
+            'achat' => 0, 'ne' => 0, 'mort' => 4, 'vente' => 0, 'effectif_final' => 56,
+        ]);
+
+        Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
+            ->call('loadDay', now()->toDateString())
+            ->assertSet('mortEnregistre', 4)
+            ->assertSee('4 mort(s) déjà enregistré(s) ce jour')
+            ->call('saveDay');
+
+        $fiche = \App\Models\LivestockDailyEntry::where('lot_id', $bande->id)->sole();
+        // Recalcul indépendant : 60 − 4.
+        $this->assertSame([4, 56], [(int) $fiche->mort, (int) $fiche->effectif_final]);
+    }
+
+    public function test_une_repartition_saisie_remplace_le_total_enregistre(): void
+    {
+        $bande = LivestockLot::where('code', 'AVI-REP-01')->sole();
+        \App\Models\LivestockDailyEntry::create([
+            'lot_id' => $bande->id, 'entry_date' => now()->toDateString(),
+            'achat' => 0, 'ne' => 0, 'mort' => 4, 'vente' => 0, 'effectif_final' => 56,
+        ]);
+
+        Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
+            ->call('loadDay', now()->toDateString())
+            ->set('mortRepro', 1)->set('mortPoussin', 1)
+            ->call('saveDay');
+
+        $this->assertSame(2, (int) \App\Models\LivestockDailyEntry::where('lot_id', $bande->id)->sole()->mort);
+    }
 }

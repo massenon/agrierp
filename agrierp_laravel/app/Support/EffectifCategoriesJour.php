@@ -5,8 +5,8 @@ namespace App\Support;
 /**
  * Ticket 15.39 — résultat PUR du calcul d'effectif par catégorie pour UNE journée.
  *
- * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Jeune (lapins) /
- * Porcelet (porcs) ; `jeune` = Lapin de Chair (lapins) / Marchand (porcs).
+ * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Sous-mères (lapins) /
+ * Porcelet (porcs) ; `jeune` = Jeune (lapins) / Marchand (porcs) — glossaire du 17/10/2026.
  *
  * ⚠️ `null` = INCONNU (une entrée du calcul n'est pas ventilée), jamais 0 : il s'affiche « — ».
  *

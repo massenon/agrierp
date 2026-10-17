@@ -229,7 +229,6 @@ void main() {
         "WORKFLOW RÉCOLTE & STOCK D'ŒUFS (COMBINE LES FICHES OFFICIELLES DE LA FERME)",
       ),
       y(tester, 'MORTS PAR CATÉGORIE'),
-      y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
@@ -248,28 +247,22 @@ void main() {
       positions,
       equals(trie),
       reason:
-          'ordre maquette : Œufs, Morts, Dons, Effectif, Rationnement, '
+          'ordre : Œufs, Morts, Effectif, Rationnement, '
           'Pesée, Prophylaxie, Attribution',
     );
   });
 
-  testWidgets('les quatre stades de la maquette sont ceux des compteurs', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-pondeuses.blade.php`), et aucun bloc Dons (le web n'en a pas).
+  testWidgets('les trois catégories de morts sont celles du web, sans bloc Dons', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final stade in [
-      'POUSSIN PONTE',
-      'POUSSIN CROISS.',
-      'POULETTE',
-      'PONDEUSE',
-    ]) {
-      expect(
-        find.text(stade),
-        findsNWidgets(2),
-        reason: '$stade apparaît en Morts ET en Dons',
-      );
+    for (final stade in ['PONDEUSE / REPRO', 'POULETTE', 'POUSSIN']) {
+      expect(find.text(stade), findsOneWidget, reason: stade);
     }
+    expect(find.text('DONS PAR CATÉGORIE'), findsNothing);
+    expect(find.text('POUSSIN PONTE'), findsNothing);
   });
 
   testWidgets('le bloc œufs recalcule à la saisie', (tester) async {
@@ -302,8 +295,8 @@ void main() {
         .widget<Text>(find.byKey(const Key('effectif-final')))
         .data;
 
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Pondeuse-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Pondeuse-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-Pondeuse / Repro-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-Pondeuse / Repro-1')));
     await tester.pumpAndSettle();
 
     final apres = tester

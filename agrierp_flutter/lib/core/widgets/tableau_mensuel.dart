@@ -49,16 +49,19 @@ class TableauMensuel extends StatelessWidget {
     required this.dateDe,
     required this.onOuvrirJour,
     this.jourActif,
+    this.libelleDate = 'Date',
   });
+
+  /// En-tête de la colonne de date (« Date / Jour » sur la fiche Pondeuses du web, F0.99).
+  final String libelleDate;
 
   /// Colonnes regroupées sous un en-tête commun.
   final List<GroupeColonnes> groupes;
 
   /// Colonnes sans groupe placées AVANT les groupes, juste après la date.
   ///
-  /// ⚠️ La fiche Reproducteurs place « Lot / Souche » à cet endroit précis, et
-  /// la maquette est la référence de mise en page : la repousser après les
-  /// groupes serait un repositionnement.
+  /// Aucune fiche ne s'en sert depuis F0.99 (« Lot / Souche » n'existe pas au web) ; gardé pour la
+  /// mise en page de la maquette.
   final List<ColonneMensuelle> colonnesAvant;
 
   /// Colonnes sans groupe, placées après les groupes.
@@ -183,7 +186,7 @@ class TableauMensuel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SizedBox(width: _largeurDate, child: _cellule('Date', entete: true)),
+          SizedBox(width: _largeurDate, child: _cellule(libelleDate, entete: true)),
           for (final c in _toutes)
             SizedBox(
               width: c.largeur * _uniteLargeur,

@@ -112,9 +112,11 @@ void main() {
       'TAUX PONTE %',
       'CASSÉS (OF)',
       'COMM. (OR-OF)',
-      'STOCK HIER (SRH)',
-      'TOTAL STOCK (TS)',
-      'SORTIE VENTE (OS)',
+      // 🔁 F0.99 — sigles du web (`fiche-pondeuses.blade.php`).
+      'DATE / JOUR',
+      'SRH',
+      'TS',
+      'OS',
       'STOCK FINAL',
       'TRAITEMENTS & RAPPELS',
     ]) {

@@ -73,7 +73,7 @@ abstract final class CategorieRationLapin {
   /// serveur est la RÉFÉRENCE (figée par le test 15.37) : c'est le poste qui
   /// s'aligne.
   static String? cle(String? libelle) {
-    final l = _plier(_trimPhp(libelle ?? ''));
+    final l = normaliser(libelle);
 
     if (l.isEmpty) return null;
 
@@ -97,6 +97,10 @@ abstract final class CategorieRationLapin {
   /// Catégorie qui porte l'effectif d'une bande, d'après son STADE technique
   /// (`livestock_lots.stage` : reproduction, croissance, ponte, engraissement).
   ///
+  /// `Str::lower(Str::ascii(trim($libelle)))` du serveur — partagé avec `CategorieRationPorc` (F0.99) :
+  /// une seule transposition de la normalisation PHP, jamais deux.
+  static String normaliser(String? libelle) => _plier(_trimPhp(libelle ?? ''));
+
   /// 🔁 TICKET F0.96 — RÈGLE DU SERVEUR (`STADE_VERS_CATEGORIE`, rationnement automatique du
   /// 17/10/2026) : reproduction → Reproducteur, croissance → Sous-mères, engraissement → Jeune.
   /// L'ancienne règle du poste (seul `engraissement` rattaché) laissait sans ration les bandes en

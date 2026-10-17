@@ -21853,3 +21853,26 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 
 ### Mesures
 - `ViderSessionsTest` (5) : session en cours conservée, comptable refusé, commande, jeton révoqué → 401 au tirage, réinitialisation.
+
+---
+
+## Tickets F0.99 / 15.55 — Glossaire des fiches hors lapins aligné sur le web ; morts conservés au rechargement (17/10/2026)
+
+### Constat (audit web ↔ poste des fiches Porcs, Pondeuses, Escargots, Reproducteurs)
+- 🔴 **Porcs (poste)** : aucune transposition de `CategorieRationPorc`. Le barème se rattachait au STADE par sous-chaîne et tout l'effectif final allait sur une seule ligne : une bande en `croissance` (Porcelet au serveur) nourrissait « Jeune porc », « Engraissement » n'était pas reconnu, aucune ration de secours, total toujours chiffré. Titre « PAR ESPÈCES », colonne « Espèce ».
+- 🔴 **Pondeuses, Escargots, Reproducteurs (poste)** : les morts repartaient à 0 au chargement ; ré-enregistrer le jour EFFAÇAIT ses morts (le défaut que le web a corrigé en 15.47). Catégories et ordre différents du web (Pondeuses : 4 stades au lieu de 3), bloc « Dons » alors que le web n'en a pas et enregistre `don = 0`.
+- 🔴 **Reproducteurs (web)** : `loadDay` ne rechargeait aucun mort (ceux d'un autre jour affiché restaient dans les compteurs) : ré-enregistrer le jour les perdait. Ticket 15.55.
+- **Lapins (poste, F0.96)** : l'aperçu par catégorie ignorait les transferts du jour, que le web compte.
+- Libellés de refus du serveur encore à l'ancien glossaire (« morts jeunes ou porcelets »).
+
+### Corrections
+- Poste : `categorie_ration_porc.dart` (clé, libellés, ordre, secours 2 000 / 300 / 600) ; normalisation PHP partagée avec les lapins (`CategorieRationLapin.normaliser`). Fiche Porcs : effectifs PAR CATÉGORIE (`calculerJour`, transferts compris), trois lignes fixes Porcelet / Porc Marchand / Reproducteur, « — » si inconnu, titre « PAR STADE PORCIN », colonne « Stade Physiologique », « 2 000 g/j (2.0 Kg) » sur la seule ligne Reproducteur, total en Kg à la manière de PHP ; morts « Reproducteur (Truie/Verrat) » / « Porc marchand / Engraiss. » ; colonne mensuelle « Traitements & Prophylaxie ».
+- Poste, Pondeuses / Escargots / Reproducteurs : catégories du web (« Pondeuse / Repro, Poulette, Poussin » ; « Reproducteur (Bordé), Engraissement, Naissain » ; « Repro, Poulet, Poussin »), total des morts conservé tant qu'aucune répartition n'est ressaisie (bandeau du web), plus de bloc Dons (`don = 0` comme le web), formules affichées du web, en-têtes mensuels du web (« Date / Jour », SRH / TS / OS ; « Traitements & Prophylaxie » ; Reproducteurs : « Morts (total) », sans « Lot / Souche » ni « Traitements »).
+- Web : `FicheReproducteurs` reçoit `mortEnregistre` (miroir de 15.47) et son bandeau ; libellés de refus et docblocks au glossaire du 17/10.
+
+### Mesures
+- Poste : `categorie_ration_porc_test.dart` (20, dont la parité EXÉCUTÉE sur la règle PHP du serveur), 7 tests de rationnement porcin (650 g du barème distingué du secours 600 g), `morts_enregistres_test.dart` (3, mutation vérifiée), tests des quatre fiches et tableaux mensuels réécrits sur les libellés du web. Suite : 2 039 verts, 16 sautés (maquette absente), 0 rouge.
+- Web : +2 tests `FicheReproducteursEclosionTest` (mutation vérifiée). Suite Feature : 1 666 verts.
+
+### Non fait
+- Écarts de STRUCTURE (sections présentes d'un seul côté) : consignés en A13 du plan, à trancher.

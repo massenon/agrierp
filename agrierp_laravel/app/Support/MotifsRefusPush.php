@@ -87,15 +87,15 @@ class MotifsRefusPush
             'achat' => 'achats', 'ne' => 'naissances', 'mort' => 'mortalité', 'vente' => 'ventes', 'don' => 'dons',
             'ponte_total' => 'ponte totale', 'ponte_casses' => 'œufs cassés', 'feed_qty_kg' => 'aliment (kg)',
             'weight_sample_avg_g' => 'poids moyen (g)', 'motif' => 'motif',
-            // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12) : la 2e catégorie est
-            // Jeune (lapins) ou Porcelet (porcs), la 3e Lapin de Chair ou Porc Marchand.
-            'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts jeunes ou porcelets',
-            'mort_jeune' => 'morts lapins de chair ou porcs marchands',
-            'don_repro' => 'dons reproducteurs', 'don_sevre' => 'dons jeunes ou porcelets',
-            'don_jeune' => 'dons lapins de chair ou porcs marchands',
+            // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12), glossaire du 17/10/2026
+            // (F0.99) : la 2e catégorie est Sous-mères (lapins) ou Porcelet (porcs), la 3e Jeune ou Porc Marchand.
+            'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts sous-mères ou porcelets',
+            'mort_jeune' => 'morts jeunes lapins ou porcs marchands',
+            'don_repro' => 'dons reproducteurs', 'don_sevre' => 'dons sous-mères ou porcelets',
+            'don_jeune' => 'dons jeunes lapins ou porcs marchands',
             'passage_sevre_jeune' => 'passage de stade',
-            'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ jeunes ou porcelets',
-            'cat_depart_jeune' => 'effectif de départ lapins de chair ou porcs marchands',
+            'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ sous-mères ou porcelets',
+            'cat_depart_jeune' => 'effectif de départ jeunes lapins ou porcs marchands',
         ];
     }
 

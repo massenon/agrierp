@@ -78,6 +78,9 @@
 
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
+                @if($mortEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
                         <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Repro</label>

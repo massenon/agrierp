@@ -97,7 +97,6 @@ void main() {
       y(tester, 'ACHATS DU JOUR'),
       y(tester, 'ŒUFS RÉCOLTÉS (PONDOIRS TERRE)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
-      y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
       y(
@@ -114,23 +113,21 @@ void main() {
       positions,
       equals([...positions]..sort()),
       reason:
-          'ordre maquette : Entrées, Pondoirs, Morts, Dons, Effectif, '
+          'ordre : Entrées, Pondoirs, Morts, Effectif, '
           'Pesée, Soins, Attribution',
     );
   });
 
-  testWidgets('les trois catégories de la maquette sont celles des compteurs', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-escargots.blade.php`), et aucun bloc Dons (le web n'en a pas).
+  testWidgets('les trois catégories de morts sont celles du web, sans bloc Dons', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['BORDÉ', 'ENGRAISSEMENT', 'NAISSAIN']) {
-      expect(
-        find.text(categorie),
-        findsNWidgets(2),
-        reason: '$categorie apparaît en Morts ET en Dons',
-      );
+    for (final categorie in ['REPRODUCTEUR (BORDÉ)', 'ENGRAISSEMENT', 'NAISSAIN']) {
+      expect(find.text(categorie), findsOneWidget, reason: categorie);
     }
+    expect(find.text('DONS PAR CATÉGORIE'), findsNothing);
   });
 
   // ── Le barème manquant ─────────────────────────────────────────────────

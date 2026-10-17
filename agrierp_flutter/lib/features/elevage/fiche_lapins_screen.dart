@@ -107,6 +107,10 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
   /// F0.96 — catégories au début du jour (chaîne ou départ déduit du stade) ; null = inconnues.
   EffectifCategories? _veilleCategories;
 
+  /// F0.99 — fiche chargée du jour : ses transferts PAR CATÉGORIE entrent dans le calcul, comme au web
+  /// (`calculerJour` du serveur). Ils manquaient à F0.96 : la provende ignorait les transferts du jour.
+  LivestockDailyEntry? _ficheDuJour;
+
   /// Totaux d'une fiche ANCIENNE non ventilée rechargée : la catégorie ne se devine pas (web 15.41).
   int? _mortAncien;
   int? _donAncien;
@@ -207,6 +211,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     setState(() {
       _effectifPrecedent = precedent;
       _veilleCategories = veilleCategories;
+      _ficheDuJour = fiche;
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
@@ -1029,6 +1034,12 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
               donSevre: _dons[_sousMeres],
               donJeune: _dons[_jeune],
               passage: _sevrage.values.single,
+              transfertEntreeRepro: _ficheDuJour?.transfertEntreeRepro ?? 0,
+              transfertEntreeSevre: _ficheDuJour?.transfertEntreeSevre ?? 0,
+              transfertEntreeJeune: _ficheDuJour?.transfertEntreeJeune ?? 0,
+              transfertSortieRepro: _ficheDuJour?.transfertSortieRepro ?? 0,
+              transfertSortieSevre: _ficheDuJour?.transfertSortieSevre ?? 0,
+              transfertSortieJeune: _ficheDuJour?.transfertSortieJeune ?? 0,
             ),
           );
     int? effectifDe(String cle) => switch (cle) {

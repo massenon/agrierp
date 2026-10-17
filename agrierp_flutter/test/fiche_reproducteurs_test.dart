@@ -110,7 +110,6 @@ void main() {
       y(tester, 'BANDE / LOT CONCERNÉ'),
       y(tester, 'ŒUFS COUVÉS (MIS EN INCUBATION)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
-      y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
@@ -125,23 +124,21 @@ void main() {
       positions,
       equals([...positions]..sort()),
       reason:
-          'ordre maquette : Bande, Couvoir, Morts, Dons, Effectif, '
+          'ordre : Bande, Couvoir, Morts, Effectif, '
           'Rationnement, Pesée, Vaccins, Attribution',
     );
   });
 
-  testWidgets('les trois catégories de la maquette sont celles des compteurs', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-reproducteurs.blade.php`), et aucun bloc Dons (le web n'en a pas).
+  testWidgets('les trois catégories de morts sont celles du web, sans bloc Dons', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['REPRODUCTEUR', 'POULET', 'POUSSIN']) {
-      expect(
-        find.text(categorie),
-        findsNWidgets(2),
-        reason: '$categorie apparaît en Morts ET en Dons',
-      );
+    for (final categorie in ['REPRO', 'POULET', 'POUSSIN']) {
+      expect(find.text(categorie), findsOneWidget, reason: categorie);
     }
+    expect(find.text('DONS PAR CATÉGORIE'), findsNothing);
   });
 
   // ── Le taux d'éclosion ─────────────────────────────────────────────────
@@ -246,9 +243,9 @@ void main() {
         .data;
 
     await tester.ensureVisible(
-      find.byKey(const Key('pas-mort-Reproducteur-1')),
+      find.byKey(const Key('pas-mort-Repro-1')),
     );
-    await tester.tap(find.byKey(const Key('pas-mort-Reproducteur-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-Repro-1')));
     await tester.pumpAndSettle();
 
     final apres = tester

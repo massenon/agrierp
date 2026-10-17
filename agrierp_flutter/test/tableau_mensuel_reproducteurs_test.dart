@@ -90,9 +90,8 @@ void main() {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
-    // ⚠️ PORTÉE LIMITÉE AU TABLEAU : « Morts par Catégorie » titre aussi une
-    // section du formulaire, plus haut dans la fiche.
-    for (final g in ['COUVOIR', 'MORTS PAR CATÉGORIE']) {
+    // 🔁 F0.99 — groupes du WEB (`fiche-reproducteurs.blade.php`) : Couvoir, Morts (total).
+    for (final g in ['COUVOIR', 'MORTS (TOTAL)']) {
       expect(
         find.descendant(of: tableau, matching: find.text(g)),
         findsOneWidget,
@@ -107,16 +106,12 @@ void main() {
 
     for (final c in [
       'DATE',
-      'LOT / SOUCHE',
       'COUVÉS',
       'NÉS',
-      'REPRO',
-      'POULET',
-      'POUSSIN',
+      'REPRO+POULET+POUSSIN',
       'EFFECTIF FINAL',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (G)',
-      'TRAITEMENTS & PROPHYLAXIE',
     ]) {
       expect(
         find.descendant(of: tableau, matching: find.text(c)),
@@ -135,15 +130,14 @@ void main() {
     expect(find.text('96'), findsWidgets);
   });
 
-  testWidgets('⚠️ le lot est rappelé sur chaque ligne', (tester) async {
+  // 🔁 F0.99 — ni « Lot / Souche » ni « Traitements & Prophylaxie » : le web n'a pas ces colonnes.
+  testWidgets('les colonnes absentes du web ne sont pas affichées', (tester) async {
     await journee(3, couves: 120);
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('AVI-REP-01')),
-      findsOneWidget,
-    );
+    for (final c in ['LOT / SOUCHE', 'TRAITEMENTS & PROPHYLAXIE']) {
+      expect(find.descendant(of: tableau, matching: find.text(c)), findsNothing, reason: c);
+    }
   });
 
   /// ⚠️ 200 g de moyenne × 200 sujets = 40 000 g pesés, pas 200.
@@ -154,22 +148,20 @@ void main() {
     expect(find.text('40000'), findsOneWidget);
   });
 
-  testWidgets('⚠️⚠️ les trois catégories de morts affichent un tiret', (
+  // 🔁 F0.99 — le web affiche le TOTAL des morts (seule valeur stockée), plus des tirets par catégorie.
+  testWidgets('⚠️⚠️ la colonne des morts porte le total enregistré', (
     tester,
   ) async {
     await journee(3, couves: 120, mort: 4, effectif: 200, moyenneG: 200);
     await afficher(tester);
 
-    // Repro, Poulet, Poussin + Traitements & Prophylaxie.
     final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('—')),
-      findsNWidgets(4),
-    );
+    expect(find.descendant(of: ligne, matching: find.text('4')), findsOneWidget);
+    expect(find.descendant(of: ligne, matching: find.text('—')), findsNothing);
   });
 
   /// 200 fin + 4 morts = 204 au départ → 4/204 = 2,0 %.
-  testWidgets('le taux de mortalité reste lisible malgré les tirets', (
+  testWidgets('le taux de mortalité est lisible', (
     tester,
   ) async {
     await journee(3, mort: 4, effectif: 200);

@@ -20,7 +20,7 @@ import 'soins_repository.dart';
 ///      Ventes (POS)) ;
 ///   4. **Workflow Récolte & Stock d'Œufs** ;
 ///   5. Morts par catégorie — 4 stades ;
-///   6. Dons par catégorie — les mêmes 4 ;
+///   6. (🔁 F0.99) pas de bloc Dons : le web n'en a pas et enregistre `don = 0` ;
 ///   7. Effectif Final du Jour + Taux de Mortalité du Jour ;
 ///   8. Rationnement & Provende Servie par Stade ;
 ///   9. Pesée ;
@@ -58,12 +58,8 @@ class FichePondeusesScreen extends StatefulWidget {
 class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// Stades de la maquette, dans SON ordre — Morts, Dons et Rationnement
   /// partagent les mêmes quatre.
-  static const _stades = [
-    'Poussin Ponte',
-    'Poussin Croiss.',
-    'Poulette',
-    'Pondeuse',
-  ];
+  /// 🔁 F0.99 — catégories des MORTS du web (`fiche-pondeuses.blade.php`), libellés et ordre exacts.
+  static const _stades = ['Pondeuse / Repro', 'Poulette', 'Poussin'];
 
   List<LivestockLot> _bandes = const [];
   LivestockLot? _bande;
@@ -83,7 +79,9 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   int _oeufsCasses = 0;
 
   final _morts = <String, int>{for (final s in _stades) s: 0};
-  final _dons = <String, int>{for (final s in _stades) s: 0};
+  /// 🔁 F0.99 — morts déjà enregistrés pour le jour rechargé (web 15.47 / 15.55) : la répartition n'est pas
+  /// stockée, seul le total l'est. Sans lui, ré-enregistrer le jour remettait ses morts à zéro.
+  int? _mortEnregistre;
 
   List<FeedRationStandard> _rations = const [];
   double _poidsTotalPese = 0;
@@ -177,16 +175,19 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       // zéro plutôt que d'afficher une répartition inventée.
       for (final cle in _stades) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
+      _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
       _chargement = false;
     });
   }
 
   // ── Calculs, repris de la maquette ────────────────────────────────────────
 
-  int get _totalMorts => _morts.values.fold(0, (a, b) => a + b);
-  int get _totalDons => _dons.values.fold(0, (a, b) => a + b);
+  /// Morts du jour : la répartition saisie, sinon le total déjà enregistré (`mortDuJour` du web).
+  int get _totalMorts {
+    final saisis = _morts.values.fold(0, (a, b) => a + b);
+    return saisis > 0 ? saisis : (_mortEnregistre ?? 0);
+  }
 
   int get _effectifFinal => FicheJournaliereRepository.calculerEffectifFinal(
     effectifPrecedent: _effectifPrecedent,
@@ -194,7 +195,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     ne: _ne,
     mort: _totalMorts,
     vente: _vente,
-    don: _totalDons,
+    // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
     transfertEntree: _transfertEntree,
     transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
@@ -274,20 +276,29 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _workflowOeufs(),
                     const SizedBox(height: AgriSpacing.md),
+                    if (_mortEnregistre != null) ...[
+                      Container(
+                        key: const Key('morts-enregistres'),
+                        padding: const EdgeInsets.all(AgriSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          '$_mortEnregistre mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
+                          "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+                          style: const TextStyle(fontSize: 11, color: AgriColors.brandForest),
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                    ],
                     _blocCategories(
                       titre: 'Morts par catégorie',
                       icone: Icons.dangerous_outlined,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
-                    ),
-                    const SizedBox(height: AgriSpacing.md),
-                    _blocCategories(
-                      titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
-                      couleur: AgriColors.brandEmerald,
-                      fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
-                      valeurs: _dons,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
@@ -455,6 +466,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         f.effectifFinal + f.mort + f.vente - f.achat - f.ne;
 
     return TableauMensuel(
+      libelleDate: 'Date / Jour',
       nombreDeJours: _fichesDuMois.length,
       jourActif: _indexDuJourCourant(),
       dateDe: (i) {
@@ -536,17 +548,17 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
           libelle: 'Stock Œufs & Plateaux (30)',
           colonnes: [
             ColonneMensuelle(
-              libelle: 'Stock Hier (SRH)',
+              libelle: 'SRH',
               largeur: 1.5,
               valeur: _sansGrandLivre,
             ),
             ColonneMensuelle(
-              libelle: 'Total Stock (TS)',
+              libelle: 'TS',
               largeur: 1.5,
               valeur: _sansGrandLivre,
             ),
             ColonneMensuelle(
-              libelle: 'Sortie Vente (OS)',
+              libelle: 'OS',
               largeur: 1.5,
               valeur: _sansGrandLivre,
             ),
@@ -1049,7 +1061,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                   ),
                 ),
                 const Text(
-                  '= Effectif (J-1) + Achats/Nés − (Morts + Ventes + Dons)',
+                  '= Effectif (J-1) + Achats/Nés − (Morts + Ventes)',
                   style: TextStyle(fontSize: 10, color: AgriColors.outline),
                 ),
                 const SizedBox(height: 4),
@@ -1710,7 +1722,6 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       _poidsTotalPese = 0;
       for (final cle in _stades) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
     });
   }
@@ -1735,7 +1746,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       achat: _achat,
       ne: _ne,
       mort: _totalMorts,
-      don: _totalDons,
+      // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
       ponteTotal: _oeufsRecoltes,
       ponteCasses: _oeufsCasses,
       poidsMoyen: _poidsMoyen,

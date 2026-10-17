@@ -4,6 +4,8 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
+import 'categorie_ration_porc.dart';
+import 'effectif_par_categorie.dart';
 import 'fiche_journaliere_repository.dart';
 import 'soins_repository.dart';
 
@@ -48,6 +50,12 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   /// Catégories de la maquette, dans SON ordre — Morts et Dons les partagent.
   static const _categories = ['Reproducteur', 'Porc Marchand', 'Porcelet'];
 
+  /// F0.99 — libellés du bloc « Morts » du web (`fiche-porcs.blade.php`), différents de ceux des dons.
+  static const _libellesMorts = {
+    'Reproducteur': 'Reproducteur (Truie/Verrat)',
+    'Porc Marchand': 'Porc marchand / Engraiss.',
+  };
+
   List<LivestockLot> _bandes = const [];
   LivestockLot? _bande;
   DateTime _jour = DateTime.now();
@@ -61,6 +69,12 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   int _transfertEntree = 0;
   int _transfertSortie = 0;
   int _effectifPrecedent = 0;
+
+  /// F0.99 — veille par catégorie (chaîne, ou départ déduit du stade) ; `null` = inconnue (« — »).
+  EffectifCategories? _veilleCategories;
+
+  /// F0.99 — fiche chargée du jour : ses transferts PAR CATÉGORIE entrent dans le calcul, comme au web.
+  LivestockDailyEntry? _ficheDuJour;
 
   final _morts = <String, int>{for (final c in _categories) c: 0};
   final _dons = <String, int>{for (final c in _categories) c: 0};
@@ -125,6 +139,10 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
     setState(() => _chargement = true);
 
     final precedent = await widget.depot.effectifPrecedent(bande.id, _jour);
+    final veilleCategories = await widget.depot.veilleParCategorie(
+      bande.id,
+      _jour,
+    );
     final fiche = await widget.depot.chargerJour(bande.id, _jour);
     final protocole = await widget.soins.protocoleDuJour(
       bande: bande,
@@ -138,6 +156,8 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
 
     setState(() {
       _effectifPrecedent = precedent;
+      _veilleCategories = veilleCategories;
+      _ficheDuJour = fiche;
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
@@ -222,33 +242,59 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
     return moyenneG == null ? null : moyenneG / 1000;
   }
 
-  /// Effectif porté par une ligne du référentiel — même écart que les autres
-  /// fiches : la ventilation par catégorie n'est pas synchronisée.
-  int _effectifDeLaLigne(String libelle) {
-    return _correspondAuStade(libelle) ? _effectifFinal : 0;
+  /// 🔁 F0.99 — effectifs PAR CATÉGORIE du jour, calculés comme le web (`categoriesJour`, 15.42) : veille de
+  /// la chaîne (ou départ déduit du stade) + mouvements saisis + transferts du jour. `null` = inconnus.
+  EffectifCategoriesJour? get _categoriesDuJour {
+    final veille = _veilleCategories;
+    if (veille == null) return null;
+    final f = _ficheDuJour;
+    return EffectifParCategorie.calculerJour(
+      EffectifParCategorie.porcs,
+      veille,
+      MouvementsJour(
+        achat: _achat,
+        ne: _ne,
+        vente: _vente,
+        mortRepro: _morts['Reproducteur'],
+        mortSevre: _morts['Porcelet'],
+        mortJeune: _morts['Porc Marchand'],
+        donRepro: _dons['Reproducteur'],
+        donSevre: _dons['Porcelet'],
+        donJeune: _dons['Porc Marchand'],
+        passage: _passage.values.single,
+        transfertEntreeRepro: f?.transfertEntreeRepro ?? 0,
+        transfertEntreeSevre: f?.transfertEntreeSevre ?? 0,
+        transfertEntreeJeune: f?.transfertEntreeJeune ?? 0,
+        transfertSortieRepro: f?.transfertSortieRepro ?? 0,
+        transfertSortieSevre: f?.transfertSortieSevre ?? 0,
+        transfertSortieJeune: f?.transfertSortieJeune ?? 0,
+      ),
+    );
   }
 
-  bool _correspondAuStade(String libelle) {
-    final stade = (_bande?.stage ?? '').toLowerCase();
-    final l = libelle.toLowerCase();
+  /// Effectif d'une catégorie du rationnement (`sevre` = Porcelet, `jeune` = Porc Marchand).
+  int? _effectifDeCategorie(EffectifCategoriesJour? jour, String cle) =>
+      switch (cle) {
+        CategorieRationPorc.reproducteur => jour?.repro,
+        CategorieRationPorc.porcelet => jour?.sevre,
+        _ => jour?.jeune,
+      };
 
-    if (stade.contains('reproduction')) return l.contains('reproducteur');
-    if (stade.contains('porcelet') || stade.contains('sevrage')) {
-      return l.contains('porcelet');
+  /// `number_format($n, 0, ',', ' ')` de PHP (séparateur de milliers : espace).
+  static String _milliers(num n) {
+    final t = n.round().abs().toString();
+    final sb = StringBuffer();
+    for (var i = 0; i < t.length; i++) {
+      if (i > 0 && (t.length - i) % 3 == 0) sb.write(' ');
+      sb.write(t[i]);
     }
-    // Engraissement et stades voisins alimentent le jeune porc / porc marchand.
-    return l.contains('jeune') || l.contains('marchand');
+    return '${n.round() < 0 ? '-' : ''}$sb';
   }
 
-  double get _totalProvendeG {
-    var total = 0.0;
-    for (final ration in _rations) {
-      total += FicheJournaliereRepository.provendeGrammes(
-        effectif: _effectifDeLaLigne(ration.stageLabel),
-        rationGParJour: ration.rationGPerDay,
-      );
-    }
-    return total;
+  /// `round($g / 1000, 2)` affiché par PHP : 2 décimales au plus, sans zéro final (« 2.8 », « 3 »).
+  static String _kgCommePhp(double g) {
+    final t = (g / 1000).toStringAsFixed(2);
+    return t.replaceFirst(RegExp(r'\.?0+$'), '');
   }
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
@@ -458,7 +504,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   /// Colonnes de la maquette : Date · **Entrées** (Achat, Né) · **Sorties**
   /// (Mort, Vente, Don) · **Effectif Final du Jour** (Truies Gest., Verrats,
   /// Porcelets, Engraiss., Total) · Taux Mort % · **Poids Général (Kg)** ·
-  /// Suivi Clinique & Prophylaxie.
+  /// Traitements & Prophylaxie.
   ///
   /// ⚠️⚠️ **LA PESÉE EST EN KILOS, seule fiche à cette échelle.** La colonne
   /// annonce le TOTAL pesé ; la base stocke la MOYENNE par sujet en grammes.
@@ -567,7 +613,8 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
           },
         ),
         const ColonneMensuelle(
-          libelle: 'Suivi Clinique & Prophylaxie',
+          // F0.99 — en-tête du web (`fiche-porcs.blade.php`).
+          libelle: 'Traitements & Prophylaxie',
           largeur: 2.4,
           // ⚠️ Registre vétérinaire : autre table, une requête par ligne
           // serait nécessaire. Signalé plutôt qu'approximé.
@@ -837,7 +884,10 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
     return Column(
       children: [
         Text(
-          categorie.toUpperCase(),
+          (identical(valeurs, _morts)
+                  ? (_libellesMorts[categorie] ?? categorie)
+                  : categorie)
+              .toUpperCase(),
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 9,
@@ -987,19 +1037,43 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   /// « Rationnement & Provende Servie par Espèces (en Grammes g/j) ».
   ///
   /// ⚠️ LES GRAMMAGES ET LES LIBELLÉS VIENNENT DU RÉFÉRENTIEL SYNCHRONISÉ.
+  /// 🔁 F0.99 — le tableau du web (`fiche-porcs.blade.php`) : trois lignes fixes Porcelet / Porc Marchand /
+  /// Reproducteur, effectifs CALCULÉS par catégorie, ration du barème par clé stable (secours sinon). Une
+  /// catégorie inconnue donne « — » et un total « — » : jamais une provende partielle présentée comme complète.
   Widget _rationnement() {
-    if (_rations.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(AgriSpacing.md),
-        decoration: BoxDecoration(
-          color: AgriColors.surfaceZebra,
-          border: Border.all(color: AgriColors.outlineVariant),
-          borderRadius: BorderRadius.circular(AgriRadius.lg),
-        ),
-        child: const Text(
-          'Aucune ration normative reçue pour la porciculture — synchronisez '
-          'le poste avant de servir la provende.',
-          style: TextStyle(fontSize: 11, color: AgriColors.outline),
+    final jour = _categoriesDuJour;
+    double? total = 0;
+    final lignes = <TableRow>[];
+
+    for (final cle in CategorieRationPorc.ordre) {
+      final ration = CategorieRationPorc.ration(_rations, cle);
+      final effectif = _effectifDeCategorie(jour, cle);
+      final grammes = effectif == null ? null : effectif * ration;
+      total = (grammes == null || total == null) ? null : total + grammes;
+
+      lignes.add(
+        TableRow(
+          decoration: cle == CategorieRationPorc.marchand
+              ? const BoxDecoration(color: AgriColors.surfaceZebra)
+              : null,
+          children: [
+            _Cellule(CategorieRationPorc.libelles[cle]!, cle: 'ration-libelle-$cle', gras: true),
+            _Cellule(effectif == null ? '—' : '$effectif', cle: 'ration-effectif-$cle', centre: true),
+            // Le web double l'unité sur la seule ligne Reproducteur : « 2 000 g/j (2.0 Kg) ».
+            _Cellule(
+              cle == CategorieRationPorc.reproducteur
+                  ? '${_milliers(ration)} g/j (${(ration / 1000).toStringAsFixed(1)} Kg)'
+                  : '${ration.round()} g/j',
+              cle: 'ration-g-$cle',
+              centre: true,
+            ),
+            _Cellule(
+              grammes == null ? '—' : '${grammes.round()} g',
+              cle: 'ration-grammes-$cle',
+              droite: true,
+              gras: true,
+            ),
+          ],
         ),
       );
     }
@@ -1020,7 +1094,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
-                  'RATIONNEMENT & PROVENDE SERVIE PAR ESPÈCES (EN GRAMMES G/J)',
+                  'RATIONNEMENT & PROVENDE SERVIE PAR STADE PORCIN (EN GRAMMES G/J)',
                   style: TextStyle(
                     fontSize: AgriTypography.xs,
                     fontWeight: FontWeight.bold,
@@ -1043,36 +1117,13 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               const TableRow(
                 decoration: BoxDecoration(color: AgriColors.surfaceZebra),
                 children: [
-                  _CelluleEntete('Espèce'),
+                  _CelluleEntete('Stade Physiologique'),
                   _CelluleEntete('Effectif'),
                   _CelluleEntete('Ration Normative'),
                   _CelluleEntete('Provende Servie (g)'),
                 ],
               ),
-              for (final ration in _rations)
-                TableRow(
-                  children: [
-                    _Cellule(ration.stageLabel),
-                    _Cellule(
-                      '${_effectifDeLaLigne(ration.stageLabel)}',
-                      centre: true,
-                    ),
-                    // ⚠️ La maquette double l'unité au-dessus du kilo :
-                    // « 2 000 g/j (2.0 Kg) ». En dessous, le gramme seul.
-                    _Cellule(
-                      ration.rationGPerDay >= 1000
-                          ? '${ration.rationGPerDay.round()} g/j '
-                                '(${(ration.rationGPerDay / 1000).toStringAsFixed(1)} Kg)'
-                          : '${ration.rationGPerDay.round()} g/j',
-                      centre: true,
-                    ),
-                    _Cellule(
-                      '${FicheJournaliereRepository.provendeGrammes(effectif: _effectifDeLaLigne(ration.stageLabel), rationGParJour: ration.rationGPerDay).round()} g',
-                      centre: true,
-                      gras: true,
-                    ),
-                  ],
-                ),
+              ...lignes,
               TableRow(
                 decoration: BoxDecoration(
                   color: AgriColors.brandEmerald.withValues(alpha: 0.08),
@@ -1085,21 +1136,16 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                   const _Cellule(''),
                   const _Cellule(''),
                   _Cellule(
-                    '${_totalProvendeG.round()} g '
-                    '(${(_totalProvendeG / 1000).toStringAsFixed(1)} Kg)',
-                    centre: true,
+                    total == null
+                        ? '—'
+                        : '${total.round()} g (${_kgCommePhp(total)} Kg)',
+                    cle: 'total-provende',
+                    droite: true,
                     gras: true,
                   ),
                 ],
               ),
             ],
-          ),
-          const SizedBox(height: AgriSpacing.xs),
-          const Text(
-            "L'effectif n'est pas encore ventilé par catégorie : la fiche du "
-            "jour n'en porte que le total. La ligne du stade de la bande le "
-            'reçoit entièrement.',
-            style: TextStyle(fontSize: 10, color: AgriColors.outline),
           ),
         ],
       ),
@@ -1679,11 +1725,21 @@ class _CelluleEntete extends StatelessWidget {
 }
 
 class _Cellule extends StatelessWidget {
-  const _Cellule(this.texte, {this.centre = false, this.gras = false});
+  const _Cellule(
+    this.texte, {
+    this.centre = false,
+    this.droite = false,
+    this.gras = false,
+    this.cle,
+  });
 
   final String texte;
   final bool centre;
+  final bool droite;
   final bool gras;
+
+  /// Clé du texte (tests du rationnement, F0.99).
+  final String? cle;
 
   @override
   Widget build(BuildContext context) {
@@ -1691,7 +1747,10 @@ class _Cellule extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       child: Text(
         texte,
-        textAlign: centre ? TextAlign.center : TextAlign.start,
+        key: cle == null ? null : Key(cle!),
+        textAlign: centre
+            ? TextAlign.center
+            : (droite ? TextAlign.end : TextAlign.start),
         style: TextStyle(
           fontSize: 11,
           fontWeight: gras ? FontWeight.bold : FontWeight.normal,

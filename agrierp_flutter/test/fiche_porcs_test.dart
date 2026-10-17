@@ -115,7 +115,7 @@ void main() {
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
-      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR ESPÈCES (EN GRAMMES G/J)'),
+      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE PORCIN (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
       y(tester, 'Traitements & Soins Porcins Automatiques Prévus pour ce Jour'),
       y(
@@ -133,18 +133,18 @@ void main() {
     );
   });
 
-  testWidgets('les trois catégories de la maquette sont celles des compteurs', (
+  // 🔁 F0.99 — libellés du WEB : les morts disent « Reproducteur (Truie/Verrat) » et « Porc marchand /
+  // Engraiss. », les dons « Reproducteur » et « Porc marchand » (`fiche-porcs.blade.php`).
+  testWidgets('les catégories des morts et des dons sont celles du web', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['REPRODUCTEUR', 'PORC MARCHAND', 'PORCELET']) {
-      expect(
-        find.text(categorie),
-        findsNWidgets(2),
-        reason: '$categorie apparaît en Morts ET en Dons',
-      );
-    }
+    expect(find.text('REPRODUCTEUR (TRUIE/VERRAT)'), findsOneWidget);
+    expect(find.text('PORC MARCHAND / ENGRAISS.'), findsOneWidget);
+    expect(find.text('REPRODUCTEUR'), findsOneWidget, reason: 'bloc Dons');
+    expect(find.text('PORC MARCHAND'), findsOneWidget, reason: 'bloc Dons');
+    expect(find.text('PORCELET'), findsNWidgets(2), reason: 'Morts ET Dons');
   });
 
   testWidgets('les libellés propres aux porcs sont repris tels quels', (
@@ -238,9 +238,9 @@ void main() {
     (tester) async {
       await afficher(tester);
 
-      // « 2 000 g/j (2.0 Kg) » pour le reproducteur ; « 300 g/j » seul en
-      // dessous du kilo.
-      expect(find.text('2000 g/j (2.0 Kg)'), findsOneWidget);
+      // 🔁 F0.99 — `number_format($r, 0, ',', ' ')` du web : « 2 000 g/j (2.0 Kg) » sur la seule ligne
+      // Reproducteur ; « 300 g/j » seul pour le Porcelet.
+      expect(find.text('2 000 g/j (2.0 Kg)'), findsOneWidget);
       expect(find.text('300 g/j'), findsOneWidget);
     },
   );
@@ -269,5 +269,75 @@ void main() {
     await afficher(tester);
 
     expect(find.textContaining('Aucune bande porcine active'), findsOneWidget);
+  });
+
+  // ── 🔁 F0.99 — rationnement par catégorie, comme le web (15.42) ─────────────────
+  // Barème du setUp : Porcelet 300, Jeune porc 600 (= Porc Marchand, D15), Porc reproducteur 2 000.
+  // Bande sans chaîne : tout l'effectif dans la catégorie de son stade (`departDepuisStade`).
+
+  String texte(WidgetTester tester, String cle) =>
+      tester.widget<Text>(find.byKey(Key(cle))).data!;
+
+  testWidgets('engraissement : 100 Porcs Marchands × 600 = 60 000 g, les autres lignes à 0', (
+    tester,
+  ) async {
+    await afficher(tester);
+
+    expect(texte(tester, 'ration-libelle-marchand'), 'Porc Marchand');
+    expect(texte(tester, 'ration-effectif-marchand'), '100');
+    expect(texte(tester, 'ration-grammes-marchand'), '${100 * 600} g');
+    expect(texte(tester, 'ration-effectif-porcelet'), '0');
+    expect(texte(tester, 'ration-effectif-reproducteur'), '0');
+    expect(texte(tester, 'total-provende'), '60000 g (60 Kg)');
+  });
+
+  testWidgets('🔴 croissance : la ligne Porcelet est nourrie (le poste nourrissait « Jeune porc »)', (
+    tester,
+  ) async {
+    await bande(stade: 'croissance');
+    await afficher(tester);
+
+    expect(texte(tester, 'ration-effectif-porcelet'), '100');
+    expect(texte(tester, 'ration-effectif-marchand'), '0');
+    expect(texte(tester, 'total-provende'), '${100 * 300} g (30 Kg)');
+  });
+
+  testWidgets('un mort Porc Marchand saisi réduit aussitôt sa ligne', (tester) async {
+    await afficher(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-Porc Marchand-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-Porc Marchand-1')));
+    await tester.pumpAndSettle();
+
+    expect(texte(tester, 'ration-effectif-marchand'), '99');
+    expect(texte(tester, 'total-provende'), '${99 * 600} g (59.4 Kg)');
+  });
+
+  testWidgets('bande sans stade : effectifs et total « — », jamais 0', (tester) async {
+    await bande(stade: null);
+    await afficher(tester);
+
+    for (final c in ['porcelet', 'marchand', 'reproducteur']) {
+      expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
+      expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
+    }
+    expect(texte(tester, 'total-provende'), '—');
+  });
+
+  testWidgets('la ration vient du barème (650 g), pas du secours (600 g)', (tester) async {
+    await (db.update(db.feedRationStandards)..where((t) => t.stageLabel.equals('Jeune porc')))
+        .write(const FeedRationStandardsCompanion(rationGPerDay: Value(650)));
+    await afficher(tester);
+
+    expect(texte(tester, 'ration-g-marchand'), '650 g/j');
+    expect(texte(tester, 'total-provende'), '${100 * 650} g (65 Kg)');
+  });
+
+  testWidgets('barème sans la catégorie : ration de secours du serveur (600 g)', (tester) async {
+    await (db.delete(db.feedRationStandards)..where((t) => t.stageLabel.equals('Jeune porc'))).go();
+    await afficher(tester);
+
+    expect(texte(tester, 'ration-g-marchand'), '600 g/j');
+    expect(texte(tester, 'total-provende'), '60000 g (60 Kg)');
   });
 }

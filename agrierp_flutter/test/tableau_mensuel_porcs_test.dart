@@ -116,7 +116,7 @@ void main() {
       'TOTAL',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (KG)',
-      'SUIVI CLINIQUE & PROPHYLAXIE',
+      'TRAITEMENTS & PROPHYLAXIE',
     ]) {
       expect(find.text(c), findsOneWidget, reason: c);
     }

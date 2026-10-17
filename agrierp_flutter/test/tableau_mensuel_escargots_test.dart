@@ -119,7 +119,7 @@ void main() {
       'TOTAL',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (G)',
-      'ENTRETIEN & HYGROMÉTRIE',
+      'TRAITEMENTS & PROPHYLAXIE',
     ]) {
       expect(
         find.descendant(of: tableau, matching: find.text(c)),

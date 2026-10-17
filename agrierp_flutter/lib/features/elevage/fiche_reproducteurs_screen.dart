@@ -18,7 +18,7 @@ import 'soins_repository.dart';
 ///   3. Bande / Lot Concerné · Achats du jour · Ventes (POS) ;
 ///   4. **Couvoir** : Œufs Couvés · Poussins Nés · Taux d'Éclosion Calculé ;
 ///   5. Morts par catégorie — Reproducteur · Poulet · Poussin ;
-///   6. Dons par catégorie — les mêmes trois ;
+///   6. (🔁 F0.99) pas de bloc Dons : le web n'en a pas et enregistre `don = 0` ;
 ///   7. Effectif Final du Jour + Taux de Mortalité du Jour ;
 ///   8. Rationnement & Provende Servie ;
 ///   9. Pesée (en grammes, contrairement aux porcs) ;
@@ -53,7 +53,8 @@ class FicheReproducteursScreen extends StatefulWidget {
 
 class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   /// Catégories de la maquette, dans SON ordre.
-  static const _categories = ['Reproducteur', 'Poulet', 'Poussin'];
+  /// 🔁 F0.99 — catégories des MORTS du web (`fiche-reproducteurs.blade.php`), libellés et ordre exacts.
+  static const _categories = ['Repro', 'Poulet', 'Poussin'];
 
   List<LivestockLot> _bandes = const [];
   LivestockLot? _bande;
@@ -72,7 +73,9 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   int _poussinsNes = 0;
 
   final _morts = <String, int>{for (final c in _categories) c: 0};
-  final _dons = <String, int>{for (final c in _categories) c: 0};
+  /// 🔁 F0.99 — morts déjà enregistrés pour le jour rechargé (web 15.47 / 15.55) : la répartition n'est pas
+  /// stockée, seul le total l'est. Sans lui, ré-enregistrer le jour remettait ses morts à zéro.
+  int? _mortEnregistre;
 
   List<FeedRationStandard> _rations = const [];
 
@@ -162,16 +165,19 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       _observations.clear();
       for (final cle in _categories) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
+      _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
       _chargement = false;
     });
   }
 
   // ── Calculs ───────────────────────────────────────────────────────────────
 
-  int get _totalMorts => _morts.values.fold(0, (a, b) => a + b);
-  int get _totalDons => _dons.values.fold(0, (a, b) => a + b);
+  /// Morts du jour : la répartition saisie, sinon le total déjà enregistré (`mortDuJour` du web).
+  int get _totalMorts {
+    final saisis = _morts.values.fold(0, (a, b) => a + b);
+    return saisis > 0 ? saisis : (_mortEnregistre ?? 0);
+  }
 
   int get _effectifFinal => FicheJournaliereRepository.calculerEffectifFinal(
     effectifPrecedent: _effectifPrecedent,
@@ -180,7 +186,8 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
     ne: _poussinsNes,
     mort: _totalMorts,
     vente: _vente,
-    don: _totalDons,
+    // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
     transfertEntree: _transfertEntree,
     transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
@@ -248,20 +255,29 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _couvoir(),
                     const SizedBox(height: AgriSpacing.md),
+                    if (_mortEnregistre != null) ...[
+                      Container(
+                        key: const Key('morts-enregistres'),
+                        padding: const EdgeInsets.all(AgriSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          '$_mortEnregistre mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
+                          "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+                          style: const TextStyle(fontSize: 11, color: AgriColors.brandForest),
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                    ],
                     _blocCategories(
                       titre: 'Morts par catégorie',
                       icone: Icons.dangerous_outlined,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
-                    ),
-                    const SizedBox(height: AgriSpacing.md),
-                    _blocCategories(
-                      titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
-                      couleur: AgriColors.brandEmerald,
-                      fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
-                      valeurs: _dons,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
@@ -392,11 +408,9 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   /// maquette — d'où `colonnesAvant` sur le composant. Le repousser après les
   /// groupes serait un repositionnement.
   ///
-  /// ⚠️⚠️ **REPRO / POULET / POUSSIN AFFICHENT UN TIRET.** La ventilation des
-  /// morts n'existe qu'à la saisie : `livestock_daily_entries` ne porte qu'une
-  /// colonne `mort`, et le contrat de synchronisation n'en descend pas d'autre.
-  /// La mortalité du jour reste lisible dans « Taux Mort % », qui est bien une
-  /// colonne de la maquette — aucune colonne n'a été ajoutée pour compenser.
+  /// 🔁 F0.99 — colonnes du WEB (`fiche-reproducteurs.blade.php`) : Date | Couvoir (Couvés, Nés) | Morts
+  /// (total) | Effectif Final | Taux Mort % | Poids Général (g). « Lot / Souche » et « Traitements »
+  /// n'existent pas au web ; la ventilation des morts n'est pas stockée, le web montre le total.
   ///
   /// ⚠️ **LE POIDS EST EN GRAMMES ICI** (les porcs pèsent en kilos). La base
   /// stocke la moyenne par sujet ; la maquette annonce le total pesé, d'où la
@@ -417,13 +431,6 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
         return 'Jour ${d.day} ($j/$m)';
       },
       onOuvrirJour: (i) => _ouvrirJour(_fichesDuMois[i].entryDate),
-      colonnesAvant: [
-        ColonneMensuelle(
-          libelle: 'Lot / Souche',
-          largeur: 1.8,
-          valeur: (_) => _bande?.code ?? '—',
-        ),
-      ],
       groupes: [
         GroupeColonnes(
           libelle: 'Couvoir',
@@ -439,13 +446,15 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
             ),
           ],
         ),
-        // ⚠️ Ventilation non synchronisée — voir le docblock.
-        const GroupeColonnes(
-          libelle: 'Morts par Catégorie',
+        // 🔁 F0.99 — le web affiche le TOTAL des morts (`fiche-reproducteurs.blade.php`), la seule valeur stockée.
+        GroupeColonnes(
+          libelle: 'Morts (total)',
           colonnes: [
-            ColonneMensuelle(libelle: 'Repro', valeur: _nonSynchronise),
-            ColonneMensuelle(libelle: 'Poulet', valeur: _nonSynchronise),
-            ColonneMensuelle(libelle: 'Poussin', valeur: _nonSynchronise),
+            ColonneMensuelle(
+              libelle: 'Repro+Poulet+Poussin',
+              largeur: 1.8,
+              valeur: (i) => '${_fichesDuMois[i].mort}',
+            ),
           ],
         ),
       ],
@@ -478,18 +487,10 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
             return (moyenne * f.effectifFinal).toStringAsFixed(0);
           },
         ),
-        const ColonneMensuelle(
-          libelle: 'Traitements & Prophylaxie',
-          largeur: 2.4,
-          // ⚠️ Registre vétérinaire : autre table, une requête par ligne
-          // serait nécessaire. Signalé plutôt qu'approximé.
-          valeur: _nonSynchronise,
-        ),
       ],
     );
   }
 
-  static String _nonSynchronise(int _) => '—';
 
   int? _indexDuJourCourant() {
     for (var i = 0; i < _fichesDuMois.length; i++) {
@@ -928,7 +929,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                   ),
                 ),
                 const Text(
-                  '= Effectif (J-1) + Achats/Nés − (Morts + Ventes + Dons)',
+                  '= Effectif (J-1) + Achats/Poussins Nés − Morts',
                   style: TextStyle(fontSize: 10, color: AgriColors.outline),
                 ),
                 const SizedBox(height: 4),
@@ -1580,7 +1581,6 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       _poidsTotalPese = 0;
       for (final cle in _categories) {
         _morts[cle] = 0;
-        _dons[cle] = 0;
       }
     });
   }
@@ -1598,7 +1598,8 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       // pour des naissances.
       ne: _poussinsNes,
       mort: _totalMorts,
-      don: _totalDons,
+      // F0.99 — aucun don sur cette fiche au web (`'don' => 0`).
+      don: 0,
       ponteTotal: _oeufsCouves,
       poidsMoyen: _poidsMoyen,
     );

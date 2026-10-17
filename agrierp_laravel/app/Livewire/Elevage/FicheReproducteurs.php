@@ -68,6 +68,14 @@ class FicheReproducteurs extends Component
 
     public int $mortPoussin = 0;
 
+    /**
+     * Ticket 15.55 — morts déjà enregistrés pour le jour rechargé (miroir de 15.47, Pondeuses et Escargots). La
+     * répartition Repro / Poulet / Poussin n'est pas stockée : `loadDay` ne rechargeait AUCUN mort (ceux d'un
+     * autre jour affiché restaient même dans les compteurs), et ré-enregistrer le jour remettait ses morts à zéro
+     * ou y inscrivait ceux d'un autre jour. Le total est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $mortEnregistre = null;
+
     public ?int $peseeTotal = null;
 
     public string $observations = '';
@@ -199,16 +207,24 @@ class FicheReproducteurs extends Component
             ->value('vente') ?? 0);
     }
 
+    /** Morts du jour : la répartition saisie, sinon le total déjà enregistré (15.55). */
+    private function mortDuJour(): int
+    {
+        $saisis = $this->mortRepro + $this->mortPoulet + $this->mortPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
+    }
+
     public function getEffectifFinalCalcProperty(): int
     {
-        $mort = $this->mortRepro + $this->mortPoulet + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
         return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->poussinsNes, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
     {
-        $mort = $this->mortRepro + $this->mortPoulet + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
@@ -240,10 +256,13 @@ class FicheReproducteurs extends Component
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 
+        $this->reset(['mortRepro', 'mortPoulet', 'mortPoussin', 'mortEnregistre']);
+
         if ($entry) {
             $this->achat = $entry->achat;
             $this->oeufsCouves = $entry->ponte_total ?? 0;
             $this->poussinsNes = $entry->ne;
+            $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
             // Le TOTAL pese se reconstitue depuis la moyenne stockee.
             $effectifFiche = (int) ($entry->effectif_final ?? 0);
             $this->peseeTotal = $entry->weight_sample_avg_g && $effectifFiche > 0
@@ -263,7 +282,7 @@ class FicheReproducteurs extends Component
             return;
         }
 
-        $mort = $this->mortRepro + $this->mortPoulet + $this->mortPoussin;
+        $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;        // 🔴→✅ TICKET 14.37 — état AVANT enregistrement, pour n'appliquer
         // au stock que l'ÉCART. Une fiche se corrige : appliquer les
         // valeurs telles quelles compterait la production autant de fois

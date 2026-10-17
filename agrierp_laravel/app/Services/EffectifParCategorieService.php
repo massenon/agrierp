@@ -16,8 +16,8 @@ use InvalidArgumentException;
  * par catégorie et un DÉPART, et DÉRIVE `cat_eff_*` (comme `effectif_final`). Ce service n'a
  * AUCUNE interface ni push : tickets 15.40 à 15.42.
  *
- * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Jeune (lapins) /
- * Porcelet (porcs) ; `jeune` = Lapin de Chair (lapins) / Marchand (porcs).
+ * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Sous-mères (lapins) /
+ * Porcelet (porcs) ; `jeune` = Jeune (lapins) / Marchand (porcs) — glossaire du 17/10/2026.
  *
  * FORMULES (chaque catégorie bornée à 0 ; v = dernière fiche ANTÉRIEURE de la même bande, un jour
  * sauté est franchi ; p = passage de stade) :
