@@ -141,7 +141,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
-                    <input wire:model="peseeTotal" type="number" min="0" placeholder="ex : 4500" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 4500" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
                 </div>
             </div>
 
@@ -205,8 +211,8 @@
                             <td class="px-sm py-xs text-center">{{ $entry?->effectif_sevres ?? '—' }}</td>
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
-                            <td class="px-sm py-xs text-right">{{ $entry?->weight_sample_avg_g ?? '—' }}</td>
-                            <td class="px-sm py-xs text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ?: '—') }}</td>
+                            <td class="px-sm py-xs text-right">{{ $entry?->poids_general_g ?? '—' }}</td>
+                            <td class="px-sm py-xs text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -22,8 +22,9 @@ use Tests\TestCase;
 /**
  * Ticket 15.41 — FICHE WEB LAPINS : EFFECTIF AUTOMATIQUE PAR CATÉGORIE.
  *
- * Emplacements génériques (14.11 / 14.12) : `sevre` = Jeune (champ « Lapereau » des Morts/Dons, D2) ;
- * `jeune` = Lapin de Chair. Date figée au 14/10/2026.
+ * 🔁 17/10/2026 : glossaire Reproducteur / Jeune / Sous-mères ; départ déduit du stade de la bande.
+ * Emplacements génériques (14.11 / 14.12) : `sevre` = Sous-mères (ex-« Lapereau » / « Jeune » 30 g) ;
+ * `jeune` = Jeune (ex-« Lapin de Chair », 60 g). Date figée au 14/10/2026.
  *
  * ⚠️ Les valeurs attendues sont des LITTÉRAUX calculés à la main (plan du 14/10/2026), jamais produits
  * par le service. Départ R10/J20/C30 (total 60), rations 120/30/60 :
@@ -54,8 +55,9 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
         $this->lot = $this->bande('LOT-LAP-A', 60);
 
         FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => 'Reproducteur', 'ration_g_per_day' => 120]);
-        FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 30]);
-        FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => 'Lapin de Chair', 'ration_g_per_day' => 60]);
+        // Glossaire du 17/10/2026 : Sous-mères 30 g/j (emplacement `sevre`), Jeune 60 g/j (emplacement `jeune`).
+        FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => 'Sous-mères', 'ration_g_per_day' => 30]);
+        FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 60]);
     }
 
     protected function tearDown(): void
@@ -228,31 +230,42 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
 
     // ===================================================================== (3) bande sans chaîne
 
-    public function test_bande_sans_chaine_les_trois_categories_affichent_un_tiret_jamais_zero(): void
+    /**
+     * 🔁 17/10/2026 — RATIONNEMENT AUTOMATIQUE. Bande sans chaîne, stade « croissance » (= Sous-mères) de 60 :
+     * le départ est DÉDUIT du stade (0 / 60 / 0) et tout se calcule sans saisie. Provende : 60 × 30 = 1 800 g.
+     */
+    public function test_bande_sans_chaine_le_depart_est_deduit_du_stade_et_le_rationnement_est_calcule(): void
     {
         $c = $this->ouvrir(self::J1);
 
+        $this->assertSame(['0', '60', '0'], $this->ecran($c));
+        $this->assertSame('0 g', $this->cellule($c, 'cat-prov-repro-g'));
+        $this->assertSame('1800 g', $this->cellule($c, 'cat-prov-lapereau-g'));
+        $this->assertSame('0 g', $this->cellule($c, 'cat-prov-chair-g'));
+        $this->assertSame('1800 g (1.8 Kg)', $this->cellule($c, 'day-total-provende-g'));
+
+        // Seule une bande dont le stade ne relève d'aucune catégorie (« ponte », héritée) reste inconnue : « — », jamais 0.
+        $this->lot->update(['stage' => 'ponte']);
+        $c = $this->ouvrir(self::J1);
         $this->assertSame(['—', '—', '—'], $this->ecran($c));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-repro-g'));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-lapereau-g'));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-chair-g'));
         $this->assertSame('—', $this->cellule($c, 'day-total-provende-g'));
     }
 
     public function test_aucun_pourcentage_de_demonstration_du_premier_jour(): void
     {
-        // La maquette répartit le premier jour à 15 % / 35 % / reste. Bande de 100 : 15 / 50 / 35 seraient affichés.
+        // La maquette répartit le premier jour à 15 % / 35 % / reste. Le départ déduit met TOUT l'effectif dans la
+        // catégorie du stade de la bande : jamais une répartition inventée.
         $this->lot->update(['initial_quantity' => 100, 'current_quantity' => 100]);
 
         $c = $this->ouvrir(self::J1);
 
-        $this->assertSame(['—', '—', '—'], $this->ecran($c));
-        $this->assertNull($c->instance()->categoriesJour['repro']);
+        $this->assertSame(['0', '100', '0'], $this->ecran($c));
+        $this->assertSame(0, $c->instance()->categoriesJour['repro']);
         $this->assertStringNotContainsString('0.15', file_get_contents(app_path('Livewire/Elevage/FicheLapins.php')));
         $this->assertStringNotContainsString('0.35', file_get_contents(app_path('Livewire/Elevage/FicheLapins.php')));
     }
 
-    public function test_bande_sans_chaine_le_formulaire_propose_l_effectif_de_depart_en_trois_champs(): void
+    public function test_bande_sans_chaine_le_depart_deduit_est_pre_rempli_et_corrigeable(): void
     {
         $c = $this->ouvrir(self::J1);
 
@@ -260,10 +273,11 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
             $tag = $this->tag($c, $id);
             $this->assertNotSame('', $tag, "champ #{$id}");
             $this->assertStringContainsString('wire:model.live="'.$modele.'"', $tag);
-            $this->assertDoesNotMatchRegularExpression('/\bdisabled\b|\breadonly\b/', $tag);
+            $this->assertDoesNotMatchRegularExpression('/\bdisabled\b|\breadonly\b/', $tag, 'corrigeable pour une bande mixte');
         }
-        $this->voit($c, 'Effectif de départ');
-        $this->voit($c, 'effectif total au début du jour : 60');
+        $c->assertSet('departRepro', 0)->assertSet('departSevre', 60)->assertSet('departJeune', 0);
+        $this->voit($c, 'déduit du stade de la bande');
+        $this->voit($c, "l'effectif total au début du jour (60)");
     }
 
     public function test_un_depart_valide_donne_un_apercu_en_direct_avant_l_enregistrement(): void
@@ -290,22 +304,27 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
 
     public function test_un_depart_incomplet_est_refuse_a_l_enregistrement(): void
     {
-        $c = $this->ouvrir(self::J1)->set('departRepro', 10)->set('departSevre', 50)->call('saveDay');
+        $c = $this->ouvrir(self::J1)->set('departRepro', 10)->set('departSevre', 50)->set('departJeune', null)->call('saveDay');
 
         $this->voit($c, 'Effectif de départ incomplet');
         $this->assertSame(0, LivestockDailyEntry::count());
     }
 
-    public function test_sans_depart_saisi_la_fiche_s_enregistre_comme_avant_sans_chaine(): void
+    /**
+     * 🔁 17/10/2026 — sans rien saisir dans le départ, la première fiche ENREGISTRE le départ déduit du stade et
+     * démarre la chaîne. Achat 2 (les achats de lapins entrent en Sous-mères, D11) : 0 / 62 / 0, total 62,
+     * provende 62 × 30 = 1 860 g = 1,86 kg.
+     */
+    public function test_sans_saisie_la_premiere_fiche_enregistre_le_depart_deduit_du_stade(): void
     {
         $this->ouvrir(self::J1)->set('achat', 2)->call('saveDay');
 
         $f = $this->entree(self::J1);
         $this->assertSame(62, (int) $f->effectif_final);
-        $this->assertNull($f->cat_depart_repro);
-        $this->assertNull($f->cat_eff_repro, 'sans chaîne, aucune catégorie n\'est inventée');
-        $this->assertNull($f->feed_qty_kg, 'provende inconnue : null, jamais 0');
-        $this->assertFalse(app(EffectifParCategorieService::class)->aUneChaine($this->lot->id));
+        $this->assertSame([0, 60, 0], [(int) $f->cat_depart_repro, (int) $f->cat_depart_sevre, (int) $f->cat_depart_jeune]);
+        $this->assertSame([0, 62, 0], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
+        $this->assertSame(1.86, round((float) $f->feed_qty_kg, 2));
+        $this->assertTrue(app(EffectifParCategorieService::class)->aUneChaine($this->lot->id));
     }
 
     // ===================================================================== (3) verrouillage du départ
@@ -485,16 +504,20 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
     public function test_le_depart_et_la_chaine_sont_propres_a_chaque_bande(): void
     {
         $autre = $this->bande('LOT-LAP-B', 500);
-        $this->departer($this->ouvrir(self::J1))->call('saveDay');          // chaîne sur A
+        $this->departer($this->ouvrir(self::J1))->call('saveDay');          // chaîne sur A (10 / 20 / 30)
 
         $c = Livewire::test(FicheLapins::class)->set('bandeId', $autre->id)->set('selectedDate', self::J1);
-        $this->assertSame(['—', '—', '—'], $this->ecran($c), 'B n\'a pas de chaîne');
-        $this->assertNotSame('', $this->tag($c, 'depart-repro'));
+        $this->assertSame(['0', '500', '0'], $this->ecran($c), 'B : départ déduit de SON stade, jamais celui de A');
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->tag($c, 'depart-repro'), 'B n\'a pas encore de départ verrouillé');
     }
 
     // ===================================================================== D6, D8, D9, D12, départ refusé
 
-    public function test_d6_une_bande_deja_saisie_n_est_pas_migree_automatiquement_et_le_depart_reste_a_saisir(): void
+    /**
+     * 🔁 17/10/2026 — D6 : les effectifs saisis à la main restent signalés et ne sont jamais repris ; le départ
+     * est déduit du stade de la bande (et non plus « à saisir »). Les fiches anciennes ne sont pas touchées.
+     */
+    public function test_d6_les_saisies_anciennes_ne_sont_pas_reprises_et_le_depart_est_deduit_du_stade(): void
     {
         $this->fiche($this->lot, '2026-10-03', ['effectif_final' => 60, 'cat_eff_repro' => 5, 'cat_eff_sevre' => 6, 'cat_eff_jeune' => 7]);
 
@@ -502,17 +525,21 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
 
         $this->voit($c, 'saisis à la main');
         $this->voit($c, '03/10/2026');
-        $this->voit($c, 'décision de migration');
-        $this->assertSame(['—', '—', '—'], $this->ecran($c), 'jamais repris automatiquement comme départ');
-        $c->assertSet('departRepro', null)->assertSet('departSevre', null)->assertSet('departJeune', null);
+        $this->voit($c, 'Reproducteur 5, Jeune 7, Sous-mères 6');
+        $this->assertSame(['0', '60', '0'], $this->ecran($c), 'départ déduit du stade, jamais les saisies anciennes');
 
         $c->set('achat', 1)->call('saveDay');
         $this->assertNull($this->entree('2026-10-03')->cat_depart_repro);
-        $this->assertNull($this->entree(self::J1)->cat_depart_repro);
+        $this->assertSame([0, 60, 0], [(int) $this->entree(self::J1)->cat_depart_repro, (int) $this->entree(self::J1)->cat_depart_sevre, (int) $this->entree(self::J1)->cat_depart_jeune]);
         $this->assertSame(5, (int) $this->entree('2026-10-03')->cat_eff_repro, 'les saisies anciennes ne sont pas touchées');
     }
 
-    public function test_une_bande_sans_chaine_reenregistree_conserve_ses_cat_eff_anciens(): void
+    /**
+     * 🔁 17/10/2026 (« faut-il corriger les bandes déjà saisies ? OUI ») — réenregistrer une fiche sans chaîne pose
+     * le départ déduit du stade (0 / 60 / 0) et la chaîne RECALCULE ses catégories : 5 / 6 / 7 (somme 18 pour 60
+     * sujets) devient 0 / 60 / 0.
+     */
+    public function test_une_bande_deja_saisie_reenregistree_est_corrigee_par_la_chaine(): void
     {
         $this->fiche($this->lot, self::J1, ['effectif_final' => 60, 'cat_eff_repro' => 5, 'cat_eff_sevre' => 6, 'cat_eff_jeune' => 7,
             'mort_repro' => 0, 'mort_sevre' => 0, 'mort_jeune' => 0, 'don_repro' => 0, 'don_sevre' => 0, 'don_jeune' => 0]);
@@ -520,7 +547,8 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
         Livewire::test(FicheLapins::class)->call('loadDay', self::J1)->set('achat', 0)->call('saveDay');
 
         $f = $this->entree(self::J1);
-        $this->assertSame([5, 6, 7], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
+        $this->assertSame([0, 60, 0], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
+        $this->assertSame(60, (int) $f->effectif_final);
     }
 
     public function test_d8_somme_differente_du_total_donne_un_avertissement_date_sans_bloquer(): void
@@ -633,16 +661,19 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
         $calcul = $this->departer($this->ouvrir(self::J1))->instance()->provendeCalculation;
 
         $this->assertSame(10, $calcul['repro']['effectif']);
-        $this->assertSame(20, $calcul['jeune']['effectif']);
+        $this->assertSame(20, $calcul['sous_meres']['effectif']);
         $this->assertSame(30, $calcul['chair']['effectif']);
         $this->assertSame(10 * 150, $calcul['repro']['total_g']);
-        $this->assertSame(20 * 40, $calcul['jeune']['total_g']);
+        $this->assertSame(20 * 40, $calcul['sous_meres']['total_g']);
         $this->assertSame(30 * 70, $calcul['chair']['total_g']);
         $this->assertSame(1500 + 800 + 2100, $calcul['total_g']);
     }
 
     public function test_sans_effectif_de_categorie_connu_la_provende_est_un_tiret_et_l_autonomie_n_est_pas_calculee(): void
     {
+        // Seul cas encore inconnu : bande héritée au stade « ponte », qui ne relève d'aucune catégorie de lapins.
+        $this->lot->update(['stage' => 'ponte']);
+
         $calcul = $this->ouvrir(self::J1)->instance()->provendeCalculation;
 
         $this->assertNull($calcul['repro']['effectif']);
@@ -668,25 +699,29 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
 
     // ===================================================================== (6) libellés
 
-    public function test_les_libelles_de_la_maquette_sont_respectes_et_lapereau_vaut_jeune(): void
+    /** 🔁 Décision client du 17/10/2026 : glossaire Reproducteur / Jeune / Sous-mères partout. */
+    public function test_le_glossaire_reproducteur_jeune_sous_meres_est_applique(): void
     {
         $html = html_entity_decode(strip_tags($this->ouvrir(self::J1)->html()));
 
-        foreach (['Morts par catégorie', 'Dons par catégorie', 'Reproducteur', 'Lapin de chair', 'Lapin de Chair', 'Lapereau', 'Achats du jour', 'Nés (Mise bas)', 'Effectif Final du Jour (Calculé dynamique)', 'Taux de Mortalité du Jour (%)', 'Jeune', 'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)'] as $libelle) {
+        foreach (['Morts par catégorie', 'Dons par catégorie', 'Reproducteur', 'Jeune', 'Sous-mères', 'Achats du jour', 'Nés (Mise bas)', 'Effectif Final du Jour (Calculé dynamique)', 'Taux de Mortalité du Jour (%)', 'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)'] as $libelle) {
             $this->assertStringContainsString($libelle, $html, $libelle);
+        }
+        foreach (['Lapin de chair', 'Lapin de Chair', 'Lapereau', 'Sevré'] as $ancien) {
+            $this->assertStringNotContainsString($ancien, $html, "ancien libellé « {$ancien} »");
         }
 
         $source = file_get_contents(base_path('resources/views/livewire/elevage/fiche-lapins.blade.php'));
-        $this->assertStringContainsString('D2', $source, 'D2 (Lapereau = Jeune) est documenté dans la vue');
-        $this->assertStringNotContainsString('Sevré', $html);
+        $this->assertStringContainsString('17/10/2026', $source, 'la décision du glossaire est documentée dans la vue');
     }
 
-    public function test_le_passage_de_stade_est_un_champ_saisi_hors_maquette_et_dit_comme_tel(): void
+    /** 🔁 17/10/2026 — le passage de stade est le SEVRAGE du jour (Sous-mères → Jeune), gardé et nommé comme tel. */
+    public function test_le_passage_de_stade_est_le_sevrage_sous_meres_vers_jeune(): void
     {
         $html = html_entity_decode(strip_tags($this->ouvrir(self::J1)->html()));
 
-        $this->assertStringContainsString('Passage de stade', $html);
-        $this->assertStringContainsString('hors maquette', $html);
+        $this->assertStringContainsString('Sevrage du jour (Sous-mères → Jeune)', $html);
+        $this->assertStringNotContainsString('Passage de stade', $html);
     }
 
     // ===================================================================== (8) le jeu complet, à l'écran ET en base
@@ -808,7 +843,8 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
     {
         $c = $this->departer($this->ouvrir(self::J1))->call('loadDay', self::J2);
 
-        $c->assertSet('departRepro', null)->assertSet('departSevre', null)->assertSet('departJeune', null);
+        // Le départ corrigé à la main (10 / 20 / 30) est oublié : on retrouve le départ déduit du stade.
+        $c->assertSet('departRepro', 0)->assertSet('departSevre', 60)->assertSet('departJeune', 0);
     }
 
     /** Livewire garde les propriétés calculées en cache pour la requête : l'écran rendu APRÈS l'enregistrement doit refléter l'état écrit. */
@@ -841,8 +877,9 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
     public function test_l_autonomie_n_est_pas_calculee_quand_la_consommation_est_inconnue(): void
     {
         $this->provende(100);
+        $this->lot->update(['stage' => 'ponte']);           // stade sans catégorie : consommation inconnue
 
-        $c = $this->ouvrir(self::J1);                       // bande sans chaîne : catégories inconnues
+        $c = $this->ouvrir(self::J1);
         $autonomie = $c->instance()->feedAutonomy;
 
         $this->assertTrue($autonomie['inconnu']);

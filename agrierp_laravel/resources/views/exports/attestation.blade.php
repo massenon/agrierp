@@ -39,7 +39,7 @@
 
     <div class="signature">
         <p class="role">Le Directeur Général</p>
-        <p class="name">OLOUKOUNLE Olouchegoun Hassimiyou</p>
+        <p class="name">M. Olouchègoun</p>
     </div>
 </body>
 </html>

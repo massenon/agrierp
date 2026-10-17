@@ -157,6 +157,34 @@ class EffectifParCategorieService
 
     // ====================================================================== ESPÈCE / CHAÎNE
 
+    /**
+     * Stade de bande → emplacement de catégorie. Lapins : Reproducteur / Sous-mères / Jeune ;
+     * porcs : Reproducteur / Porcelet / Porc Marchand. `ponte` ne relève d'aucune catégorie.
+     */
+    private const STADE_VERS_CATEGORIE = ['reproduction' => 'repro', 'croissance' => 'sevre', 'engraissement' => 'jeune'];
+
+    /**
+     * 🔴→✅ RATIONNEMENT AUTOMATIQUE — effectif de départ DÉDUIT du stade de la bande, sans saisie.
+     *
+     * Le départ par catégorie devait être saisi à la main avant que la moindre ration ne se calcule :
+     * tant qu'il ne l'était pas, « Rationnement & Provende Servie » restait à « — ». Une bande est créée
+     * avec un stade (« Stade Initial ») : tout son effectif relève de la catégorie de ce stade, les deux
+     * autres valent 0. La somme vaut donc toujours l'effectif total au début du jour (contrôle de
+     * `verifierDepart` respecté). Null : espèce sans catégories ou stade sans catégorie (ponte).
+     *
+     * @return array{repro: int, sevre: int, jeune: int}|null
+     */
+    public static function departDepuisStade(LivestockLot $lot, int $totalDebutJour): ?array
+    {
+        $emplacement = self::STADE_VERS_CATEGORIE[$lot->stage] ?? null;
+
+        if (self::especeDuLot($lot) === null || $emplacement === null) {
+            return null;
+        }
+
+        return array_merge(['repro' => 0, 'sevre' => 0, 'jeune' => 0], [$emplacement => max(0, $totalDebutJour)]);
+    }
+
     public static function especeDuLot(LivestockLot $lot): ?string
     {
         return self::ESPECES[$lot->species?->code] ?? null;

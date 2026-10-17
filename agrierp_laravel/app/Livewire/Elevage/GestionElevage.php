@@ -38,17 +38,17 @@ class GestionElevage extends Component
 
     public function getEffectifTotalProperty(): int
     {
-        return (int) LivestockLot::where('status', 'actif')->sum('current_quantity');
+        return (int) LivestockLot::vivantes()->sum('current_quantity');   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
     }
 
     public function getBandesActivesProperty(): int
     {
-        return LivestockLot::where('status', 'actif')->count();
+        return LivestockLot::vivantes()->count();
     }
 
     public function getTauxMortaliteMoisProperty(): ?float
     {
-        $lots = LivestockLot::where('status', 'actif')->pluck('id');
+        $lots = LivestockLot::vivantes()->pluck('id');
 
         if ($lots->isEmpty()) {
             return null;

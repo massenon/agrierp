@@ -147,12 +147,13 @@ class DashboardElevage extends Component
     public function getSanitaireBySpeciesProperty()
     {
         return LivestockSpecies::enabled()->get()->map(function ($species) {
-            $lotIds = LivestockLot::where('species_id', $species->id)->pluck('id');
+            // Bandes NON archivées (une bande clôturée ce mois-ci a bien reçu ses soins) ; soins archivés exclus.
+            $lotIds = LivestockLot::where('species_id', $species->id)->where('is_active', true)->pluck('id');
 
-            $records = VeterinaryRecord::whereIn('lot_id', $lotIds)
+            $records = VeterinaryRecord::whereIn('lot_id', $lotIds)->where('is_active', true)
                 ->whereMonth('record_date', now()->month)->whereYear('record_date', now()->year);
 
-            $effectifTotal = (int) LivestockLot::whereIn('id', $lotIds)->where('status', 'actif')->sum('current_quantity');
+            $effectifTotal = (int) LivestockLot::whereIn('id', $lotIds)->vivantes()->sum('current_quantity');
             $enInfirmerie = InfirmaryRecord::whereIn('lot_id', $lotIds)->where('status', 'en_cours')->count();
 
             return [
@@ -167,7 +168,7 @@ class DashboardElevage extends Component
     public function getSanitaireKpisProperty(): array
     {
         $lotIds = $this->activeLots->pluck('id');
-        $records = VeterinaryRecord::whereIn('lot_id', $lotIds)
+        $records = VeterinaryRecord::whereIn('lot_id', $lotIds)->where('is_active', true)   // soin archivé = supprimé
             ->whereMonth('record_date', now()->month)->whereYear('record_date', now()->year);
 
         $traitementFrequent = (clone $records)->select('action_type')

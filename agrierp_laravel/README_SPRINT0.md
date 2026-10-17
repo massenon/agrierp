@@ -21594,3 +21594,32 @@ Les quatre écrans web et le repository du poste appellent la cascade unique (`R
 
 ### Décisions OUVERTES (voir `PLAN_FINALISATION.md`)
 A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucun transfert entre bandes n'existe), A3 (« Don » reçu soustrait par la formule), A4 (Transformation hors fiche, effacée par la cascade suivante), A5 (`saveDay()` sans `authorize()` sur les cinq fiches).
+
+---
+
+## Ticket 15.44 (Laravel) : CORRECTIONS CLIENT DU 17/10/2026 — GLOSSAIRE LAPINS, RATIONNEMENT AUTOMATIQUE, AUTONOMIE, POIDS ET TRAITEMENTS, TRANSFORMATION, ARCHIVAGE, TIROIR DES BANDES, PARAMÈTRES, SEEDERS
+
+### Décisions client du 17/10/2026
+- Lapins : trois catégories **Reproducteur / Jeune / Sous-mères**, partout (remplace D2 et la décision du 14/10/2026). L'ancien « Lapin de Chair » (60 g) = Jeune ; l'ancien « Jeune » / « Lapereau » (30 g) = Sous-mères. Emplacements de synchronisation inchangés (`*_sevre` = Sous-mères, `*_jeune` = Jeune).
+- « Don » = sortie, soustraite (A3 fermée). Transformation = vente (A4 fermée). Bandes déjà saisies : corrigées (D6 tranchée).
+- Administrateur : « M. Olouchègoun », `contact@fermeolouwachegoun.com` ; serveur `https://agrierp.fermeolouwachegoun.com`.
+
+### Défauts trouvés et corrigés
+1. **Rationnement jamais automatique** : sans départ par catégorie saisi à la main, la provende restait « — ». Départ désormais DÉDUIT du stade de la bande (`EffectifParCategorieService::departDepuisStade`, trait `AvecDepartAutomatique`), corrigeable avant le premier enregistrement (Lapins, Porcs).
+2. **« Poids Général (g) »** des tableaux mensuels Lapins / Escargots / Reproducteurs affichait la MOYENNE. Accesseur `poids_general_g`. « Poids Moyen Constaté » : troncature (Lapins) → arrondi ; ajouté à Escargots et Reproducteurs.
+3. **« Traitements & Prophylaxie »** des tableaux mensuels ne lisait jamais le registre vétérinaire (trait `AvecSoinsDuMois`). Prophylaxie du jour raccordée à Pondeuses et Reproducteurs (marqueurs « à planifier » retirés).
+4. **Autonomie alimentaire** : composant unique, rouge en rupture / sous 3 jours / sans produit de provende ; jamais bloquante. Calcul unique `AutonomieAlimentaireService`.
+5. **Transformation effacée** à la sauvegarde de fiche suivante : passe par `RecordSaleOnFicheElevageAction`.
+6. **Archivage** : `archiveLot()` posait `is_active = false` mais les KPI ne filtraient que `status = actif`. Scope `LivestockLot::vivantes()`. Aussi corrigés : absences archivées retenues sur la paie, utilisateurs archivés comptés par rôle, avances archivées dans les acomptes du mois, soins archivés dans le coût vétérinaire et le tableau de bord sanitaire, bandes archivées dans la mortalité et le taux de ponte du tableau de bord.
+7. **Tiroir de Gestion des Bandes** : Autonomie alimentaire et Suivi sanitaire réels (délai d'attente, infirmerie, mortalité 7 jours, derniers soins).
+8. **`DemoUsersSeeder`** retrouvait les comptes par e-mail : le changement d'e-mail de l'admin aurait créé un second « admin » (échec d'unicité). Retrouvés par identifiant.
+9. **Seeders** : les bandes lapins / porcs suivent la chaîne par catégorie (départ déduit, mouvements ventilés, sevrage avant vente). Recalcul indépendant (Python sur la base SQLite) : 8 bandes, 932 fiches, 0 anomalie ; « Effectif Total Vivant » 263 en base = 263 à l'écran (Gestion Élevage, Gestion des Bandes).
+
+### Mesures
+- Suite Feature : **1 588 verts** avant l'ajout du test « Don » ; `CorrectionsElevage17OctobreTest` (13) et glossaire (28) verts ensuite.
+- Tests réécrits parce qu'ils verrouillaient l'ancien comportement (départ manuel, provende « — » sans départ, glossaire du 14/10) : 14 Lapins, 10 Porcs, 11 glossaire, 2 rationnement, 1 prophylaxie — chaque réécriture documentée dans son test.
+
+### Ce qui n'a PAS été fait / vérifié
+- **Poste** : le glossaire du 17/10 n'est pas porté dans `categorie_ration_lapin.dart` (plus de 25 tests du poste à réécrire, périmètre de F0.96). À livrer AVANT de déployer la migration `2026_10_17_000001` (PLAN_FINALISATION A12). Sur le poste : nom de l'attestation et adresse du serveur par défaut alignés.
+- Fiches Pondeuses et Escargots à plusieurs bandes (A11) : non traitées.
+- Aucun test Dusk, aucun essai sur la base de production.

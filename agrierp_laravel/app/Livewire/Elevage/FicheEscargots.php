@@ -4,6 +4,7 @@ namespace App\Livewire\Elevage;
 
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
+use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -44,6 +45,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheEscargots extends Component
 {
+    use AvecSoinsDuMois;
+
     public string $selectedDate;
 
     public int $achat = 0;
@@ -106,6 +109,12 @@ class FicheEscargots extends Component
             'taux_eclosion' => $totalOeufs > 0 ? round(($totalNaissains / $totalOeufs) * 100, 1) : 0.0,
             'taux_mortalite_mois' => $totalEffectifDepart > 0 ? round(($totalMorts / $totalEffectifDepart) * 100, 1) : 0.0,
         ];
+    }
+
+    /** Bandes du tableau mensuel (AvecSoinsDuMois). */
+    protected function lotsDuTableauMensuel(): array
+    {
+        return $this->lots->pluck('id')->all();
     }
 
     public function getMonthlyEntriesProperty()

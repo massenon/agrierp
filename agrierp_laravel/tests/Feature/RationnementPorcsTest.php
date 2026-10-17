@@ -164,15 +164,15 @@ class RationnementPorcsTest extends TestCase
         $this->assertEquals(36_000, $component->instance()->provendeCalculation['total_g']);
     }
 
-    /** Remplace « sans historique la ligne reste manuelle » : sans départ, « — » (jamais 0) et départ à saisir. */
-    public function test_without_history_the_lines_are_unknown_and_the_start_is_asked(): void
+    /** 🔁 17/10/2026 — sans historique, le départ est DÉDUIT du stade (« croissance » = Porcelet) : 0 / 60 / 0, provende 60 × 300 g. */
+    public function test_without_history_the_start_is_deduced_from_the_band_stage(): void
     {
         $component = Livewire::test(FichePorcs::class)->set('selectedDate', '2026-07-10');
 
-        $this->assertNull($component->instance()->categoriesJour['repro']);
-        $this->assertSame(['—', '—', '—'], $this->ecran($component));
+        $this->assertSame(0, $component->instance()->categoriesJour['repro']);
+        $this->assertSame(['0', '60', '0'], $this->ecran($component));
         $this->assertTrue($component->instance()->categoriesJour['depart_requis']);
-        $this->assertNull($component->instance()->provendeCalculation['total_g']);
+        $this->assertSame(60 * 300, $component->instance()->provendeCalculation['total_g']);
     }
 
     public function test_the_breeder_headcount_never_goes_negative(): void

@@ -224,7 +224,7 @@ class SoinsVaccinsHub extends Component
     public function getKpisInfirmerieProperty(): array
     {
         $monthRecords = InfirmaryRecord::whereMonth('entry_date', now()->month)->whereYear('entry_date', now()->year);
-        $effectifTotal = LivestockLot::where('status', 'actif')->sum('current_quantity');
+        $effectifTotal = LivestockLot::vivantes()->sum('current_quantity');   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
         $enCours = InfirmaryRecord::where('status', 'en_cours')->count();
 
         return [

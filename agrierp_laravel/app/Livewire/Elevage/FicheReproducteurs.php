@@ -4,6 +4,7 @@ namespace App\Livewire\Elevage;
 
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
+use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -47,6 +48,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheReproducteurs extends Component
 {
+    use AvecProphylaxieDuJour;
+
     public string $selectedDate;
 
     public string $selectedLotId = '';
@@ -80,6 +83,12 @@ class FicheReproducteurs extends Component
             ->where('status', 'actif')
             ->where('is_active', true)
             ->get();
+    }
+
+    /** Prophylaxie du jour : la bande sélectionnée dans la fiche (AvecProphylaxieDuJour). */
+    protected function bandeDeLaFiche()
+    {
+        return $this->selectedLot;
     }
 
     public function getSelectedLotProperty(): ?LivestockLot
@@ -225,6 +234,7 @@ class FicheReproducteurs extends Component
 
     public function loadDay(string $date): void
     {
+        $this->traitementsCoches = [];   // une case cochée ne survit pas à un changement de jour
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 

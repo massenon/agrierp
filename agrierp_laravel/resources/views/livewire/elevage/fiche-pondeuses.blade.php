@@ -146,7 +146,10 @@
 
             <div class="border-t border-outline-variant pt-md">
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">vaccines</span>Traitements &amp; Rappels</p>
-                <x-module-pending label="Le protocole de prophylaxie du jour de cette fiche" since="à planifier — le moteur existe (ticket 3.11 terminé) et alimente déjà les fiches Lapins et Porcs ; son raccordement à cette fiche n'est pas fait" />
+                @php $protocoleDuJour = $this->protocoleDuJour; @endphp
+                @if($protocoleDuJour)
+                    <x-prophylaxie-du-jour :protocole="$protocoleDuJour" />
+                @endif
                 <div class="mt-sm">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Observations</label>
                     <input wire:model="observations" type="text" placeholder="ex : RAS" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
@@ -210,7 +213,7 @@
                             <td class="px-1.5 py-1 text-center text-outline">{{ $isToday ? $this->stockToday['ts'] : '—' }}</td>
                             <td class="px-1.5 py-1 text-center text-outline">{{ $isToday ? $this->stockToday['os'] : '—' }}</td>
                             <td class="px-1.5 py-1 text-center font-bold text-brand-emerald">{{ $isToday ? $this->stockToday['final'] : '—' }}</td>
-                            <td class="px-2 py-1 text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ?: '—') }}</td>
+                            <td class="px-2 py-1 text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

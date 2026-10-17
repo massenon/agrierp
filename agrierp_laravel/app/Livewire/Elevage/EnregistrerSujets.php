@@ -92,7 +92,7 @@ class EnregistrerSujets extends Component
         return [
             'naissances_mois' => (int) (clone $entries)->sum('ne'),
             'acquisitions_mois' => (int) (clone $entries)->sum('achat'),
-            'effectif_total' => (int) LivestockLot::where('status', 'actif')->sum('current_quantity'),
+            'effectif_total' => (int) LivestockLot::vivantes()->sum('current_quantity'),   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
         ];
     }
 

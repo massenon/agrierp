@@ -192,7 +192,7 @@ class ProductionCheptelStockTest extends TestCase
             // et écraserait une saisie antérieure.
             ->set('species_id', $this->lot->species_id)
             ->set('code', 'CUN-2026-99')
-            ->set('stage', 'Engraissement')
+            ->set('stage', 'engraissement')
             ->set('created_date', now()->format('Y-m-d'))
             ->set('quantity', 40)
             ->set('product_id', $this->lapereau->id)

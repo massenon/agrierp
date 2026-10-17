@@ -4,6 +4,8 @@ namespace App\Livewire\Elevage;
 
 use App\Actions\RecordEggProductionStockAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
+use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
+use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -43,6 +45,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePondeuses extends Component
 {
+    use AvecProphylaxieDuJour;
+    use AvecSoinsDuMois;
+
     public string $selectedDate;
 
     public int $achat = 0;
@@ -107,6 +112,12 @@ class FichePondeuses extends Component
             'stock_plateaux' => $this->eggProduct ? (int) floor($this->eggProduct->stock_qty) : null,
             'taux_mortalite_mois' => $totalEffectifDepart > 0 ? round(($totalMorts / $totalEffectifDepart) * 100, 1) : 0.0,
         ];
+    }
+
+    /** Bandes du tableau mensuel (AvecSoinsDuMois). */
+    protected function lotsDuTableauMensuel(): array
+    {
+        return $this->lots->pluck('id')->all();
     }
 
     public function getMonthlyEntriesProperty()
@@ -251,6 +262,7 @@ class FichePondeuses extends Component
 
     public function loadDay(string $date): void
     {
+        $this->traitementsCoches = [];   // une case cochée ne survit pas à un changement de jour
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 

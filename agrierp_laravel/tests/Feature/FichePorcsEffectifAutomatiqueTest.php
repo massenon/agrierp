@@ -286,28 +286,37 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
 
     // ===================================================================== (3) bande sans chaîne
 
-    public function test_bande_sans_chaine_les_trois_categories_affichent_un_tiret_jamais_zero(): void
+    /**
+     * 🔁 17/10/2026 — RATIONNEMENT AUTOMATIQUE. Bande sans chaîne, stade « engraissement » (= Porc Marchand) de 120 :
+     * départ DÉDUIT du stade (0 / 0 / 120) ; provende 120 × 600 = 72 000 g sans aucune saisie.
+     */
+    public function test_bande_sans_chaine_le_depart_est_deduit_du_stade_et_le_rationnement_est_calcule(): void
     {
         $c = $this->ouvrir(self::J1);
 
-        $this->assertSame(['—', '—', '—'], $this->ecran($c));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-repro-g'));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-porcelet-g'));
-        $this->assertSame('—', $this->cellule($c, 'cat-prov-jeune-g'));
-        $this->assertSame('—', $this->cellule($c, 'day-total-provende-g'));
+        $this->assertSame(['0', '0', '120'], $this->ecran($c));
+        $this->assertSame('0 g', $this->cellule($c, 'cat-prov-repro-g'));
+        $this->assertSame('0 g', $this->cellule($c, 'cat-prov-porcelet-g'));
+        $this->assertSame('72000 g', $this->cellule($c, 'cat-prov-jeune-g'));
+        $this->assertSame('72000 g (72 Kg)', $this->cellule($c, 'day-total-provende-g'));
+
+        // Seule une bande dont le stade ne relève d'aucune catégorie (« ponte », héritée) reste inconnue : « — », jamais 0.
+        $this->lot->update(['stage' => 'ponte']);
+        $this->assertSame(['—', '—', '—'], $this->ecran($this->ouvrir(self::J1)));
     }
 
     public function test_aucun_pourcentage_de_demonstration_du_premier_jour(): void
     {
-        // La maquette répartit le premier jour à 20 % / 72 % / reste. Bande de 100 : 20 / 72 / 8 seraient affichés.
+        // La maquette répartit le premier jour à 20 % / 72 % / reste. Le départ déduit met TOUT l'effectif dans la
+        // catégorie du stade de la bande : jamais une répartition inventée.
         $this->lot->update(['initial_quantity' => 100, 'current_quantity' => 100]);
 
         $c = $this->ouvrir(self::J1);
 
-        $this->assertSame(['—', '—', '—'], $this->ecran($c));
-        $this->assertNull($c->instance()->categoriesJour['repro']);
-        $this->assertNull($c->instance()->categoriesJour['sevre']);
-        $this->assertNull($c->instance()->categoriesJour['jeune']);
+        $this->assertSame(['0', '0', '100'], $this->ecran($c));
+        $this->assertSame(0, $c->instance()->categoriesJour['repro']);
+        $this->assertSame(0, $c->instance()->categoriesJour['sevre']);
+        $this->assertSame(100, $c->instance()->categoriesJour['jeune']);
     }
 
     public function test_bande_sans_chaine_le_formulaire_propose_l_effectif_de_depart_en_trois_champs(): void
@@ -321,7 +330,8 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/\bdisabled\b|\breadonly\b/', $tag);
         }
         $this->voit($c, 'Effectif de départ');
-        $this->voit($c, 'effectif total au début du jour : 120');
+        $this->voit($c, "l'effectif total au début du jour (120)");
+        $c->assertSet('departRepro', 0)->assertSet('departSevre', 0)->assertSet('departJeune', 120);
     }
 
     public function test_un_depart_valide_donne_un_apercu_en_direct_avant_l_enregistrement(): void
@@ -348,24 +358,27 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
 
     public function test_un_depart_incomplet_est_refuse_a_l_enregistrement(): void
     {
-        $c = $this->ouvrir(self::J1)->set('departRepro', 10)->set('departSevre', 50)->call('saveDay');
+        $c = $this->ouvrir(self::J1)->set('departRepro', 10)->set('departSevre', 50)->set('departJeune', null)->call('saveDay');
 
         $this->voit($c, 'Effectif de départ incomplet');
         $this->assertSame(0, LivestockDailyEntry::count());
     }
 
-    public function test_sans_depart_saisi_la_fiche_s_enregistre_comme_avant_sans_chaine(): void
+    /**
+     * 🔁 17/10/2026 — sans saisie, la première fiche ENREGISTRE le départ déduit du stade (0 / 0 / 120) et démarre
+     * la chaîne. Achat 2 (les achats de porcs vont aux Reproducteurs, D11) : 2 / 0 / 120, total 122 ; provende
+     * 2 × 2 000 + 120 × 600 = 76 000 g = 76 kg.
+     */
+    public function test_sans_saisie_la_premiere_fiche_enregistre_le_depart_deduit_du_stade(): void
     {
         $this->ouvrir(self::J1)->set('achat', 2)->call('saveDay');
 
         $f = $this->entree(self::J1);
         $this->assertSame(122, (int) $f->effectif_final);
-        $this->assertNull($f->cat_depart_repro);
-        $this->assertNull($f->cat_eff_repro, 'sans chaîne, aucune catégorie n\'est inventée');
-        $this->assertNull($f->cat_eff_sevre);
-        $this->assertNull($f->cat_eff_jeune);
-        $this->assertNull($f->feed_qty_kg, 'provende inconnue : null, jamais 0');
-        $this->assertFalse(app(EffectifParCategorieService::class)->aUneChaine($this->lot->id));
+        $this->assertSame([0, 0, 120], [(int) $f->cat_depart_repro, (int) $f->cat_depart_sevre, (int) $f->cat_depart_jeune]);
+        $this->assertSame([2, 0, 120], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
+        $this->assertSame(76.0, round((float) $f->feed_qty_kg, 2));
+        $this->assertTrue(app(EffectifParCategorieService::class)->aUneChaine($this->lot->id));
     }
 
     // ===================================================================== (3) verrouillage du départ
@@ -563,8 +576,8 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
         $this->departer($this->ouvrir(self::J1))->call('saveDay');          // chaîne sur A
 
         $c = Livewire::test(FichePorcs::class)->set('bandeId', $autre->id)->set('selectedDate', self::J1);
-        $this->assertSame(['—', '—', '—'], $this->ecran($c), 'B n\'a pas de chaîne');
-        $this->assertNotSame('', $this->tag($c, 'depart-repro'));
+        $this->assertSame(['0', '0', '500'], $this->ecran($c), 'B : départ déduit de SON stade, jamais celui de A');
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->tag($c, 'depart-repro'), 'B n\'a pas encore de départ verrouillé');
     }
 
     public function test_changer_de_bande_recharge_le_jour_de_la_nouvelle_bande(): void
@@ -587,7 +600,8 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
 
     // ===================================================================== D6, D8, D9, D12, départ refusé
 
-    public function test_d6_une_bande_deja_saisie_n_est_pas_migree_automatiquement_et_le_depart_reste_a_saisir(): void
+    /** 🔁 17/10/2026 — D6 : les saisies anciennes restent signalées, jamais reprises ; le départ est déduit du stade. */
+    public function test_d6_les_saisies_anciennes_ne_sont_pas_reprises_et_le_depart_est_deduit_du_stade(): void
     {
         $this->fiche($this->lot, '2026-10-03', ['effectif_final' => 120, 'cat_eff_repro' => 5, 'cat_eff_sevre' => 6, 'cat_eff_jeune' => 109]);
 
@@ -595,17 +609,16 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
 
         $this->voit($c, 'saisis à la main');
         $this->voit($c, '03/10/2026');
-        $this->voit($c, 'décision de migration');
-        $this->assertSame(['—', '—', '—'], $this->ecran($c), 'jamais repris automatiquement comme départ');
-        $c->assertSet('departRepro', null)->assertSet('departSevre', null)->assertSet('departJeune', null);
+        $this->assertSame(['0', '0', '120'], $this->ecran($c), 'départ déduit du stade, jamais les saisies anciennes');
 
         $c->set('achat', 1)->call('saveDay');
         $this->assertNull($this->entree('2026-10-03')->cat_depart_repro);
-        $this->assertNull($this->entree(self::J1)->cat_depart_repro);
+        $this->assertSame([0, 0, 120], [(int) $this->entree(self::J1)->cat_depart_repro, (int) $this->entree(self::J1)->cat_depart_sevre, (int) $this->entree(self::J1)->cat_depart_jeune]);
         $this->assertSame(5, (int) $this->entree('2026-10-03')->cat_eff_repro, 'les saisies anciennes ne sont pas touchées');
     }
 
-    public function test_une_bande_sans_chaine_reenregistree_conserve_ses_cat_eff_anciens(): void
+    /** 🔁 17/10/2026 — une bande déjà saisie, réenregistrée, est CORRIGÉE par la chaîne : 5 / 6 / 109 devient 0 / 0 / 120. */
+    public function test_une_bande_deja_saisie_reenregistree_est_corrigee_par_la_chaine(): void
     {
         $this->fiche($this->lot, self::J1, ['effectif_final' => 120, 'cat_eff_repro' => 5, 'cat_eff_sevre' => 6, 'cat_eff_jeune' => 109,
             'mort_repro' => 0, 'mort_sevre' => 0, 'mort_jeune' => 0, 'don_repro' => 0, 'don_sevre' => 0, 'don_jeune' => 0]);
@@ -613,7 +626,7 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
         Livewire::test(FichePorcs::class)->call('loadDay', self::J1)->set('achat', 0)->call('saveDay');
 
         $f = $this->entree(self::J1);
-        $this->assertSame([5, 6, 109], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
+        $this->assertSame([0, 0, 120], [(int) $f->cat_eff_repro, (int) $f->cat_eff_sevre, (int) $f->cat_eff_jeune]);
     }
 
     public function test_d8_somme_differente_du_total_donne_un_avertissement_date_sans_bloquer(): void
@@ -763,6 +776,9 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
 
     public function test_sans_effectif_de_categorie_connu_la_provende_est_un_tiret_et_l_autonomie_n_est_pas_calculee(): void
     {
+        // Seul cas encore inconnu : bande héritée au stade « ponte », qui ne relève d'aucune catégorie de porcs.
+        $this->lot->update(['stage' => 'ponte']);
+
         $calcul = $this->ouvrir(self::J1)->instance()->provendeCalculation;
 
         $this->assertNull($calcul['repro']['effectif']);
@@ -910,7 +926,8 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
     {
         $c = $this->departer($this->ouvrir(self::J1))->call('loadDay', self::J2);
 
-        $c->assertSet('departRepro', null)->assertSet('departSevre', null)->assertSet('departJeune', null);
+        // Le départ corrigé à la main est oublié : on retrouve le départ déduit du stade.
+        $c->assertSet('departRepro', 0)->assertSet('departSevre', 0)->assertSet('departJeune', 120);
     }
 
     public function test_etat_pour_jour_du_service_sur_les_porcs(): void
@@ -942,8 +959,9 @@ class FichePorcsEffectifAutomatiqueTest extends TestCase
     public function test_l_autonomie_n_est_pas_calculee_quand_la_consommation_est_inconnue(): void
     {
         $this->provende(100);
+        $this->lot->update(['stage' => 'ponte']);           // stade sans catégorie : consommation inconnue
 
-        $c = $this->ouvrir(self::J1);                       // bande sans chaîne : catégories inconnues
+        $c = $this->ouvrir(self::J1);
         $autonomie = $c->instance()->feedAutonomy;
 
         $this->assertTrue($autonomie['inconnu']);

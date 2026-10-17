@@ -226,7 +226,7 @@ class Index extends Component
             ->whereHas('species', fn ($q) => $q->where('code', $code))->sum('current_quantity');
 
         $mortaliteMois = function (string $code) {
-            $lotIds = \App\Models\LivestockLot::whereHas('species', fn ($q) => $q->where('code', $code))->pluck('id');
+            $lotIds = \App\Models\LivestockLot::where('is_active', true)->whereHas('species', fn ($q) => $q->where('code', $code))->pluck('id');   // bande archivée exclue
             $entries = \App\Models\LivestockDailyEntry::whereIn('lot_id', $lotIds)->where('entry_date', '>=', now()->startOfMonth())->get();
             $totalMorts = $entries->sum('mort');
             $effectifRef = $entries->sum(fn ($e) => max($e->effectif_final - $e->achat - $e->ne + $e->mort + $e->vente + $e->don, 1));
@@ -254,7 +254,7 @@ class Index extends Component
             'volailles' => [
                 'lots_actifs' => \App\Models\LivestockLot::where('is_active', true)->where('status', 'actif')->whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->count(),
                 'taux_ponte' => (function () {
-                    $lotIds = \App\Models\LivestockLot::whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->pluck('id');
+                    $lotIds = \App\Models\LivestockLot::where('is_active', true)->whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->pluck('id');   // bande archivée exclue
                     $entries = \App\Models\LivestockDailyEntry::whereIn('lot_id', $lotIds)->where('entry_date', '>=', now()->startOfMonth())->get();
                     $totalPonte = $entries->sum('ponte_total');
                     $effectifPondeuses = $entries->sum('effectif_final');

@@ -5,17 +5,18 @@ namespace App\Livewire\Elevage;
 use App\Actions\RaiseFeedAutonomyAlertAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
+use App\Livewire\Elevage\Concerns\AvecDepartAutomatique;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
+use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\FeedRationStandard;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
-use App\Models\Product;
+use App\Services\AutonomieAlimentaireService;
 use App\Services\EffectifParCategorieService;
 use App\Support\CategorieRationLapin;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -85,11 +86,23 @@ use Livewire\Component;
  * l'espèce cuniculture) — si aucun produit de provende correspondant
  * n'existe encore en stock, l'alerte reste en attente plutôt que d'inventer
  * un stock fictif (Document 00 §2.1).
+ *
+ * 🔁 DÉCISION CLIENT DU 17/10/2026 — GLOSSAIRE Reproducteur / Jeune / Sous-mères, partout (morts, dons,
+ * départ, rationnement, stade de la bande). Remplace D2 et la décision du 14/10/2026 décrites ci-dessus :
+ * l'ancien « Lapereau » (Morts / Dons) et l'ancien « Jeune » (30 g/j) sont les SOUS-MÈRES (emplacement
+ * `sevre`) ; l'ancien « Lapin de Chair » (60 g/j) est le JEUNE (emplacement `jeune`). Les propriétés
+ * `mortLapereau` / `donLapereau` / `departSevre` portent donc les Sous-mères, `mortChair` / `donChair` /
+ * `departJeune` les Jeunes. Le passage de stade est le SEVRAGE du jour (Sous-mères → Jeune) : il est gardé,
+ * car c'est le seul mouvement qui fait passer les nés (comptés en Sous-mères) dans la catégorie vendue
+ * (Jeune) ; sans lui, les effectifs par catégorie dériveraient. Effectif de départ : déduit du stade de la
+ * bande (`AvecDepartAutomatique`), plus de saisie obligatoire.
  */
 #[Layout('layouts.app')]
 class FicheLapins extends Component
 {
+    use AvecDepartAutomatique;
     use AvecProphylaxieDuJour;
+    use AvecSoinsDuMois;
 
     public string $selectedDate;
 
@@ -233,6 +246,12 @@ class FicheLapins extends Component
     }
 
     /** Fiches du mois courant de LA bande de la fiche, par date (le tableau mensuel est celui d'une bande). */
+    /** Bandes du tableau mensuel (AvecSoinsDuMois). */
+    protected function lotsDuTableauMensuel(): array
+    {
+        return [$this->bande?->id];
+    }
+
     public function getMonthlyEntriesProperty()
     {
         $bande = $this->bande;
@@ -366,7 +385,7 @@ class FicheLapins extends Component
 
         $resultat = EffectifParCategorieService::calculerJour(EffectifParCategorieService::LAPINS, $veille, [
             'achat' => $this->achat, 'ne' => $this->ne, 'vente' => $this->venteDuJour,
-            // Emplacements : Lapereau = Jeune (`sevre`, D2) ; Lapin de chair = `jeune`.
+            // Emplacements (17/10/2026) : Sous-mères = `sevre` ; Jeune = `jeune`.
             'mort_repro' => $this->mortRepro, 'mort_sevre' => $this->mortLapereau, 'mort_jeune' => $this->mortChair,
             'don_repro' => $this->donRepro, 'don_sevre' => $this->donLapereau, 'don_jeune' => $this->donChair,
             'passage' => $this->passage,
@@ -427,66 +446,36 @@ class FicheLapins extends Component
         // Ticket 15.36 : rapprochement par CLÉ STABLE (plus par sous-chaîne du libellé,
         // qui retombait en silence sur 30/60/120 dès qu'on renommait une ligne du barème).
         $rRepro = CategorieRationLapin::ration($rations, CategorieRationLapin::REPRODUCTEUR);
-        $rJeune = CategorieRationLapin::ration($rations, CategorieRationLapin::JEUNE);
+        $rSousMeres = CategorieRationLapin::ration($rations, CategorieRationLapin::SOUS_MERES);
         $rChair = CategorieRationLapin::ration($rations, CategorieRationLapin::CHAIR);
 
         $cat = $this->categoriesJour;
-        // Colonnes de synchro INCHANGÉES : cat_eff_sevre = Jeune, cat_eff_jeune = Lapin de Chair.
+        // Colonnes de synchro INCHANGÉES : cat_eff_sevre = Sous-mères, cat_eff_jeune = Jeune (17/10/2026).
         $ligne = fn (?int $effectif, int $ration): array => [
             'ration' => $ration, 'effectif' => $effectif, 'total_g' => $effectif === null ? null : $effectif * $ration,
         ];
         $repro = $ligne($cat['repro'], $rRepro);
-        $jeune = $ligne($cat['sevre'], $rJeune);
+        $sousMeres = $ligne($cat['sevre'], $rSousMeres);
         $chair = $ligne($cat['jeune'], $rChair);
 
-        $inconnu = $repro['total_g'] === null || $jeune['total_g'] === null || $chair['total_g'] === null;
-        $total = $inconnu ? null : $repro['total_g'] + $jeune['total_g'] + $chair['total_g'];
+        $inconnu = $repro['total_g'] === null || $sousMeres['total_g'] === null || $chair['total_g'] === null;
+        $total = $inconnu ? null : $repro['total_g'] + $sousMeres['total_g'] + $chair['total_g'];
 
         return [
             'repro' => $repro,
-            'jeune' => $jeune,
+            'sous_meres' => $sousMeres,
             'chair' => $chair,
             'total_g' => $total,
             'total_kg' => $total === null ? null : round($total / 1000, 2),
         ];
     }
 
+    /** Autonomie alimentaire de la filière sur la provende du jour affiché — calcul commun (AutonomieAlimentaireService). */
     public function getFeedAutonomyProperty(): ?array
     {
-        if (! Schema::hasTable('products')) {
-            return null;
-        }
+        $service = app(AutonomieAlimentaireService::class);
 
-        $stockProduct = Product::whereHas('species', fn ($q) => $q->where('code', $this->speciesCode()))
-            ->where(fn ($q) => $q->where('name', 'like', '%provende%')->orWhere('name', 'like', '%aliment%'))
-            ->first();
-
-        $totalProvKg = $this->provendeCalculation['total_kg'];
-
-        if (! $stockProduct) {
-            return ['available' => false];
-        }
-
-        // Ticket 15.41 : consommation inconnue (effectif d'une catégorie inconnu) → autonomie NON calculée,
-        // jamais « 99 jours » : diviser par une provende prise pour 0 masquerait une rupture réelle.
-        if ($totalProvKg === null) {
-            return ['available' => true, 'inconnu' => true, 'product' => $stockProduct, 'stock_kg' => $stockProduct->stockEnKg(), 'autonomie_jours' => null, 'critique' => false];
-        }
-
-        // ⚠️ CONVERSION OBLIGATOIRE : l'aliment est compté en SACS de 25 kg
-        // depuis le ticket 14.36, alors que la consommation est en kilos.
-        // Comparer les deux directement donnait une autonomie 25 fois trop
-        // faible, donc une alerte de rupture permanente (ticket 14.40).
-        $stockKg = $stockProduct->stockEnKg();
-        $autonomieJours = $totalProvKg > 0 ? round($stockKg / $totalProvKg, 1) : 99;
-
-        return [
-            'available' => true,
-            'product' => $stockProduct,
-            'stock_kg' => $stockKg,
-            'autonomie_jours' => $autonomieJours,
-            'critique' => $autonomieJours <= 3.0,
-        ];
+        return $service->evaluer($service->produitProvende($this->speciesCode()), $this->provendeCalculation['total_kg']);
     }
 
     /**
@@ -557,6 +546,7 @@ class FicheLapins extends Component
         $this->traitementsCoches = [];
         // Le départ saisi (aperçu) est propre à un jour : il ne survit pas à un changement de jour.
         $this->reset(['departRepro', 'departSevre', 'departJeune', 'mortAncienTotal', 'donAncienTotal']);
+        $this->preremplirDepartDepuisStade();
 
         // Ticket 15.41 : la fiche de LA bande à CETTE date, quel que soit le mois (le tableau mensuel ne couvre que
         // le mois courant) — jamais la fiche d'une autre bande.
@@ -571,7 +561,7 @@ class FicheLapins extends Component
             // 🔴→✅ TICKET 15.41 — DÉFAUT (a) : les compteurs de morts, de dons et le passage de stade étaient
             // laissés à leur valeur précédente à l'ouverture d'un jour existant, puis réécrits tels quels
             // (`mort` / `don` périmés) au réenregistrement. Ils sont rechargés depuis les colonnes PAR CATÉGORIE.
-            // Emplacements : `mort_sevre` = Lapereau (= Jeune, D2), `mort_jeune` = Lapin de chair.
+            // Emplacements (17/10/2026) : `mort_sevre` = Sous-mères, `mort_jeune` = Jeune.
             if ($entry->mort_repro !== null && $entry->mort_sevre !== null && $entry->mort_jeune !== null) {
                 $this->mortRepro = (int) $entry->mort_repro;
                 $this->mortLapereau = (int) $entry->mort_sevre;
@@ -656,7 +646,7 @@ class FicheLapins extends Component
 
         // Fiche ancienne non ventilée rechargée : ne pas remettre ses morts / dons à zéro en silence.
         if (($this->mortAncienTotal !== null && $mort === 0) || ($this->donAncienTotal !== null && $don === 0)) {
-            $this->dispatch('toast', message: 'Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les (Reproducteur / Lapereau / Lapin de chair) avant d\'enregistrer.', type: 'error');
+            $this->dispatch('toast', message: 'Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les (Reproducteur / Jeune / Sous-mères) avant d\'enregistrer.', type: 'error');
 
             return;
         }
@@ -689,7 +679,7 @@ class FicheLapins extends Component
             'effectif_smeres' => $this->effectifSmeres,
             'feed_qty_kg' => $this->provendeCalculation['total_kg'],
             // Ticket 15.41 — MOUVEMENTS PAR CATÉGORIE persistés (ils rechargent le jour et alimentent la chaîne).
-            // Emplacements : `*_sevre` = Lapereau (= Jeune, D2), `*_jeune` = Lapin de chair.
+            // Emplacements (17/10/2026) : `*_sevre` = Sous-mères, `*_jeune` = Jeune.
             'mort_repro' => $this->mortRepro, 'mort_sevre' => $this->mortLapereau, 'mort_jeune' => $this->mortChair,
             'don_repro' => $this->donRepro, 'don_sevre' => $this->donLapereau, 'don_jeune' => $this->donChair,
             'passage_sevre_jeune' => $this->passage,

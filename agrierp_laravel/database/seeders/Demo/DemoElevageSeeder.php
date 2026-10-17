@@ -10,6 +10,9 @@ use App\Models\LivestockReproductionEvent;
 use App\Models\VeterinaryCalendarEvent;
 use App\Models\VeterinaryRecord;
 use App\Models\VeterinaryWithdrawalPeriod;
+use App\Services\EffectifParCategorieService;
+use App\Support\CategorieRationLapin;
+use App\Support\CategorieRationPorc;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 
@@ -167,6 +170,16 @@ class DemoElevageSeeder extends Seeder
         $ponte = $stade === 'ponte';
         $jourCycle = 0;
 
+        // 🔴→✅ CORRECTIF DU 17/10/2026 (« corriger les bandes déjà saisies : OUI ») — lapins et porcs : la bande
+        // suit la CHAÎNE PAR CATÉGORIE comme une saisie réelle. Départ DÉDUIT du stade (même règle que les fiches,
+        // `departDepuisStade`), mouvements ventilés par catégorie, sevrage avant toute vente de jeunes, provende
+        // calculée catégorie × ration. Avant : `cat_eff_repro` OU `cat_eff_jeune` seul renseigné, sans départ — un
+        // état que la chaîne ne savait pas reproduire et que les fiches signalaient « saisi à la main ».
+        $chaine = EffectifParCategorieService::especeDuLot($lot->loadMissing('species')) !== null;
+        $categories = $chaine ? EffectifParCategorieService::departDepuisStade($lot, $effectif) : null;
+        $chaine = $categories !== null;
+        $rationsCategorie = $chaine ? $this->rationsParCategorie($espece) : null;
+
         foreach ($this->ctx->jours($config['debut']) as $jour) {
             if ($effectif <= 0) {
                 break;
@@ -258,6 +271,30 @@ class DemoElevageSeeder extends Seeder
             // dérive du précédent, il n'est jamais tiré au sort.
             $effectifFinal = max(0, $effectif + 0 + $nes - ($morts + $vendus + $dons));
 
+            // Ventilation par catégorie (lapins, porcs) : les nés entrent en 2e catégorie (Sous-mères / Porcelet),
+            // les ventes sortent de la 3e (Jeune / Porc Marchand) après un sevrage du même nombre, morts et dons sont
+            // pris là où il y a des sujets. La somme des catégories reste donc égale à l'effectif final.
+            $ventilation = [];
+            if ($chaine) {
+                $categories['sevre'] += $nes;
+                $passage = max(0, min($categories['sevre'], $vendus - $categories['jeune']));
+                $categories['sevre'] -= $passage;
+                $categories['jeune'] += $passage;
+                $categories['jeune'] -= $vendus;
+                $mortsVentiles = $this->prelever($categories, $morts, $stade === 'reproduction' ? ['repro', 'sevre', 'jeune'] : ['jeune', 'sevre', 'repro']);
+                $donsVentiles = $this->prelever($categories, $dons, ['sevre', 'jeune', 'repro']);
+                $ventilation = [
+                    'mort_repro' => $mortsVentiles['repro'], 'mort_sevre' => $mortsVentiles['sevre'], 'mort_jeune' => $mortsVentiles['jeune'],
+                    'don_repro' => $donsVentiles['repro'], 'don_sevre' => $donsVentiles['sevre'], 'don_jeune' => $donsVentiles['jeune'],
+                    'passage_sevre_jeune' => $passage,
+                ];
+                if ($entrees === 0) {
+                    // Le départ (effectif au DÉBUT du premier jour) est posé sur la première fiche, comme à l'écran.
+                    $depart = EffectifParCategorieService::departDepuisStade($lot, (int) $config['effectif']);
+                    $ventilation += ['cat_depart_repro' => $depart['repro'], 'cat_depart_sevre' => $depart['sevre'], 'cat_depart_jeune' => $depart['jeune']];
+                }
+            }
+
             // --- Provende : ration normative × effectif --------------------
             //
             // ⚠️ CONVERTIE EN SACS DE 25 KG, l'unité du produit au catalogue
@@ -265,13 +302,15 @@ class DemoElevageSeeder extends Seeder
             // le référentiel `feed_ration_standards` — mais le stock, lui, se
             // décrémente dans son unité réelle. Sortir des kilos d'un produit
             // compté en sacs aurait vidé le stock 25 fois trop vite.
-            $feedKg = round(($rationG * $effectifFinal) / 1000, 2);
+            $feedKg = $chaine
+                ? round(($categories['repro'] * $rationsCategorie['repro'] + $categories['sevre'] * $rationsCategorie['sevre'] + $categories['jeune'] * $rationsCategorie['jeune']) / 1000, 2)
+                : round(($rationG * $effectifFinal) / 1000, 2);
             $feedSacs = round($feedKg / 25, 3);
 
             // --- Poids moyen : progression au GMQ du référentiel -----------
             $poids += $gmq;
 
-            $entree = LivestockDailyEntry::create([
+            $entree = LivestockDailyEntry::create($ventilation + [
                 'lot_id' => $lot->id,
                 'entry_date' => $jour->format('Y-m-d'),
                 'achat' => 0,
@@ -280,8 +319,7 @@ class DemoElevageSeeder extends Seeder
                 'vente' => $vendus,
                 'don' => $dons,
                 'effectif_final' => $effectifFinal,
-                'cat_eff_repro' => $stade === 'reproduction' ? $effectifFinal : null,
-                'cat_eff_jeune' => $stade === 'engraissement' ? $effectifFinal : null,
+                // `cat_eff_*` : calculés par la chaîne en fin de bande (recalculerChaine), jamais posés à la main.
                 'feed_qty_kg' => $feedKg,
                 'feed_product_id' => $aliment->id,
                 'weight_sample_avg_g' => $this->ctx->chance(20) ? (int) round($poids) : null,
@@ -348,6 +386,10 @@ class DemoElevageSeeder extends Seeder
             $entrees++;
         }
 
+        if ($chaine) {
+            app(EffectifParCategorieService::class)->recalculerChaine($lot->id);
+        }
+
         // Une bande entièrement écoulée est clôturée — c'est la fin normale
         // d'un cycle d'engraissement, pas une anomalie à laisser « active ».
         $lot->update([
@@ -404,6 +446,50 @@ class DemoElevageSeeder extends Seeder
     }
 
     // ------------------------------------------------------- le référentiel
+
+    /**
+     * Prélève `$quantite` sujets dans les catégories, dans l'ordre donné, sans jamais descendre sous 0.
+     *
+     * @param  array{repro: int, sevre: int, jeune: int}  $categories  modifié en place
+     * @param  list<string>  $ordre
+     * @return array{repro: int, sevre: int, jeune: int} quantité prise dans chaque catégorie
+     */
+    private function prelever(array &$categories, int $quantite, array $ordre): array
+    {
+        $pris = ['repro' => 0, 'sevre' => 0, 'jeune' => 0];
+        foreach ($ordre as $cle) {
+            $n = min($quantite, max(0, $categories[$cle]));
+            $categories[$cle] -= $n;
+            $pris[$cle] += $n;
+            $quantite -= $n;
+        }
+
+        return $pris;
+    }
+
+    /**
+     * Rations par emplacement de catégorie, lues par les MÊMES clés stables que les fiches.
+     *
+     * @return array{repro: int, sevre: int, jeune: int}
+     */
+    private function rationsParCategorie(string $espece): array
+    {
+        $rations = \App\Models\FeedRationStandard::where('species_code', $espece)->get();
+
+        if ($espece === 'porciculture') {
+            return [
+                'repro' => CategorieRationPorc::ration($rations, CategorieRationPorc::REPRODUCTEUR),
+                'sevre' => CategorieRationPorc::ration($rations, CategorieRationPorc::PORCELET),
+                'jeune' => CategorieRationPorc::ration($rations, CategorieRationPorc::MARCHAND),
+            ];
+        }
+
+        return [
+            'repro' => CategorieRationLapin::ration($rations, CategorieRationLapin::REPRODUCTEUR),
+            'sevre' => CategorieRationLapin::ration($rations, CategorieRationLapin::SOUS_MERES),
+            'jeune' => CategorieRationLapin::ration($rations, CategorieRationLapin::CHAIR),
+        ];
+    }
 
     private function rationJournaliere(string $espece, string $stade): int
     {

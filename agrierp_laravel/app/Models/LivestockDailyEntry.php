@@ -102,6 +102,20 @@ class LivestockDailyEntry extends Model
         return $previous?->effectif_final ?? $this->lot?->initial_quantity ?? 0;
     }
 
+    /**
+     * 🔴→✅ « POIDS GÉNÉRAL » DU TABLEAU MENSUEL — total pesé du jour, en grammes, reconstitué depuis le poids
+     * MOYEN stocké (`weight_sample_avg_g`, ticket 14.63) × l'effectif final. Les fiches Lapins, Escargots et
+     * Reproducteurs affichaient la moyenne sous l'en-tête « Poids Général (g) ». Null = aucune pesée ce jour-là.
+     */
+    public function getPoidsGeneralGAttribute(): ?int
+    {
+        if (! $this->weight_sample_avg_g || ! $this->effectif_final) {
+            return null;
+        }
+
+        return (int) round($this->weight_sample_avg_g * $this->effectif_final);
+    }
+
     public function getMortalityRateAttribute(): float
     {
         $previous = $this->previousEffectif();

@@ -129,7 +129,7 @@ class BilanTechnicoEconomique extends Component
         $prixMoyenKg = (float) (FeedType::where('species_id', $lot->species_id)->avg('price_per_kg') ?? 0);
         $coutProvende = round($provendeServieKg * $prixMoyenKg);
 
-        $coutVeterinaire = (float) VeterinaryRecord::where('lot_id', $lot->id)->sum('cost');
+        $coutVeterinaire = (float) VeterinaryRecord::where('lot_id', $lot->id)->where('is_active', true)->sum('cost');   // soin archivé = supprimé
 
         return [
             ['label' => 'Acquisition initiale', 'montant' => $lot->acquisition_cost, 'reel' => $lot->acquisition_cost !== null],

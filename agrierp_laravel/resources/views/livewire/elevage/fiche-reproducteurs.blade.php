@@ -121,13 +121,22 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
-                    <input wire:model="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
                 </div>
             </div>
 
             <div class="border-t border-outline-variant pt-md">
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">vaccines</span>Traitements &amp; Prophylaxie</p>
-                <x-module-pending label="Le protocole de prophylaxie du jour de cette fiche" since="à planifier — le moteur existe (ticket 3.11 terminé) et alimente déjà les fiches Lapins et Porcs ; son raccordement à cette fiche n'est pas fait" />
+                @php $protocoleDuJour = $this->protocoleDuJour; @endphp
+                @if($protocoleDuJour)
+                    <x-prophylaxie-du-jour :protocole="$protocoleDuJour" />
+                @endif
                 <div class="mt-sm">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Observations</label>
                     <input wire:model="observations" type="text" placeholder="ex : RAS" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
@@ -173,7 +182,7 @@
                             <td class="px-sm py-xs text-center border-r border-outline-variant {{ ($entry?->mort ?? 0) > 0 ? 'text-error-deep font-bold' : '' }}">{{ $entry?->mort ?? '—' }}</td>
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
-                            <td class="px-sm py-xs text-right">{{ $entry?->weight_sample_avg_g ?? '—' }}</td>
+                            <td class="px-sm py-xs text-right">{{ $entry?->poids_general_g ?? '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

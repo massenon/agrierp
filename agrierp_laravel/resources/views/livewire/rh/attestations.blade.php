@@ -100,7 +100,7 @@
                     <div class="flex justify-end pt-xl">
                         <div class="text-center">
                             <p class="text-[10px] text-outline mb-8">Le Directeur Général</p>
-                            <p class="font-bold text-brand-forest text-xs border-t border-outline-variant pt-xs">OLOUKOUNLE Olouchegoun Hassimiyou</p>
+                            <p class="font-bold text-brand-forest text-xs border-t border-outline-variant pt-xs">M. Olouchègoun</p>
                         </div>
                     </div>
                 </div>

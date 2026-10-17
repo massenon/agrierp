@@ -53,8 +53,8 @@
                 {{-- D6 : une bande déjà saisie à la main n'est JAMAIS migrée automatiquement ; le départ reste à saisir. --}}
                 <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest">
                     Cette bande porte déjà des effectifs par catégorie saisis à la main (fiche du {{ \Carbon\Carbon::parse($cat['ancien']['date'])->format('d/m/Y') }} :
-                    Reproducteur {{ $cat['ancien']['categories']['repro'] }}, Jeune {{ $cat['ancien']['categories']['sevre'] }}, Lapin de Chair {{ $cat['ancien']['categories']['jeune'] }}).
-                    Ils ne sont pas repris automatiquement comme effectif de départ : saisissez l'effectif de départ ci-dessous (décision de migration à prendre avec le client).
+                    Reproducteur {{ $cat['ancien']['categories']['repro'] }}, Jeune {{ $cat['ancien']['categories']['jeune'] }}, Sous-mères {{ $cat['ancien']['categories']['sevre'] }}).
+                    Ils ne sont pas repris comme effectif de départ : l'effectif de départ ci-dessous est déduit du stade de la bande, corrigez-le si besoin avant d'enregistrer.
                 </div>
             @endif
 
@@ -73,9 +73,9 @@
                 </div>
             </div>
 
-            {{-- D2 (décision client du 15/10/2026, recommandation de l'agent) : la maquette dit « Lapereau » aux Morts et aux Dons,
-                 « Jeune » au rationnement (glossaire 15.36) — c'est la MÊME catégorie. Libellé de la maquette conservé ici ;
-                 emplacement `sevre` (colonnes `mort_sevre` / `don_sevre`). « Lapin de chair » (Morts) et « Lapin de Chair » (Dons) sont ceux de la maquette. --}}
+            {{-- Décision client du 17/10/2026 : glossaire Reproducteur / Jeune / Sous-mères, partout (remplace D2 et la décision du 14/10/2026).
+                 Jeune = emplacement `jeune` (`mortChair` / `donChair`, colonnes `mort_jeune` / `don_jeune`) ;
+                 Sous-mères = emplacement `sevre` (`mortLapereau` / `donLapereau`, colonnes `mort_sevre` / `don_sevre`). --}}
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
                 <div class="grid grid-cols-3 gap-sm">
@@ -88,7 +88,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapin de chair</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('mortChair', {{ max(0, $mortChair - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="mortChair" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -96,7 +96,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapereau</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Sous-mères</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('mortLapereau', {{ max(0, $mortLapereau - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="mortLapereau" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -118,7 +118,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapin de Chair</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('donChair', {{ max(0, $donChair - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="donChair" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -126,7 +126,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapereau</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Sous-mères</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('donLapereau', {{ max(0, $donLapereau - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="donLapereau" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -136,31 +136,33 @@
                 </div>
             </div>
 
-            {{-- Passage de stade (QC3/D3 du 14-15/10/2026) : un FAIT saisi — nombre de sujets qui passent de Jeune à Lapin de Chair ce jour. HORS MAQUETTE, assumé. --}}
+            {{-- Sevrage du jour (ex-« Passage de stade », QC3/D3 du 14-15/10/2026, réévalué le 17/10/2026) : nombre de sujets qui passent de
+                 Sous-mères à Jeune ce jour. GARDÉ : c'est le seul mouvement qui fait passer les nés (comptés en Sous-mères) dans la catégorie
+                 vendue (Jeune) ; sans lui, les effectifs par catégorie, donc la provende, dériveraient. Hors maquette, assumé. --}}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
                 <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Passage de stade (Jeune → Lapin de Chair) <span class="text-outline font-normal text-[9px] normal-case">(hors maquette)</span></label>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Sevrage du jour (Sous-mères → Jeune)</label>
                     <input wire:model.live="passage" type="number" min="0" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white">
                 </div>
             </div>
 
             @if($cat['depart_requis'])
-                {{-- Effectif de DÉPART (D4) : saisi UNE seule fois, au DÉBUT du jour, puis verrouillé (D5 non tranché : aucun déverrouillage). --}}
+                {{-- Effectif de DÉPART (D4) : DÉDUIT du stade de la bande (AvecDepartAutomatique), corrigeable avant le premier enregistrement, puis verrouillé. --}}
                 <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
-                    <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">edit_note</span>Effectif de départ par catégorie (saisi une seule fois)</p>
-                    <p class="text-[10px] text-outline mb-xs">Effectif au DÉBUT du jour, avant les mouvements du jour. La somme des trois catégories doit égaler l'effectif total au début du jour (effectif total au début du jour : {{ $this->previousEffectif }}). Une fois enregistré, il est verrouillé.</p>
+                    <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">edit_note</span>Effectif de départ par catégorie (déduit du stade de la bande)</p>
+                    <p class="text-[10px] text-outline mb-xs">Effectif au DÉBUT du jour, avant les mouvements du jour, pré-rempli automatiquement depuis le stade de la bande. La somme des trois catégories doit égaler l'effectif total au début du jour ({{ $this->previousEffectif }}). Corrigez-le seulement pour une bande mixte ; il est verrouillé au premier enregistrement.</p>
                     <div class="grid grid-cols-3 gap-sm">
                         <div>
                             <label for="depart-repro" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
                             <input id="depart-repro" wire:model.live="departRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
                         </div>
                         <div>
-                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
-                            <input id="depart-sevre" wire:model.live="departSevre" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
+                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
+                            <input id="depart-jeune" wire:model.live="departJeune" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
                         </div>
                         <div>
-                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapin de Chair</label>
-                            <input id="depart-jeune" wire:model.live="departJeune" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
+                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Sous-mères</label>
+                            <input id="depart-sevre" wire:model.live="departSevre" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
                         </div>
                     </div>
                 </div>
@@ -174,12 +176,12 @@
                             <input id="depart-repro" type="number" value="{{ $cat['depart']['repro'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
                         </div>
                         <div>
-                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
-                            <input id="depart-sevre" type="number" value="{{ $cat['depart']['sevre'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
+                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
+                            <input id="depart-jeune" type="number" value="{{ $cat['depart']['jeune'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
                         </div>
                         <div>
-                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Lapin de Chair</label>
-                            <input id="depart-jeune" type="number" value="{{ $cat['depart']['jeune'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
+                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Sous-mères</label>
+                            <input id="depart-sevre" type="number" value="{{ $cat['depart']['sevre'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
                         </div>
                     </div>
                     @if($cat['mode'] === 'avant_depart')
@@ -256,15 +258,15 @@
                                 </tr>
                                 <tr class="bg-surface-zebra">
                                     <td class="px-md py-xs font-bold text-brand-forest">Jeune</td>
-                                    <td class="px-md py-xs text-center"><input id="cat-eff-lapereau" type="text" inputmode="numeric" disabled value="{{ $provende['jeune']['effectif'] ?? '—' }}" title="Calculé automatiquement : veille + achats + nés − morts − dons Lapereau − passage de stade." class="w-16 h-8 text-center border border-outline-variant rounded text-xs font-bold bg-white"></td>
-                                    <td class="px-md py-xs text-center font-mono text-brand-emerald font-bold">{{ $provende['jeune']['ration'] }} g/j</td>
-                                    <td id="cat-prov-lapereau-g" class="px-md py-xs text-right font-mono font-bold text-brand-emerald">{{ $provende['jeune']['total_g'] === null ? '—' : $provende['jeune']['total_g'].' g' }}</td>
+                                    <td class="px-md py-xs text-center"><input id="cat-eff-chair" type="text" inputmode="numeric" disabled value="{{ $provende['chair']['effectif'] ?? '—' }}" title="Calculé automatiquement : veille − ventes − morts − dons Jeune + sevrage du jour." class="w-16 h-8 text-center border border-outline-variant rounded text-xs font-bold bg-white"></td>
+                                    <td class="px-md py-xs text-center font-mono text-brand-emerald font-bold">{{ $provende['chair']['ration'] }} g/j</td>
+                                    <td id="cat-prov-chair-g" class="px-md py-xs text-right font-mono font-bold text-brand-emerald">{{ $provende['chair']['total_g'] === null ? '—' : $provende['chair']['total_g'].' g' }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="px-md py-xs font-bold text-brand-forest">Lapin de Chair</td>
-                                    <td class="px-md py-xs text-center"><input id="cat-eff-chair" type="text" inputmode="numeric" disabled value="{{ $provende['chair']['effectif'] ?? '—' }}" title="Calculé automatiquement : veille − ventes − morts − dons Lapin de Chair + passage de stade." class="w-16 h-8 text-center border border-outline-variant rounded text-xs font-bold bg-surface-zebra"></td>
-                                    <td class="px-md py-xs text-center font-mono">{{ $provende['chair']['ration'] }} g/j</td>
-                                    <td id="cat-prov-chair-g" class="px-md py-xs text-right font-mono font-bold text-brand-emerald">{{ $provende['chair']['total_g'] === null ? '—' : $provende['chair']['total_g'].' g' }}</td>
+                                    <td class="px-md py-xs font-bold text-brand-forest">Sous-mères</td>
+                                    <td class="px-md py-xs text-center"><input id="cat-eff-lapereau" type="text" inputmode="numeric" disabled value="{{ $provende['sous_meres']['effectif'] ?? '—' }}" title="Calculé automatiquement : veille + achats + nés − morts − dons Sous-mères − sevrage du jour." class="w-16 h-8 text-center border border-outline-variant rounded text-xs font-bold bg-surface-zebra"></td>
+                                    <td class="px-md py-xs text-center font-mono">{{ $provende['sous_meres']['ration'] }} g/j</td>
+                                    <td id="cat-prov-lapereau-g" class="px-md py-xs text-right font-mono font-bold text-brand-emerald">{{ $provende['sous_meres']['total_g'] === null ? '—' : $provende['sous_meres']['total_g'].' g' }}</td>
                                 </tr>
                             </tbody>
                             <tfoot class="bg-brand-emerald/10 font-bold text-brand-forest border-t border-brand-emerald/20">
@@ -274,30 +276,7 @@
                     </div>
                 </div>
 
-                @if(($this->feedAutonomy['available'] ?? false))
-                    @if($this->feedAutonomy['inconnu'] ?? false)
-                        <div class="bg-surface-zebra border border-outline-variant rounded-lg p-sm text-xs text-brand-forest">
-                            Autonomie alimentaire : <strong>—</strong> ({{ $this->feedAutonomy['product']->name }}, {{ $this->feedAutonomy['stock_kg'] }} Kg en stock) — la consommation du jour est inconnue tant que les effectifs par catégorie le sont.
-                        </div>
-                    @elseif($this->feedAutonomy['critique'])
-                        <div class="bg-error-bg border border-error-deep/30 rounded-lg p-md flex items-start justify-between gap-sm shadow-sm flex-wrap">
-                            <div class="flex items-start gap-sm">
-                                <span class="material-symbols-outlined text-error-deep text-[22px] flex-shrink-0 mt-0.5">warning</span>
-                                <div class="text-xs text-error-deep">
-                                    <p class="font-bold text-sm">Alerte critique - Autonomie alimentaire</p>
-                                    <p>Le stock de {{ $this->feedAutonomy['product']->name }} ne couvre plus que {{ $this->feedAutonomy['autonomie_jours'] }} jours de consommation théorique du cheptel actif !</p>
-                                </div>
-                            </div>
-                            <a href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
-                        </div>
-                    @else
-                        <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm text-xs text-brand-forest">
-                            Autonomie alimentaire : <strong>{{ $this->feedAutonomy['autonomie_jours'] }} jours</strong> ({{ $this->feedAutonomy['product']->name }}, {{ $this->feedAutonomy['stock_kg'] }} Kg en stock).
-                        </div>
-                    @endif
-                @else
-                    <x-module-pending label="Le suivi d'autonomie alimentaire" since="qu'un produit de provende cuniculture existe en catalogue avec un stock suivi" />
-                @endif
+                <x-autonomie-alimentaire :autonomie="$this->feedAutonomy" filiere="cuniculture" />
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-md border-t border-outline-variant pt-md">
                     <div>
@@ -311,7 +290,8 @@
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté</label>
                         <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
-                            {{ $peseeTotal && $this->effectifFinalCalc > 0 ? intdiv($peseeTotal, $this->effectifFinalCalc) : 0 }} g
+                            {{-- Arrondi, comme la valeur enregistrée (ticket 14.63) ; « — » sans pesée, jamais 0. --}}
+                            {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
                         </div>
                     </div>
                 </div>
@@ -382,8 +362,8 @@
                             <td class="px-sm py-xs text-center">{{ $entry?->effectif_smeres ?? '—' }}</td>
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
-                            <td class="px-sm py-xs text-right">{{ $entry?->weight_sample_avg_g ?? '—' }}</td>
-                            <td class="px-sm py-xs text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ? $entry->symptomes : '—') }}</td>
+                            <td class="px-sm py-xs text-right">{{ $entry?->poids_general_g ?? '—' }}</td>
+                            <td class="px-sm py-xs text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

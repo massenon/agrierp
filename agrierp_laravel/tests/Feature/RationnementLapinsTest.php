@@ -144,16 +144,16 @@ class RationnementLapinsTest extends TestCase
         $this->assertSame([20, 32, 40], [$cat['repro'], $cat['sevre'], $cat['jeune']]);
     }
 
-    /** Sans historique (aucun départ), l'effectif n'est plus une saisie : « — », et le départ est proposé. */
-    public function test_without_history_the_breeder_line_is_unknown_and_the_departure_is_offered(): void
+    /** 🔁 17/10/2026 — sans historique, le départ est DÉDUIT du stade (« engraissement » = Jeune) : 0 / 0 / 100, sans saisie. */
+    public function test_without_history_the_departure_is_deduced_from_the_band_stage(): void
     {
         $component = Livewire::test(FicheLapins::class)->set('selectedDate', '2026-07-10');
 
         $cat = $component->instance()->categoriesJour;
-        $this->assertNull($cat['repro']);
-        $this->assertNull($cat['sevre']);
-        $this->assertNull($cat['jeune']);
-        $this->assertTrue($cat['depart_requis']);
+        $this->assertSame(0, $cat['repro']);
+        $this->assertSame(0, $cat['sevre']);
+        $this->assertSame(100, $cat['jeune']);
+        $this->assertTrue($cat['depart_requis'], 'le départ déduit reste affiché, corrigeable, tant qu\'il n\'est pas enregistré');
     }
 
     /** L'effectif calculé alimente réellement le rationnement. */

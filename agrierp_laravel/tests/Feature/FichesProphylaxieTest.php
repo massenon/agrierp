@@ -428,19 +428,23 @@ class FichesProphylaxieTest extends TestCase
     // ───────────────────── Marqueurs des fiches non câblées ─────────────────────
 
     /**
-     * Pondeuses, Reproducteurs, Escargots : INCHANGÉES fonctionnellement, mais le
-     * marqueur ne ment plus. Lecture de la source : ces trois fiches ont besoin
-     * de leurs propres jeux de données pour se rendre, et seule la FORMULATION
-     * est en jeu ici.
+     * 🔁 17/10/2026 — Pondeuses et Reproducteurs sont RACCORDÉES au protocole du jour (même moteur que Lapins et
+     * Porcs) : plus de marqueur « à planifier » pour la prophylaxie. Escargots garde ses marqueurs (hygrométrie,
+     * rationnement) : leur suite reste dite, sans échéance inventée.
      */
     public function test_les_marqueurs_restants_ne_pretendent_plus_attendre_le_ticket_3_11(): void
     {
-        foreach (['fiche-pondeuses', 'fiche-reproducteurs', 'fiche-escargots'] as $vue) {
+        foreach (['fiche-pondeuses', 'fiche-reproducteurs'] as $vue) {
             $source = file_get_contents(resource_path("views/livewire/elevage/{$vue}.blade.php"));
 
             $this->assertStringNotContainsString('Sprint 3, ticket 3.11', $source, "{$vue} : marqueur périmé.");
-            $this->assertStringContainsString('à planifier', $source, "{$vue} : la suite doit être dite, sans échéance inventée.");
+            $this->assertStringContainsString('<x-prophylaxie-du-jour', $source, "{$vue} : la prophylaxie du jour est raccordée.");
+            $this->assertStringNotContainsString("son raccordement à cette fiche n'est pas fait", $source);
         }
+
+        $escargots = file_get_contents(resource_path('views/livewire/elevage/fiche-escargots.blade.php'));
+        $this->assertStringNotContainsString('Sprint 3, ticket 3.11', $escargots);
+        $this->assertStringContainsString('à planifier', $escargots, 'fiche-escargots : la suite doit être dite, sans échéance inventée.');
 
         foreach (['fiche-lapins', 'fiche-porcs'] as $vue) {
             $source = file_get_contents(resource_path("views/livewire/elevage/{$vue}.blade.php"));
