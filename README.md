@@ -45,6 +45,7 @@ dart run build_runner build          # régénère app_database.g.dart après un
 flutter analyze
 flutter test
 flutter run -d windows
+build_windows.bat                    # Windows : build release + installateur AgriERP-Setup-<version>.exe
 ```
 
 ### Base de référence — `database/`
@@ -58,6 +59,9 @@ mysql -u root -p agrierp_db < database/agrierp_db.sql
 `manuel/build.py` assemble `src/part*.html` et imprime le PDF via Chrome.
 
 ## Conventions
+
+- [`DOCTRINE_PORTAGE.md`](DOCTRINE_PORTAGE.md) : règles de fidélité Laravel → Flutter et d'architecture hors ligne.
+- [`PLAN_FINALISATION.md`](PLAN_FINALISATION.md) : tickets restants, par sprint, et décisions client en attente.
 
 - Toute la prose, les libellés d'interface, les commentaires et la documentation sont **en français**.
 - Le prototype HTML reste la source de vérité visuelle et comportementale des deux clients (voir les `CLAUDE.md` des projets).
