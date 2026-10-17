@@ -49,7 +49,7 @@ php artisan dusk --filter=PosSaleTest
 
 - **`php artisan test` with no argument FAILS**: `phpunit.xml` declares a `tests/Unit` suite that does not exist (no unit tests were ever written). Always pass `--testsuite=Feature`.
 - Feature tests use `RefreshDatabase` against **sqlite `:memory:`** (set in `phpunit.xml`) — they never touch MySQL.
-- Dusk uses `DatabaseMigrations` (i.e. `migrate:fresh`) and loads **`.env.dusk.local`**, which points at `agrierp_dusk`. Never repoint that file at `agrierp_db` — it would destroy the dev database. Dusk needs the app actually served on `127.0.0.1:8002` and Chrome installed.
+- Dusk uses `DatabaseMigrations` (i.e. `migrate:fresh`) and loads **`.env.dusk.local`** (not versioned — copy it from `.env.dusk.example` and fill in `APP_KEY` and `DB_PASSWORD`), which points at `agrierp_dusk`. Never repoint that file at `agrierp_db` — it would destroy the dev database. Dusk needs the app actually served on `127.0.0.1:8002` and Chrome installed.
 - Feature tests run through `Livewire::test()`, i.e. **server-side only, zero JavaScript**. A whole class of bugs (double Alpine instance, `$wire is not defined`, toast overlays intercepting clicks) is invisible to them and only Dusk catches it. Any change touching Alpine, z-index, or overlay stacking needs a Dusk run.
 
 ### Verification discipline

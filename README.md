@@ -32,6 +32,7 @@ Tests :
 
 ```bash
 php artisan test --testsuite=Feature   # toujours préciser la suite : tests/Unit n'existe pas
+cp .env.dusk.example .env.dusk.local  # puis renseigner APP_KEY et DB_PASSWORD
 php artisan dusk                       # parcours navigateur, base dédiée agrierp_dusk
 ```
 
