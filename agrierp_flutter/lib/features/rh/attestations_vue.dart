@@ -70,7 +70,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
   static const _ferme = 'FERME ÉCOLE OLOUWACHEGOUN';
   static const _adresse = 'Attan-Ewé, Ikpinlè, Adja-Ouèrè, Bénin';
   static const _rccm = 'RCCM : RB/PNO/22 A 33870';
-  static const _directeur = 'OLOUKOUNLE Olouchegoun Hassimiyou';
+  static const _directeur = 'M. Olouchègoun';   // décision client du 17/10/2026, comme le web
 
   String _onglet = 'generer';
   String _type = 'employe';

@@ -46,18 +46,15 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
   - Le transfert est-il une colonne de la fiche (`transfert_sortie`) ou un écran dédié ?
   - Faut-il corriger les bandes déjà saisies (D6) ?
 
-### A3 ❓ « Don » dans Enregistrer des Sujets
+### A3 ✅ « Don » dans Enregistrer des Sujets — décision client du 17/10/2026
 
-- L'origine « Don » (animal **reçu**) est écrite dans la colonne `don`.
-- La formule du Document 05 **soustrait** cette colonne, qui sert pour les animaux **donnés**.
-- Un don reçu de 5 sujets **baisse** donc l'effectif de 5 au lieu de l'augmenter.
-- **Décision :** créer une colonne `don_recu` (entrée), ou ranger les dons reçus avec les achats ?
+- Le « Don » est une **sortie** (animal donné, non comptabilisé) : la formule le soustrait, c'est voulu.
+- Verrouillé par `CorrectionsElevage17OctobreTest::test_un_don_enregistre_est_une_sortie_soustraite_de_l_effectif`.
 
-### A4 🔧 Transformation (abattage) hors fiche
+### A4 ✅ Transformation (abattage) = vente — décision client du 17/10/2026
 
-- `TransformationForm` fait `decrement('current_quantity')` sans écrire de fiche journalière.
-- La sauvegarde de fiche suivante réaligne la bande sur la dernière fiche et **efface** donc l'abattage. Ce comportement existait déjà avant A1.
-- **Proposition :** inscrire la transformation comme sortie dans la fiche du jour, puis lancer la cascade.
+- `TransformationForm` passe par `RecordSaleOnFicheElevageAction` : les sujets transformés sont une « Vente » de la fiche du jour, avec cascade.
+- La sauvegarde de fiche suivante ne l'efface plus.
 
 ### A5 🔧 Autorisation des fiches journalières
 
@@ -89,13 +86,40 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 
 ---
 
+### A10 ✅ Corrections du 17/10/2026 (web, `agrierp_laravel`)
+
+| Point | Correction |
+|---|---|
+| Glossaire lapins | Reproducteur / Jeune / Sous-mères partout : morts, dons, départ, rationnement, barème (migration `2026_10_17_000001`), « Stade Initial » de la modale Nouvelle bande. L'ancien « Lapin de Chair » (60 g) devient « Jeune » ; l'ancien « Jeune » / « Lapereau » (30 g) devient « Sous-mères ». |
+| Passage de stade | Évalué et **gardé**, renommé « Sevrage du jour (Sous-mères → Jeune) ». C'est le seul mouvement qui fait passer les nés (comptés en Sous-mères) dans la catégorie vendue (Jeune). Sans lui, les effectifs par catégorie, donc la provende, dérivent. |
+| Rationnement automatique | Le départ par catégorie est **déduit du stade de la bande** (`departDepuisStade`) : provende servie et autonomie calculées sans saisie (Lapins, Porcs). |
+| Autonomie alimentaire | Composant unique `x-autonomie-alimentaire`. **Rouge** en rupture, sous 3 jours ou sans produit de provende. N'empêche jamais l'enregistrement. |
+| Poids et traitements | « Poids Général (g) » = total pesé (et non la moyenne). « Poids Moyen Constaté » automatique et arrondi (Lapins, Escargots, Reproducteurs). La colonne « Traitements & Prophylaxie » lit le registre vétérinaire. La prophylaxie du jour est raccordée à Pondeuses et Reproducteurs. |
+| Archivage | Scope `LivestockLot::vivantes()`. Les KPI élevage, la paie (absences), les rôles (utilisateurs), les acomptes, le coût vétérinaire et le tableau de bord excluent les données archivées. |
+| Tiroir Gestion des Bandes | Autonomie alimentaire et suivi sanitaire réels : délai d'attente, infirmerie, mortalité 7 jours, derniers soins. |
+| Paramètres | Administrateur « M. Olouchègoun », `contact@fermeolouwachegoun.com`. Le poste pointe par défaut sur `https://agrierp.fermeolouwachegoun.com`. |
+| Seeders | Les bandes de démonstration lapins et porcs suivent la chaîne par catégorie (départ déduit, mouvements ventilés, sevrage). Recalcul indépendant : 0 anomalie, « Effectif Total Vivant » = 263 à l'écran comme en base. |
+
+### A11 🔧 Fiches Pondeuses et Escargots à plusieurs bandes
+
+- Le tableau mensuel réunit **toutes** les bandes, indexées par date : deux bandes saisies le même jour s'écrasent à l'écran.
+- `saveDay()` enregistre toujours sur la **première** bande.
+- **Proposition :** sélecteur de bande, comme les fiches Lapins et Porcs (ticket 15.41).
+
+### A12 ⚠️ Poste : glossaire du 17/10/2026 à porter AVANT de déployer le serveur
+
+- La migration `2026_10_17_000001` renomme le barème lapins (« Jeune » = 60 g, « Sous-mères » = 30 g).
+- Le poste (`categorie_ration_lapin.dart`) lit encore « Jeune » comme la catégorie à 30 g.
+- Les rations d'une bande en engraissement restent justes (repli à 60 g), mais les libellés et `cleDuStade()` doivent suivre. Cela touche plus de 25 tests du poste.
+- **À livrer avec F0.96**, en mise en service simultanée (3.F4).
+
 ## Sprint 3 — Finalisation Élevage (web ↔ poste)
 
 | # | Ticket | Statut |
 |---|---|---|
 | 3.F1 | **F0.96** — fiche Lapins du poste : saisie ventilée (morts et dons par catégorie, passage sevré → jeune), miroir du ticket 15.41 | 🔧 Bloquant : tant qu'il n'est pas livré, une fiche du poste avec morts ou dons sur une bande « à départ » est **refusée** (D7). |
 | 3.F2 | **F0.97** — fiche Porcs du poste : même chose, miroir du ticket 15.42 | 🔧 Bloquant (même motif) |
-| 3.F3 | Décisions D5 (qui déverrouille un départ erroné), D6 (bandes déjà saisies), D15 (« Porc Marchand » / « Jeune porc »), confirmation de D2/D8/D9/D12 | ❓ |
+| 3.F3 | D6 tranchée le 17/10/2026 (bandes déjà saisies : corrigées par la chaîne, départ déduit du stade). Restent D5 (qui déverrouille un départ erroné), D15 (« Porc Marchand » / « Jeune porc »), confirmation de D2/D8/D9/D12 | ❓ |
 | 3.F4 | Mise en service **simultanée** du serveur (15.39–15.42) et du poste (F0.95–F0.97) | 🔧 À planifier avec l'exploitant |
 | 3.F5 | Tests de cascade pour Escargots et Reproducteurs en parité exécutée PHP ↔ Dart (`test/php_laravel.dart`) | 🔧 |
 | 3.F6 | A2, A3, A4 ci-dessus (transferts, dons reçus, transformation) | ❓ puis 🔧 |
@@ -190,8 +214,8 @@ Les deux côtés migrent **ensemble**, module par module, sinon la parité est p
 
 | Ref. | Question |
 |---|---|
-| A2 / D6 | Transfert entre bandes (portées, sevrés) ; correction des bandes déjà saisies. |
-| A3 | Les dons **reçus** sont-ils des entrées (nouvelle colonne) ou des achats ? |
+| A2 | Transfert entre bandes (portées, sevrés) : colonne de la fiche ou écran dédié ? |
+| A11 | Sélecteur de bande sur les fiches Pondeuses et Escargots. |
 | 3.F7 | La mise-bas alimente-t-elle automatiquement la fiche du jour ? |
 | D5, D15, D2/D8/D9/D12 | Voir ticket F0.95 dans `README_SPRINT0.md`. |
 | C | Périmètre exact de la clôture de caisse (absente du prototype). |

@@ -25,9 +25,15 @@ class ParametresPoste {
   static const cleIdentifiant = 'poste.identifiant';
   static const cleAdresseServeur = 'poste.adresse_serveur';
 
-  /// Valeur de départ, volontairement locale : un poste neuf ne doit pas
-  /// tenter d'atteindre un serveur qu'on ne lui a pas encore désigné.
-  static const adresseParDefaut = 'http://127.0.0.1:8000';
+  /// Valeur de départ : le serveur de production de la ferme.
+  ///
+  /// 🔁 Décision client du 17/10/2026 — « le serveur est hébergé à
+  /// https://agrierp.fermeolouwachegoun.com ». Le poste installé chez
+  /// l'exploitant synchronise avec ce serveur, sans réglage préalable ;
+  /// l'administrateur peut toujours le changer dans Paramètres du poste.
+  /// L'ancienne valeur (`http://127.0.0.1:8000`, « volontairement locale »)
+  /// obligeait à configurer chaque poste avant sa première synchronisation.
+  static const adresseParDefaut = 'https://agrierp.fermeolouwachegoun.com';
 
   final AppDatabase _db;
   final Uuid _uuid;
