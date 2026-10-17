@@ -48,10 +48,13 @@ flutter run -d windows
 build_windows.bat                    # Windows : build release + installateur AgriERP-Setup-<version>.exe
 ```
 
-### Base de référence — `database/`
+### Base de données
+
+Aucun export SQL n'est versionné (retiré de l'historique le 17/10/2026 : il contenait des hash de mots de passe et
+des jetons). La base se reconstruit depuis les migrations et les seeders :
 
 ```bash
-mysql -u root -p agrierp_db < database/agrierp_db.sql
+cd agrierp_laravel && php artisan migrate:fresh --seed
 ```
 
 ### Manuel — `manuel/`

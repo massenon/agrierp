@@ -16,3 +16,9 @@ __pycache__/
 
 # Sorties générées du manuel
 /manuel/*.pdf
+
+# Exports de base de données et archives de déploiement : jamais versionnés (ils ont contenu des hash de mots
+# de passe, des jetons et un .env ; retirés de tout l'historique le 17/10/2026).
+/database/*.sql
+*.zip
+.env.dusk.local
