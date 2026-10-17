@@ -156,6 +156,9 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.57 — rationnement par stade : section du poste, désormais des deux côtés. --}}
+            <x-ration-volaille :tableau="$this->rationnement" ligne-cle="des reproducteurs" />
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>

@@ -8,6 +8,8 @@ use App\Actions\SyncLotProductionStockAction;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
+use App\Models\FeedRationStandard;
+use App\Support\RationVolaille;
 use App\Models\LivestockLot;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -369,6 +371,18 @@ class FicheReproducteurs extends Component
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');
+    }
+
+    /**
+     * Ticket 15.57 — rationnement par stade, même règle que le poste (`RationVolaille`). Barème de l'aviculture.
+     */
+    public function getRationnementProperty(): array
+    {
+        return RationVolaille::tableau(
+            FeedRationStandard::where('species_code', 'aviculture')->get(),
+            RationVolaille::REPRODUCTEUR,
+            $this->effectifFinalCalc,
+        );
     }
 
     public function render()

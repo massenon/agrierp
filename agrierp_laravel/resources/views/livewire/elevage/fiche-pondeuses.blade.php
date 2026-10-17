@@ -181,6 +181,26 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.57 — sections du poste, désormais des deux côtés : rationnement par stade et pesée. --}}
+            <x-ration-volaille :tableau="$this->rationnement" ligne-cle="du stade de la bande (Pondeuse)" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taille Échantillon</label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold">{{ $this->effectifFinalCalc }}</div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
+                </div>
+            </div>
+
             <div>
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px] text-brand-emerald">inventory_2</span>Stock Œufs &amp; Plateaux (30) — Jour Sélectionné</p>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-sm">

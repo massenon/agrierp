@@ -10,6 +10,8 @@ use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
 use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
+use App\Models\FeedRationStandard;
+use App\Support\RationVolaille;
 use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -74,6 +76,9 @@ class FichePondeuses extends Component
      * n'est pas stockée, seul le total l'est ; il est gardé tant qu'aucune répartition n'est ressaisie.
      */
     public ?int $donEnregistre = null;
+
+    /** Ticket 15.57 — poids TOTAL pesé (g) ; la base stocke la moyenne par sujet, comme les autres fiches. */
+    public ?int $peseeTotal = null;
 
     public int $oeufsRecoltes = 0;
 
@@ -358,8 +363,12 @@ class FichePondeuses extends Component
             $this->donEnregistre = (int) ($entry->don ?? 0) > 0 ? (int) $entry->don : null;
             $this->oeufsRecoltes = $entry->ponte_total ?? 0;
             $this->oeufsCasses = $entry->ponte_casses ?? 0;
+            $effectifFiche = (int) ($entry->effectif_final ?? 0);
+            $this->peseeTotal = $entry->weight_sample_avg_g && $effectifFiche > 0
+                ? (int) round($entry->weight_sample_avg_g * $effectifFiche)
+                : null;
         } else {
-            $this->reset(['achat', 'ne', 'oeufsRecoltes', 'oeufsCasses']);
+            $this->reset(['achat', 'ne', 'oeufsRecoltes', 'oeufsCasses', 'peseeTotal']);
         }
     }
 
@@ -395,6 +404,10 @@ class FichePondeuses extends Component
                 'effectif_final' => $effectifFinal,
                 'ponte_total' => $this->oeufsRecoltes,
                 'ponte_casses' => $this->oeufsCasses,
+                // Ticket 15.57 — moyenne par sujet (g), comme les fiches Reproducteurs et Escargots.
+                'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
+                    ? (int) round($this->peseeTotal / $effectifFinal)
+                    : null,
             ]
         );
 
@@ -426,6 +439,18 @@ class FichePondeuses extends Component
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');
+    }
+
+    /**
+     * Ticket 15.57 — rationnement par stade, même règle que le poste (`RationVolaille`). Barème de l'aviculture.
+     */
+    public function getRationnementProperty(): array
+    {
+        return RationVolaille::tableau(
+            FeedRationStandard::where('species_code', 'aviculture')->get(),
+            RationVolaille::PONDEUSE,
+            $this->effectifFinalCalc,
+        );
     }
 
     public function render()

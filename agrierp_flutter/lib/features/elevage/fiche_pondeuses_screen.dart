@@ -5,6 +5,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import 'fiche_journaliere_repository.dart';
+import 'ration_volaille.dart';
 import 'production_oeufs_service.dart';
 import 'soins_repository.dart';
 
@@ -238,29 +239,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     tailleEchantillon: _effectifFinal,
   );
 
-  /// Effectif porté par une ligne de stade — voir l'avertissement de classe.
-  int _effectifDuStade(String libelleReferentiel) {
-    final bande = _bande;
-    if (bande == null) return 0;
-    return _correspondAuStadeDeLaBande(libelleReferentiel) ? _effectifFinal : 0;
-  }
-
-  /// La bande de ponte alimente la ligne « Pondeuse … » du référentiel.
-  bool _correspondAuStadeDeLaBande(String libelle) {
-    final normalise = libelle.toLowerCase();
-    return normalise.startsWith('pondeuse');
-  }
-
-  double get _totalProvendeG {
-    var total = 0.0;
-    for (final ration in _rations) {
-      total += FicheJournaliereRepository.provendeGrammes(
-        effectif: _effectifDuStade(ration.stageLabel),
-        rationGParJour: ration.rationGPerDay,
-      );
-    }
-    return total;
-  }
+  /// 🔁 15.57 — lignes du rationnement, règle commune au web (`RationVolaille`) : l'effectif final va à la
+  /// première ligne « pondeuse » du barème ; aucune ligne ne correspond → « — », jamais 0 g.
+  List<LigneRationVolaille> get _lignesRation =>
+      RationVolaille.lignes(_rations, RationVolaille.pondeuse, _effectifFinal);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -1221,20 +1203,17 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                   _CelluleEntete('Provende Servie (g)'),
                 ],
               ),
-              for (final ration in _rations)
+              for (final l in _lignesRation)
                 TableRow(
                   children: [
-                    _Cellule(ration.stageLabel),
+                    _Cellule(l.libelle),
                     _Cellule(
-                      '${_effectifDuStade(ration.stageLabel)}',
+                      l.effectif == null ? '—' : '${l.effectif}',
                       centre: true,
                     ),
+                    _Cellule('${l.ration.round()} g/j', centre: true),
                     _Cellule(
-                      '${ration.rationGPerDay.round()} g/j',
-                      centre: true,
-                    ),
-                    _Cellule(
-                      '${FicheJournaliereRepository.provendeGrammes(effectif: _effectifDuStade(ration.stageLabel), rationGParJour: ration.rationGPerDay).round()} g',
+                      l.totalG == null ? '—' : '${l.totalG!.round()} g',
                       centre: true,
                       gras: true,
                     ),
@@ -1252,8 +1231,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                   const _Cellule(''),
                   const _Cellule(''),
                   _Cellule(
-                    '${_totalProvendeG.round()} g '
-                    '(${(_totalProvendeG / 1000).toStringAsFixed(1)} Kg)',
+                    RationVolaille.totalAffiche(
+                      RationVolaille.totalG(_lignesRation),
+                    ),
+                    key: const Key('total-provende'),
                     centre: true,
                     gras: true,
                   ),
@@ -1264,12 +1245,20 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
           const SizedBox(height: AgriSpacing.xs),
           // ⚠️ L'écart est dit à l'écran, pas masqué par une répartition
           // inventée entre les quatre stades.
-          const Text(
-            "L'effectif n'est pas encore ventilé par stade : la fiche du jour "
-            "n'en porte que le total. La ligne du stade de la bande le reçoit "
-            'entièrement.',
-            style: TextStyle(fontSize: 10, color: AgriColors.outline),
-          ),
+          if (RationVolaille.rattachee(_lignesRation))
+            const Text(
+              "L'effectif n'est pas encore ventilé par stade : la fiche du jour "
+              "n'en porte que le total. La ligne du stade de la bande (Pondeuse) le reçoit "
+              'entièrement.',
+              style: TextStyle(fontSize: 10, color: AgriColors.outline),
+            )
+          else
+            const Text(
+              'Aucune ligne du barème ne correspond du stade de la bande (Pondeuse) : ajoutez-la dans '
+              'Paramètres Élevage > Rationnement pour calculer la provende.',
+              key: Key('ration-non-rattachee'),
+              style: TextStyle(fontSize: 10, color: AgriColors.errorDeep),
+            ),
         ],
       ),
     );
@@ -1837,7 +1826,7 @@ class _CelluleEntete extends StatelessWidget {
 }
 
 class _Cellule extends StatelessWidget {
-  const _Cellule(this.texte, {this.centre = false, this.gras = false});
+  const _Cellule(this.texte, {super.key, this.centre = false, this.gras = false});
 
   final String texte;
   final bool centre;

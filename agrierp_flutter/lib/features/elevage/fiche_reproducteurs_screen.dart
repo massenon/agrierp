@@ -5,6 +5,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import 'fiche_journaliere_repository.dart';
+import 'ration_volaille.dart';
 import 'soins_repository.dart';
 
 /// `prototype_html/fiche-volailles-reproducteurs.html` → Suivi Reproducteurs
@@ -226,19 +227,10 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
     tailleEchantillon: _effectifFinal,
   );
 
-  int _effectifDeLaLigne(String libelle) =>
-      libelle.toLowerCase().contains('reproducteur') ? _effectifFinal : 0;
-
-  double get _totalProvendeG {
-    var total = 0.0;
-    for (final ration in _rations) {
-      total += FicheJournaliereRepository.provendeGrammes(
-        effectif: _effectifDeLaLigne(ration.stageLabel),
-        rationGParJour: ration.rationGPerDay,
-      );
-    }
-    return total;
-  }
+  /// 🔁 15.57 — lignes du rationnement, règle commune au web (`RationVolaille`) : l'effectif final va à la
+  /// première ligne « reproducteur » du barème ; aucune ligne ne correspond → « — », jamais 0 g.
+  List<LigneRationVolaille> get _lignesRation =>
+      RationVolaille.lignes(_rations, RationVolaille.reproducteur, _effectifFinal);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -1082,20 +1074,17 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                   _CelluleEntete('Provende Servie (g)'),
                 ],
               ),
-              for (final ration in _rations)
+              for (final l in _lignesRation)
                 TableRow(
                   children: [
-                    _Cellule(ration.stageLabel),
+                    _Cellule(l.libelle),
                     _Cellule(
-                      '${_effectifDeLaLigne(ration.stageLabel)}',
+                      l.effectif == null ? '—' : '${l.effectif}',
                       centre: true,
                     ),
+                    _Cellule('${l.ration.round()} g/j', centre: true),
                     _Cellule(
-                      '${ration.rationGPerDay.round()} g/j',
-                      centre: true,
-                    ),
-                    _Cellule(
-                      '${FicheJournaliereRepository.provendeGrammes(effectif: _effectifDeLaLigne(ration.stageLabel), rationGParJour: ration.rationGPerDay).round()} g',
+                      l.totalG == null ? '—' : '${l.totalG!.round()} g',
                       centre: true,
                       gras: true,
                     ),
@@ -1113,8 +1102,10 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                   const _Cellule(''),
                   const _Cellule(''),
                   _Cellule(
-                    '${_totalProvendeG.round()} g '
-                    '(${(_totalProvendeG / 1000).toStringAsFixed(1)} Kg)',
+                    RationVolaille.totalAffiche(
+                      RationVolaille.totalG(_lignesRation),
+                    ),
+                    key: const Key('total-provende'),
                     centre: true,
                     gras: true,
                   ),
@@ -1123,12 +1114,20 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
             ],
           ),
           const SizedBox(height: AgriSpacing.xs),
-          const Text(
-            "L'effectif n'est pas encore ventilé par stade : la fiche du jour "
-            "n'en porte que le total. La ligne des reproducteurs le reçoit "
-            'entièrement.',
-            style: TextStyle(fontSize: 10, color: AgriColors.outline),
-          ),
+          if (RationVolaille.rattachee(_lignesRation))
+            const Text(
+              "L'effectif n'est pas encore ventilé par stade : la fiche du jour "
+              "n'en porte que le total. La ligne des reproducteurs le reçoit "
+              'entièrement.',
+              style: TextStyle(fontSize: 10, color: AgriColors.outline),
+            )
+          else
+            const Text(
+              'Aucune ligne du barème ne correspond des reproducteurs : ajoutez-la dans '
+              'Paramètres Élevage > Rationnement pour calculer la provende.',
+              key: Key('ration-non-rattachee'),
+              style: TextStyle(fontSize: 10, color: AgriColors.errorDeep),
+            ),
         ],
       ),
     );
@@ -1675,7 +1674,7 @@ class _CelluleEntete extends StatelessWidget {
 }
 
 class _Cellule extends StatelessWidget {
-  const _Cellule(this.texte, {this.centre = false, this.gras = false});
+  const _Cellule(this.texte, {super.key, this.centre = false, this.gras = false});
 
   final String texte;
   final bool centre;
