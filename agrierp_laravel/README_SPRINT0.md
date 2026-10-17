@@ -21743,18 +21743,18 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 
 ### Constat (mesuré en classant chaque table du schéma migré)
 - 🔴 La liste des tables vidées nommait `correspondences`, table inexistante : les courriers (`mails`) n'étaient JAMAIS vidés. La liste conservée nommait `module_configs` (la table est `modules_config`).
-- 🔴 Survivaient : `livestock_transfers` (15.46), `fixed_assets` (registre d'immobilisations sans plus aucune écriture d'acquisition ni d'amortissement), `notifications` (alertes pointant vers des bandes, produits et soins effacés).
+- 🔴 Survivaient : `livestock_transfers` (15.46), `notifications` (alertes pointant vers des bandes, produits et soins effacés), et les immobilisations restaient « capitalisées » sans plus aucune écriture d'acquisition ni d'amortissement — achats de démonstration compris.
 - Quinze tables n'étaient classées nulle part (dont `growth_standards`, `attestation_templates`, `elevage_numbering_settings` et les tables techniques).
 - 🔴 Un poste hors ligne pendant la réinitialisation gardait toutes les données effacées et RENVOYAIT ses saisies en attente : la réinitialisation était défaite à la reconnexion suivante.
 
 ### Corrections
-- `ReinitialisationDonneesService` : courriers, transferts, immobilisations et notifications vidés ; référentiels jamais classés ajoutés aux conservés ; nouvelle liste `tablesTechniques()` (jetons et sessions conservés : l'administrateur n'est pas déconnecté).
+- `ReinitialisationDonneesService` : courriers, transferts et notifications vidés ; immobilisations ACHETÉES dans l'application (écriture `asset_acquisition`) supprimées, les autres (reprise d'antériorité de `FixedAssetsSeeder`, apport `asset_opening`) remises hors comptabilité et en service ; référentiels jamais classés ajoutés aux conservés ; nouvelle liste `tablesTechniques()` (jetons et sessions conservés : l'administrateur n'est pas déconnecté).
 - Migration `2026_10_18_000003` : `company_settings.data_reset_at`, posé par la réinitialisation, servi au tirage (`data_reset_at`).
 - Envoi : un poste qui ne renvoie pas la marque connue est refusé EN BLOC (409, `MotifsRefusPush::reinitialisationNonVue`). Sans réinitialisation, rien n'est exigé (anciens postes inchangés).
 - Poste : à la marque inconnue, AVANT toute absorption et tout envoi, `purgerDonneesDActivite()` (36 tables d'activité, stock et trésorerie à 0, curseur effacé), puis tirage complet ; la perte des saisies en attente est ANNONCÉE avec leur nombre. Écran web : listes Supprimé / Conservé mises à jour, perte côté poste annoncée.
 
 ### Mesures
-- `ReinitialisationCompleteTest` (6) : chaque table du schéma classée une seule fois, aucune table listée inexistante, vidage effectif, marque servie, 409 sans marque ou marque périmée, envoi accepté avec la marque, aucune exigence sans réinitialisation. Suite Feature : 1 641 verts.
+- `ReinitialisationCompleteTest` (7) : immobilisations suivant leurs écritures, chaque table du schéma classée une seule fois, aucune table listée inexistante, vidage effectif, marque servie, 409 sans marque ou marque périmée, envoi accepté avec la marque, aucune exigence sans réinitialisation. Suite Feature : 1 642 verts.
 - Poste : `reinitialisation_poste_test.dart` (6), dont le classement de chaque table Drift. Suite : 1 982 verts, 32 ignorés, 3 rouges connus (A7).
 
 ### Non fait — ARBITRAGE CLIENT

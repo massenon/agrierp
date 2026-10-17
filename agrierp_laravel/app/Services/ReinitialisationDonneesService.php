@@ -83,9 +83,6 @@ class ReinitialisationDonneesService
             // Comptabilité
             'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
             'bank_statement_lines',
-            // 🔴 Ticket 15.50 : les immobilisations PRÉSERVÉES alors que leurs écritures d'acquisition et
-            // d'amortissement étaient effacées — un registre sans aucune écriture pour le justifier.
-            'fixed_assets',
             // Administration — 🔴 Ticket 15.50 : la liste nommait `correspondences`, table qui n'existe pas :
             // les courriers s'appellent `mails`, et n'étaient JAMAIS vidés.
             'administrative_documents', 'archived_documents', 'mails',
@@ -111,6 +108,9 @@ class ReinitialisationDonneesService
             'products', 'product_categories', 'livestock_species',
             'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards',
             'cost_centers', 'income_tax_brackets',
+            // Immobilisations semées en reprise d'antériorité (`FixedAssetsSeeder`) : paramètres de base. Celles
+            // ACHETÉES dans l'application sont retirées par `remettreLesImmobilisations()` (ticket 15.50).
+            'fixed_assets',
             // Ticket 15.50 : référentiels jamais classés (normes de croissance, modèles d'attestation, préfixes
             // de numérotation de l'élevage).
             'growth_standards', 'attestation_templates', 'elevage_numbering_settings',
@@ -146,6 +146,12 @@ class ReinitialisationDonneesService
         // et un échec à mi-parcours laisserait la base à moitié vidée.
         Schema::withoutForeignKeyConstraints(function () use (&$supprimees) {
             DB::transaction(function () use (&$supprimees) {
+                // ⚠️ AVANT le vidage : il faut encore lire le type des écritures d'acquisition.
+                $immobilisationsAchetees = $this->remettreLesImmobilisations();
+                if ($immobilisationsAchetees > 0) {
+                    $supprimees['fixed_assets'] = $immobilisationsAchetees;
+                }
+
                 foreach (static::tablesTransactionnelles() as $table) {
                     if (! Schema::hasTable($table)) {
                         continue;
@@ -179,6 +185,39 @@ class ReinitialisationDonneesService
      * les justifier** — précisément l'incohérence que ce projet traque depuis
      * le début, et qu'aucun rapport ne pourrait plus expliquer.
      */
+    /**
+     * 🔴 Ticket 15.50 — LES IMMOBILISATIONS SUIVENT LEURS ÉCRITURES.
+     *
+     * Le registre était conservé tel quel alors que les écritures d'acquisition, d'apport et d'amortissement
+     * étaient effacées : des biens « capitalisés » sans aucune écriture, et des achats de démonstration
+     * restés à l'actif.
+     *  - un bien ACHETÉ dans l'application (écriture `asset_acquisition`) est une opération : il est supprimé ;
+     *  - un bien ENTRÉ PAR APPORT (`asset_opening`) ou jamais capitalisé revient à l'état de sa reprise
+     *    d'antériorité : hors comptabilité, en service (sa cession ou sa réforme était une opération).
+     *
+     * @return int nombre de biens achetés supprimés
+     */
+    private function remettreLesImmobilisations(): int
+    {
+        if (! Schema::hasTable('fixed_assets')) {
+            return 0;
+        }
+
+        $achetes = DB::table('fixed_assets')
+            ->whereIn('acquisition_entry_id', DB::table('accounting_entries')
+                ->where('source_type', 'asset_acquisition')->select('id'))
+            ->pluck('id');
+
+        DB::table('fixed_assets')->whereIn('id', $achetes)->delete();
+
+        DB::table('fixed_assets')->update([
+            'is_capitalized' => false, 'acquisition_entry_id' => null,
+            'status' => 'en_service', 'disposal_date' => null, 'disposal_reason' => null,
+        ]);
+
+        return $achetes->count();
+    }
+
     private function remettreLesSoldesAZero(): void
     {
         if (Schema::hasTable('products')) {

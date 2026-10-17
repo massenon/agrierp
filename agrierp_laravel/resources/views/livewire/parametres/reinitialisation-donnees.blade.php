@@ -52,7 +52,7 @@
                 <p class="text-xs text-outline leading-relaxed">
                     Ventes et clients · Achats et fournisseurs · Dépenses · Mouvements de stock ·
                     Bandes, fiches journalières, transferts et soins vétérinaires · Employés, paies et stages ·
-                    Écritures comptables, clôtures et immobilisations · Courriers, archives et documents
+                    Écritures comptables, clôtures et immobilisations achetées · Courriers, archives et documents
                     administratifs · Notifications
                 </p>
                 <p class="text-xs text-outline leading-relaxed mt-xs">
@@ -68,7 +68,8 @@
                     Comptes utilisateurs et rôles · Réglages de l'entreprise · Plan comptable ·
                     Exercices et comptes de trésorerie · Catalogue produits · Espèces, rations,
                     protocoles prophylactiques, normes de croissance · Centres de coût · Barème ITS ·
-                    Modèles d'attestation · Numérotation de l'élevage ·
+                    Modèles d'attestation · Numérotation de l'élevage · Immobilisations reprises
+                    d'antériorité (remises hors comptabilité) ·
                     <strong>Journal d'audit</strong>
                 </p>
             </div>

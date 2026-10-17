@@ -18,8 +18,8 @@ use Tests\TestCase;
  *
  * 🔴 Avant :
  *  - la liste nommait `correspondences`, table inexistante : les courriers (`mails`) n'étaient JAMAIS vidés ;
- *  - transferts entre bandes, immobilisations et notifications survivaient (registre d'immobilisations sans
- *    écriture, alertes pointant vers des bandes effacées) ;
+ *  - transferts entre bandes et notifications survivaient (alertes pointant vers des bandes effacées), et les
+ *    immobilisations gardaient leur capitalisation sans plus aucune écriture ;
  *  - quinze tables n'étaient classées nulle part : la prochaine table oubliée l'aurait été sans bruit ;
  *  - un poste hors ligne au moment de la réinitialisation renvoyait ensuite ses données effacées.
  */
@@ -81,9 +81,35 @@ class ReinitialisationCompleteTest extends TestCase
         $this->assertSame(0, Notification::count());
         $this->assertSame(1, $supprimees['mails']);
         $this->assertSame(1, $supprimees['notifications']);
-        foreach (['livestock_transfers', 'fixed_assets'] as $table) {
-            $this->assertContains($table, ReinitialisationDonneesService::tablesTransactionnelles());
-        }
+        $this->assertContains('livestock_transfers', ReinitialisationDonneesService::tablesTransactionnelles());
+    }
+
+    /** Un bien acheté dans l'application disparaît ; un bien repris d'antériorité revient hors comptabilité. */
+    public function test_les_immobilisations_suivent_leurs_ecritures(): void
+    {
+        $exercice = \App\Models\FiscalYear::create([
+            'year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert',
+        ]);
+        $ecriture = fn (string $type) => tap((string) Str::uuid(), fn ($id) => DB::table('accounting_entries')->insert([
+            'id' => $id, 'fiscal_year_id' => $exercice->id, 'entry_date' => '2026-03-01', 'reference' => 'IMM',
+            'source_type' => $type,
+        ]));
+        $bien = fn (string $code, ?string $entree, bool $capitalise, string $statut = 'en_service') => DB::table('fixed_assets')->insert([
+            'id' => (string) Str::uuid(), 'code' => $code, 'label' => $code, 'account_code' => '241',
+            'acquisition_date' => '2025-01-01', 'acquisition_value' => 100_000, 'duration_years' => 5,
+            'is_capitalized' => $capitalise, 'acquisition_entry_id' => $entree, 'status' => $statut, 'is_active' => true,
+        ]);
+        $bien('ACHETE', $ecriture('asset_acquisition'), true);
+        $bien('APPORTE', $ecriture('asset_opening'), true, 'cede');
+        $bien('REPRIS', null, false);
+
+        $supprimees = app(ReinitialisationDonneesService::class)->executer();
+
+        $this->assertSame(1, $supprimees['fixed_assets']);
+        $this->assertEqualsCanonicalizing(['APPORTE', 'REPRIS'], DB::table('fixed_assets')->pluck('code')->all());
+        $this->assertSame(0, DB::table('fixed_assets')->where('is_capitalized', true)->count());
+        $this->assertSame(0, DB::table('fixed_assets')->whereNotNull('acquisition_entry_id')->count());
+        $this->assertSame(['en_service'], DB::table('fixed_assets')->distinct()->pluck('status')->all());
     }
 
     public function test_la_marque_de_reinitialisation_est_posee_et_servie_au_tirage(): void
