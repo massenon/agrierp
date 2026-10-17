@@ -1,0 +1,43 @@
+
+ECRIR UN PROMPT DE CHECKLIST DE CONFORMITÉ ET FIDELITE VISUELLE POUR LE PROJET AgriERP
+Rôles dynamiques + Recherche globale + Synchronisation Laravel + Fidélité visuelle; Rappel de Prophylaxie du Jour, la gestion des TAB, la gestion des toast, la gestion des notification,gestion des kpis, 
+boutons d'action (*Éditer, Supprimer, Exporter PDF, Importer, Consulter/View, Filtrer*)
+Alertes Critiques de Stock, IMPRESSION PDF, 
+Recettes et Dépenses
+État de Trésorerie
+Créances Clients
+Dettes Fournisseurs
+Rapport Élevage
+Rapport de Stocks
+
+AgriERP A 94 ECRANS 
+MOTEUR_DE_RECHERCHE_GLOBALE_ERP.md, fidèle à sa spécification :
+
+fidélité et conformite strict visuelle layout par layout interface dart avec le prototype, respect des couleurs, des typographies, des bordures, 
+
+responsive sur Desktop, Laptop, Tablet et Mobile ;
+
+fonctionnement du menu, sidebar, menu flottant, des accordéons kpis, des bouton imprimer pdf avec impressions des etats, exporter, les modales, les boutons daccess rapide, rbac avec option CRUD sur les boutons, notifications, seeder generated, des formulaires et des interactions, formulaire, topbar, etc......, profil-client, profil-fournisseur, profil-user, les filtres dans les datatables, les tables avec les boutons CRUD, les offcanvas etc......
+
+respect de page layout des fiches avec le tableau pour chaque categorie despeces
+
+navigation entre toutes les pages ;
+
+implementation  Synchroniser avec laravel, communication avec api laravel agrierp.fermeolouwachegoun.com
+
+Rôles dynamiques + Recherche globale + Synchronisation Laravel + Fidélité visuelle
+
+Les 4 écarts de schéma (granularité Élevage, PMP, Administration/Documents, RAN)
+
+Audit RBAC CRUD / seeder generated / formulaires-interactions écran par écran 
+
+il faut tt reconstruit si les ecrans sont pas fidele, priorite absolue, tt en gardant la logique metier, la base est la maquette html du prototype, tt est fournir dans la base de connaissance, navigation entre toutes les pages ;
+
+verifie chaque page screen view BLADE avec page web html (son equivalence)
+
+
+oui meme si u nas pas de navigateur pour visualiser; FAUT VERIFIER SI LES LAYOUTS BODY DE CHAQUE PAGE A ETE RESPECTER, SI CHAQUE LIGNE DU BODY, structure visuelle, SECTION ORDER, CSS layout, PAGE STRUCTURE
+FAUT RECONTRUIT LES 4 confirmés orphelins à raison ET MEME LES écrans isolés (Notifications, Mon Profil, Aide, etc....) SI CEST PAS FAIT. TOUT DOIT ETRE cohérent
+
+1. Les pages Blade sont-elles fidèles aux 94 écrans ?
+Oui, au niveau du code source — 90 écrans construits et vérifiés conformes (73 déjà fidèles, 8 corrigés, 2 reconstruits intégralement), 4 confirmés orphelins à raison. Détail complet dans `AUDIT_FIDELITE_94_ECRANS.md`. Je répète la limite honnête : c'est une vérification de code rigoureuse, pas un rendu pixel réel — je n'ai toujours pas de navigateur ici.

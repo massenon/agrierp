@@ -1,0 +1,54 @@
+# =====================================================================
+#  AgriERP — .htaccess de la RACINE DU PROJET
+# =====================================================================
+#
+#  ⚠️ CE FICHIER EST UN FILET DE SÉCURITÉ, PAS LA BONNE CONFIGURATION.
+#
+#  La configuration correcte consiste à faire pointer la « racine du
+#  document » du sous-domaine agrierp.fermeolouwachegoun.com sur le
+#  dossier `public/`, et non sur la racine du projet. Tant que ce
+#  réglage n'est pas fait chez l'hébergeur, tout le code source de
+#  l'application (app/, config/, database/, routes/, vendor/, storage/)
+#  est servi par le serveur web et donc téléchargeable par n'importe qui.
+#
+#  Ce fichier limite les dégâts en attendant :
+#    1. il coupe l'affichage du contenu des dossiers ;
+#    2. il refuse l'accès aux fichiers et dossiers sensibles ;
+#    3. il redirige toutes les requêtes vers public/.
+#
+#  Une fois la racine du document corrigée, ce fichier n'est plus lu
+#  par le serveur (il se trouve alors hors de la racine servie) et peut
+#  être conservé sans effet.
+# =====================================================================
+
+# --- 1. Jamais de liste de fichiers ----------------------------------
+Options -Indexes
+
+# --- 2. Fichiers sensibles interdits ---------------------------------
+<FilesMatch "^\.env|^\.env\..*|^composer\.(json|lock)$|^package(-lock)?\.json$|^artisan$|^phpunit\.xml$|^.*\.md$|^.*\.zip$|^.*\.sql$|^.*\.log$">
+    Require all denied
+</FilesMatch>
+
+# Tout fichier commençant par un point (.env, .git, .editorconfig...)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# --- 3. Dossiers applicatifs interdits -------------------------------
+#
+# ⚠️ `storage` est VOLONTAIREMENT ABSENT de cette liste. Le dossier
+# `public/storage` est un lien symbolique vers les fichiers téléversés
+# (photos de reçus, justificatifs) : les bloquer sur `/storage/...`
+# casserait leur affichage dans l'application. Le vrai dossier privé
+# `storage/` reste inatteignable de toute façon, puisque la règle 4
+# ci-dessous renvoie TOUTES les requêtes dans `public/`.
+RedirectMatch 404 ^/(app|bootstrap|config|database|resources|routes|tests|vendor|node_modules)(/|$)
+
+# --- 4. Tout le trafic est envoyé dans public/ -----------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Ne jamais boucler si la requête vise déjà public/
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

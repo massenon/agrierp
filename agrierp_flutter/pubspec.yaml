@@ -1,0 +1,80 @@
+name: agrierp
+description: "AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin). Client Windows offline-first, synchronisé avec la surface web Laravel."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ─── Persistance locale offline-first ────────────────────────────────────
+  # Drift sur SQLite : le CDC impose un fonctionnement local prioritaire, la
+  # synchronisation réseau n'intervenant qu'ensuite.
+  drift: ^2.28.2
+  sqlite3_flutter_libs: ^0.6.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # ─── Identifiants ────────────────────────────────────────────────────────
+  # ⚠️ CDC §291 : toute table synchronisable porte une clé primaire UUID,
+  # JAMAIS un entier auto-incrémenté — deux appareils hors ligne créeraient
+  # sinon des enregistrements de même identifiant, et la synchronisation en
+  # perdrait un sans le dire.
+  uuid: ^4.5.1
+
+  # ─── État applicatif ─────────────────────────────────────────────────────
+  flutter_riverpod: ^2.6.1
+
+  # ─── Sync Engine — moitié cliente ────────────────────────────────────────
+  # Les endpoints serveur existent déjà côté Laravel : POST /api/auth/login,
+  # GET /api/sync/pull, POST /api/sync/push (jeton Sanctum nommé par appareil).
+  dio: ^5.7.0
+  connectivity_plus: ^6.1.0
+  flutter_secure_storage: ^9.2.2
+
+  # ─── Présentation ────────────────────────────────────────────────────────
+  intl: ^0.19.0
+
+  # ─── Édition des rapports (ticket F0.52) ─────────────────────────────────
+  # ⚠️ TOUTES TROIS SONT DU DART PUR OU UN GREFFON WINDOWS LOCAL : rien ne
+  # part sur le réseau à l'édition. C'est la condition pour qu'un rapport
+  # s'imprime à la ferme le jour où la liaison est tombée — soit précisément
+  # le jour où le poste sert à quelque chose.
+  #
+  # ⚠️ `printing` ouvre la boîte d'impression de Windows, qui offre aussi
+  # « Enregistrer au format PDF ». Écrire le fichier nous-mêmes obligerait à
+  # choisir un dossier à la place de l'utilisateur.
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  # ⚠️ Le QR de la fiche sujet encode l'IDENTIFIANT lisible, comme le web.
+  qr_flutter: ^4.1.0
+  excel: ^4.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.28.2
+  build_runner: ^2.4.14
+
+flutter:
+  uses-material-design: true
+
+  # ⚠️ LE LOGO EST EMBARQUÉ, PAS CHARGÉ. `pdf-export.js` le tire de
+  # `assets/images/logo.png` et tolère son absence (`onerror`) : sur le web, un
+  # logo manquant laisse un document lisible. Ici il doit être PRÉSENT — un
+  # rapport imprimé sort de la ferme, et l'en-tête officiel en fait partie.
+  # C'est le même fichier que la maquette, copié et non redessiné.
+  #
+  # ⚠️ ROBOTO EST EMBARQUÉE POUR LES DOCUMENTS PDF (ticket F0.75). La police par
+  # défaut du moteur PDF (Helvetica) n'a pas Unicode : le tiret cadratin « — » et
+  # l'apostrophe typographique « ’ » y sortent en CARRÉ BARRÉ, y compris dans le
+  # pied de page des trois structures. Licence Apache 2.0 (fichier joint), copiée
+  # du SDK Flutter.
+  assets:
+    - assets/images/logo.png
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf

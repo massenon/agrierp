@@ -1,0 +1,63 @@
+{
+    "name": "AgriERP — Ferme École Olouwachegoun",
+    "short_name": "AgriERP",
+    "description": "Logiciel de gestion et de suivi d'élevage intégré : production animale, ventes, achats, stocks, personnel et comptabilité.",
+    "lang": "fr",
+    "dir": "ltr",
+    "start_url": "/dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#F8F9FA",
+    "theme_color": "#052e16",
+    "categories": ["business", "productivity", "utilities"],
+    "icons": [
+        {
+            "src": "/assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/assets/icons/icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/assets/icons/icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Enregistrer une vente",
+            "short_name": "Vente",
+            "description": "Ouvrir directement la caisse",
+            "url": "/ventes-devis?tab=vente",
+            "icons": [{ "src": "/assets/icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Fiches d'élevage",
+            "short_name": "Élevage",
+            "description": "Saisir la fiche journalière",
+            "url": "/gestion-elevage",
+            "icons": [{ "src": "/assets/icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Tableau de bord",
+            "short_name": "Bord",
+            "description": "Indicateurs et alertes du jour",
+            "url": "/dashboard",
+            "icons": [{ "src": "/assets/icons/icon-192.png", "sizes": "192x192" }]
+        }
+    ]
+}

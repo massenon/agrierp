@@ -1,0 +1,268 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   AgriERP — resources/css/app.css
+   Fusion de assets/css/common.css (prototype, source de vérité DOM/classes)
+   et Document 06 §1.3. Aucune classe renommée : les vues Blade portées
+   depuis le prototype référencent ces mêmes noms de classe sans changement
+   (Directive Transversale, Document 00 §1).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Police de texte Inter — hébergée en LOCAL (Offline-First), ticket 15.4.
+   Remplace les deux <link> vers fonts.googleapis.com qui figuraient dans
+   layouts/app.blade.php et layouts/guest.blade.php.
+
+   ⚠️ UN SEUL FICHIER PAR SOUS-ENSEMBLE : Inter est une police VARIABLE.
+   Le même .woff2 couvre tout l'axe de graisse 100–900 — inutile de
+   télécharger un fichier par graisse (400, 500, 600, 700, 800), ce qui
+   aurait représenté cinq fois plus de poids pour un rendu identique.
+   Vérifié : l'API Google renvoie exactement la même URL pour
+   `wght@400;500;600;700;800` et pour `wght@100..900`.
+
+   Les `unicode-range` sont ceux de Google : le navigateur ne télécharge
+   `latin-ext` (85 Ko) que si la page contient réellement un caractère de
+   cette plage. Une page courante ne charge donc que `latin` (48 Ko).
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/fonts/Inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/fonts/Inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                 U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                 U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* --------------------------------------------------------------------------
+   Police d'icônes Material Symbols Outlined — hébergée en LOCAL (Offline-First)
+   Fichier binaire à copier tel quel : public/assets/fonts/MaterialSymbolsOutlined.woff2
+   Aucune requête vers fonts.googleapis.com / fonts.gstatic.com au chargement.
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url("/assets/fonts/MaterialSymbolsOutlined.woff2") format("woff2");
+}
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "liga";
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* --------------------------------------------------------------------------
+   Base / Typographie
+   -------------------------------------------------------------------------- */
+body {
+  font-family: 'Inter', sans-serif;
+}
+.text-xs {
+  font-size: 0.85rem !important;
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+.sidebar-gradient {
+  background: linear-gradient(180deg, #052e16 0%, #00210d 100%);
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #284f33;
+  border-radius: 10px;
+}
+.submenu {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height .3s ease, opacity .2s ease;
+}
+.submenu.open {
+  max-height: 600px;
+  opacity: 1;
+}
+.chev {
+  transition: transform .2s ease;
+}
+.chev.rot {
+  transform: rotate(90deg);
+}
+
+/* --------------------------------------------------------------------------
+   Formulaires / Validation
+   -------------------------------------------------------------------------- */
+.is-invalid {
+  border-color: #BA1A1A !important;
+  background-color: #FFF5F5;
+}
+.invalid-feedback {
+  color: #BA1A1A;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Toasts
+   -------------------------------------------------------------------------- */
+.toast-in {
+  animation: toastIn .3s ease-out;
+  transition: opacity .3s, transform .3s;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* --------------------------------------------------------------------------
+   Mode Sombre
+   -------------------------------------------------------------------------- */
+body.dark-mode {
+  background: #121212;
+  color: #e8e8e8;
+}
+body.dark-mode .bg-white {
+  background-color: #1e1e1e !important;
+  color: #e8e8e8;
+}
+body.dark-mode .bg-surface-bg {
+  background-color: #121212 !important;
+}
+body.dark-mode .text-on-surface {
+  color: #e8e8e8 !important;
+}
+body.dark-mode .border-outline-variant {
+  border-color: #3a3a3a !important;
+}
+
+/* --------------------------------------------------------------------------
+   Accordéon KPI (mobile ET desktop) — classe exacte, jamais de variante locale
+   (Document 06 §3 : <x-kpi-accordion> doit utiliser CETTE classe uniquement)
+   -------------------------------------------------------------------------- */
+.kpi-mobile-collapsed {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height .3s ease, opacity .2s ease;
+}
+.kpi-mobile-collapsed.open {
+  max-height: 900px;
+  opacity: 1;
+}
+@media (min-width: 768px) {
+  .kpi-mobile-collapsed {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+}
+.kpi-chev {
+  transition: transform .2s ease;
+}
+.kpi-chev.rot {
+  transform: rotate(180deg);
+}
+
+/* --------------------------------------------------------------------------
+   DataTable responsive (table.rtable) — mobile : tableau -> cartes empilées
+   Utilisé par <x-datatable> (Document 06 §3)
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  table.rtable thead {
+    display: none;
+  }
+  table.rtable,
+  table.rtable tbody,
+  table.rtable tr,
+  table.rtable td {
+    display: block;
+    width: 100%;
+  }
+  table.rtable tr.rrow {
+    border: 1px solid #bec9c2;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    padding: 6px 0;
+  }
+  table.rtable td {
+    text-align: right;
+    padding: 6px 12px !important;
+    position: relative;
+    padding-left: 46% !important;
+    white-space: normal !important;
+  }
+  table.rtable td[data-label]::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 12px;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #6f7973;
+    text-align: left;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Impression (fiches journalières, exports print natif du navigateur)
+   -------------------------------------------------------------------------- */
+@media print {
+  #sidebar, #sidebar-overlay, header, nav.fixed.bottom-0, .no-print {
+    display: none !important;
+  }
+  body, .flex-1 {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  #print-fiche-header {
+    display: block !important;
+  }
+  table {
+    font-size: 8px !important;
+  }
+  th, td {
+    padding: 3px !important;
+  }
+}
+
+/* ==========================================================================
+   Anti-flash sidebar mobile (défense en profondeur) — renforcé en CSS pur,
+   charge avant l'hydratation Alpine.js, pour éliminer tout flash visuel
+   pendant la navigation (chaque page Livewire = re-render du layout).
+   ========================================================================== */
+#sidebar-overlay.hidden { display: none !important; }
+@media (max-width: 1023px) {
+  #sidebar.-translate-x-full { transform: translateX(-100%) !important; }
+}

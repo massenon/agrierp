@@ -1,0 +1,118 @@
+<?php
+
+namespace App\Livewire\Facturation;
+
+use App\Models\AuditLog;
+use App\Models\Sale;
+use App\Services\Mecef\MecefGatewayInterface;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+
+/**
+ * Ticket 7.1 (Sprint 7) — facturation.html → Livewire\Facturation\Facturation
+ * "Émission de factures normalisées et transmission au système MeCeF
+ * (DGI Bénin)."
+ *
+ * Un seul point de vérité : chaque vente validée (`sales`, réelle depuis
+ * le ticket 4.2) EST une facture — jamais une table `invoices` parallèle
+ * inventée. `mecef_status`/`mecef_qr_ref` (ticket 7.1) portent le statut
+ * de transmission réel, alimenté par `MecefGatewayInterface` (voir
+ * `PosInterface::validateSale()`, câblé dans ce même ticket).
+ *
+ * ⚠️ "NOUVELLE FACTURE" NON DUPLIQUÉE : le prototype propose un formulaire
+ * de création indépendant (Client + Montant HT + TVA, sans article ni
+ * produit), ce qui créerait une facture déconnectée de toute vente et de
+ * tout stock — en contradiction directe avec la règle "vente à la pièce"
+ * et le suivi produit par produit déjà appliqués partout ailleurs dans ce
+ * projet (Document 01 §6.7). Le bouton redirige vers le POS (ticket 4.2),
+ * seul point d'entrée réel pour créer une vente/facture.
+ *
+ * QR code réel (`simplesoftwareio/simple-qrcode`, Document 06 §7),
+ * encodant `mecef_qr_ref` (NIM + signature).
+ *
+ * "Modifier" une facture non implémenté : une facture EST une vente déjà
+ * validée, potentiellement déjà transmise à la DGI — la modifier après
+ * coup romprait l'intégrité fiscale, contrairement à l'annulation déjà
+ * réelle (`HistoriqueVentes::cancelSale()`, ticket 4.4).
+ */
+#[Layout('layouts.app')]
+class Facturation extends Component
+{
+    #[Url]
+    public string $search = '';
+
+    #[Url]
+    public string $statusFilter = '';
+
+    public ?string $viewingSaleId = null;
+
+    public function getKpisProperty(): array
+    {
+        $monthSales = Sale::where('status', 'validee')
+            ->soldBetween(now()->startOfMonth(), now()->endOfMonth());
+
+        return [
+            'factures_mois' => (clone $monthSales)->count(),
+            'transmises' => (clone $monthSales)->where('mecef_status', 'transmise')->count(),
+            'en_attente' => (clone $monthSales)->where('mecef_status', 'en_attente')->count(),
+            'erreurs' => (clone $monthSales)->where('mecef_status', 'erreur')->count(),
+        ];
+    }
+
+    public function getSalesProperty()
+    {
+        $statusMap = ['Transmise' => 'transmise', 'En attente' => 'en_attente', 'Erreur MeCeF' => 'erreur'];
+
+        return Sale::with('customer')
+            ->where('status', 'validee')
+            ->when($this->search, fn ($q) => $q->where(fn ($q2) => $q2->where('id', 'like', '%'.$this->search.'%')
+                ->orWhereHas('customer', fn ($q3) => $q3->where('name', 'like', '%'.$this->search.'%'))))
+            ->when($this->statusFilter, fn ($q) => $q->where('mecef_status', $statusMap[$this->statusFilter] ?? $this->statusFilter))
+            ->orderByEffectiveDate()
+            ->limit(100)
+            ->get();
+    }
+
+    public function getViewingSaleProperty(): ?Sale
+    {
+        return $this->viewingSaleId ? Sale::with('customer')->find($this->viewingSaleId) : null;
+    }
+
+    public function getQrSvgProperty(): ?string
+    {
+        if (! $this->viewingSale || ! $this->viewingSale->mecef_qr_ref) {
+            return null;
+        }
+
+        return QrCode::size(220)->generate($this->viewingSale->mecef_qr_ref);
+    }
+
+    public function showMecef(string $id): void
+    {
+        $this->viewingSaleId = $id;
+        $this->dispatch('open-modal', name: 'modal-mecef');
+    }
+
+    public function retryMecef(string $id): void
+    {
+        $this->authorize('manage-facturation');
+
+        $sale = Sale::findOrFail($id);
+        $result = app(MecefGatewayInterface::class)->transmit($sale);
+
+        $sale->update([
+            'mecef_qr_ref' => $result['qr_ref'],
+            'mecef_status' => $result['success'] ? 'transmise' : 'erreur',
+        ]);
+
+        AuditLog::record('sale.mecef_retried', 'facturation');
+        $this->dispatch('toast', message: $result['message'], type: $result['success'] ? 'success' : 'error');
+    }
+
+    public function render()
+    {
+        return view('livewire.facturation.facturation', ['title' => 'Facturation & MeCeF']);
+    }
+}

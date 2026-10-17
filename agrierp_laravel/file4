@@ -1,0 +1,172 @@
+
+
+# PROMPT MASTER : DIRECTIVE TECHNIQUE D'AUDIT, DE REFONTE ET DE CERTIFICATION DE CONFORMITÉ
+## APPLICATION : AgriERP — FERME ÉCOLE OLOUWACHEGOUN (94 ÉCRANS BLADE / HTML)
+### DESTINATAIRES : CLAUDE CODE, LEAD DEVELOPER & AUDITEURS TECHNIQUE
+
+---
+
+## 🎯 OBJECTIF ET PRIORITÉ ABSOLUE DE CET AUDIT
+
+> **PRIORITÉ ABSOLUE : FIDÉLITÉ VISUELLE ET FONCTIONNELLE À 100% AUX MAQUETTES PROTOTYPES HTML.**
+> Si un écran Blade (`.blade.php`) présente un écart visuel, d'alignement, de typographie, de couleur, de bordure, d'espacement ou d'interactivité par rapport à sa maquette HTML de référence, **IL DOIT ÊTRE RECONSTRUIT IMMÉDIATEMENT**.
+> 
+> La logique métier, la synchronisation API Laravel (`agrierp.fermeolouwachegoun.com`), la sécurité RBAC, les moteurs de recherche et les modales doivent être injectés **SANS AUCUNE ALTÉRATION DE LA CHARTE GRAPHIQUE VALIDÉE**.
+
+---
+
+# SECTION 1 : AUDIT DU MOTEUR DE RECHERCHE GLOBALE ERP (`Ctrl+K / Cmd+K`)
+
+Le moteur de recherche globale en topbar (`Recherche globale ERP…`) doit être strictement certifié conforme à la spécification `MOTEUR_DE_RECHERCHE_GLOBALE_ERP.md` sur l'ensemble des 94 écrans :
+
+```
++-----------------------------------------------------------------------------------+
+|               CHECKLIST DE CERTIFICATION DU MOTEUR DE RECHERCHE                   |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  [ ] 1. DÉCLENCHEMENT UNIVERSEL                                                   |
+|      - Raccourci clavier `Ctrl + K` (Windows/Linux) ou `Cmd + K` (Mac) utilisable |
+|        depuis n'importe quel écran pour ouvrir/focaliser la recherche.            |
+|      - Clic sur la loupe mobile ouvrant la modale plein écran.                    |
+|                                                                                   |
+|  [ ] 2. DYNAMIQUE DE PERFORMANCES                                                 |
+|      - Temporisation Debounce strictement fixée à 150ms.                          |
+|      - Seuil minimal de déclenchement : 2 caractères saisis.                      |
+|                                                                                   |
+|  [ ] 3. PRÉ-FILTRAGE RBAC EN AMONT (SOUVERAINETÉ DES RÔLES)                       |
+|      - Le moteur NE REQUÊTE PAS un domaine si le rôle de l'utilisateur n'y a    |
+|        pas accès (Le domaine est exclu avant la requête, pas filtré après).       |
+|                                                                                   |
+|  [ ] 4. COUVERTURE DES 5 DOMAINES D'INDEXATION                                    |
+|      - Domaine Élevage (Bandes, Lapines R1..Rn, Truies T1..Tn, Cages/Parcs)       |
+|      - Domaine Santé & Pharmacie (Produits VMS, Pathologies, Rémanences)          |
+|      - Domaine Commercial (Factures POS, Devis, Clients, IFU, Créances)           |
+|      - Domaine Achats & Stocks (Produits, Aliments Kg, Bons de Commande, Fourn.)  |
+|      - Domaine Comptabilité & Admin (Comptes SYSCOHADA, Écritures, Salariés, GED) |
+|                                                                                   |
+|  [ ] 5. ERGONOMIE & NAVIGATION CLAVIER                                            |
+|      - Navigation dans les résultats au clavier : Flèches `Haut` / `Bas`,          |
+|        validation par `Entrée` (ouverture directe), fermeture par `Échap`.       |
+|      - Panneau flottant surélevé (`z-[200]`) avec badges de couleur par domaine.   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+# SECTION 2 : CONTROLE ÉCRAN PAR ÉCRAN — ÉQUIVALENCE STRICTE BLADE VS HTML
+
+Pour chacun des **94 écrans** d'AgriERP, tu doit procéder à la vérification d'équivalence stricte entre le fichier Blade (`.blade.php`) et la maquette HTML source :
+
+```
++-----------------------------------------------------------------------------------+
+|                MATRICE D'AUDIT COMPARAISON ÉCRAN BLADE VS MAQUETTE HTML            |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  [ ] 1. CHARTE CHROMATIQUE STRICTE                                                |
+|      - Vert Forêt Sombre `#052e16` (Header, Sidebar, Titres)                      |
+|      - Vert Émeraude `#065f46` (Boutons primaires, Badges positifs)                |
+|      - Jaune Maïs `#FFD55F` (Accents, Alertes récurrence, Icône Agriculture)       |
+|      - Rouge Danger `#DC2626` / `#BA1A1A` (Mortalité, Rémanence, Modale Suppr.)  |
+|      - Gris Sauge Surface `#F8F9FA` & Zèbre `#F3F4F5` (Fonds de page et tables)   |
+|                                                                                   |
+|  [ ] 2. TYPOGRAPHIE & BORDURES                                                    |
+|      - Police principale : Inter (Poids 400, 500, 600, 700, 800).                  |
+|      - Icônes : Material Symbols Outlined (Configuration `opsz 24, wght 400`).     |
+|      - Couleurs de bordures : `#bec9c2` (Outline Variant) et `#6f7973`.          |
+|                                                                                   |
+|  [ ] 3. RESPONSIVE DESIGN QUADRA-ÉCRAN                                            |
+|      - Desktop (1920px+), Laptop (1366px), Tablette (768px), Mobile (360-480px).  |
+|      - Défilement horizontal des tables (`rtable / overflow-x-auto`).             |
+|      - Accordéon KPI Mobile & Desktop (`toggleKpiPanel`).                         |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+# SECTION 3 : AUDIT RBAC DYNAMIQUE, CRUD & FILTRES DANS LES TABLES
+
+Chaque écran comportant une table de données doit être validé sur la présence effective des contrôles d'accès et des actions interactives :
+
+### A. Contrôle des Rôles & Permissions (Audit RBAC)
+* **Masquage / Activation Conditionnelle des Boutons :**
+  * Les boutons *Éditer*, *Supprimer*, *Nouveau*, *Ajouter* doivent être masqués ou désactivés si le rôle actif ne possède pas les droits d'écriture/suppression sur le module.
+  * Tenter d'accéder directement à une page interdite déclenche la modale **403 Accès Refusé**.
+
+### B. Standard des 6 Boutons d'Action Universels
+Sur tous les tableaux de tous les modules, vérifier la présence et le fonctionnement réactif de :
+1. **Bouton `Éditer` :** Ouvre la modale d'édition pré-remplie, enregistre en JS/API et met à jour la ligne sans recharger la page.
+2. **Bouton `Supprimer` :** Ouvre la modale d'avertissement rouge danger avec message d'impact explicite et confirmation.
+3. **Bouton `Exporter PDF` :** Déclenche le moteur d'impression A4 avec l'en-tête officiel de la **FERME ÉCOLE OLOUWACHEGOUN**, le logo `assets/images/logo.png`, la date et les signatures.
+4. **Bouton `Importer` :** Ouvre la modale d'importation CSV/Excel avec zone de glisser-déposer.
+5. **Bouton `Consulter / View` :** Ouvre le tiroir latéral glissant droit (**Offcanvas**) avec la fiche à 360°, les graphiques et le bouton de redirection intelligente.
+6. **Bouton `Filtrer` :** Filtre réactif multi-critères (Recherche texte, Espèce, Statut, Plage de dates) avec bouton de réinitialisation (`filter_alt_off`).
+
+---
+
+# SECTION 4 : REGULARISATION DES 4 ÉCARTS DE SCHÉMA MAJEURS
+
+U doit s'assurer que les **4 ajustements de schéma métier** suivants sont parfaitement intégrés dans les modèles de données et formulaires Blade :
+
+```
++-----------------------------------------------------------------------------------+
+|                     RÉGULARISATION DES 4 ÉCARTS DE SCHÉMA                         |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  1. GRANULARITÉ ÉLEVAGE (VENTILATION DES SORTIES)                                 |
+|     - Saisie et stockage séparés des Morts, Ventes et Dons selon 3 catégories :    |
+|       * Reproducteur (Géniteurs)                                                  |
+|       * Chair / Engraissement (Poulet / Lapin / Porc)                             |
+|       * Poussin / Lapereau / Porcelet                                             |
+|                                                                                   |
+|  2. VALORISATION DES STOCKS AU PMP / CMUP                                         |
+|     - Moteur de calcul du Prix Moyen Pondéré (CMUP) sur chaque entrée en stock.    |
+|     - Valorisation financière automatique du magasin dans les rapports.           |
+|                                                                                   |
+|  3. ADMINISTRATION & GESTION DOCUMENTAIRE (GED)                                   |
+|     - Classement et archivage des Conventions PAEB, Procès-Verbaux FAGUEZ SARL,   |
+|       Agréments et Contrats avec moteur de recherche documentaire.                |
+|                                                                                   |
+|  4. COMPTABILITÉ : REPORT À NOUVEAU (RAN) & CLÔTURE                               |
+|     - Prise en charge des écritures de Report à Nouveau lors de la clôture de     |
+|       l'exercice fiscal SYSCOHADA.                                                |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+# SECTION 5 : AUDIT DU HUB RAPPORTS & ÉTATS DÉCISIONNELS (6 RAPPORTS CRITIQUES)
+
+L'écran `rapports-exports.html` (et ses vues Blade associées) doit être rigoureusement audité sur ses **6 onglets de rapports** :
+
+| Onglet de Rapport | Contenu Exigé & Formules | Format Export |
+| :--- | :--- | :--- |
+| **1. État Recettes & Dépenses** | Compte de résultat, P&L, Marge brute %, Résultat net (Recettes - Dépenses) | PDF Paysage / Excel |
+| **2. État de Trésorerie** | Solde Caisse, Banque Coris, Mobile Money MTN/Moov, Trésorerie disponible | PDF Portrait / Excel |
+| **3. Créances Clients** | Factures impayées, Retards en jours (Badge rouge), Acomptes, Taux de recouvrement % | PDF Relance / Excel |
+| **4. Dettes Fournisseurs** | Factures provendes/soins dues, Échéancier de règlement, Solde restant dû | PDF Échéancier / Excel |
+| **5. Rapport Élevage Détaillé** | **Tableau 1** (Recensement hebdo), **Tableau 2** (Mouvements & Soins), **Tableau 3** (Ponte $OR, OF, SRH, TS, OS$, Plateaux) | **PDF Grand Format A4** |
+| **6. Rapport de Stocks** | Inventaire physique, CMUP (FCFA), Valorisation totale magasin, Produits sous seuil critique | PDF Inventaire / Excel |
+
+---
+
+# SECTION 6 : SYNCHRONISATION LARAVEL API & SEEDERS GENERATED
+
+1. **Communication API Backend :** L'ensemble des formulaires et tables doit communiquer en HTTPS réactif avec les endpoints de l'API AgriERP (`agrierp.fermeolouwachegoun.com`).
+2. **Gestion Hors-Ligne & Cache :** En cas de perte de connexion dans les bâtiments d'élevage, la donnée est enregistrée en cache local (`localStorage`) et synchronisée automatiquement dès le retour du réseau (Badge animé topbar `12 en attente`).
+3. **Seeders de Démonstration :** Génération de jeu de données réaliste par Seeder Laravel pour la **Ferme École OLOUWACHEGOUN** (Bandes réelles, historique de ponte, calendrier de prophylaxie, stock d'aliments en Kg, écritures comptables SYSCOHADA).
+
+---
+
+## 📋 CHECKLIST FINALE DE CERTIFICATION ÉCRAN PAR ÉCRAN (À VALIDER POUR LES 94 ÉCRANS)
+
+- [ ] **Fidélité Visuelle :** La vue Blade est identique au pixel près à la maquette HTML prototype.
+- [ ] **TopBar & Sidebar :** Recherche globale `Ctrl+K` fonctionnelle, badge sync, notifications, profil, rôle switcher RBAC.
+- [ ] **Menu Flottant Droite (`right-floating-menu`) :** Présent et opérationnel pour l'accès rapide inter-espèces.
+- [ ] **Bouton Aide Flottant (`btn-help-tour`) :** Déclenche la visite guidée interactive avec surbrillance spotlight.
+- [ ] **KPIs & Accordéon :** Fonction `toggleKpiPanel` testée sur mobile et desktop.
+- [ ] **Action Buttons & Modales :** Add, Edit, Delete (Avertissement rouge), View (Offcanvas), Import, Export PDF fonctionnels.
+- [ ] **Popups Automatiques :** "Rappel Prophylaxie du Jour" et "Alerte Stock Critique" s'affichent sur les dashboards.
+- [ ] **Interconnexion ERP :** Rémanence sanitaire active bloquant les ventes en Caisse POS.

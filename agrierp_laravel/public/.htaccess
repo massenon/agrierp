@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------
+#  Types MIME du PWA (ticket 15.4)
+#
+#  ⚠️ Apache ne connaît PAS l'extension .webmanifest par défaut : il la
+#  sert alors en text/plain, et le navigateur ignore silencieusement le
+#  manifeste — l'application cesse d'être installable sans le moindre
+#  message d'erreur. Défaut invisible en local (`php artisan serve`
+#  renvoie le bon type tout seul), visible seulement en production.
+# ---------------------------------------------------------------------
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+    AddType font/woff2 .woff2
+</IfModule>
+
+# Le service worker doit pouvoir piloter TOUTE l'application : son cache
+# ne doit jamais figer une version ancienne de sw.js lui-même.
+<IfModule mod_headers.c>
+    <Files "sw.js">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Service-Worker-Allowed "/"
+    </Files>
+    <FilesMatch "\.woff2$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # Audit Lighthouse du 24/08/2026 — « Use efficient cache lifetimes ».
+    # Les fichiers bâtis par Vite portent une empreinte dans leur nom
+    # (app-D_IdB1ks.css) : leur contenu ne change JAMAIS sans que le nom
+    # change aussi. Un an de cache est donc sans risque — alors que le
+    # JavaScript bâti était servi SANS aucune durée de cache, redemandé à
+    # chaque visite.
+    <FilesMatch "-[A-Za-z0-9_-]{8,}\.(css|js)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # Images et icônes de l'application : sept jours au lieu d'un an, car
+    # elles ne portent PAS d'empreinte — un logo remplacé doit pouvoir
+    # atteindre les postes sans attendre.
+    <FilesMatch "\.(png|jpe?g|webp|svg|ico)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
