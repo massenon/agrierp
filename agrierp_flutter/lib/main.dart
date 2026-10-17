@@ -12,6 +12,8 @@ import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
 import 'core/widgets/barre_superieure.dart';
 import 'core/theme/agri_tokens.dart';
+import 'features/demarrage/premier_demarrage_repository.dart';
+import 'features/demarrage/premier_demarrage_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/elevage/fiche_journaliere_repository.dart';
 import 'features/achats/achats_commandes_screen.dart';
@@ -141,6 +143,13 @@ class _AgriErpAppState extends State<AgriErpApp> {
     // poste. La constante partagée d'avant rendait deux postes de la ferme
     // indiscernables : aucun conflit n'était explicable.
     deviceId: widget.identifiantPoste,
+  );
+
+  /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).
+  late final PremierDemarrageRepository _demarrage = PremierDemarrageRepository(
+    database: _db,
+    parametres: widget.parametres,
+    client: _client,
   );
 
   late final AuthService _auth = AuthService(
@@ -276,6 +285,10 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// utilisateur déjà authentifié.
   bool? _sessionOuverte;
 
+  /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
+  /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
+  bool _premierDemarrage = false;
+
   @override
   void initState() {
     super.initState();
@@ -284,7 +297,23 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   Future<void> _reprendre() async {
     final ouverte = await _auth.reprendreSession();
-    if (mounted) setState(() => _sessionOuverte = ouverte);
+    final neuf = ouverte && await _demarrage.posteNeuf();
+    if (mounted) {
+      setState(() {
+        _sessionOuverte = ouverte;
+        _premierDemarrage = neuf;
+      });
+    }
+  }
+
+  Future<void> _connecte() async {
+    final neuf = await _demarrage.posteNeuf();
+    if (mounted) {
+      setState(() {
+        _sessionOuverte = true;
+        _premierDemarrage = neuf;
+      });
+    }
   }
 
   @override
@@ -306,7 +335,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
         ),
         false => LoginScreen(
           auth: _auth,
-          onConnecte: () => setState(() => _sessionOuverte = true),
+          demarrage: _demarrage,
+          onConnecte: _connecte,
+        ),
+        true when _premierDemarrage => PremierDemarrageScreen(
+          depot: _demarrage,
+          engine: _engine,
+          utilisateur: _auth.utilisateur?.nom ?? '—',
+          onTermine: () => setState(() => _premierDemarrage = false),
         ),
         true => SocleAccueil(
           database: _db,

@@ -19,6 +19,8 @@ class CompanySetting extends Model
         'demo_mode_enabled',
         // Ticket 15.50 — instant de la dernière réinitialisation des données (servi au tirage).
         'data_reset_at',
+        // Ticket 15.51 — assistant de démarrage marqué terminé.
+        'onboarding_completed_at',
         'company_name', 'promoter_name', 'address', 'phone', 'email', 'ifu', 'rccm',
         'smtp_host', 'smtp_port', 'smtp_security', 'smtp_user', 'smtp_password_encrypted',
         'logo_path', 'favicon_path',
@@ -38,6 +40,7 @@ class CompanySetting extends Model
             'vonage_api_secret_encrypted' => 'encrypted',
             'payroll_settings_edited_at' => 'datetime',
             'data_reset_at' => 'datetime',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 

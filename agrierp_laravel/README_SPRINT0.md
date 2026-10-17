@@ -21759,3 +21759,23 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 
 ### Non fait — ARBITRAGE CLIENT
 - Un exercice CLÔTURÉ reste clôturé après réinitialisation (ses écritures, dont le report à nouveaux, sont effacées). La clôture est irréversible par conception : la rouvrir est une décision de l'exploitant, pas une conséquence automatique.
+
+---
+
+## Tickets 15.51 / F0.98 — Assistant de démarrage (web) et premier démarrage du poste (17/10/2026)
+
+### Constat
+- Sur une base vide, rien ne disait à l'administrateur ce qui manquait : la première vente échouait sur « aucun exercice ouvert », la première dépense sur l'absence de compte de trésorerie. Et AUCUN écran ne permettait d'ouvrir le premier exercice (seule la clôture crée le suivant — constat déjà fait au ticket 13.4, comblé alors par un seeder uniquement).
+- Poste neuf : rien n'indiquait qu'une synchronisation devait précéder toute saisie, et l'adresse du serveur ne se changeait que dans « Paramètres du poste », réservé à l'administrateur… donc inaccessible avant une connexion réussie.
+
+### Corrections
+- Web : `DemarrageService` CONSTATE six étapes dans la base (identité, plan comptable, exercice ouvert couvrant aujourd'hui — règle de `AccountingEntryService` —, trésorerie active, module d'élevage activé ; comptes de l'équipe en recommandé). `AssistantDemarrage` (modale du tableau de bord) : administrateur seulement, ouverte tant qu'une étape obligatoire manque, NON bloquante (« Plus tard » pour la session), chaque étape renvoie à son écran ; « Ouvrir l'exercice AAAA » (année civile, règle de `FiscalYearSeeder`, jamais sur un exercice clôturé) ; « Terminer » exige les étapes obligatoires et pose `company_settings.onboarding_completed_at` (migration `2026_10_18_000004`).
+- Poste : `PremierDemarrageScreen` après la connexion d'un poste NEUF (jamais tiré, rien en attente) : serveur et identifiant du poste, lancement et compte rendu de la première synchronisation, « Plus tard ». À la connexion, un poste neuf affiche son serveur et peut en changer (appliqué aussitôt au client partagé) ; un poste en service ne le peut pas (règle de « Paramètres du poste » inchangée).
+- Défaut attrapé au test : le contrôleur de saisie de l'adresse était libéré pendant l'animation de fermeture de la modale.
+
+### Mesures
+- `AssistantDemarrageTest` (9). Suite Feature : 1 651 verts.
+- `premier_demarrage_test.dart` (9). Suite du poste : 1 991 verts, 32 ignorés, 3 rouges connus (A7). `flutter analyze` propre.
+
+### Non fait
+- L'assistant ne crée ni compte de trésorerie, ni utilisateur, ni plan comptable : il renvoie aux écrans existants qui le font.
