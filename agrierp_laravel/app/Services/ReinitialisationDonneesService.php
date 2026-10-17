@@ -119,8 +119,8 @@ class ReinitialisationDonneesService
     }
 
     /**
-     * Ticket 15.50 — tables TECHNIQUES du cadriciel, ni vidées ni « préservées » au sens métier. ⚠️ Les jetons et
-     * sessions restent : les vider déconnecterait l'administrateur qui vient de lancer l'opération.
+     * Ticket 15.50 — tables TECHNIQUES du cadriciel, ni vidées ni « préservées » au sens métier. Sessions et jetons
+     * sont vidés à part (ticket 15.54, `ViderSessionsService`), en gardant la session de l'administrateur.
      *
      * @return array<int, string>
      */
@@ -169,6 +169,10 @@ class ReinitialisationDonneesService
                 }
             });
         });
+
+        // 🔁 Ticket 15.54 — sessions vidées et jetons des postes révoqués : chaque poste se reconnecte, et son
+        // premier tirage applique la réinitialisation. La session de l'administrateur qui l'a lancée est conservée.
+        app(ViderSessionsService::class)->vider(app()->runningInConsole() ? null : session()->getId());
 
         AuditLog::record('donnees.reinitialisees', 'parametres');
 

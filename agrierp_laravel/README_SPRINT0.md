@@ -21836,3 +21836,20 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 
 ### Mesures
 - `ReouvertureExerciceTest` (5), chiffres calculés à la main : report 1 000 000 → contre-passé → 0 ; correction de 250 000 puis nouvelle clôture → à-nouveau 1 250 000 ; refus si N+1 clos ; comptable refusé ; réinitialisation rouvre.
+
+---
+
+## Ticket 15.54 — Vider les sessions (17/10/2026)
+
+### Décision client
+« Vider les sessions » (17/10/2026), en réponse à l'expiration des jetons des postes à 90 jours (S1).
+
+### Corrections
+- `ViderSessionsService` : supprime les sessions web (pilote `database`) et révoque tous les jetons Sanctum des postes, en conservant la session de celui qui agit.
+- Gestion des Utilisateurs : bouton « Déconnecter Toutes les Sessions » (`manage-users`), modale de confirmation, nombre réel annoncé, journalisé `sessions.videes`.
+- Commande `php artisan agrierp:vider-sessions [--force]` (cPanel, maintenance).
+- Réinitialisation des données : vide aussi sessions et jetons ; chaque poste se reconnecte, et son premier tirage applique la réinitialisation (15.50).
+- Les saisies en attente d'un poste déconnecté restent sur la machine et partent après la reconnexion (aucune donnée du poste n'est touchée par ce geste).
+
+### Mesures
+- `ViderSessionsTest` (5) : session en cours conservée, comptable refusé, commande, jeton révoqué → 401 au tirage, réinitialisation.
