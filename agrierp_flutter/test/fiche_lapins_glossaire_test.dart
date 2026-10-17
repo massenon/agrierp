@@ -8,6 +8,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.92 — GLOSSAIRE DE LA FICHE LAPINS AU POSTE (suite de 15.36).
 ///
@@ -351,7 +352,7 @@ void main() {
     'écarts ASSUMÉS vis-à-vis de la maquette (décision client 14/10/2026)',
     () {
       final maquette = File(
-        'C:/Projects/agrierp_laravel/prototype_html/fiche-lapins.html',
+        '$dossierPrototype/fiche-lapins.html',
       );
       final ecran = File('lib/features/elevage/fiche_lapins_screen.dart');
 

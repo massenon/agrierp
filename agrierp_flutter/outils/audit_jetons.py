@@ -22,9 +22,8 @@ import glob
 import io
 import os
 import re
+from chemins import PROTO, RACINE  # A7 : chemins résolus, plus de C:/ en dur
 
-RACINE = 'C:/Projects/agrierp_flutter'
-PROTO = 'C:/Projects/agrierp_laravel/prototype_html'
 
 # Echelle typographique de Tailwind, avec la surcharge de `common.css`.
 TAILWIND_TAILLES = {'text-xs': 13.6, 'text-sm': 14, 'text-base': 16,

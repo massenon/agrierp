@@ -12,6 +12,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.83 — PLAN COMPTABLE SYSCOHADA RÉVISÉ AU POSTE (phase A de l'item 9).
 ///
@@ -24,8 +25,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// solde 0 dans la balance, et le Grand Livre s'ouvre sur « 531 » comme le serveur (F0.85 ; le ticket
 /// F0.83 l'ouvrait sur le premier compte mouvementé, un écart au serveur désormais retiré) — deux
 /// défauts qui n'émettent AUCUNE erreur.
-const _cheminCsv =
-    'C:/laragon/www/agrierp/database/data/plan-comptable-syscohada-revise.csv';
+final _cheminCsv =
+    '$dossierLaravel/database/data/plan-comptable-syscohada-revise.csv';
 
 class _ConnectiviteFeinte implements Connectivity {
   @override

@@ -12,6 +12,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.87 (item 9, T4) — « Exporter PDF » des quatre pages comptables du poste
 /// (`plan-comptable.html`, `journal-comptable.html`, `grand-livre.html`, `balance-generale.html`).
@@ -553,7 +554,7 @@ void main() {
     String fonction,
   ) {
     final html = File(
-      'C:/Projects/agrierp_laravel/prototype_html/$fichier',
+      '$dossierPrototype/$fichier',
     ).readAsStringSync();
     final debut = html.indexOf('function $fonction(');
     final corps = html.substring(debut, html.indexOf('\n}', debut));
@@ -576,7 +577,7 @@ void main() {
     String composant,
   ) {
     final corps = File(
-      'C:/laragon/www/agrierp/resources/views/exports/$vue.blade.php',
+      '$dossierLaravel/resources/views/exports/$vue.blade.php',
     ).readAsStringSync();
     final thead = RegExp(
       r'<thead>([\s\S]*?)</thead>',
@@ -586,7 +587,7 @@ void main() {
         m.group(1)!.trim(),
     ];
     final php = File(
-      'C:/laragon/www/agrierp/app/Livewire/Comptabilite/$composant.php',
+      '$dossierLaravel/app/Livewire/Comptabilite/$composant.php',
     ).readAsStringSync();
     final debut = php.indexOf("'exports.$vue',");
     expect(debut, greaterThan(0), reason: '$composant : appel introuvable');
@@ -714,7 +715,7 @@ void main() {
         final livre = web('grand-livre', 'GrandLivre');
         expect(
           File(
-            'C:/laragon/www/agrierp/app/Livewire/Comptabilite/GrandLivre.php',
+            '$dossierLaravel/app/Livewire/Comptabilite/GrandLivre.php',
           ).readAsStringSync(),
           contains(
             "'Grand Livre — Compte '.\$account->code.' — '.\$account->label",
@@ -758,6 +759,11 @@ void main() {
       () async {
         // Couverture conservée : les fonctions d'export de la maquette sont toujours lues, et
         // chaque écart du PDF par rapport à elles est ÉNUMÉRÉ (un écart non listé fait échouer).
+        // A7 : sans la maquette (absente du monorepo, plan A8), saut AVEC sa raison, jamais rouge.
+        if (!File('$dossierPrototype/plan-comptable.html').existsSync()) {
+          markTestSkipped('maquette absente ($dossierPrototype) : comparaison impossible');
+          return;
+        }
         final docs = await quatreDocuments();
 
         List<int> ecarts(List<String> a, List<String> b) {

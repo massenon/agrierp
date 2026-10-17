@@ -15,6 +15,7 @@ AppId={{69B3D13F-4283-4B8E-ABD1-456845FC5182}
 AppName=AgriERP
 AppVersion={#AppVersion}
 AppVerName=AgriERP {#AppVersion}
+VersionInfoVersion={#AppVersion}
 AppPublisher=Dr MASSENON Rhodes - Ferme Ecole OLOUWACHEGOUN
 AppPublisherURL=https://agrierp.fermeolouwachegoun.com
 DefaultDirName={autopf}\AgriERP

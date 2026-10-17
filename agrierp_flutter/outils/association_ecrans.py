@@ -25,9 +25,8 @@ import io
 import os
 import re
 import sys
+from chemins import PROTO, RACINE  # A7 : chemins résolus, plus de C:/ en dur
 
-RACINE = 'C:/Projects/agrierp_flutter'
-PROTO = 'C:/Projects/agrierp_laravel/prototype_html'
 
 # Pages sans objet pour un audit de fidelite (technique, publique, doublon).
 HORS_PERIMETRE = {

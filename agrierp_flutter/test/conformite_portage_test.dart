@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.40 — GARDE-FOUS DE LA DOCTRINE DE PORTAGE.
 ///
@@ -81,6 +82,7 @@ void main() {
   /// serveur quand le dépôt Laravel est présent : une table ajoutée côté serveur le fait échouer.
   const tablesServies = {
     'server_time',
+    'data_reset_at',
     'products',
     'product_categories',
     'livestock_lots',
@@ -133,6 +135,9 @@ void main() {
     'server_time':
         'curseur du tirage (horloge du serveur), noté par noterEtatDeSynchronisation : '
         'ce n est pas une table',
+    'data_reset_at':
+        'marque de réinitialisation (15.50), lue en tête de _tirer pour purger le poste : '
+        'ce n est pas une table',
   };
 
   Set<String> clesAbsorbees() {
@@ -177,7 +182,7 @@ void main() {
   );
 
   final controleur = File(
-    'C:/laragon/www/agrierp/app/Http/Controllers/Api/SyncController.php',
+    '$dossierLaravel/app/Http/Controllers/Api/SyncController.php',
   );
   test(
     '⚠️ la liste des tables servies est celle du serveur (SyncController::pull)',
@@ -207,7 +212,7 @@ void main() {
     },
     skip: controleur.existsSync()
         ? false
-        : 'dépôt Laravel absent (C:/laragon/www/agrierp) : comparaison au serveur impossible',
+        : 'dépôt Laravel absent ($dossierLaravel) : comparaison au serveur impossible',
   );
 
   test('⚠️⚠️ aucune disposition ne se décide sur constraints.maxWidth', () {

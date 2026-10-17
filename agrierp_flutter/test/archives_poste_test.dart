@@ -13,6 +13,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Serveur de synchronisation feint : sert, tirage après tirage, les blocs [tirages]
 /// (le dernier se répète), répond [reponsePush] à l'envoi et note ce qui est envoyé.
@@ -1689,7 +1690,7 @@ void main() {
       '⚠️⚠️ les libellés de cartes de l’écran sont ceux de archivage-documents.html (lus dans la maquette)',
       () {
         final maquette = File(
-          'C:/Projects/agrierp_laravel/prototype_html/archivage-documents.html',
+          '$dossierPrototype/archivage-documents.html',
         );
         if (!maquette.existsSync()) {
           markTestSkipped('maquette absente de ce poste de travail');

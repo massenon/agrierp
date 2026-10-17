@@ -13,12 +13,18 @@ rem
 rem  Utilisation :
 rem    build_windows.bat              chaine complete (analyse + tests + build + installateur)
 rem    build_windows.bat --sans-tests saute flutter test (deconseille avant une livraison)
+rem    build_windows.bat --sans-installateur  produit seulement le dossier Release
+rem                                   (sans ce drapeau, Inno Setup absent = ECHEC)
 rem ============================================================================
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 set "SANS_TESTS=0"
-if /i "%~1"=="--sans-tests" set "SANS_TESTS=1"
+set "SANS_INSTALLATEUR=0"
+for %%a in (%*) do (
+  if /i "%%~a"=="--sans-tests" set "SANS_TESTS=1"
+  if /i "%%~a"=="--sans-installateur" set "SANS_INSTALLATEUR=1"
+)
 
 rem --- Version lue dans pubspec.yaml (ligne "version: 1.0.0+1") ---------------
 set "VERSION="
@@ -28,6 +34,11 @@ if not defined VERSION (
   exit /b 1
 )
 for /f "tokens=1 delims=+" %%v in ("%VERSION%") do set "VERSION_COURTE=%%v"
+rem  Ticket A7 / D2 : une version mal formee donnerait un installateur au nom faux.
+echo %VERSION_COURTE%| findstr /r /x "[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*" >nul || (
+  echo [ERREUR] Version "%VERSION_COURTE%" invalide dans pubspec.yaml : attendu x.y.z+n.
+  exit /b 1
+)
 echo === AgriERP Desktop %VERSION% ===
 
 where flutter >nul 2>nul || (echo [ERREUR] Flutter introuvable dans le PATH. & exit /b 1)
@@ -65,11 +76,14 @@ if not exist "%SORTIE%\agrierp.exe" (
 rem --- Runtime Visual C++ : livre a cote de l'exe --------------------------------
 rem  Un poste de ferme fraichement installe n'a pas forcement le redistribuable
 rem  VC++ : sans ces DLL, agrierp.exe ne demarre pas, sans message utile.
+rem  Ticket A7 / D2 : une DLL absente est une ERREUR (un avertissement laissait livrer
+rem  un installateur dont l'application ne demarre pas sur un poste neuf).
 for %%d in (msvcp140.dll vcruntime140.dll vcruntime140_1.dll) do (
   if exist "%SystemRoot%\System32\%%d" (
-    copy /y "%SystemRoot%\System32\%%d" "%SORTIE%\" >nul
+    copy /y "%SystemRoot%\System32\%%d" "%SORTIE%\" >nul || goto :echec
   ) else (
-    echo [AVERTISSEMENT] %%d introuvable dans System32 : l'installateur ne l'embarquera pas.
+    echo [ERREUR] %%d introuvable dans System32 : installez le redistribuable Visual C++ 2015-2022 x64.
+    goto :echec
   )
 )
 
@@ -83,11 +97,20 @@ if not defined ISCC (
   where iscc >nul 2>nul && set "ISCC=iscc"
 )
 if not defined ISCC (
-  echo [AVERTISSEMENT] Inno Setup 6 introuvable : seul le dossier %SORTIE% est produit.
-  echo                 Installez-le puis relancez pour obtenir AgriERP-Setup-%VERSION_COURTE%.exe.
-  exit /b 0
+  rem  Ticket A7 / D2 : sortir en SUCCES sans installateur laissait croire a une livraison prete.
+  if "%SANS_INSTALLATEUR%"=="1" (
+    echo [INFO] --sans-installateur : seul le dossier %SORTIE% est produit.
+    exit /b 0
+  )
+  echo [ERREUR] Inno Setup 6 introuvable ^(ISCC.exe^) : https://jrsoftware.org/isdl.php
+  echo          Installez-le, ou relancez avec --sans-installateur pour le seul dossier Release.
+  goto :echec
 )
 "%ISCC%" /Q /DAppVersion=%VERSION_COURTE% installer\agrierp.iss || goto :echec
+if not exist "installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe" (
+  echo [ERREUR] installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe absent apres Inno Setup.
+  goto :echec
+)
 
 echo.
 echo === Termine : installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe ===

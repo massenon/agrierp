@@ -27,9 +27,8 @@ import subprocess
 import sys
 
 from PIL import Image, ImageDraw
+from chemins import PROTO, RACINE  # A7 : chemins résolus, plus de C:/ en dur
 
-RACINE = 'C:/Projects/agrierp_flutter'
-PROTO = 'C:/Projects/agrierp_laravel/prototype_html'
 SORTIE = RACINE + '/build/audit/captures'
 CHROME = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 

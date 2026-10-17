@@ -23,8 +23,8 @@ lecture — pas un verdict.
 import glob
 import os
 import re
+from chemins import PROTO  # A7 : chemins résolus, plus de C:/ en dur
 
-PROTO = 'C:/Projects/agrierp_laravel/prototype_html'
 
 
 def sources():

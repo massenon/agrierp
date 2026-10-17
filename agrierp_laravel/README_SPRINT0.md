@@ -21779,3 +21779,23 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 
 ### Non fait
 - L'assistant ne crée ni compte de trésorerie, ni utilisateur, ni plan comptable : il renvoie aux écrans existants qui le font.
+
+---
+
+## Ticket A7 — Chemins des tests du poste, script de construction Windows (17/10/2026)
+
+### Constat
+- 12 fichiers de test et 7 outils lisaient `C:/laragon/www/agrierp` ou `C:/Projects/agrierp_laravel/prototype_html` en dur : dans le monorepo, `export_comptabilite_test` échouait (3) et 32 tests se sautaient, dont toutes les parités exécutées avec le serveur.
+- 🔴 Une fois les chemins résolus, `conformite_portage_test` a aussitôt attrapé une divergence réelle : la clé `data_reset_at` (15.50) servie au tirage n'était pas déclarée côté poste.
+- `build_windows.bat` sortait en SUCCÈS sans Inno Setup (aucun installateur produit), et ne faisait qu'avertir quand une DLL du runtime VC++ manquait — l'application livrée ne démarrait pas sur un poste neuf.
+
+### Corrections
+- `test/chemins_depot.dart` et `outils/chemins.py` : variable d'environnement (`AGRIERP_LARAVEL`, `AGRIERP_PROTOTYPE`), puis monorepo, puis ancien chemin Windows.
+- Le test qui lit la maquette se saute AVEC sa raison quand elle est absente (A8).
+- `build_windows.bat` : version `x.y.z` contrôlée, DLL VC++ manquante = échec, Inno Setup absent = échec sauf `--sans-installateur`, présence de `AgriERP-Setup-<version>.exe` vérifiée ; `agrierp.iss` estampille `VersionInfoVersion`.
+
+### Mesures
+- Suite du poste : 2 010 verts, 16 sautés (maquette absente), 0 rouge. `flutter analyze` propre.
+
+### Non fait
+- ⚠️ `build_windows.bat` n'a PAS été exécuté : il exige Windows, Visual Studio 2022 et Inno Setup. À valider sur le poste de compilation (plan, D2).

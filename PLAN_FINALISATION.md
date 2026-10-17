@@ -67,7 +67,10 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - **Corrigé** par une copie finale locale, sans changement de règle.
 - 🔧 Figer la version de Flutter du poste de compilation (`.fvmrc` ou mention dans `build_windows.bat`) pour éviter la prochaine dérive.
 
-### A7 🔧 Chemins Windows absolus dans les tests du poste
+### A7 ✅ Chemins Windows absolus dans les tests du poste
+
+- ✅ Fait le 17/10/2026 : `test/chemins_depot.dart` et `outils/chemins.py` (variable d'environnement, puis monorepo, puis ancien chemin Windows). Suite du poste : 2 010 verts, 16 sautés (maquette absente, A8), 0 rouge.
+
 
 - 19 fichiers de `agrierp_flutter/test` et `outils/` lisent `C:/laragon/www/agrierp/...` ou `C:/Projects/agrierp_laravel/prototype_html/...`.
 - Dans le monorepo, ces chemins n'existent plus. Hors du poste du développeur, `export_comptabilite_test.dart` échoue (3 tests) et d'autres tests se mettent en saut (32 sautés).

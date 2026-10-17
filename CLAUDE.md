@@ -33,4 +33,5 @@ cd agrierp_flutter && build_windows.bat
 ```
 
 - La suite Laravel a besoin de `npm run build` (manifeste Vite) et de `php artisan storage:link`, sinon 10 tests échouent pour des raisons d'environnement.
-- Plusieurs tests Flutter lisent encore des chemins Windows absolus (`C:/laragon/...`) : voir A7 du plan.
+- Les tests et outils du poste trouvent `agrierp_laravel/` et `prototype_html/` par `test/chemins_depot.dart` / `outils/chemins.py` (variables `AGRIERP_LARAVEL`, `AGRIERP_PROTOTYPE`, sinon le monorepo, sinon l'ancien chemin Windows). Sans la maquette (A8), 16 tests se sautent avec leur raison.
+- `build_windows.bat` échoue si Inno Setup ou le runtime VC++ manque ; `--sans-installateur` produit le seul dossier Release.

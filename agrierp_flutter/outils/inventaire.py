@@ -11,8 +11,8 @@ import json
 import os
 import re
 import sys
+from chemins import PROTO  # A7 : chemins résolus, plus de C:/ en dur
 
-PROTO = r'C:/Projects/agrierp_laravel/prototype_html'
 
 # Blocs de chrome partages par les 97 pages : barre laterale, barre
 # superieure, menu de notifications, navigation basse. Ils ne font pas partie

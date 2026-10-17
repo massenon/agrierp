@@ -10,6 +10,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.85 — GRAND LIVRE DU POSTE (item 9, ticket T2 ; serveur : 15.29).
 ///
@@ -1036,10 +1037,10 @@ void main() {
     // ── Fidélité à la maquette ET à la page web (lues dans le dépôt Laravel, jamais copiées) ──────
 
     final maquette = File(
-      'C:/Projects/agrierp_laravel/prototype_html/grand-livre.html',
+      '$dossierPrototype/grand-livre.html',
     );
     final vueWeb = File(
-      'C:/laragon/www/agrierp/resources/views/livewire/comptabilite/grand-livre.blade.php',
+      '$dossierLaravel/resources/views/livewire/comptabilite/grand-livre.blade.php',
     );
     final sautMaquette = maquette.existsSync() && vueWeb.existsSync()
         ? null
@@ -1176,8 +1177,7 @@ void main() {
   });
 
   group('parité avec la règle du serveur', () {
-    const dossierLaravel = 'C:/laragon/www/agrierp';
-    final source = File(
+        final source = File(
       '$dossierLaravel/app/Services/FinancialReportService.php',
     );
     final csv = File(
@@ -1432,7 +1432,7 @@ void main() {
       '⚠️ ces comptes existent bien au plan importé (sinon la liste est périmée)',
       () {
         final csv = File(
-          'C:/laragon/www/agrierp/database/data/plan-comptable-syscohada-revise.csv',
+          '$dossierLaravel/database/data/plan-comptable-syscohada-revise.csv',
         );
         if (!csv.existsSync()) {
           // ignore: avoid_print
