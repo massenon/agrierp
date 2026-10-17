@@ -1,0 +1,2488 @@
+<meta charset="utf-8">
+<title>Manuel d'utilisation — AgriERP</title>
+<style>
+  :root{
+    --forest:#052e16; --forest2:#0a3d20; --emerald:#065f46; --maize:#FFD55F;
+    --info:#1D4ED8; --warn:#B45309; --alert:#B91C1C; --tip:#047857;
+    --info-bg:#EFF6FF; --warn-bg:#FFFBEB; --alert-bg:#FEF2F2; --tip-bg:#ECFDF5;
+    --ink:#17201b; --muted:#5b6660; --line:#d8e0da; --zebra:#f4f7f5;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  body{
+    font-family:"Arial","Roboto","Helvetica Neue",sans-serif;
+    font-size:11pt; line-height:1.62; color:var(--ink); margin:0;
+  }
+  p{margin:0 0 9pt}
+  strong{color:var(--forest)}
+  a{color:var(--emerald); text-decoration:none}
+
+  /* ---------- COUVERTURE ---------- */
+  .couverture{
+    position:relative; width:210mm; height:296.6mm; padding:30mm 24mm 0 24mm;
+    background:linear-gradient(160deg,#052e16 0%,#064e2b 55%,#0a6b3c 100%);
+    color:#fff; break-after:page; overflow:hidden;
+  }
+  .couverture::after{
+    content:""; position:absolute; right:-60mm; bottom:-70mm; width:190mm; height:190mm;
+    border-radius:50%; background:rgba(255,213,95,.09);
+  }
+  .cv-marque{display:flex; align-items:center; gap:9pt; font-size:19pt; font-weight:bold; letter-spacing:.4pt}
+  .cv-marque .pastille{
+    width:30pt;height:30pt;border-radius:8pt;background:var(--maize);color:var(--forest);
+    display:flex;align-items:center;justify-content:center;font-size:17pt;
+  }
+  .cv-marque em{color:var(--maize); font-style:normal}
+  .cv-sur{margin-top:2pt; font-size:8.5pt; letter-spacing:2.4pt; color:rgba(255,255,255,.72)}
+  .cv-titre{margin-top:52mm; font-size:41pt; line-height:1.06; font-weight:bold; letter-spacing:-.6pt}
+  .cv-titre span{display:block; color:var(--maize)}
+  .cv-baseline{margin-top:9mm; font-size:13pt; color:rgba(255,255,255,.9); max-width:120mm; line-height:1.5}
+  .cv-filet{width:44mm;height:3.5pt;background:var(--maize);margin:11mm 0 9mm;border-radius:2pt}
+  .cv-meta{position:relative; z-index:2; font-size:10pt; line-height:1.85; color:rgba(255,255,255,.88)}
+  .cv-meta b{color:#fff}
+  .cv-pied{
+    position:absolute; left:24mm; right:24mm; bottom:20mm; z-index:2;
+    border-top:1px solid rgba(255,255,255,.22); padding-top:7pt;
+    font-size:8.5pt; line-height:1.7; color:rgba(255,255,255,.72);
+  }
+
+  /* ---------- TITRES ---------- */
+  .chapitre{break-before:page}
+  .ch-entete{display:flex; align-items:flex-start; gap:11pt; border-bottom:2.5pt solid var(--forest); padding-bottom:8pt; margin-bottom:14pt}
+  .ch-num{
+    flex:0 0 auto; width:34pt;height:34pt;border-radius:9pt;background:var(--forest);color:var(--maize);
+    display:flex;align-items:center;justify-content:center;font-size:18pt;font-weight:bold;
+  }
+  .ch-entete h1{margin:0; font-size:21pt; color:var(--forest); line-height:1.15; letter-spacing:-.2pt}
+  .ch-entete .ch-sous{margin:2pt 0 0; font-size:9.5pt; color:var(--muted)}
+  h2{
+    font-size:13.5pt; color:var(--forest); margin:17pt 0 7pt; break-after:avoid;
+    padding-left:8pt; border-left:4pt solid var(--maize); line-height:1.25;
+  }
+  h3{font-size:11.5pt; color:var(--emerald); margin:13pt 0 5pt; break-after:avoid}
+  .intro{font-size:10.5pt; color:var(--muted); margin:-4pt 0 12pt}
+
+  /* ---------- LISTES ---------- */
+  ol.etapes{counter-reset:et; list-style:none; padding:0; margin:0 0 11pt}
+  ol.etapes>li{
+    counter-increment:et; position:relative; padding:1pt 0 8pt 26pt; break-inside:avoid;
+  }
+  ol.etapes>li::before{
+    content:counter(et); position:absolute; left:0; top:1.5pt;
+    width:17pt;height:17pt;border-radius:50%;background:var(--emerald);color:#fff;
+    font-size:9.5pt;font-weight:bold;text-align:center;line-height:17pt;
+  }
+  ul.puces{list-style:none; padding:0; margin:0 0 11pt}
+  ul.puces>li{position:relative; padding:0 0 5pt 15pt}
+  ul.puces>li::before{content:""; position:absolute; left:3pt; top:6.5pt; width:5pt;height:5pt;border-radius:50%;background:var(--maize); border:1.2pt solid var(--emerald)}
+  .fleche{color:var(--emerald); font-weight:bold; padding:0 1pt}
+  .chemin{
+    display:inline-block; background:var(--zebra); border:1px solid var(--line); border-radius:4pt;
+    padding:1.5pt 6pt; font-size:10pt; color:var(--forest); font-weight:bold; white-space:nowrap;
+  }
+  .btn{
+    display:inline-block; background:var(--forest); color:#fff; border-radius:4pt;
+    padding:1pt 6pt; font-size:9.5pt; font-weight:bold; white-space:nowrap;
+  }
+  .champ{
+    display:inline-block; background:#fff; border:1.4px solid var(--emerald); border-radius:3pt;
+    padding:0 5pt; font-size:10pt; color:var(--forest); font-weight:bold; white-space:nowrap;
+  }
+
+  /* ---------- ENCADRÉS ---------- */
+  .note{
+    display:flex; gap:9pt; border-radius:6pt; padding:8pt 11pt; margin:0 0 11pt;
+    border-left:4.5pt solid; break-inside:avoid; font-size:10.5pt; line-height:1.55;
+    orphans:2; widows:2;
+  }
+  .note .ico{flex:0 0 auto; font-size:13pt; line-height:1.25}
+  .note p{margin:0}
+  .note p+p{margin-top:5pt}
+  .note b{display:block; font-size:9pt; letter-spacing:.8pt; text-transform:uppercase; margin-bottom:2pt}
+  .note.longue{break-inside:auto}
+  .groupe{break-inside:avoid}
+  .info{background:var(--info-bg); border-color:var(--info)} .info b{color:var(--info)}
+  .attention{background:var(--warn-bg); border-color:#D97706} .attention b{color:var(--warn)}
+  .alerte{background:var(--alert-bg); border-color:#DC2626} .alerte b{color:var(--alert)}
+  .astuce{background:var(--tip-bg); border-color:#059669} .astuce b{color:var(--tip)}
+
+  /* ---------- CAPTURES ---------- */
+  figure.capture{margin:0 0 13pt; break-inside:avoid}
+  .cadre{position:relative; border:1px solid var(--line); border-radius:7pt; overflow:hidden; box-shadow:0 1.5pt 5pt rgba(5,46,22,.10)}
+  .cadre img{display:block; width:100%}
+  .cible{
+    position:absolute; border:2.4pt solid #E11D48; border-radius:5pt;
+    box-shadow:0 0 0 2.4pt rgba(225,29,72,.16);
+  }
+  .cible b{
+    position:absolute; left:-9.5pt; top:-9.5pt; width:16pt;height:16pt;border-radius:50%;
+    background:#E11D48;color:#fff;font-size:9.5pt;font-weight:bold;text-align:center;line-height:16pt;
+    box-shadow:0 1pt 2pt rgba(0,0,0,.3);
+  }
+  .cible.bas b{top:auto; bottom:-9.5pt}
+  .cible.zone{border:2pt dashed #E11D48; box-shadow:none; background:rgba(225,29,72,.045)}
+  .cible.droite b{left:auto; right:-9.5pt}
+  figcaption{
+    font-size:8.8pt; color:var(--muted); margin-top:4pt; padding-left:2pt;
+    border-left:2.5pt solid var(--maize); padding-left:6pt;
+  }
+  figcaption b{color:var(--forest)}
+  .legende-reperes{font-size:9.5pt; margin:-8pt 0 12pt; padding-left:2pt}
+  .legende-reperes span{display:inline-block; margin-right:12pt; white-space:nowrap}
+  .legende-reperes i{
+    display:inline-block; width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;
+    font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal;margin-right:3pt;
+  }
+
+  /* ---------- TABLEAUX ---------- */
+  table{width:100%; border-collapse:collapse; font-size:9.8pt; margin:0 0 12pt; break-inside:auto}
+  thead{display:table-header-group}
+  tr{break-inside:avoid}
+  th{background:var(--forest); color:#fff; text-align:left; padding:5pt 7pt; font-size:8.8pt; text-transform:uppercase; letter-spacing:.5pt}
+  td{padding:5pt 7pt; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody tr:nth-child(even){background:var(--zebra)}
+  td.oui{color:var(--tip); font-weight:bold; text-align:center}
+  td.non{color:#b9c2bc; text-align:center}
+
+  /* ---------- SOMMAIRE ---------- */
+  .som h1{font-size:24pt;color:var(--forest);margin:0 0 3pt;letter-spacing:-.3pt}
+  .som .filet{width:38mm;height:3pt;background:var(--maize);border-radius:2pt;margin-bottom:15pt}
+  .som-grille{column-count:2; column-gap:12mm}
+  .som-bloc{break-inside:avoid; margin-bottom:11pt}
+  .som-bloc h4{
+    margin:0 0 3pt; font-size:10.5pt; color:var(--forest);
+    padding-bottom:2.5pt; border-bottom:1.4pt solid var(--line);
+  }
+  .som-bloc h4 i{
+    display:inline-block;width:14pt;height:14pt;border-radius:4pt;background:var(--forest);color:var(--maize);
+    font-style:normal;font-size:8.5pt;text-align:center;line-height:14pt;margin-right:5pt;font-weight:bold;
+  }
+  .som-bloc ul{list-style:none;margin:0;padding:0 0 0 19pt;font-size:9.3pt;color:var(--muted);line-height:1.5}
+
+  /* ---------- LÉGENDE ---------- */
+  .cartouche{border:1px solid var(--line); border-radius:7pt; padding:11pt 13pt; margin:0 0 12pt; background:#fff}
+  .cartouche h3{margin-top:0}
+</style><div class="couverture">
+  <div class="cv-marque"><span class="pastille">▲</span> <span>Agri<em>ERP</em></span></div>
+  <div class="cv-sur">FERME ÉCOLE OLOUWACHEGOUN</div>
+
+  <div class="cv-titre">Manuel<span>d'utilisation</span></div>
+  <div class="cv-baseline">Le guide complet de votre logiciel de gestion et de suivi d'élevage intégré : production animale, ventes, achats, stocks, personnel et comptabilité.</div>
+
+  <div class="cv-filet"></div>
+  <div class="cv-meta">
+    <b>Logiciel :</b> AgriERP — version 1.0.0<br>
+    <b>Destinataire :</b> Ferme École OLOUWACHEGOUN — Ikpinlè, Bénin<br>
+    <b>Maîtrise d'ouvrage :</b> Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB)<br>
+    <b>Accompagnement :</b> Cabinet FAGUEZ SARL<br>
+    <b>Éditeur :</b> Dr MASSENON Rhodes<br>
+    <span style="padding-left:0;color:rgba(255,255,255,.75)">Docteur en Génie Logiciel et IA</span><br>
+    <b>Édition :</b> août 2026
+  </div>
+
+  <div class="cv-pied">
+    <div style="color:rgba(255,255,255,.9)">© 2026 &nbsp;·&nbsp; PAEB &nbsp;·&nbsp; Cabinet FAGUEZ SARL &nbsp;·&nbsp; Dr MASSENON Rhodes</div>
+    <div>Document destiné aux utilisateurs de la ferme — à conserver près du poste de travail.</div>
+  </div>
+</div>
+
+<!-- =======================  COUVERTURE  ======================= -->
+
+
+<!-- =======================  COMMENT LIRE  ======================= -->
+<section>
+  <div class="ch-entete">
+    <div class="ch-num">?</div>
+    <div>
+      <h1>Comment lire ce manuel</h1>
+      <p class="ch-sous">Les conventions utilisées dans tout le document — lisez cette page une fois, elle vous servira partout.</p>
+    </div>
+  </div>
+
+  <p>Ce manuel s'adresse à <strong>toute personne qui utilise AgriERP</strong>, même si elle n'a jamais travaillé sur un logiciel de gestion. Chaque tâche est décrite du premier au dernier clic. Vous pouvez le lire en entier, ou aller directement au chapitre du module qui vous concerne.</p>
+
+  <div class="cartouche">
+    <h3>Les chemins de navigation</h3>
+    <p>Une suite de flèches indique où cliquer, dans l'ordre :</p>
+    <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Gestion Utilisateurs</span> <span class="fleche">➔</span> <span class="chemin">Nouvel Utilisateur</span></p>
+    <p style="margin-top:7pt">Se lit : « ouvrez <strong>Paramètres</strong> dans le menu de gauche, puis l'onglet <strong>Gestion Utilisateurs</strong>, puis cliquez sur le bouton <strong>Nouvel Utilisateur</strong> ».</p>
+  </div>
+
+  <div class="cartouche">
+    <h3>Les repères sur les captures d'écran</h3>
+    <p>Les images sont de <strong>véritables captures du logiciel</strong>. Les zones importantes sont entourées en rouge et numérotées <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">1</i> <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">2</i> <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">3</i>. La légende sous l'image explique chaque numéro.</p>
+  </div>
+
+  <div class="cartouche">
+    <h3>Les mises en forme</h3>
+    <ul class="puces">
+      <li><span class="btn">Enregistrer</span> — un bouton sur lequel vous cliquez.</li>
+      <li><span class="champ">Montant reçu</span> — un champ que vous remplissez.</li>
+      <li><span class="chemin">Ventes &amp; Devis</span> — un écran ou un onglet du logiciel.</li>
+      <li>Les <strong>chiffres 1, 2, 3</strong> indiquent des étapes à suivre dans l'ordre. Les <strong>puces rondes</strong> présentent une liste sans ordre imposé.</li>
+    </ul>
+  </div>
+
+  <h2>Les quatre encadrés</h2>
+  <p>Quatre types d'encadrés reviennent tout au long du manuel. Prenez l'habitude de les repérer d'un coup d'œil : la couleur suffit.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une précision utile pour comprendre ce que fait le logiciel. Vous pouvez travailler sans la lire, mais elle vous fera gagner du temps.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Une erreur fréquente à éviter. Lisez ces encadrés : ils décrivent presque toujours une situation déjà rencontrée sur le terrain.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Un risque de perte de données ou une action <strong>irréversible</strong>. Ne réalisez jamais l'opération décrite sans en avoir parlé au responsable.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un raccourci ou une bonne pratique qui rend le travail quotidien plus rapide.</p></div></div>
+
+  <h2>Ce dont vous avez besoin pour commencer</h2>
+  <ul class="puces">
+    <li>Un ordinateur relié au réseau de la ferme, avec un navigateur récent (Chrome, Edge ou Firefox).</li>
+    <li>L'adresse du logiciel, communiquée par votre administrateur.</li>
+    <li>Votre <strong>nom d'utilisateur</strong> et votre <strong>mot de passe</strong> personnels.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>AgriERP est <strong>un seul et même logiciel de gestion et de suivi d'élevage intégré</strong> : les mêmes écrans, les mêmes libellés et les mêmes données, quel que soit le poste depuis lequel vous vous connectez — bureau de direction, comptoir de vente ou bâtiment d'élevage.</p><p>Ce manuel vaut donc pour tous les postes de la ferme. Il n'y a <strong>rien à installer</strong> : un navigateur suffit.</p></div></div>
+</section>
+
+<!-- =======================  SOMMAIRE  ======================= -->
+<section class="som" style="break-before:page">
+  <h1>Sommaire</h1>
+  <div class="filet"></div>
+  <p class="intro">Le document suit l'ordre du menu de gauche du logiciel. Chaque chapitre est autonome : vous pouvez ouvrir directement celui qui vous concerne.</p>
+
+  <div class="som-grille">
+    <div class="som-bloc"><h4><i>1</i>Prise en main</h4><ul>
+      <li>Se connecter et se déconnecter</li><li>L'écran type et le menu de gauche</li>
+      <li>Le tableau de bord</li><li>Recherche globale et menu du compte</li>
+      <li>Notifications, alertes et rappels</li><li>Mon profil et mot de passe</li>
+      <li>Ce que votre rôle vous autorise</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>2</i>Élevage</h4><ul>
+      <li>Créer une bande, enregistrer des sujets</li><li>La fiche journalière</li>
+      <li>Rationnement, prophylaxie, provende</li><li>Reproduction des trois filières</li>
+      <li>Soins, vaccins et rémanence</li><li>Abattage et transformation</li>
+      <li>Croissance, GMQ et bilan de lot</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>3</i>Ventes &amp; Clients</h4><ul>
+      <li>Enregistrer une vente au comptoir</li><li>Devis et proforma</li>
+      <li>Historique et annulation</li><li>Retours et avoirs</li>
+      <li>Clients, dettes, relances, avances</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>4</i>Achats &amp; Dépenses</h4><ul>
+      <li>Enregistrer un achat</li><li>Bons de commande</li>
+      <li>Fournisseurs et dettes</li><li>Saisie des dépenses</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>5</i>Stocks &amp; Produits</h4><ul>
+      <li>Tableau et valorisation</li><li>Journal des mouvements</li>
+      <li>Ajustement d'inventaire</li><li>Catalogue et seuils d'alerte</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>6</i>Facturation &amp; MeCeF</h4><ul>
+      <li>Émettre une facture normalisée</li><li>Le statut MeCeF</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>7</i>Personnel &amp; Stages</h4><ul>
+      <li>Employés et pointage</li><li>Paie, CNSS et ITS</li>
+      <li>Stagiaires et attestations</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>8</i>Comptabilité</h4><ul>
+      <li>Le principe de l'écriture automatique</li><li>Plan comptable et journal</li>
+      <li>Grand livre et balances</li><li>Bilan et états financiers</li>
+      <li>TVA, banque, immobilisations</li><li>Clôture périodique et annuelle</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>9</i>Rapports &amp; Exports</h4><ul>
+      <li>Rapport mensuel de synthèse</li><li>Les six rapports du hub</li>
+      <li>Exporter en PDF et en Excel</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>10</i>Paramètres &amp; Administration</h4><ul>
+      <li>Entreprise, utilisateurs, rôles</li><li>Modules, paiements, barème ITS</li>
+      <li>Sauvegardes et restauration</li><li>Journal d'audit</li>
+      <li>Documents, courriers, archivage</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>11</i>Aide et assistance</h4><ul>
+      <li>Aide &amp; À Propos, foire aux questions</li>
+      <li>Envoyer un message à l'éditeur</li>
+      <li>Signaler un bug</li>
+      <li>Qui fait quoi : PAEB, FAGUEZ, éditeur</li>
+      <li>Que faire avant d'appeler</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>A</i>Annexes</h4><ul>
+      <li>A — Qui peut faire quoi</li><li>B — Que faire si… (dépannage)</li>
+      <li>C — Glossaire</li><li>D — Les gestes à ne jamais faire</li>
+      <li>E — Les comptes de la ferme</li><li>F — Les colonnes de chaque tableau</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- =======================  CHAPITRE 1  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">1</div>
+    <div>
+      <h1>Prise en main</h1>
+      <p class="ch-sous">Se connecter, reconnaître les écrans, comprendre ce que votre rôle vous permet de faire.</p>
+    </div>
+  </div>
+
+  <h2>1.1 Se connecter</h2>
+  <p>Ouvrez votre navigateur et saisissez l'adresse d'AgriERP communiquée par votre administrateur. La page de connexion s'affiche.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/00-connexion.jpg" alt="Écran de connexion d'AgriERP">
+      <span class="cible" style="left:59.4%;top:48.6%;width:31.2%;height:9.8%"><b>1</b></span>
+      <span class="cible" style="left:59.4%;top:58.0%;width:31.2%;height:9.8%"><b>2</b></span>
+      <span class="cible droite" style="left:79.8%;top:67.6%;width:11.2%;height:3.4%"><b>3</b></span>
+      <span class="cible" style="left:59.4%;top:72.1%;width:31.2%;height:5.4%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 1.1</b> — La page de connexion.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Nom d'utilisateur ou email</span>
+    <span><i>2</i>Mot de passe</span>
+    <span><i>3</i>Mot de passe oublié</span>
+    <span><i>4</i>Bouton Se connecter</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Cliquez dans le champ <span class="champ">Nom d'utilisateur ou email</span> et saisissez votre identifiant. Vous pouvez indiquer <strong>soit votre nom court</strong> (par exemple <em>caisse</em>), <strong>soit votre adresse e-mail complète</strong> : les deux fonctionnent.</li>
+    <li>Saisissez votre <span class="champ">Mot de passe</span>. Pour vérifier ce que vous avez tapé, cliquez sur l'icône en forme d'œil à droite du champ.</li>
+    <li>Cochez <span class="champ">Se souvenir de moi</span> uniquement si l'ordinateur est <strong>le vôtre</strong> et qu'il n'est utilisé par personne d'autre.</li>
+    <li>Cliquez sur <span class="btn">SE CONNECTER</span>. Le tableau de bord s'ouvre.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Ne cochez jamais <strong>Se souvenir de moi</strong> sur le poste partagé du comptoir. La personne suivante entrerait dans le logiciel <strong>sous votre nom</strong>, et toutes ses actions seraient enregistrées à votre compte dans le journal d'audit.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Mot de passe oublié ? Cliquez sur <span class="btn">Mot de passe oublié&nbsp;?</span> : un lien de réinitialisation est envoyé à l'adresse e-mail de votre compte. C'est la raison pour laquelle chaque compte possède une adresse e-mail, même si vous vous connectez avec un nom court.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne communiquez jamais votre mot de passe à un collègue, même temporairement. Chaque action réalisée dans AgriERP — une vente, une écriture, une suppression — est <strong>tracée au nom du compte connecté</strong>. Un mot de passe prêté rend cette traçabilité inutilisable le jour où elle sert vraiment.</p></div></div>
+
+  <h2>1.2 L'écran type d'AgriERP</h2>
+  <p>Tous les écrans du logiciel sont bâtis sur le même modèle. Une fois cette organisation comprise, vous savez vous repérer partout.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/01-dashboard.jpg" alt="Anatomie d'un écran AgriERP">
+      <span class="cible zone" style="left:0.4%;top:0.6%;width:19.7%;height:98.5%"><b>1</b></span>
+      <span class="cible zone" style="left:20.8%;top:0.8%;width:78.6%;height:7.2%"><b>2</b></span>
+      <span class="cible" style="left:51.4%;top:1.6%;width:18.6%;height:5.0%"><b>3</b></span>
+      <span class="cible" style="left:70.6%;top:1.4%;width:3.6%;height:5.4%"><b>4</b></span>
+      <span class="cible droite" style="left:74.2%;top:1.5%;width:24.6%;height:5.2%"><b>5</b></span>
+      <span class="cible zone bas" style="left:20.8%;top:8.8%;width:78.6%;height:90.0%"><b>6</b></span>
+    </div>
+    <figcaption><b>Figure 1.2</b> — Les six zones communes à tous les écrans.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:8%">N°</th><th style="width:28%">Zone</th><th>À quoi elle sert</th></tr></thead>
+    <tbody>
+      <tr><td><b>1</b></td><td><strong>Menu latéral</strong></td><td>Tous les modules du logiciel, regroupés par thème. Il n'affiche que ce que votre rôle vous autorise à ouvrir.</td></tr>
+      <tr><td><b>2</b></td><td><strong>Barre supérieure</strong></td><td>Toujours visible. Contient la recherche, les notifications et votre compte.</td></tr>
+      <tr><td><b>3</b></td><td><strong>Recherche globale</strong></td><td>Recherche un client, un produit, une facture ou une bande dans tout le logiciel.</td></tr>
+      <tr><td><b>4</b></td><td><strong>Cloche de notifications</strong></td><td>La pastille rouge indique le nombre d'alertes non lues (stock critique, créance en retard, rappel de prophylaxie).</td></tr>
+      <tr><td><b>5</b></td><td><strong>Votre compte</strong></td><td>Votre nom et votre rôle. Cliquez dessus pour accéder à votre profil ou vous déconnecter.</td></tr>
+      <tr><td><b>6</b></td><td><strong>Zone de travail</strong></td><td>Le contenu de l'écran ouvert. C'est la seule zone qui change quand vous naviguez.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le bouton <span class="btn">☰</span> à gauche de la barre supérieure replie le menu latéral. Sur un petit écran ou une tablette, le menu est replié par défaut : c'est normal, il n'a pas disparu.</p></div></div>
+
+  <h2>1.3 Le menu latéral, section par section</h2>
+  <p>Le menu regroupe les écrans par métier. L'écran ouvert est surligné en jaune.</p>
+
+  <table>
+    <thead><tr><th style="width:36%">Section du menu</th><th>Écrans qu'elle contient</th></tr></thead>
+    <tbody>
+      <tr><td><strong>PILOTAGE</strong></td><td>Tableau de Bord</td></tr>
+      <tr><td><strong>PRODUCTION ÉLEVAGE &amp; SOINS</strong></td><td>Gestion Élevage · Dashboard Élevage · Suivi Reproduction · Soins et vaccins · Paramètres Élevage</td></tr>
+      <tr><td><strong>VENTES FERME</strong></td><td>Ventes &amp; Devis · Clients et Créances</td></tr>
+      <tr><td><strong>ACHATS &amp; CHARGES</strong></td><td>Achats &amp; Commandes · Fournisseurs · Saisie Dépenses</td></tr>
+      <tr><td><strong>STOCKS &amp; PRODUITS</strong></td><td>Gestion Stocks · Catalogue Produits</td></tr>
+      <tr><td><strong>FACTURATION</strong></td><td>Facturation &amp; MeCeF</td></tr>
+      <tr><td><strong>RESSOURCES HUMAINES</strong></td><td>Personnel &amp; Stages</td></tr>
+      <tr><td><strong>ADMINISTRATION</strong></td><td>Administration &amp; Document</td></tr>
+      <tr><td><strong>COMPTABILITÉ &amp; ADMIN</strong></td><td>Comptabilité · Paramètres Général</td></tr>
+      <tr><td><strong>EDITIONS</strong></td><td>Rapports &amp; Exports</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Certains écrans ne figurent pas directement dans le menu : on y accède depuis un écran parent. C'est le cas du <strong>Rapport Mensuel</strong>, du <strong>Grand Livre</strong>, du <strong>Bilan</strong> ou de la <strong>Clôture d'Exercice</strong>, tous accessibles depuis les cartes de l'écran <span class="chemin">Comptabilité</span>.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Si une section n'apparaît pas dans votre menu, ce n'est pas une panne : <strong>votre rôle ne l'autorise pas</strong>. Voir la section 1.9 et l'annexe A. Demandez à l'administrateur si vous pensez qu'il s'agit d'une erreur.</p></div></div>
+
+  <h2>1.4 Le tableau de bord</h2>
+  <p>C'est l'écran qui s'ouvre à la connexion. Il répond en un coup d'œil à la question : <em>où en est la ferme aujourd'hui&nbsp;?</em></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/01-dashboard.jpg" alt="Tableau de bord AgriERP">
+      <span class="cible" style="left:75.0%;top:10.9%;width:15.2%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:22.1%;top:19.2%;width:76.4%;height:6.2%"><b>2</b></span>
+      <span class="cible" style="left:22.1%;top:29.6%;width:18.4%;height:13.8%"><b>3</b></span>
+      <span class="cible bas" style="left:74.3%;top:58.4%;width:24.2%;height:40.0%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 1.3</b> — Le tableau de bord et ses quatre zones utiles.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Accès direct à la vente</span>
+    <span><i>2</i>Période analysée</span>
+    <span><i>3</i>Indicateurs clés</span>
+    <span><i>4</i>Alertes critiques</span>
+  </p>
+
+  <h3>Les indicateurs clés</h3>
+  <ul class="puces">
+    <li><strong>Chiffre d'affaires</strong> — le total vendu sur la période, avec la comparaison au mois précédent.</li>
+    <li><strong>Trésorerie</strong> — l'argent réellement disponible en caisse et en banque.</li>
+    <li><strong>Dépenses</strong> — tout ce qui est sorti sur la période.</li>
+    <li><strong>Résultat net</strong> — la différence entre les deux, et la marge nette correspondante.</li>
+    <li><strong>Créances clients</strong> — ce que les clients vous doivent encore.</li>
+    <li><strong>Dettes fournisseurs</strong> — ce que vous devez encore à vos fournisseurs.</li>
+    <li><strong>Stock critique</strong> — le nombre de produits passés sous leur seuil d'alerte.</li>
+    <li><strong>Effectif animaux</strong> — le nombre total de têtes vivantes, toutes filières confondues.</li>
+  </ul>
+
+  <h3>Changer la période analysée</h3>
+  <ol class="etapes">
+    <li>Cliquez sur la première date et choisissez le <strong>début</strong> de la période.</li>
+    <li>Cliquez sur la seconde date et choisissez la <strong>fin</strong> de la période.</li>
+    <li>Les indicateurs et les graphiques se recalculent immédiatement — aucun bouton à valider.</li>
+    <li>Pour conserver une trace papier, cliquez sur <span class="btn">PDF</span> en haut à droite.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un résultat net négatif n'est pas forcément une mauvaise nouvelle : sur un mois où vous avez acheté de la provende pour tout le trimestre, les dépenses dépassent normalement les ventes. Comparez toujours sur une période représentative, pas sur trois jours.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Les <strong>Alertes critiques</strong> à droite sont cliquables : un clic sur une alerte de stock vous emmène directement sur le produit concerné. C'est le chemin le plus rapide pour traiter un manque avant la rupture.</p></div></div>
+
+  <h2>1.5 La barre supérieure</h2>
+  <p>Trois outils y sont disponibles en permanence, quel que soit l'écran ouvert.</p>
+
+  <h3>La recherche globale</h3>
+  <p>Tapez quelques lettres dans le champ <span class="champ">Recherche globale ERP…</span> : le logiciel cherche <strong>en même temps</strong> parmi les clients, les produits, les fournisseurs, les bandes et les factures. Les résultats apparaissent immédiatement, regroupés par catégorie.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C3-recherche-globale.jpg" alt="Résultats de la recherche globale">
+      <span class="cible" style="left:51.4%;top:1.6%;width:18.6%;height:5.0%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 1.4</b> — La recherche globale. <b>1</b> Saisissez ici, les résultats s'affichent dessous.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le chemin le plus court vers une fiche. Plutôt que d'ouvrir <span class="chemin">Clients et Créances</span> puis de faire défiler la liste, tapez les trois premières lettres du nom du client dans la recherche et cliquez sur le résultat.</p></div></div>
+
+  <h3>Le menu de votre compte</h3>
+  <p>Cliquez sur votre nom, en haut à droite. Un menu se déroule.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C1-menu-compte.jpg" alt="Menu du compte utilisateur">
+      <span class="cible droite" style="left:74.2%;top:1.5%;width:24.6%;height:5.2%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 1.5</b> — Le menu du compte. <b>1</b> Cliquez sur votre nom pour l'ouvrir.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:32%">Entrée du menu</th><th>Ce qu'elle ouvre</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Mon Profil</strong></td><td>Vos informations, le changement de mot de passe et l'historique de vos connexions (section 1.7).</td></tr>
+      <tr><td><strong>Aide &amp; À Propos</strong></td><td>La foire aux questions et la version installée (chapitre 11).</td></tr>
+      <tr><td><strong>Contactez l'Éditeur</strong></td><td>Le formulaire de message et de signalement de bug (chapitre 11).</td></tr>
+      <tr><td><strong>Déconnexion</strong></td><td>Ferme votre session (section 1.8).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Sous votre nom, le menu rappelle <strong>votre rôle</strong> — <em>ADMIN</em>, <em>COMPTABLE</em>, <em>CAISSIER</em> ou <em>ANIMALIER</em>. C'est la façon la plus rapide de vérifier avec quel compte vous travaillez, notamment sur un poste partagé.</p></div></div>
+
+  <h2>1.6 Les notifications et les alertes</h2>
+  <p>AgriERP vous prévient de trois manières différentes. Il est important de ne pas les confondre.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Où</th><th style="width:32%">Quoi</th><th>Quand regarder</th></tr></thead>
+    <tbody>
+      <tr><td><strong>La cloche</strong><br>(barre supérieure)</td><td>Les 4 dernières notifications, avec le nombre de non lues en pastille rouge.</td><td>En permanence — la pastille rouge attire l'œil.</td></tr>
+      <tr><td><strong>Alertes Critiques</strong><br>(tableau de bord)</td><td>Les 6 problèmes les plus urgents du moment, recalculés à chaque ouverture.</td><td>Chaque matin, à la connexion.</td></tr>
+      <tr><td><strong>Centre de Notifications</strong><br>(écran dédié)</td><td>L'historique complet, lues et non lues.</td><td>Une fois par jour, pour traiter ce qui reste.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>La cloche</h3>
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C2-cloche-notifications.jpg" alt="Panneau de la cloche de notifications">
+      <span class="cible" style="left:70.6%;top:1.4%;width:3.6%;height:5.4%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 1.6</b> — Le panneau de la cloche. <b>1</b> La pastille rouge indique le nombre de notifications non lues.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Cliquez sur la <strong>cloche</strong> : les quatre dernières notifications s'affichent.</li>
+    <li>Cliquez sur une notification pour ouvrir l'écran concerné — elle passe alors en « lue ».</li>
+    <li>Cliquez sur <span class="btn">Voir tout</span> pour ouvrir le centre de notifications.</li>
+  </ol>
+
+  <h3>Les alertes critiques du tableau de bord</h3>
+  <p>Ce panneau ne conserve <strong>que les six alertes les plus urgentes</strong>. Il en existe trois familles, avec des règles de déclenchement précises.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Alerte</th><th style="width:34%">Quand elle apparaît</th><th>Ce qu'il faut faire</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Stock critique</strong><br><span style="color:#B91C1C">gravité critique</span></td>
+          <td>Le stock d'un produit actif est <strong>inférieur ou égal</strong> à son seuil d'alerte. 5 produits au maximum.</td>
+          <td>Commander, produire ou transformer avant la rupture. Le clic mène à <span class="chemin">Gestion Stocks</span>.</td></tr>
+      <tr><td><strong>Mortalité anormale</strong><br><span style="color:#B91C1C">gravité critique</span></td>
+          <td>Sur les 7 derniers jours, une fiche journalière affiche un taux de mortalité <strong>supérieur ou égal à 5 %</strong>.</td>
+          <td>Ouvrir la bande, vérifier les soins en cours, appeler le vétérinaire. Le clic mène à <span class="chemin">Bandes &amp; Sujets</span>.</td></tr>
+      <tr><td><strong>Créance en retard</strong><br><span style="color:#B45309">gravité moyenne</span></td>
+          <td>Une créance dont l'échéance est dépassée et qui n'est pas soldée. 3 au maximum.</td>
+          <td>Relancer le client depuis <span class="chemin">Clients et Créances</span> (section 3.5).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le panneau s'arrête à <strong>six alertes</strong>. S'il est plein de stocks critiques, une créance en retard peut ne pas y apparaître. Le tableau de bord ne remplace donc pas la consultation régulière des écrans <span class="chemin">Gestion Stocks</span> et <span class="chemin">Clients et Créances</span>.</p></div></div>
+
+  <h3>Le rappel de prophylaxie du jour</h3>
+  <p>Chaque matin à 6 h, le logiciel compare le <strong>jour de cycle</strong> de chaque bande active au <strong>calendrier de prophylaxie</strong> de son espèce. Pour chaque traitement dû ce jour-là, il crée une notification :</p>
+
+  <div class="cartouche" style="margin-bottom:11pt">
+    <p style="margin:0"><strong style="color:#B45309">⚠ Traitement dû aujourd'hui — AVI-2026-01</strong></p>
+    <p style="margin:3pt 0 0;font-size:10pt;color:#5b6660">Vaccination Newcastle — NDV HB1, 1 goutte/sujet — Bande AVI-2026-01, Aviculture (Volailles)</p>
+  </div>
+
+  <ul class="puces">
+    <li>Le message indique <strong>le traitement, le produit conseillé, la posologie et la bande</strong>.</li>
+    <li>Un clic ouvre la bande concernée dans <span class="chemin">Bandes &amp; Sujets</span>.</li>
+    <li>Le même rappel n'est <strong>jamais envoyé deux fois le même jour</strong> pour la même bande et le même traitement.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le jour de cycle se compte à partir de la date de référence de la bande — la mise en lot, ou la dernière saillie pour une bande de reproduction. Si un rappel vous paraît décalé, c'est cette date qu'il faut vérifier, pas le calendrier.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Deux entrées du calendrier de cuniculture et de porciculture sont formulées « chaque mois » sans jour de cycle précis : elles <strong>ne déclenchent aucun rappel automatique</strong>. Ces traitements-là restent à votre charge. Consultez l'onglet <span class="chemin">Calendriers de Prophylaxie</span> (section 2.5) pour les repérer.</p></div></div>
+
+  <h3>L'alerte d'autonomie alimentaire</h3>
+  <p>Le logiciel rapproche le stock de provende de la consommation théorique de l'effectif en place. Quand la réserve ne couvre plus assez de jours, une notification est émise. L'indicateur <strong>Autonomie aliment min.</strong> du <span class="chemin">Dashboard Élevage</span> affiche en permanence le nombre de jours restants.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'alerte la plus utile de tout le logiciel : elle prévient <em>avant</em> la rupture, pas au moment où les mangeoires sont vides. Traitez-la le jour où elle arrive.</p></div></div>
+
+  <h3>Le centre de notifications</h3>
+  <p><span class="chemin">Notifications</span>, ou la cloche <span class="fleche">➔</span> <span class="btn">Voir tout</span>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/02-notifications.jpg" alt="Centre de notifications">
+      <span class="cible" style="left:21.8%;top:9.8%;width:76.9%;height:5.0%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 1.7</b> — Le centre de notifications regroupe l'historique complet.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Date / heure, Catégorie, Message, Gravité, Statut, Actions</strong>. Deux actions sur chaque ligne :</p>
+  <ul class="puces">
+    <li>l'icône <strong>✔</strong> marque la notification comme lue ;</li>
+    <li>l'icône <strong>corbeille</strong> la retire de la liste.</li>
+  </ul>
+
+  <p>Les catégories que vous rencontrerez :</p>
+  <table>
+    <thead><tr><th style="width:32%">Catégorie</th><th>Signification</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Stock critique</strong></td><td>Un produit est passé sous son seuil d'alerte.</td></tr>
+      <tr><td><strong>Traitement dû aujourd'hui</strong></td><td>Rappel de prophylaxie sur une bande.</td></tr>
+      <tr><td><strong>Autonomie alimentaire</strong></td><td>La provende ne couvre plus assez de jours.</td></tr>
+      <tr><td><strong>Créance en retard</strong></td><td>Un client a dépassé son échéance de paiement.</td></tr>
+      <tr><td><strong>Vente sous rémanence</strong></td><td>Une vente a été signalée sur une bande sous délai d'attente vétérinaire.</td></tr>
+      <tr><td><strong>Sauvegarde à télécharger</strong></td><td>Rappel hebdomadaire adressé à l'administrateur (section 10.8).</td></tr>
+      <tr><td><strong>Système</strong></td><td>Messages d'information du logiciel.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Ne supprimez pas une notification sans l'avoir traitée. Supprimer l'alerte ne règle rien : le stock reste critique, la créance reste impayée, le vaccin reste à faire.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les notifications lues depuis <strong>plus de 90 jours</strong> sont effacées automatiquement chaque semaine. L'historique reste donc lisible sans intervention de votre part.</p></div></div>
+
+  <h2>1.7 Mon profil, mot de passe et historique</h2>
+  <p>Cliquez sur votre nom en haut à droite <span class="fleche">➔</span> <span class="chemin">Mon Profil</span>.</p>
+
+  <h3>Changer votre mot de passe</h3>
+  <ol class="etapes">
+    <li>Saisissez votre <span class="champ">Ancien mot de passe</span>.</li>
+    <li>Saisissez le <span class="champ">Nouveau mot de passe</span>.</li>
+    <li>Saisissez-le une seconde fois dans <span class="champ">Confirmer le nouveau mot de passe</span>.</li>
+    <li>Cliquez sur <span class="btn">Mettre à jour le mot de passe</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le nouveau mot de passe doit contenir <strong>au moins 8 caractères, dont une lettre, un chiffre et un symbole</strong> (par exemple <em>Ferme@2026</em>). Le logiciel refuse tout mot de passe plus faible — ce n'est pas une erreur de votre part.</p></div></div>
+
+  <h3>L'historique de vos connexions</h3>
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C4-profil-historique.jpg" alt="Historique des connexions dans Mon Profil">
+    </div>
+    <figcaption><b>Figure 1.8</b> — Le bas de l'écran Mon Profil : la trace de vos connexions et de vos actions.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Date / heure, Action, Module, IP</strong>.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Parcourez cette liste de temps en temps. Une connexion <strong>à une heure où vous ne travaillez pas</strong>, ou depuis une adresse inhabituelle, doit être signalée <strong>immédiatement</strong> à l'administrateur — et votre mot de passe changé dans la foulée.</p></div></div>
+
+  <div class="groupe"><h2>1.8 Se déconnecter</h2>
+  <ol class="etapes">
+    <li>Cliquez sur votre nom en haut à droite.</li>
+    <li>Cliquez sur <span class="btn">Déconnexion</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Déconnectez-vous <strong>systématiquement</strong> en quittant le poste du comptoir, même pour une courte absence. Fermer l'onglet du navigateur ne suffit pas : la session reste ouverte.</p></div></div>
+
+  </div><h2>1.9 Ce que votre rôle vous autorise</h2>
+  <p>AgriERP fonctionne avec <strong>quatre rôles</strong>. Votre rôle détermine les écrans visibles dans le menu <em>et</em> les actions autorisées à l'intérieur de ces écrans.</p>
+
+  <table>
+    <thead><tr><th style="width:20%">Rôle</th><th style="width:32%">Qui</th><th>Ce qu'il peut faire</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Administrateur</strong></td><td>Direction, support technique</td><td>Tout, sans exception : paramètres, utilisateurs, sauvegardes, clôture.</td></tr>
+      <tr><td><strong>Comptable</strong></td><td>Comptable de la ferme</td><td>Toute la comptabilité, la clôture d'exercice, les rapports et leurs exports.</td></tr>
+      <tr><td><strong>Caissier</strong></td><td>Personnel du comptoir</td><td>Enregistrer les ventes, gérer les clients et les créances, exporter les ventes.</td></tr>
+      <tr><td><strong>Animalier</strong></td><td>Chef d'élevage, soigneurs</td><td>Bandes, fiches journalières, reproduction, soins et vaccins, archivage élevage.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La protection ne se limite pas à cacher un lien du menu. Même en tapant l'adresse d'un écran directement dans le navigateur, un utilisateur non autorisé est <strong>bloqué par le serveur</strong>. Il est donc inutile — et sans risque — d'essayer.</p></div></div>
+
+  <p>La répartition complète, écran par écran, figure à l'<strong>annexe A</strong>.</p>
+</section>
+
+<!-- =======================  CHAPITRE 2  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">2</div>
+    <div>
+      <h1>Élevage</h1>
+      <p class="ch-sous">Bandes et sujets, fiches journalières, rationnement, reproduction, soins, abattage et suivi technique.</p>
+    </div>
+  </div>
+
+  <p class="intro">Le module Élevage est le cœur du travail quotidien à la ferme. Il reprend, écran par écran, les registres papier existants : registre des bandes, fiche journalière, cahier de prophylaxie, registre des reproducteurs.</p>
+
+  <h2>2.1 Le principe : tout part de la bande</h2>
+  <p>Dans AgriERP, rien ne se saisit « en vrac ». Toute donnée d'élevage est rattachée à une <strong>bande</strong> (aussi appelée lot) : un groupe d'animaux de la même espèce, entré à la même période, suivi ensemble.</p>
+
+  <p style="text-align:center;font-size:11pt;margin:14pt 0 16pt">
+    <span class="chemin">Créer la bande</span> <span class="fleche">➔</span>
+    <span class="chemin">Y enregistrer des sujets</span> <span class="fleche">➔</span>
+    <span class="chemin">Saisir la fiche chaque jour</span> <span class="fleche">➔</span>
+    <span class="chemin">Vendre ou transformer</span>
+  </p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>C'est parce que tout est rattaché à une bande que le logiciel sait calculer un taux de mortalité, un gain moyen quotidien ou une marge par lot. Une saisie sans bande serait un chiffre sans histoire.</p></div></div>
+
+  <h2>2.2 Créer une bande</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Bandes &amp; Sujets</span> <span class="fleche">➔</span> <span class="btn">Nouvelle Bande</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/11-elevage-bandes.jpg" alt="Écran Bandes et Sujets">
+      <span class="cible" style="left:86.3%;top:10.9%;width:12.2%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:22.1%;top:36.6%;width:76.4%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 2.1</b> — La liste des bandes. <b>1</b> Créer une bande — <b>2</b> En-tête du tableau de suivi.</figcaption>
+  </figure>
+
+  <p>Le tableau affiche, pour chaque bande : <strong>Code bande, Espèce, Stade, Date de création, Effectif initial, Effectif actuel, Mortalité, Statut</strong>.</p>
+
+  <h3>Remplir la fenêtre « Nouvelle Bande »</h3>
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Espèce</span> : <em>Aviculture (Volailles)</em>, <em>Cuniculture (Lapins)</em> ou <em>Porciculture (Porcs)</em>.</li>
+    <li>Saisissez le <span class="champ">Code unique de la bande</span>. Suivez la convention de la ferme, par exemple <strong>AVI-2026-01</strong> : espèce, année, numéro d'ordre.</li>
+    <li>Choisissez le <span class="champ">Stade initial</span> : <em>Reproduction</em>, <em>Croissance</em>, <em>Ponte</em> ou <em>Engraissement</em>.</li>
+    <li>Vérifiez la <span class="champ">Date de création</span>, qui correspond au jour d'entrée des animaux.</li>
+    <li>Saisissez la <span class="champ">Quantité initiale (effectif)</span> : le nombre de têtes réellement comptées.</li>
+    <li>Indiquez le <span class="champ">Coût d'acquisition (FCFA)</span> si vous avez acheté ces animaux. Ce montant sert au calcul de la marge du lot.</li>
+    <li>Si la bande produit un article vendable (des œufs, par exemple), sélectionnez-le dans <span class="champ">Produit issu de cette bande</span>.</li>
+    <li>Cliquez sur <span class="btn">Créer la Bande</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le <strong>code de la bande ne peut plus être modifié</strong> une fois des saisies journalières rattachées. Prenez le temps de le vérifier avant de valider — un code erroné se traîne ensuite dans tous les rapports.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le champ <strong>Produit issu de cette bande</strong> est ce qui permet à la récolte quotidienne d'alimenter automatiquement le stock vendable. Sans lui, vous devrez saisir l'entrée en stock à la main.</p></div></div>
+
+  <h2>2.3 Enregistrer des sujets</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer des Sujets</span> <span class="fleche">➔</span> <span class="btn">Nouveau Sujet</span></p>
+
+  <p>Cet écran sert à faire entrer des animaux dans une bande <strong>après</strong> sa création : une nouvelle livraison, une naissance en nombre, un don reçu.</p>
+
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Espèce</span>.</li>
+    <li>Choisissez la <span class="champ">Bande / lot de destination</span> (la liste ne propose que les bandes de l'espèce retenue).</li>
+    <li>Indiquez l'<span class="champ">Origine</span> : <em>Naissance</em>, <em>Achat</em> ou <em>Don</em>.</li>
+    <li>Saisissez la <span class="champ">Quantité</span> et la <span class="champ">Date</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>. L'effectif de la bande est mis à jour immédiatement.</li>
+  </ol>
+
+  <h3>Modifier ou archiver une bande</h3>
+  <p>Sur chaque ligne du tableau <span class="chemin">Bandes &amp; Sujets</span>, deux icônes sont disponibles à droite, dans la colonne <strong>Actions</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G1-editer-bande.jpg" alt="Modification d'une bande">
+    </div>
+    <figcaption><b>Figure 2.2</b> — La fenêtre de modification reprend les mêmes champs que la création, déjà remplis.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:22%">Icône</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td><strong>crayon</strong> (edit)</td><td>Ouvre la fenêtre de modification, préremplie avec les valeurs actuelles. Corrigez, puis <span class="btn">Enregistrer</span>.</td></tr>
+      <tr><td><strong>corbeille</strong></td><td><strong>Archive</strong> la bande : elle sort des listes actives, sans être supprimée.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>L'icône corbeille <strong>n'efface rien</strong>. La bande, ses fiches journalières et ses ventes restent en base et un administrateur peut la restaurer depuis <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span>. C'est vrai de toutes les corbeilles du logiciel.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les quatre indicateurs en haut de l'écran — <strong>Bandes actives</strong>, <strong>En reproduction</strong>, <strong>Effectif total vivant</strong>, <strong>Alertes sanitaires</strong> — se recalculent à chaque ouverture. Ils ne se saisissent pas.</p></div></div>
+
+  <h2>2.4 La fiche journalière</h2>
+  <p>C'est la saisie la plus fréquente : <strong>une fois par jour, par bande</strong>. Chaque filière a sa fiche, adaptée à ses données :</p>
+
+  <table>
+    <thead><tr><th style="width:36%">Écran</th><th>Filière</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chemin">Fiches Pondeuses</span></td><td>Aviculture — suivi de la ponte et de la récolte d'œufs</td></tr>
+      <tr><td><span class="chemin">Fiches Volailles Reproducteurs</span></td><td>Aviculture — reproducteurs, poussins, Goliath</td></tr>
+      <tr><td><span class="chemin">Fiches Lapins</span></td><td>Cuniculture</td></tr>
+      <tr><td><span class="chemin">Fiches Porcs</span></td><td>Porciculture</td></tr>
+      <tr><td><span class="chemin">Fiches Escargots</span></td><td>Héliciculture — visible seulement si le module est activé</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Exemple complet : la fiche Pondeuses</h3>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Fiches Pondeuses</span></p>
+
+  <p>Le haut de l'écran rappelle quatre indicateurs : <strong>Effectif pondeuses vivantes</strong>, <strong>Taux de ponte moyen</strong>, <strong>Stock plateaux (30 œufs)</strong> et <strong>Taux de mortalité</strong>. Le bloc <em>Saisie Journalière Ponte &amp; Cheptel</em> se trouve juste en dessous.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/S1-fiche-pondeuses-saisie.jpg" alt="Saisie journalière de la fiche pondeuses">
+      <span class="cible" style="left:24.6%;top:59.8%;width:18.1%;height:8.0%"><b>1</b></span>
+      <span class="cible" style="left:42.3%;top:59.8%;width:18.1%;height:8.0%"><b>2</b></span>
+      <span class="cible" style="left:60.0%;top:59.8%;width:18.1%;height:8.0%"><b>3</b></span>
+      <span class="cible bas" style="left:24.6%;top:68.8%;width:53.5%;height:8.5%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 2.3</b> — Le bloc de saisie journalière. Seuls les champs blancs se remplissent : les champs grisés sont calculés par le logiciel.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Total œufs récoltés (OR)</span>
+    <span><i>2</i>Œufs cassés / fêlés (OF)</span>
+    <span><i>3</i>Commercialisables (calculé)</span>
+    <span><i>4</i>Report automatique en stock</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Vérifiez la <span class="champ">Date</span> en haut à droite du bloc — par défaut, la date du jour.</li>
+    <li>Saisissez les <span class="champ">Achats / Entrées du jour</span> et les <span class="champ">Nés / Transferts du jour</span> s'il y en a eu.</li>
+    <li>Saisissez le <span class="champ">Total œufs récoltés (OR)</span>, puis les <span class="champ">Œufs cassés / fêlés (OF)</span>.</li>
+    <li>Dans <strong>Morts par catégorie</strong>, indiquez les pertes par catégorie : <em>Pondeuse / Repro</em>, <em>Poulette</em>, <em>Poussin</em>. Utilisez les boutons <strong>–</strong> et <strong>+</strong> ou tapez directement le nombre.</li>
+    <li>Complétez les traitements et rappels du jour si un soin a été donné.</li>
+    <li>Ajoutez si besoin une note dans <span class="champ">Observations</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer ce Jour</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Quatre valeurs sont <strong>calculées par le logiciel</strong> et ne se saisissent pas :</p>
+  <p><strong>Commercialisables</strong> = OR − OF &nbsp;•&nbsp; <strong>Taux de ponte</strong> = œufs ÷ effectif × 100 &nbsp;•&nbsp; <strong>Effectif final</strong> = effectif de la veille + achats et nés − (morts + ventes) &nbsp;•&nbsp; <strong>Taux de mortalité</strong> = morts du jour ÷ effectif de la veille × 100.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Le champ <strong>Ventes (POS, réel)</strong> est grisé : il se remplit tout seul à partir des ventes réellement enregistrées à la caisse. <strong>Ne cherchez pas à le corriger</strong> — si le chiffre vous semble faux, c'est une vente qui a été mal saisie au comptoir, et c'est là qu'il faut la reprendre.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les œufs commercialisables alimentent <strong>automatiquement le stock</strong> par plateaux de 30. Le bloc <em>Incrémentation Automatique du Stock</em> vous indique combien de plateaux viennent d'être ajoutés. Vous n'avez aucune saisie de stock à faire par ailleurs.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Saisissez la fiche <strong>le jour même</strong>. Les effectifs se calculent en chaîne, chaque jour repartant du précédent : une journée oubliée fausse tous les jours suivants jusqu'à ce qu'elle soit rattrapée.</p></div></div>
+
+  <h3>La fiche Lapins</h3>
+  <p>Même principe, avec les catégories propres à la cuniculture : <strong>Reproducteur</strong>, <strong>Lapin de chair</strong>, <strong>Lapereau</strong>. Vous y saisissez en plus l'<span class="champ">Effectif mâles</span>, l'<span class="champ">Effectif femelles</span>, le nombre de <span class="champ">Sevrés</span> et de sujets <span class="champ">S/mères</span> (sous mères).</p>
+  <p>Les entrées et sorties sont ventilées en cinq colonnes : <strong>Achat, Né, Mort, Vente, Don</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/S3-fiche-lapins-rations.jpg" alt="Tableau de rationnement de la fiche lapins">
+    </div>
+    <figcaption><b>Figure 2.4</b> — Le tableau de rationnement compare, catégorie par catégorie, la ration normative et la provende réellement servie.</figcaption>
+  </figure>
+
+  <h3>La fiche Porcs</h3>
+  <p>Les stades physiologiques sont : <strong>Reproducteur (truie/verrat)</strong>, <strong>Porc marchand / engraissement</strong>, <strong>Porcelet</strong>. Le détail du cheptel distingue <span class="champ">Verrats</span>, <span class="champ">Truies gestantes</span>, <span class="champ">Porcelets</span> et <span class="champ">Engraissement</span>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H1-fiche-porcs-saisie.jpg" alt="Saisie journalière de la fiche porcs">
+    </div>
+    <figcaption><b>Figure 2.5</b> — La saisie journalière porcine. Les poids se saisissent en <strong>kilogrammes</strong>, non en grammes.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Sur la fiche Porcs, le poids est en <strong>kilogrammes</strong> ; sur les fiches Lapins et Pondeuses, il est en <strong>grammes</strong>. Se tromper d'unité multiplie ou divise le GMQ par mille et rend toute l'analyse de croissance inutilisable.</p></div></div>
+
+  <h3>La fiche Volailles Reproducteurs</h3>
+  <p>Elle suit les <strong>reproducteurs, les poussins et la souche Goliath</strong>, avec les œufs mis à couver et les éclosions obtenues.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H3-fiche-reproducteurs.jpg" alt="Fiche volailles reproducteurs">
+    </div>
+    <figcaption><b>Figure 2.6</b> — La fiche Reproducteurs, Poussins &amp; Goliath.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Si aucune bande de reproducteurs n'existe encore, l'écran affiche simplement un renvoi : <em>« Créer une bande depuis Bandes &amp; Sujets → »</em>. Ce n'est pas une panne — créez d'abord la bande (section 2.2).</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Sur les fiches Lapins et Porcs, le <strong>poids général pesé</strong> est le poids <em>total</em> de l'échantillon, pas le poids moyen d'un animal. Le logiciel calcule lui-même le poids moyen en divisant par l'effectif. Saisir un poids moyen à cet endroit divise le résultat par le nombre de têtes et rend le suivi de croissance absurde.</p></div></div>
+
+  <h2>2.5 Le rationnement</h2>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Fiche de Rationnement (g/j)</span></p>
+
+  <p>Cet écran fixe la <strong>ration normative</strong> — la quantité de provende théorique par tête et par jour, pour chaque espèce et chaque stade physiologique.</p>
+
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Ajouter une Ration</span>.</li>
+    <li>Choisissez l'<span class="champ">Espèce</span>.</li>
+    <li>Saisissez le <span class="champ">Stade physiologique / tranche d'âge</span> (par exemple <em>Poulette 8–18 semaines</em>).</li>
+    <li>Saisissez la <span class="champ">Ration normative (g/tête/jour)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Sur la fiche journalière, le tableau de rationnement compare la <strong>ration normative</strong> (issue de cet écran) à la <strong>provende réellement servie</strong>. L'écart entre les deux est le premier signal d'un problème : gaspillage, vol, ou animaux qui ne mangent pas.</p></div></div>
+
+  <h3>Modifier une ration existante</h3>
+  <p>Cliquez sur l'icône <strong>crayon</strong> de la ligne. La fenêtre <em>Saisir une Ration</em> se rouvre, préremplie.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G2-editer-ration.jpg" alt="Modification d'une ration">
+    </div>
+    <figcaption><b>Figure 2.7</b> — La modification d'une ration normative.</figcaption>
+  </figure>
+
+  <h3>Les calendriers de prophylaxie</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Calendriers de Prophylaxie</span></p>
+  <p>C'est le programme sanitaire type de la ferme, espèce par espèce. Colonnes : <strong>Jour / période, Traitement prévu, Produit conseillé, Posologie, Délai rémanence</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E7-param-prophylaxie.jpg" alt="Calendriers de prophylaxie">
+    </div>
+    <figcaption><b>Figure 2.8</b> — Le calendrier de prophylaxie : c'est lui qui déclenche le rappel quotidien de 6 h.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>La colonne <strong>Délai rémanence</strong> de ce calendrier est reprise par défaut lors de la saisie d'un soin. Une valeur fausse ici se propage à toutes les bandes traitées : elle autoriserait la vente d'animaux encore sous traitement (section 2.7).</p></div></div>
+
+  <h3>Les types de provende</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Types de Provende</span></p>
+  <p>Colonnes : <strong>Nom du type d'aliment, Espèce cible, Poids sac standard (kg), Prix indicatif (FCFA/kg)</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>poids du sac standard</strong> permet au logiciel de convertir une réserve exprimée en sacs vers une consommation exprimée en grammes par tête. C'est ce qui rend possible le calcul de l'autonomie alimentaire (section 1.6).</p></div></div>
+
+  <h3>La numérotation des bandes et des sujets</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Numérotation</span></p>
+  <p>Cet écran fixe les préfixes utilisés pour créer les identifiants : <span class="champ">Format d'affichage du nom de bande</span>, <span class="champ">Lapines reproductrices</span>, <span class="champ">Mâles saillisseurs</span>, <span class="champ">Truies reproductrices</span>, <span class="champ">Verrats reproducteurs</span>, <span class="champ">Portées de porcelets</span>, <span class="champ">Préfixe lots volailles / pondeuses</span>, <span class="champ">Préfixe bâtiments / parcs volailles</span> et <span class="champ">Préfixe parcs / fosses escargots</span>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Fixez ces préfixes <strong>une fois pour toutes, au démarrage</strong>. Les changer en cours d'exploitation crée deux générations d'identifiants qui cohabitent dans les mêmes registres — le personnel ne s'y retrouve plus.</p></div></div>
+
+  <h2>2.6 Le suivi de la reproduction</h2>
+  <p><span class="chemin">Suivi Reproduction</span></p>
+  <p>Quatre onglets d'espèce en haut de l'écran : <strong>Lapins</strong>, <strong>Volailles</strong>, <strong>Porcs</strong>, <strong>Escargots</strong>.</p>
+
+  <h3>Déclarer une saillie (lapins)</h3>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Déclarer une Saillie Lapin</span>.</li>
+    <li>Choisissez la <span class="champ">Bande</span>.</li>
+    <li>Saisissez le <span class="champ">N° lapine</span> et le <span class="champ">Mâle saillisseur n°</span>.</li>
+    <li>Vérifiez la <span class="champ">Date de saillie</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer la Saillie</span>.</li>
+  </ol>
+
+  <p>Le tableau suit ensuite chaque femelle : <strong>Bande, N° lapine, Date saillie, Mâle n°, Palpation, Mise bas attendue, Nés (vivants), Statut</strong>. Le bouton <span class="btn">Saisir Mise Bas</span> clôture le cycle.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les échéances sont <strong>calculées à partir de la date de saillie</strong>, pas saisies : palpation, mise bas attendue, et pour les porcs le retour de chaleur (J+21) et le sevrage (J+42). Corrigez la date de saillie si une échéance vous paraît fausse — c'est la seule donnée d'origine.</p></div></div>
+
+  <h3>Le suivi porcin</h3>
+  <p>Onglet <span class="chemin">Porcs</span>. Colonnes : <strong>Bande, N° truie, Date saillie, Verrat n°, Retour chaleur, Mise bas attendue, Nés (vivants), Statut</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F2-repro-porcs.jpg" alt="Suivi reproduction porcine">
+    </div>
+    <figcaption><b>Figure 2.9</b> — Le suivi de la reproduction porcine et ses échéances calculées.</figcaption>
+  </figure>
+
+  <h3>Le couvoir (volailles)</h3>
+  <p>Onglet <span class="chemin">Volailles</span> — <em>Suivi Reproduction Volailles — Couvoir &amp; Éclosion</em>. Le panneau reprend les œufs mis à couver et les éclosions du mois, à partir de ce qui a déjà été saisi sur la fiche Reproducteurs.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Cet onglet est un <strong>résumé, pas un second formulaire</strong>. Les œufs couvés et les naissances se saisissent une seule fois, sur la fiche journalière Reproducteurs. Saisir la même donnée à deux endroits est précisément ce que le logiciel cherche à éviter.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Sans œuf mis à couver, le taux d'éclosion s'affiche en <strong>tiret</strong> et non en « 0,0 % » : un zéro se lirait comme un échec total du couvoir, alors qu'il n'y a simplement rien à mesurer.</p></div></div>
+
+  <p>Les quatre indicateurs communs aux quatre onglets sont : <strong>Reproductrices gestantes</strong>, <strong>Palpations / échéances dues</strong>, <strong>Mises bas / éclosions (mois)</strong> et <strong>Alertes réforme / pertes</strong>.</p>
+
+  <h2>2.7 Soins, vaccins et rémanence</h2>
+  <p><span class="chemin">Soins et vaccins</span> — trois onglets.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/21-soins-registre.jpg" alt="Registre vétérinaire">
+      <span class="cible" style="left:22.9%;top:10.6%;width:14.0%;height:5.4%"><b>1</b></span>
+      <span class="cible" style="left:37.0%;top:10.6%;width:14.8%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:51.9%;top:10.6%;width:11.2%;height:5.4%"><b>3</b></span>
+      <span class="cible" style="left:87.3%;top:18.8%;width:11.0%;height:5.2%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 2.10</b> — Le registre vétérinaire. <b>1</b> Registre — <b>2</b> Calendrier — <b>3</b> Suivi sanitaire — <b>4</b> Nouveau soin.</figcaption>
+  </figure>
+
+  <h3>Enregistrer un soin</h3>
+  <ol class="etapes">
+    <li>Onglet <span class="chemin">Registre Vétérinaire</span> <span class="fleche">➔</span> <span class="btn">Nouveau Soin</span>.</li>
+    <li>Choisissez le <span class="champ">Lot / bande</span> concerné.</li>
+    <li>Vérifiez la <span class="champ">Date du soin</span>.</li>
+    <li>Choisissez le <span class="champ">Type d'action</span> : <em>Vaccination</em>, <em>Traitement curatif</em>, <em>Vermifuge</em>, <em>Vitamines</em>, <em>Antistress</em>, <em>Hépato-protection</em>.</li>
+    <li>Saisissez le <span class="champ">Produit utilisé</span> et la <span class="champ">Dose</span>.</li>
+    <li><strong>Saisissez le <span class="champ">Délai d'attente / rémanence (jours)</span></strong> indiqué sur la notice du produit.</li>
+    <li>Renseignez le <span class="champ">Vétérinaire / animalier</span>, les <span class="champ">Symptômes observés</span> et le <span class="champ">Coût (FCFA)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Le délai de rémanence n'est pas une simple information : il bloque la vente.</strong> Tant que le délai court, AgriERP <strong>refuse toute vente d'un animal de cette bande</strong> et affiche « Vente interdite — bande sous rémanence vétérinaire active ».</p>
+  <p>Oublier de saisir ce délai revient à autoriser la vente d'un animal encore sous traitement. C'est un risque sanitaire pour le consommateur et un risque juridique pour la ferme.</p></div></div>
+
+  <h3>Les deux autres onglets</h3>
+  <ul class="puces">
+    <li><strong>Calendrier Vétérinaire</strong> — la planification à quinze jours, bande par bande. <span class="btn">Planifier une Intervention</span> demande le <span class="champ">Lot / bande</span>, l'<span class="champ">Intervention</span> et la <span class="champ">Date prévue</span>.</li>
+    <li><strong>Suivi Sanitaire</strong> — l'infirmerie. <span class="btn">Nouvelle Entrée Infirmerie</span> demande le <span class="champ">Lot / bande</span>, le <span class="champ">Sujet (optionnel)</span>, le <span class="champ">Motif</span>, le <span class="champ">Niveau d'isolement</span> (<em>Quarantaine stricte</em>, <em>Infirmerie</em>, <em>Simple surveillance</em>) et la <span class="champ">Date d'entrée</span>.</li>
+  </ul>
+
+  <h2>2.8 Abattage et transformation</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Transformation</span></p>
+  <p>Cet écran transforme des <strong>animaux vivants</strong> en <strong>produit fini vendable</strong> : un poulet vivant devient du poulet braisé ou fumé.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/22-transformation.jpg" alt="Bon d'abattage et transformation">
+      <span class="cible" style="left:22.9%;top:56.4%;width:40.1%;height:8.0%"><b>1</b></span>
+      <span class="cible" style="left:22.9%;top:65.8%;width:40.1%;height:8.0%"><b>2</b></span>
+      <span class="cible bas" style="left:22.9%;top:94.5%;width:40.1%;height:5.0%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 2.11</b> — Le bon d'abattage. <b>1</b> Sujets à abattre — <b>2</b> Produit fini visé — <b>3</b> Validation.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Lot / bande d'élevage</span> source.</li>
+    <li>Saisissez le <span class="champ">Nombre de sujets à abattre</span>.</li>
+    <li>Choisissez le <span class="champ">Produit fini cible</span>.</li>
+    <li>Saisissez la <span class="champ">Quantité produite (unités / kg)</span> réellement obtenue.</li>
+    <li>Vérifiez la <span class="champ">Date de transaction</span> et indiquez l'<span class="champ">Opérateur</span>.</li>
+    <li>Cliquez sur <span class="btn">Valider la Transformation</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une transformation validée fait <strong>deux choses en même temps</strong> : elle diminue l'effectif de la bande du nombre de sujets abattus, et elle augmente le stock du produit fini de la quantité produite. Vous n'avez aucune saisie de stock complémentaire à faire.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>La quantité produite est rarement égale au nombre de sujets abattus (rendement, découpe, pertes). Saisissez ce que vous avez <strong>réellement obtenu et pesé</strong>, jamais le chiffre théorique.</p></div></div>
+
+  <h2>2.9 Suivre les performances</h2>
+
+  <h3>Le Dashboard Élevage et ses cinq onglets</h3>
+  <p><span class="chemin">Dashboard Élevage</span></p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Ce qu'il montre</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Synthèse Globale</strong></td><td>Vue d'ensemble des trois filières : effectifs, mortalité, production.</td></tr>
+      <tr><td><strong>GMQ &amp; Croissance</strong></td><td>Quatre indicateurs — <em>Effectif total vivant</em>, <em>Autonomie aliment min.</em>, <em>GMQ moyen</em>, <em>Mortalité cumulée (7 j)</em> — puis le GMQ bande par bande et les rappels VMS à venir.</td></tr>
+      <tr><td><strong>Bilan Technico-Économique</strong></td><td>Pour un lot : <em>Coût total connu</em>, <em>Revenu total</em>, <em>Marge nette</em>, avec le détail des coûts et des revenus.</td></tr>
+      <tr><td><strong>Analyse Sanitaire</strong></td><td>Fréquence des maladies : <em>Filière, Nb traitements (mois), Coût total, Taux de morbidité %</em>.</td></tr>
+      <tr><td><strong>Prévision de Croissance</strong></td><td><em>Bande, Poids actuel (g), Tendance (g/j), Projection à 30 jours (g)</em>.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D4-elevage-gmq.jpg" alt="Onglet GMQ et croissance">
+    </div>
+    <figcaption><b>Figure 2.12</b> — L'onglet GMQ &amp; Croissance : quatre indicateurs, puis le détail par bande.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>L'indicateur <strong>Autonomie aliment min.</strong> est le plus opérationnel des quatre : il donne le nombre de jours de provende restants pour la bande la moins bien pourvue. C'est votre signal de commande.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D5-elevage-bilan.jpg" alt="Bilan technico-économique de lot">
+    </div>
+    <figcaption><b>Figure 2.13</b> — Le bilan technico-économique : ce que le lot a coûté, ce qu'il a rapporté, la marge nette.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le libellé exact est <strong>« Coût total connu du lot »</strong>. Il ne contient que ce qui a été saisi et rattaché : acquisition, provende, soins. Une charge payée en espèces sans passer par <span class="chemin">Saisie Dépenses</span> n'y figure pas, et la marge apparaît alors meilleure qu'elle ne l'est.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D6-elevage-sanitaire.jpg" alt="Analyse sanitaire">
+    </div>
+    <figcaption><b>Figure 2.14</b> — L'analyse sanitaire : traitements administrés, coût et taux de morbidité par filière.</figcaption>
+  </figure>
+
+  <h3>Analyse des croissances — GMQ</h3>
+  <p><span class="chemin">Analyse Croissance</span> compare, bande par bande, le <strong>poids précédent</strong> et le <strong>poids actuel</strong> pour en déduire le <strong>GMQ</strong> (gain moyen quotidien, en grammes par jour) et le situer face à l'objectif de la race.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le GMQ n'apparaît que si <strong>au moins deux pesées</strong> ont été saisies sur la bande. Une seule pesée ne permet aucun calcul de progression — ce n'est pas un défaut du logiciel.</p></div></div>
+
+  <h3>Bilan technico-économique de lot</h3>
+  <p><span class="chemin">Bilan Technico-Économique</span> rassemble, pour une bande donnée, ce qu'elle a coûté (acquisition, provende, soins) et ce qu'elle a rapporté (ventes). C'est le document qui répond à la question : <em>ce lot a-t-il été rentable&nbsp;?</em></p>
+
+  <h2>2.10 Registre des reproducteurs et fiche d'un sujet</h2>
+  <p><span class="chemin">Registre des Reproducteurs</span> suit les animaux <strong>identifiés individuellement</strong> : <strong>Identifiant, Espèce, Sexe, Race, Bande, Cage, Statut</strong>.</p>
+  <p>Cliquez sur l'icône <strong>œil</strong> d'une ligne pour ouvrir la fiche du sujet. Un bouton <span class="btn">Exporter PDF</span> édite la fiche complète.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E6-sujet-alimentation.jpg" alt="Fiche d'un sujet identifié">
+    </div>
+    <figcaption><b>Figure 2.15</b> — La fiche d'un reproducteur : identification, QR code du sujet et huit onglets.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:26%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Général</strong></td><td>Identification : espèce, catégorie, date de naissance, date d'entrée, bande, cage. Un <strong>QR code</strong> propre au sujet permet de le retrouver depuis le terrain.</td></tr>
+      <tr><td><strong>Historique</strong></td><td>La suite chronologique des événements du sujet.</td></tr>
+      <tr><td><strong>Alimentation</strong></td><td>Les rations qui lui ont été appliquées.</td></tr>
+      <tr><td><strong>Vaccins</strong></td><td><em>Date, Action, Produit, Dose</em> — tous les soins reçus.</td></tr>
+      <tr><td><strong>Reproduction</strong></td><td>Ses saillies, palpations et mises bas.</td></tr>
+      <tr><td><strong>Production</strong></td><td>Ce qu'il a produit : œufs, portées, poids.</td></tr>
+      <tr><td><strong>Mouvements</strong></td><td><em>Date, Mouvement, Détail</em> — entrées, transferts, sorties.</td></tr>
+      <tr><td><strong>Documents</strong></td><td>Les pièces jointes au sujet (certificats, photos).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Imprimez le <strong>QR code</strong> de l'onglet Général et fixez-le sur la cage. Un scan avec le téléphone ouvre directement la fiche du sujet, sans le chercher dans la liste.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Éditez la fiche PDF d'un reproducteur avant une vente ou une exposition : elle rassemble en une page la généalogie, les vaccins et les performances du sujet.</p></div></div>
+
+  <div class="groupe"><h2>2.11 Modules d'élevage non activés</h2>
+  <p>Si vous ouvrez une fiche et lisez « Module non activé » (le cas le plus courant est l'héliciculture), la filière n'est pas ouverte sur votre installation.</p>
+  <p>Un administrateur peut l'activer : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modules Actifs</span>.</p>
+</div></section>
+
+<!-- =======================  CHAPITRE 3  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">3</div>
+    <div>
+      <h1>Ventes &amp; Clients</h1>
+      <p class="ch-sous">Enregistrer une vente au comptoir, établir un devis, suivre les créances et relancer les clients.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Ventes &amp; Devis</span> regroupe quatre onglets : <strong>Enregistrer Vente</strong>, <strong>Devis Prestations</strong>, <strong>Historique des Ventes</strong> et <strong>Retours et Avoirs</strong>.</p>
+
+  <h2>3.1 Enregistrer une vente</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer Vente</span></p>
+  <p>C'est l'écran de caisse. Il est conçu pour être rapide : les produits à gauche, le panier à droite.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/30-pos.jpg" alt="Écran de vente au comptoir">
+      <span class="cible" style="left:21.9%;top:18.6%;width:16.3%;height:4.4%"><b>1</b></span>
+      <span class="cible" style="left:38.1%;top:18.1%;width:12.0%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:72.6%;top:26.4%;width:24.8%;height:9.8%"><b>3</b></span>
+      <span class="cible" style="left:72.6%;top:71.0%;width:24.8%;height:9.8%"><b>4</b></span>
+      <span class="cible bas" style="left:72.6%;top:86.8%;width:24.8%;height:5.2%"><b>5</b></span>
+    </div>
+    <figcaption><b>Figure 3.1</b> — L'écran de vente.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Rechercher un produit</span>
+    <span><i>2</i>Ajouter un produit ferme</span>
+    <span><i>3</i>Choix du client</span>
+    <span><i>4</i>Mode de règlement</span>
+    <span><i>5</i>Valider la vente</span>
+  </p>
+
+  <h3>Le parcours complet</h3>
+  <ol class="etapes">
+    <li><strong>Trouvez le produit.</strong> Tapez son nom dans <span class="champ">Rechercher un produit…</span>, ou cliquez sur une catégorie (<em>Aliments</em>, <em>Aviculture</em>, <em>Cuniculture</em>, <em>Équipements</em>, <em>Maraîchage</em>, <em>Médicaments</em>, <em>Porciculture</em>, <em>Transformation</em>).</li>
+    <li><strong>Cliquez sur la carte du produit.</strong> La fenêtre <em>Vente à la Pièce</em> s'ouvre.</li>
+    <li><strong>Si le produit est un animal vivant</strong>, choisissez la <span class="champ">Bande source</span>. Ce choix est obligatoire : il permet au logiciel de vérifier qu'aucune rémanence vétérinaire n'est en cours sur cette bande.</li>
+    <li>Saisissez le <span class="champ">Nombre de sujets / Quantité</span>.</li>
+    <li>Saisissez le <span class="champ">Montant global de la vente (FCFA)</span> — le <strong>total convenu avec le client</strong> pour toute la quantité.</li>
+    <li>Cliquez sur <span class="btn">Ajouter au panier</span>. Le produit apparaît dans le <em>Panier de Vente</em> à droite.</li>
+    <li>Répétez pour chaque article.</li>
+    <li><strong>Choisissez le client</strong> dans la liste <span class="champ">Client</span>, ou laissez <em>Client Anonyme</em> pour une vente de passage.</li>
+    <li>Saisissez une <span class="champ">Remise (FCFA)</span> si elle a été accordée. Le <strong>Total à payer</strong> se recalcule.</li>
+    <li>Choisissez le <span class="champ">Mode de règlement</span>.</li>
+    <li>Pour un paiement en espèces, saisissez le <span class="champ">Montant reçu</span> : la <strong>Monnaie à rendre</strong> s'affiche automatiquement.</li>
+    <li>Cliquez sur <span class="btn">Valider la Vente</span>.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/M0b-panier-rempli.jpg" alt="Panier de vente rempli">
+    </div>
+    <figcaption><b>Figure 3.2</b> — Un article dans le panier. Le message vert en haut à droite confirme chaque ajout ; il disparaît seul après quelques secondes.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Le champ <strong>Montant global de la vente</strong> attend le <strong>total</strong>, pas un prix unitaire. Pour 30 plateaux d'œufs vendus 2&nbsp;500 F l'unité, saisissez <strong>75&nbsp;000</strong>, pas 2&nbsp;500.</p>
+  <p>Ce fonctionnement est volontaire : à la ferme, le prix se négocie sur le lot entier, et le logiciel ne doit jamais décider seul du total à la place du vendeur.</p></div></div>
+
+  <h3>Les modes de règlement</h3>
+  <table>
+    <thead><tr><th style="width:32%">Mode</th><th>Quand l'utiliser</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Espèces</strong></td><td>Paiement comptant en liquide. Saisissez le montant reçu pour obtenir la monnaie à rendre.</td></tr>
+      <tr><td><strong>Mobile Money</strong></td><td>Paiement par MTN MoMo, Moov Money ou équivalent.</td></tr>
+      <tr><td><strong>Virement bancaire</strong></td><td>Le client paie par virement sur le compte de la ferme.</td></tr>
+      <tr><td><strong>Crédit / À terme</strong></td><td>Le client emporte la marchandise et paiera plus tard. Une créance est créée automatiquement.</td></tr>
+      <tr><td><strong>Déduire de l'avance</strong></td><td>Le client a déjà versé une avance ; la vente s'impute dessus.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le mode <strong>Crédit / À terme</strong> est réservé aux clients enregistrés. Choisir <em>Client Anonyme</em> avec un règlement à crédit revient à créer une dette que personne ne pourra recouvrer.</p></div></div>
+
+  <h3>Deux blocages que vous rencontrerez</h3>
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>« Vente interdite — bande sous rémanence vétérinaire active »</strong><br>
+  Les animaux de cette bande sont sous délai d'attente après un traitement. La vente est refusée par le logiciel. Retirez l'article du panier et prévenez le chef d'élevage — n'essayez pas de contourner le blocage en changeant de bande source.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p><strong>« Stock insuffisant »</strong><br>
+  Le message apparaît en orange mais la vente reste possible : sur une ferme, la marchandise physique existe parfois avant sa saisie informatique. Signalez néanmoins l'écart au responsable des stocks — il faudra le régulariser par un ajustement d'inventaire (section 5.3).</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un produit affiché <strong>Sur devis technique</strong> ne peut pas être vendu directement au comptoir : le logiciel vous redirige vers l'onglet <em>Devis</em>. C'est le cas des cages et équipements, dont le prix dépend d'un chiffrage.</p></div></div>
+
+  <h3>Ce que la validation déclenche</h3>
+  <div class="note info longue"><span class="ico">ℹ️</span><div><b>Information</b><p>Un clic sur <strong>Valider la Vente</strong> ne fait pas qu'imprimer un ticket. En une seule opération, le logiciel :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>enregistre la vente et sa facture ;</li>
+    <li><strong>diminue le stock</strong> des produits vendus ;</li>
+    <li><strong>crédite la caisse</strong> ou le compte de trésorerie concerné ;</li>
+    <li><strong>génère l'écriture comptable</strong> SYSCOHADA correspondante ;</li>
+    <li><strong>reporte la vente sur la fiche d'élevage</strong> du jour s'il s'agit d'un animal ou d'un produit issu d'une bande ;</li>
+    <li>crée la <strong>créance</strong> si le règlement est à crédit.</li>
+  </ul></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Si le message de confirmation précise « écriture comptable non générée », la vente est bien enregistrée mais la comptabilité ne l'a pas reçue : il manque un mode de règlement ou un compte de trésorerie. <strong>Signalez-le au comptable le jour même</strong> pour régularisation au journal.</p></div></div>
+
+  <h3>Autres boutons de l'écran de vente</h3>
+  <ul class="puces">
+    <li><span class="btn">Ajouter Produit Ferme</span> — crée à la volée un produit absent du catalogue, sans quitter la caisse.</li>
+    <li><span class="btn">Livraison concernée</span> — précise le régime de livraison : <em>Livraison gratuite (offerte)</em>, <em>assurée par le client</em>, <em>prix inclus dans le montant</em> ou <em>facturée séparément</em>.</li>
+    <li>L'icône <strong>personne +</strong> à droite du champ Client crée un client sans quitter l'écran : <span class="champ">Nom complet</span>, <span class="champ">Téléphone</span>, <span class="champ">Ville</span>, <span class="champ">Email</span>.</li>
+  </ul>
+
+  <h2>3.2 Établir un devis</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Devis Prestations</span> <span class="fleche">➔</span> <span class="btn">Nouveau Devis</span></p>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Client</span>.</li>
+    <li>Décrivez les <span class="champ">Articles / prestations</span>.</li>
+    <li>Saisissez le <span class="champ">Montant HT (FCFA)</span> et choisissez la <span class="champ">TVA (%)</span> : <em>0 %</em> ou <em>18 %</em>.</li>
+    <li>Indiquez la <span class="champ">Validité (jours)</span> et la <span class="champ">Date du devis</span>.</li>
+    <li>Ajoutez une <span class="champ">Note</span> si nécessaire, puis cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <p>Sur chaque ligne du tableau, les icônes permettent d'<strong>accepter</strong>, <strong>refuser</strong>, <strong>modifier</strong>, <strong>envoyer</strong> le devis ou de le <strong>convertir en facture</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un devis accepté se transforme en facture sans ressaisie : utilisez l'icône <em>facture</em> de la ligne plutôt que de recréer la vente au comptoir.</p></div></div>
+
+  <h2>3.3 Consulter et annuler une vente</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Historique des Ventes</span></p>
+  <p>Le tableau affiche : <strong>Facture, Client, Date, Articles, Remise, Total TTC, Payé, Reste, Mode, Statut</strong>. Le bouton <span class="btn">Réinitialiser</span> efface les filtres de recherche.</p>
+
+  <h3>Consulter le détail d'une vente</h3>
+  <p>Cliquez sur l'icône <strong>œil</strong> de la ligne. Le détail complet s'affiche : les articles vendus, les quantités, les montants, le mode de règlement et le statut de la facture.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H4-detail-vente.jpg" alt="Détail d'une vente">
+    </div>
+    <figcaption><b>Figure 3.3</b> — Le détail d'une vente enregistrée.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant d'annuler une vente ou d'établir un avoir, ouvrez toujours ce détail : il vous dit exactement ce qui a été vendu et à quel prix. C'est aussi ce que vous devez lire au client au téléphone.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Annuler une vente est une opération <strong>lourde et tracée</strong> : elle remet la marchandise en stock, retire l'argent de la caisse et contre-passe l'écriture comptable. Elle reste visible dans l'historique avec le statut <em>Annulée</em> — une vente n'est <strong>jamais effacée</strong>.</p>
+  <p>N'annulez une vente que le jour même et pour une erreur de saisie. Pour un retour de marchandise, utilisez un <strong>avoir</strong> (section 3.4).</p></div></div>
+
+  <h2>3.4 Retours et avoirs</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Retours et Avoirs</span> <span class="fleche">➔</span> <span class="btn">Nouveau Retour</span></p>
+  <ol class="etapes">
+    <li>Sélectionnez la vente concernée dans la liste (numéro, client et montant y figurent).</li>
+    <li>Indiquez le motif du retour et la décision prise.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer le Retour</span>.</li>
+  </ol>
+  <p>Le tableau suit chaque avoir : <strong>Avoir, Facture, Client, Date, Motif, Décision, Montant, Statut</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un avoir validé génère sa <strong>propre écriture comptable</strong>, en sens inverse de la vente d'origine. La vente initiale reste intacte : c'est ce qui permet, en fin d'année, de distinguer le chiffre d'affaires réalisé du chiffre d'affaires repris.</p></div></div>
+
+  <h2>3.5 Les clients et les créances</h2>
+  <p><span class="chemin">Clients et Créances</span> — quatre onglets.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/34-clients-liste.jpg" alt="Liste des clients">
+      <span class="cible" style="left:86.4%;top:18.8%;width:12.1%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:35.2%;top:10.6%;width:12.5%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 3.4</b> — La liste des clients. <b>1</b> Créer un client — <b>2</b> Onglet Suivi des Dettes.</figcaption>
+  </figure>
+
+  <h3>Liste des Clients</h3>
+  <p>Colonnes : <strong>Nom, Téléphone, Ville, Total achats, Solde dû, Statut</strong>. Le bouton <span class="btn">Nouveau Client</span> demande le <span class="champ">Nom complet</span>, le <span class="champ">Téléphone</span>, la <span class="champ">Ville</span> et l'<span class="champ">Email</span>.</p>
+
+  <p>Les indicateurs du haut — <strong>Clients actifs</strong>, <strong>Nouveaux (mois)</strong>, <strong>Solde créances</strong> — se recalculent seuls.</p>
+
+  <h3>Modifier ou archiver un client</h3>
+  <p>Trois icônes sont disponibles sur chaque ligne, dans la colonne <strong>Actions</strong> :</p>
+  <table>
+    <thead><tr><th style="width:24%">Icône</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td><strong>crayon</strong></td><td>Ouvre <em>Modifier le Client</em>, préremplie. Corrigez le nom, le téléphone, la ville ou l'e-mail, puis <span class="btn">Enregistrer</span>.</td></tr>
+      <tr><td><strong>facture</strong></td><td>Ouvre le profil du client (ventes, créances, avances, relances).</td></tr>
+      <tr><td><strong>corbeille</strong></td><td><strong>Archive</strong> le client. Ses ventes passées restent intactes.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G6-editer-client.jpg" alt="Modification d'un client">
+    </div>
+    <figcaption><b>Figure 3.5</b> — La fenêtre <em>Modifier le Client</em>.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>N'archivez jamais un client dont le <strong>solde dû n'est pas nul</strong> : la créance reste enregistrée mais le client disparaît des listes de relance. Encaissez d'abord, archivez ensuite.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Saisissez toujours le <strong>téléphone</strong> : sans lui, aucune relance par SMS ni par WhatsApp n'est possible, et c'est le canal qui fonctionne réellement pour le recouvrement.</p></div></div>
+
+  <h3>Suivi des Dettes</h3>
+  <p>Colonnes : <strong>Débiteur, Facture associée, Échéance, Total facturé, Solde restant</strong>. Le bouton <span class="btn">Ajouter un Recouvrement</span> enregistre un paiement reçu : saisissez le <span class="champ">Montant du règlement (FCFA)</span> et le <span class="champ">Compte de trésorerie</span> qui l'encaisse.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Choisissez le <strong>bon compte de trésorerie</strong> : espèces reçues en main propre → <em>Caisse</em> ; virement reçu → <em>Compte bancaire</em>. Une erreur ici fait diverger le solde affiché du solde réel, et l'écart n'est retrouvé qu'au rapprochement bancaire, parfois des semaines plus tard.</p></div></div>
+
+  <h3>Relances Clients</h3>
+  <p>Quatre canaux de relance sont proposés sur chaque débiteur : <span class="btn">Relancer WhatsApp</span>, <span class="btn">Relancer par Mail</span>, <span class="btn">Relancer par SMS</span> et <span class="btn">Exporter Courrier</span>.</p>
+  <p>Choisissez le <span class="champ">Niveau de relance</span> puis adaptez le <span class="champ">Modèle de message</span>. Les mentions <strong>[NOM]</strong>, <strong>[FACTURE]</strong>, <strong>[MONTANT_DU]</strong> et <strong>[DATE_ECHEANCE]</strong> sont remplacées automatiquement par les valeurs du client — ne les modifiez pas.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'envoi par e-mail et par SMS suppose que la configuration a été faite : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Intégrations</span>. Le bouton <span class="btn">Configurer Email &amp; SMS</span> vous y conduit directement.</p></div></div>
+
+  <h3>Historique des Avances</h3>
+  <p>Colonnes : <strong>Client, Montant avance, Solde restant, Date, Statut</strong>. Le bouton <span class="btn">Nouvelle Avance</span> demande le <span class="champ">Client</span>, le <span class="champ">Montant (FCFA)</span> et la <span class="champ">Date</span>.</p>
+
+  <h3>Le profil d'un client</h3>
+  <p>Cliquez sur le nom d'un client pour ouvrir sa fiche. Le haut de l'écran affiche son <strong>solde global dû</strong> et sa <strong>limite de crédit</strong>, puis trois actions : <span class="btn">Modifier la fiche</span>, <span class="btn">Enregistrer un règlement</span>, <span class="btn">Envoyer une relance rapide</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ventes</strong></td><td><em>Facture, Date, Articles, Montant, Statut</em> — tout ce que ce client a acheté.</td></tr>
+      <tr><td><strong>Créances</strong></td><td>Ce qu'il doit encore, facture par facture, avec les échéances.</td></tr>
+      <tr><td><strong>Avances &amp; Acomptes</strong></td><td>Les sommes versées d'avance et le solde qu'il lui reste à consommer.</td></tr>
+      <tr><td><strong>Relances</strong></td><td>L'historique des relances envoyées : quand, par quel canal, à quel niveau.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D8-client-creances.jpg" alt="Onglet Créances du profil client">
+    </div>
+    <figcaption><b>Figure 3.6</b> — L'onglet Créances du profil client.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La <strong>limite de crédit</strong> affichée en haut du profil est le montant maximal que la ferme accepte de laisser impayé pour ce client. Comparez-la au solde dû avant d'accorder une nouvelle vente à terme.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/DA-client-relances.jpg" alt="Onglet Relances du profil client">
+    </div>
+    <figcaption><b>Figure 3.7</b> — L'onglet Relances : la trace de tout ce qui a déjà été tenté.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Consultez l'onglet <strong>Relances</strong> avant d'appeler : relancer trois fois la même semaine par le même canal irrite le client sans faire avancer le recouvrement. L'historique vous dit où vous en êtes.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant d'accorder une vente à crédit, ouvrez le profil du client : son <strong>solde dû</strong> et son historique de règlements y sont réunis. C'est trente secondes qui évitent des mois de relance.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 4  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">4</div>
+    <div>
+      <h1>Achats &amp; Dépenses</h1>
+      <p class="ch-sous">Enregistrer les achats de la ferme, suivre les fournisseurs et saisir les charges courantes.</p>
+    </div>
+  </div>
+
+  <p class="intro">Deux écrans distincts, souvent confondus : <strong>Achats &amp; Commandes</strong> sert à ce qui entre en stock (provende, médicaments, matériel) ; <strong>Saisie Dépenses</strong> sert à ce qui ne s'y stocke pas (carburant, électricité, transport).</p>
+
+  <h2>4.1 Enregistrer un achat</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer un Achat</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/40-achat-enregistrer.jpg" alt="Enregistrer un achat">
+      <span class="cible" style="left:22.9%;top:30.6%;width:48.1%;height:9.8%"><b>1</b></span>
+      <span class="cible" style="left:22.9%;top:44.1%;width:48.1%;height:9.8%"><b>2</b></span>
+      <span class="cible" style="left:22.9%;top:56.6%;width:48.1%;height:5.4%"><b>3</b></span>
+      <span class="cible bas" style="left:73.5%;top:94.5%;width:24.8%;height:5.0%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 4.1</b> — L'écran d'achat. <b>1</b> Fournisseur — <b>2</b> Article — <b>3</b> Ajouter au bon — <b>4</b> Enregistrer l'achat.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le fournisseur dans <span class="champ">Sélectionner fournisseur</span>. L'icône <strong>personne +</strong> permet d'en créer un sans quitter l'écran.</li>
+    <li>Dans <strong>Ajouter un article</strong>, choisissez le <span class="champ">Produit / article</span>, puis saisissez la <span class="champ">Quantité</span> et le <span class="champ">Prix unitaire</span>.</li>
+    <li>Cliquez sur <span class="btn">Ajouter au bon d'achat</span>. Répétez pour chaque ligne de la facture du fournisseur.</li>
+    <li>Choisissez le <span class="champ">Mode de paiement</span> et le <span class="champ">Compte débité</span>.</li>
+    <li>Saisissez le <span class="champ">Montant payé (FCFA)</span>. S'il est inférieur au total, le solde devient une <strong>dette fournisseur</strong>.</li>
+    <li>Ajoutez la <span class="champ">Pièce justificative</span> : cliquez sur <em>Associer une photo du reçu</em> (JPG ou PNG, 5 Mo maximum).</li>
+    <li>Cliquez sur <span class="btn">Enregistrer l'Achat</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'enregistrement d'un achat <strong>augmente le stock</strong> des articles reçus, <strong>diminue la trésorerie</strong> du montant payé, <strong>génère l'écriture comptable</strong> et <strong>crée la dette</strong> pour le solde impayé. Une seule saisie, quatre effets.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Photographiez le reçu <strong>avant</strong> de le ranger et joignez-le tout de suite. Une pièce justificative attachée à la saisie est retrouvée en trois secondes le jour du contrôle ; un reçu classé dans un carton ne l'est jamais.</p></div></div>
+
+  <div class="groupe"><h2>4.2 Liste des achats et remboursements</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Liste d'Achats</span></p>
+  <p>Colonnes : <strong>Référence achat, Date, Fournisseur, Catégorie, Montant total, Statut</strong>. Le bouton <span class="btn">Ajouter Remboursement</span> enregistre un retour de marchandise au fournisseur.</p>
+
+  </div><h2>4.3 Les bons de commande</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Bons de Commande</span></p>
+  <p>Le bon de commande est un <strong>engagement avant livraison</strong> : il ne touche ni le stock ni la trésorerie.</p>
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Fournisseur</span> et la <span class="champ">Date de livraison attendue</span>.</li>
+    <li>Ajoutez chaque ligne : <span class="champ">Produit / article</span>, <span class="champ">Quantité</span>, <span class="champ">P.U estimé (FCFA)</span>, puis <span class="btn">Ajouter au bon de commande</span>.</li>
+    <li>Cliquez sur <span class="btn">Générer le Bon</span>. L'icône <strong>imprimante</strong> édite le document à envoyer au fournisseur.</li>
+    <li>À la livraison, utilisez l'icône <strong>réception</strong> de la ligne pour transformer le bon en achat réel.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Tant que la réception n'est pas enregistrée, la marchandise <strong>n'est pas en stock</strong>, même si elle est physiquement dans le magasin. Réceptionnez le bon le jour de la livraison.</p></div></div>
+
+  <h2>4.4 Les fournisseurs</h2>
+  <p><span class="chemin">Fournisseurs</span> — trois onglets : <strong>Fiches Fournisseurs</strong>, <strong>Ajouter Fournisseur</strong>, <strong>Dettes Fournisseurs</strong>.</p>
+  <ul class="puces">
+    <li><strong>Fiches Fournisseurs</strong> — <em>Nom, Catégorie, Total achats (année), Dernière commande, Statut</em>.</li>
+    <li><strong>Ajouter Fournisseur</strong> — <em>Nom, Contact, Catégorie, Statut</em>, avec le bouton <span class="btn">Nouveau Fournisseur</span>.</li>
+    <li><strong>Dettes Fournisseurs</strong> — <em>Fournisseur, Montant dû, Échéance, Statut</em>. Le bouton <span class="btn">Enregistrer un Règlement</span> solde tout ou partie d'une dette.</li>
+  </ul>
+
+  <h3>Le profil d'un fournisseur</h3>
+  <p>Cliquez sur l'icône <strong>œil</strong> d'une fiche. Le haut de l'écran affiche le <strong>solde global dû</strong>, puis deux actions : <span class="btn">Modifier la fiche</span> et <span class="btn">Enregistrer un règlement</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Achats</strong></td><td><em>Référence, Date, Catégorie, Montant, Statut</em> — l'historique de ce que vous lui avez acheté.</td></tr>
+      <tr><td><strong>Dettes</strong></td><td>Ce que la ferme lui doit encore, avec les échéances.</td></tr>
+      <tr><td><strong>Commandes</strong></td><td>Les bons de commande en cours et livrés.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E1-fournisseur-dettes.jpg" alt="Onglet Dettes du profil fournisseur">
+    </div>
+    <figcaption><b>Figure 4.2</b> — L'onglet Dettes du profil fournisseur.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant de passer une nouvelle commande, ouvrez le profil du fournisseur : un solde dû important est le meilleur argument pour négocier un délai, et la meilleure raison de payer avant de commander à nouveau.</p></div></div>
+
+  <h2>4.5 Saisir une dépense</h2>
+  <p><span class="chemin">Saisie Dépenses</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/47-saisie-depenses.jpg" alt="Saisie des dépenses">
+      <span class="cible" style="left:60.3%;top:50.8%;width:36.5%;height:8.3%"><b>1</b></span>
+      <span class="cible" style="left:23.4%;top:60.2%;width:36.5%;height:9.8%"><b>2</b></span>
+      <span class="cible" style="left:23.4%;top:69.6%;width:36.5%;height:9.8%"><b>3</b></span>
+      <span class="cible bas" style="left:23.4%;top:79.4%;width:73.4%;height:5.4%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 4.3</b> — La saisie d'une dépense.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Libellé</span>
+    <span><i>2</i>Catégorie SYSCOHADA</span>
+    <span><i>3</i>Compte de trésorerie</span>
+    <span><i>4</i>Enregistrer</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Vérifiez la <span class="champ">Date de la transaction</span>.</li>
+    <li>Saisissez un <span class="champ">Libellé de la dépense</span> précis — <em>« Gasoil groupe électrogène — semaine 34 »</em> vaut mieux que <em>« carburant »</em>.</li>
+    <li>Choisissez la <span class="champ">Catégorie de charges (SYSCOHADA)</span>.</li>
+    <li>Saisissez le <span class="champ">Montant décaissé (FCFA)</span>.</li>
+    <li>Choisissez le <span class="champ">Compte de trésorerie débité</span> : celui d'où l'argent est réellement sorti.</li>
+    <li>Joignez le <span class="champ">Reçu / facture (photo)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer la Dépense</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>La <strong>catégorie de charges</strong> détermine le compte comptable mouvementé, et donc la lecture du compte de résultat. Une erreur de catégorie ne se voit pas le jour même : elle apparaît des mois plus tard, dans un poste de charges anormalement gonflé. En cas de doute, demandez au comptable <strong>avant</strong> de valider.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Achat ou dépense ? La règle est simple : <strong>si l'article entre en stock, c'est un achat</strong> (provende, médicaments, matériel). <strong>S'il est consommé immédiatement, c'est une dépense</strong> (carburant, électricité, transport, réparation).</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 5  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">5</div>
+    <div>
+      <h1>Stocks &amp; Produits</h1>
+      <p class="ch-sous">Suivre les quantités et leur valeur, corriger un écart d'inventaire, tenir le catalogue à jour.</p>
+    </div>
+  </div>
+
+  <p class="intro">Le stock n'est presque jamais saisi à la main : il bouge tout seul à chaque vente, chaque achat, chaque transformation et chaque récolte d'œufs. Cet écran sert à <strong>consulter</strong>, à <strong>vérifier</strong> et à <strong>corriger les écarts</strong>.</p>
+
+  <h2>5.1 Tableau et valorisation</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Tableau &amp; Valorisation</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/50-stocks-tableau.jpg" alt="Tableau des stocks">
+      <span class="cible" style="left:82.1%;top:11.8%;width:16.2%;height:3.4%"><b>1</b></span>
+      <span class="cible" style="left:34.8%;top:41.1%;width:14.6%;height:5.0%"><b>2</b></span>
+      <span class="cible" style="left:49.3%;top:41.1%;width:14.0%;height:5.0%"><b>3</b></span>
+      <span class="cible" style="left:86.0%;top:49.8%;width:11.1%;height:5.2%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 5.1</b> — Le tableau des stocks. <b>1</b> Seuils d'alerte — <b>2</b> Journal des mouvements — <b>3</b> Ajustement — <b>4</b> Ajouter du stock.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Code, Désignation, Catégorie, Stock, PMP unit., Valeur, Urgence</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>PMP</strong> (prix moyen pondéré) est le coût moyen d'une unité en stock, recalculé à chaque achat. C'est lui qui donne la <strong>valeur</strong> du stock — et non le prix de vente. Deux livraisons de provende achetées à des prix différents donnent un PMP intermédiaire : c'est normal.</p></div></div>
+
+  <p>La colonne <strong>Urgence</strong> signale les produits sous leur seuil d'alerte. Ce sont eux qui remontent en <em>Alertes critiques</em> sur le tableau de bord.</p>
+
+  <div class="groupe"><h2>5.2 Journal des mouvements</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Journal des Mouvements</span></p>
+  <p>Chaque entrée et chaque sortie y est tracée : <strong>Date / heure, Référence, Produit, Type, Motif, Quantité, Valeur</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'écran à ouvrir quand un stock affiché ne correspond pas à la réalité du magasin. Remontez les mouvements du produit : dans la quasi-totalité des cas, l'explication est une vente, une transformation ou une réception qui n'avait pas été remarquée.</p></div></div>
+
+  </div><h2>5.3 Corriger un écart d'inventaire</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Ajustement / Correction</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/52-stocks-ajustements.jpg" alt="Ajustement de stock">
+      <span class="cible" style="left:23.4%;top:63.8%;width:19.1%;height:8.3%"><b>1</b></span>
+      <span class="cible" style="left:42.7%;top:63.8%;width:19.1%;height:8.3%"><b>2</b></span>
+      <span class="cible" style="left:23.4%;top:83.2%;width:38.4%;height:8.3%"><b>3</b></span>
+      <span class="cible bas" style="left:23.4%;top:92.5%;width:38.4%;height:4.4%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 5.2</b> — L'ajustement d'inventaire.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Stock théorique (logiciel)</span>
+    <span><i>2</i>Stock physique compté</span>
+    <span><i>3</i>Motif de l'écart</span>
+    <span><i>4</i>Valider</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Produit</span>. Le <span class="champ">Stock théorique</span> s'affiche : c'est ce que le logiciel pense avoir.</li>
+    <li>Saisissez le <span class="champ">Stock physique constaté</span> : ce que vous avez <strong>réellement compté</strong> dans le magasin.</li>
+    <li>Saisissez le <span class="champ">Motif de l'écart</span> — casse, perte, vol, erreur de comptage antérieure.</li>
+    <li>Cliquez sur <span class="btn">Valider l'ajustement</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Un ajustement <strong>génère une écriture comptable</strong> : un écart de stock est une perte ou un profit qui touche le résultat de la ferme. Ce n'est pas une simple correction d'affichage.</p>
+  <p>N'ajustez jamais « pour faire coller les chiffres ». Comptez physiquement, notez le motif réel, et signalez tout écart important au responsable.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le motif est obligatoire et il est conservé. Un ajustement sans explication crédible sera relevé lors du contrôle des comptes — écrivez ce qui s'est passé, pas « régularisation ».</p></div></div>
+
+  <h2>5.4 Le catalogue produits</h2>
+  <p><span class="chemin">Catalogue Produits</span></p>
+  <p>Deux affichages sont disponibles et les mêmes catégories qu'à la caisse permettent de filtrer.</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Bouton</th><th>Affichage obtenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>grid_view</strong> (grille)</td><td>Une carte par produit, avec sa photo, sa fourchette de prix et son stock. Pratique au comptoir.</td></tr>
+      <tr><td><strong>view_list</strong> (liste)</td><td>Un tableau dense, plus lisible pour comparer des dizaines de produits d'un coup d'œil.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F6-catalogue-liste.jpg" alt="Catalogue produits en vue liste">
+    </div>
+    <figcaption><b>Figure 5.3</b> — Le catalogue en vue liste.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Le choix grille ou liste est un simple confort d'affichage : il ne change ni les données, ni les filtres, ni les actions disponibles sur chaque produit.</p></div></div>
+
+  <h3>Créer un produit</h3>
+  <p><span class="btn">Nouveau Produit</span>, ou <span class="chemin">Catalogue Produits</span> <span class="fleche">➔</span> <span class="chemin">Ajouter un Produit</span></p>
+  <ol class="etapes">
+    <li>Saisissez le <span class="champ">Nom du produit</span> et choisissez la <span class="champ">Catégorie</span>.</li>
+    <li>Indiquez la <span class="champ">Filière d'élevage</span> si le produit provient d'une bande.</li>
+    <li>Choisissez l'<span class="champ">Unité de comptage</span> (unité, kilogramme, sac, plateau…).</li>
+    <li>Choisissez le <span class="champ">Mode de tarification</span> :
+      <ul class="puces" style="margin:4pt 0 0">
+        <li><strong>Fourchette</strong> — vous saisissez un <span class="champ">Prix min</span> et un <span class="champ">Prix max</span> ; le vendeur négocie entre les deux.</li>
+        <li><strong>Sur devis</strong> — le produit ne peut pas être vendu au comptoir, il passe obligatoirement par un devis.</li>
+      </ul>
+    </li>
+    <li>Saisissez le <span class="champ">Stock initial</span>, le <span class="champ">Seuil d'alerte</span> et la <span class="champ">TVA (%)</span>.</li>
+    <li>Ajoutez une <span class="champ">Description</span>, puis cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un produit n'est jamais supprimé : il est <strong>archivé</strong>. L'icône <em>archive</em> le retire du catalogue actif tout en conservant l'historique des ventes qui le mentionnent. Un administrateur peut le restaurer depuis <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span>.</p></div></div>
+
+  <h2>5.5 Les seuils d'alerte</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="btn">Configurer les Seuils d'Alerte</span></p>
+  <p>Colonnes : <strong>Produit, Stock actuel, Seuil configuré, Statut</strong>. Les deux indicateurs du haut rappellent le nombre de <strong>produits sous seuil</strong> et de <strong>seuils configurés</strong>.</p>
+
+  <ol class="etapes">
+    <li>Repérez le produit dans la liste.</li>
+    <li>Cliquez sur l'icône <strong>crayon</strong> de sa ligne. La fenêtre <em>Configurer un Seuil</em> s'ouvre.</li>
+    <li>Saisissez la nouvelle valeur dans <span class="champ">Seuil d'alerte</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G5-editer-seuil.jpg" alt="Configuration d'un seuil d'alerte">
+    </div>
+    <figcaption><b>Figure 5.4</b> — La fenêtre <em>Configurer un Seuil</em>.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le seuil déclenche <strong>trois choses à la fois</strong> : la mention <em>Urgence</em> dans le tableau des stocks, l'alerte critique du tableau de bord et la notification de stock critique. Un seul réglage, trois signaux.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Réglez le seuil sur la <strong>consommation du délai de réapprovisionnement</strong>. Si la provende met une semaine à arriver et que vous en consommez 4 sacs par semaine, le seuil est de 4 sacs — pas de 1.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 6  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">6</div>
+    <div>
+      <h1>Facturation &amp; MeCeF</h1>
+      <p class="ch-sous">Suivre les factures normalisées et leur transmission à la DGI.</p>
+    </div>
+  </div>
+
+  <p class="intro">MeCeF est le système de facturation normalisée de la Direction Générale des Impôts du Bénin. Chaque facture doit lui être transmise et reçoit en retour un code de certification et un QR code.</p>
+
+  <h2>6.1 Consulter les factures</h2>
+  <p><span class="chemin">Facturation &amp; MeCeF</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/60-facturation.jpg" alt="Écran de facturation MeCeF">
+      <span class="cible" style="left:85.7%;top:11.1%;width:12.8%;height:5.2%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 6.1</b> — L'écran Facturation &amp; MeCeF. <b>1</b> Nouvelle facture (renvoie vers l'écran de vente).</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>N° facture, Client, Date, Montant TTC, Statut MeCeF</strong>. Les filtres permettent d'isoler les statuts <em>Transmise</em>, <em>En attente</em> ou <em>Erreur MeCeF</em>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le bouton <strong>Nouvelle Facture</strong> ne crée pas une facture directement : il vous renvoie vers <span class="chemin">Ventes &amp; Devis</span>. C'est voulu — <strong>une facture naît toujours d'une vente</strong>. Une facture saisie séparément de la vente donnerait deux chiffres d'affaires différents.</p></div></div>
+
+  <h2>6.2 Les trois statuts</h2>
+  <table>
+    <thead><tr><th style="width:26%">Statut</th><th>Signification et action attendue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Transmise</strong></td><td>La facture est certifiée par la DGI. Le QR code est disponible : cliquez sur l'icône <em>QR</em> de la ligne pour l'afficher et l'imprimer.</td></tr>
+      <tr><td><strong>En attente</strong></td><td>La transmission n'a pas encore abouti. C'est normal juste après la vente, ou pendant une coupure réseau. Vérifiez à nouveau plus tard.</td></tr>
+      <tr><td><strong>Erreur MeCeF</strong></td><td>La transmission a échoué. Utilisez l'action de <strong>relance</strong> sur la ligne. Si l'erreur persiste, prévenez l'administrateur.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Une facture <em>En attente</em> ou <em>en erreur</em> reste une <strong>vente parfaitement valide</strong> dans AgriERP : la marchandise est sortie, l'argent est encaissé, la comptabilité est à jour. Seule la certification fiscale manque. Ne ressaisissez jamais la vente pour « réessayer » — vous la compteriez deux fois.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La TVA appliquée dépend du paramétrage de la ferme : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>. L'IFU et le RCCM y sont également saisis — ils figurent sur toutes les factures éditées.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 7  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">7</div>
+    <div>
+      <h1>Personnel &amp; Stages</h1>
+      <p class="ch-sous">Registre des employés, pointage, paie, stagiaires et attestations.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Personnel &amp; Stages</span> compte cinq onglets : <strong>Registre Employés</strong>, <strong>Registre Stagiaires</strong>, <strong>Feuille de Pointage</strong>, <strong>Gestion de la Paie</strong> et <strong>Attestations</strong>.</p>
+
+  <h2>7.1 Le registre des employés</h2>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/65-rh-employes.jpg" alt="Registre des employés">
+      <span class="cible" style="left:86.0%;top:19.1%;width:12.5%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:63.0%;top:10.6%;width:13.2%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 7.1</b> — Le registre des employés. <b>1</b> Créer un employé — <b>2</b> Onglet Paie.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Nom, Fonction, Date d'embauche, Salaire, Statut</strong>.</p>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvel Employé</span>.</li>
+    <li>Saisissez le <span class="champ">Prénom</span> et le <span class="champ">Nom</span>.</li>
+    <li>Choisissez la <span class="champ">Fonction</span> : <em>Chef d'élevage</em>, <em>Comptable</em>, <em>Gardien</em>, <em>Vendeuse POS</em>, <em>Ouvrier agricole</em>.</li>
+    <li>Indiquez la <span class="champ">Date d'embauche</span> et le <span class="champ">Salaire de base (FCFA)</span>.</li>
+    <li>Choisissez le <span class="champ">Statut</span> : <em>Actif</em>, <em>Congé</em> ou <em>Suspendu</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Un employé qui quitte la ferme se met en <strong>Suspendu</strong> ou s'archive — il ne se supprime pas. Ses bulletins de paie passés doivent rester consultables.</p></div></div>
+
+  <h3>Modifier ou archiver un employé</h3>
+  <p>Sur chaque ligne, l'icône <strong>crayon</strong> rouvre la même fenêtre, préremplie ; l'icône <strong>archive</strong> retire l'employé des listes actives.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G3-editer-employe.jpg" alt="Modification d'un employé">
+    </div>
+    <figcaption><b>Figure 7.2</b> — La modification d'une fiche employé.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Pour une absence de longue durée, préférez le statut <strong>Congé</strong> à l'archivage : l'employé reste dans la liste de pointage et sa paie continue d'être calculée selon les règles de la ferme.</p></div></div>
+
+  <h2>7.2 La feuille de pointage</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Feuille de Pointage</span> <span class="fleche">➔</span> <span class="btn">Enregistrer un Pointage</span></p>
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Employé</span> et la <span class="champ">Date</span>.</li>
+    <li>Saisissez l'<span class="champ">Heure d'arrivée</span> et l'<span class="champ">Heure de départ</span>.</li>
+    <li>Choisissez le <span class="champ">Statut</span> : <em>Présent</em>, <em>Absent</em>, <em>Retard</em> ou <em>Congé</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le pointage n'est pas décoratif : les <strong>absences saisies ici sont déduites automatiquement</strong> du bulletin de paie du mois. Un pointage oublié est un salaire payé en trop.</p></div></div>
+
+  <h2>7.3 La paie</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Gestion de la Paie</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/67-rh-paie.jpg" alt="Gestion de la paie">
+      <span class="cible" style="left:69.5%;top:50.5%;width:8.5%;height:6.5%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 7.3</b> — Le tableau de paie. <b>1</b> Le net à payer, calculé automatiquement.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Employé, Poste, Salaire brut, Absences, Ret. absences, Ret. CNSS, Ret. ITS, Net à payer, Charges patronales, Statut</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les retenues sont calculées par le logiciel selon la réglementation béninoise : la <strong>CNSS salariale</strong> et l'<strong>ITS</strong> (impôt sur les traitements et salaires, calculé par tranches). Les <strong>charges patronales</strong> — VPS, pensions, prestations familiales, risques professionnels — s'ajoutent au coût employeur.</p>
+  <p>Les taux se règlent dans <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>, et les tranches d'ITS dans <span class="chemin">Barème IR-PTS / ITS</span>.</p></div></div>
+
+  <p>Sur chaque ligne, l'icône <em>document</em> édite le <strong>bulletin de paie</strong> et l'icône <em>paiement</em> enregistre le règlement du salaire.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Le paiement d'un salaire <strong>génère son écriture comptable</strong> et sort l'argent du compte de trésorerie choisi. Vérifiez le net à payer <strong>avant</strong> de cliquer : la correction passe ensuite par le comptable et une écriture de contre-passation.</p></div></div>
+
+  <div class="groupe"><h2>7.4 Les stagiaires</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Registre Stagiaires</span> <span class="fleche">➔</span> <span class="btn">Nouveau Stagiaire</span></p>
+  <ol class="etapes">
+    <li>Saisissez le <span class="champ">Prénom</span>, le <span class="champ">Nom</span> et l'<span class="champ">Établissement d'origine</span>.</li>
+    <li>Indiquez la <span class="champ">Date de début</span> et la <span class="champ">Date de fin</span>.</li>
+    <li>Saisissez les <span class="champ">Frais de stage (FCFA)</span> et cochez <span class="champ">Frais réglé</span> le cas échéant.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+  <p>Les icônes de la ligne permettent d'enregistrer une <strong>absence</strong> et de générer l'<strong>attestation de stage</strong>.</p>
+
+  </div><div class="groupe"><h2>7.5 Les attestations</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Attestations</span></p>
+  <p>Deux boutons : <span class="btn">Générer une Attestation</span> produit le document pour un employé ou un stagiaire ; <span class="btn">Personnaliser les Modèles</span> adapte le texte type de la ferme.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Personnalisez le modèle <strong>une seule fois</strong>, en début de campagne. Toutes les attestations générées ensuite reprennent la même formulation — plus de version différente selon la personne qui l'édite.</p></div></div>
+</div></section>
+
+<!-- =======================  CHAPITRE 8  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">8</div>
+    <div>
+      <h1>Comptabilité</h1>
+      <p class="ch-sous">Plan comptable, journal, grand livre, balances, bilan, TVA, banque, immobilisations et clôture.</p>
+    </div>
+  </div>
+
+  <p class="intro">Ce chapitre s'adresse principalement au <strong>comptable</strong> et à l'<strong>administrateur</strong>. Les autres utilisateurs n'ont pas accès à ces écrans — mais tous alimentent la comptabilité sans le savoir, à chaque vente et à chaque dépense.</p>
+
+  <h2>8.1 Le principe : la comptabilité s'écrit toute seule</h2>
+  <p>C'est le point le plus important du chapitre. Dans AgriERP, <strong>vous ne ressaisissez jamais en comptabilité ce qui a déjà été saisi ailleurs</strong>.</p>
+
+  <p style="text-align:center;font-size:11pt;margin:14pt 0 14pt">
+    <span class="chemin">Une vente au comptoir</span> <span class="fleche">➔</span>
+    <span class="chemin">Écriture SYSCOHADA générée</span> <span class="fleche">➔</span>
+    <span class="chemin">Grand livre</span> <span class="fleche">➔</span>
+    <span class="chemin">Balance</span> <span class="fleche">➔</span>
+    <span class="chemin">Bilan</span>
+  </p>
+
+  <p>Chaque opération de gestion déclenche automatiquement son écriture : vente, achat, dépense, avoir, règlement client, règlement fournisseur, paie, virement interne, écart d'inventaire, acquisition d'immobilisation et dotation aux amortissements.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Tous les rapports comptables — grand livre, balance, bilan, états financiers — sont lus <strong>depuis le grand livre</strong>, jamais recalculés à partir des tables de vente ou d'achat. C'est ce qui garantit qu'un chiffre présenté au bilan est bien celui qui figure au journal.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne ressaisissez <strong>jamais</strong> une vente ou une dépense au journal comptable « pour être sûr » : elle y est déjà. Vous compteriez l'opération deux fois, et l'erreur ne se verrait qu'au bilan.</p>
+  <p>La saisie manuelle au journal est réservée aux écritures qui n'ont <strong>aucun écran métier</strong> : apport en capital, régularisation, opération diverse.</p></div></div>
+
+  <h2>8.2 Le plan comptable</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Plan Comptable</span></p>
+  <p>La liste des comptes SYSCOHADA de la ferme : <strong>N° compte, Intitulé, Classe</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Classe</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1</strong></td><td>Ressources — capital, résultat, emprunts</td></tr>
+      <tr><td><strong>2</strong></td><td>Immobilisations — bâtiments, cages, matériel, amortissements</td></tr>
+      <tr><td><strong>3</strong></td><td>Stocks</td></tr>
+      <tr><td><strong>4</strong></td><td>Tiers — clients, fournisseurs, personnel, État</td></tr>
+      <tr><td><strong>5</strong></td><td>Trésorerie — caisse, banque, mobile money</td></tr>
+      <tr><td><strong>6</strong></td><td>Charges</td></tr>
+      <tr><td><strong>7</strong></td><td>Produits</td></tr>
+    </tbody>
+  </table>
+
+  <p>Pour créer un compte : <span class="btn">Nouveau Compte</span>, puis saisissez le <span class="champ">Numéro de compte</span>, l'<span class="champ">Intitulé</span> et la <span class="champ">Classe</span>.</p>
+
+  <h3>Modifier ou archiver un compte</h3>
+  <p>L'icône <strong>crayon</strong> rouvre la fenêtre, préremplie ; l'icône <strong>archive</strong> retire le compte des listes de sélection.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G4-editer-compte.jpg" alt="Modification d'un compte du plan comptable">
+    </div>
+    <figcaption><b>Figure 8.1</b> — La modification d'un compte SYSCOHADA.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne modifiez <strong>jamais le numéro</strong> d'un compte qui porte déjà des écritures : le grand livre, la balance et le bilan s'appuient dessus. Créez un nouveau compte et archivez l'ancien plutôt que de renuméroter.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le premier chiffre du numéro doit correspondre à la classe choisie : un compte de charges commence par 6, un compte de produits par 7. Un compte mal classé fausse le compte de résultat sans jamais déclencher d'erreur visible.</p></div></div>
+
+  <h2>8.3 Le journal comptable</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Journal Comptable</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/72-journal.jpg" alt="Journal comptable">
+      <span class="cible" style="left:86.0%;top:11.1%;width:12.4%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:75.1%;top:11.0%;width:11.0%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 8.2</b> — Le journal comptable. <b>1</b> Saisie d'écriture manuelle — <b>2</b> Export PDF.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>N° pièce, Date, Libellé, Débit, Crédit, Montant</strong>.</p>
+
+  <h3>Saisir une écriture manuelle</h3>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Saisie d'Écriture</span>.</li>
+    <li>Indiquez la <span class="champ">Date de l'écriture</span>.</li>
+    <li>Saisissez un <span class="champ">Libellé</span> explicite.</li>
+    <li>Choisissez le <span class="champ">Compte à débiter</span>.</li>
+    <li>Choisissez le <span class="champ">Compte à créditer</span>.</li>
+    <li>Saisissez le <span class="champ">Montant (FCFA)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Trois contrôles sont appliqués <strong>avant</strong> tout enregistrement, et l'écriture est refusée si l'un échoue :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>le <strong>total débit doit égaler le total crédit</strong>, au franc près ;</li>
+    <li>le compte débité doit être <strong>différent</strong> du compte crédité ;</li>
+    <li>la date doit tomber dans un <strong>exercice ouvert</strong>.</li>
+  </ul>
+  <p>Aucune écriture déséquilibrée n'entre jamais en base — même partiellement.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le message <strong>« exercice clos »</strong> signifie que vous tentez d'écrire à une date déjà arrêtée. Ce n'est pas une panne. Deux solutions : passer l'écriture à une date de l'exercice ouvert, ou demander à l'administrateur une déclôture exceptionnelle (section 8.9).</p></div></div>
+
+  <h2>8.4 Le grand livre</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Grand Livre</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/73-grand-livre.jpg" alt="Grand livre">
+      <span class="cible" style="left:22.9%;top:24.5%;width:32.0%;height:6.5%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 8.3</b> — Le grand livre. <b>1</b> Sélection du compte à consulter.</figcaption>
+  </figure>
+
+  <p>Choisissez un compte dans la liste <span class="champ">Compte</span> : toutes ses écritures s'affichent avec <strong>Date, N° pièce, Libellé, Débit, Crédit</strong> et un <strong>solde progressif</strong> ligne à ligne.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'outil de contrôle par excellence. Un solde de caisse qui vous surprend ? Ouvrez le compte 531 au grand livre et remontez les lignes : l'opération fautive saute aux yeux, avec sa date et son libellé.</p></div></div>
+
+  <h2>8.5 Les balances</h2>
+
+  <h3>Balance générale</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Balance Générale</span></p>
+  <p>Pour la <span class="champ">Période</span> choisie, chaque compte est présenté avec son <strong>solde d'ouverture</strong>, ses <strong>mouvements de la période</strong> (débit et crédit) et son <strong>solde final</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Sur une balance juste, le <strong>total des débits égale le total des crédits</strong>. C'est le premier contrôle à faire avant toute clôture.</p></div></div>
+
+  <h3>Balance âgée</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Balance Âgée</span></p>
+  <p>Choisissez le <span class="champ">Volet</span> (clients ou fournisseurs) et la date d'<span class="champ">Arrêté au</span>. Les montants sont ventilés par ancienneté : <strong>Non échu, 1 à 30 jours, 31 à 60, 61 à 90, plus de 90 jours</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>La colonne <strong>plus de 90 jours</strong> est votre liste de recouvrement prioritaire. Éditez-la en début de mois et travaillez-la avec l'écran <span class="chemin">Relances Clients</span>.</p></div></div>
+
+  <h2>8.6 Bilan et états financiers</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Bilan Simplifié</span> présente l'actif et le passif de la ferme à une date donnée.</p>
+  <p><span class="chemin">États Financiers</span> réunit quatre onglets. Le bouton <span class="btn">Exporter PDF (Onglet Actif)</span> édite <strong>uniquement l'onglet affiché</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bilan</strong></td><td><em>Actif (emplois)</em> face à <em>Passif (ressources)</em> à la date d'arrêté.</td></tr>
+      <tr><td><strong>Compte de Résultat</strong></td><td>La structure <strong>en cascade SYSCOHADA</strong> : des produits d'exploitation jusqu'au résultat net, soldes intermédiaires compris.</td></tr>
+      <tr><td><strong>Flux de Trésorerie</strong></td><td>Le <strong>TAFIRE simplifié</strong> : d'où vient l'argent, où il est parti.</td></tr>
+      <tr><td><strong>Notes Annexes</strong></td><td>Le détail des postes du bilan, actif et passif.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D1-etats-resultat.jpg" alt="Compte de résultat en cascade SYSCOHADA">
+    </div>
+    <figcaption><b>Figure 8.4</b> — Le compte de résultat, en structure de cascade SYSCOHADA.</figcaption>
+  </figure>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D2-etats-flux.jpg" alt="Tableau des flux de trésorerie">
+    </div>
+    <figcaption><b>Figure 8.5</b> — Le tableau des flux de trésorerie (TAFIRE simplifié).</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un résultat positif au compte de résultat <strong>ne signifie pas</strong> qu'il y a de l'argent en caisse. Le compte de résultat mesure l'activité, le tableau des flux mesure la trésorerie. Une ferme peut être bénéficiaire et à court d'argent si ses clients ne l'ont pas encore payée — lisez toujours les deux ensemble.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Un bilan qui ne s'équilibre pas signale presque toujours un exercice non clôturé ou une écriture d'ouverture manquante. N'ajustez rien à la main : reprenez d'abord la balance générale.</p></div></div>
+
+  <h2>8.7 TVA, banque et immobilisations</h2>
+
+  <h3>Déclaration de TVA</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Déclaration TVA</span></p>
+  <p>Choisissez la <span class="champ">Période de déclaration</span>. L'écran présente la <strong>TVA collectée</strong> (sur les ventes) et la <strong>TVA déductible</strong> (sur les achats), puis le solde à payer. Le bouton <span class="btn">Générer la Déclaration PDF</span> édite le document.</p>
+
+  <h3>Rapprochement bancaire</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Rapprochement Bancaire</span></p>
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Compte</span> bancaire concerné.</li>
+    <li>Cliquez sur <span class="btn">Importer un Relevé (CSV)</span> et sélectionnez le fichier fourni par la banque.</li>
+    <li>Rapprochez les lignes du relevé et celles du logiciel.</li>
+    <li>Analysez les lignes non rapprochées : ce sont les écarts à expliquer.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une ligne présente sur le relevé mais absente du logiciel est une opération <strong>non saisie</strong> (frais bancaires, virement reçu). Une ligne présente dans le logiciel mais absente du relevé est une opération <strong>en cours</strong> (chèque non encaissé) — ou une erreur de saisie.</p></div></div>
+
+  <h3>Immobilisations</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Immobilisations</span></p>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvelle Immobilisation</span>.</li>
+    <li>Saisissez le <span class="champ">Code</span> et la <span class="champ">Désignation</span>.</li>
+    <li>Choisissez la <span class="champ">Nature (compte de classe 2)</span> : bâtiments, cages et matériel d'élevage, broyeurs et équipements.</li>
+    <li>Indiquez la <span class="champ">Date d'acquisition</span>, la <span class="champ">Valeur d'acquisition (FCFA)</span> et la <span class="champ">Valeur résiduelle</span>.</li>
+    <li>Saisissez la <span class="champ">Durée d'amortissement (ans)</span>.</li>
+    <li>Choisissez la <span class="champ">Comptabilisation de l'acquisition</span> : <em>reprise d'antériorité</em> (aucune écriture), <em>payé par caisse</em>, <em>par compte bancaire</em>, <em>par mobile money</em>, ou <em>à crédit — dette fournisseur</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+  <p>Le bouton <span class="btn">Passer la Dotation</span> génère l'écriture d'amortissement de la période. Le tableau suit la <strong>valeur brute</strong>, l'<strong>amortissement cumulé</strong> et la <strong>valeur nette comptable (V.N.C.)</strong>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Choisissez <em>Reprise d'antériorité</em> pour un bien <strong>déjà possédé avant l'informatisation</strong> : aucune écriture ne sera générée. Choisir un mode de paiement pour un bien ancien ferait sortir de l'argent d'un compte de trésorerie aujourd'hui, pour un achat fait il y a trois ans.</p></div></div>
+
+  <h3>Comptabilité analytique</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Comptabilité Analytique</span> répartit le chiffre d'affaires, les charges et la marge <strong>par filière</strong> : aviculture, cuniculture, porciculture, maraîchage.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le tableau à présenter en conseil d'exploitation : il montre en une page quelle filière porte la ferme et laquelle consomme sans rendre.</p></div></div>
+
+  <h2>8.8 La clôture périodique (mensuelle)</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Clôture d'Exercice</span> <span class="fleche">➔</span> <span class="chemin">Clôture Périodique</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/82-cloture.jpg" alt="Clôture d'exercice">
+      <span class="cible" style="left:21.9%;top:21.2%;width:11.4%;height:5.0%"><b>1</b></span>
+      <span class="cible" style="left:33.2%;top:21.2%;width:10.5%;height:5.0%"><b>2</b></span>
+      <span class="cible bas" style="left:21.9%;top:54.2%;width:76.4%;height:5.2%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 8.6</b> — La clôture. <b>1</b> Périodique — <b>2</b> Annuelle — <b>3</b> Clôturer le mois.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Vérifiez que la balance générale du mois est équilibrée.</li>
+    <li>Choisissez le <span class="champ">Mois à clôturer</span>.</li>
+    <li>Cliquez sur <span class="btn">Clôturer le Mois Sélectionné</span>.</li>
+  </ol>
+
+  <p>Une fois le mois clôturé, <strong>plus aucune écriture ne peut y être passée</strong>. Le tableau conserve la trace de chaque clôture : <strong>Mois, Date de clôture, Statut</strong>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Avant de clôturer, assurez-vous que <strong>toutes les pièces du mois sont saisies</strong> : dernières ventes, dernières dépenses, factures fournisseurs reçues en retard. Une pièce oubliée devra faire l'objet d'une déclôture, opération exceptionnelle et tracée.</p></div></div>
+
+  <p>Le bouton <span class="btn">Déclôturer (exceptionnel)</span> est réservé à l'administrateur. Son usage est enregistré au journal d'audit.</p>
+
+  <h2>8.9 La clôture annuelle</h2>
+  <p><span class="chemin">Clôture d'Exercice</span> <span class="fleche">➔</span> <span class="chemin">Clôture Annuelle</span></p>
+  <p>La clôture annuelle arrête définitivement l'exercice, calcule le résultat et l'affecte, puis ouvre l'exercice suivant avec les à-nouveaux. Un <strong>assistant</strong> vous guide pas à pas.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F5-cloture-annuelle.jpg" alt="Assistant de clôture d'exercice">
+    </div>
+    <figcaption><b>Figure 8.7</b> — L'assistant de clôture d'exercice, ici de 2026 vers 2027.</figcaption>
+  </figure>
+
+  <p>L'écran rappelle en permanence trois éléments : l'<strong>exercice sélectionné</strong>, le <strong>résultat provisoire</strong> calculé à cet instant, et le nombre de <strong>comptes de gestion à solder</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>résultat provisoire</strong> s'affiche avant toute validation. Comparez-le au résultat du compte de résultat : s'ils diffèrent, une écriture manque ou un mois n'est pas clôturé. Ne poursuivez pas tant que les deux ne concordent pas.</p></div></div>
+
+  <div class="note alerte longue"><span class="ico">🛑</span><div><b>Alerte</b><p>La clôture annuelle est l'opération <strong>la plus lourde et la moins réversible</strong> du logiciel. Avant de la lancer :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>générez une <strong>sauvegarde complète</strong> (<span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Sauvegardes</span>) et <strong>téléchargez-la hors du serveur</strong> ;</li>
+    <li>vérifiez que <strong>tous les mois de l'exercice sont clôturés</strong> ;</li>
+    <li>éditez et archivez le bilan, le compte de résultat et la balance générale ;</li>
+    <li>faites valider l'ensemble par le comptable et la direction.</li>
+  </ul>
+  <p>Ne lancez jamais cette opération seul, un vendredi soir, sans sauvegarde téléchargée.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 9  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">9</div>
+    <div>
+      <h1>Rapports &amp; Exports</h1>
+      <p class="ch-sous">Éditer les états de synthèse et les sortir en PDF ou en Excel.</p>
+    </div>
+  </div>
+
+  <div class="groupe"><h2>9.1 Le rapport mensuel de synthèse</h2>
+  <p><span class="chemin">Rapport Mensuel</span></p>
+  <p>Un tableau unique compare, indicateur par indicateur, <strong>le mois en cours</strong> et <strong>le mois précédent</strong>, avec la variation en pourcentage. Le bouton <span class="btn">Exporter PDF</span> édite le document.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le document de pilotage mensuel : éditez-le le 1<sup>er</sup> de chaque mois et classez-le. Douze exemplaires font une année d'historique lisible en dix minutes.</p></div></div>
+
+  </div><h2>9.2 Les six rapports du hub</h2>
+  <p><span class="chemin">Rapports &amp; Exports</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/86-rapports-tresorerie.jpg" alt="Rapports et exports">
+      <span class="cible" style="left:74.6%;top:23.2%;width:11.0%;height:5.4%"><b>1</b></span>
+      <span class="cible" style="left:85.4%;top:23.2%;width:11.6%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:21.9%;top:33.1%;width:14.9%;height:5.9%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 9.1</b> — Le hub des rapports. <b>1</b> Export PDF — <b>2</b> Export Excel — <b>3</b> Choix du rapport.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:34%">Rapport</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Recettes et Dépenses</strong></td><td>Toutes les entrées et sorties de la période, ligne par ligne.</td></tr>
+      <tr><td><strong>État de Trésorerie</strong></td><td>Solde caisse, solde banque et solde total, jour par jour.</td></tr>
+      <tr><td><strong>Créances Clients</strong></td><td>Ce que les clients doivent, avec les échéances.</td></tr>
+      <tr><td><strong>Dettes Fournisseurs</strong></td><td>Ce que la ferme doit, avec les échéances.</td></tr>
+      <tr><td><strong>Rapport Élevage</strong></td><td>Trois tableaux distincts (voir ci-dessous).</td></tr>
+      <tr><td><strong>Rapport de Stocks</strong></td><td>Valeur du stock par catégorie et articles sous seuil.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Les trois tableaux du rapport Élevage</h3>
+  <p>Deux indicateurs coiffent l'écran : le <strong>taux de ponte moyen</strong> et le <strong>taux de mortalité hebdomadaire</strong>. En dessous, trois tableaux se sélectionnent par un bouton.</p>
+
+  <table>
+    <thead><tr><th style="width:28%">Tableau</th><th>Colonnes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1 — Recensement</strong></td><td><em>Date, Lot / souche, Effectif M, Effectif F, Sous mères, Sevrés, Achats, Nés, Morts, Effectif final</em></td></tr>
+      <tr><td><strong>2 — Mouvements, traitements &amp; ventes</strong></td><td><em>Date, Lot, Sexe vendu, Qté vendue, Montant vente (FCFA), Effectif final, Traitement administré, Dose, Signes de maladie observés</em></td></tr>
+      <tr><td><strong>3 — Suivi de la ponte</strong></td><td><em>Âge (sem.), Jour, Lot, Total œufs récoltés (OR), Taux ponte %, Cassés/fêlés (OF), Commercialisables (OR-OF), Stock restant hier (SRH), Total stock (TS), Sorties vente OS (plateaux), Stock final</em></td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F4-rapport-elevage-t3.jpg" alt="Tableau de suivi de la ponte">
+    </div>
+    <figcaption><b>Figure 9.2</b> — Le tableau 3 : le suivi de la ponte, jour par jour et lot par lot.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Ces trois tableaux reprennent <strong>exactement la structure des registres papier</strong> de la ferme. Ils sont conçus pour être imprimés et classés tels quels, sans remise en forme.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>L'export PDF ne prend que <strong>le tableau affiché</strong>. Pour un dossier complet, exportez les trois l'un après l'autre.</p></div></div>
+
+  <h2>9.3 Exporter</h2>
+  <ul class="puces">
+    <li><span class="btn">Exporter PDF</span> — document mis en page, avec l'en-tête officiel de la ferme. À imprimer, à signer, à archiver.</li>
+    <li><span class="btn">Exporter Excel</span> — fichier de données réutilisable, pour un calcul complémentaire ou un envoi au partenaire.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'export reprend <strong>exactement la période et les filtres affichés à l'écran</strong>. Vérifiez donc vos dates <em>avant</em> d'exporter : un PDF sorti sur la mauvaise période ressemble en tout point à un PDF juste.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 10  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">10</div>
+    <div>
+      <h1>Paramètres &amp; Administration</h1>
+      <p class="ch-sous">Réservé à l'administrateur : entreprise, utilisateurs, rôles, modules, sauvegardes et journal d'audit.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Paramètres</span> compte neuf onglets. Les réglages qui y sont faits s'appliquent à <strong>toute la ferme et à tous les utilisateurs</strong> — d'où la restriction au rôle administrateur.</p>
+
+  <h2>10.1 Données de l'entreprise</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span></p>
+
+  <h3>Identité</h3>
+  <ul class="puces">
+    <li><span class="champ">Raison sociale</span>, <span class="champ">Nom du promoteur</span>, <span class="champ">Adresse du siège d'exploitation</span></li>
+    <li><span class="champ">Téléphone principal</span>, <span class="champ">Email de contact</span></li>
+    <li><span class="champ">Identifiant fiscal unique (IFU)</span> et <span class="champ">Registre du commerce (RCCM)</span></li>
+  </ul>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>L'IFU et le RCCM figurent sur <strong>toutes les factures</strong> éditées par le logiciel. Une erreur ici se retrouve sur chaque document remis à un client ou à l'administration fiscale.</p></div></div>
+
+  <h3>Envoi d'e-mails (SMTP)</h3>
+  <p><span class="champ">Serveur SMTP</span>, <span class="champ">Port</span>, <span class="champ">Sécurité</span>, <span class="champ">Utilisateur SMTP</span>, <span class="champ">Mot de passe</span>. Le bouton <span class="btn">Envoyer un e-mail de test</span> vérifie la configuration <strong>avant</strong> qu'un client ne reçoive rien.</p>
+
+  <h3>Charges sociales</h3>
+  <p>Les taux utilisés par la paie : <span class="champ">CNSS salariale (%)</span>, <span class="champ">VPS — versement patronal sur salaires (%)</span>, <span class="champ">CNSS patronale — pensions (%)</span>, <span class="champ">— prestations familiales (%)</span>, <span class="champ">— risques professionnels (%)</span>.</p>
+
+  <p>Terminez toujours par <span class="btn">Enregistrer les Modifications</span>.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne modifiez un taux de charge sociale <strong>qu'après publication officielle</strong> d'un nouveau barème. Un taux changé en cours d'année rend les bulletins du mois incohérents avec ceux des mois précédents.</p></div></div>
+
+  <h2>10.2 Les utilisateurs</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Gestion Utilisateurs</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/93-param-utilisateurs.jpg" alt="Gestion des utilisateurs">
+      <span class="cible" style="left:85.2%;top:24.6%;width:13.2%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:23.0%;top:10.6%;width:14.2%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 10.1</b> — La gestion des utilisateurs. <b>1</b> Créer un compte — <b>2</b> Onglet Rôles &amp; Permissions.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvel Utilisateur</span>.</li>
+    <li>Saisissez le <span class="champ">Nom complet</span>.</li>
+    <li>Saisissez le <span class="champ">Nom d'utilisateur</span> — l'identifiant court de connexion (par exemple <em>caisse</em>).</li>
+    <li>Saisissez l'<span class="champ">Email</span> : il sert à la réinitialisation du mot de passe.</li>
+    <li>Choisissez le <span class="champ">Rôle</span> : <em>Admin</em>, <em>Animalier</em>, <em>Caissier</em> ou <em>Comptable</em>.</li>
+    <li>Saisissez un <span class="champ">Mot de passe</span> provisoire (8 caractères minimum, avec lettre, chiffre et symbole).</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p><strong>Un compte par personne.</strong> Un compte « caisse » partagé par trois vendeuses rend le journal d'audit inutilisable : plus personne ne peut dire qui a saisi quoi le jour où un écart apparaît.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Demandez à chaque nouvel utilisateur de changer son mot de passe provisoire dès sa première connexion, depuis <span class="chemin">Mon Profil</span>.</p></div></div>
+
+  <p>Un utilisateur qui quitte la ferme s'<strong>archive</strong> (icône <em>archive</em>) — il ne se supprime pas. Son historique d'actions reste consultable.</p>
+
+  <div class="groupe"><h2>10.3 Rôles et permissions</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Rôles &amp; Permissions</span></p>
+  <p>Une matrice croise les quatre rôles et les modules : <strong>Dashboard, Ventes &amp; Devis, Achats &amp; Charges, Stocks, Élevage &amp; Soins, RH, Comptabilité, Administration, Paramètres</strong>.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne retirez jamais une permission au rôle <strong>Admin</strong> : vous risquez de vous fermer l'accès aux paramètres, y compris celui qui permettrait de corriger l'erreur.</p></div></div>
+
+  </div><div class="groupe"><h2>10.4 Modules actifs</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modules Actifs</span></p>
+  <p>Chaque filière d'élevage — cuniculture, aviculture, porciculture, héliciculture — s'active ou se désactive ici. Un module désactivé disparaît du menu et ses fiches affichent « Module non activé ».</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Désactiver un module <strong>ne supprime aucune donnée</strong> : les bandes et les fiches restent en base et réapparaissent intactes à la réactivation.</p></div></div>
+
+  </div><h2>10.5 Modes de paiement</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modes de Paiement</span></p>
+  <ul class="puces">
+    <li><span class="btn">Ajouter un Compte Bancaire</span> — un nouveau compte de trésorerie bancaire.</li>
+    <li><span class="btn">Ajouter une Ligne Mobile Money</span> — une ligne MTN ou Moov.</li>
+    <li><span class="btn">Virement Interne</span> — un mouvement d'un compte à un autre, par exemple un dépôt d'espèces de la caisse vers la banque.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>virement interne</strong> ne change pas la trésorerie totale de la ferme : il déplace de l'argent d'un compte vers un autre. Utilisez-le systématiquement pour les dépôts en banque, sinon la caisse restera créditée d'un argent qui n'y est plus.</p></div></div>
+
+  <div class="groupe"><h2>10.6 Barème IR-PTS / ITS</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Barème IR-PTS / ITS</span></p>
+  <p>Les tranches d'imposition sur les salaires : <strong>De (FCFA), À (FCFA), Taux (%)</strong>. Utilisez <span class="btn">Ajouter une tranche</span> puis <span class="btn">Enregistrer le barème</span>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Les tranches doivent être <strong>continues et sans chevauchement</strong> : la borne haute d'une tranche est la borne basse de la suivante. Un trou dans le barème produit un impôt calculé faux, sans message d'erreur.</p></div></div>
+
+  </div><div class="groupe"><h2>10.7 Intégrations e-mail et SMS</h2>
+  <p><span class="chemin">Paramètres Intégrations</span></p>
+  <p>Deux blocs indépendants : la <strong>configuration SMTP</strong> (hôte, port, sécurité, identifiant, mot de passe, adresse d'expédition) et la <strong>configuration SMS</strong> (fournisseur et identifiants). Le bouton <span class="btn">Tester</span> vérifie la liaison.</p>
+
+  </div><h2>10.8 Les sauvegardes</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Sauvegardes</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/96-param-sauvegardes.jpg" alt="Sauvegardes de la base de données">
+      <span class="cible" style="left:85.1%;top:25.3%;width:13.6%;height:6.1%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 10.2</b> — Les sauvegardes. <b>1</b> Générer une sauvegarde immédiate.</figcaption>
+  </figure>
+
+  <p>Une sauvegarde automatique est produite <strong>chaque nuit à 2 h</strong>. Le bouton <span class="btn">Générer une sauvegarde</span> en crée une immédiatement, avant une opération sensible.</p>
+  <p>Les boutons <span class="btn">Exporter ce module</span> et <span class="btn">Importer</span> permettent de transférer les données d'un module précis.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Une sauvegarde laissée sur le serveur ne protège de rien.</strong> L'incendie, le vol du serveur ou la panne de disque emportent la base <em>et</em> ses sauvegardes.</p>
+  <p>Téléchargez la sauvegarde <strong>chaque semaine</strong> sur un support extérieur — clé USB, disque externe, espace en ligne. Un rappel hebdomadaire est envoyé à l'administrateur ; ne l'ignorez pas.</p></div></div>
+
+  <h2>10.9 Restauration (la corbeille)</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span></p>
+  <p>Tout ce qui a été archivé dans le logiciel se retrouve ici : <strong>Type, Élément, Module, Archivé le</strong>. L'action de restauration remet l'élément en service.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un client, un produit, un fournisseur ou une bande archivés par erreur se récupèrent en un clic. C'est la raison pour laquelle AgriERP <strong>archive au lieu de supprimer</strong>.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Les <strong>écritures comptables ne figurent pas</strong> dans la corbeille, et c'est volontaire : une écriture ne se restaure pas, elle se <strong>contre-passe</strong>. La faire réapparaître dans un exercice éventuellement clos déséquilibrerait le grand livre.</p></div></div>
+
+  <div class="groupe"><h2>10.10 Réinitialisation</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Réinitialisation</span></p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Cet écran efface des données de façon définitive.</strong> Il sert à repartir d'une base propre après une phase de test — jamais en exploitation courante.</p>
+  <p>Ne l'utilisez que sur instruction écrite de la direction, après avoir généré <strong>et téléchargé</strong> une sauvegarde complète. Aucune corbeille, aucune restauration ne rattrape cette opération.</p></div></div>
+
+  </div><div class="groupe"><h2>10.11 Le journal d'audit</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Audit Logs</span></p>
+  <p>Chaque action sensible y est tracée : <strong>Horodatage, Utilisateur, Action, Module</strong>. Le bouton <span class="btn">Exporter le Journal</span> édite l'historique.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le premier écran à ouvrir en cas de doute : « qui a annulé cette vente ? », « quand ce mois a-t-il été déclôturé ? ». Les connexions échouées y figurent également — plusieurs échecs successifs sur un même compte méritent une vérification.</p></div></div>
+
+  </div><h2>10.12 Documents, courriers et archivage</h2>
+  <p><span class="chemin">Administration</span> — trois onglets.</p>
+  <ul class="puces">
+    <li><strong>Documents Administratifs</strong> — <em>Document, Type, Bénéficiaire, Date, Statut</em>.</li>
+    <li><strong>Gestion des Courriers</strong> — <em>Référence, Type, Objet, Partie, Date</em>. Le bouton <span class="btn">Nouveau Courrier</span> demande le <span class="champ">Type</span> (<em>Entrant</em> ou <em>Sortant</em>), l'<span class="champ">Objet</span>, l'<span class="champ">Expéditeur / destinataire</span> et la <span class="champ">Date</span>.</li>
+    <li><strong>Archivage des Documents</strong> — <em>Document, Catégorie, Date archivage, Expiration, Statut</em>.</li>
+  </ul>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Renseignez la <strong>date d'expiration</strong> des documents à durée limitée — agrément, assurance, contrat. Le logiciel vous préviendra avant l'échéance, ce que le classeur papier ne fait pas.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 11  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">11</div>
+    <div>
+      <h1>Aide, contact et assistance</h1>
+      <p class="ch-sous">Trouver une réponse seul, puis joindre l'éditeur quand c'est nécessaire.</p>
+    </div>
+  </div>
+
+  <h2>11.1 Aide &amp; À Propos</h2>
+  <p>Cliquez sur votre nom en haut à droite <span class="fleche">➔</span> <span class="chemin">Aide &amp; À Propos</span>.</p>
+
+  <p>L'écran s'ouvre sur l'identité du logiciel : le nom, le <strong>numéro de version installé</strong>, la ferme destinataire et l'éditeur. C'est le premier renseignement à donner en cas de demande d'assistance.</p>
+
+  <h3>Les modules du logiciel</h3>
+  <p>Une grille de cartes présente chaque module avec une courte description. <strong>Chaque carte est un raccourci</strong> : un clic ouvre directement l'écran correspondant.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C5-aide-modules.jpg" alt="Grille des modules dans Aide et À Propos">
+    </div>
+    <figcaption><b>Figure 11.1</b> — La grille des modules : une description et un raccourci par module.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'écran à montrer à un nouvel arrivant le premier jour : en une page, il voit tout ce que le logiciel couvre et peut ouvrir chaque module d'un clic pour se repérer.</p></div></div>
+
+  <h3>La foire aux questions</h3>
+  <p>La partie basse de l'écran regroupe les questions les plus fréquentes.</p>
+
+  <ol class="etapes">
+    <li>Tapez un mot dans le champ <span class="champ">Rechercher dans l'aide</span> — par exemple <em>facture</em>, <em>stock</em> ou <em>paie</em>. La liste se filtre pendant que vous tapez.</li>
+    <li>Cliquez sur une question : la réponse se déplie en dessous.</li>
+    <li>Cliquez à nouveau pour la replier.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C6-aide-faq.jpg" alt="Foire aux questions dépliée">
+    </div>
+    <figcaption><b>Figure 11.2</b> — Une question dépliée dans la foire aux questions.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La recherche porte à la fois sur <strong>la question et sur le texte de la réponse</strong>. Si un mot vous vient à l'esprit, tapez-le : la bonne entrée remonte même s'il ne figure pas dans le titre.</p></div></div>
+
+  <h2>11.2 Contacter l'éditeur</h2>
+  <p>Cliquez sur votre nom en haut à droite <span class="fleche">➔</span> <span class="chemin">Contactez l'Éditeur</span>.</p>
+  <p>L'écran comporte deux onglets — <strong>Envoyer un Message</strong> et <strong>Signaler un Bug</strong> — et un encadré permanent avec les coordonnées de l'éditeur.</p>
+
+  <h3>Envoyer un message</h3>
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C7-contact-message.jpg" alt="Formulaire de message à l'éditeur">
+    </div>
+    <figcaption><b>Figure 11.3</b> — L'onglet <em>Envoyer un Message</em> et les coordonnées de l'éditeur, à droite.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Saisissez l'<span class="champ">Objet</span> de votre message (150 caractères au maximum).</li>
+    <li>Rédigez le <span class="champ">Message</span>.</li>
+    <li>Cliquez sur <span class="btn">Envoyer le Message</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Votre <strong>nom et votre adresse e-mail sont joints automatiquement</strong> : inutile de les recopier dans le message. L'éditeur sait donc toujours qui écrit, et peut vous répondre directement.</p></div></div>
+
+  <h3>Signaler un bug</h3>
+  <p>Utilisez cet onglet quand le logiciel <strong>ne se comporte pas comme prévu</strong> : un bouton sans effet, un chiffre manifestement faux, un message d'erreur inattendu.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C8-contact-bug.jpg" alt="Formulaire de signalement de bug">
+    </div>
+    <figcaption><b>Figure 11.4</b> — L'onglet <em>Signaler un Bug</em>, avec la pièce jointe.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Module concerné</span> : <em>Élevage &amp; Soins</em>, <em>Ventes &amp; POS</em>, <em>Stocks</em>, <em>Comptabilité</em>, <em>Ressources Humaines</em> ou <em>Autre</em>.</li>
+    <li>Rédigez la <span class="champ">Description du problème</span>.</li>
+    <li>Décrivez les <span class="champ">Étapes pour reproduire</span> : ce que vous avez fait, dans l'ordre, avant que le problème n'apparaisse.</li>
+    <li>Cliquez sur <span class="champ">Joindre une capture d'écran</span> et choisissez votre image (JPG ou PNG, 4 Mo au maximum).</li>
+    <li>Cliquez sur <span class="btn">Signaler le Bug</span>.</li>
+  </ol>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un bon signalement tient en trois phrases :</p>
+  <p><em>« Sur l'écran Enregistrer Vente, j'ajoute un plateau d'œufs puis je clique sur Valider la Vente. Un message rouge s'affiche : “Le panier est vide.” Le panier contient pourtant bien un article. »</em></p>
+  <p>Écran, geste, message exact. Avec la capture jointe, c'est traité en quelques minutes.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Pour faire une capture d'écran sous Windows, appuyez sur la touche <strong>Impr. écran</strong>, ou utilisez <strong>Windows + Maj + S</strong> pour ne sélectionner qu'une zone. Enregistrez l'image, puis joignez-la au signalement.</p></div></div>
+
+  <h3>Les coordonnées de l'éditeur</h3>
+  <p>Elles restent affichées à droite des deux onglets.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Élément</th><th>Valeur</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Éditeur</strong></td><td>Dr MASSENON Rhodes — Docteur en Génie Logiciel et IA</td></tr>
+      <tr><td><strong>E-mail</strong></td><td>rarhodes06@gmail.com</td></tr>
+      <tr><td><strong>E-mail</strong></td><td>contact@massenonrhodes.com</td></tr>
+      <tr><td><strong>Téléphone</strong></td><td>+229 01 51 33 50 40</td></tr>
+      <tr><td><strong>Mobile</strong></td><td>+229 01 97 31 24 37</td></tr>
+      <tr><td><strong>Horaires</strong></td><td>Du lundi au vendredi, 8 h – 17 h (GMT)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le formulaire envoie un <strong>e-mail réel</strong>. Il suppose donc que la configuration d'envoi a été faite : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>, bloc SMTP. Si l'envoi échoue, utilisez directement les adresses ci-dessus.</p></div></div>
+
+  <h2>11.3 Qui fait quoi autour d'AgriERP</h2>
+  <p>Trois structures interviennent sur ce logiciel, avec des rôles distincts. Savoir à qui s'adresser fait gagner du temps.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Structure</th><th style="width:26%">Rôle</th><th>À contacter pour</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>PAEB</strong><br><span style="font-size:9pt;color:var(--muted)">Projet d'Appui à l'Entrepreneuriat au Bénin</span></td>
+        <td>Maîtrise d'ouvrage</td>
+        <td>Le cadre du projet, son financement et son périmètre.</td>
+      </tr>
+      <tr>
+        <td><strong>Cabinet FAGUEZ SARL</strong></td>
+        <td>Accompagnement des PME</td>
+        <td>L'appui à la ferme dans le cadre du PAEB : organisation, gestion, suivi comptable et validation des paramètres réglementaires — notamment le <strong>barème IR-PTS / ITS</strong> avant toute paie réelle (section 10.6).</td>
+      </tr>
+      <tr>
+        <td><strong>Dr MASSENON Rhodes</strong><br><span style="font-size:9pt;color:var(--muted)">Docteur en Génie Logiciel et IA</span></td>
+        <td>Éditeur du logiciel</td>
+        <td>Tout ce qui touche au fonctionnement d'AgriERP : anomalie, question d'utilisation, évolution (section 11.2).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La règle simple : <strong>un écran qui se comporte mal</strong> relève de l'éditeur ; <strong>un chiffre réglementaire à valider</strong> — taux de charges sociales, tranches d'impôt, plan comptable — relève du cabinet d'accompagnement. Le logiciel applique ce qu'on lui donne, il ne décide pas d'un barème fiscal.</p></div></div>
+
+  <h2>11.4 Que faire avant d'appeler</h2>
+  <p>Trois réflexes règlent la plupart des situations, et vous feront gagner du temps :</p>
+
+  <ol class="etapes">
+    <li><strong>Actualisez la page</strong> (touche F5). Un affichage figé disparaît souvent ainsi.</li>
+    <li><strong>Consultez la foire aux questions</strong> (section 11.1) et l'<strong>annexe B</strong> de ce manuel : les cas les plus fréquents y sont déjà traités.</li>
+    <li><strong>Vérifiez votre rôle</strong> (annexe A). Un écran absent ou une action refusée est le plus souvent une question de droits, pas une panne.</li>
+  </ol>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Si vous devez appeler, ayez sous les yeux : le <strong>numéro de version</strong> (écran Aide &amp; À Propos), le <strong>nom de l'écran</strong> concerné et le <strong>message exact</strong> affiché. Ces trois éléments suffisent presque toujours au diagnostic.</p></div></div>
+</section>
+
+<!-- =======================  ANNEXES  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">A</div>
+    <div>
+      <h1>Annexes</h1>
+      <p class="ch-sous">Matrice des rôles, dépannage, glossaire et rappels de sécurité.</p>
+    </div>
+  </div>
+
+  <h2>Annexe A — Qui peut faire quoi</h2>
+  <table>
+    <thead><tr>
+      <th style="width:30%">Module</th><th>Admin</th><th>Comptable</th><th>Caissier</th><th>Animalier</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Tableau de bord</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td></tr>
+      <tr><td>Notifications, profil, aide</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td></tr>
+      <tr><td>Élevage &amp; soins</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="oui">✔</td></tr>
+      <tr><td>Ventes &amp; devis</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Clients &amp; créances</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Facturation &amp; MeCeF</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Achats &amp; dépenses</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Stocks &amp; produits</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Personnel &amp; stages</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Comptabilité</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Clôture d'exercice</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Rapports &amp; exports</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Administration &amp; paramètres</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le caissier peut <strong>exporter</strong> ses ventes et l'animalier <strong>archiver</strong> ses bandes : ces droits particuliers s'ajoutent aux accès du tableau ci-dessus.</p></div></div>
+
+  <h2>Annexe B — Que faire si…</h2>
+  <table>
+    <thead><tr><th style="width:38%">Situation</th><th>Ce qu'il faut faire</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Je n'arrive pas à me connecter</strong></td><td>Vérifiez la casse du mot de passe et la touche Verr. Maj. Utilisez <em>Mot de passe oublié ?</em>. Après plusieurs échecs, contactez l'administrateur : le compte peut avoir été désactivé.</td></tr>
+      <tr><td><strong>Un écran n'apparaît pas dans mon menu</strong></td><td>Votre rôle ne l'autorise pas (annexe A). Ce n'est pas une panne.</td></tr>
+      <tr><td><strong>« Vente interdite — rémanence vétérinaire »</strong></td><td>La bande est sous délai d'attente après un traitement. Retirez l'article du panier et prévenez le chef d'élevage.</td></tr>
+      <tr><td><strong>« Stock insuffisant »</strong></td><td>La vente reste possible. Signalez l'écart pour un ajustement d'inventaire (section 5.3).</td></tr>
+      <tr><td><strong>« Exercice clos »</strong></td><td>La date de l'écriture tombe dans un mois déjà clôturé. Changez la date, ou demandez une déclôture à l'administrateur.</td></tr>
+      <tr><td><strong>Écriture refusée : débit ≠ crédit</strong></td><td>Les deux montants doivent être rigoureusement égaux. Vérifiez la saisie.</td></tr>
+      <tr><td><strong>Le stock affiché est faux</strong></td><td>Ouvrez le <em>Journal des Mouvements</em> et remontez l'historique du produit avant tout ajustement.</td></tr>
+      <tr><td><strong>Facture « Erreur MeCeF »</strong></td><td>Relancez la transmission depuis la ligne. Ne ressaisissez jamais la vente.</td></tr>
+      <tr><td><strong>J'ai archivé quelque chose par erreur</strong></td><td>Demandez à l'administrateur de le restaurer depuis <em>Paramètres ➔ Restauration</em>.</td></tr>
+      <tr><td><strong>Le taux de ponte est à 0 %</strong></td><td>La récolte du jour n'a pas encore été saisie, ou l'effectif de la bande est nul.</td></tr>
+      <tr><td><strong>Le GMQ ne s'affiche pas</strong></td><td>Il faut au moins deux pesées enregistrées sur la bande.</td></tr>
+      <tr><td><strong>Le logiciel ne répond plus</strong></td><td>Actualisez la page (touche F5). Si le problème persiste, notez l'heure et le message exact, puis prévenez l'administrateur.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Annexe C — Glossaire</h2>
+  <table>
+    <thead><tr><th style="width:26%">Terme</th><th>Définition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bande (ou lot)</strong></td><td>Groupe d'animaux de même espèce, entrés ensemble et suivis ensemble.</td></tr>
+      <tr><td><strong>Effectif</strong></td><td>Nombre de têtes vivantes à un instant donné.</td></tr>
+      <tr><td><strong>Taux de ponte</strong></td><td>Œufs récoltés ÷ effectif de pondeuses × 100.</td></tr>
+      <tr><td><strong>OR / OF</strong></td><td>Œufs récoltés / œufs cassés ou fêlés. Les commercialisables valent OR − OF.</td></tr>
+      <tr><td><strong>GMQ</strong></td><td>Gain moyen quotidien : prise de poids en grammes par jour.</td></tr>
+      <tr><td><strong>Ration normative</strong></td><td>Quantité théorique de provende par tête et par jour.</td></tr>
+      <tr><td><strong>Rémanence</strong></td><td>Délai d'attente après un traitement, pendant lequel l'animal ne peut pas être vendu.</td></tr>
+      <tr><td><strong>Prophylaxie</strong></td><td>Ensemble des mesures préventives : vaccins, vermifuges, désinfections.</td></tr>
+      <tr><td><strong>PMP</strong></td><td>Prix moyen pondéré : coût moyen d'une unité en stock.</td></tr>
+      <tr><td><strong>Créance</strong></td><td>Somme qu'un client doit encore à la ferme.</td></tr>
+      <tr><td><strong>Dette fournisseur</strong></td><td>Somme que la ferme doit encore à un fournisseur.</td></tr>
+      <tr><td><strong>Avoir</strong></td><td>Document annulant tout ou partie d'une facture, après retour de marchandise.</td></tr>
+      <tr><td><strong>SYSCOHADA</strong></td><td>Plan comptable commun aux pays de l'OHADA, dont le Bénin.</td></tr>
+      <tr><td><strong>MeCeF</strong></td><td>Système de facturation normalisée de la DGI du Bénin.</td></tr>
+      <tr><td><strong>IFU / RCCM</strong></td><td>Identifiant fiscal unique / registre du commerce et du crédit mobilier.</td></tr>
+      <tr><td><strong>CNSS</strong></td><td>Caisse nationale de sécurité sociale.</td></tr>
+      <tr><td><strong>ITS</strong></td><td>Impôt sur les traitements et salaires, calculé par tranches.</td></tr>
+      <tr><td><strong>Contre-passer</strong></td><td>Annuler une écriture comptable par une écriture inverse, sans jamais l'effacer.</td></tr>
+      <tr><td><strong>Clôture</strong></td><td>Arrêt définitif d'une période : plus aucune écriture ne peut y être passée.</td></tr>
+      <tr><td><strong>Archiver</strong></td><td>Retirer un élément des listes actives en conservant ses données et son historique.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Annexe D — Les gestes à ne jamais faire</h2>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne partagez jamais votre mot de passe.</strong> Toute action est enregistrée au nom du compte connecté.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne ressaisissez jamais une vente ou une dépense au journal comptable.</strong> L'écriture existe déjà : vous la compteriez deux fois.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne contournez jamais un blocage de rémanence vétérinaire.</strong> C'est un risque sanitaire, pas une contrainte informatique.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>N'ajustez jamais un stock « pour faire coller les chiffres ».</strong> Comptez, puis saisissez le motif réel de l'écart.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne lancez jamais une clôture annuelle ou une réinitialisation sans sauvegarde téléchargée hors du serveur.</strong></p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne laissez jamais une session ouverte sur le poste du comptoir.</strong> Déconnectez-vous en quittant.</p></div></div>
+
+  <h2>Annexe E — Les comptes de la ferme</h2>
+  <p>Quatre comptes sont créés à l'installation, un par rôle. Leur mot de passe initial est remis par l'administrateur, séparément de ce manuel.</p>
+  <table>
+    <thead><tr><th style="width:24%">Identifiant</th><th style="width:26%">Rôle</th><th>Poste concerné</th></tr></thead>
+    <tbody>
+      <tr><td><strong>admin</strong></td><td>Administrateur</td><td>Direction et support technique</td></tr>
+      <tr><td><strong>compta</strong></td><td>Comptable</td><td>Bureau comptable</td></tr>
+      <tr><td><strong>caisse</strong></td><td>Caissier</td><td>Comptoir de vente</td></tr>
+      <tr><td><strong>elevage</strong></td><td>Animalier</td><td>Chef d'élevage et soigneurs</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ces comptes sont livrés avec un <strong>mot de passe par défaut</strong>. Changez-les <strong>tous</strong> lors de la mise en service réelle, et créez ensuite un compte nominatif par utilisateur plutôt que de partager ces quatre-là.</p></div></div>
+
+  <h2>Annexe F — Les colonnes de chaque tableau</h2>
+  <p>Un aide-mémoire pour retrouver rapidement quelle information se trouve dans quel écran.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Écran</th><th>Colonnes du tableau</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bandes &amp; Sujets</strong></td><td>Code bande · Espèce · Stade · Date création · Effectif initial · Effectif actuel · Mortalité · Statut · Actions</td></tr>
+      <tr><td><strong>Enregistrer des Sujets</strong></td><td>Date · Bande · Espèce · Origine · Quantité</td></tr>
+      <tr><td><strong>Registre Vétérinaire</strong></td><td>Date · Lot / espèce · Type d'action · Produit · Dose · Actions</td></tr>
+      <tr><td><strong>Suivi Sanitaire</strong></td><td>Date d'entrée · Lot / sujet · Motif · Niveau d'isolement · Statut · Actions</td></tr>
+      <tr><td><strong>Calendriers de Prophylaxie</strong></td><td>Jour / période · Traitement prévu · Produit conseillé · Posologie · Délai rémanence · Actions</td></tr>
+      <tr><td><strong>Types de Provende</strong></td><td>Nom du type d'aliment · Espèce cible · Poids sac standard (kg) · Prix indicatif (FCFA/kg)</td></tr>
+      <tr><td><strong>Fiche de Rationnement</strong></td><td>Espèce · Stade physiologique / tranche d'âge · Ration (g/tête/jour) · Actions</td></tr>
+      <tr><td><strong>Suivi Reproduction (lapins)</strong></td><td>Bande · N° lapine · Date saillie · Mâle n° · Palpation · Mise bas attendue · Nés (vivants) · Statut</td></tr>
+      <tr><td><strong>Suivi Reproduction (porcs)</strong></td><td>Bande · N° truie · Date saillie · Verrat n° · Retour chaleur · Mise bas attendue · Nés (vivants) · Statut</td></tr>
+      <tr><td><strong>Registre des Reproducteurs</strong></td><td>Identifiant · Espèce · Sexe · Race · Bande · Cage · Statut · Actions</td></tr>
+      <tr><td><strong>Analyse des Croissances</strong></td><td>Bande · Espèce · Dernière pesée · Poids précédent (g) · Poids actuel (g) · Jours écoulés · GMQ (g/jour) · Statut vs objectif</td></tr>
+      <tr><td><strong>Transformation</strong></td><td>Date · Bande source · Sujets abattus · Produit fini · Qté produite · Statut</td></tr>
+      <tr><td><strong>Historique des Ventes</strong></td><td>Facture · Client · Date · Articles · Remise · Total TTC · Payé · Reste · Mode · Statut · Actions</td></tr>
+      <tr><td><strong>Devis</strong></td><td>N° devis · Client · Date · Validité · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Retours et Avoirs</strong></td><td>Avoir · Facture · Client · Date · Motif · Décision · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Liste des Clients</strong></td><td>Nom · Téléphone · Ville · Total achats · Solde dû · Statut · Actions</td></tr>
+      <tr><td><strong>Suivi des Dettes clients</strong></td><td>Débiteur · Facture associée · Échéance · Total facturé · Solde restant · Actions</td></tr>
+      <tr><td><strong>Historique des Avances</strong></td><td>Client · Montant avance · Solde restant · Date · Statut · Actions</td></tr>
+      <tr><td><strong>Liste d'Achats</strong></td><td>Référence achat · Date · Fournisseur · Catégorie · Montant total · Statut · Actions</td></tr>
+      <tr><td><strong>Bons de Commande</strong></td><td>Réf commande · Date d'émission · Livraison attendue · Fournisseur · Montant estimé · Statut · Actions</td></tr>
+      <tr><td><strong>Fiches Fournisseurs</strong></td><td>Nom · Catégorie · Total achats (année) · Dernière commande · Statut · Actions</td></tr>
+      <tr><td><strong>Dettes Fournisseurs</strong></td><td>Fournisseur · Montant dû · Échéance · Statut</td></tr>
+      <tr><td><strong>Saisie des Dépenses</strong></td><td>Date · Libellé · Catégorie · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Tableau des stocks</strong></td><td>Code · Désignation · Catégorie · Stock · PMP unit. · Valeur · Urgence · Actions</td></tr>
+      <tr><td><strong>Journal des Mouvements</strong></td><td>Date / heure · Référence · Produit · Type · Motif · Quantité · Valeur</td></tr>
+      <tr><td><strong>Seuils d'Alerte</strong></td><td>Produit · Stock actuel · Seuil configuré · Statut · Actions</td></tr>
+      <tr><td><strong>Facturation &amp; MeCeF</strong></td><td>N° facture · Client · Date · Montant TTC · Statut MeCeF · Actions</td></tr>
+      <tr><td><strong>Registre des Employés</strong></td><td>Nom · Fonction · Date d'embauche · Salaire · Statut · Actions</td></tr>
+      <tr><td><strong>Feuille de Pointage</strong></td><td>Employé · Date · Arrivée · Départ · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion de la Paie</strong></td><td>Employé · Poste · Salaire brut · Absences · Ret. absences · Ret. CNSS · Ret. ITS · Net à payer · Charges patronales · Statut · Actions</td></tr>
+      <tr><td><strong>Registre des Stagiaires</strong></td><td>Nom · Établissement d'origine · Période · Frais de scolarité · Statut · Actions</td></tr>
+      <tr><td><strong>Plan Comptable</strong></td><td>N° compte · Intitulé · Classe · Actions</td></tr>
+      <tr><td><strong>Journal Comptable</strong></td><td>N° pièce · Date · Libellé · Débit · Crédit · Montant · Actions</td></tr>
+      <tr><td><strong>Grand Livre</strong></td><td>Date · N° pièce · Libellé · Débit · Crédit · Solde progressif</td></tr>
+      <tr><td><strong>Balance Générale</strong></td><td>N° compte · Libellé · Solde ouverture · Mouvements période (débit / crédit) · Solde final</td></tr>
+      <tr><td><strong>Balance Âgée</strong></td><td>Client · Non échu · 1 à 30 jours · 31 à 60 · 61 à 90 · Plus de 90 jours · Total</td></tr>
+      <tr><td><strong>Immobilisations</strong></td><td>Code · Désignation · Acquisition · Durée · Annuité · Cumul amort. · V.N.C. · Comptabilisé · Statut · Actions</td></tr>
+      <tr><td><strong>Comptabilité Analytique</strong></td><td>Filière · CA (FCFA) · Charges (FCFA) · Marge (FCFA) · Taux</td></tr>
+      <tr><td><strong>Clôture Périodique</strong></td><td>Mois · Date de clôture · Statut · Action (admin)</td></tr>
+      <tr><td><strong>Rapport Mensuel</strong></td><td>Indicateur · Mois en cours · Mois précédent · Variation · Actions</td></tr>
+      <tr><td><strong>Centre de Notifications</strong></td><td>Date / heure · Catégorie · Message · Gravité · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion des Utilisateurs</strong></td><td>Nom · Email · Rôle · Statut · Actions</td></tr>
+      <tr><td><strong>Audit Logs</strong></td><td>Horodatage · Utilisateur · Action · Module · Actions</td></tr>
+      <tr><td><strong>Restauration</strong></td><td>Type · Élément · Module · Archivé le · Actions</td></tr>
+      <tr><td><strong>Documents Administratifs</strong></td><td>Document · Type · Bénéficiaire · Date · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion des Courriers</strong></td><td>Référence · Type · Objet · Partie · Date · Actions</td></tr>
+      <tr><td><strong>Archivage des Documents</strong></td><td>Document · Catégorie · Date archivage · Expiration · Statut · Actions</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Besoin d'aide ?</h2>
+  <p>Le <strong>chapitre 11</strong> détaille les deux écrans d'assistance : <span class="chemin">Aide &amp; À Propos</span> et <span class="chemin">Contactez l'Éditeur</span>.</p>
+
+  <div class="cartouche">
+    <h3>Coordonnées de l'éditeur</h3>
+    <p style="margin:0"><strong>Dr MASSENON Rhodes</strong> — Docteur en Génie Logiciel et IA</p>
+    <p style="margin:4pt 0 0">E-mail : <strong>rarhodes06@gmail.com</strong> · <strong>contact@massenonrhodes.com</strong><br>
+    Téléphone : <strong>+229 01 51 33 50 40</strong> · <strong>+229 01 97 31 24 37</strong><br>
+    Du lundi au vendredi, 8 h – 17 h (GMT)</p>
+  </div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Pour signaler un problème utilement, indiquez trois choses : <strong>l'écran</strong> où vous étiez, <strong>ce que vous veniez de faire</strong>, et <strong>le message exact</strong> affiché. Un signalement précis se traite en quelques minutes ; un « ça ne marche pas » demande une journée d'enquête.</p></div></div>
+
+  <div style="margin-top:22pt;border-top:2.5pt solid var(--forest);padding-top:9pt;font-size:9pt;color:var(--muted);text-align:center">
+    <strong style="color:var(--forest)">AgriERP — Manuel d'utilisation</strong><br>
+    Ferme École OLOUWACHEGOUN — Ikpinlè, Bénin<br>
+    Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB)<br>
+    Accompagnement des PME : Cabinet FAGUEZ SARL<br>
+    Édité par Dr MASSENON Rhodes, Docteur en Génie Logiciel et IA<br>
+    Édition d'août 2026 — version 1.0.0 du logiciel
+  </div>
+</section>

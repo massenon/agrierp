@@ -1,0 +1,324 @@
+<meta charset="utf-8">
+<title>Manuel d'utilisation — AgriERP</title>
+<style>
+  :root{
+    --forest:#052e16; --forest2:#0a3d20; --emerald:#065f46; --maize:#FFD55F;
+    --info:#1D4ED8; --warn:#B45309; --alert:#B91C1C; --tip:#047857;
+    --info-bg:#EFF6FF; --warn-bg:#FFFBEB; --alert-bg:#FEF2F2; --tip-bg:#ECFDF5;
+    --ink:#17201b; --muted:#5b6660; --line:#d8e0da; --zebra:#f4f7f5;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  body{
+    font-family:"Arial","Roboto","Helvetica Neue",sans-serif;
+    font-size:11pt; line-height:1.62; color:var(--ink); margin:0;
+  }
+  p{margin:0 0 9pt}
+  strong{color:var(--forest)}
+  a{color:var(--emerald); text-decoration:none}
+
+  /* ---------- COUVERTURE ---------- */
+  .couverture{
+    position:relative; width:210mm; height:296.6mm; padding:30mm 24mm 0 24mm;
+    background:linear-gradient(160deg,#052e16 0%,#064e2b 55%,#0a6b3c 100%);
+    color:#fff; break-after:page; overflow:hidden;
+  }
+  .couverture::after{
+    content:""; position:absolute; right:-60mm; bottom:-70mm; width:190mm; height:190mm;
+    border-radius:50%; background:rgba(255,213,95,.09);
+  }
+  .cv-marque{display:flex; align-items:center; gap:9pt; font-size:19pt; font-weight:bold; letter-spacing:.4pt}
+  .cv-marque .pastille{
+    width:30pt;height:30pt;border-radius:8pt;background:var(--maize);color:var(--forest);
+    display:flex;align-items:center;justify-content:center;font-size:17pt;
+  }
+  .cv-marque em{color:var(--maize); font-style:normal}
+  .cv-sur{margin-top:2pt; font-size:8.5pt; letter-spacing:2.4pt; color:rgba(255,255,255,.72)}
+  .cv-titre{margin-top:52mm; font-size:41pt; line-height:1.06; font-weight:bold; letter-spacing:-.6pt}
+  .cv-titre span{display:block; color:var(--maize)}
+  .cv-baseline{margin-top:9mm; font-size:13pt; color:rgba(255,255,255,.9); max-width:120mm; line-height:1.5}
+  .cv-filet{width:44mm;height:3.5pt;background:var(--maize);margin:11mm 0 9mm;border-radius:2pt}
+  .cv-meta{position:relative; z-index:2; font-size:10pt; line-height:1.85; color:rgba(255,255,255,.88)}
+  .cv-meta b{color:#fff}
+  .cv-pied{
+    position:absolute; left:24mm; right:24mm; bottom:20mm; z-index:2;
+    border-top:1px solid rgba(255,255,255,.22); padding-top:7pt;
+    font-size:8.5pt; line-height:1.7; color:rgba(255,255,255,.72);
+  }
+
+  /* ---------- TITRES ---------- */
+  .chapitre{break-before:page}
+  .ch-entete{display:flex; align-items:flex-start; gap:11pt; border-bottom:2.5pt solid var(--forest); padding-bottom:8pt; margin-bottom:14pt}
+  .ch-num{
+    flex:0 0 auto; width:34pt;height:34pt;border-radius:9pt;background:var(--forest);color:var(--maize);
+    display:flex;align-items:center;justify-content:center;font-size:18pt;font-weight:bold;
+  }
+  .ch-entete h1{margin:0; font-size:21pt; color:var(--forest); line-height:1.15; letter-spacing:-.2pt}
+  .ch-entete .ch-sous{margin:2pt 0 0; font-size:9.5pt; color:var(--muted)}
+  h2{
+    font-size:13.5pt; color:var(--forest); margin:17pt 0 7pt; break-after:avoid;
+    padding-left:8pt; border-left:4pt solid var(--maize); line-height:1.25;
+  }
+  h3{font-size:11.5pt; color:var(--emerald); margin:13pt 0 5pt; break-after:avoid}
+  .intro{font-size:10.5pt; color:var(--muted); margin:-4pt 0 12pt}
+
+  /* ---------- LISTES ---------- */
+  ol.etapes{counter-reset:et; list-style:none; padding:0; margin:0 0 11pt}
+  ol.etapes>li{
+    counter-increment:et; position:relative; padding:1pt 0 8pt 26pt; break-inside:avoid;
+  }
+  ol.etapes>li::before{
+    content:counter(et); position:absolute; left:0; top:1.5pt;
+    width:17pt;height:17pt;border-radius:50%;background:var(--emerald);color:#fff;
+    font-size:9.5pt;font-weight:bold;text-align:center;line-height:17pt;
+  }
+  ul.puces{list-style:none; padding:0; margin:0 0 11pt}
+  ul.puces>li{position:relative; padding:0 0 5pt 15pt}
+  ul.puces>li::before{content:""; position:absolute; left:3pt; top:6.5pt; width:5pt;height:5pt;border-radius:50%;background:var(--maize); border:1.2pt solid var(--emerald)}
+  .fleche{color:var(--emerald); font-weight:bold; padding:0 1pt}
+  .chemin{
+    display:inline-block; background:var(--zebra); border:1px solid var(--line); border-radius:4pt;
+    padding:1.5pt 6pt; font-size:10pt; color:var(--forest); font-weight:bold; white-space:nowrap;
+  }
+  .btn{
+    display:inline-block; background:var(--forest); color:#fff; border-radius:4pt;
+    padding:1pt 6pt; font-size:9.5pt; font-weight:bold; white-space:nowrap;
+  }
+  .champ{
+    display:inline-block; background:#fff; border:1.4px solid var(--emerald); border-radius:3pt;
+    padding:0 5pt; font-size:10pt; color:var(--forest); font-weight:bold; white-space:nowrap;
+  }
+
+  /* ---------- ENCADRÉS ---------- */
+  .note{
+    display:flex; gap:9pt; border-radius:6pt; padding:8pt 11pt; margin:0 0 11pt;
+    border-left:4.5pt solid; break-inside:avoid; font-size:10.5pt; line-height:1.55;
+    orphans:2; widows:2;
+  }
+  .note .ico{flex:0 0 auto; font-size:13pt; line-height:1.25}
+  .note p{margin:0}
+  .note p+p{margin-top:5pt}
+  .note b{display:block; font-size:9pt; letter-spacing:.8pt; text-transform:uppercase; margin-bottom:2pt}
+  .note.longue{break-inside:auto}
+  .groupe{break-inside:avoid}
+  .info{background:var(--info-bg); border-color:var(--info)} .info b{color:var(--info)}
+  .attention{background:var(--warn-bg); border-color:#D97706} .attention b{color:var(--warn)}
+  .alerte{background:var(--alert-bg); border-color:#DC2626} .alerte b{color:var(--alert)}
+  .astuce{background:var(--tip-bg); border-color:#059669} .astuce b{color:var(--tip)}
+
+  /* ---------- CAPTURES ---------- */
+  figure.capture{margin:0 0 13pt; break-inside:avoid}
+  .cadre{position:relative; border:1px solid var(--line); border-radius:7pt; overflow:hidden; box-shadow:0 1.5pt 5pt rgba(5,46,22,.10)}
+  .cadre img{display:block; width:100%}
+  .cible{
+    position:absolute; border:2.4pt solid #E11D48; border-radius:5pt;
+    box-shadow:0 0 0 2.4pt rgba(225,29,72,.16);
+  }
+  .cible b{
+    position:absolute; left:-9.5pt; top:-9.5pt; width:16pt;height:16pt;border-radius:50%;
+    background:#E11D48;color:#fff;font-size:9.5pt;font-weight:bold;text-align:center;line-height:16pt;
+    box-shadow:0 1pt 2pt rgba(0,0,0,.3);
+  }
+  .cible.bas b{top:auto; bottom:-9.5pt}
+  .cible.zone{border:2pt dashed #E11D48; box-shadow:none; background:rgba(225,29,72,.045)}
+  .cible.droite b{left:auto; right:-9.5pt}
+  figcaption{
+    font-size:8.8pt; color:var(--muted); margin-top:4pt; padding-left:2pt;
+    border-left:2.5pt solid var(--maize); padding-left:6pt;
+  }
+  figcaption b{color:var(--forest)}
+  .legende-reperes{font-size:9.5pt; margin:-8pt 0 12pt; padding-left:2pt}
+  .legende-reperes span{display:inline-block; margin-right:12pt; white-space:nowrap}
+  .legende-reperes i{
+    display:inline-block; width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;
+    font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal;margin-right:3pt;
+  }
+
+  /* ---------- TABLEAUX ---------- */
+  table{width:100%; border-collapse:collapse; font-size:9.8pt; margin:0 0 12pt; break-inside:auto}
+  thead{display:table-header-group}
+  tr{break-inside:avoid}
+  th{background:var(--forest); color:#fff; text-align:left; padding:5pt 7pt; font-size:8.8pt; text-transform:uppercase; letter-spacing:.5pt}
+  td{padding:5pt 7pt; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody tr:nth-child(even){background:var(--zebra)}
+  td.oui{color:var(--tip); font-weight:bold; text-align:center}
+  td.non{color:#b9c2bc; text-align:center}
+
+  /* ---------- SOMMAIRE ---------- */
+  .som h1{font-size:24pt;color:var(--forest);margin:0 0 3pt;letter-spacing:-.3pt}
+  .som .filet{width:38mm;height:3pt;background:var(--maize);border-radius:2pt;margin-bottom:15pt}
+  .som-grille{column-count:2; column-gap:12mm}
+  .som-bloc{break-inside:avoid; margin-bottom:11pt}
+  .som-bloc h4{
+    margin:0 0 3pt; font-size:10.5pt; color:var(--forest);
+    padding-bottom:2.5pt; border-bottom:1.4pt solid var(--line);
+  }
+  .som-bloc h4 i{
+    display:inline-block;width:14pt;height:14pt;border-radius:4pt;background:var(--forest);color:var(--maize);
+    font-style:normal;font-size:8.5pt;text-align:center;line-height:14pt;margin-right:5pt;font-weight:bold;
+  }
+  .som-bloc ul{list-style:none;margin:0;padding:0 0 0 19pt;font-size:9.3pt;color:var(--muted);line-height:1.5}
+
+  /* ---------- LÉGENDE ---------- */
+  .cartouche{border:1px solid var(--line); border-radius:7pt; padding:11pt 13pt; margin:0 0 12pt; background:#fff}
+  .cartouche h3{margin-top:0}
+</style>
+
+<!-- =======================  COUVERTURE  ======================= -->
+<div class="couverture">
+  <div class="cv-marque"><span class="pastille">▲</span> <span>Agri<em>ERP</em></span></div>
+  <div class="cv-sur">FERME ÉCOLE OLOUWACHEGOUN</div>
+
+  <div class="cv-titre">Manuel<span>d'utilisation</span></div>
+  <div class="cv-baseline">Le guide complet de votre logiciel de gestion et de suivi d'élevage intégré : production animale, ventes, achats, stocks, personnel et comptabilité.</div>
+
+  <div class="cv-filet"></div>
+  <div class="cv-meta">
+    <b>Logiciel :</b> AgriERP — version 1.0.0<br>
+    <b>Destinataire :</b> Ferme École OLOUWACHEGOUN — Ikpinlè, Bénin<br>
+    <b>Maîtrise d'ouvrage :</b> Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB)<br>
+    <b>Accompagnement :</b> Cabinet FAGUEZ SARL<br>
+    <b>Éditeur :</b> Dr MASSENON Rhodes<br>
+    <span style="padding-left:0;color:rgba(255,255,255,.75)">Docteur en Génie Logiciel et IA</span><br>
+    <b>Édition :</b> août 2026
+  </div>
+
+  <div class="cv-pied">
+    <div style="color:rgba(255,255,255,.9)">© 2026 &nbsp;·&nbsp; PAEB &nbsp;·&nbsp; Cabinet FAGUEZ SARL &nbsp;·&nbsp; Dr MASSENON Rhodes</div>
+    <div>Document destiné aux utilisateurs de la ferme — à conserver près du poste de travail.</div>
+  </div>
+</div>
+
+<!-- =======================  COMMENT LIRE  ======================= -->
+<section>
+  <div class="ch-entete">
+    <div class="ch-num">?</div>
+    <div>
+      <h1>Comment lire ce manuel</h1>
+      <p class="ch-sous">Les conventions utilisées dans tout le document — lisez cette page une fois, elle vous servira partout.</p>
+    </div>
+  </div>
+
+  <p>Ce manuel s'adresse à <strong>toute personne qui utilise AgriERP</strong>, même si elle n'a jamais travaillé sur un logiciel de gestion. Chaque tâche est décrite du premier au dernier clic. Vous pouvez le lire en entier, ou aller directement au chapitre du module qui vous concerne.</p>
+
+  <div class="cartouche">
+    <h3>Les chemins de navigation</h3>
+    <p>Une suite de flèches indique où cliquer, dans l'ordre :</p>
+    <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Gestion Utilisateurs</span> <span class="fleche">➔</span> <span class="chemin">Nouvel Utilisateur</span></p>
+    <p style="margin-top:7pt">Se lit : « ouvrez <strong>Paramètres</strong> dans le menu de gauche, puis l'onglet <strong>Gestion Utilisateurs</strong>, puis cliquez sur le bouton <strong>Nouvel Utilisateur</strong> ».</p>
+  </div>
+
+  <div class="cartouche">
+    <h3>Les repères sur les captures d'écran</h3>
+    <p>Les images sont de <strong>véritables captures du logiciel</strong>. Les zones importantes sont entourées en rouge et numérotées <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">1</i> <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">2</i> <i style="display:inline-block;width:13pt;height:13pt;border-radius:50%;background:#E11D48;color:#fff;font-size:8.5pt;font-weight:bold;text-align:center;line-height:13pt;font-style:normal">3</i>. La légende sous l'image explique chaque numéro.</p>
+  </div>
+
+  <div class="cartouche">
+    <h3>Les mises en forme</h3>
+    <ul class="puces">
+      <li><span class="btn">Enregistrer</span> — un bouton sur lequel vous cliquez.</li>
+      <li><span class="champ">Montant reçu</span> — un champ que vous remplissez.</li>
+      <li><span class="chemin">Ventes &amp; Devis</span> — un écran ou un onglet du logiciel.</li>
+      <li>Les <strong>chiffres 1, 2, 3</strong> indiquent des étapes à suivre dans l'ordre. Les <strong>puces rondes</strong> présentent une liste sans ordre imposé.</li>
+    </ul>
+  </div>
+
+  <h2>Les quatre encadrés</h2>
+  <p>Quatre types d'encadrés reviennent tout au long du manuel. Prenez l'habitude de les repérer d'un coup d'œil : la couleur suffit.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une précision utile pour comprendre ce que fait le logiciel. Vous pouvez travailler sans la lire, mais elle vous fera gagner du temps.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Une erreur fréquente à éviter. Lisez ces encadrés : ils décrivent presque toujours une situation déjà rencontrée sur le terrain.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Un risque de perte de données ou une action <strong>irréversible</strong>. Ne réalisez jamais l'opération décrite sans en avoir parlé au responsable.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un raccourci ou une bonne pratique qui rend le travail quotidien plus rapide.</p></div></div>
+
+  <h2>Ce dont vous avez besoin pour commencer</h2>
+  <ul class="puces">
+    <li>Un ordinateur relié au réseau de la ferme, avec un navigateur récent (Chrome, Edge ou Firefox).</li>
+    <li>L'adresse du logiciel, communiquée par votre administrateur.</li>
+    <li>Votre <strong>nom d'utilisateur</strong> et votre <strong>mot de passe</strong> personnels.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>AgriERP est <strong>un seul et même logiciel de gestion et de suivi d'élevage intégré</strong> : les mêmes écrans, les mêmes libellés et les mêmes données, quel que soit le poste depuis lequel vous vous connectez — bureau de direction, comptoir de vente ou bâtiment d'élevage.</p><p>Ce manuel vaut donc pour tous les postes de la ferme. Il n'y a <strong>rien à installer</strong> : un navigateur suffit.</p></div></div>
+</section>
+
+<!-- =======================  SOMMAIRE  ======================= -->
+<section class="som" style="break-before:page">
+  <h1>Sommaire</h1>
+  <div class="filet"></div>
+  <p class="intro">Le document suit l'ordre du menu de gauche du logiciel. Chaque chapitre est autonome : vous pouvez ouvrir directement celui qui vous concerne.</p>
+
+  <div class="som-grille">
+    <div class="som-bloc"><h4><i>1</i>Prise en main</h4><ul>
+      <li>Se connecter et se déconnecter</li><li>L'écran type et le menu de gauche</li>
+      <li>Le tableau de bord</li><li>Recherche globale et menu du compte</li>
+      <li>Notifications, alertes et rappels</li><li>Mon profil et mot de passe</li>
+      <li>Ce que votre rôle vous autorise</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>2</i>Élevage</h4><ul>
+      <li>Créer une bande, enregistrer des sujets</li><li>La fiche journalière</li>
+      <li>Rationnement, prophylaxie, provende</li><li>Reproduction des trois filières</li>
+      <li>Soins, vaccins et rémanence</li><li>Abattage et transformation</li>
+      <li>Croissance, GMQ et bilan de lot</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>3</i>Ventes &amp; Clients</h4><ul>
+      <li>Enregistrer une vente au comptoir</li><li>Devis et proforma</li>
+      <li>Historique et annulation</li><li>Retours et avoirs</li>
+      <li>Clients, dettes, relances, avances</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>4</i>Achats &amp; Dépenses</h4><ul>
+      <li>Enregistrer un achat</li><li>Bons de commande</li>
+      <li>Fournisseurs et dettes</li><li>Saisie des dépenses</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>5</i>Stocks &amp; Produits</h4><ul>
+      <li>Tableau et valorisation</li><li>Journal des mouvements</li>
+      <li>Ajustement d'inventaire</li><li>Catalogue et seuils d'alerte</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>6</i>Facturation &amp; MeCeF</h4><ul>
+      <li>Émettre une facture normalisée</li><li>Le statut MeCeF</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>7</i>Personnel &amp; Stages</h4><ul>
+      <li>Employés et pointage</li><li>Paie, CNSS et ITS</li>
+      <li>Stagiaires et attestations</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>8</i>Comptabilité</h4><ul>
+      <li>Le principe de l'écriture automatique</li><li>Plan comptable et journal</li>
+      <li>Grand livre et balances</li><li>Bilan et états financiers</li>
+      <li>TVA, banque, immobilisations</li><li>Clôture périodique et annuelle</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>9</i>Rapports &amp; Exports</h4><ul>
+      <li>Rapport mensuel de synthèse</li><li>Les six rapports du hub</li>
+      <li>Exporter en PDF et en Excel</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>10</i>Paramètres &amp; Administration</h4><ul>
+      <li>Entreprise, utilisateurs, rôles</li><li>Modules, paiements, barème ITS</li>
+      <li>Sauvegardes et restauration</li><li>Journal d'audit</li>
+      <li>Documents, courriers, archivage</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>11</i>Aide et assistance</h4><ul>
+      <li>Aide &amp; À Propos, foire aux questions</li>
+      <li>Envoyer un message à l'éditeur</li>
+      <li>Signaler un bug</li>
+      <li>Qui fait quoi : PAEB, FAGUEZ, éditeur</li>
+      <li>Que faire avant d'appeler</li>
+    </ul></div>
+
+    <div class="som-bloc"><h4><i>A</i>Annexes</h4><ul>
+      <li>A — Qui peut faire quoi</li><li>B — Que faire si… (dépannage)</li>
+      <li>C — Glossaire</li><li>D — Les gestes à ne jamais faire</li>
+      <li>E — Les comptes de la ferme</li><li>F — Les colonnes de chaque tableau</li>
+    </ul></div>
+  </div>
+</section>

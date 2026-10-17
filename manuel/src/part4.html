@@ -1,0 +1,268 @@
+<!-- =======================  CHAPITRE 5  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">5</div>
+    <div>
+      <h1>Stocks &amp; Produits</h1>
+      <p class="ch-sous">Suivre les quantités et leur valeur, corriger un écart d'inventaire, tenir le catalogue à jour.</p>
+    </div>
+  </div>
+
+  <p class="intro">Le stock n'est presque jamais saisi à la main : il bouge tout seul à chaque vente, chaque achat, chaque transformation et chaque récolte d'œufs. Cet écran sert à <strong>consulter</strong>, à <strong>vérifier</strong> et à <strong>corriger les écarts</strong>.</p>
+
+  <h2>5.1 Tableau et valorisation</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Tableau &amp; Valorisation</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/50-stocks-tableau.jpg" alt="Tableau des stocks">
+      <span class="cible" style="left:82.1%;top:11.8%;width:16.2%;height:3.4%"><b>1</b></span>
+      <span class="cible" style="left:34.8%;top:41.1%;width:14.6%;height:5.0%"><b>2</b></span>
+      <span class="cible" style="left:49.3%;top:41.1%;width:14.0%;height:5.0%"><b>3</b></span>
+      <span class="cible" style="left:86.0%;top:49.8%;width:11.1%;height:5.2%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 5.1</b> — Le tableau des stocks. <b>1</b> Seuils d'alerte — <b>2</b> Journal des mouvements — <b>3</b> Ajustement — <b>4</b> Ajouter du stock.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Code, Désignation, Catégorie, Stock, PMP unit., Valeur, Urgence</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>PMP</strong> (prix moyen pondéré) est le coût moyen d'une unité en stock, recalculé à chaque achat. C'est lui qui donne la <strong>valeur</strong> du stock — et non le prix de vente. Deux livraisons de provende achetées à des prix différents donnent un PMP intermédiaire : c'est normal.</p></div></div>
+
+  <p>La colonne <strong>Urgence</strong> signale les produits sous leur seuil d'alerte. Ce sont eux qui remontent en <em>Alertes critiques</em> sur le tableau de bord.</p>
+
+  <h2>5.2 Journal des mouvements</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Journal des Mouvements</span></p>
+  <p>Chaque entrée et chaque sortie y est tracée : <strong>Date / heure, Référence, Produit, Type, Motif, Quantité, Valeur</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'écran à ouvrir quand un stock affiché ne correspond pas à la réalité du magasin. Remontez les mouvements du produit : dans la quasi-totalité des cas, l'explication est une vente, une transformation ou une réception qui n'avait pas été remarquée.</p></div></div>
+
+  <h2>5.3 Corriger un écart d'inventaire</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="chemin">Ajustement / Correction</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/52-stocks-ajustements.jpg" alt="Ajustement de stock">
+      <span class="cible" style="left:23.4%;top:63.8%;width:19.1%;height:8.3%"><b>1</b></span>
+      <span class="cible" style="left:42.7%;top:63.8%;width:19.1%;height:8.3%"><b>2</b></span>
+      <span class="cible" style="left:23.4%;top:83.2%;width:38.4%;height:8.3%"><b>3</b></span>
+      <span class="cible bas" style="left:23.4%;top:92.5%;width:38.4%;height:4.4%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 5.2</b> — L'ajustement d'inventaire.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Stock théorique (logiciel)</span>
+    <span><i>2</i>Stock physique compté</span>
+    <span><i>3</i>Motif de l'écart</span>
+    <span><i>4</i>Valider</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Produit</span>. Le <span class="champ">Stock théorique</span> s'affiche : c'est ce que le logiciel pense avoir.</li>
+    <li>Saisissez le <span class="champ">Stock physique constaté</span> : ce que vous avez <strong>réellement compté</strong> dans le magasin.</li>
+    <li>Saisissez le <span class="champ">Motif de l'écart</span> — casse, perte, vol, erreur de comptage antérieure.</li>
+    <li>Cliquez sur <span class="btn">Valider l'ajustement</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Un ajustement <strong>génère une écriture comptable</strong> : un écart de stock est une perte ou un profit qui touche le résultat de la ferme. Ce n'est pas une simple correction d'affichage.</p>
+  <p>N'ajustez jamais « pour faire coller les chiffres ». Comptez physiquement, notez le motif réel, et signalez tout écart important au responsable.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le motif est obligatoire et il est conservé. Un ajustement sans explication crédible sera relevé lors du contrôle des comptes — écrivez ce qui s'est passé, pas « régularisation ».</p></div></div>
+
+  <h2>5.4 Le catalogue produits</h2>
+  <p><span class="chemin">Catalogue Produits</span></p>
+  <p>Deux affichages sont disponibles et les mêmes catégories qu'à la caisse permettent de filtrer.</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Bouton</th><th>Affichage obtenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>grid_view</strong> (grille)</td><td>Une carte par produit, avec sa photo, sa fourchette de prix et son stock. Pratique au comptoir.</td></tr>
+      <tr><td><strong>view_list</strong> (liste)</td><td>Un tableau dense, plus lisible pour comparer des dizaines de produits d'un coup d'œil.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F6-catalogue-liste.jpg" alt="Catalogue produits en vue liste">
+    </div>
+    <figcaption><b>Figure 5.3</b> — Le catalogue en vue liste.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Le choix grille ou liste est un simple confort d'affichage : il ne change ni les données, ni les filtres, ni les actions disponibles sur chaque produit.</p></div></div>
+
+  <h3>Créer un produit</h3>
+  <p><span class="btn">Nouveau Produit</span>, ou <span class="chemin">Catalogue Produits</span> <span class="fleche">➔</span> <span class="chemin">Ajouter un Produit</span></p>
+  <ol class="etapes">
+    <li>Saisissez le <span class="champ">Nom du produit</span> et choisissez la <span class="champ">Catégorie</span>.</li>
+    <li>Indiquez la <span class="champ">Filière d'élevage</span> si le produit provient d'une bande.</li>
+    <li>Choisissez l'<span class="champ">Unité de comptage</span> (unité, kilogramme, sac, plateau…).</li>
+    <li>Choisissez le <span class="champ">Mode de tarification</span> :
+      <ul class="puces" style="margin:4pt 0 0">
+        <li><strong>Fourchette</strong> — vous saisissez un <span class="champ">Prix min</span> et un <span class="champ">Prix max</span> ; le vendeur négocie entre les deux.</li>
+        <li><strong>Sur devis</strong> — le produit ne peut pas être vendu au comptoir, il passe obligatoirement par un devis.</li>
+      </ul>
+    </li>
+    <li>Saisissez le <span class="champ">Stock initial</span>, le <span class="champ">Seuil d'alerte</span> et la <span class="champ">TVA (%)</span>.</li>
+    <li>Ajoutez une <span class="champ">Description</span>, puis cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un produit n'est jamais supprimé : il est <strong>archivé</strong>. L'icône <em>archive</em> le retire du catalogue actif tout en conservant l'historique des ventes qui le mentionnent. Un administrateur peut le restaurer depuis <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span>.</p></div></div>
+
+  <h2>5.5 Les seuils d'alerte</h2>
+  <p><span class="chemin">Gestion Stocks</span> <span class="fleche">➔</span> <span class="btn">Configurer les Seuils d'Alerte</span></p>
+  <p>Colonnes : <strong>Produit, Stock actuel, Seuil configuré, Statut</strong>. Les deux indicateurs du haut rappellent le nombre de <strong>produits sous seuil</strong> et de <strong>seuils configurés</strong>.</p>
+
+  <ol class="etapes">
+    <li>Repérez le produit dans la liste.</li>
+    <li>Cliquez sur l'icône <strong>crayon</strong> de sa ligne. La fenêtre <em>Configurer un Seuil</em> s'ouvre.</li>
+    <li>Saisissez la nouvelle valeur dans <span class="champ">Seuil d'alerte</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G5-editer-seuil.jpg" alt="Configuration d'un seuil d'alerte">
+    </div>
+    <figcaption><b>Figure 5.4</b> — La fenêtre <em>Configurer un Seuil</em>.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le seuil déclenche <strong>trois choses à la fois</strong> : la mention <em>Urgence</em> dans le tableau des stocks, l'alerte critique du tableau de bord et la notification de stock critique. Un seul réglage, trois signaux.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Réglez le seuil sur la <strong>consommation du délai de réapprovisionnement</strong>. Si la provende met une semaine à arriver et que vous en consommez 4 sacs par semaine, le seuil est de 4 sacs — pas de 1.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 6  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">6</div>
+    <div>
+      <h1>Facturation &amp; MeCeF</h1>
+      <p class="ch-sous">Suivre les factures normalisées et leur transmission à la DGI.</p>
+    </div>
+  </div>
+
+  <p class="intro">MeCeF est le système de facturation normalisée de la Direction Générale des Impôts du Bénin. Chaque facture doit lui être transmise et reçoit en retour un code de certification et un QR code.</p>
+
+  <h2>6.1 Consulter les factures</h2>
+  <p><span class="chemin">Facturation &amp; MeCeF</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/60-facturation.jpg" alt="Écran de facturation MeCeF">
+      <span class="cible" style="left:85.7%;top:11.1%;width:12.8%;height:5.2%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 6.1</b> — L'écran Facturation &amp; MeCeF. <b>1</b> Nouvelle facture (renvoie vers l'écran de vente).</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>N° facture, Client, Date, Montant TTC, Statut MeCeF</strong>. Les filtres permettent d'isoler les statuts <em>Transmise</em>, <em>En attente</em> ou <em>Erreur MeCeF</em>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le bouton <strong>Nouvelle Facture</strong> ne crée pas une facture directement : il vous renvoie vers <span class="chemin">Ventes &amp; Devis</span>. C'est voulu — <strong>une facture naît toujours d'une vente</strong>. Une facture saisie séparément de la vente donnerait deux chiffres d'affaires différents.</p></div></div>
+
+  <h2>6.2 Les trois statuts</h2>
+  <table>
+    <thead><tr><th style="width:26%">Statut</th><th>Signification et action attendue</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Transmise</strong></td><td>La facture est certifiée par la DGI. Le QR code est disponible : cliquez sur l'icône <em>QR</em> de la ligne pour l'afficher et l'imprimer.</td></tr>
+      <tr><td><strong>En attente</strong></td><td>La transmission n'a pas encore abouti. C'est normal juste après la vente, ou pendant une coupure réseau. Vérifiez à nouveau plus tard.</td></tr>
+      <tr><td><strong>Erreur MeCeF</strong></td><td>La transmission a échoué. Utilisez l'action de <strong>relance</strong> sur la ligne. Si l'erreur persiste, prévenez l'administrateur.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Une facture <em>En attente</em> ou <em>en erreur</em> reste une <strong>vente parfaitement valide</strong> dans AgriERP : la marchandise est sortie, l'argent est encaissé, la comptabilité est à jour. Seule la certification fiscale manque. Ne ressaisissez jamais la vente pour « réessayer » — vous la compteriez deux fois.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La TVA appliquée dépend du paramétrage de la ferme : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>. L'IFU et le RCCM y sont également saisis — ils figurent sur toutes les factures éditées.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 7  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">7</div>
+    <div>
+      <h1>Personnel &amp; Stages</h1>
+      <p class="ch-sous">Registre des employés, pointage, paie, stagiaires et attestations.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Personnel &amp; Stages</span> compte cinq onglets : <strong>Registre Employés</strong>, <strong>Registre Stagiaires</strong>, <strong>Feuille de Pointage</strong>, <strong>Gestion de la Paie</strong> et <strong>Attestations</strong>.</p>
+
+  <h2>7.1 Le registre des employés</h2>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/65-rh-employes.jpg" alt="Registre des employés">
+      <span class="cible" style="left:86.0%;top:19.1%;width:12.5%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:63.0%;top:10.6%;width:13.2%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 7.1</b> — Le registre des employés. <b>1</b> Créer un employé — <b>2</b> Onglet Paie.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Nom, Fonction, Date d'embauche, Salaire, Statut</strong>.</p>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvel Employé</span>.</li>
+    <li>Saisissez le <span class="champ">Prénom</span> et le <span class="champ">Nom</span>.</li>
+    <li>Choisissez la <span class="champ">Fonction</span> : <em>Chef d'élevage</em>, <em>Comptable</em>, <em>Gardien</em>, <em>Vendeuse POS</em>, <em>Ouvrier agricole</em>.</li>
+    <li>Indiquez la <span class="champ">Date d'embauche</span> et le <span class="champ">Salaire de base (FCFA)</span>.</li>
+    <li>Choisissez le <span class="champ">Statut</span> : <em>Actif</em>, <em>Congé</em> ou <em>Suspendu</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Un employé qui quitte la ferme se met en <strong>Suspendu</strong> ou s'archive — il ne se supprime pas. Ses bulletins de paie passés doivent rester consultables.</p></div></div>
+
+  <h3>Modifier ou archiver un employé</h3>
+  <p>Sur chaque ligne, l'icône <strong>crayon</strong> rouvre la même fenêtre, préremplie ; l'icône <strong>archive</strong> retire l'employé des listes actives.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G3-editer-employe.jpg" alt="Modification d'un employé">
+    </div>
+    <figcaption><b>Figure 7.2</b> — La modification d'une fiche employé.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Pour une absence de longue durée, préférez le statut <strong>Congé</strong> à l'archivage : l'employé reste dans la liste de pointage et sa paie continue d'être calculée selon les règles de la ferme.</p></div></div>
+
+  <h2>7.2 La feuille de pointage</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Feuille de Pointage</span> <span class="fleche">➔</span> <span class="btn">Enregistrer un Pointage</span></p>
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Employé</span> et la <span class="champ">Date</span>.</li>
+    <li>Saisissez l'<span class="champ">Heure d'arrivée</span> et l'<span class="champ">Heure de départ</span>.</li>
+    <li>Choisissez le <span class="champ">Statut</span> : <em>Présent</em>, <em>Absent</em>, <em>Retard</em> ou <em>Congé</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le pointage n'est pas décoratif : les <strong>absences saisies ici sont déduites automatiquement</strong> du bulletin de paie du mois. Un pointage oublié est un salaire payé en trop.</p></div></div>
+
+  <h2>7.3 La paie</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Gestion de la Paie</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/67-rh-paie.jpg" alt="Gestion de la paie">
+      <span class="cible" style="left:69.5%;top:50.5%;width:8.5%;height:6.5%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 7.2</b> — Le tableau de paie. <b>1</b> Le net à payer, calculé automatiquement.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>Employé, Poste, Salaire brut, Absences, Ret. absences, Ret. CNSS, Ret. ITS, Net à payer, Charges patronales, Statut</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les retenues sont calculées par le logiciel selon la réglementation béninoise : la <strong>CNSS salariale</strong> et l'<strong>ITS</strong> (impôt sur les traitements et salaires, calculé par tranches). Les <strong>charges patronales</strong> — VPS, pensions, prestations familiales, risques professionnels — s'ajoutent au coût employeur.</p>
+  <p>Les taux se règlent dans <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>, et les tranches d'ITS dans <span class="chemin">Barème IR-PTS / ITS</span>.</p></div></div>
+
+  <p>Sur chaque ligne, l'icône <em>document</em> édite le <strong>bulletin de paie</strong> et l'icône <em>paiement</em> enregistre le règlement du salaire.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Le paiement d'un salaire <strong>génère son écriture comptable</strong> et sort l'argent du compte de trésorerie choisi. Vérifiez le net à payer <strong>avant</strong> de cliquer : la correction passe ensuite par le comptable et une écriture de contre-passation.</p></div></div>
+
+  <h2>7.4 Les stagiaires</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Registre Stagiaires</span> <span class="fleche">➔</span> <span class="btn">Nouveau Stagiaire</span></p>
+  <ol class="etapes">
+    <li>Saisissez le <span class="champ">Prénom</span>, le <span class="champ">Nom</span> et l'<span class="champ">Établissement d'origine</span>.</li>
+    <li>Indiquez la <span class="champ">Date de début</span> et la <span class="champ">Date de fin</span>.</li>
+    <li>Saisissez les <span class="champ">Frais de stage (FCFA)</span> et cochez <span class="champ">Frais réglé</span> le cas échéant.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+  <p>Les icônes de la ligne permettent d'enregistrer une <strong>absence</strong> et de générer l'<strong>attestation de stage</strong>.</p>
+
+  <h2>7.5 Les attestations</h2>
+  <p><span class="chemin">Personnel &amp; Stages</span> <span class="fleche">➔</span> <span class="chemin">Attestations</span></p>
+  <p>Deux boutons : <span class="btn">Générer une Attestation</span> produit le document pour un employé ou un stagiaire ; <span class="btn">Personnaliser les Modèles</span> adapte le texte type de la ferme.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Personnalisez le modèle <strong>une seule fois</strong>, en début de campagne. Toutes les attestations générées ensuite reprennent la même formulation — plus de version différente selon la personne qui l'édite.</p></div></div>
+</section>

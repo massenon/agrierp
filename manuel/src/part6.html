@@ -1,0 +1,472 @@
+<!-- =======================  CHAPITRE 10  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">10</div>
+    <div>
+      <h1>Paramètres &amp; Administration</h1>
+      <p class="ch-sous">Réservé à l'administrateur : entreprise, utilisateurs, rôles, modules, sauvegardes et journal d'audit.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Paramètres</span> compte neuf onglets. Les réglages qui y sont faits s'appliquent à <strong>toute la ferme et à tous les utilisateurs</strong> — d'où la restriction au rôle administrateur.</p>
+
+  <h2>10.1 Données de l'entreprise</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span></p>
+
+  <h3>Identité</h3>
+  <ul class="puces">
+    <li><span class="champ">Raison sociale</span>, <span class="champ">Nom du promoteur</span>, <span class="champ">Adresse du siège d'exploitation</span></li>
+    <li><span class="champ">Téléphone principal</span>, <span class="champ">Email de contact</span></li>
+    <li><span class="champ">Identifiant fiscal unique (IFU)</span> et <span class="champ">Registre du commerce (RCCM)</span></li>
+  </ul>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>L'IFU et le RCCM figurent sur <strong>toutes les factures</strong> éditées par le logiciel. Une erreur ici se retrouve sur chaque document remis à un client ou à l'administration fiscale.</p></div></div>
+
+  <h3>Envoi d'e-mails (SMTP)</h3>
+  <p><span class="champ">Serveur SMTP</span>, <span class="champ">Port</span>, <span class="champ">Sécurité</span>, <span class="champ">Utilisateur SMTP</span>, <span class="champ">Mot de passe</span>. Le bouton <span class="btn">Envoyer un e-mail de test</span> vérifie la configuration <strong>avant</strong> qu'un client ne reçoive rien.</p>
+
+  <h3>Charges sociales</h3>
+  <p>Les taux utilisés par la paie : <span class="champ">CNSS salariale (%)</span>, <span class="champ">VPS — versement patronal sur salaires (%)</span>, <span class="champ">CNSS patronale — pensions (%)</span>, <span class="champ">— prestations familiales (%)</span>, <span class="champ">— risques professionnels (%)</span>.</p>
+
+  <p>Terminez toujours par <span class="btn">Enregistrer les Modifications</span>.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne modifiez un taux de charge sociale <strong>qu'après publication officielle</strong> d'un nouveau barème. Un taux changé en cours d'année rend les bulletins du mois incohérents avec ceux des mois précédents.</p></div></div>
+
+  <h2>10.2 Les utilisateurs</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Gestion Utilisateurs</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/93-param-utilisateurs.jpg" alt="Gestion des utilisateurs">
+      <span class="cible" style="left:85.2%;top:24.6%;width:13.2%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:23.0%;top:10.6%;width:14.2%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 10.1</b> — La gestion des utilisateurs. <b>1</b> Créer un compte — <b>2</b> Onglet Rôles &amp; Permissions.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvel Utilisateur</span>.</li>
+    <li>Saisissez le <span class="champ">Nom complet</span>.</li>
+    <li>Saisissez le <span class="champ">Nom d'utilisateur</span> — l'identifiant court de connexion (par exemple <em>caisse</em>).</li>
+    <li>Saisissez l'<span class="champ">Email</span> : il sert à la réinitialisation du mot de passe.</li>
+    <li>Choisissez le <span class="champ">Rôle</span> : <em>Admin</em>, <em>Animalier</em>, <em>Caissier</em> ou <em>Comptable</em>.</li>
+    <li>Saisissez un <span class="champ">Mot de passe</span> provisoire (8 caractères minimum, avec lettre, chiffre et symbole).</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p><strong>Un compte par personne.</strong> Un compte « caisse » partagé par trois vendeuses rend le journal d'audit inutilisable : plus personne ne peut dire qui a saisi quoi le jour où un écart apparaît.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Demandez à chaque nouvel utilisateur de changer son mot de passe provisoire dès sa première connexion, depuis <span class="chemin">Mon Profil</span>.</p></div></div>
+
+  <p>Un utilisateur qui quitte la ferme s'<strong>archive</strong> (icône <em>archive</em>) — il ne se supprime pas. Son historique d'actions reste consultable.</p>
+
+  <h2>10.3 Rôles et permissions</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Rôles &amp; Permissions</span></p>
+  <p>Une matrice croise les quatre rôles et les modules : <strong>Dashboard, Ventes &amp; Devis, Achats &amp; Charges, Stocks, Élevage &amp; Soins, RH, Comptabilité, Administration, Paramètres</strong>.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne retirez jamais une permission au rôle <strong>Admin</strong> : vous risquez de vous fermer l'accès aux paramètres, y compris celui qui permettrait de corriger l'erreur.</p></div></div>
+
+  <h2>10.4 Modules actifs</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modules Actifs</span></p>
+  <p>Chaque filière d'élevage — cuniculture, aviculture, porciculture, héliciculture — s'active ou se désactive ici. Un module désactivé disparaît du menu et ses fiches affichent « Module non activé ».</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Désactiver un module <strong>ne supprime aucune donnée</strong> : les bandes et les fiches restent en base et réapparaissent intactes à la réactivation.</p></div></div>
+
+  <h2>10.5 Modes de paiement</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modes de Paiement</span></p>
+  <ul class="puces">
+    <li><span class="btn">Ajouter un Compte Bancaire</span> — un nouveau compte de trésorerie bancaire.</li>
+    <li><span class="btn">Ajouter une Ligne Mobile Money</span> — une ligne MTN ou Moov.</li>
+    <li><span class="btn">Virement Interne</span> — un mouvement d'un compte à un autre, par exemple un dépôt d'espèces de la caisse vers la banque.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>virement interne</strong> ne change pas la trésorerie totale de la ferme : il déplace de l'argent d'un compte vers un autre. Utilisez-le systématiquement pour les dépôts en banque, sinon la caisse restera créditée d'un argent qui n'y est plus.</p></div></div>
+
+  <h2>10.6 Barème IR-PTS / ITS</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Barème IR-PTS / ITS</span></p>
+  <p>Les tranches d'imposition sur les salaires : <strong>De (FCFA), À (FCFA), Taux (%)</strong>. Utilisez <span class="btn">Ajouter une tranche</span> puis <span class="btn">Enregistrer le barème</span>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Les tranches doivent être <strong>continues et sans chevauchement</strong> : la borne haute d'une tranche est la borne basse de la suivante. Un trou dans le barème produit un impôt calculé faux, sans message d'erreur.</p></div></div>
+
+  <h2>10.7 Intégrations e-mail et SMS</h2>
+  <p><span class="chemin">Paramètres Intégrations</span></p>
+  <p>Deux blocs indépendants : la <strong>configuration SMTP</strong> (hôte, port, sécurité, identifiant, mot de passe, adresse d'expédition) et la <strong>configuration SMS</strong> (fournisseur et identifiants). Le bouton <span class="btn">Tester</span> vérifie la liaison.</p>
+
+  <h2>10.8 Les sauvegardes</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Sauvegardes</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/96-param-sauvegardes.jpg" alt="Sauvegardes de la base de données">
+      <span class="cible" style="left:85.1%;top:25.3%;width:13.6%;height:6.1%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 10.2</b> — Les sauvegardes. <b>1</b> Générer une sauvegarde immédiate.</figcaption>
+  </figure>
+
+  <p>Une sauvegarde automatique est produite <strong>chaque nuit à 2 h</strong>. Le bouton <span class="btn">Générer une sauvegarde</span> en crée une immédiatement, avant une opération sensible.</p>
+  <p>Les boutons <span class="btn">Exporter ce module</span> et <span class="btn">Importer</span> permettent de transférer les données d'un module précis.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Une sauvegarde laissée sur le serveur ne protège de rien.</strong> L'incendie, le vol du serveur ou la panne de disque emportent la base <em>et</em> ses sauvegardes.</p>
+  <p>Téléchargez la sauvegarde <strong>chaque semaine</strong> sur un support extérieur — clé USB, disque externe, espace en ligne. Un rappel hebdomadaire est envoyé à l'administrateur ; ne l'ignorez pas.</p></div></div>
+
+  <h2>10.9 Restauration (la corbeille)</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span></p>
+  <p>Tout ce qui a été archivé dans le logiciel se retrouve ici : <strong>Type, Élément, Module, Archivé le</strong>. L'action de restauration remet l'élément en service.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un client, un produit, un fournisseur ou une bande archivés par erreur se récupèrent en un clic. C'est la raison pour laquelle AgriERP <strong>archive au lieu de supprimer</strong>.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Les <strong>écritures comptables ne figurent pas</strong> dans la corbeille, et c'est volontaire : une écriture ne se restaure pas, elle se <strong>contre-passe</strong>. La faire réapparaître dans un exercice éventuellement clos déséquilibrerait le grand livre.</p></div></div>
+
+  <h2>10.10 Réinitialisation</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Réinitialisation</span></p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Cet écran efface des données de façon définitive.</strong> Il sert à repartir d'une base propre après une phase de test — jamais en exploitation courante.</p>
+  <p>Ne l'utilisez que sur instruction écrite de la direction, après avoir généré <strong>et téléchargé</strong> une sauvegarde complète. Aucune corbeille, aucune restauration ne rattrape cette opération.</p></div></div>
+
+  <h2>10.11 Le journal d'audit</h2>
+  <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Audit Logs</span></p>
+  <p>Chaque action sensible y est tracée : <strong>Horodatage, Utilisateur, Action, Module</strong>. Le bouton <span class="btn">Exporter le Journal</span> édite l'historique.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le premier écran à ouvrir en cas de doute : « qui a annulé cette vente ? », « quand ce mois a-t-il été déclôturé ? ». Les connexions échouées y figurent également — plusieurs échecs successifs sur un même compte méritent une vérification.</p></div></div>
+
+  <h2>10.12 Documents, courriers et archivage</h2>
+  <p><span class="chemin">Administration</span> — trois onglets.</p>
+  <ul class="puces">
+    <li><strong>Documents Administratifs</strong> — <em>Document, Type, Bénéficiaire, Date, Statut</em>.</li>
+    <li><strong>Gestion des Courriers</strong> — <em>Référence, Type, Objet, Partie, Date</em>. Le bouton <span class="btn">Nouveau Courrier</span> demande le <span class="champ">Type</span> (<em>Entrant</em> ou <em>Sortant</em>), l'<span class="champ">Objet</span>, l'<span class="champ">Expéditeur / destinataire</span> et la <span class="champ">Date</span>.</li>
+    <li><strong>Archivage des Documents</strong> — <em>Document, Catégorie, Date archivage, Expiration, Statut</em>.</li>
+  </ul>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Renseignez la <strong>date d'expiration</strong> des documents à durée limitée — agrément, assurance, contrat. Le logiciel vous préviendra avant l'échéance, ce que le classeur papier ne fait pas.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 11  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">11</div>
+    <div>
+      <h1>Aide, contact et assistance</h1>
+      <p class="ch-sous">Trouver une réponse seul, puis joindre l'éditeur quand c'est nécessaire.</p>
+    </div>
+  </div>
+
+  <h2>11.1 Aide &amp; À Propos</h2>
+  <p>Cliquez sur votre nom en haut à droite <span class="fleche">➔</span> <span class="chemin">Aide &amp; À Propos</span>.</p>
+
+  <p>L'écran s'ouvre sur l'identité du logiciel : le nom, le <strong>numéro de version installé</strong>, la ferme destinataire et l'éditeur. C'est le premier renseignement à donner en cas de demande d'assistance.</p>
+
+  <h3>Les modules du logiciel</h3>
+  <p>Une grille de cartes présente chaque module avec une courte description. <strong>Chaque carte est un raccourci</strong> : un clic ouvre directement l'écran correspondant.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C5-aide-modules.jpg" alt="Grille des modules dans Aide et À Propos">
+    </div>
+    <figcaption><b>Figure 11.1</b> — La grille des modules : une description et un raccourci par module.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'écran à montrer à un nouvel arrivant le premier jour : en une page, il voit tout ce que le logiciel couvre et peut ouvrir chaque module d'un clic pour se repérer.</p></div></div>
+
+  <h3>La foire aux questions</h3>
+  <p>La partie basse de l'écran regroupe les questions les plus fréquentes.</p>
+
+  <ol class="etapes">
+    <li>Tapez un mot dans le champ <span class="champ">Rechercher dans l'aide</span> — par exemple <em>facture</em>, <em>stock</em> ou <em>paie</em>. La liste se filtre pendant que vous tapez.</li>
+    <li>Cliquez sur une question : la réponse se déplie en dessous.</li>
+    <li>Cliquez à nouveau pour la replier.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C6-aide-faq.jpg" alt="Foire aux questions dépliée">
+    </div>
+    <figcaption><b>Figure 11.2</b> — Une question dépliée dans la foire aux questions.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La recherche porte à la fois sur <strong>la question et sur le texte de la réponse</strong>. Si un mot vous vient à l'esprit, tapez-le : la bonne entrée remonte même s'il ne figure pas dans le titre.</p></div></div>
+
+  <h2>11.2 Contacter l'éditeur</h2>
+  <p>Cliquez sur votre nom en haut à droite <span class="fleche">➔</span> <span class="chemin">Contactez l'Éditeur</span>.</p>
+  <p>L'écran comporte deux onglets — <strong>Envoyer un Message</strong> et <strong>Signaler un Bug</strong> — et un encadré permanent avec les coordonnées de l'éditeur.</p>
+
+  <h3>Envoyer un message</h3>
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C7-contact-message.jpg" alt="Formulaire de message à l'éditeur">
+    </div>
+    <figcaption><b>Figure 11.3</b> — L'onglet <em>Envoyer un Message</em> et les coordonnées de l'éditeur, à droite.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Saisissez l'<span class="champ">Objet</span> de votre message (150 caractères au maximum).</li>
+    <li>Rédigez le <span class="champ">Message</span>.</li>
+    <li>Cliquez sur <span class="btn">Envoyer le Message</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Votre <strong>nom et votre adresse e-mail sont joints automatiquement</strong> : inutile de les recopier dans le message. L'éditeur sait donc toujours qui écrit, et peut vous répondre directement.</p></div></div>
+
+  <h3>Signaler un bug</h3>
+  <p>Utilisez cet onglet quand le logiciel <strong>ne se comporte pas comme prévu</strong> : un bouton sans effet, un chiffre manifestement faux, un message d'erreur inattendu.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/C8-contact-bug.jpg" alt="Formulaire de signalement de bug">
+    </div>
+    <figcaption><b>Figure 11.4</b> — L'onglet <em>Signaler un Bug</em>, avec la pièce jointe.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Module concerné</span> : <em>Élevage &amp; Soins</em>, <em>Ventes &amp; POS</em>, <em>Stocks</em>, <em>Comptabilité</em>, <em>Ressources Humaines</em> ou <em>Autre</em>.</li>
+    <li>Rédigez la <span class="champ">Description du problème</span>.</li>
+    <li>Décrivez les <span class="champ">Étapes pour reproduire</span> : ce que vous avez fait, dans l'ordre, avant que le problème n'apparaisse.</li>
+    <li>Cliquez sur <span class="champ">Joindre une capture d'écran</span> et choisissez votre image (JPG ou PNG, 4 Mo au maximum).</li>
+    <li>Cliquez sur <span class="btn">Signaler le Bug</span>.</li>
+  </ol>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un bon signalement tient en trois phrases :</p>
+  <p><em>« Sur l'écran Enregistrer Vente, j'ajoute un plateau d'œufs puis je clique sur Valider la Vente. Un message rouge s'affiche : “Le panier est vide.” Le panier contient pourtant bien un article. »</em></p>
+  <p>Écran, geste, message exact. Avec la capture jointe, c'est traité en quelques minutes.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Pour faire une capture d'écran sous Windows, appuyez sur la touche <strong>Impr. écran</strong>, ou utilisez <strong>Windows + Maj + S</strong> pour ne sélectionner qu'une zone. Enregistrez l'image, puis joignez-la au signalement.</p></div></div>
+
+  <h3>Les coordonnées de l'éditeur</h3>
+  <p>Elles restent affichées à droite des deux onglets.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Élément</th><th>Valeur</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Éditeur</strong></td><td>Dr MASSENON Rhodes — Docteur en Génie Logiciel et IA</td></tr>
+      <tr><td><strong>E-mail</strong></td><td>rarhodes06@gmail.com</td></tr>
+      <tr><td><strong>E-mail</strong></td><td>contact@massenonrhodes.com</td></tr>
+      <tr><td><strong>Téléphone</strong></td><td>+229 01 51 33 50 40</td></tr>
+      <tr><td><strong>Mobile</strong></td><td>+229 01 97 31 24 37</td></tr>
+      <tr><td><strong>Horaires</strong></td><td>Du lundi au vendredi, 8 h – 17 h (GMT)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le formulaire envoie un <strong>e-mail réel</strong>. Il suppose donc que la configuration d'envoi a été faite : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>, bloc SMTP. Si l'envoi échoue, utilisez directement les adresses ci-dessus.</p></div></div>
+
+  <h2>11.3 Qui fait quoi autour d'AgriERP</h2>
+  <p>Trois structures interviennent sur ce logiciel, avec des rôles distincts. Savoir à qui s'adresser fait gagner du temps.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Structure</th><th style="width:26%">Rôle</th><th>À contacter pour</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>PAEB</strong><br><span style="font-size:9pt;color:var(--muted)">Projet d'Appui à l'Entrepreneuriat au Bénin</span></td>
+        <td>Maîtrise d'ouvrage</td>
+        <td>Le cadre du projet, son financement et son périmètre.</td>
+      </tr>
+      <tr>
+        <td><strong>Cabinet FAGUEZ SARL</strong></td>
+        <td>Accompagnement des PME</td>
+        <td>L'appui à la ferme dans le cadre du PAEB : organisation, gestion, suivi comptable et validation des paramètres réglementaires — notamment le <strong>barème IR-PTS / ITS</strong> avant toute paie réelle (section 10.6).</td>
+      </tr>
+      <tr>
+        <td><strong>Dr MASSENON Rhodes</strong><br><span style="font-size:9pt;color:var(--muted)">Docteur en Génie Logiciel et IA</span></td>
+        <td>Éditeur du logiciel</td>
+        <td>Tout ce qui touche au fonctionnement d'AgriERP : anomalie, question d'utilisation, évolution (section 11.2).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La règle simple : <strong>un écran qui se comporte mal</strong> relève de l'éditeur ; <strong>un chiffre réglementaire à valider</strong> — taux de charges sociales, tranches d'impôt, plan comptable — relève du cabinet d'accompagnement. Le logiciel applique ce qu'on lui donne, il ne décide pas d'un barème fiscal.</p></div></div>
+
+  <h2>11.4 Que faire avant d'appeler</h2>
+  <p>Trois réflexes règlent la plupart des situations, et vous feront gagner du temps :</p>
+
+  <ol class="etapes">
+    <li><strong>Actualisez la page</strong> (touche F5). Un affichage figé disparaît souvent ainsi.</li>
+    <li><strong>Consultez la foire aux questions</strong> (section 11.1) et l'<strong>annexe B</strong> de ce manuel : les cas les plus fréquents y sont déjà traités.</li>
+    <li><strong>Vérifiez votre rôle</strong> (annexe A). Un écran absent ou une action refusée est le plus souvent une question de droits, pas une panne.</li>
+  </ol>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Si vous devez appeler, ayez sous les yeux : le <strong>numéro de version</strong> (écran Aide &amp; À Propos), le <strong>nom de l'écran</strong> concerné et le <strong>message exact</strong> affiché. Ces trois éléments suffisent presque toujours au diagnostic.</p></div></div>
+</section>
+
+<!-- =======================  ANNEXES  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">A</div>
+    <div>
+      <h1>Annexes</h1>
+      <p class="ch-sous">Matrice des rôles, dépannage, glossaire et rappels de sécurité.</p>
+    </div>
+  </div>
+
+  <h2>Annexe A — Qui peut faire quoi</h2>
+  <table>
+    <thead><tr>
+      <th style="width:30%">Module</th><th>Admin</th><th>Comptable</th><th>Caissier</th><th>Animalier</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Tableau de bord</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td></tr>
+      <tr><td>Notifications, profil, aide</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td><td class="oui">✔</td></tr>
+      <tr><td>Élevage &amp; soins</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="oui">✔</td></tr>
+      <tr><td>Ventes &amp; devis</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Clients &amp; créances</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Facturation &amp; MeCeF</td><td class="oui">✔</td><td class="non">—</td><td class="oui">✔</td><td class="non">—</td></tr>
+      <tr><td>Achats &amp; dépenses</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Stocks &amp; produits</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Personnel &amp; stages</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Comptabilité</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Clôture d'exercice</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Rapports &amp; exports</td><td class="oui">✔</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td></tr>
+      <tr><td>Administration &amp; paramètres</td><td class="oui">✔</td><td class="non">—</td><td class="non">—</td><td class="non">—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le caissier peut <strong>exporter</strong> ses ventes et l'animalier <strong>archiver</strong> ses bandes : ces droits particuliers s'ajoutent aux accès du tableau ci-dessus.</p></div></div>
+
+  <h2>Annexe B — Que faire si…</h2>
+  <table>
+    <thead><tr><th style="width:38%">Situation</th><th>Ce qu'il faut faire</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Je n'arrive pas à me connecter</strong></td><td>Vérifiez la casse du mot de passe et la touche Verr. Maj. Utilisez <em>Mot de passe oublié ?</em>. Après plusieurs échecs, contactez l'administrateur : le compte peut avoir été désactivé.</td></tr>
+      <tr><td><strong>Un écran n'apparaît pas dans mon menu</strong></td><td>Votre rôle ne l'autorise pas (annexe A). Ce n'est pas une panne.</td></tr>
+      <tr><td><strong>« Vente interdite — rémanence vétérinaire »</strong></td><td>La bande est sous délai d'attente après un traitement. Retirez l'article du panier et prévenez le chef d'élevage.</td></tr>
+      <tr><td><strong>« Stock insuffisant »</strong></td><td>La vente reste possible. Signalez l'écart pour un ajustement d'inventaire (section 5.3).</td></tr>
+      <tr><td><strong>« Exercice clos »</strong></td><td>La date de l'écriture tombe dans un mois déjà clôturé. Changez la date, ou demandez une déclôture à l'administrateur.</td></tr>
+      <tr><td><strong>Écriture refusée : débit ≠ crédit</strong></td><td>Les deux montants doivent être rigoureusement égaux. Vérifiez la saisie.</td></tr>
+      <tr><td><strong>Le stock affiché est faux</strong></td><td>Ouvrez le <em>Journal des Mouvements</em> et remontez l'historique du produit avant tout ajustement.</td></tr>
+      <tr><td><strong>Facture « Erreur MeCeF »</strong></td><td>Relancez la transmission depuis la ligne. Ne ressaisissez jamais la vente.</td></tr>
+      <tr><td><strong>J'ai archivé quelque chose par erreur</strong></td><td>Demandez à l'administrateur de le restaurer depuis <em>Paramètres ➔ Restauration</em>.</td></tr>
+      <tr><td><strong>Le taux de ponte est à 0 %</strong></td><td>La récolte du jour n'a pas encore été saisie, ou l'effectif de la bande est nul.</td></tr>
+      <tr><td><strong>Le GMQ ne s'affiche pas</strong></td><td>Il faut au moins deux pesées enregistrées sur la bande.</td></tr>
+      <tr><td><strong>Le logiciel ne répond plus</strong></td><td>Actualisez la page (touche F5). Si le problème persiste, notez l'heure et le message exact, puis prévenez l'administrateur.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Annexe C — Glossaire</h2>
+  <table>
+    <thead><tr><th style="width:26%">Terme</th><th>Définition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bande (ou lot)</strong></td><td>Groupe d'animaux de même espèce, entrés ensemble et suivis ensemble.</td></tr>
+      <tr><td><strong>Effectif</strong></td><td>Nombre de têtes vivantes à un instant donné.</td></tr>
+      <tr><td><strong>Taux de ponte</strong></td><td>Œufs récoltés ÷ effectif de pondeuses × 100.</td></tr>
+      <tr><td><strong>OR / OF</strong></td><td>Œufs récoltés / œufs cassés ou fêlés. Les commercialisables valent OR − OF.</td></tr>
+      <tr><td><strong>GMQ</strong></td><td>Gain moyen quotidien : prise de poids en grammes par jour.</td></tr>
+      <tr><td><strong>Ration normative</strong></td><td>Quantité théorique de provende par tête et par jour.</td></tr>
+      <tr><td><strong>Rémanence</strong></td><td>Délai d'attente après un traitement, pendant lequel l'animal ne peut pas être vendu.</td></tr>
+      <tr><td><strong>Prophylaxie</strong></td><td>Ensemble des mesures préventives : vaccins, vermifuges, désinfections.</td></tr>
+      <tr><td><strong>PMP</strong></td><td>Prix moyen pondéré : coût moyen d'une unité en stock.</td></tr>
+      <tr><td><strong>Créance</strong></td><td>Somme qu'un client doit encore à la ferme.</td></tr>
+      <tr><td><strong>Dette fournisseur</strong></td><td>Somme que la ferme doit encore à un fournisseur.</td></tr>
+      <tr><td><strong>Avoir</strong></td><td>Document annulant tout ou partie d'une facture, après retour de marchandise.</td></tr>
+      <tr><td><strong>SYSCOHADA</strong></td><td>Plan comptable commun aux pays de l'OHADA, dont le Bénin.</td></tr>
+      <tr><td><strong>MeCeF</strong></td><td>Système de facturation normalisée de la DGI du Bénin.</td></tr>
+      <tr><td><strong>IFU / RCCM</strong></td><td>Identifiant fiscal unique / registre du commerce et du crédit mobilier.</td></tr>
+      <tr><td><strong>CNSS</strong></td><td>Caisse nationale de sécurité sociale.</td></tr>
+      <tr><td><strong>ITS</strong></td><td>Impôt sur les traitements et salaires, calculé par tranches.</td></tr>
+      <tr><td><strong>Contre-passer</strong></td><td>Annuler une écriture comptable par une écriture inverse, sans jamais l'effacer.</td></tr>
+      <tr><td><strong>Clôture</strong></td><td>Arrêt définitif d'une période : plus aucune écriture ne peut y être passée.</td></tr>
+      <tr><td><strong>Archiver</strong></td><td>Retirer un élément des listes actives en conservant ses données et son historique.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Annexe D — Les gestes à ne jamais faire</h2>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne partagez jamais votre mot de passe.</strong> Toute action est enregistrée au nom du compte connecté.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne ressaisissez jamais une vente ou une dépense au journal comptable.</strong> L'écriture existe déjà : vous la compteriez deux fois.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne contournez jamais un blocage de rémanence vétérinaire.</strong> C'est un risque sanitaire, pas une contrainte informatique.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>N'ajustez jamais un stock « pour faire coller les chiffres ».</strong> Comptez, puis saisissez le motif réel de l'écart.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne lancez jamais une clôture annuelle ou une réinitialisation sans sauvegarde téléchargée hors du serveur.</strong></p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Ne laissez jamais une session ouverte sur le poste du comptoir.</strong> Déconnectez-vous en quittant.</p></div></div>
+
+  <h2>Annexe E — Les comptes de la ferme</h2>
+  <p>Quatre comptes sont créés à l'installation, un par rôle. Leur mot de passe initial est remis par l'administrateur, séparément de ce manuel.</p>
+  <table>
+    <thead><tr><th style="width:24%">Identifiant</th><th style="width:26%">Rôle</th><th>Poste concerné</th></tr></thead>
+    <tbody>
+      <tr><td><strong>admin</strong></td><td>Administrateur</td><td>Direction et support technique</td></tr>
+      <tr><td><strong>compta</strong></td><td>Comptable</td><td>Bureau comptable</td></tr>
+      <tr><td><strong>caisse</strong></td><td>Caissier</td><td>Comptoir de vente</td></tr>
+      <tr><td><strong>elevage</strong></td><td>Animalier</td><td>Chef d'élevage et soigneurs</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ces comptes sont livrés avec un <strong>mot de passe par défaut</strong>. Changez-les <strong>tous</strong> lors de la mise en service réelle, et créez ensuite un compte nominatif par utilisateur plutôt que de partager ces quatre-là.</p></div></div>
+
+  <h2>Annexe F — Les colonnes de chaque tableau</h2>
+  <p>Un aide-mémoire pour retrouver rapidement quelle information se trouve dans quel écran.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Écran</th><th>Colonnes du tableau</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bandes &amp; Sujets</strong></td><td>Code bande · Espèce · Stade · Date création · Effectif initial · Effectif actuel · Mortalité · Statut · Actions</td></tr>
+      <tr><td><strong>Enregistrer des Sujets</strong></td><td>Date · Bande · Espèce · Origine · Quantité</td></tr>
+      <tr><td><strong>Registre Vétérinaire</strong></td><td>Date · Lot / espèce · Type d'action · Produit · Dose · Actions</td></tr>
+      <tr><td><strong>Suivi Sanitaire</strong></td><td>Date d'entrée · Lot / sujet · Motif · Niveau d'isolement · Statut · Actions</td></tr>
+      <tr><td><strong>Calendriers de Prophylaxie</strong></td><td>Jour / période · Traitement prévu · Produit conseillé · Posologie · Délai rémanence · Actions</td></tr>
+      <tr><td><strong>Types de Provende</strong></td><td>Nom du type d'aliment · Espèce cible · Poids sac standard (kg) · Prix indicatif (FCFA/kg)</td></tr>
+      <tr><td><strong>Fiche de Rationnement</strong></td><td>Espèce · Stade physiologique / tranche d'âge · Ration (g/tête/jour) · Actions</td></tr>
+      <tr><td><strong>Suivi Reproduction (lapins)</strong></td><td>Bande · N° lapine · Date saillie · Mâle n° · Palpation · Mise bas attendue · Nés (vivants) · Statut</td></tr>
+      <tr><td><strong>Suivi Reproduction (porcs)</strong></td><td>Bande · N° truie · Date saillie · Verrat n° · Retour chaleur · Mise bas attendue · Nés (vivants) · Statut</td></tr>
+      <tr><td><strong>Registre des Reproducteurs</strong></td><td>Identifiant · Espèce · Sexe · Race · Bande · Cage · Statut · Actions</td></tr>
+      <tr><td><strong>Analyse des Croissances</strong></td><td>Bande · Espèce · Dernière pesée · Poids précédent (g) · Poids actuel (g) · Jours écoulés · GMQ (g/jour) · Statut vs objectif</td></tr>
+      <tr><td><strong>Transformation</strong></td><td>Date · Bande source · Sujets abattus · Produit fini · Qté produite · Statut</td></tr>
+      <tr><td><strong>Historique des Ventes</strong></td><td>Facture · Client · Date · Articles · Remise · Total TTC · Payé · Reste · Mode · Statut · Actions</td></tr>
+      <tr><td><strong>Devis</strong></td><td>N° devis · Client · Date · Validité · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Retours et Avoirs</strong></td><td>Avoir · Facture · Client · Date · Motif · Décision · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Liste des Clients</strong></td><td>Nom · Téléphone · Ville · Total achats · Solde dû · Statut · Actions</td></tr>
+      <tr><td><strong>Suivi des Dettes clients</strong></td><td>Débiteur · Facture associée · Échéance · Total facturé · Solde restant · Actions</td></tr>
+      <tr><td><strong>Historique des Avances</strong></td><td>Client · Montant avance · Solde restant · Date · Statut · Actions</td></tr>
+      <tr><td><strong>Liste d'Achats</strong></td><td>Référence achat · Date · Fournisseur · Catégorie · Montant total · Statut · Actions</td></tr>
+      <tr><td><strong>Bons de Commande</strong></td><td>Réf commande · Date d'émission · Livraison attendue · Fournisseur · Montant estimé · Statut · Actions</td></tr>
+      <tr><td><strong>Fiches Fournisseurs</strong></td><td>Nom · Catégorie · Total achats (année) · Dernière commande · Statut · Actions</td></tr>
+      <tr><td><strong>Dettes Fournisseurs</strong></td><td>Fournisseur · Montant dû · Échéance · Statut</td></tr>
+      <tr><td><strong>Saisie des Dépenses</strong></td><td>Date · Libellé · Catégorie · Montant · Statut · Actions</td></tr>
+      <tr><td><strong>Tableau des stocks</strong></td><td>Code · Désignation · Catégorie · Stock · PMP unit. · Valeur · Urgence · Actions</td></tr>
+      <tr><td><strong>Journal des Mouvements</strong></td><td>Date / heure · Référence · Produit · Type · Motif · Quantité · Valeur</td></tr>
+      <tr><td><strong>Seuils d'Alerte</strong></td><td>Produit · Stock actuel · Seuil configuré · Statut · Actions</td></tr>
+      <tr><td><strong>Facturation &amp; MeCeF</strong></td><td>N° facture · Client · Date · Montant TTC · Statut MeCeF · Actions</td></tr>
+      <tr><td><strong>Registre des Employés</strong></td><td>Nom · Fonction · Date d'embauche · Salaire · Statut · Actions</td></tr>
+      <tr><td><strong>Feuille de Pointage</strong></td><td>Employé · Date · Arrivée · Départ · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion de la Paie</strong></td><td>Employé · Poste · Salaire brut · Absences · Ret. absences · Ret. CNSS · Ret. ITS · Net à payer · Charges patronales · Statut · Actions</td></tr>
+      <tr><td><strong>Registre des Stagiaires</strong></td><td>Nom · Établissement d'origine · Période · Frais de scolarité · Statut · Actions</td></tr>
+      <tr><td><strong>Plan Comptable</strong></td><td>N° compte · Intitulé · Classe · Actions</td></tr>
+      <tr><td><strong>Journal Comptable</strong></td><td>N° pièce · Date · Libellé · Débit · Crédit · Montant · Actions</td></tr>
+      <tr><td><strong>Grand Livre</strong></td><td>Date · N° pièce · Libellé · Débit · Crédit · Solde progressif</td></tr>
+      <tr><td><strong>Balance Générale</strong></td><td>N° compte · Libellé · Solde ouverture · Mouvements période (débit / crédit) · Solde final</td></tr>
+      <tr><td><strong>Balance Âgée</strong></td><td>Client · Non échu · 1 à 30 jours · 31 à 60 · 61 à 90 · Plus de 90 jours · Total</td></tr>
+      <tr><td><strong>Immobilisations</strong></td><td>Code · Désignation · Acquisition · Durée · Annuité · Cumul amort. · V.N.C. · Comptabilisé · Statut · Actions</td></tr>
+      <tr><td><strong>Comptabilité Analytique</strong></td><td>Filière · CA (FCFA) · Charges (FCFA) · Marge (FCFA) · Taux</td></tr>
+      <tr><td><strong>Clôture Périodique</strong></td><td>Mois · Date de clôture · Statut · Action (admin)</td></tr>
+      <tr><td><strong>Rapport Mensuel</strong></td><td>Indicateur · Mois en cours · Mois précédent · Variation · Actions</td></tr>
+      <tr><td><strong>Centre de Notifications</strong></td><td>Date / heure · Catégorie · Message · Gravité · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion des Utilisateurs</strong></td><td>Nom · Email · Rôle · Statut · Actions</td></tr>
+      <tr><td><strong>Audit Logs</strong></td><td>Horodatage · Utilisateur · Action · Module · Actions</td></tr>
+      <tr><td><strong>Restauration</strong></td><td>Type · Élément · Module · Archivé le · Actions</td></tr>
+      <tr><td><strong>Documents Administratifs</strong></td><td>Document · Type · Bénéficiaire · Date · Statut · Actions</td></tr>
+      <tr><td><strong>Gestion des Courriers</strong></td><td>Référence · Type · Objet · Partie · Date · Actions</td></tr>
+      <tr><td><strong>Archivage des Documents</strong></td><td>Document · Catégorie · Date archivage · Expiration · Statut · Actions</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Besoin d'aide ?</h2>
+  <p>Le <strong>chapitre 11</strong> détaille les deux écrans d'assistance : <span class="chemin">Aide &amp; À Propos</span> et <span class="chemin">Contactez l'Éditeur</span>.</p>
+
+  <div class="cartouche">
+    <h3>Coordonnées de l'éditeur</h3>
+    <p style="margin:0"><strong>Dr MASSENON Rhodes</strong> — Docteur en Génie Logiciel et IA</p>
+    <p style="margin:4pt 0 0">E-mail : <strong>rarhodes06@gmail.com</strong> · <strong>contact@massenonrhodes.com</strong><br>
+    Téléphone : <strong>+229 01 51 33 50 40</strong> · <strong>+229 01 97 31 24 37</strong><br>
+    Du lundi au vendredi, 8 h – 17 h (GMT)</p>
+  </div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Pour signaler un problème utilement, indiquez trois choses : <strong>l'écran</strong> où vous étiez, <strong>ce que vous veniez de faire</strong>, et <strong>le message exact</strong> affiché. Un signalement précis se traite en quelques minutes ; un « ça ne marche pas » demande une journée d'enquête.</p></div></div>
+
+  <div style="margin-top:22pt;border-top:2.5pt solid var(--forest);padding-top:9pt;font-size:9pt;color:var(--muted);text-align:center">
+    <strong style="color:var(--forest)">AgriERP — Manuel d'utilisation</strong><br>
+    Ferme École OLOUWACHEGOUN — Ikpinlè, Bénin<br>
+    Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB)<br>
+    Accompagnement des PME : Cabinet FAGUEZ SARL<br>
+    Édité par Dr MASSENON Rhodes, Docteur en Génie Logiciel et IA<br>
+    Édition d'août 2026 — version 1.0.0 du logiciel
+  </div>
+</section>

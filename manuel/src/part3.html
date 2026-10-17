@@ -1,0 +1,355 @@
+<!-- =======================  CHAPITRE 3  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">3</div>
+    <div>
+      <h1>Ventes &amp; Clients</h1>
+      <p class="ch-sous">Enregistrer une vente au comptoir, établir un devis, suivre les créances et relancer les clients.</p>
+    </div>
+  </div>
+
+  <p class="intro">L'écran <span class="chemin">Ventes &amp; Devis</span> regroupe quatre onglets : <strong>Enregistrer Vente</strong>, <strong>Devis Prestations</strong>, <strong>Historique des Ventes</strong> et <strong>Retours et Avoirs</strong>.</p>
+
+  <h2>3.1 Enregistrer une vente</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer Vente</span></p>
+  <p>C'est l'écran de caisse. Il est conçu pour être rapide : les produits à gauche, le panier à droite.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/30-pos.jpg" alt="Écran de vente au comptoir">
+      <span class="cible" style="left:21.9%;top:18.6%;width:16.3%;height:4.4%"><b>1</b></span>
+      <span class="cible" style="left:38.1%;top:18.1%;width:12.0%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:72.6%;top:26.4%;width:24.8%;height:9.8%"><b>3</b></span>
+      <span class="cible" style="left:72.6%;top:71.0%;width:24.8%;height:9.8%"><b>4</b></span>
+      <span class="cible bas" style="left:72.6%;top:86.8%;width:24.8%;height:5.2%"><b>5</b></span>
+    </div>
+    <figcaption><b>Figure 3.1</b> — L'écran de vente.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Rechercher un produit</span>
+    <span><i>2</i>Ajouter un produit ferme</span>
+    <span><i>3</i>Choix du client</span>
+    <span><i>4</i>Mode de règlement</span>
+    <span><i>5</i>Valider la vente</span>
+  </p>
+
+  <h3>Le parcours complet</h3>
+  <ol class="etapes">
+    <li><strong>Trouvez le produit.</strong> Tapez son nom dans <span class="champ">Rechercher un produit…</span>, ou cliquez sur une catégorie (<em>Aliments</em>, <em>Aviculture</em>, <em>Cuniculture</em>, <em>Équipements</em>, <em>Maraîchage</em>, <em>Médicaments</em>, <em>Porciculture</em>, <em>Transformation</em>).</li>
+    <li><strong>Cliquez sur la carte du produit.</strong> La fenêtre <em>Vente à la Pièce</em> s'ouvre.</li>
+    <li><strong>Si le produit est un animal vivant</strong>, choisissez la <span class="champ">Bande source</span>. Ce choix est obligatoire : il permet au logiciel de vérifier qu'aucune rémanence vétérinaire n'est en cours sur cette bande.</li>
+    <li>Saisissez le <span class="champ">Nombre de sujets / Quantité</span>.</li>
+    <li>Saisissez le <span class="champ">Montant global de la vente (FCFA)</span> — le <strong>total convenu avec le client</strong> pour toute la quantité.</li>
+    <li>Cliquez sur <span class="btn">Ajouter au panier</span>. Le produit apparaît dans le <em>Panier de Vente</em> à droite.</li>
+    <li>Répétez pour chaque article.</li>
+    <li><strong>Choisissez le client</strong> dans la liste <span class="champ">Client</span>, ou laissez <em>Client Anonyme</em> pour une vente de passage.</li>
+    <li>Saisissez une <span class="champ">Remise (FCFA)</span> si elle a été accordée. Le <strong>Total à payer</strong> se recalcule.</li>
+    <li>Choisissez le <span class="champ">Mode de règlement</span>.</li>
+    <li>Pour un paiement en espèces, saisissez le <span class="champ">Montant reçu</span> : la <strong>Monnaie à rendre</strong> s'affiche automatiquement.</li>
+    <li>Cliquez sur <span class="btn">Valider la Vente</span>.</li>
+  </ol>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/M0b-panier-rempli.jpg" alt="Panier de vente rempli">
+    </div>
+    <figcaption><b>Figure 3.2</b> — Un article dans le panier. Le message vert en haut à droite confirme chaque ajout ; il disparaît seul après quelques secondes.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Le champ <strong>Montant global de la vente</strong> attend le <strong>total</strong>, pas un prix unitaire. Pour 30 plateaux d'œufs vendus 2&nbsp;500 F l'unité, saisissez <strong>75&nbsp;000</strong>, pas 2&nbsp;500.</p>
+  <p>Ce fonctionnement est volontaire : à la ferme, le prix se négocie sur le lot entier, et le logiciel ne doit jamais décider seul du total à la place du vendeur.</p></div></div>
+
+  <h3>Les modes de règlement</h3>
+  <table>
+    <thead><tr><th style="width:32%">Mode</th><th>Quand l'utiliser</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Espèces</strong></td><td>Paiement comptant en liquide. Saisissez le montant reçu pour obtenir la monnaie à rendre.</td></tr>
+      <tr><td><strong>Mobile Money</strong></td><td>Paiement par MTN MoMo, Moov Money ou équivalent.</td></tr>
+      <tr><td><strong>Virement bancaire</strong></td><td>Le client paie par virement sur le compte de la ferme.</td></tr>
+      <tr><td><strong>Crédit / À terme</strong></td><td>Le client emporte la marchandise et paiera plus tard. Une créance est créée automatiquement.</td></tr>
+      <tr><td><strong>Déduire de l'avance</strong></td><td>Le client a déjà versé une avance ; la vente s'impute dessus.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le mode <strong>Crédit / À terme</strong> est réservé aux clients enregistrés. Choisir <em>Client Anonyme</em> avec un règlement à crédit revient à créer une dette que personne ne pourra recouvrer.</p></div></div>
+
+  <h3>Deux blocages que vous rencontrerez</h3>
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>« Vente interdite — bande sous rémanence vétérinaire active »</strong><br>
+  Les animaux de cette bande sont sous délai d'attente après un traitement. La vente est refusée par le logiciel. Retirez l'article du panier et prévenez le chef d'élevage — n'essayez pas de contourner le blocage en changeant de bande source.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p><strong>« Stock insuffisant »</strong><br>
+  Le message apparaît en orange mais la vente reste possible : sur une ferme, la marchandise physique existe parfois avant sa saisie informatique. Signalez néanmoins l'écart au responsable des stocks — il faudra le régulariser par un ajustement d'inventaire (section 5.3).</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un produit affiché <strong>Sur devis technique</strong> ne peut pas être vendu directement au comptoir : le logiciel vous redirige vers l'onglet <em>Devis</em>. C'est le cas des cages et équipements, dont le prix dépend d'un chiffrage.</p></div></div>
+
+  <h3>Ce que la validation déclenche</h3>
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un clic sur <strong>Valider la Vente</strong> ne fait pas qu'imprimer un ticket. En une seule opération, le logiciel :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>enregistre la vente et sa facture ;</li>
+    <li><strong>diminue le stock</strong> des produits vendus ;</li>
+    <li><strong>crédite la caisse</strong> ou le compte de trésorerie concerné ;</li>
+    <li><strong>génère l'écriture comptable</strong> SYSCOHADA correspondante ;</li>
+    <li><strong>reporte la vente sur la fiche d'élevage</strong> du jour s'il s'agit d'un animal ou d'un produit issu d'une bande ;</li>
+    <li>crée la <strong>créance</strong> si le règlement est à crédit.</li>
+  </ul></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Si le message de confirmation précise « écriture comptable non générée », la vente est bien enregistrée mais la comptabilité ne l'a pas reçue : il manque un mode de règlement ou un compte de trésorerie. <strong>Signalez-le au comptable le jour même</strong> pour régularisation au journal.</p></div></div>
+
+  <h3>Autres boutons de l'écran de vente</h3>
+  <ul class="puces">
+    <li><span class="btn">Ajouter Produit Ferme</span> — crée à la volée un produit absent du catalogue, sans quitter la caisse.</li>
+    <li><span class="btn">Livraison concernée</span> — précise le régime de livraison : <em>Livraison gratuite (offerte)</em>, <em>assurée par le client</em>, <em>prix inclus dans le montant</em> ou <em>facturée séparément</em>.</li>
+    <li>L'icône <strong>personne +</strong> à droite du champ Client crée un client sans quitter l'écran : <span class="champ">Nom complet</span>, <span class="champ">Téléphone</span>, <span class="champ">Ville</span>, <span class="champ">Email</span>.</li>
+  </ul>
+
+  <h2>3.2 Établir un devis</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Devis Prestations</span> <span class="fleche">➔</span> <span class="btn">Nouveau Devis</span></p>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Client</span>.</li>
+    <li>Décrivez les <span class="champ">Articles / prestations</span>.</li>
+    <li>Saisissez le <span class="champ">Montant HT (FCFA)</span> et choisissez la <span class="champ">TVA (%)</span> : <em>0 %</em> ou <em>18 %</em>.</li>
+    <li>Indiquez la <span class="champ">Validité (jours)</span> et la <span class="champ">Date du devis</span>.</li>
+    <li>Ajoutez une <span class="champ">Note</span> si nécessaire, puis cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <p>Sur chaque ligne du tableau, les icônes permettent d'<strong>accepter</strong>, <strong>refuser</strong>, <strong>modifier</strong>, <strong>envoyer</strong> le devis ou de le <strong>convertir en facture</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Un devis accepté se transforme en facture sans ressaisie : utilisez l'icône <em>facture</em> de la ligne plutôt que de recréer la vente au comptoir.</p></div></div>
+
+  <h2>3.3 Consulter et annuler une vente</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Historique des Ventes</span></p>
+  <p>Le tableau affiche : <strong>Facture, Client, Date, Articles, Remise, Total TTC, Payé, Reste, Mode, Statut</strong>. Le bouton <span class="btn">Réinitialiser</span> efface les filtres de recherche.</p>
+
+  <h3>Consulter le détail d'une vente</h3>
+  <p>Cliquez sur l'icône <strong>œil</strong> de la ligne. Le détail complet s'affiche : les articles vendus, les quantités, les montants, le mode de règlement et le statut de la facture.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H4-detail-vente.jpg" alt="Détail d'une vente">
+    </div>
+    <figcaption><b>Figure 3.4</b> — Le détail d'une vente enregistrée.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant d'annuler une vente ou d'établir un avoir, ouvrez toujours ce détail : il vous dit exactement ce qui a été vendu et à quel prix. C'est aussi ce que vous devez lire au client au téléphone.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Annuler une vente est une opération <strong>lourde et tracée</strong> : elle remet la marchandise en stock, retire l'argent de la caisse et contre-passe l'écriture comptable. Elle reste visible dans l'historique avec le statut <em>Annulée</em> — une vente n'est <strong>jamais effacée</strong>.</p>
+  <p>N'annulez une vente que le jour même et pour une erreur de saisie. Pour un retour de marchandise, utilisez un <strong>avoir</strong> (section 3.4).</p></div></div>
+
+  <h2>3.4 Retours et avoirs</h2>
+  <p><span class="chemin">Ventes &amp; Devis</span> <span class="fleche">➔</span> <span class="chemin">Retours et Avoirs</span> <span class="fleche">➔</span> <span class="btn">Nouveau Retour</span></p>
+  <ol class="etapes">
+    <li>Sélectionnez la vente concernée dans la liste (numéro, client et montant y figurent).</li>
+    <li>Indiquez le motif du retour et la décision prise.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer le Retour</span>.</li>
+  </ol>
+  <p>Le tableau suit chaque avoir : <strong>Avoir, Facture, Client, Date, Motif, Décision, Montant, Statut</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un avoir validé génère sa <strong>propre écriture comptable</strong>, en sens inverse de la vente d'origine. La vente initiale reste intacte : c'est ce qui permet, en fin d'année, de distinguer le chiffre d'affaires réalisé du chiffre d'affaires repris.</p></div></div>
+
+  <h2>3.5 Les clients et les créances</h2>
+  <p><span class="chemin">Clients et Créances</span> — quatre onglets.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/34-clients-liste.jpg" alt="Liste des clients">
+      <span class="cible" style="left:86.4%;top:18.8%;width:12.1%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:35.2%;top:10.6%;width:12.5%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 3.3</b> — La liste des clients. <b>1</b> Créer un client — <b>2</b> Onglet Suivi des Dettes.</figcaption>
+  </figure>
+
+  <h3>Liste des Clients</h3>
+  <p>Colonnes : <strong>Nom, Téléphone, Ville, Total achats, Solde dû, Statut</strong>. Le bouton <span class="btn">Nouveau Client</span> demande le <span class="champ">Nom complet</span>, le <span class="champ">Téléphone</span>, la <span class="champ">Ville</span> et l'<span class="champ">Email</span>.</p>
+
+  <p>Les indicateurs du haut — <strong>Clients actifs</strong>, <strong>Nouveaux (mois)</strong>, <strong>Solde créances</strong> — se recalculent seuls.</p>
+
+  <h3>Modifier ou archiver un client</h3>
+  <p>Trois icônes sont disponibles sur chaque ligne, dans la colonne <strong>Actions</strong> :</p>
+  <table>
+    <thead><tr><th style="width:24%">Icône</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td><strong>crayon</strong></td><td>Ouvre <em>Modifier le Client</em>, préremplie. Corrigez le nom, le téléphone, la ville ou l'e-mail, puis <span class="btn">Enregistrer</span>.</td></tr>
+      <tr><td><strong>facture</strong></td><td>Ouvre le profil du client (ventes, créances, avances, relances).</td></tr>
+      <tr><td><strong>corbeille</strong></td><td><strong>Archive</strong> le client. Ses ventes passées restent intactes.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G6-editer-client.jpg" alt="Modification d'un client">
+    </div>
+    <figcaption><b>Figure 3.6</b> — La fenêtre <em>Modifier le Client</em>.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>N'archivez jamais un client dont le <strong>solde dû n'est pas nul</strong> : la créance reste enregistrée mais le client disparaît des listes de relance. Encaissez d'abord, archivez ensuite.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Saisissez toujours le <strong>téléphone</strong> : sans lui, aucune relance par SMS ni par WhatsApp n'est possible, et c'est le canal qui fonctionne réellement pour le recouvrement.</p></div></div>
+
+  <h3>Suivi des Dettes</h3>
+  <p>Colonnes : <strong>Débiteur, Facture associée, Échéance, Total facturé, Solde restant</strong>. Le bouton <span class="btn">Ajouter un Recouvrement</span> enregistre un paiement reçu : saisissez le <span class="champ">Montant du règlement (FCFA)</span> et le <span class="champ">Compte de trésorerie</span> qui l'encaisse.</p>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Choisissez le <strong>bon compte de trésorerie</strong> : espèces reçues en main propre → <em>Caisse</em> ; virement reçu → <em>Compte bancaire</em>. Une erreur ici fait diverger le solde affiché du solde réel, et l'écart n'est retrouvé qu'au rapprochement bancaire, parfois des semaines plus tard.</p></div></div>
+
+  <h3>Relances Clients</h3>
+  <p>Quatre canaux de relance sont proposés sur chaque débiteur : <span class="btn">Relancer WhatsApp</span>, <span class="btn">Relancer par Mail</span>, <span class="btn">Relancer par SMS</span> et <span class="btn">Exporter Courrier</span>.</p>
+  <p>Choisissez le <span class="champ">Niveau de relance</span> puis adaptez le <span class="champ">Modèle de message</span>. Les mentions <strong>[NOM]</strong>, <strong>[FACTURE]</strong>, <strong>[MONTANT_DU]</strong> et <strong>[DATE_ECHEANCE]</strong> sont remplacées automatiquement par les valeurs du client — ne les modifiez pas.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'envoi par e-mail et par SMS suppose que la configuration a été faite : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Intégrations</span>. Le bouton <span class="btn">Configurer Email &amp; SMS</span> vous y conduit directement.</p></div></div>
+
+  <h3>Historique des Avances</h3>
+  <p>Colonnes : <strong>Client, Montant avance, Solde restant, Date, Statut</strong>. Le bouton <span class="btn">Nouvelle Avance</span> demande le <span class="champ">Client</span>, le <span class="champ">Montant (FCFA)</span> et la <span class="champ">Date</span>.</p>
+
+  <h3>Le profil d'un client</h3>
+  <p>Cliquez sur le nom d'un client pour ouvrir sa fiche. Le haut de l'écran affiche son <strong>solde global dû</strong> et sa <strong>limite de crédit</strong>, puis trois actions : <span class="btn">Modifier la fiche</span>, <span class="btn">Enregistrer un règlement</span>, <span class="btn">Envoyer une relance rapide</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ventes</strong></td><td><em>Facture, Date, Articles, Montant, Statut</em> — tout ce que ce client a acheté.</td></tr>
+      <tr><td><strong>Créances</strong></td><td>Ce qu'il doit encore, facture par facture, avec les échéances.</td></tr>
+      <tr><td><strong>Avances &amp; Acomptes</strong></td><td>Les sommes versées d'avance et le solde qu'il lui reste à consommer.</td></tr>
+      <tr><td><strong>Relances</strong></td><td>L'historique des relances envoyées : quand, par quel canal, à quel niveau.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D8-client-creances.jpg" alt="Onglet Créances du profil client">
+    </div>
+    <figcaption><b>Figure 3.7</b> — L'onglet Créances du profil client.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>La <strong>limite de crédit</strong> affichée en haut du profil est le montant maximal que la ferme accepte de laisser impayé pour ce client. Comparez-la au solde dû avant d'accorder une nouvelle vente à terme.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/DA-client-relances.jpg" alt="Onglet Relances du profil client">
+    </div>
+    <figcaption><b>Figure 3.8</b> — L'onglet Relances : la trace de tout ce qui a déjà été tenté.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Consultez l'onglet <strong>Relances</strong> avant d'appeler : relancer trois fois la même semaine par le même canal irrite le client sans faire avancer le recouvrement. L'historique vous dit où vous en êtes.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant d'accorder une vente à crédit, ouvrez le profil du client : son <strong>solde dû</strong> et son historique de règlements y sont réunis. C'est trente secondes qui évitent des mois de relance.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 4  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">4</div>
+    <div>
+      <h1>Achats &amp; Dépenses</h1>
+      <p class="ch-sous">Enregistrer les achats de la ferme, suivre les fournisseurs et saisir les charges courantes.</p>
+    </div>
+  </div>
+
+  <p class="intro">Deux écrans distincts, souvent confondus : <strong>Achats &amp; Commandes</strong> sert à ce qui entre en stock (provende, médicaments, matériel) ; <strong>Saisie Dépenses</strong> sert à ce qui ne s'y stocke pas (carburant, électricité, transport).</p>
+
+  <h2>4.1 Enregistrer un achat</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer un Achat</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/40-achat-enregistrer.jpg" alt="Enregistrer un achat">
+      <span class="cible" style="left:22.9%;top:30.6%;width:48.1%;height:9.8%"><b>1</b></span>
+      <span class="cible" style="left:22.9%;top:44.1%;width:48.1%;height:9.8%"><b>2</b></span>
+      <span class="cible" style="left:22.9%;top:56.6%;width:48.1%;height:5.4%"><b>3</b></span>
+      <span class="cible bas" style="left:73.5%;top:94.5%;width:24.8%;height:5.0%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 4.1</b> — L'écran d'achat. <b>1</b> Fournisseur — <b>2</b> Article — <b>3</b> Ajouter au bon — <b>4</b> Enregistrer l'achat.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le fournisseur dans <span class="champ">Sélectionner fournisseur</span>. L'icône <strong>personne +</strong> permet d'en créer un sans quitter l'écran.</li>
+    <li>Dans <strong>Ajouter un article</strong>, choisissez le <span class="champ">Produit / article</span>, puis saisissez la <span class="champ">Quantité</span> et le <span class="champ">Prix unitaire</span>.</li>
+    <li>Cliquez sur <span class="btn">Ajouter au bon d'achat</span>. Répétez pour chaque ligne de la facture du fournisseur.</li>
+    <li>Choisissez le <span class="champ">Mode de paiement</span> et le <span class="champ">Compte débité</span>.</li>
+    <li>Saisissez le <span class="champ">Montant payé (FCFA)</span>. S'il est inférieur au total, le solde devient une <strong>dette fournisseur</strong>.</li>
+    <li>Ajoutez la <span class="champ">Pièce justificative</span> : cliquez sur <em>Associer une photo du reçu</em> (JPG ou PNG, 5 Mo maximum).</li>
+    <li>Cliquez sur <span class="btn">Enregistrer l'Achat</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'enregistrement d'un achat <strong>augmente le stock</strong> des articles reçus, <strong>diminue la trésorerie</strong> du montant payé, <strong>génère l'écriture comptable</strong> et <strong>crée la dette</strong> pour le solde impayé. Une seule saisie, quatre effets.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Photographiez le reçu <strong>avant</strong> de le ranger et joignez-le tout de suite. Une pièce justificative attachée à la saisie est retrouvée en trois secondes le jour du contrôle ; un reçu classé dans un carton ne l'est jamais.</p></div></div>
+
+  <h2>4.2 Liste des achats et remboursements</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Liste d'Achats</span></p>
+  <p>Colonnes : <strong>Référence achat, Date, Fournisseur, Catégorie, Montant total, Statut</strong>. Le bouton <span class="btn">Ajouter Remboursement</span> enregistre un retour de marchandise au fournisseur.</p>
+
+  <h2>4.3 Les bons de commande</h2>
+  <p><span class="chemin">Achats &amp; Commandes</span> <span class="fleche">➔</span> <span class="chemin">Bons de Commande</span></p>
+  <p>Le bon de commande est un <strong>engagement avant livraison</strong> : il ne touche ni le stock ni la trésorerie.</p>
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Fournisseur</span> et la <span class="champ">Date de livraison attendue</span>.</li>
+    <li>Ajoutez chaque ligne : <span class="champ">Produit / article</span>, <span class="champ">Quantité</span>, <span class="champ">P.U estimé (FCFA)</span>, puis <span class="btn">Ajouter au bon de commande</span>.</li>
+    <li>Cliquez sur <span class="btn">Générer le Bon</span>. L'icône <strong>imprimante</strong> édite le document à envoyer au fournisseur.</li>
+    <li>À la livraison, utilisez l'icône <strong>réception</strong> de la ligne pour transformer le bon en achat réel.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Tant que la réception n'est pas enregistrée, la marchandise <strong>n'est pas en stock</strong>, même si elle est physiquement dans le magasin. Réceptionnez le bon le jour de la livraison.</p></div></div>
+
+  <h2>4.4 Les fournisseurs</h2>
+  <p><span class="chemin">Fournisseurs</span> — trois onglets : <strong>Fiches Fournisseurs</strong>, <strong>Ajouter Fournisseur</strong>, <strong>Dettes Fournisseurs</strong>.</p>
+  <ul class="puces">
+    <li><strong>Fiches Fournisseurs</strong> — <em>Nom, Catégorie, Total achats (année), Dernière commande, Statut</em>.</li>
+    <li><strong>Ajouter Fournisseur</strong> — <em>Nom, Contact, Catégorie, Statut</em>, avec le bouton <span class="btn">Nouveau Fournisseur</span>.</li>
+    <li><strong>Dettes Fournisseurs</strong> — <em>Fournisseur, Montant dû, Échéance, Statut</em>. Le bouton <span class="btn">Enregistrer un Règlement</span> solde tout ou partie d'une dette.</li>
+  </ul>
+
+  <h3>Le profil d'un fournisseur</h3>
+  <p>Cliquez sur l'icône <strong>œil</strong> d'une fiche. Le haut de l'écran affiche le <strong>solde global dû</strong>, puis deux actions : <span class="btn">Modifier la fiche</span> et <span class="btn">Enregistrer un règlement</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Achats</strong></td><td><em>Référence, Date, Catégorie, Montant, Statut</em> — l'historique de ce que vous lui avez acheté.</td></tr>
+      <tr><td><strong>Dettes</strong></td><td>Ce que la ferme lui doit encore, avec les échéances.</td></tr>
+      <tr><td><strong>Commandes</strong></td><td>Les bons de commande en cours et livrés.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E1-fournisseur-dettes.jpg" alt="Onglet Dettes du profil fournisseur">
+    </div>
+    <figcaption><b>Figure 4.3</b> — L'onglet Dettes du profil fournisseur.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Avant de passer une nouvelle commande, ouvrez le profil du fournisseur : un solde dû important est le meilleur argument pour négocier un délai, et la meilleure raison de payer avant de commander à nouveau.</p></div></div>
+
+  <h2>4.5 Saisir une dépense</h2>
+  <p><span class="chemin">Saisie Dépenses</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/47-saisie-depenses.jpg" alt="Saisie des dépenses">
+      <span class="cible" style="left:60.3%;top:50.8%;width:36.5%;height:8.3%"><b>1</b></span>
+      <span class="cible" style="left:23.4%;top:60.2%;width:36.5%;height:9.8%"><b>2</b></span>
+      <span class="cible" style="left:23.4%;top:69.6%;width:36.5%;height:9.8%"><b>3</b></span>
+      <span class="cible bas" style="left:23.4%;top:79.4%;width:73.4%;height:5.4%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 4.2</b> — La saisie d'une dépense.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Libellé</span>
+    <span><i>2</i>Catégorie SYSCOHADA</span>
+    <span><i>3</i>Compte de trésorerie</span>
+    <span><i>4</i>Enregistrer</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Vérifiez la <span class="champ">Date de la transaction</span>.</li>
+    <li>Saisissez un <span class="champ">Libellé de la dépense</span> précis — <em>« Gasoil groupe électrogène — semaine 34 »</em> vaut mieux que <em>« carburant »</em>.</li>
+    <li>Choisissez la <span class="champ">Catégorie de charges (SYSCOHADA)</span>.</li>
+    <li>Saisissez le <span class="champ">Montant décaissé (FCFA)</span>.</li>
+    <li>Choisissez le <span class="champ">Compte de trésorerie débité</span> : celui d'où l'argent est réellement sorti.</li>
+    <li>Joignez le <span class="champ">Reçu / facture (photo)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer la Dépense</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>La <strong>catégorie de charges</strong> détermine le compte comptable mouvementé, et donc la lecture du compte de résultat. Une erreur de catégorie ne se voit pas le jour même : elle apparaît des mois plus tard, dans un poste de charges anormalement gonflé. En cas de doute, demandez au comptable <strong>avant</strong> de valider.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Achat ou dépense ? La règle est simple : <strong>si l'article entre en stock, c'est un achat</strong> (provende, médicaments, matériel). <strong>S'il est consommé immédiatement, c'est une dépense</strong> (carburant, électricité, transport, réparation).</p></div></div>
+</section>

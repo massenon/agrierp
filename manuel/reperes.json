@@ -1,0 +1,507 @@
+{
+    "00-connexion": [
+        {
+            "h": 1.78,
+            "txt": "NOM D'UTILISATEUR OU EMAIL",
+            "w": 31.25,
+            "x": 59.38,
+            "y": 49.49
+        },
+        {
+            "h": 1.78,
+            "txt": "MOT DE PASSE",
+            "w": 31.25,
+            "x": 59.38,
+            "y": 58.89
+        },
+        {
+            "h": 5.23,
+            "txt": "lock_open SE CONNECTER",
+            "w": 31.25,
+            "x": 59.38,
+            "y": 72.09
+        },
+        {
+            "h": 1.9,
+            "txt": "Mot de passe oublié ?",
+            "w": 10.15,
+            "x": 80.47,
+            "y": 68.28
+        }
+    ],
+    "01-dashboard": [
+        {
+            "h": 4.76,
+            "txt": "point_of_sale Enregistrer une Vente",
+            "w": 14.49,
+            "x": 75.39,
+            "y": 11.18
+        },
+        {
+            "h": 2.85,
+            "txt": "CHIFFRE D'AFFAIRES trending_up",
+            "w": 15.77,
+            "x": 23.37,
+            "y": 32.34
+        },
+        {
+            "h": 2.38,
+            "txt": "Alertes Critiques",
+            "w": 22.21,
+            "x": 74.88,
+            "y": 60.76
+        },
+        {
+            "h": 4.76,
+            "txt": "picture_as_pdf PDF",
+            "w": 6.15,
+            "x": 91.5,
+            "y": 19.62
+        }
+    ],
+    "30-pos": [
+        {
+            "h": 4.04,
+            "txt": "Rechercher un produit...",
+            "w": 15.91,
+            "x": 22.16,
+            "y": 18.91
+        },
+        {
+            "h": 1.78,
+            "txt": "CLIENT",
+            "w": 24.23,
+            "x": 72.86,
+            "y": 27.23
+        },
+        {
+            "h": 1.78,
+            "txt": "MODE DE RÈGLEMENT",
+            "w": 24.23,
+            "x": 72.86,
+            "y": 71.84
+        },
+        {
+            "h": 4.76,
+            "txt": "point_of_sale Valider la Vente",
+            "w": 24.23,
+            "x": 72.86,
+            "y": 87.12
+        },
+        {
+            "h": 4.99,
+            "txt": "add_box Ajouter Produit Ferme",
+            "w": 11.62,
+            "x": 38.35,
+            "y": 18.43
+        }
+    ],
+    "11-elevage-bandes": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouvelle Bande",
+            "w": 11.64,
+            "x": 86.65,
+            "y": 11.18
+        },
+        {
+            "h": 4.99,
+            "txt": "picture_as_pdf Exporter PDF",
+            "w": 76.14,
+            "x": 22.16,
+            "y": 36.86
+        }
+    ],
+    "32-historique-ventes": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouvelle Vente",
+            "w": 11.42,
+            "x": 86.88,
+            "y": 19.14
+        },
+        {
+            "h": 4.76,
+            "txt": "restart_alt Réinitialiser",
+            "w": 8.66,
+            "x": 88.43,
+            "y": 51.44
+        }
+    ],
+    "34-clients-liste": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouveau Client",
+            "w": 11.5,
+            "x": 86.8,
+            "y": 19.14
+        },
+        {
+            "h": 4.99,
+            "txt": "request_quote Suivi des Dettes",
+            "w": 11.86,
+            "x": 35.59,
+            "y": 10.94
+        }
+    ],
+    "40-achat-enregistrer": [
+        {
+            "h": 1.78,
+            "txt": "SÉLECTIONNER FOURNISSEUR",
+            "w": 47.07,
+            "x": 23.37,
+            "y": 31.51
+        },
+        {
+            "h": 1.78,
+            "txt": "AJOUTER UN ARTICLE",
+            "w": 47.07,
+            "x": 23.37,
+            "y": 44.95
+        },
+        {
+            "h": 5.23,
+            "txt": "add Ajouter au bon d'achat",
+            "w": 47.07,
+            "x": 23.37,
+            "y": 56.9
+        },
+        {
+            "h": 4.76,
+            "txt": "check_circle Enregistrer l'Achat",
+            "w": 24.23,
+            "x": 73.99,
+            "y": 97.09
+        }
+    ],
+    "47-saisie-depenses": [
+        {
+            "h": 7.49,
+            "txt": "LIBELLÉ DE LA DÉPENSE *",
+            "w": 35.72,
+            "x": 60.8,
+            "y": 51.61
+        },
+        {
+            "h": 1.78,
+            "txt": "CATÉGORIE DE CHARGES (SYSCOHADA) *",
+            "w": 35.72,
+            "x": 23.93,
+            "y": 61
+        },
+        {
+            "h": 1.78,
+            "txt": "COMPTE DE TRÉSORERIE DÉBITÉ *",
+            "w": 35.72,
+            "x": 23.93,
+            "y": 70.39
+        },
+        {
+            "h": 4.76,
+            "txt": "save Enregistrer la Dépense",
+            "w": 72.59,
+            "x": 23.93,
+            "y": 79.79
+        }
+    ],
+    "50-stocks-tableau": [
+        {
+            "h": 2.85,
+            "txt": "notification_important Configurer les Se",
+            "w": 15.79,
+            "x": 82.51,
+            "y": 12.13
+        },
+        {
+            "h": 4.52,
+            "txt": "Journal des Mouvements",
+            "w": 14.21,
+            "x": 35.22,
+            "y": 41.38
+        },
+        {
+            "h": 4.52,
+            "txt": "Ajustement \/ Correction",
+            "w": 13.59,
+            "x": 49.72,
+            "y": 41.38
+        },
+        {
+            "h": 4.76,
+            "txt": "add_circle Ajouter Stock",
+            "w": 10.68,
+            "x": 86.41,
+            "y": 50.06
+        }
+    ],
+    "52-stocks-ajustements": [
+        {
+            "h": 1.78,
+            "txt": "STOCK THÉORIQUE",
+            "w": 18.11,
+            "x": 23.93,
+            "y": 64.57
+        },
+        {
+            "h": 7.49,
+            "txt": "STOCK PHYSIQUE CONSTATÉ",
+            "w": 18.11,
+            "x": 43.18,
+            "y": 64.57
+        },
+        {
+            "h": 1.78,
+            "txt": "MOTIF DE L'ÉCART",
+            "w": 37.36,
+            "x": 23.93,
+            "y": 83.95
+        },
+        {
+            "h": 3.8,
+            "txt": "Valider l'ajustement",
+            "w": 37.36,
+            "x": 23.93,
+            "y": 93.34
+        }
+    ],
+    "53-catalogue-produits": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouveau Produit",
+            "w": 12.14,
+            "x": 86.15,
+            "y": 19.14
+        },
+        {
+            "h": 4.99,
+            "txt": "warning Seuils d'Alerte",
+            "w": 11.11,
+            "x": 35.88,
+            "y": 10.94
+        }
+    ],
+    "60-facturation": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouvelle Facture",
+            "w": 12.24,
+            "x": 86.06,
+            "y": 11.41
+        }
+    ],
+    "65-rh-employes": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouvel Employé",
+            "w": 11.87,
+            "x": 86.42,
+            "y": 19.38
+        },
+        {
+            "h": 4.99,
+            "txt": "payments Gestion de la Paie",
+            "w": 12.62,
+            "x": 63.43,
+            "y": 10.94
+        }
+    ],
+    "67-rh-paie": [
+        {
+            "h": 5.53,
+            "txt": "NET À PAYER",
+            "w": 5.77,
+            "x": 70.78,
+            "y": 51.49
+        }
+    ],
+    "72-journal": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Saisie d'Écriture",
+            "w": 11.97,
+            "x": 86.32,
+            "y": 11.41
+        },
+        {
+            "h": 4.99,
+            "txt": "picture_as_pdf Exporter PDF",
+            "w": 10.6,
+            "x": 75.44,
+            "y": 11.3
+        }
+    ],
+    "73-grand-livre": [
+        {
+            "h": 1.78,
+            "txt": "COMPTE :",
+            "w": 3.51,
+            "x": 23.37,
+            "y": 25.39
+        }
+    ],
+    "82-cloture": [
+        {
+            "h": 4.52,
+            "txt": "Clôture Périodique",
+            "w": 11.07,
+            "x": 22.16,
+            "y": 21.52
+        },
+        {
+            "h": 4.52,
+            "txt": "Clôture Annuelle",
+            "w": 10.17,
+            "x": 33.51,
+            "y": 21.52
+        },
+        {
+            "h": 4.76,
+            "txt": "lock Clôturer le Mois Sélectionné",
+            "w": 76.14,
+            "x": 22.16,
+            "y": 54.52
+        }
+    ],
+    "86-rapports-tresorerie": [
+        {
+            "h": 4.99,
+            "txt": "picture_as_pdf Exporter PDF",
+            "w": 10.6,
+            "x": 74.97,
+            "y": 23.54
+        },
+        {
+            "h": 4.99,
+            "txt": "table_view Exporter Excel",
+            "w": 11.24,
+            "x": 85.85,
+            "y": 23.54
+        },
+        {
+            "h": 5.47,
+            "txt": "payments Recettes et Dépenses",
+            "w": 14.51,
+            "x": 22.16,
+            "y": 33.41
+        }
+    ],
+    "93-param-utilisateurs": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouvel Utilisateur",
+            "w": 12.68,
+            "x": 85.61,
+            "y": 24.85
+        },
+        {
+            "h": 4.99,
+            "txt": "admin_panel_settings Rôles & Permissions",
+            "w": 13.78,
+            "x": 23.3,
+            "y": 10.94
+        }
+    ],
+    "96-param-sauvegardes": [
+        {
+            "h": 5.71,
+            "txt": "backup Générer une sauvegarde",
+            "w": 12.81,
+            "x": 85.49,
+            "y": 25.56
+        }
+    ],
+    "02-notifications": [
+        {
+            "h": 3.8,
+            "txt": "notifications Centre de Notifications",
+            "w": 76.14,
+            "x": 22.16,
+            "y": 10.46
+        }
+    ],
+    "21-soins-registre": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Nouveau Soin",
+            "w": 10.82,
+            "x": 87.48,
+            "y": 19.14
+        },
+        {
+            "h": 4.99,
+            "txt": "event_repeat Calendrier Vétérinaire",
+            "w": 14.63,
+            "x": 37.17,
+            "y": 10.94
+        },
+        {
+            "h": 4.99,
+            "txt": "monitor_heart Suivi Sanitaire",
+            "w": 11.01,
+            "x": 52.08,
+            "y": 10.94
+        }
+    ],
+    "22-transformation": [
+        {
+            "h": 7.49,
+            "txt": "NOMBRE DE SUJETS À ABATTRE *",
+            "w": 39.46,
+            "x": 23.37,
+            "y": 57.07
+        },
+        {
+            "h": 1.78,
+            "txt": "PRODUIT FINI CIBLE *",
+            "w": 39.46,
+            "x": 23.37,
+            "y": 66.47
+        },
+        {
+            "h": 4.76,
+            "txt": "check_circle Valider la Transformation",
+            "w": 39.46,
+            "x": 23.37,
+            "y": 96.91
+        }
+    ],
+    "S1-fiche-pondeuses-saisie": [
+        {
+            "h": 7.02,
+            "txt": "TOTAL ŒUFS RÉCOLTÉS (OR)",
+            "w": 17.12,
+            "x": 25.14,
+            "y": 60.52
+        },
+        {
+            "h": 7.02,
+            "txt": "ŒUFS CASSÉS \/ FÊLÉS (OF)",
+            "w": 17.12,
+            "x": 42.83,
+            "y": 60.52
+        },
+        {
+            "h": 1.78,
+            "txt": "COMMERCIALISABLES (OR-OF)",
+            "w": 17.12,
+            "x": 60.51,
+            "y": 60.52
+        }
+    ],
+    "28-parametres-elevage": [
+        {
+            "h": 4.76,
+            "txt": "add_circle Ajouter une Ration",
+            "w": 12.99,
+            "x": 85.31,
+            "y": 18.91
+        },
+        {
+            "h": 4.99,
+            "txt": "event_repeat Calendriers de Prophylaxie",
+            "w": 16.98,
+            "x": 40.84,
+            "y": 10.94
+        }
+    ]
+}

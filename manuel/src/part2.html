@@ -1,0 +1,411 @@
+<!-- =======================  CHAPITRE 2  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">2</div>
+    <div>
+      <h1>Élevage</h1>
+      <p class="ch-sous">Bandes et sujets, fiches journalières, rationnement, reproduction, soins, abattage et suivi technique.</p>
+    </div>
+  </div>
+
+  <p class="intro">Le module Élevage est le cœur du travail quotidien à la ferme. Il reprend, écran par écran, les registres papier existants : registre des bandes, fiche journalière, cahier de prophylaxie, registre des reproducteurs.</p>
+
+  <h2>2.1 Le principe : tout part de la bande</h2>
+  <p>Dans AgriERP, rien ne se saisit « en vrac ». Toute donnée d'élevage est rattachée à une <strong>bande</strong> (aussi appelée lot) : un groupe d'animaux de la même espèce, entré à la même période, suivi ensemble.</p>
+
+  <p style="text-align:center;font-size:11pt;margin:14pt 0 16pt">
+    <span class="chemin">Créer la bande</span> <span class="fleche">➔</span>
+    <span class="chemin">Y enregistrer des sujets</span> <span class="fleche">➔</span>
+    <span class="chemin">Saisir la fiche chaque jour</span> <span class="fleche">➔</span>
+    <span class="chemin">Vendre ou transformer</span>
+  </p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>C'est parce que tout est rattaché à une bande que le logiciel sait calculer un taux de mortalité, un gain moyen quotidien ou une marge par lot. Une saisie sans bande serait un chiffre sans histoire.</p></div></div>
+
+  <h2>2.2 Créer une bande</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Bandes &amp; Sujets</span> <span class="fleche">➔</span> <span class="btn">Nouvelle Bande</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/11-elevage-bandes.jpg" alt="Écran Bandes et Sujets">
+      <span class="cible" style="left:86.3%;top:10.9%;width:12.2%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:22.1%;top:36.6%;width:76.4%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 2.1</b> — La liste des bandes. <b>1</b> Créer une bande — <b>2</b> En-tête du tableau de suivi.</figcaption>
+  </figure>
+
+  <p>Le tableau affiche, pour chaque bande : <strong>Code bande, Espèce, Stade, Date de création, Effectif initial, Effectif actuel, Mortalité, Statut</strong>.</p>
+
+  <h3>Remplir la fenêtre « Nouvelle Bande »</h3>
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Espèce</span> : <em>Aviculture (Volailles)</em>, <em>Cuniculture (Lapins)</em> ou <em>Porciculture (Porcs)</em>.</li>
+    <li>Saisissez le <span class="champ">Code unique de la bande</span>. Suivez la convention de la ferme, par exemple <strong>AVI-2026-01</strong> : espèce, année, numéro d'ordre.</li>
+    <li>Choisissez le <span class="champ">Stade initial</span> : <em>Reproduction</em>, <em>Croissance</em>, <em>Ponte</em> ou <em>Engraissement</em>.</li>
+    <li>Vérifiez la <span class="champ">Date de création</span>, qui correspond au jour d'entrée des animaux.</li>
+    <li>Saisissez la <span class="champ">Quantité initiale (effectif)</span> : le nombre de têtes réellement comptées.</li>
+    <li>Indiquez le <span class="champ">Coût d'acquisition (FCFA)</span> si vous avez acheté ces animaux. Ce montant sert au calcul de la marge du lot.</li>
+    <li>Si la bande produit un article vendable (des œufs, par exemple), sélectionnez-le dans <span class="champ">Produit issu de cette bande</span>.</li>
+    <li>Cliquez sur <span class="btn">Créer la Bande</span>.</li>
+  </ol>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le <strong>code de la bande ne peut plus être modifié</strong> une fois des saisies journalières rattachées. Prenez le temps de le vérifier avant de valider — un code erroné se traîne ensuite dans tous les rapports.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le champ <strong>Produit issu de cette bande</strong> est ce qui permet à la récolte quotidienne d'alimenter automatiquement le stock vendable. Sans lui, vous devrez saisir l'entrée en stock à la main.</p></div></div>
+
+  <h2>2.3 Enregistrer des sujets</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Enregistrer des Sujets</span> <span class="fleche">➔</span> <span class="btn">Nouveau Sujet</span></p>
+
+  <p>Cet écran sert à faire entrer des animaux dans une bande <strong>après</strong> sa création : une nouvelle livraison, une naissance en nombre, un don reçu.</p>
+
+  <ol class="etapes">
+    <li>Choisissez l'<span class="champ">Espèce</span>.</li>
+    <li>Choisissez la <span class="champ">Bande / lot de destination</span> (la liste ne propose que les bandes de l'espèce retenue).</li>
+    <li>Indiquez l'<span class="champ">Origine</span> : <em>Naissance</em>, <em>Achat</em> ou <em>Don</em>.</li>
+    <li>Saisissez la <span class="champ">Quantité</span> et la <span class="champ">Date</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>. L'effectif de la bande est mis à jour immédiatement.</li>
+  </ol>
+
+  <h3>Modifier ou archiver une bande</h3>
+  <p>Sur chaque ligne du tableau <span class="chemin">Bandes &amp; Sujets</span>, deux icônes sont disponibles à droite, dans la colonne <strong>Actions</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G1-editer-bande.jpg" alt="Modification d'une bande">
+    </div>
+    <figcaption><b>Figure 2.2</b> — La fenêtre de modification reprend les mêmes champs que la création, déjà remplis.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:22%">Icône</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td><strong>crayon</strong> (edit)</td><td>Ouvre la fenêtre de modification, préremplie avec les valeurs actuelles. Corrigez, puis <span class="btn">Enregistrer</span>.</td></tr>
+      <tr><td><strong>corbeille</strong></td><td><strong>Archive</strong> la bande : elle sort des listes actives, sans être supprimée.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>L'icône corbeille <strong>n'efface rien</strong>. La bande, ses fiches journalières et ses ventes restent en base et un administrateur peut la restaurer depuis <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span>. C'est vrai de toutes les corbeilles du logiciel.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les quatre indicateurs en haut de l'écran — <strong>Bandes actives</strong>, <strong>En reproduction</strong>, <strong>Effectif total vivant</strong>, <strong>Alertes sanitaires</strong> — se recalculent à chaque ouverture. Ils ne se saisissent pas.</p></div></div>
+
+  <h2>2.4 La fiche journalière</h2>
+  <p>C'est la saisie la plus fréquente : <strong>une fois par jour, par bande</strong>. Chaque filière a sa fiche, adaptée à ses données :</p>
+
+  <table>
+    <thead><tr><th style="width:36%">Écran</th><th>Filière</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chemin">Fiches Pondeuses</span></td><td>Aviculture — suivi de la ponte et de la récolte d'œufs</td></tr>
+      <tr><td><span class="chemin">Fiches Volailles Reproducteurs</span></td><td>Aviculture — reproducteurs, poussins, Goliath</td></tr>
+      <tr><td><span class="chemin">Fiches Lapins</span></td><td>Cuniculture</td></tr>
+      <tr><td><span class="chemin">Fiches Porcs</span></td><td>Porciculture</td></tr>
+      <tr><td><span class="chemin">Fiches Escargots</span></td><td>Héliciculture — visible seulement si le module est activé</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Exemple complet : la fiche Pondeuses</h3>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Fiches Pondeuses</span></p>
+
+  <p>Le haut de l'écran rappelle quatre indicateurs : <strong>Effectif pondeuses vivantes</strong>, <strong>Taux de ponte moyen</strong>, <strong>Stock plateaux (30 œufs)</strong> et <strong>Taux de mortalité</strong>. Le bloc <em>Saisie Journalière Ponte &amp; Cheptel</em> se trouve juste en dessous.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/S1-fiche-pondeuses-saisie.jpg" alt="Saisie journalière de la fiche pondeuses">
+      <span class="cible" style="left:24.6%;top:59.8%;width:18.1%;height:8.0%"><b>1</b></span>
+      <span class="cible" style="left:42.3%;top:59.8%;width:18.1%;height:8.0%"><b>2</b></span>
+      <span class="cible" style="left:60.0%;top:59.8%;width:18.1%;height:8.0%"><b>3</b></span>
+      <span class="cible bas" style="left:24.6%;top:68.8%;width:53.5%;height:8.5%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 2.2</b> — Le bloc de saisie journalière. Seuls les champs blancs se remplissent : les champs grisés sont calculés par le logiciel.</figcaption>
+  </figure>
+  <p class="legende-reperes">
+    <span><i>1</i>Total œufs récoltés (OR)</span>
+    <span><i>2</i>Œufs cassés / fêlés (OF)</span>
+    <span><i>3</i>Commercialisables (calculé)</span>
+    <span><i>4</i>Report automatique en stock</span>
+  </p>
+
+  <ol class="etapes">
+    <li>Vérifiez la <span class="champ">Date</span> en haut à droite du bloc — par défaut, la date du jour.</li>
+    <li>Saisissez les <span class="champ">Achats / Entrées du jour</span> et les <span class="champ">Nés / Transferts du jour</span> s'il y en a eu.</li>
+    <li>Saisissez le <span class="champ">Total œufs récoltés (OR)</span>, puis les <span class="champ">Œufs cassés / fêlés (OF)</span>.</li>
+    <li>Dans <strong>Morts par catégorie</strong>, indiquez les pertes par catégorie : <em>Pondeuse / Repro</em>, <em>Poulette</em>, <em>Poussin</em>. Utilisez les boutons <strong>–</strong> et <strong>+</strong> ou tapez directement le nombre.</li>
+    <li>Complétez les traitements et rappels du jour si un soin a été donné.</li>
+    <li>Ajoutez si besoin une note dans <span class="champ">Observations</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer ce Jour</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Quatre valeurs sont <strong>calculées par le logiciel</strong> et ne se saisissent pas :</p>
+  <p><strong>Commercialisables</strong> = OR − OF &nbsp;•&nbsp; <strong>Taux de ponte</strong> = œufs ÷ effectif × 100 &nbsp;•&nbsp; <strong>Effectif final</strong> = effectif de la veille + achats et nés − (morts + ventes) &nbsp;•&nbsp; <strong>Taux de mortalité</strong> = morts du jour ÷ effectif de la veille × 100.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Le champ <strong>Ventes (POS, réel)</strong> est grisé : il se remplit tout seul à partir des ventes réellement enregistrées à la caisse. <strong>Ne cherchez pas à le corriger</strong> — si le chiffre vous semble faux, c'est une vente qui a été mal saisie au comptoir, et c'est là qu'il faut la reprendre.</p></div></div>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les œufs commercialisables alimentent <strong>automatiquement le stock</strong> par plateaux de 30. Le bloc <em>Incrémentation Automatique du Stock</em> vous indique combien de plateaux viennent d'être ajoutés. Vous n'avez aucune saisie de stock à faire par ailleurs.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Saisissez la fiche <strong>le jour même</strong>. Les effectifs se calculent en chaîne, chaque jour repartant du précédent : une journée oubliée fausse tous les jours suivants jusqu'à ce qu'elle soit rattrapée.</p></div></div>
+
+  <h3>La fiche Lapins</h3>
+  <p>Même principe, avec les catégories propres à la cuniculture : <strong>Reproducteur</strong>, <strong>Lapin de chair</strong>, <strong>Lapereau</strong>. Vous y saisissez en plus l'<span class="champ">Effectif mâles</span>, l'<span class="champ">Effectif femelles</span>, le nombre de <span class="champ">Sevrés</span> et de sujets <span class="champ">S/mères</span> (sous mères).</p>
+  <p>Les entrées et sorties sont ventilées en cinq colonnes : <strong>Achat, Né, Mort, Vente, Don</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/S3-fiche-lapins-rations.jpg" alt="Tableau de rationnement de la fiche lapins">
+    </div>
+    <figcaption><b>Figure 2.4</b> — Le tableau de rationnement compare, catégorie par catégorie, la ration normative et la provende réellement servie.</figcaption>
+  </figure>
+
+  <h3>La fiche Porcs</h3>
+  <p>Les stades physiologiques sont : <strong>Reproducteur (truie/verrat)</strong>, <strong>Porc marchand / engraissement</strong>, <strong>Porcelet</strong>. Le détail du cheptel distingue <span class="champ">Verrats</span>, <span class="champ">Truies gestantes</span>, <span class="champ">Porcelets</span> et <span class="champ">Engraissement</span>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H1-fiche-porcs-saisie.jpg" alt="Saisie journalière de la fiche porcs">
+    </div>
+    <figcaption><b>Figure 2.5</b> — La saisie journalière porcine. Les poids se saisissent en <strong>kilogrammes</strong>, non en grammes.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Sur la fiche Porcs, le poids est en <strong>kilogrammes</strong> ; sur les fiches Lapins et Pondeuses, il est en <strong>grammes</strong>. Se tromper d'unité multiplie ou divise le GMQ par mille et rend toute l'analyse de croissance inutilisable.</p></div></div>
+
+  <h3>La fiche Volailles Reproducteurs</h3>
+  <p>Elle suit les <strong>reproducteurs, les poussins et la souche Goliath</strong>, avec les œufs mis à couver et les éclosions obtenues.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/H3-fiche-reproducteurs.jpg" alt="Fiche volailles reproducteurs">
+    </div>
+    <figcaption><b>Figure 2.6</b> — La fiche Reproducteurs, Poussins &amp; Goliath.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Si aucune bande de reproducteurs n'existe encore, l'écran affiche simplement un renvoi : <em>« Créer une bande depuis Bandes &amp; Sujets → »</em>. Ce n'est pas une panne — créez d'abord la bande (section 2.2).</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Sur les fiches Lapins et Porcs, le <strong>poids général pesé</strong> est le poids <em>total</em> de l'échantillon, pas le poids moyen d'un animal. Le logiciel calcule lui-même le poids moyen en divisant par l'effectif. Saisir un poids moyen à cet endroit divise le résultat par le nombre de têtes et rend le suivi de croissance absurde.</p></div></div>
+
+  <h2>2.5 Le rationnement</h2>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Fiche de Rationnement (g/j)</span></p>
+
+  <p>Cet écran fixe la <strong>ration normative</strong> — la quantité de provende théorique par tête et par jour, pour chaque espèce et chaque stade physiologique.</p>
+
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Ajouter une Ration</span>.</li>
+    <li>Choisissez l'<span class="champ">Espèce</span>.</li>
+    <li>Saisissez le <span class="champ">Stade physiologique / tranche d'âge</span> (par exemple <em>Poulette 8–18 semaines</em>).</li>
+    <li>Saisissez la <span class="champ">Ration normative (g/tête/jour)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Sur la fiche journalière, le tableau de rationnement compare la <strong>ration normative</strong> (issue de cet écran) à la <strong>provende réellement servie</strong>. L'écart entre les deux est le premier signal d'un problème : gaspillage, vol, ou animaux qui ne mangent pas.</p></div></div>
+
+  <h3>Modifier une ration existante</h3>
+  <p>Cliquez sur l'icône <strong>crayon</strong> de la ligne. La fenêtre <em>Saisir une Ration</em> se rouvre, préremplie.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G2-editer-ration.jpg" alt="Modification d'une ration">
+    </div>
+    <figcaption><b>Figure 2.8</b> — La modification d'une ration normative.</figcaption>
+  </figure>
+
+  <h3>Les calendriers de prophylaxie</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Calendriers de Prophylaxie</span></p>
+  <p>C'est le programme sanitaire type de la ferme, espèce par espèce. Colonnes : <strong>Jour / période, Traitement prévu, Produit conseillé, Posologie, Délai rémanence</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E7-param-prophylaxie.jpg" alt="Calendriers de prophylaxie">
+    </div>
+    <figcaption><b>Figure 2.9</b> — Le calendrier de prophylaxie : c'est lui qui déclenche le rappel quotidien de 6 h.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>La colonne <strong>Délai rémanence</strong> de ce calendrier est reprise par défaut lors de la saisie d'un soin. Une valeur fausse ici se propage à toutes les bandes traitées : elle autoriserait la vente d'animaux encore sous traitement (section 2.7).</p></div></div>
+
+  <h3>Les types de provende</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Types de Provende</span></p>
+  <p>Colonnes : <strong>Nom du type d'aliment, Espèce cible, Poids sac standard (kg), Prix indicatif (FCFA/kg)</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>poids du sac standard</strong> permet au logiciel de convertir une réserve exprimée en sacs vers une consommation exprimée en grammes par tête. C'est ce qui rend possible le calcul de l'autonomie alimentaire (section 1.6).</p></div></div>
+
+  <h3>La numérotation des bandes et des sujets</h3>
+  <p><span class="chemin">Paramètres Élevage</span> <span class="fleche">➔</span> <span class="chemin">Numérotation</span></p>
+  <p>Cet écran fixe les préfixes utilisés pour créer les identifiants : <span class="champ">Format d'affichage du nom de bande</span>, <span class="champ">Lapines reproductrices</span>, <span class="champ">Mâles saillisseurs</span>, <span class="champ">Truies reproductrices</span>, <span class="champ">Verrats reproducteurs</span>, <span class="champ">Portées de porcelets</span>, <span class="champ">Préfixe lots volailles / pondeuses</span>, <span class="champ">Préfixe bâtiments / parcs volailles</span> et <span class="champ">Préfixe parcs / fosses escargots</span>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Fixez ces préfixes <strong>une fois pour toutes, au démarrage</strong>. Les changer en cours d'exploitation crée deux générations d'identifiants qui cohabitent dans les mêmes registres — le personnel ne s'y retrouve plus.</p></div></div>
+
+  <h2>2.6 Le suivi de la reproduction</h2>
+  <p><span class="chemin">Suivi Reproduction</span></p>
+  <p>Quatre onglets d'espèce en haut de l'écran : <strong>Lapins</strong>, <strong>Volailles</strong>, <strong>Porcs</strong>, <strong>Escargots</strong>.</p>
+
+  <h3>Déclarer une saillie (lapins)</h3>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Déclarer une Saillie Lapin</span>.</li>
+    <li>Choisissez la <span class="champ">Bande</span>.</li>
+    <li>Saisissez le <span class="champ">N° lapine</span> et le <span class="champ">Mâle saillisseur n°</span>.</li>
+    <li>Vérifiez la <span class="champ">Date de saillie</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer la Saillie</span>.</li>
+  </ol>
+
+  <p>Le tableau suit ensuite chaque femelle : <strong>Bande, N° lapine, Date saillie, Mâle n°, Palpation, Mise bas attendue, Nés (vivants), Statut</strong>. Le bouton <span class="btn">Saisir Mise Bas</span> clôture le cycle.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Les échéances sont <strong>calculées à partir de la date de saillie</strong>, pas saisies : palpation, mise bas attendue, et pour les porcs le retour de chaleur (J+21) et le sevrage (J+42). Corrigez la date de saillie si une échéance vous paraît fausse — c'est la seule donnée d'origine.</p></div></div>
+
+  <h3>Le suivi porcin</h3>
+  <p>Onglet <span class="chemin">Porcs</span>. Colonnes : <strong>Bande, N° truie, Date saillie, Verrat n°, Retour chaleur, Mise bas attendue, Nés (vivants), Statut</strong>.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F2-repro-porcs.jpg" alt="Suivi reproduction porcine">
+    </div>
+    <figcaption><b>Figure 2.11</b> — Le suivi de la reproduction porcine et ses échéances calculées.</figcaption>
+  </figure>
+
+  <h3>Le couvoir (volailles)</h3>
+  <p>Onglet <span class="chemin">Volailles</span> — <em>Suivi Reproduction Volailles — Couvoir &amp; Éclosion</em>. Le panneau reprend les œufs mis à couver et les éclosions du mois, à partir de ce qui a déjà été saisi sur la fiche Reproducteurs.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Cet onglet est un <strong>résumé, pas un second formulaire</strong>. Les œufs couvés et les naissances se saisissent une seule fois, sur la fiche journalière Reproducteurs. Saisir la même donnée à deux endroits est précisément ce que le logiciel cherche à éviter.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Sans œuf mis à couver, le taux d'éclosion s'affiche en <strong>tiret</strong> et non en « 0,0 % » : un zéro se lirait comme un échec total du couvoir, alors qu'il n'y a simplement rien à mesurer.</p></div></div>
+
+  <p>Les quatre indicateurs communs aux quatre onglets sont : <strong>Reproductrices gestantes</strong>, <strong>Palpations / échéances dues</strong>, <strong>Mises bas / éclosions (mois)</strong> et <strong>Alertes réforme / pertes</strong>.</p>
+
+  <h2>2.7 Soins, vaccins et rémanence</h2>
+  <p><span class="chemin">Soins et vaccins</span> — trois onglets.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/21-soins-registre.jpg" alt="Registre vétérinaire">
+      <span class="cible" style="left:22.9%;top:10.6%;width:14.0%;height:5.4%"><b>1</b></span>
+      <span class="cible" style="left:37.0%;top:10.6%;width:14.8%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:51.9%;top:10.6%;width:11.2%;height:5.4%"><b>3</b></span>
+      <span class="cible" style="left:87.3%;top:18.8%;width:11.0%;height:5.2%"><b>4</b></span>
+    </div>
+    <figcaption><b>Figure 2.3</b> — Le registre vétérinaire. <b>1</b> Registre — <b>2</b> Calendrier — <b>3</b> Suivi sanitaire — <b>4</b> Nouveau soin.</figcaption>
+  </figure>
+
+  <h3>Enregistrer un soin</h3>
+  <ol class="etapes">
+    <li>Onglet <span class="chemin">Registre Vétérinaire</span> <span class="fleche">➔</span> <span class="btn">Nouveau Soin</span>.</li>
+    <li>Choisissez le <span class="champ">Lot / bande</span> concerné.</li>
+    <li>Vérifiez la <span class="champ">Date du soin</span>.</li>
+    <li>Choisissez le <span class="champ">Type d'action</span> : <em>Vaccination</em>, <em>Traitement curatif</em>, <em>Vermifuge</em>, <em>Vitamines</em>, <em>Antistress</em>, <em>Hépato-protection</em>.</li>
+    <li>Saisissez le <span class="champ">Produit utilisé</span> et la <span class="champ">Dose</span>.</li>
+    <li><strong>Saisissez le <span class="champ">Délai d'attente / rémanence (jours)</span></strong> indiqué sur la notice du produit.</li>
+    <li>Renseignez le <span class="champ">Vétérinaire / animalier</span>, les <span class="champ">Symptômes observés</span> et le <span class="champ">Coût (FCFA)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p><strong>Le délai de rémanence n'est pas une simple information : il bloque la vente.</strong> Tant que le délai court, AgriERP <strong>refuse toute vente d'un animal de cette bande</strong> et affiche « Vente interdite — bande sous rémanence vétérinaire active ».</p>
+  <p>Oublier de saisir ce délai revient à autoriser la vente d'un animal encore sous traitement. C'est un risque sanitaire pour le consommateur et un risque juridique pour la ferme.</p></div></div>
+
+  <h3>Les deux autres onglets</h3>
+  <ul class="puces">
+    <li><strong>Calendrier Vétérinaire</strong> — la planification à quinze jours, bande par bande. <span class="btn">Planifier une Intervention</span> demande le <span class="champ">Lot / bande</span>, l'<span class="champ">Intervention</span> et la <span class="champ">Date prévue</span>.</li>
+    <li><strong>Suivi Sanitaire</strong> — l'infirmerie. <span class="btn">Nouvelle Entrée Infirmerie</span> demande le <span class="champ">Lot / bande</span>, le <span class="champ">Sujet (optionnel)</span>, le <span class="champ">Motif</span>, le <span class="champ">Niveau d'isolement</span> (<em>Quarantaine stricte</em>, <em>Infirmerie</em>, <em>Simple surveillance</em>) et la <span class="champ">Date d'entrée</span>.</li>
+  </ul>
+
+  <h2>2.8 Abattage et transformation</h2>
+  <p><span class="chemin">Gestion Élevage</span> <span class="fleche">➔</span> <span class="chemin">Transformation</span></p>
+  <p>Cet écran transforme des <strong>animaux vivants</strong> en <strong>produit fini vendable</strong> : un poulet vivant devient du poulet braisé ou fumé.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/22-transformation.jpg" alt="Bon d'abattage et transformation">
+      <span class="cible" style="left:22.9%;top:56.4%;width:40.1%;height:8.0%"><b>1</b></span>
+      <span class="cible" style="left:22.9%;top:65.8%;width:40.1%;height:8.0%"><b>2</b></span>
+      <span class="cible bas" style="left:22.9%;top:94.5%;width:40.1%;height:5.0%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 2.4</b> — Le bon d'abattage. <b>1</b> Sujets à abattre — <b>2</b> Produit fini visé — <b>3</b> Validation.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Lot / bande d'élevage</span> source.</li>
+    <li>Saisissez le <span class="champ">Nombre de sujets à abattre</span>.</li>
+    <li>Choisissez le <span class="champ">Produit fini cible</span>.</li>
+    <li>Saisissez la <span class="champ">Quantité produite (unités / kg)</span> réellement obtenue.</li>
+    <li>Vérifiez la <span class="champ">Date de transaction</span> et indiquez l'<span class="champ">Opérateur</span>.</li>
+    <li>Cliquez sur <span class="btn">Valider la Transformation</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une transformation validée fait <strong>deux choses en même temps</strong> : elle diminue l'effectif de la bande du nombre de sujets abattus, et elle augmente le stock du produit fini de la quantité produite. Vous n'avez aucune saisie de stock complémentaire à faire.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>La quantité produite est rarement égale au nombre de sujets abattus (rendement, découpe, pertes). Saisissez ce que vous avez <strong>réellement obtenu et pesé</strong>, jamais le chiffre théorique.</p></div></div>
+
+  <h2>2.9 Suivre les performances</h2>
+
+  <h3>Le Dashboard Élevage et ses cinq onglets</h3>
+  <p><span class="chemin">Dashboard Élevage</span></p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Ce qu'il montre</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Synthèse Globale</strong></td><td>Vue d'ensemble des trois filières : effectifs, mortalité, production.</td></tr>
+      <tr><td><strong>GMQ &amp; Croissance</strong></td><td>Quatre indicateurs — <em>Effectif total vivant</em>, <em>Autonomie aliment min.</em>, <em>GMQ moyen</em>, <em>Mortalité cumulée (7 j)</em> — puis le GMQ bande par bande et les rappels VMS à venir.</td></tr>
+      <tr><td><strong>Bilan Technico-Économique</strong></td><td>Pour un lot : <em>Coût total connu</em>, <em>Revenu total</em>, <em>Marge nette</em>, avec le détail des coûts et des revenus.</td></tr>
+      <tr><td><strong>Analyse Sanitaire</strong></td><td>Fréquence des maladies : <em>Filière, Nb traitements (mois), Coût total, Taux de morbidité %</em>.</td></tr>
+      <tr><td><strong>Prévision de Croissance</strong></td><td><em>Bande, Poids actuel (g), Tendance (g/j), Projection à 30 jours (g)</em>.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D4-elevage-gmq.jpg" alt="Onglet GMQ et croissance">
+    </div>
+    <figcaption><b>Figure 2.12</b> — L'onglet GMQ &amp; Croissance : quatre indicateurs, puis le détail par bande.</figcaption>
+  </figure>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>L'indicateur <strong>Autonomie aliment min.</strong> est le plus opérationnel des quatre : il donne le nombre de jours de provende restants pour la bande la moins bien pourvue. C'est votre signal de commande.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D5-elevage-bilan.jpg" alt="Bilan technico-économique de lot">
+    </div>
+    <figcaption><b>Figure 2.13</b> — Le bilan technico-économique : ce que le lot a coûté, ce qu'il a rapporté, la marge nette.</figcaption>
+  </figure>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le libellé exact est <strong>« Coût total connu du lot »</strong>. Il ne contient que ce qui a été saisi et rattaché : acquisition, provende, soins. Une charge payée en espèces sans passer par <span class="chemin">Saisie Dépenses</span> n'y figure pas, et la marge apparaît alors meilleure qu'elle ne l'est.</p></div></div>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D6-elevage-sanitaire.jpg" alt="Analyse sanitaire">
+    </div>
+    <figcaption><b>Figure 2.14</b> — L'analyse sanitaire : traitements administrés, coût et taux de morbidité par filière.</figcaption>
+  </figure>
+
+  <h3>Analyse des croissances — GMQ</h3>
+  <p><span class="chemin">Analyse Croissance</span> compare, bande par bande, le <strong>poids précédent</strong> et le <strong>poids actuel</strong> pour en déduire le <strong>GMQ</strong> (gain moyen quotidien, en grammes par jour) et le situer face à l'objectif de la race.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le GMQ n'apparaît que si <strong>au moins deux pesées</strong> ont été saisies sur la bande. Une seule pesée ne permet aucun calcul de progression — ce n'est pas un défaut du logiciel.</p></div></div>
+
+  <h3>Bilan technico-économique de lot</h3>
+  <p><span class="chemin">Bilan Technico-Économique</span> rassemble, pour une bande donnée, ce qu'elle a coûté (acquisition, provende, soins) et ce qu'elle a rapporté (ventes). C'est le document qui répond à la question : <em>ce lot a-t-il été rentable&nbsp;?</em></p>
+
+  <h2>2.10 Registre des reproducteurs et fiche d'un sujet</h2>
+  <p><span class="chemin">Registre des Reproducteurs</span> suit les animaux <strong>identifiés individuellement</strong> : <strong>Identifiant, Espèce, Sexe, Race, Bande, Cage, Statut</strong>.</p>
+  <p>Cliquez sur l'icône <strong>œil</strong> d'une ligne pour ouvrir la fiche du sujet. Un bouton <span class="btn">Exporter PDF</span> édite la fiche complète.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/E6-sujet-alimentation.jpg" alt="Fiche d'un sujet identifié">
+    </div>
+    <figcaption><b>Figure 2.15</b> — La fiche d'un reproducteur : identification, QR code du sujet et huit onglets.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:26%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Général</strong></td><td>Identification : espèce, catégorie, date de naissance, date d'entrée, bande, cage. Un <strong>QR code</strong> propre au sujet permet de le retrouver depuis le terrain.</td></tr>
+      <tr><td><strong>Historique</strong></td><td>La suite chronologique des événements du sujet.</td></tr>
+      <tr><td><strong>Alimentation</strong></td><td>Les rations qui lui ont été appliquées.</td></tr>
+      <tr><td><strong>Vaccins</strong></td><td><em>Date, Action, Produit, Dose</em> — tous les soins reçus.</td></tr>
+      <tr><td><strong>Reproduction</strong></td><td>Ses saillies, palpations et mises bas.</td></tr>
+      <tr><td><strong>Production</strong></td><td>Ce qu'il a produit : œufs, portées, poids.</td></tr>
+      <tr><td><strong>Mouvements</strong></td><td><em>Date, Mouvement, Détail</em> — entrées, transferts, sorties.</td></tr>
+      <tr><td><strong>Documents</strong></td><td>Les pièces jointes au sujet (certificats, photos).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Imprimez le <strong>QR code</strong> de l'onglet Général et fixez-le sur la cage. Un scan avec le téléphone ouvre directement la fiche du sujet, sans le chercher dans la liste.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Éditez la fiche PDF d'un reproducteur avant une vente ou une exposition : elle rassemble en une page la généalogie, les vaccins et les performances du sujet.</p></div></div>
+
+  <h2>2.11 Modules d'élevage non activés</h2>
+  <p>Si vous ouvrez une fiche et lisez « Module non activé » (le cas le plus courant est l'héliciculture), la filière n'est pas ouverte sur votre installation.</p>
+  <p>Un administrateur peut l'activer : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Modules Actifs</span>.</p>
+</section>

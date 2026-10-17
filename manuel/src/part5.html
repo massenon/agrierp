@@ -1,0 +1,318 @@
+<!-- =======================  CHAPITRE 8  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">8</div>
+    <div>
+      <h1>Comptabilité</h1>
+      <p class="ch-sous">Plan comptable, journal, grand livre, balances, bilan, TVA, banque, immobilisations et clôture.</p>
+    </div>
+  </div>
+
+  <p class="intro">Ce chapitre s'adresse principalement au <strong>comptable</strong> et à l'<strong>administrateur</strong>. Les autres utilisateurs n'ont pas accès à ces écrans — mais tous alimentent la comptabilité sans le savoir, à chaque vente et à chaque dépense.</p>
+
+  <h2>8.1 Le principe : la comptabilité s'écrit toute seule</h2>
+  <p>C'est le point le plus important du chapitre. Dans AgriERP, <strong>vous ne ressaisissez jamais en comptabilité ce qui a déjà été saisi ailleurs</strong>.</p>
+
+  <p style="text-align:center;font-size:11pt;margin:14pt 0 14pt">
+    <span class="chemin">Une vente au comptoir</span> <span class="fleche">➔</span>
+    <span class="chemin">Écriture SYSCOHADA générée</span> <span class="fleche">➔</span>
+    <span class="chemin">Grand livre</span> <span class="fleche">➔</span>
+    <span class="chemin">Balance</span> <span class="fleche">➔</span>
+    <span class="chemin">Bilan</span>
+  </p>
+
+  <p>Chaque opération de gestion déclenche automatiquement son écriture : vente, achat, dépense, avoir, règlement client, règlement fournisseur, paie, virement interne, écart d'inventaire, acquisition d'immobilisation et dotation aux amortissements.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Tous les rapports comptables — grand livre, balance, bilan, états financiers — sont lus <strong>depuis le grand livre</strong>, jamais recalculés à partir des tables de vente ou d'achat. C'est ce qui garantit qu'un chiffre présenté au bilan est bien celui qui figure au journal.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne ressaisissez <strong>jamais</strong> une vente ou une dépense au journal comptable « pour être sûr » : elle y est déjà. Vous compteriez l'opération deux fois, et l'erreur ne se verrait qu'au bilan.</p>
+  <p>La saisie manuelle au journal est réservée aux écritures qui n'ont <strong>aucun écran métier</strong> : apport en capital, régularisation, opération diverse.</p></div></div>
+
+  <h2>8.2 Le plan comptable</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Plan Comptable</span></p>
+  <p>La liste des comptes SYSCOHADA de la ferme : <strong>N° compte, Intitulé, Classe</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Classe</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1</strong></td><td>Ressources — capital, résultat, emprunts</td></tr>
+      <tr><td><strong>2</strong></td><td>Immobilisations — bâtiments, cages, matériel, amortissements</td></tr>
+      <tr><td><strong>3</strong></td><td>Stocks</td></tr>
+      <tr><td><strong>4</strong></td><td>Tiers — clients, fournisseurs, personnel, État</td></tr>
+      <tr><td><strong>5</strong></td><td>Trésorerie — caisse, banque, mobile money</td></tr>
+      <tr><td><strong>6</strong></td><td>Charges</td></tr>
+      <tr><td><strong>7</strong></td><td>Produits</td></tr>
+    </tbody>
+  </table>
+
+  <p>Pour créer un compte : <span class="btn">Nouveau Compte</span>, puis saisissez le <span class="champ">Numéro de compte</span>, l'<span class="champ">Intitulé</span> et la <span class="champ">Classe</span>.</p>
+
+  <h3>Modifier ou archiver un compte</h3>
+  <p>L'icône <strong>crayon</strong> rouvre la fenêtre, préremplie ; l'icône <strong>archive</strong> retire le compte des listes de sélection.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/G4-editer-compte.jpg" alt="Modification d'un compte du plan comptable">
+    </div>
+    <figcaption><b>Figure 8.2</b> — La modification d'un compte SYSCOHADA.</figcaption>
+  </figure>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>Ne modifiez <strong>jamais le numéro</strong> d'un compte qui porte déjà des écritures : le grand livre, la balance et le bilan s'appuient dessus. Créez un nouveau compte et archivez l'ancien plutôt que de renuméroter.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le premier chiffre du numéro doit correspondre à la classe choisie : un compte de charges commence par 6, un compte de produits par 7. Un compte mal classé fausse le compte de résultat sans jamais déclencher d'erreur visible.</p></div></div>
+
+  <h2>8.3 Le journal comptable</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Journal Comptable</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/72-journal.jpg" alt="Journal comptable">
+      <span class="cible" style="left:86.0%;top:11.1%;width:12.4%;height:5.2%"><b>1</b></span>
+      <span class="cible" style="left:75.1%;top:11.0%;width:11.0%;height:5.4%"><b>2</b></span>
+    </div>
+    <figcaption><b>Figure 8.1</b> — Le journal comptable. <b>1</b> Saisie d'écriture manuelle — <b>2</b> Export PDF.</figcaption>
+  </figure>
+
+  <p>Colonnes : <strong>N° pièce, Date, Libellé, Débit, Crédit, Montant</strong>.</p>
+
+  <h3>Saisir une écriture manuelle</h3>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Saisie d'Écriture</span>.</li>
+    <li>Indiquez la <span class="champ">Date de l'écriture</span>.</li>
+    <li>Saisissez un <span class="champ">Libellé</span> explicite.</li>
+    <li>Choisissez le <span class="champ">Compte à débiter</span>.</li>
+    <li>Choisissez le <span class="champ">Compte à créditer</span>.</li>
+    <li>Saisissez le <span class="champ">Montant (FCFA)</span>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Trois contrôles sont appliqués <strong>avant</strong> tout enregistrement, et l'écriture est refusée si l'un échoue :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>le <strong>total débit doit égaler le total crédit</strong>, au franc près ;</li>
+    <li>le compte débité doit être <strong>différent</strong> du compte crédité ;</li>
+    <li>la date doit tomber dans un <strong>exercice ouvert</strong>.</li>
+  </ul>
+  <p>Aucune écriture déséquilibrée n'entre jamais en base — même partiellement.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Le message <strong>« exercice clos »</strong> signifie que vous tentez d'écrire à une date déjà arrêtée. Ce n'est pas une panne. Deux solutions : passer l'écriture à une date de l'exercice ouvert, ou demander à l'administrateur une déclôture exceptionnelle (section 8.9).</p></div></div>
+
+  <h2>8.4 Le grand livre</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Grand Livre</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/73-grand-livre.jpg" alt="Grand livre">
+      <span class="cible" style="left:22.9%;top:24.5%;width:32.0%;height:6.5%"><b>1</b></span>
+    </div>
+    <figcaption><b>Figure 8.2</b> — Le grand livre. <b>1</b> Sélection du compte à consulter.</figcaption>
+  </figure>
+
+  <p>Choisissez un compte dans la liste <span class="champ">Compte</span> : toutes ses écritures s'affichent avec <strong>Date, N° pièce, Libellé, Débit, Crédit</strong> et un <strong>solde progressif</strong> ligne à ligne.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est l'outil de contrôle par excellence. Un solde de caisse qui vous surprend ? Ouvrez le compte 531 au grand livre et remontez les lignes : l'opération fautive saute aux yeux, avec sa date et son libellé.</p></div></div>
+
+  <h2>8.5 Les balances</h2>
+
+  <h3>Balance générale</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Balance Générale</span></p>
+  <p>Pour la <span class="champ">Période</span> choisie, chaque compte est présenté avec son <strong>solde d'ouverture</strong>, ses <strong>mouvements de la période</strong> (débit et crédit) et son <strong>solde final</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Sur une balance juste, le <strong>total des débits égale le total des crédits</strong>. C'est le premier contrôle à faire avant toute clôture.</p></div></div>
+
+  <h3>Balance âgée</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Balance Âgée</span></p>
+  <p>Choisissez le <span class="champ">Volet</span> (clients ou fournisseurs) et la date d'<span class="champ">Arrêté au</span>. Les montants sont ventilés par ancienneté : <strong>Non échu, 1 à 30 jours, 31 à 60, 61 à 90, plus de 90 jours</strong>.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>La colonne <strong>plus de 90 jours</strong> est votre liste de recouvrement prioritaire. Éditez-la en début de mois et travaillez-la avec l'écran <span class="chemin">Relances Clients</span>.</p></div></div>
+
+  <h2>8.6 Bilan et états financiers</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Bilan Simplifié</span> présente l'actif et le passif de la ferme à une date donnée.</p>
+  <p><span class="chemin">États Financiers</span> réunit quatre onglets. Le bouton <span class="btn">Exporter PDF (Onglet Actif)</span> édite <strong>uniquement l'onglet affiché</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Onglet</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bilan</strong></td><td><em>Actif (emplois)</em> face à <em>Passif (ressources)</em> à la date d'arrêté.</td></tr>
+      <tr><td><strong>Compte de Résultat</strong></td><td>La structure <strong>en cascade SYSCOHADA</strong> : des produits d'exploitation jusqu'au résultat net, soldes intermédiaires compris.</td></tr>
+      <tr><td><strong>Flux de Trésorerie</strong></td><td>Le <strong>TAFIRE simplifié</strong> : d'où vient l'argent, où il est parti.</td></tr>
+      <tr><td><strong>Notes Annexes</strong></td><td>Le détail des postes du bilan, actif et passif.</td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D1-etats-resultat.jpg" alt="Compte de résultat en cascade SYSCOHADA">
+    </div>
+    <figcaption><b>Figure 8.5</b> — Le compte de résultat, en structure de cascade SYSCOHADA.</figcaption>
+  </figure>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/D2-etats-flux.jpg" alt="Tableau des flux de trésorerie">
+    </div>
+    <figcaption><b>Figure 8.6</b> — Le tableau des flux de trésorerie (TAFIRE simplifié).</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un résultat positif au compte de résultat <strong>ne signifie pas</strong> qu'il y a de l'argent en caisse. Le compte de résultat mesure l'activité, le tableau des flux mesure la trésorerie. Une ferme peut être bénéficiaire et à court d'argent si ses clients ne l'ont pas encore payée — lisez toujours les deux ensemble.</p></div></div>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Un bilan qui ne s'équilibre pas signale presque toujours un exercice non clôturé ou une écriture d'ouverture manquante. N'ajustez rien à la main : reprenez d'abord la balance générale.</p></div></div>
+
+  <h2>8.7 TVA, banque et immobilisations</h2>
+
+  <h3>Déclaration de TVA</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Déclaration TVA</span></p>
+  <p>Choisissez la <span class="champ">Période de déclaration</span>. L'écran présente la <strong>TVA collectée</strong> (sur les ventes) et la <strong>TVA déductible</strong> (sur les achats), puis le solde à payer. Le bouton <span class="btn">Générer la Déclaration PDF</span> édite le document.</p>
+
+  <h3>Rapprochement bancaire</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Rapprochement Bancaire</span></p>
+  <ol class="etapes">
+    <li>Choisissez le <span class="champ">Compte</span> bancaire concerné.</li>
+    <li>Cliquez sur <span class="btn">Importer un Relevé (CSV)</span> et sélectionnez le fichier fourni par la banque.</li>
+    <li>Rapprochez les lignes du relevé et celles du logiciel.</li>
+    <li>Analysez les lignes non rapprochées : ce sont les écarts à expliquer.</li>
+  </ol>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Une ligne présente sur le relevé mais absente du logiciel est une opération <strong>non saisie</strong> (frais bancaires, virement reçu). Une ligne présente dans le logiciel mais absente du relevé est une opération <strong>en cours</strong> (chèque non encaissé) — ou une erreur de saisie.</p></div></div>
+
+  <h3>Immobilisations</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Immobilisations</span></p>
+  <ol class="etapes">
+    <li>Cliquez sur <span class="btn">Nouvelle Immobilisation</span>.</li>
+    <li>Saisissez le <span class="champ">Code</span> et la <span class="champ">Désignation</span>.</li>
+    <li>Choisissez la <span class="champ">Nature (compte de classe 2)</span> : bâtiments, cages et matériel d'élevage, broyeurs et équipements.</li>
+    <li>Indiquez la <span class="champ">Date d'acquisition</span>, la <span class="champ">Valeur d'acquisition (FCFA)</span> et la <span class="champ">Valeur résiduelle</span>.</li>
+    <li>Saisissez la <span class="champ">Durée d'amortissement (ans)</span>.</li>
+    <li>Choisissez la <span class="champ">Comptabilisation de l'acquisition</span> : <em>reprise d'antériorité</em> (aucune écriture), <em>payé par caisse</em>, <em>par compte bancaire</em>, <em>par mobile money</em>, ou <em>à crédit — dette fournisseur</em>.</li>
+    <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
+  </ol>
+  <p>Le bouton <span class="btn">Passer la Dotation</span> génère l'écriture d'amortissement de la période. Le tableau suit la <strong>valeur brute</strong>, l'<strong>amortissement cumulé</strong> et la <strong>valeur nette comptable (V.N.C.)</strong>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Choisissez <em>Reprise d'antériorité</em> pour un bien <strong>déjà possédé avant l'informatisation</strong> : aucune écriture ne sera générée. Choisir un mode de paiement pour un bien ancien ferait sortir de l'argent d'un compte de trésorerie aujourd'hui, pour un achat fait il y a trois ans.</p></div></div>
+
+  <h3>Comptabilité analytique</h3>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Comptabilité Analytique</span> répartit le chiffre d'affaires, les charges et la marge <strong>par filière</strong> : aviculture, cuniculture, porciculture, maraîchage.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le tableau à présenter en conseil d'exploitation : il montre en une page quelle filière porte la ferme et laquelle consomme sans rendre.</p></div></div>
+
+  <h2>8.8 La clôture périodique (mensuelle)</h2>
+  <p><span class="chemin">Comptabilité</span> <span class="fleche">➔</span> <span class="chemin">Clôture d'Exercice</span> <span class="fleche">➔</span> <span class="chemin">Clôture Périodique</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/82-cloture.jpg" alt="Clôture d'exercice">
+      <span class="cible" style="left:21.9%;top:21.2%;width:11.4%;height:5.0%"><b>1</b></span>
+      <span class="cible" style="left:33.2%;top:21.2%;width:10.5%;height:5.0%"><b>2</b></span>
+      <span class="cible bas" style="left:21.9%;top:54.2%;width:76.4%;height:5.2%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 8.3</b> — La clôture. <b>1</b> Périodique — <b>2</b> Annuelle — <b>3</b> Clôturer le mois.</figcaption>
+  </figure>
+
+  <ol class="etapes">
+    <li>Vérifiez que la balance générale du mois est équilibrée.</li>
+    <li>Choisissez le <span class="champ">Mois à clôturer</span>.</li>
+    <li>Cliquez sur <span class="btn">Clôturer le Mois Sélectionné</span>.</li>
+  </ol>
+
+  <p>Une fois le mois clôturé, <strong>plus aucune écriture ne peut y être passée</strong>. Le tableau conserve la trace de chaque clôture : <strong>Mois, Date de clôture, Statut</strong>.</p>
+
+  <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Avant de clôturer, assurez-vous que <strong>toutes les pièces du mois sont saisies</strong> : dernières ventes, dernières dépenses, factures fournisseurs reçues en retard. Une pièce oubliée devra faire l'objet d'une déclôture, opération exceptionnelle et tracée.</p></div></div>
+
+  <p>Le bouton <span class="btn">Déclôturer (exceptionnel)</span> est réservé à l'administrateur. Son usage est enregistré au journal d'audit.</p>
+
+  <h2>8.9 La clôture annuelle</h2>
+  <p><span class="chemin">Clôture d'Exercice</span> <span class="fleche">➔</span> <span class="chemin">Clôture Annuelle</span></p>
+  <p>La clôture annuelle arrête définitivement l'exercice, calcule le résultat et l'affecte, puis ouvre l'exercice suivant avec les à-nouveaux. Un <strong>assistant</strong> vous guide pas à pas.</p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F5-cloture-annuelle.jpg" alt="Assistant de clôture d'exercice">
+    </div>
+    <figcaption><b>Figure 8.8</b> — L'assistant de clôture d'exercice, ici de 2026 vers 2027.</figcaption>
+  </figure>
+
+  <p>L'écran rappelle en permanence trois éléments : l'<strong>exercice sélectionné</strong>, le <strong>résultat provisoire</strong> calculé à cet instant, et le nombre de <strong>comptes de gestion à solder</strong>.</p>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le <strong>résultat provisoire</strong> s'affiche avant toute validation. Comparez-le au résultat du compte de résultat : s'ils diffèrent, une écriture manque ou un mois n'est pas clôturé. Ne poursuivez pas tant que les deux ne concordent pas.</p></div></div>
+
+  <div class="note alerte"><span class="ico">🛑</span><div><b>Alerte</b><p>La clôture annuelle est l'opération <strong>la plus lourde et la moins réversible</strong> du logiciel. Avant de la lancer :</p>
+  <ul class="puces" style="margin:5pt 0 0">
+    <li>générez une <strong>sauvegarde complète</strong> (<span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Sauvegardes</span>) et <strong>téléchargez-la hors du serveur</strong> ;</li>
+    <li>vérifiez que <strong>tous les mois de l'exercice sont clôturés</strong> ;</li>
+    <li>éditez et archivez le bilan, le compte de résultat et la balance générale ;</li>
+    <li>faites valider l'ensemble par le comptable et la direction.</li>
+  </ul>
+  <p>Ne lancez jamais cette opération seul, un vendredi soir, sans sauvegarde téléchargée.</p></div></div>
+</section>
+
+<!-- =======================  CHAPITRE 9  ======================= -->
+<section class="chapitre">
+  <div class="ch-entete">
+    <div class="ch-num">9</div>
+    <div>
+      <h1>Rapports &amp; Exports</h1>
+      <p class="ch-sous">Éditer les états de synthèse et les sortir en PDF ou en Excel.</p>
+    </div>
+  </div>
+
+  <h2>9.1 Le rapport mensuel de synthèse</h2>
+  <p><span class="chemin">Rapport Mensuel</span></p>
+  <p>Un tableau unique compare, indicateur par indicateur, <strong>le mois en cours</strong> et <strong>le mois précédent</strong>, avec la variation en pourcentage. Le bouton <span class="btn">Exporter PDF</span> édite le document.</p>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>C'est le document de pilotage mensuel : éditez-le le 1<sup>er</sup> de chaque mois et classez-le. Douze exemplaires font une année d'historique lisible en dix minutes.</p></div></div>
+
+  <h2>9.2 Les six rapports du hub</h2>
+  <p><span class="chemin">Rapports &amp; Exports</span></p>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/86-rapports-tresorerie.jpg" alt="Rapports et exports">
+      <span class="cible" style="left:74.6%;top:23.2%;width:11.0%;height:5.4%"><b>1</b></span>
+      <span class="cible" style="left:85.4%;top:23.2%;width:11.6%;height:5.4%"><b>2</b></span>
+      <span class="cible" style="left:21.9%;top:33.1%;width:14.9%;height:5.9%"><b>3</b></span>
+    </div>
+    <figcaption><b>Figure 9.1</b> — Le hub des rapports. <b>1</b> Export PDF — <b>2</b> Export Excel — <b>3</b> Choix du rapport.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th style="width:34%">Rapport</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Recettes et Dépenses</strong></td><td>Toutes les entrées et sorties de la période, ligne par ligne.</td></tr>
+      <tr><td><strong>État de Trésorerie</strong></td><td>Solde caisse, solde banque et solde total, jour par jour.</td></tr>
+      <tr><td><strong>Créances Clients</strong></td><td>Ce que les clients doivent, avec les échéances.</td></tr>
+      <tr><td><strong>Dettes Fournisseurs</strong></td><td>Ce que la ferme doit, avec les échéances.</td></tr>
+      <tr><td><strong>Rapport Élevage</strong></td><td>Trois tableaux distincts (voir ci-dessous).</td></tr>
+      <tr><td><strong>Rapport de Stocks</strong></td><td>Valeur du stock par catégorie et articles sous seuil.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Les trois tableaux du rapport Élevage</h3>
+  <p>Deux indicateurs coiffent l'écran : le <strong>taux de ponte moyen</strong> et le <strong>taux de mortalité hebdomadaire</strong>. En dessous, trois tableaux se sélectionnent par un bouton.</p>
+
+  <table>
+    <thead><tr><th style="width:28%">Tableau</th><th>Colonnes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1 — Recensement</strong></td><td><em>Date, Lot / souche, Effectif M, Effectif F, Sous mères, Sevrés, Achats, Nés, Morts, Effectif final</em></td></tr>
+      <tr><td><strong>2 — Mouvements, traitements &amp; ventes</strong></td><td><em>Date, Lot, Sexe vendu, Qté vendue, Montant vente (FCFA), Effectif final, Traitement administré, Dose, Signes de maladie observés</em></td></tr>
+      <tr><td><strong>3 — Suivi de la ponte</strong></td><td><em>Âge (sem.), Jour, Lot, Total œufs récoltés (OR), Taux ponte %, Cassés/fêlés (OF), Commercialisables (OR-OF), Stock restant hier (SRH), Total stock (TS), Sorties vente OS (plateaux), Stock final</em></td></tr>
+    </tbody>
+  </table>
+
+  <figure class="capture">
+    <div class="cadre">
+      <img src="jpg/F4-rapport-elevage-t3.jpg" alt="Tableau de suivi de la ponte">
+    </div>
+    <figcaption><b>Figure 9.2</b> — Le tableau 3 : le suivi de la ponte, jour par jour et lot par lot.</figcaption>
+  </figure>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Ces trois tableaux reprennent <strong>exactement la structure des registres papier</strong> de la ferme. Ils sont conçus pour être imprimés et classés tels quels, sans remise en forme.</p></div></div>
+
+  <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>L'export PDF ne prend que <strong>le tableau affiché</strong>. Pour un dossier complet, exportez les trois l'un après l'autre.</p></div></div>
+
+  <h2>9.3 Exporter</h2>
+  <ul class="puces">
+    <li><span class="btn">Exporter PDF</span> — document mis en page, avec l'en-tête officiel de la ferme. À imprimer, à signer, à archiver.</li>
+    <li><span class="btn">Exporter Excel</span> — fichier de données réutilisable, pour un calcul complémentaire ou un envoi au partenaire.</li>
+  </ul>
+
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>L'export reprend <strong>exactement la période et les filtres affichés à l'écran</strong>. Vérifiez donc vos dates <em>avant</em> d'exporter : un PDF sorti sur la mauvaise période ressemble en tout point à un PDF juste.</p></div></div>
+</section>
