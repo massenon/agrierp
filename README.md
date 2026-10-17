@@ -8,7 +8,6 @@ Ce dépôt regroupe les deux clients du produit, la base de référence et le ma
 |---|---|
 | [`agrierp_laravel/`](agrierp_laravel/) | Application web Laravel 12 + Livewire 3 (PHP 8.3, MySQL) : serveur, règles métier, API de synchronisation `/api/sync/*` |
 | [`agrierp_flutter/`](agrierp_flutter/) | Client Windows Flutter, *offline-first* (Drift / SQLite), synchronisé avec l'application Laravel |
-| [`database/`](database/) | Export SQL de référence de la base `agrierp_db` |
 | [`manuel/`](manuel/) | Manuel d'utilisation (sources HTML, captures d'écran, génération PDF) |
 
 Chaque projet a son propre `CLAUDE.md` qui décrit son architecture, ses conventions et ses pièges : lisez-le avant d'y toucher.
