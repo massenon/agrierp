@@ -46,13 +46,8 @@ class TransfertsRepository {
   static const categories = ['repro', 'sevre', 'jeune'];
 
   /// Stade de bande → catégorie (`EffectifParCategorieService::categorieDuStade`).
-  static const _stadeVersCategorie = {
-    'reproduction': 'repro',
-    'croissance': 'sevre',
-    'engraissement': 'jeune',
-  };
-
-  static String? categorieDuStade(String? stade) => _stadeVersCategorie[stade];
+  static String? categorieDuStade(String? stade) =>
+      EffectifParCategorie.categorieDuStade(stade);
 
   /// Libellés des catégories d'une espèce (glossaire du 17/10/2026 pour les lapins).
   static Map<String, String> libellesCategories(String? codeEspece) =>

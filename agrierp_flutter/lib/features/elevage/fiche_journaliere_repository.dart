@@ -23,6 +23,47 @@ class RapportCascade {
   final ResultatChaine chaine;
 }
 
+/// Tickets F0.96 / F0.97 — MOUVEMENTS DU JOUR PAR CATÉGORIE (lapins et porcs), miroir des colonnes
+/// `mort_*`, `don_*` et `passage_sevre_jeune` du serveur (15.39). Emplacements : `repro`, `sevre`
+/// (Sous-mères / Porcelet), `jeune` (Jeune / Porc Marchand).
+///
+/// ⚠️ Sans eux, une fiche du poste avec des morts ou des dons sur une bande à chaîne était REFUSÉE par le
+/// serveur (D7 : « morts non ventilés par catégorie ») : la saisie restait en conflit.
+class VentilationJour {
+  const VentilationJour({
+    this.mortRepro = 0,
+    this.mortSevre = 0,
+    this.mortJeune = 0,
+    this.donRepro = 0,
+    this.donSevre = 0,
+    this.donJeune = 0,
+    this.passage = 0,
+  });
+
+  final int mortRepro;
+  final int mortSevre;
+  final int mortJeune;
+  final int donRepro;
+  final int donSevre;
+  final int donJeune;
+
+  /// Passage de stade du jour (Sous-mères → Jeune, Porcelet → Porc Marchand) : un FAIT saisi.
+  final int passage;
+
+  int get totalMorts => mortRepro + mortSevre + mortJeune;
+  int get totalDons => donRepro + donSevre + donJeune;
+}
+
+/// Saisie refusée avant toute écriture, avec le motif du serveur (D3 : passage supérieur à la source).
+class FicheRefusee implements Exception {
+  const FicheRefusee(this.motif);
+
+  final String motif;
+
+  @override
+  String toString() => motif;
+}
+
 /// Saisie journalière du cheptel — accès local et règles de calcul.
 ///
 /// ⚠️ LA FORMULE EST CELLE DU SERVEUR, AU CARACTÈRE PRÈS :
@@ -143,9 +184,30 @@ class FicheJournaliereRepository {
     int? ponteCasses,
     double? aliment,
     double? poidsMoyen,
+    VentilationJour? ventilation,
   }) async {
     final date = _minuit(jour);
     final existante = await chargerJour(lotId, date);
+
+    // F0.96 / F0.97 — saisie VENTILÉE : les totaux sont la somme des catégories (règle du serveur).
+    if (ventilation != null) {
+      mort = ventilation.totalMorts;
+      don = ventilation.totalDons;
+    }
+    final departDeduit = ventilation == null
+        ? null
+        : await _departAEcrire(lotId, date);
+    if (ventilation != null) {
+      await _refuserPassageImpossible(
+        lotId,
+        date,
+        existante,
+        ventilation,
+        departDeduit,
+        achat: achat,
+        ne: ne,
+      );
+    }
 
     final vente = existante?.vente ?? 0;
     final effectif = calculerEffectifFinal(
@@ -183,6 +245,26 @@ class FicheJournaliereRepository {
       feedQtyKg: Value(aliment),
       weightSampleAvgG: Value(poidsMoyen),
     );
+    final ventilee = ventilation == null
+        ? null
+        : LivestockDailyEntriesCompanion(
+            mortRepro: Value(ventilation.mortRepro),
+            mortSevre: Value(ventilation.mortSevre),
+            mortJeune: Value(ventilation.mortJeune),
+            donRepro: Value(ventilation.donRepro),
+            donSevre: Value(ventilation.donSevre),
+            donJeune: Value(ventilation.donJeune),
+            passageSevreJeune: Value(ventilation.passage),
+            catDepartRepro: departDeduit == null
+                ? const Value.absent()
+                : Value(departDeduit.repro),
+            catDepartSevre: departDeduit == null
+                ? const Value.absent()
+                : Value(departDeduit.sevre),
+            catDepartJeune: departDeduit == null
+                ? const Value.absent()
+                : Value(departDeduit.jeune),
+          );
 
     // ⚠️⚠️ F0.95 — UNE VENTILATION DEVENUE FAUSSE DEVIENT INCONNUE, jamais recopiée. Ce formulaire
     // ne saisit que les TOTAUX (la ventilation arrive avec les écrans F0.96/F0.97) ; une fiche
@@ -192,7 +274,7 @@ class FicheJournaliereRepository {
     // un mot. Mises à null (inconnu), elles ne partent plus : le serveur juge alors la fiche
     // (refus « ventilation incohérente » ou D7, visible en conflit) — rien n'est inventé.
     final perimees = <String, Value<int?>>{};
-    if (existante != null) {
+    if (existante != null && ventilation == null) {
       if (_ventilationContredite(
         existante.mortRepro,
         existante.mortSevre,
@@ -231,6 +313,11 @@ class FicheJournaliereRepository {
             donJeune: perimees['don_jeune'] ?? const Value.absent(),
           ),
         );
+    if (ventilee != null) {
+      await (_db.update(_db.livestockDailyEntries)
+            ..where((t) => t.lotId.equals(lotId) & t.entryDate.equals(date)))
+          .write(ventilee);
+    }
 
     // L'effectif courant de la bande suit la fiche : sans cela, l'écran de
     // caisse continuerait de proposer des sujets déjà morts ou vendus.
@@ -243,6 +330,100 @@ class FicheJournaliereRepository {
     await recalculerEnCascade(lotId, date);
 
     return (await chargerJour(lotId, date))!;
+  }
+
+  /// F0.96 / F0.97 — départ DÉDUIT du stade à écrire sur cette fiche : seulement pour une bande d'espèce
+  /// suivie qui n'a pas encore de chaîne (`AvecDepartAutomatique` du web). null sinon.
+  Future<EffectifCategories?> _departAEcrire(String lotId, DateTime jour) async {
+    final bande = await (_db.select(
+      _db.livestockLots,
+    )..where((t) => t.id.equals(lotId))).getSingleOrNull();
+    if (bande == null || await aUneChaine(lotId)) return null;
+    return EffectifParCategorie.departDepuisStade(
+      codeEspece: bande.speciesCode,
+      stade: bande.stage,
+      totalDebutJour: await effectifPrecedent(lotId, jour),
+    );
+  }
+
+  /// D3 AVANT ÉCRITURE (comme `saveDay` du web) : un passage de stade supérieur à la catégorie source
+  /// n'est pas enregistré. Lève [FicheRefusee] avec le motif du serveur.
+  Future<void> _refuserPassageImpossible(
+    String lotId,
+    DateTime jour,
+    LivestockDailyEntry? existante,
+    VentilationJour v,
+    EffectifCategories? departDeduit, {
+    required int achat,
+    required int ne,
+  }) async {
+    if (v.passage == 0) return;
+    final bande = await (_db.select(
+      _db.livestockLots,
+    )..where((t) => t.id.equals(lotId))).getSingleOrNull();
+    final autres = await (_db.select(
+      _db.livestockDailyEntries,
+    )..where((t) => t.lotId.equals(lotId))).get();
+    final proposee = FicheChaine(
+      id: existante?.id ?? 'proposee',
+      jour: _minuit(jour),
+      effectifFinal: 0,
+      achat: achat,
+      ne: ne,
+      vente: existante?.vente ?? 0,
+      mortRepro: v.mortRepro,
+      mortSevre: v.mortSevre,
+      mortJeune: v.mortJeune,
+      donRepro: v.donRepro,
+      donSevre: v.donSevre,
+      donJeune: v.donJeune,
+      passage: v.passage,
+      departRepro: departDeduit?.repro ?? existante?.catDepartRepro,
+      departSevre: departDeduit?.sevre ?? existante?.catDepartSevre,
+      departJeune: departDeduit?.jeune ?? existante?.catDepartJeune,
+      transfertEntreeRepro: existante?.transfertEntreeRepro ?? 0,
+      transfertEntreeSevre: existante?.transfertEntreeSevre ?? 0,
+      transfertEntreeJeune: existante?.transfertEntreeJeune ?? 0,
+      transfertSortieRepro: existante?.transfertSortieRepro ?? 0,
+      transfertSortieSevre: existante?.transfertSortieSevre ?? 0,
+      transfertSortieJeune: existante?.transfertSortieJeune ?? 0,
+    );
+    final refus = EffectifParCategorie.refusDuPassage(
+      espece: EffectifParCategorie.especeDuCode(bande?.speciesCode),
+      autres: [for (final f in autres) ficheChaine(f)],
+      proposee: proposee,
+    );
+    if (refus != null) throw FicheRefusee(refus);
+  }
+
+  /// F0.96 — catégories au DÉBUT du jour [jour] (veille de la chaîne, ou départ déduit du stade pour une
+  /// bande d'espèce suivie sans chaîne), pour calculer l'aperçu du jour avec `calculerJour` — miroir de
+  /// `categoriesJour` de la fiche web. null : catégories inconnues (avant le départ, départ refusé, stade
+  /// sans catégorie).
+  Future<EffectifCategories?> veilleParCategorie(
+    String lotId,
+    DateTime jour,
+  ) async {
+    final bande = await (_db.select(
+      _db.livestockLots,
+    )..where((t) => t.id.equals(lotId))).getSingleOrNull();
+    if (bande == null) return null;
+    final fiches = await (_db.select(
+      _db.livestockDailyEntries,
+    )..where((t) => t.lotId.equals(lotId))).get();
+    final etat = EffectifParCategorie.etatPourJour(
+      espece: EffectifParCategorie.especeDuCode(bande.speciesCode),
+      fiches: [for (final f in fiches) ficheChaine(f)],
+      initialQuantity: bande.initialQuantity,
+      jour: jour,
+    );
+    if (etat.mode == 'chaine') return etat.veille;
+    if (etat.mode != 'sans_chaine') return null;
+    return EffectifParCategorie.departDepuisStade(
+      codeEspece: bande.speciesCode,
+      stade: bande.stage,
+      totalDebutJour: await effectifPrecedent(lotId, jour),
+    );
   }
 
   /// Vrai si les trois catégories sont connues et que leur somme contredit [total].

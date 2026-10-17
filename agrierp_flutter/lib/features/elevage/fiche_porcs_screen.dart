@@ -65,6 +65,13 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   final _morts = <String, int>{for (final c in _categories) c: 0};
   final _dons = <String, int>{for (final c in _categories) c: 0};
 
+  /// F0.97 — passage de stade du jour (Porcelet → Porc Marchand), `passage_sevre_jeune`.
+  final _passage = <String, int>{'Porcelet → Porc Marchand': 0};
+
+  /// Totaux d'une fiche ANCIENNE non ventilée rechargée : la catégorie ne se devine pas (web 15.42).
+  int? _mortAncien;
+  int? _donAncien;
+
   List<FeedRationStandard> _rations = const [];
 
   /// Journées du mois pour la bande choisie — le tableau de bas de fiche.
@@ -148,10 +155,36 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       _protocole = protocole;
       _traitementsCoches.clear();
       _observations.clear();
+      // 🔴→✅ F0.97 — LES MORTS ET DONS DU JOUR SONT RELUS PAR CATÉGORIE. Ils étaient remis à zéro au
+      // rechargement : ré-enregistrer le jour effaçait ses morts. Emplacements : Reproducteur = `repro`,
+      // Porcelet = `sevre`, Porc Marchand = `jeune`.
       for (final cle in _categories) {
         _morts[cle] = 0;
         _dons[cle] = 0;
       }
+      _mortAncien = null;
+      _donAncien = null;
+      if (fiche != null) {
+        if (fiche.mortRepro != null &&
+            fiche.mortSevre != null &&
+            fiche.mortJeune != null) {
+          _morts['Reproducteur'] = fiche.mortRepro!;
+          _morts['Porcelet'] = fiche.mortSevre!;
+          _morts['Porc Marchand'] = fiche.mortJeune!;
+        } else if (fiche.mort > 0) {
+          _mortAncien = fiche.mort;
+        }
+        if (fiche.donRepro != null &&
+            fiche.donSevre != null &&
+            fiche.donJeune != null) {
+          _dons['Reproducteur'] = fiche.donRepro!;
+          _dons['Porcelet'] = fiche.donSevre!;
+          _dons['Porc Marchand'] = fiche.donJeune!;
+        } else if (fiche.don > 0) {
+          _donAncien = fiche.don;
+        }
+      }
+      _passage.updateAll((_, _) => fiche?.passageSevreJeune ?? 0);
       _chargement = false;
     });
   }
@@ -259,6 +292,35 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
+                    ),
+                    if (_mortAncien != null || _donAncien != null) ...[
+                      const SizedBox(height: AgriSpacing.sm),
+                      Container(
+                        key: const Key('porcs-non-ventilee'),
+                        padding: const EdgeInsets.all(AgriSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          'Fiche ancienne non ventilée par catégorie : ${_mortAncien ?? 0} mort(s) et '
+                          '${_donAncien ?? 0} don(s) non ventilé(s) y sont enregistrés. Ventilez-les '
+                          "ci-dessus avant d'enregistrer.",
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: AgriColors.brandForest,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AgriSpacing.md),
+                    _blocCategories(
+                      titre: 'Passage de stade (Porcelet → Porc Marchand)',
+                      icone: Icons.trending_up,
+                      couleur: AgriColors.brandForest,
+                      fond: AgriColors.surfaceZebra,
+                      valeurs: _passage,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
@@ -751,9 +813,10 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
           const SizedBox(height: AgriSpacing.xs),
           Row(
             children: [
-              for (final categorie in _categories) ...[
+              // Les clés du bloc, pas `_categories` : le bloc de passage n'a qu'un compteur.
+              for (final categorie in valeurs.keys) ...[
                 Expanded(child: _compteur(categorie, valeurs)),
-                if (categorie != _categories.last)
+                if (categorie != valeurs.keys.last)
                   const SizedBox(width: AgriSpacing.sm),
               ],
             ],
@@ -765,7 +828,11 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
 
   Widget _compteur(String categorie, Map<String, int> valeurs) {
     final valeur = valeurs[categorie] ?? 0;
-    final prefixe = valeurs == _morts ? 'mort' : 'don';
+    final prefixe = identical(valeurs, _morts)
+        ? 'mort'
+        : identical(valeurs, _dons)
+        ? 'don'
+        : 'passage';
 
     return Column(
       children: [
@@ -1524,7 +1591,14 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
         _morts[cle] = 0;
         _dons[cle] = 0;
       }
+      _passage.updateAll((_, _) => 0);
     });
+  }
+
+  void _signalerRefus(String motif) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(backgroundColor: AgriColors.errorDeep, content: Text(motif)),
+    );
   }
 
   Future<void> _enregistrer() async {
@@ -1539,15 +1613,39 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       tailleEchantillon: _effectifFinal,
     );
 
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _ne,
-      mort: _totalMorts,
-      don: _totalDons,
-      poidsMoyen: moyenneG,
-    );
+    // Fiche ancienne non ventilée rechargée : ne pas remettre ses morts / dons à zéro en silence.
+    if ((_mortAncien != null && _totalMorts == 0) ||
+        (_donAncien != null && _totalDons == 0)) {
+      _signalerRefus(
+        "Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les "
+        "(Reproducteur / Porc Marchand / Porcelet) avant d'enregistrer.",
+      );
+      return;
+    }
+
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _ne,
+        mort: _totalMorts,
+        don: _totalDons,
+        poidsMoyen: moyenneG,
+        ventilation: VentilationJour(
+          mortRepro: _morts['Reproducteur']!,
+          mortSevre: _morts['Porcelet']!,
+          mortJeune: _morts['Porc Marchand']!,
+          donRepro: _dons['Reproducteur']!,
+          donSevre: _dons['Porcelet']!,
+          donJeune: _dons['Porc Marchand']!,
+          passage: _passage.values.single,
+        ),
+      );
+    } on FicheRefusee catch (e) {
+      _signalerRefus(e.motif);
+      return;
+    }
 
     if (!mounted) return;
 

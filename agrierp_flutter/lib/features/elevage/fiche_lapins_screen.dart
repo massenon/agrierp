@@ -5,6 +5,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import 'categorie_ration_lapin.dart';
+import 'effectif_par_categorie.dart';
 import 'fiche_journaliere_repository.dart';
 import 'soins_repository.dart';
 
@@ -14,8 +15,8 @@ import 'soins_repository.dart';
 ///   1. en-tête « Fiches Lapins - Cuniculture » + sélecteur de date ;
 ///   2. « Saisie Journalière du Cheptel — Jour N (jj/mm/aaaa) » ;
 ///   3. Entrées & Ventes (Achats du jour, Nés (Mise bas), Ventes (POS)) ;
-///   4. « Morts par catégorie » — Reproducteur / Lapin de chair / Lapereau ;
-///   5. « Dons par catégorie » — mêmes trois catégories ;
+///   4. « Morts par catégorie » — Reproducteur / Jeune / Sous-mères (glossaire du 17/10/2026, F0.96) ;
+///   5. « Dons par catégorie » — mêmes trois catégories ; puis le sevrage du jour (Sous-mères → Jeune) ;
 ///   6. Effectif Final du Jour, calculé, avec sa formule affichée.
 ///
 /// ⚠️ **« VENTES » EST EN LECTURE SEULE**, exactement comme dans la maquette :
@@ -91,16 +92,24 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
   int _transfertEntree = 0;
   int _transfertSortie = 0;
 
-  final _morts = <String, int>{
-    'Reproducteur': 0,
-    'Lapin de chair': 0,
-    'Lapereau': 0,
-  };
-  final _dons = <String, int>{
-    'Reproducteur': 0,
-    'Lapin de Chair': 0,
-    'Lapereau': 0,
-  };
+  /// F0.96 — libellés et ordre de la fiche web (17/10/2026). Emplacements : Reproducteur = `repro`,
+  /// Jeune = `jeune`, Sous-mères = `sevre` (colonnes `mort_*` / `don_*` du serveur).
+  static const _repro = 'Reproducteur';
+  static const _jeune = 'Jeune';
+  static const _sousMeres = 'Sous-mères';
+  final _morts = <String, int>{_repro: 0, _jeune: 0, _sousMeres: 0};
+  final _dons = <String, int>{_repro: 0, _jeune: 0, _sousMeres: 0};
+
+  /// Sevrage du jour (Sous-mères → Jeune), `passage_sevre_jeune` : seul mouvement qui fait passer les
+  /// nés dans la catégorie vendue (Jeune).
+  final _sevrage = <String, int>{'Sous-mères → Jeune': 0};
+
+  /// F0.96 — catégories au début du jour (chaîne ou départ déduit du stade) ; null = inconnues.
+  EffectifCategories? _veilleCategories;
+
+  /// Totaux d'une fiche ANCIENNE non ventilée rechargée : la catégorie ne se devine pas (web 15.41).
+  int? _mortAncien;
+  int? _donAncien;
 
   int _effectifPrecedent = 0;
   double _poidsTotalPese = 0;
@@ -175,6 +184,10 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     setState(() => _chargement = true);
 
     final precedent = await widget.depot.effectifPrecedent(bande.id, _jour);
+    final veilleCategories = await widget.depot.veilleParCategorie(
+      bande.id,
+      _jour,
+    );
     final fiche = await widget.depot.chargerJour(bande.id, _jour);
     final protocole = await widget.soins.protocoleDuJour(
       bande: bande,
@@ -193,6 +206,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
 
     setState(() {
       _effectifPrecedent = precedent;
+      _veilleCategories = veilleCategories;
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
@@ -200,17 +214,39 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       _transfertEntree = fiche?.transfertEntree ?? 0;
       _transfertSortie = fiche?.transfertSortie ?? 0;
 
-      // ⚠️ La ventilation par catégorie n'est pas persistée (voir docblock) :
-      // au rechargement, le total relu est porté sur la première catégorie
-      // plutôt que réparti au hasard entre les trois.
+      // 🔴→✅ F0.96 — LA VENTILATION EST RELUE DES COLONNES PAR CATÉGORIE. Le poste portait le total
+      // relu sur « Reproducteur » : une répartition FABRIQUÉE, renvoyée telle quelle au serveur au
+      // prochain enregistrement. Une fiche ancienne non ventilée ne se devine pas : son total est
+      // gardé à part et l'enregistrement exige sa ventilation (règle de la fiche web).
       for (final k in _morts.keys) {
         _morts[k] = 0;
       }
       for (final k in _dons.keys) {
         _dons[k] = 0;
       }
-      _morts['Reproducteur'] = fiche?.mort ?? 0;
-      _dons['Reproducteur'] = fiche?.don ?? 0;
+      _mortAncien = null;
+      _donAncien = null;
+      if (fiche != null) {
+        if (fiche.mortRepro != null &&
+            fiche.mortSevre != null &&
+            fiche.mortJeune != null) {
+          _morts[_repro] = fiche.mortRepro!;
+          _morts[_sousMeres] = fiche.mortSevre!;
+          _morts[_jeune] = fiche.mortJeune!;
+        } else if (fiche.mort > 0) {
+          _mortAncien = fiche.mort;
+        }
+        if (fiche.donRepro != null &&
+            fiche.donSevre != null &&
+            fiche.donJeune != null) {
+          _dons[_repro] = fiche.donRepro!;
+          _dons[_sousMeres] = fiche.donSevre!;
+          _dons[_jeune] = fiche.donJeune!;
+        } else if (fiche.don > 0) {
+          _donAncien = fiche.don;
+        }
+      }
+      _sevrage.updateAll((_, _) => fiche?.passageSevreJeune ?? 0);
 
       // Le poids TOTAL n'est pas conservé : seul le poids MOYEN l'est
       // (`weight_sample_avg_g` du contrat). On le reconstitue pour que la
@@ -226,15 +262,39 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     final bande = _bande;
     if (bande == null) return;
 
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _ne,
-      mort: _totalMorts,
-      don: _totalDons,
-      poidsMoyen: _poidsMoyen,
-    );
+    // Fiche ancienne non ventilée rechargée : ne pas remettre ses morts / dons à zéro en silence.
+    if ((_mortAncien != null && _totalMorts == 0) ||
+        (_donAncien != null && _totalDons == 0)) {
+      _signalerRefus(
+        "Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les "
+        "(Reproducteur / Jeune / Sous-mères) avant d'enregistrer.",
+      );
+      return;
+    }
+
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _ne,
+        mort: _totalMorts,
+        don: _totalDons,
+        poidsMoyen: _poidsMoyen,
+        ventilation: VentilationJour(
+          mortRepro: _morts[_repro]!,
+          mortSevre: _morts[_sousMeres]!,
+          mortJeune: _morts[_jeune]!,
+          donRepro: _dons[_repro]!,
+          donSevre: _dons[_sousMeres]!,
+          donJeune: _dons[_jeune]!,
+          passage: _sevrage.values.single,
+        ),
+      );
+    } on FicheRefusee catch (e) {
+      _signalerRefus(e.motif);
+      return;
+    }
 
     if (!mounted) return;
 
@@ -248,6 +308,12 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     );
 
     await _chargerJour();
+  }
+
+  void _signalerRefus(String motif) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(backgroundColor: AgriColors.errorDeep, content: Text(motif)),
+    );
   }
 
   Future<void> _choisirDate() async {
@@ -301,6 +367,35 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
+                    ),
+                    if (_mortAncien != null || _donAncien != null) ...[
+                      const SizedBox(height: AgriSpacing.sm),
+                      Container(
+                        key: const Key('lapins-non-ventilee'),
+                        padding: const EdgeInsets.all(AgriSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AgriColors.accentYellow.withValues(alpha: 0.2),
+                          border: Border.all(color: AgriColors.accentYellow),
+                          borderRadius: BorderRadius.circular(AgriRadius.lg),
+                        ),
+                        child: Text(
+                          'Fiche ancienne non ventilée par catégorie : ${_mortAncien ?? 0} mort(s) et '
+                          '${_donAncien ?? 0} don(s) non ventilé(s) y sont enregistrés. Ventilez-les '
+                          "ci-dessus avant d'enregistrer.",
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: AgriColors.brandForest,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AgriSpacing.md),
+                    _blocCategories(
+                      titre: 'Sevrage du jour (Sous-mères → Jeune)',
+                      icone: Icons.trending_up,
+                      couleur: AgriColors.brandForest,
+                      fond: AgriColors.surfaceZebra,
+                      valeurs: _sevrage,
                     ),
                     const SizedBox(height: AgriSpacing.md),
                     // ⚠️ ORDRE DE LA MAQUETTE, NON NEGOCIABLE : l'Effectif
@@ -877,10 +972,8 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
 
   /// « Rationnement & Provende Servie par Catégorie (en Grammes g/j) ».
   ///
-  /// 🔁 TICKET F0.92 — GLOSSAIRE (décision client VALIDÉE du 14/10/2026,
-  /// serveur 15.36) : trois lignes FIXES, dans l'ordre du web — Reproducteur ·
-  /// Jeune (ex-« Sevré ») · Lapin de Chair (ex-« Jeune (engraissement) ») —
-  /// et colonne « Catégorie ». ÉCART ASSUMÉ vis-à-vis de la maquette, qui dit
+  /// 🔁 TICKET F0.96 — GLOSSAIRE du 17/10/2026 (serveur 15.44) : trois lignes FIXES, dans l'ordre du
+  /// web — Reproducteur · Jeune (60 g) · Sous-mères (30 g) — et colonne « Catégorie ». ÉCART ASSUMÉ vis-à-vis de la maquette, qui dit
   /// encore « Espèce », « Lapereau » et « par Espèces » (verrouillé par
   /// `test/fiche_lapins_glossaire_test.dart`).
   ///
@@ -894,12 +987,9 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
   /// entièrement absent (poste jamais synchronisé) affiche « Rationnement
   /// indisponible » plutôt que trois valeurs de secours.
   ///
-  /// ⚠️ L'EFFECTIF PAR CATÉGORIE N'EST PAS VENTILÉ AU POSTE (`cat_eff_*` ne
-  /// descend pas). L'effectif total du jour est porté sur la ligne du STADE
-  /// de la bande (`CategorieRationLapin.cleDuStade`) ; les autres lignes
-  /// affichent « — » (effectif ET provende), JAMAIS « 0 » : un zéro se lirait
-  /// « aucun reproducteur nourri ». Si aucune ligne ne porte l'effectif
-  /// (stade sans catégorie), le total est lui aussi « — ».
+  /// 🔁 F0.96 — L'EFFECTIF PAR CATÉGORIE EST CALCULÉ comme sur le web : veille de la chaîne (ou départ
+  /// déduit du stade) + mouvements saisis. Une catégorie inconnue affiche « — » (effectif ET provende),
+  /// JAMAIS « 0 » : un zéro se lirait « aucun reproducteur nourri ».
   Widget _rationnement() {
     if (_rations.isEmpty) {
       return Container(
@@ -920,19 +1010,44 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       );
     }
 
-    // Seule la catégorie du stade de la bande porte un effectif connu.
-    final cleDeLaBande = CategorieRationLapin.cleDuStade(_bande?.stage);
+    // F0.96 — effectifs PAR CATÉGORIE du jour, calculés comme sur le web (`categoriesJour`) : veille de
+    // la chaîne (ou départ déduit du stade) + mouvements saisis à l'écran. Inconnue = « — », jamais 0.
+    final veille = _veilleCategories;
+    final jourCalcule = veille == null
+        ? null
+        : EffectifParCategorie.calculerJour(
+            EffectifParCategorie.lapins,
+            veille,
+            MouvementsJour(
+              achat: _achat,
+              ne: _ne,
+              vente: _vente,
+              mortRepro: _morts[_repro],
+              mortSevre: _morts[_sousMeres],
+              mortJeune: _morts[_jeune],
+              donRepro: _dons[_repro],
+              donSevre: _dons[_sousMeres],
+              donJeune: _dons[_jeune],
+              passage: _sevrage.values.single,
+            ),
+          );
+    int? effectifDe(String cle) => switch (cle) {
+      CategorieRationLapin.reproducteur => jourCalcule?.repro,
+      CategorieRationLapin.sousMeres => jourCalcule?.sevre,
+      _ => jourCalcule?.jeune,
+    };
     double? totalGrammes;
 
     final lignes = <TableRow>[];
 
     for (final cle in CategorieRationLapin.ordre) {
       final ration = CategorieRationLapin.ration(_rations, cle);
-      final connue = cle == cleDeLaBande;
+      final effectif = effectifDe(cle);
+      final connue = effectif != null;
 
       final grammes = connue
           ? FicheJournaliereRepository.provendeGrammes(
-              effectif: _effectifFinal,
+              effectif: effectif,
               rationGParJour: ration,
             )
           : null;
@@ -947,7 +1062,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
               cle: 'ration-libelle-$cle',
             ),
             _celluleTexte(
-              connue ? '$_effectifFinal' : '—',
+              connue ? '$effectif' : '—',
               centre: true,
               cle: 'ration-effectif-$cle',
             ),
@@ -1792,6 +1907,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       for (final cle in _dons.keys) {
         _dons[cle] = 0;
       }
+      _sevrage.updateAll((_, _) => 0);
     });
   }
 }

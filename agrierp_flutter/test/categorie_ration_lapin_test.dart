@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Ticket F0.92 — PARITÉ DE LA CLÉ STABLE DES CATÉGORIES DE RATIONNEMENT
 /// DES LAPINS avec `App\Support\CategorieRationLapin` (serveur, ticket 15.36).
 ///
+/// 🔁 F0.96 — glossaire du 17/10/2026 : « Sous-mères » (30 g) et « Jeune » (60 g). Les valeurs attendues
+/// ont été CONTRÔLÉES en exécutant la règle PHP du serveur sur chaque libellé de ce fichier.
+///
 /// ⚠️⚠️ **LE PIÈGE** : après la migration serveur 15.36, le barème descend
 /// avec « Jeune » et « Lapin de Chair » au lieu de « Lapin Sevré » et « Jeune
 /// Lapin (engraissement) ». Le poste rattachait l'effectif de la bande à une
@@ -22,11 +25,11 @@ void main() {
     const jeuDuServeur = <String, String?>{
       'Reproducteur': CategorieRationLapin.reproducteur,
       'Lapine Mère / Reproducteur': CategorieRationLapin.reproducteur,
-      'Jeune': CategorieRationLapin.jeune,
-      ' jeune ': CategorieRationLapin.jeune,
-      'Sevré': CategorieRationLapin.jeune,
-      'Lapin Sevré': CategorieRationLapin.jeune,
-      'Lapin Sevre': CategorieRationLapin.jeune,
+      'Jeune': CategorieRationLapin.chair,
+      ' jeune ': CategorieRationLapin.chair,
+      'Sevré': CategorieRationLapin.sousMeres,
+      'Lapin Sevré': CategorieRationLapin.sousMeres,
+      'Lapin Sevre': CategorieRationLapin.sousMeres,
       'Lapin de Chair': CategorieRationLapin.chair,
       // Contient « Jeune » : doit rester CHAIR (chair testé avant jeune).
       'Jeune Lapin (engraissement)': CategorieRationLapin.chair,
@@ -46,7 +49,7 @@ void main() {
     const casDeduits = <String, String?>{
       'REPRODUCTEUR': CategorieRationLapin.reproducteur,
       'lapin de chair': CategorieRationLapin.chair,
-      'LAPIN SEVRÉ': CategorieRationLapin.jeune,
+      'LAPIN SEVRÉ': CategorieRationLapin.sousMeres,
       'Jeune Lapin (Engraissement)': CategorieRationLapin.chair,
       // « jeune » n'est reconnu QU'EN ÉGALITÉ STRICTE côté serveur.
       'Jeunes': null,
@@ -80,12 +83,12 @@ void main() {
       'Jeune porc': null,
       'Jeune.': null,
       'Jeune lapin': null,
-      'Jeune': CategorieRationLapin.jeune,
-      'jeune': CategorieRationLapin.jeune,
-      'JEUNE': CategorieRationLapin.jeune,
-      ' Jeune ': CategorieRationLapin.jeune,
-      'Jéune': CategorieRationLapin.jeune,
-      'JÉUNE': CategorieRationLapin.jeune,
+      'Jeune': CategorieRationLapin.chair,
+      'jeune': CategorieRationLapin.chair,
+      'JEUNE': CategorieRationLapin.chair,
+      ' Jeune ': CategorieRationLapin.chair,
+      'Jéune': CategorieRationLapin.chair,
+      'JÉUNE': CategorieRationLapin.chair,
     };
     for (final e in egaliteStricteDuServeur.entries) {
       test('égalité stricte (serveur) « ${e.key} » → ${e.value}', () {
@@ -94,7 +97,7 @@ void main() {
     }
 
     // 🔴 F0.93 — `trim()` de Dart retire les espaces Unicode, `trim()` de PHP
-    // non : le poste donnait `jeune` (ration du barème) là où le serveur donne
+    // non : le poste donnait `chair` (ration du barème) là où le serveur donne
     // `null` (ration de secours).
     const unicodeDuServeur = <String, String?>{
       ' Jeune': null, // espace insécable avant
@@ -102,7 +105,7 @@ void main() {
       ' Jeune': null, // cadratin avant
       'Jeune ': null, // cadratin après
       ' \tJeune\n':
-          CategorieRationLapin.jeune, // témoin : espaces ASCII retirées
+          CategorieRationLapin.chair, // témoin : espaces ASCII retirées
     };
     for (final e in unicodeDuServeur.entries) {
       test('🔴 unicode (serveur) ${_visible(e.key)} → ${e.value}', () {
@@ -117,27 +120,27 @@ void main() {
     // autres caractères de contrôle — d'où `\f`, U+FEFF et U+0085 qui donnent
     // `jeune`. Un simple « trim ASCII » aurait créé ces trois divergences-là.
     const mesuresSurLeServeur = <String, String?>{
-      '\x0BJeune\r': CategorieRationLapin.jeune,
-      '\x00Jeune\x00': CategorieRationLapin.jeune,
+      '\x0BJeune\r': CategorieRationLapin.chair,
+      '\x00Jeune\x00': CategorieRationLapin.chair,
       '\x0CJeune': CategorieRationLapin
-          .jeune, // \f : non retiré par trim, supprimé par Str::ascii
-      'Jeune\x0C': CategorieRationLapin.jeune,
-      '﻿Jeune': CategorieRationLapin.jeune, // supprimé par Str::ascii
-      '\u0085Jeune': CategorieRationLapin.jeune, // supprimé par Str::ascii
+          .chair, // \f : non retiré par trim, supprimé par Str::ascii
+      'Jeune\x0C': CategorieRationLapin.chair,
+      '﻿Jeune': CategorieRationLapin.chair, // supprimé par Str::ascii
+      '\u0085Jeune': CategorieRationLapin.chair, // supprimé par Str::ascii
       ' Jeune': null,
       '　Jeune': null,
       ' Jeune': null,
       ' Jeune': null,
       '​Jeune': null, // U+200B devient une espace
-      'Jeu‌ne': CategorieRationLapin.jeune, // U+200C est supprimé
+      'Jeu‌ne': CategorieRationLapin.chair, // U+200C est supprimé
       'J eune': null,
       'Jeu\tne': null, // \t intérieur : devient une espace, pas supprimé
-      'Jeu\x0Cne': CategorieRationLapin.jeune, // \f intérieur : supprimé
+      'Jeu\x0Cne': CategorieRationLapin.chair, // \f intérieur : supprimé
       'Jeu\x10ne':
           null, // U+0010 : CONSERVÉ par Str::ascii (bizarrerie mesurée)
       ' Lapin de Chair ': CategorieRationLapin.chair,
       ' Reproducteur': CategorieRationLapin.reproducteur,
-      ' Lapin Sevré': CategorieRationLapin.jeune,
+      ' Lapin Sevré': CategorieRationLapin.sousMeres,
       '\t\t': null,
       ' ': null,
       'ponte': null,
@@ -148,32 +151,21 @@ void main() {
       });
     }
 
-    test('🔴 cleDuStade suit EXACTEMENT cle (même bord, même pliage)', () {
-      final tous = {
-        ...jeuDuServeur.keys,
-        ...casDeduits.keys,
-        ...egaliteStricteDuServeur.keys,
-        ...unicodeDuServeur.keys,
-        ...mesuresSurLeServeur.keys,
-        ' engraissement',
-        'engraissement ',
-        ' croissance',
-      };
-      for (final s in tous) {
-        expect(
-          CategorieRationLapin.cleDuStade(s),
-          CategorieRationLapin.cle(s),
-          reason: _visible(s),
-        );
-      }
-    });
-
-    test('stade de la bande : seul `engraissement` porte une catégorie', () {
+    // 🔁 F0.96 — le stade se rattache par la règle du SERVEUR (`STADE_VERS_CATEGORIE`), plus par `cle`.
+    test('stade de la bande : reproduction, croissance, engraissement (règle du serveur)', () {
+      expect(
+        CategorieRationLapin.cleDuStade('reproduction'),
+        CategorieRationLapin.reproducteur,
+      );
+      expect(
+        CategorieRationLapin.cleDuStade('croissance'),
+        CategorieRationLapin.sousMeres,
+      );
       expect(
         CategorieRationLapin.cleDuStade('engraissement'),
         CategorieRationLapin.chair,
       );
-      for (final s in ['reproduction', 'croissance', 'ponte', null, '']) {
+      for (final s in ['ponte', null, '', ' engraissement', 'Jeune']) {
         expect(CategorieRationLapin.cleDuStade(s), isNull, reason: '$s');
       }
     });
@@ -201,8 +193,10 @@ void main() {
         'Sevré',
         'Jeune (engraissement)',
       ],
-      'nouveaux (glossaire)': ['Reproducteur', 'Jeune', 'Lapin de Chair'],
-      'nouveaux en casse libre': ['REPRODUCTEUR', 'jeune', 'lapin de chair'],
+      'glossaire du 14/10/2026': ['Reproducteur', 'Lapin Sevré', 'Lapin de Chair'],
+      // F0.96 — glossaire du 17/10/2026 (serveur 15.44), mot pour mot.
+      'glossaire du 17/10/2026': ['Reproducteur', 'Sous-mères', 'Jeune'],
+      'glossaire en casse libre': ['REPRODUCTEUR', 'sous-mères', 'jeune'],
     };
 
     for (final j in jeux.entries) {
@@ -220,7 +214,7 @@ void main() {
           150,
         );
         expect(
-          CategorieRationLapin.ration(bareme, CategorieRationLapin.jeune),
+          CategorieRationLapin.ration(bareme, CategorieRationLapin.sousMeres),
           40,
         );
         expect(
@@ -239,7 +233,7 @@ void main() {
         120,
       );
       expect(
-        CategorieRationLapin.ration(const [], CategorieRationLapin.jeune),
+        CategorieRationLapin.ration(const [], CategorieRationLapin.sousMeres),
         30,
       );
       expect(
@@ -259,7 +253,7 @@ void main() {
         120,
       );
       expect(
-        CategorieRationLapin.ration(bareme, CategorieRationLapin.jeune),
+        CategorieRationLapin.ration(bareme, CategorieRationLapin.sousMeres),
         30,
       );
       expect(
@@ -271,9 +265,9 @@ void main() {
     test(
       'une catégorie absente retombe sur SON secours sans toucher aux autres',
       () {
-        final bareme = [ligne('Jeune', 45)];
+        final bareme = [ligne('Sous-mères', 45)];
         expect(
-          CategorieRationLapin.ration(bareme, CategorieRationLapin.jeune),
+          CategorieRationLapin.ration(bareme, CategorieRationLapin.sousMeres),
           45,
         );
         expect(
@@ -304,21 +298,21 @@ void main() {
       },
     );
 
-    test('libellés affichés : ceux de la décision client du 14/10/2026', () {
+    test('libellés affichés : ceux de la décision client du 17/10/2026', () {
       expect(CategorieRationLapin.libelles, {
         CategorieRationLapin.reproducteur: 'Reproducteur',
-        CategorieRationLapin.jeune: 'Jeune',
-        CategorieRationLapin.chair: 'Lapin de Chair',
+        CategorieRationLapin.sousMeres: 'Sous-mères',
+        CategorieRationLapin.chair: 'Jeune',
       });
-      // Ordre d'affichage du web (fiche-lapins.blade.php).
+      // Ordre d'affichage du web (fiche-lapins.blade.php) : Reproducteur, Jeune, Sous-mères.
       expect(CategorieRationLapin.ordre, [
         CategorieRationLapin.reproducteur,
-        CategorieRationLapin.jeune,
         CategorieRationLapin.chair,
+        CategorieRationLapin.sousMeres,
       ]);
       expect(CategorieRationLapin.rationsDeSecours, {
         CategorieRationLapin.reproducteur: 120,
-        CategorieRationLapin.jeune: 30,
+        CategorieRationLapin.sousMeres: 30,
         CategorieRationLapin.chair: 60,
       });
     });

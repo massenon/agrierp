@@ -21711,3 +21711,28 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 ### Non fait
 - Le poste n'émet aucune alerte hors ligne : elles descendent au tirage (règle serveur unique).
 - Aucune règle de réforme par âge n'existe nulle part : non inventée.
+
+---
+
+## Tickets F0.96 / F0.97 — Glossaire Lapins du 17/10/2026 au poste, saisie ventilée Lapins et Porcs (17/10/2026)
+
+### Constat
+- Le poste suivait encore le glossaire du 14/10 (Reproducteur / Jeune / Lapin de Chair) quand le serveur (15.44) sert Reproducteur (120 g) / Sous-mères (30 g) / Jeune (60 g) : ~25 tests du poste échouaient.
+- 🔴 La fiche Lapins enregistrait TOUS ses morts et dons sur « Reproducteur » : catégorie fabriquée, chaîne par catégorie faussée.
+- 🔴 La fiche Porcs rechargeait ses morts à 0 : ré-enregistrer le jour les effaçait.
+- Le rationnement du poste ne déduisait pas le départ du stade (`departDepuisStade`, 15.41) : « — » partout là où le web calcule.
+- Le bloc « Passage de stade » des porcs (ajouté en cours de ticket) affichait trois compteurs au lieu d'un — attrapé par `fiche_porcs_test`.
+
+### Corrections
+- `CategorieRationLapin` : clés `reproducteur` / `sous_meres` / `chair`, libellés, ordre et secours du serveur ; `cle()` transposée de `App\Support\CategorieRationLapin::cle` ; le stade se rattache par `STADE_VERS_CATEGORIE`.
+- `FicheJournaliereRepository.enregistrer(…, ventilation:)` : écrit `mort_*` / `don_*` / `passage_sevre_jeune`, totaux = somme ; départ déduit du stade écrit pour une bande sans chaîne ; D3 (passage > catégorie source) refusé AVANT écriture (`FicheRefusee`, motif du serveur).
+- Fiches Lapins et Porcs : chargement des colonnes ventilées ; une fiche ancienne non ventilée est SIGNALÉE et son enregistrement bloqué tant qu'elle n'est pas ventilée (aucune ventilation inventée) ; rationnement par `EffectifParCategorie.calculerJour`.
+- Fiche Sujet : motif du web (« Reproducteur / Jeune / Sous-mères »).
+
+### Mesures
+- Parité de `cle()` : 7 452 libellés (bords Unicode × libellés anciens et nouveaux) passés dans le Dart du poste ET dans la règle PHP du serveur (`php` + `vendor/autoload.php`) : 0 écart.
+- `ventilation_categories_test.dart` (6, dont une mutation vérifiée : retirer le blocage fait échouer le test), `categorie_ration_lapin_test.dart` et `fiche_lapins_glossaire_test.dart` réécrits au glossaire du 17/10.
+- Suite du poste : 1 976 verts, 32 ignorés, 3 rouges connus (`export_comptabilite_test`, chemins `C:/laragon`, A7). `flutter analyze` propre.
+
+### Non fait
+- Les fiches anciennes non ventilées ne sont PAS ventilées automatiquement : l'animalier les ventile à la ressaisie (aucune répartition ne peut être déduite sans fabriquer une donnée).

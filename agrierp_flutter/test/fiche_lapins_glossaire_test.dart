@@ -11,6 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket F0.92 — GLOSSAIRE DE LA FICHE LAPINS AU POSTE (suite de 15.36).
 ///
+/// 🔁 Ticket F0.96 — GLOSSAIRE DU 17/10/2026 (serveur 15.44) : Reproducteur
+/// (120 g) / Sous-mères (30 g, ex-« Lapin Sevré ») / Jeune (60 g, ex-« Lapin de
+/// Chair »). Une bande sans chaîne part de l'effectif ENTIER dans la catégorie
+/// de son stade, 0 dans les deux autres (`departDepuisStade` du web, 15.41) :
+/// un « 0 » y est une valeur déduite par la règle du serveur, pas un trou.
+///
 /// Décision client VALIDÉE le 14/10/2026 : tableau « Rationnement & Provende
 /// Servie par Catégorie » = Reproducteur / Jeune (ex-« Sevré ») / Lapin de
 /// Chair (ex-« Jeune (engraissement) ») ; colonne « Catégorie » ; « Sevrés »
@@ -91,8 +97,8 @@ void main() {
 
   const nouveaux = [
     ('Reproducteur', 150.0),
-    ('Jeune', 40.0),
-    ('Lapin de Chair', 70.0),
+    ('Sous-mères', 40.0),
+    ('Jeune', 70.0),
   ];
   const anciens = [
     ('Lapine Mère / Reproducteur', 150.0),
@@ -123,8 +129,8 @@ void main() {
       expect(find.text('Catégorie'), findsOneWidget);
       expect(find.text('Espèce'), findsNothing);
       expect(texte(tester, 'ration-libelle-reproducteur'), 'Reproducteur');
-      expect(texte(tester, 'ration-libelle-jeune'), 'Jeune');
-      expect(texte(tester, 'ration-libelle-chair'), 'Lapin de Chair');
+      expect(texte(tester, 'ration-libelle-sous_meres'), 'Sous-mères');
+      expect(texte(tester, 'ration-libelle-chair'), 'Jeune');
     });
 
     testWidgets(
@@ -136,15 +142,15 @@ void main() {
 
         expect(find.text('Lapin Sevré'), findsNothing);
         expect(find.text('Jeune Lapin (engraissement)'), findsNothing);
-        expect(texte(tester, 'ration-libelle-jeune'), 'Jeune');
-        expect(texte(tester, 'ration-libelle-chair'), 'Lapin de Chair');
+        expect(texte(tester, 'ration-libelle-sous_meres'), 'Sous-mères');
+        expect(texte(tester, 'ration-libelle-chair'), 'Jeune');
       },
     );
   });
 
   group('⚠️⚠️ rattachement de la bande par CLÉ STABLE', () {
     testWidgets(
-      'bande en engraissement, barème NOUVEAU : 40 × 70 = 2 800 g sur Lapin de Chair',
+      'bande en engraissement, barème NOUVEAU : 40 × 70 = 2 800 g sur Jeune',
       (tester) async {
         await bande(stade: 'engraissement');
         await bareme(nouveaux);
@@ -175,7 +181,7 @@ void main() {
         await bareme(anciens);
         await afficher(tester);
         final avant = [
-          for (final c in ['reproducteur', 'jeune', 'chair']) ...[
+          for (final c in ['reproducteur', 'sous_meres', 'chair']) ...[
             texte(tester, 'ration-effectif-$c'),
             texte(tester, 'ration-g-$c'),
             texte(tester, 'ration-grammes-$c'),
@@ -183,25 +189,23 @@ void main() {
           texte(tester, 'total-provende'),
         ];
 
-        // La migration 15.36, telle que le pull la rapporte.
+        // Les migrations 15.36 puis 15.44, telles que le pull les rapporte.
         await (db.update(
           db.feedRationStandards,
         )..where((t) => t.stageLabel.equals('Lapin Sevré'))).write(
-          const FeedRationStandardsCompanion(stageLabel: Value('Jeune')),
+          const FeedRationStandardsCompanion(stageLabel: Value('Sous-mères')),
         );
         await (db.update(
               db.feedRationStandards,
             )..where((t) => t.stageLabel.equals('Jeune Lapin (engraissement)')))
             .write(
-              const FeedRationStandardsCompanion(
-                stageLabel: Value('Lapin de Chair'),
-              ),
+              const FeedRationStandardsCompanion(stageLabel: Value('Jeune')),
             );
         await tester.pumpWidget(const SizedBox());
         await afficher(tester);
 
         final apres = [
-          for (final c in ['reproducteur', 'jeune', 'chair']) ...[
+          for (final c in ['reproducteur', 'sous_meres', 'chair']) ...[
             texte(tester, 'ration-effectif-$c'),
             texte(tester, 'ration-g-$c'),
             texte(tester, 'ration-grammes-$c'),
@@ -217,7 +221,7 @@ void main() {
       'catégorie absente du barème : ration de secours (60 g pour la chair), comme le serveur',
       (tester) async {
         await bande(stade: 'engraissement');
-        await bareme(const [('Reproducteur', 150), ('Jeune', 40)]);
+        await bareme(const [('Reproducteur', 150), ('Sous-mères', 40)]);
         await afficher(tester);
 
         expect(texte(tester, 'ration-g-chair'), '60 g/j');
@@ -231,8 +235,8 @@ void main() {
         await bande(stade: 'engraissement');
         await bareme(const [
           ('Reproducteur', 150),
-          ('Jeune', 40),
-          ('Lapin de Chair', 70),
+          ('Sous-mères', 40),
+          ('Jeune', 70),
           ('Jeune Lapin (engraissement)', 65),
         ]);
         await afficher(tester);
@@ -248,37 +252,47 @@ void main() {
     );
   });
 
-  group('⚠️ une ligne hors stade de la bande affiche « — », JAMAIS « 0 »', () {
-    testWidgets('bande en engraissement : Reproducteur et Jeune en tirets', (
-      tester,
-    ) async {
-      await bande(stade: 'engraissement');
-      await bareme(nouveaux);
-      await afficher(tester);
+  group('🔁 F0.96 — départ déduit du stade (règle du web), « — » sans stade', () {
+    testWidgets(
+      'bande en engraissement : tout sur Jeune, Reproducteur et Sous-mères à 0',
+      (tester) async {
+        await bande(stade: 'engraissement');
+        await bareme(nouveaux);
+        await afficher(tester);
 
-      for (final c in ['reproducteur', 'jeune']) {
-        expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
-        expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
-      }
-      // La ration normative reste connue : elle vient du barème.
-      expect(texte(tester, 'ration-g-reproducteur'), '150 g/j');
-      expect(texte(tester, 'ration-g-jeune'), '40 g/j');
-    });
+        for (final c in ['reproducteur', 'sous_meres']) {
+          expect(texte(tester, 'ration-effectif-$c'), '0', reason: c);
+          expect(texte(tester, 'ration-grammes-$c'), '0 g', reason: c);
+        }
+        // La ration normative reste celle du barème.
+        expect(texte(tester, 'ration-g-reproducteur'), '150 g/j');
+        expect(texte(tester, 'ration-g-sous_meres'), '40 g/j');
+      },
+    );
 
     testWidgets(
-      'stade sans catégorie (reproduction) : trois tirets et un total « — »',
+      'bande en reproduction : 40 × 150 = 6 000 g sur Reproducteur',
       (tester) async {
         await bande(stade: 'reproduction');
         await bareme(nouveaux);
         await afficher(tester);
 
-        for (final c in ['reproducteur', 'jeune', 'chair']) {
-          expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
-          expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
-        }
-        expect(texte(tester, 'total-provende'), '—');
+        expect(texte(tester, 'ration-effectif-reproducteur'), '40');
+        expect(texte(tester, 'ration-effectif-chair'), '0');
+        expect(texte(tester, 'total-provende'), '${40 * 150} g (6.0 Kg)');
       },
     );
+
+    testWidgets('bande en croissance : 40 × 40 = 1 600 g sur Sous-mères', (
+      tester,
+    ) async {
+      await bande(stade: 'croissance');
+      await bareme(nouveaux);
+      await afficher(tester);
+
+      expect(texte(tester, 'ration-effectif-sous_meres'), '40');
+      expect(texte(tester, 'total-provende'), '${40 * 40} g (1.6 Kg)');
+    });
 
     testWidgets('bande sans stade : trois tirets et un total « — »', (
       tester,
@@ -287,12 +301,15 @@ void main() {
       await bareme(nouveaux);
       await afficher(tester);
 
-      expect(texte(tester, 'ration-effectif-chair'), '—');
+      for (final c in ['reproducteur', 'sous_meres', 'chair']) {
+        expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
+        expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
+      }
       expect(texte(tester, 'total-provende'), '—');
     });
 
     testWidgets(
-      'effectif réellement nul sur la ligne du stade : « 0 », c\'est une mesure',
+      'effectif réellement nul : « 0 », c\'est une mesure',
       (tester) async {
         await bande(stade: 'engraissement', effectif: 0);
         await bareme(nouveaux);
@@ -301,7 +318,6 @@ void main() {
         expect(texte(tester, 'ration-effectif-chair'), '0');
         expect(texte(tester, 'ration-grammes-chair'), '0 g');
         expect(texte(tester, 'total-provende'), '0 g (0.0 Kg)');
-        expect(texte(tester, 'ration-effectif-jeune'), '—');
       },
     );
   });
@@ -379,14 +395,14 @@ void main() {
     },
   );
 
-  test('la Fiche Sujet reprend le motif du web 15.36 (glossaire lapins)', () {
+  test('la Fiche Sujet reprend le motif du web (glossaire lapins du 17/10/2026)', () {
     final code = File(
       'lib/features/elevage/fiche_sujet_screen.dart',
     ).readAsStringSync();
     expect(code, isNot(contains('Sevré / Jeune')));
     expect(
       code,
-      contains('pour les lapins : Reproducteur / Jeune / Lapin de Chair)'),
+      contains('pour les lapins : Reproducteur / Jeune / Sous-mères)'),
     );
   });
 }

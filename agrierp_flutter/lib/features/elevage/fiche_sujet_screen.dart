@@ -77,9 +77,9 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
   /// Motifs des trois onglets sans source — ceux de la page web.
   static const _motifs = {
     'alimentation':
-        // Ticket F0.92 : texte du web après 15.36 (glossaire lapins).
+        // Tickets F0.92 puis F0.96 : texte du web (glossaire lapins du 17/10/2026).
         'Le rationnement est calculé PAR BANDE et par catégorie (par exemple, '
-        'pour les lapins : Reproducteur / Jeune / Lapin de Chair), jamais par '
+        'pour les lapins : Reproducteur / Jeune / Sous-mères), jamais par '
         'sujet. Afficher une ration individuelle '
         "supposerait de diviser arbitrairement la provende de la bande — un "
         "chiffre qui n'aurait aucune valeur zootechnique.",

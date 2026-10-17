@@ -206,9 +206,9 @@ void main() {
     await afficher(tester);
 
     await tester.ensureVisible(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first,
+      find.byKey(Key('pas-${'Jeune'.hashCode}-1')).first,
     );
-    await tester.tap(find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first);
+    await tester.tap(find.byKey(Key('pas-${'Jeune'.hashCode}-1')).first);
     await tester.pump();
 
     expect(

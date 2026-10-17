@@ -1052,8 +1052,8 @@ class LivestockDailyEntries extends Table with SyncColumns {
   //
   // ⚠️⚠️ TOUTES NULLABLES, SANS DÉFAUT : `null` = « non ventilé / inconnu », JAMAIS 0 (un 0 dirait
   // « rien ne s'est passé dans cette catégorie »). Types : `unsignedInteger` nullable au serveur.
-  // Emplacements génériques : `repro` = Reproducteur ; `sevre` = Jeune (lapins) / Porcelet (porcs) ;
-  // `jeune` = Lapin de Chair (lapins) / Porc Marchand (porcs).
+  // Emplacements génériques : `repro` = Reproducteur ; `sevre` = Sous-mères (lapins) / Porcelet (porcs) ;
+  // `jeune` = Jeune (lapins) / Porc Marchand (porcs) — glossaire du 17/10/2026.
 
   /// Morts et dons PAR CATÉGORIE (saisis). Le total `mort` / `don` doit en être la somme.
   IntColumn get mortRepro => integer().nullable()();
