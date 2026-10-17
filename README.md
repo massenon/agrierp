@@ -14,6 +14,8 @@ Chaque projet a son propre `CLAUDE.md` qui décrit son architecture, ses convent
 
 ## Démarrage rapide
 
+Guide complet pas à pas (Windows, clonage, tests, installateur) : [`INSTALLATION_LOCALE.md`](INSTALLATION_LOCALE.md).
+
 ### Application web — `agrierp_laravel/`
 
 ```bash
