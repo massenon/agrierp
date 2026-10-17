@@ -46,6 +46,12 @@ class SyncLignesVenteValidationTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->utilisateur->assignRole('admin');
+
         $categorie = new ProductCategory();
         $categorie->id = '11111111-1111-4111-8111-111111111111';
         $categorie->label = 'Aliments';

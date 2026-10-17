@@ -277,6 +277,7 @@ class RolesPermissions extends Component
 
     public function generateBackup(): void
     {
+        $this->authorizeAdmin();
         Artisan::call('agrierp:backup');
         $output = Artisan::output();
 

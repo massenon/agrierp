@@ -254,6 +254,7 @@ class FicheReproducteurs extends Component
 
     public function saveDay(): void
     {
+        $this->authorize('manage-elevage');
         if (! $this->selectedLot) {
             $this->dispatch('toast', message: "Sélectionnez d'abord une bande.", type: 'error');
 

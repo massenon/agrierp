@@ -242,6 +242,7 @@ class FicheEscargots extends Component
 
     public function saveDay(): void
     {
+        $this->authorize('manage-elevage');
         $lot = $this->lots->first();
 
         if (! $lot) {

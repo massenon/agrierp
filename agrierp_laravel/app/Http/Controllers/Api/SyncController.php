@@ -24,6 +24,7 @@ use App\Services\AttestationService;
 use App\Services\EffectifParCategorieService;
 use App\Services\LotRevenueService;
 use App\Services\ProductCatalogService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use App\Models\FeedRationStandard;
 use App\Models\LivestockDailyEntry;
@@ -580,7 +581,10 @@ class SyncController extends Controller
 
         // ⚠️ BORNE A 100 LIGNES : la table grossit d'une ligne par action et
         // n'a d'interet, au poste, que pour les dernieres.
+        // 🔴→✅ TICKET S3 — LE JOURNAL D'AUDIT (qui a fait quoi, depuis quelle adresse IP) est réservé aux comptes
+        // qui gèrent les utilisateurs, comme son écran web. Les autres postes reçoivent une liste vide.
         $auditLogs = AuditLog::query()
+            ->when(! $request->user()?->can('manage-users'), fn ($q) => $q->whereRaw('1 = 0'))
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->limit(100)
@@ -767,7 +771,14 @@ class SyncController extends Controller
         $employes = Employee::query()
             ->where('is_active', true)
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status']);
+            ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status'])
+            // 🔴→✅ TICKET S3 — LE SALAIRE NE DESCEND QU'AUX RÔLES RH. Il partait vers tout poste connecté,
+            // caissier compris. Sans `view-rh`, le poste reçoit `null` et affiche « — » (salaire inconnu).
+            ->each(function (Employee $employe) use ($request) {
+                if (! $request->user()?->can('view-rh')) {
+                    $employe->base_salary = null;
+                }
+            });
 
         // ⚠️ UN STAGIAIRE N'EST PAS UN EMPLOYE : la table est autonome, sans
         // relation vers `employees` — c'est aussi pourquoi la feuille de
@@ -956,6 +967,12 @@ class SyncController extends Controller
             }
         }
 
+        // 🔴→✅ TICKET S1 — LE RÔLE EST CONTRÔLÉ SUR CHAQUE TABLE ÉCRITE. Ces huit tables étaient acceptées de
+        // n'importe quel jeton : un compte caissier pouvait créer des dépenses (trésorerie débitée), des achats,
+        // des ajustements de stock ou des pointages. Les enregistrements refusés le sont un par un, avec leur
+        // motif, et rejoignent la réponse de leur table après traitement des autres.
+        $refusParRole = $this->retirerLesEnvoisSansDroit($request);
+
         $result = [
             'cles_invalides' => $clesInvalides,
             'livestock_daily_entries' => ['accepted' => [], 'rejected' => []],
@@ -1070,7 +1087,10 @@ class SyncController extends Controller
         }
 
         if ($request->has('livestock_daily_entries')) {
-            $result['livestock_daily_entries'] = $this->pushDailyEntries($request->input('livestock_daily_entries'));
+            $result['livestock_daily_entries'] = $this->pushDailyEntries(
+                $request->input('livestock_daily_entries'),
+                ! $request->user()?->can('manage-elevage'),
+            );
         }
 
         if ($request->has('expenses')) {
@@ -1150,9 +1170,72 @@ class SyncController extends Controller
             $result['veterinary_records'] = $this->pushVeterinaryRecords($request->input('veterinary_records'));
         }
 
+        foreach ($refusParRole as $table => $refus) {
+            $result[$table]['rejected'] = array_merge($result[$table]['rejected'], $refus);
+        }
+
         AuditLog::record('api.sync_push', 'sync', $request->user()->id);
 
         return response()->json($result);
+    }
+
+    /**
+     * Ticket S1 — permission exigée pour écrire chaque table par le poste, identique à celle de l'écran web
+     * correspondant (`$this->authorize()` des composants Livewire). Les autres tables écrivables contrôlent
+     * déjà le rôle dans leur propre traitement.
+     */
+    private const PERMISSION_PAR_TABLE = [
+        'livestock_daily_entries' => 'manage-elevage',
+        'livestock_reproduction_events' => 'manage-elevage',
+        'veterinary_records' => 'manage-elevage',
+        'expenses' => 'manage-achats',
+        'purchases' => 'manage-achats',
+        'attendance_records' => 'manage-rh',
+        'sales' => 'manage-ventes',
+        'stock_adjustments' => 'manage-stocks',
+    ];
+
+    /**
+     * Ticket S1 — retire de la requête les enregistrements que le rôle de l'utilisateur ne permet pas d'écrire,
+     * et renvoie leurs refus motivés, table par table.
+     *
+     * ⚠️ Le poste inscrit chaque vente de bétail dans la fiche du jour (`vente`) et renvoie cette fiche avec
+     * la vente : un compte `manage-ventes` passe donc ce filtre pour les fiches, et `pushDailyEntries` ne lui
+     * laisse modifier que la vente.
+     *
+     * @return array<string, array<int, array{id?: mixed, client_ref?: mixed, reason: string}>>
+     */
+    private function retirerLesEnvoisSansDroit(Request $request): array
+    {
+        $utilisateur = $request->user();
+        $refus = [];
+
+        foreach (self::PERMISSION_PAR_TABLE as $table => $permission) {
+            $envois = $request->input($table);
+
+            if (! is_array($envois) || ($utilisateur && $utilisateur->can($permission))) {
+                continue;
+            }
+
+            // Les fiches d'un compte de vente sont jugées une par une dans `pushDailyEntries` : il peut y
+            // inscrire la vente, rien d'autre.
+            if ($table === 'livestock_daily_entries' && $utilisateur && $utilisateur->can('manage-ventes')) {
+                continue;
+            }
+
+            $autorises = [];
+            foreach ($envois as $envoi) {
+                $cle = $table === 'stock_adjustments' ? 'client_ref' : 'id';
+                $refus[$table][] = [
+                    $cle => is_array($envoi) ? ($envoi[$cle] ?? null) : null,
+                    'reason' => MotifsRefusPush::roleInsuffisant($table),
+                ];
+            }
+
+            $request->merge([$table => $autorises]);
+        }
+
+        return $refus;
     }
 
     /**
@@ -1214,6 +1297,37 @@ class SyncController extends Controller
      * ou un départ à valeur NON nulle (même 0) reste une saisie : « connu à zéro » est une information, comme
      * `mort = 0` ; leurs `null` ont été retirés avant (clé absente).
      */
+    /**
+     * Ticket S1 — la fiche envoyée change-t-elle autre chose que la vente par rapport au serveur ? Une fiche
+     * inconnue est comparée aux valeurs par défaut (0 pour achat, ne, mort, don et les mouvements ventilés que
+     * la vente pose « connus à zéro », vide pour le reste).
+     *
+     * @param  array<string, mixed>  $fiche  champs validés
+     */
+    private function modifieAutreChoseQueLaVente(array $fiche, ?LivestockDailyEntry $existant): bool
+    {
+        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant'];
+        $aZeroParDefaut = array_merge(self::FICHE_COLONNES_NOT_NULL, ['don'], self::FICHE_COLONNES_VENTILATION);
+
+        foreach (array_diff_key($fiche, array_flip($libres)) as $colonne => $valeur) {
+            $connue = $existant?->getAttribute($colonne);
+
+            if ($existant === null && in_array($colonne, $aZeroParDefaut, true)) {
+                $connue = 0;
+            }
+
+            $egal = is_numeric($valeur) && is_numeric($connue)
+                ? (float) $valeur === (float) $connue
+                : ($valeur === null ? $connue === null : (string) $valeur === (string) $connue);
+
+            if (! $egal) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function porteUneColonneDeSaisie(array $entry): bool
     {
         $colonnes = array_diff(
@@ -1356,7 +1470,11 @@ class SyncController extends Controller
      *    `livestock_lots.current_quantity` des fiches suivantes — ce qui referme le point ouvert de 15.31 (une fiche
      *    poussée sur un jour antérieur ne déclenchait pas la cascade).
      */
-    private function pushDailyEntries(array $entries): array
+    /**
+     * @param  bool  $venteSeulement  ticket S1 — compte de vente sans `manage-elevage` : seule la vente de la fiche
+     *                                 peut différer de ce que le serveur connaît (voir `modifieAutreChoseQueLaVente`).
+     */
+    private function pushDailyEntries(array $entries, bool $venteSeulement = false): array
     {
         $entries = array_values($entries);
         $issues = [];
@@ -1417,6 +1535,22 @@ class SyncController extends Controller
                     'cat_depart_repro' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_sevre' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_jeune' => ['nullable', 'integer', 'min:0'],
+                    // 🔴→✅ TICKET S1 — colonnes que `fill()` écrivait SANS contrôle : effectifs négatifs, produit
+                    // inexistant (violation de clé étrangère, donc erreur 500 pour tout l'envoi), sexe hors liste.
+                    'effectif_m' => ['nullable', 'integer', 'min:0'],
+                    'effectif_f' => ['nullable', 'integer', 'min:0'],
+                    'effectif_sevres' => ['nullable', 'integer', 'min:0'],
+                    'effectif_smeres' => ['nullable', 'integer', 'min:0'],
+                    'cat_eff_repro' => ['nullable', 'integer', 'min:0'],
+                    'cat_eff_sevre' => ['nullable', 'integer', 'min:0'],
+                    'cat_eff_jeune' => ['nullable', 'integer', 'min:0'],
+                    'cat_eff_4' => ['nullable', 'integer', 'min:0'],
+                    'feed_product_id' => ['nullable', 'uuid', 'exists:products,id'],
+                    'treatment_product_id' => ['nullable', 'uuid', 'exists:products,id'],
+                    'treatment_dose' => ['nullable', 'string', 'max:100'],
+                    'symptomes' => ['nullable', 'string', 'max:5000'],
+                    'vente_sexe' => ['nullable', 'in:M,F,Mixte'],
+                    'vente_montant' => ['nullable', 'numeric', 'min:0'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 // ⚠️ 'id' n'est PAS dans $fillable de LivestockDailyEntry
@@ -1446,6 +1580,16 @@ class SyncController extends Controller
                     continue;
                 }
 
+                // 🔴→✅ TICKET S1 — un compte de vente inscrit la vente dans la fiche, jamais une saisie d'élevage.
+                // Une fiche qui porte autre chose (morts saisis par l'animalier sur le même poste, par exemple)
+                // est refusée avec son motif : elle reste sur le poste, sans perte, jusqu'à son envoi par un
+                // compte autorisé.
+                if ($venteSeulement && $this->modifieAutreChoseQueLaVente($validated, $existant)) {
+                    $issues[$rang] = ['ko' => ['id' => $validated['id'], 'reason' => MotifsRefusPush::ficheEleveurRequise()]];
+
+                    continue;
+                }
+
                 $record = $existant ?? new LivestockDailyEntry();
                 $record->id = $validated['id'];
                 // ⚠️⚠️ `effectif_final` N'EST JAMAIS REPRIS DU CLIENT. Le poste
@@ -1458,7 +1602,9 @@ class SyncController extends Controller
                 // ⚠️ C'est aussi ce qui fait tenir la borne a zero du ticket
                 // 14.63 sur ce chemin : reprendre le nombre du client la
                 // contournait entierement.
-                $record->fill(collect($entry)->except(['id', 'effectif_final'])->toArray());
+                // 🔴→✅ TICKET S1 — seules les colonnes VALIDÉES ci-dessus sont reprises (clés présentes dans l'envoi,
+                // pour qu'une colonne absente garde sa valeur : comportement 15.38 inchangé).
+                $record->fill(Arr::only($entry, array_diff(array_keys($validated), ['id', 'effectif_final'])));
 
                 // Ticket 15.40 — ventilation, cohérence, D4/D7/D3 (lève une ValidationException motivée).
                 $this->verifierVentilation($entry, $record, $existant);
@@ -2613,6 +2759,17 @@ class SyncController extends Controller
     /**
      * @param  array<string, true>  $fichesRecues  fiches acceptées dans le MÊME envoi (ticket 15.30)
      */
+    /** Ticket S1 — champs d'une vente que le poste a le droit d'écrire (tous validés dans `pushSales`). */
+    private const VENTE_CHAMPS_DU_POSTE = [
+        'customer_id', 'payment_mode', 'subtotal', 'discount', 'total',
+        'cash_received', 'change_due', 'status', 'sold_at',
+    ];
+
+    /** Ticket S1 — champs d'une ligne de vente que le poste a le droit d'écrire. */
+    private const LIGNE_DE_VENTE_CHAMPS_DU_POSTE = [
+        'product_id', 'lot_id', 'qty', 'unit_price', 'manual_total_amount',
+    ];
+
     private function pushSales(array $sales, array $fichesRecues = []): array
     {
         $accepted = [];
@@ -2632,7 +2789,13 @@ class SyncController extends Controller
                 // defaut que le doublon de fiche, ticket 14.69).
                 $validated = validator($saleData, [
                     'id' => ['required', 'uuid', 'unique:sales,id'],
-                    'payment_mode' => ['required', 'string'],
+                    // 🔴→✅ TICKET S1 — mode de paiement borné aux valeurs de la colonne (enum) : une autre valeur
+                    // échouait en base au lieu d'un refus motivé.
+                    'payment_mode' => ['required', 'string', 'in:especes,mobile_money,virement,credit,avance'],
+                    'customer_id' => ['nullable', 'uuid', 'exists:customers,id'],
+                    'cash_received' => ['nullable', 'numeric', 'min:0'],
+                    'change_due' => ['nullable', 'numeric', 'min:0'],
+                    'status' => ['nullable', 'in:validee,annulee'],
                     // 🔴→✅ TICKET 15.38 — `sales.subtotal` est NOT NULL SANS défaut : `nullable` laissait passer
                     // un 500 pour l'envoi entier (une clé omise le donnait déjà). Refus motivé de CETTE vente.
                     'subtotal' => ['required', 'numeric', 'min:0'],
@@ -2679,11 +2842,22 @@ class SyncController extends Controller
                     // côté client Flutter au moment de la vente hors-ligne.
                     $sale = new Sale();
                     $sale->id = $validated['id'];
-                    $sale->fill(collect($saleData)->except(['id', 'lines'])->toArray());
+                    // 🔴→✅ TICKET S1 — SEULS LES CHAMPS VALIDÉS SONT REPRIS. `fill()` recevait toute la vente
+                    // envoyée : `mecef_status`, `mecef_qr_ref` ou `accounting_entry_id` passaient tels quels, et
+                    // une ligne pouvait se rattacher à une autre vente (son `sale_id` écrasait celui du serveur).
+                    // `status` est NOT NULL avec défaut : absent ou `null`, il garde son défaut (`validee`).
+                    $sale->fill(array_filter(
+                        Arr::only($saleData, self::VENTE_CHAMPS_DU_POSTE),
+                        fn ($valeur, $champ) => $champ !== 'status' || $valeur !== null,
+                        ARRAY_FILTER_USE_BOTH,
+                    ));
                     $sale->save();
 
                     foreach ($saleData['lines'] as $line) {
-                        SaleLine::create(array_merge(['sale_id' => $sale->id], $line));
+                        SaleLine::create(array_merge(
+                            Arr::only($line, self::LIGNE_DE_VENTE_CHAMPS_DU_POSTE),
+                            ['sale_id' => $sale->id],
+                        ));
                     }
 
                     // 🔴→✅ TICKET 14.53 — LES QUATRE EFFETS D'UNE VENTE.
@@ -2849,9 +3023,16 @@ class SyncController extends Controller
                 $validated = validator($soin, [
                     'id' => ['required', 'uuid'],
                     'lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
-                    'action_type' => ['required', 'string'],
+                    'action_type' => ['required', 'string', 'max:100'],
                     'record_date' => ['required', 'date'],
                     'withdrawal_days' => ['nullable', 'integer', 'min:0'],
+                    // 🔴→✅ TICKET S1 — champs transmis tels quels à `RecordVeterinaryCareAction` sans contrôle.
+                    'product_used' => ['nullable', 'string', 'max:150'],
+                    'dose' => ['nullable', 'string', 'max:100'],
+                    'vet_name' => ['nullable', 'string', 'max:150'],
+                    'symptomes' => ['nullable', 'string', 'max:5000'],
+                    'gravite' => ['nullable', 'in:legere,moderee,severe'],
+                    'cost' => ['nullable', 'numeric', 'min:0'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 if (VeterinaryRecord::where('id', $validated['id'])->exists()) {
@@ -2860,8 +3041,9 @@ class SyncController extends Controller
                     continue;
                 }
 
+                // Ticket S1 — seuls les champs validés partent : ni `is_active` ni `daily_entry_id` venus du poste.
                 app(RecordVeterinaryCareAction::class)->execute(
-                    collect($soin)->except('withdrawal_days')->toArray(),
+                    Arr::except($validated, 'withdrawal_days'),
                     (int) ($soin['withdrawal_days'] ?? 0),
                 );
 

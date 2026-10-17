@@ -123,6 +123,7 @@ class SoinsVaccinsHub extends Component
 
     public function saveSoin(): void
     {
+        $this->authorize('manage-elevage');
         $this->validate([
             'soinLotId' => ['required', 'exists:livestock_lots,id'],
             'soinDate' => ['required', 'date'],

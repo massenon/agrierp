@@ -47,6 +47,11 @@ class SyncParametresGenerauxTest extends TestCase
             'email' => 'dg@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+
+        // Ticket S3 : le journal d'audit ne descend qu'aux comptes qui gèrent les utilisateurs. Permission
+        // directe, sans rôle : ces tests créent eux-mêmes les rôles dont ils vérifient le transport.
+        Permission::findOrCreate('manage-users', 'web');
+        $this->administrateur->givePermissionTo('manage-users');
     }
 
     private function tirer(): \Illuminate\Testing\TestResponse

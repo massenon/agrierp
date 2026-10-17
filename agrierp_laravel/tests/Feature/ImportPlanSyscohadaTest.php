@@ -686,6 +686,15 @@ class ImportPlanSyscohadaTest extends TestCase
         // ce test à jour avec la décision du cabinet, ne pas le « réparer » en silence.
         $this->seed(ChartOfAccountsSeeder::class);
 
+        // Ticket S2 : l'enregistrement d'un mode de paiement exige `manage-comptabilite`.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $comptable = User::create([
+            'name' => 'Comptable', 'username' => 'compta-a2', 'email' => 'compta-a2@olouwachegoun.bj',
+            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $comptable->assignRole('comptable');
+        $this->actingAs($comptable);
+
         Livewire::test(ModesPaiement::class)
             ->set('bankName', 'Banque test')->set('rib', 'RIB-1')->set('iban', 'BJ00-1')
             ->call('saveBank')->assertHasNoErrors();

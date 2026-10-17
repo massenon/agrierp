@@ -119,6 +119,7 @@ class ListeClients extends Component
 
     public function saveCustomer(): void
     {
+        $this->authorize('manage-ventes');
         // Ticket 15.18 : règles et écriture partagées avec `/sync/push` (le poste Flutter).
         $service = app(CustomerCatalogService::class);
 
@@ -145,6 +146,7 @@ class ListeClients extends Component
 
     public function archiveCustomer(string $id): void
     {
+        $this->authorize('manage-ventes');
         app(CustomerCatalogService::class)->archiver(Customer::findOrFail($id));
         $this->dispatch('toast', message: 'Client archivé avec succès.', type: 'warning');
     }

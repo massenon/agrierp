@@ -155,4 +155,28 @@ class MotifsRefusPush
     {
         return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins et les porcs.";
     }
+
+    /** Ticket S1 : un compte de vente envoie une fiche qui contient des saisies d'élevage. */
+    public static function ficheEleveurRequise(): string
+    {
+        return "Fiche refusée : elle contient des saisies d'élevage (morts, naissances, achats, alimentation…) que "
+            .'votre rôle ne permet pas d\'envoyer. Elle reste sur le poste : un compte animalier doit la synchroniser.';
+    }
+
+    /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
+    public static function roleInsuffisant(string $table): string
+    {
+        $objet = [
+            'livestock_daily_entries' => 'saisir une fiche d\'élevage',
+            'livestock_reproduction_events' => 'enregistrer un événement de reproduction',
+            'veterinary_records' => 'enregistrer un soin vétérinaire',
+            'expenses' => 'enregistrer une dépense',
+            'purchases' => 'enregistrer un achat',
+            'attendance_records' => 'enregistrer un pointage',
+            'sales' => 'enregistrer une vente',
+            'stock_adjustments' => 'ajuster le stock',
+        ][$table] ?? 'écrire ces données';
+
+        return "Refusé : votre rôle ne permet pas de {$objet}. Connectez-vous au poste avec un compte autorisé.";
+    }
 }

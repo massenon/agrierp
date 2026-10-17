@@ -200,7 +200,10 @@ class GestionUtilisateurs extends Component
             return;
         }
 
-        User::findOrFail($id)->update(['is_active' => false]);
+        $utilisateur = User::findOrFail($id);
+        $utilisateur->update(['is_active' => false]);
+        // Ticket S3 — les jetons de ses postes sont révoqués : la désactivation vaut aussi hors du web.
+        $utilisateur->tokens()->delete();
         AuditLog::record('user.archived', 'parametres');
         $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
     }

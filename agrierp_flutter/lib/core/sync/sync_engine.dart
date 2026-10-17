@@ -5,6 +5,33 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
 
+/// Ticket S3 — refus du serveur, avec un message que l'écran affiche tel quel.
+class EchecSynchronisation implements Exception {
+  const EchecSynchronisation(this.message);
+
+  final String message;
+
+  /// Message pour un statut HTTP de refus ; `null` pour toute autre erreur (relancée telle quelle).
+  static String? motifHttp(int? statut, Object? corps) {
+    final serveur = corps is Map && corps['message'] is String
+        ? corps['message'] as String
+        : null;
+    return switch (statut) {
+      401 =>
+        'Session expirée : reconnectez-vous. Vos saisies en attente sont conservées sur ce poste.',
+      403 =>
+        serveur ??
+            'Accès refusé par le serveur : votre compte est désactivé ou n\'a pas les droits nécessaires.',
+      429 =>
+        'Trop de synchronisations rapprochées : réessayez dans une minute.',
+      _ => null,
+    };
+  }
+
+  @override
+  String toString() => message;
+}
+
 /// Résultat d'une synchronisation, rendu à l'écran tel quel.
 ///
 /// ⚠️ LES REJETS SONT PORTÉS JUSQU'À L'UTILISATEUR. Le serveur répond table
@@ -98,8 +125,25 @@ class SyncEngine {
     }
 
     _avertissements.clear();
-    var tire = await _tirer();
-    final (accepte, rejete, motifs) = await _pousser();
+    final int tire0;
+    final int accepte;
+    final int rejete;
+    final List<String> motifs;
+    try {
+      tire0 = await _tirer();
+      (accepte, rejete, motifs) = await _pousser();
+    } on DioException catch (e) {
+      // ⚠️ TICKET S3 — UN REFUS DU SERVEUR EST NOMMÉ. Session expirée, compte désactivé ou débit dépassé
+      // s'affichaient comme une erreur technique brute (« DioException [bad response] … ») : l'utilisateur
+      // ne savait pas qu'il lui suffisait de se reconnecter. Les saisies en attente restent conservées.
+      final motif = EchecSynchronisation.motifHttp(
+        e.response?.statusCode,
+        e.response?.data,
+      );
+      if (motif != null) throw EchecSynchronisation(motif);
+      rethrow;
+    }
+    var tire = tire0;
 
     // ⚠️ TIRAGE DE CONFIRMATION (ticket F0.73). Le poste tire AVANT de pousser : une
     // avance ou une imputation que le serveur vient d'accepter a modifié, côté serveur,

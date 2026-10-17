@@ -604,6 +604,7 @@ class FicheLapins extends Component
 
     public function saveDay(): void
     {
+        $this->authorize('manage-elevage');
         $lot = $this->bande;
 
         if (! $lot) {

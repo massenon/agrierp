@@ -417,6 +417,7 @@ class PosInterface extends Component
 
     public function saveNewClient(): void
     {
+        $this->authorize('manage-ventes');
         $this->validate([
             'newClientName' => ['required', 'string', 'max:150'],
             'newClientPhone' => ['nullable', 'string', 'max:30'],

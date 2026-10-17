@@ -298,6 +298,7 @@ class ClotureExercice extends Component
 
     public function confirmStep1(): void
     {
+        $this->authorize('close-fiscal-year');
         $year = $this->fiscalYear;
         if (! $year) {
             return;
@@ -366,6 +367,7 @@ class ClotureExercice extends Component
 
     public function confirmCloture(): void
     {
+        $this->authorize('close-fiscal-year');
         $year = $this->fiscalYear;
 
         if (! $year || $year->status !== 'ouvert') {

@@ -27,7 +27,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
 
-Route::middleware('auth:sanctum')->group(function () {
+// Ticket S3 — `CompteActif` : un compte désactivé sur le web perd aussitôt l'accès de ses postes.
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // Ticket 15.9 : changement de mot de passe depuis le poste. Même limiteur
     // que la connexion : il vérifie lui aussi un mot de passe.
@@ -53,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
-    Route::get('/sync/pull', [SyncController::class, 'pull']);
-    Route::post('/sync/push', [SyncController::class, 'push']);
+    // Ticket S1 — débit borné : un poste synchronise toutes les quelques minutes ; 30 appels par minute et par
+    // compte laissent la marge d'une relance manuelle répétée sans permettre d'épuiser le serveur.
+    Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:30,1');
+    Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
 });

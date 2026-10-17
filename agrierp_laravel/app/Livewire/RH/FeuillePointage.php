@@ -123,6 +123,7 @@ class FeuillePointage extends Component
 
     public function savePointage(): void
     {
+        $this->authorize('manage-rh');
         $this->validate([
             'employeeId' => ['required', 'exists:employees,id'],
             'attendanceDate' => ['required', 'date'],
@@ -151,6 +152,7 @@ class FeuillePointage extends Component
 
     public function archiveRecord(string $id): void
     {
+        $this->authorize('manage-rh');
         AttendanceRecord::findOrFail($id)->update(['is_active' => false]);
         AuditLog::record('attendance.archived', 'rh');
         $this->dispatch('toast', message: 'Pointage archivé avec succès.', type: 'warning');

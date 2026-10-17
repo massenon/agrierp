@@ -59,11 +59,14 @@ class SyncFicheReduiteInconnueTest extends TestCase
             Permission::findOrCreate($nom, 'web');
         }
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes', 'manage-ventes']);
+        // Ticket S1 : ces tests envoient aussi des fiches complètes, qui exigent `manage-elevage`.
+        Permission::findOrCreate('manage-elevage', 'web');
+        Role::findOrCreate('animalier', 'web')->givePermissionTo('manage-elevage');
 
         User::create([
             'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
             'password' => bcrypt(self::MDP), 'is_active' => true,
-        ])->assignRole('caissier');
+        ])->assignRole('caissier', 'animalier');
 
         FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);
 

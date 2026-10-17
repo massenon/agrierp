@@ -110,6 +110,7 @@ class RegistreEmployes extends Component
 
     public function saveEmployee(): void
     {
+        $this->authorize('manage-rh');
         $this->validate([
             'firstName' => ['required', 'string', 'max:100'],
             'lastName' => ['required', 'string', 'max:100'],
@@ -145,6 +146,7 @@ class RegistreEmployes extends Component
 
     public function archiveEmployee(string $id): void
     {
+        $this->authorize('manage-rh');
         Employee::findOrFail($id)->update(['is_active' => false]);
         AuditLog::record('employee.archived', 'rh');
         $this->dispatch('toast', message: 'Employé archivé avec succès.', type: 'warning');

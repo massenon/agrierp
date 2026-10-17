@@ -39,6 +39,12 @@ class SyncDepensesTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->utilisateur->assignRole('admin');
+
         $this->caisse = TreasuryAccount::create([
             'label' => 'Caisse Physique',
             'account_code' => '531',

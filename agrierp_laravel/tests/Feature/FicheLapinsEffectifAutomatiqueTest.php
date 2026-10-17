@@ -49,6 +49,15 @@ class FicheLapinsEffectifAutomatiqueTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Ticket S2 : l'enregistrement exige désormais `authorize()` ; l'écran est utilisé par un compte animalier.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $compte = \App\Models\User::create([
+            'name' => 'Animalier', 'username' => 'animalier-test',
+            'email' => 'animalier-test@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $compte->assignRole('animalier');
+        $this->actingAs($compte);
         Carbon::setTestNow('2026-10-14 12:00:00');
 
         $this->espece = LivestockSpecies::create(['code' => 'cuniculture', 'label' => 'Lapins', 'is_enabled' => true]);

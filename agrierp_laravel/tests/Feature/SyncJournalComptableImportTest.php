@@ -59,10 +59,12 @@ class SyncJournalComptableImportTest extends TestCase
         DB::statement('PRAGMA defer_foreign_keys = ON');
         Carbon::setTestNow('2026-10-10 10:00:00');
 
-        foreach (['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite'] as $nom) {
+        // Ticket S2 : `close-fiscal-year` — la confirmation de clôture exige désormais son autorisation.
+        $permissions = ['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite', 'close-fiscal-year'];
+        foreach ($permissions as $nom) {
             Permission::findOrCreate($nom, 'web');
         }
-        Role::findOrCreate('admin', 'web')->givePermissionTo(['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite']);
+        Role::findOrCreate('admin', 'web')->givePermissionTo($permissions);
         $this->admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,

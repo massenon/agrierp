@@ -143,6 +143,7 @@ class HistoriqueVentes extends Component
 
     public function cancelSale(): void
     {
+        $this->authorize('manage-ventes');
         $sale = Sale::with('lines')->findOrFail($this->cancellingSaleId);
 
         if ($sale->status === 'annulee') {

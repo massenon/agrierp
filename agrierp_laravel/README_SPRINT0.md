@@ -21623,3 +21623,30 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 - **Poste** : le glossaire du 17/10 n'est pas porté dans `categorie_ration_lapin.dart` (plus de 25 tests du poste à réécrire, périmètre de F0.96). À livrer AVANT de déployer la migration `2026_10_17_000001` (PLAN_FINALISATION A12). Sur le poste : nom de l'attestation et adresse du serveur par défaut alignés.
 - Fiches Pondeuses et Escargots à plusieurs bandes (A11) : non traitées.
 - Aucun test Dusk, aucun essai sur la base de production.
+
+## Ticket 15.45 (Laravel) + F0.99 (Flutter) : SÉCURITÉ DE L'API DE SYNCHRONISATION ET DES ÉCRITURES (S1 à S3 de l'audit du 17/10/2026)
+
+### Ce qui a été constaté (audit statique du 17/10/2026)
+- `POST /api/sync/push` acceptait fiches, reproduction, soins, dépenses, achats, pointages, ventes et ajustements de stock de **n'importe quel jeton**, sans contrôle de rôle.
+- Une vente envoyée était remplie avec **tous** ses champs (`mecef_status`, `mecef_qr_ref`, `accounting_entry_id`…) ; une ligne pouvait se rattacher à une autre vente (son `sale_id` passait après celui du serveur).
+- Fiches et soins : `fill()` recevait des colonnes jamais validées (effectifs négatifs, produit inexistant → 500 pour tout l'envoi, `is_active` d'un soin).
+- 27 méthodes Livewire écrivaient sans `authorize()`, dont les cinq `saveDay()`.
+- `GET /api/sync/pull` servait les salaires et le journal d'audit à tout compte ; un compte désactivé gardait l'accès de ses postes ; les jetons n'expiraient jamais ; tirage et envoi sans limite de débit.
+
+### Corrections
+- **S1** : permission par table à l'envoi (`PERMISSION_PAR_TABLE`, motif `MotifsRefusPush::roleInsuffisant`). Un compte de vente peut inscrire la **vente** dans une fiche (le poste la répercute sur la fiche du jour) mais rien d'autre : sinon refus `ficheEleveurRequise`, la fiche reste sur le poste sans perte. Ventes, lignes, fiches et soins ne reprennent que des champs validés (`payment_mode` borné à l'enum, `customer_id` existant, sexe et gravité bornés). `throttle:30,1` sur `/sync/pull` et `/sync/push`.
+- **S2** : `authorize()` en première ligne de 27 méthodes (fiches, soins, modes de paiement, pointage, employés, devis, annulation de vente, clients, règlement fournisseur, clôture, sauvegarde depuis Rôles & Permissions). Garde-fou `AutorisationsMethodesMutantesTest` qui lit le code source.
+- **S3** : middleware `CompteActif` (403 motivé, jeton révoqué) ; archiver un utilisateur révoque ses jetons ; salaire `null` sans `view-rh` ; journal d'audit vide sans `manage-users` ; `config/sanctum.php` : expiration 90 jours (`SANCTUM_EXPIRATION`). Poste : `EchecSynchronisation` nomme le 401, le 403 et le 429 au lieu d'afficher l'exception brute.
+
+### Mesures
+- Référence (copie propre de la branche, même environnement) : 1 579 verts, 10 échecs d'environnement (manifeste Vite absent).
+- Après : **1 601 verts**, les mêmes 10 échecs d'environnement. 22 tests nouveaux (`SyncPushDroitsEtChampsTest`, `SyncPullDroitsEtCompteActifTest`, `AutorisationsMethodesMutantesTest`) : 17 sur 20 de la première version échouaient sans les correctifs (épreuve de mutation), les autres sont des contrôles positifs.
+- 20 fichiers de tests existants mis à jour : leur utilisateur n'avait aucun rôle, ou un caissier envoyait des fiches complètes. Rôle ajouté, intention du test inchangée.
+- Poste : `flutter analyze` propre ; `flutter test` 1 958 verts, 32 sautés, 3 échecs déjà connus (`export_comptabilite_test`, chemins `C:/laragon`, A7).
+
+### Ce qui n'a PAS été fait / vérifié
+- Tirage : comptabilité, utilisateurs et autres modules restent servis à tout compte (filtrer le journal comptable touche la purge à deux tirages du poste : ticket à part).
+- Pas de limite de taille par envoi (un poste longtemps hors ligne envoie toute sa file en une fois).
+- **Au déploiement** : les jetons de plus de 90 jours deviennent invalides ; les postes concernés affichent « Session expirée : reconnectez-vous ».
+- Hors code (propriétaire du serveur) : changer `APP_KEY`, supprimer `agrierp.zip` du serveur, révoquer jetons et sessions, retirer `database/agrierp_db.sql` du dépôt et de l'historique.
+- Aucun test Dusk ; essai réel poste ↔ serveur non fait.

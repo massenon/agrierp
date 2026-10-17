@@ -44,6 +44,15 @@ class RationnementPorcsTest extends TestCase
     {
         parent::setUp();
 
+        // Ticket S2 : l'enregistrement exige désormais `authorize()` ; l'écran est utilisé par un compte animalier.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $compte = \App\Models\User::create([
+            'name' => 'Animalier', 'username' => 'animalier-test',
+            'email' => 'animalier-test@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $compte->assignRole('animalier');
+        $this->actingAs($compte);
+
         $species = LivestockSpecies::create(['code' => 'porciculture', 'label' => 'Porcs', 'is_enabled' => true]);
 
         $this->lot = LivestockLot::create([

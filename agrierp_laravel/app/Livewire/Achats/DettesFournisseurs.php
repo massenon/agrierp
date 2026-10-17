@@ -130,6 +130,7 @@ class DettesFournisseurs extends Component
 
     public function submitPaiementFournisseur(): void
     {
+        $this->authorize('manage-achats');
         $this->validate([
             'paymentSupplierId' => ['required', 'exists:suppliers,id'],
             'paymentAmount' => ['required', 'numeric', 'min:1'],

@@ -23,6 +23,20 @@ class ClotureExerciceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Ticket S2 : les étapes de clôture exigent désormais `close-fiscal-year`.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $comptable = \App\Models\User::create([
+            'name' => 'Comptable', 'username' => 'compta-cloture', 'email' => 'compta-cloture@olouwachegoun.bj',
+            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $comptable->assignRole('comptable');
+        $this->actingAs($comptable);
+    }
+
     private function account(string $code, string $label, int $class): ChartOfAccount
     {
         return ChartOfAccount::create(['code' => $code, 'label' => $label, 'class' => $class, 'is_active' => true]);
