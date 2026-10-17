@@ -91,18 +91,18 @@ void main() {
     // Colonnes.
     for (final c in [
       'DATE',
-      'ACHAT',
-      'NÉ',
-      'MORT',
-      'VENTE',
-      'DON',
+      'Achat',
+      'Né',
+      'Mort',
+      'Vente',
+      'Don',
       'M',
       'F',
       // Ticket F0.92 : « Sevrés » devient « Jeunes » (décision client du
       // 14/10/2026) ; la maquette dit encore « Sevrés » — écart assumé.
-      'JEUNES',
-      'S/MÈRES',
-      'TOTAL',
+      'Jeunes',
+      'S/Mères',
+      'Total',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (G)',
       'TRAITEMENTS & PROPHYLAXIE',

@@ -100,15 +100,15 @@ void main() {
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
+  testWidgets('toutes les colonnes du web sont là (sous-colonnes en casse mixte, 15.57)', (tester) async {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
     for (final c in [
       'DATE',
-      'COUVÉS',
-      'NÉS',
-      'REPRO+POULET+POUSSIN',
+      'Couvés',
+      'Nés',
+      'Repro+Poulet+Poussin',
       'EFFECTIF FINAL',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (G)',

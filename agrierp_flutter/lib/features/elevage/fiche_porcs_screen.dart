@@ -76,6 +76,21 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   /// F0.99 — fiche chargée du jour : ses transferts PAR CATÉGORIE entrent dans le calcul, comme au web.
   LivestockDailyEntry? _ficheDuJour;
 
+  /// 🔁 15.57 — état de la chaîne (mode, départ, date) : section « Effectif de départ par catégorie » du web.
+  EtatJour? _etatCategories;
+
+  /// 🔁 15.57 — départ par catégorie pré-rempli depuis le stade, corrigeable tant que la bande n'a pas de chaîne.
+  int? _departRepro;
+  int? _departSevre;
+  int? _departJeune;
+
+  /// 🔁 15.57 — effectifs saisis du web (QC5) : `effectif_m` Verrats, `effectif_f` Truies gestantes,
+  /// `effectif_sevres` Porcelets, `effectif_smeres` Engraissement.
+  int _effectifVerrats = 0;
+  int _effectifTruies = 0;
+  int _effectifPorcelets = 0;
+  int _effectifEngraissement = 0;
+
   final _morts = <String, int>{for (final c in _categories) c: 0};
   final _dons = <String, int>{for (final c in _categories) c: 0};
 
@@ -143,6 +158,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       bande.id,
       _jour,
     );
+    final etatCategories = await widget.depot.etatCategories(bande.id, _jour);
     final fiche = await widget.depot.chargerJour(bande.id, _jour);
     final protocole = await widget.soins.protocoleDuJour(
       bande: bande,
@@ -158,6 +174,16 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       _effectifPrecedent = precedent;
       _veilleCategories = veilleCategories;
       _ficheDuJour = fiche;
+      _etatCategories = etatCategories;
+      // Sans chaîne : le départ est pré-rempli depuis le stade (`departDepuisStade`), comme au web.
+      final sansChaine = etatCategories?.mode == 'sans_chaine';
+      _departRepro = sansChaine ? veilleCategories?.repro : null;
+      _departSevre = sansChaine ? veilleCategories?.sevre : null;
+      _departJeune = sansChaine ? veilleCategories?.jeune : null;
+      _effectifVerrats = fiche?.effectifM ?? 0;
+      _effectifTruies = fiche?.effectifF ?? 0;
+      _effectifPorcelets = fiche?.effectifSevres ?? 0;
+      _effectifEngraissement = fiche?.effectifSmeres ?? 0;
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
@@ -244,8 +270,18 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
 
   /// 🔁 F0.99 — effectifs PAR CATÉGORIE du jour, calculés comme le web (`categoriesJour`, 15.42) : veille de
   /// la chaîne (ou départ déduit du stade) + mouvements saisis + transferts du jour. `null` = inconnus.
+  /// Sans chaîne, le départ SAISI (corrigé) remplace la veille déduite, comme `categoriesJour` du web.
+  bool get _departModifiable =>
+      _etatCategories?.mode == 'sans_chaine' && _veilleCategories != null;
+
   EffectifCategoriesJour? get _categoriesDuJour {
-    final veille = _veilleCategories;
+    final veille = _departModifiable
+        ? EffectifCategories(
+            repro: _departRepro,
+            sevre: _departSevre,
+            jeune: _departJeune,
+          )
+        : _veilleCategories;
     if (veille == null) return null;
     final f = _ficheDuJour;
     return EffectifParCategorie.calculerJour(
@@ -368,6 +404,9 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                       fond: AgriColors.surfaceZebra,
                       valeurs: _passage,
                     ),
+                    ..._departParCategorie(),
+                    const SizedBox(height: AgriSpacing.md),
+                    _effectifsSaisis(),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
                     const SizedBox(height: AgriSpacing.md),
@@ -564,22 +603,23 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
         GroupeColonnes(
           libelle: 'Effectif Final du Jour',
           colonnes: [
-            // ⚠️ Quatre colonnes non synchronisées — voir le docblock.
-            const ColonneMensuelle(
+            // 🔁 15.57 — effectifs SAISIS synchronisés, ordre du web : Truies (`effectif_f`), Verrats (`effectif_m`),
+            // Porcelets (`effectif_sevres`), Engraissement (`effectif_smeres`) ; « — » si non saisis.
+            ColonneMensuelle(
               libelle: 'Truies Gest.',
               largeur: 1.3,
-              valeur: _nonSynchronise,
+              valeur: (i) => _fichesDuMois[i].effectifF?.toString() ?? '—',
             ),
-            const ColonneMensuelle(libelle: 'Verrats', valeur: _nonSynchronise),
-            const ColonneMensuelle(
+            ColonneMensuelle(libelle: 'Verrats', valeur: (i) => _fichesDuMois[i].effectifM?.toString() ?? '—'),
+            ColonneMensuelle(
               libelle: 'Porcelets',
               largeur: 1.2,
-              valeur: _nonSynchronise,
+              valeur: (i) => _fichesDuMois[i].effectifSevres?.toString() ?? '—',
             ),
-            const ColonneMensuelle(
+            ColonneMensuelle(
               libelle: 'Engraiss.',
               largeur: 1.2,
-              valeur: _nonSynchronise,
+              valeur: (i) => _fichesDuMois[i].effectifSmeres?.toString() ?? '—',
             ),
             ColonneMensuelle(
               libelle: 'Total',
@@ -776,6 +816,195 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
             onChanged: (t) => surChangement(int.tryParse(t) ?? 0),
           ),
         ),
+      ],
+    );
+  }
+
+  /// 🔁 15.57 — section « Effectif de départ par catégorie » du web (`fiche-porcs.blade.php`) : modifiable tant
+  /// que la bande n'a pas de chaîne (pré-remplie depuis le stade), verrouillée ensuite, motif du refus affiché.
+  List<Widget> _departParCategorie() {
+    final etat = _etatCategories;
+    if (etat == null) return const [];
+    String date(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+    Widget cadre({required Widget enfant, required bool modifiable}) => Container(
+      padding: const EdgeInsets.all(AgriSpacing.sm),
+      decoration: BoxDecoration(
+        color: modifiable
+            ? AgriColors.brandEmerald.withValues(alpha: 0.05)
+            : AgriColors.surfaceZebra,
+        border: Border.all(
+          color: modifiable
+              ? AgriColors.brandEmerald.withValues(alpha: 0.2)
+              : AgriColors.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      child: enfant,
+    );
+
+    final motif = etat.refus ?? _motifDepart;
+    final widgets = <Widget>[];
+    if (_departModifiable) {
+      widgets.add(
+        cadre(
+          modifiable: true,
+          enfant: Column(
+            key: const Key('porcs-depart-modifiable'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'EFFECTIF DE DÉPART PAR CATÉGORIE (DÉDUIT DU STADE DE LA BANDE)',
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandEmerald,
+                ),
+              ),
+              Text(
+                "Effectif au DÉBUT du jour, avant les mouvements du jour, pré-rempli automatiquement depuis le stade "
+                'de la bande. La somme des trois catégories doit égaler l\'effectif total au début du jour '
+                '($_effectifPrecedent). Corrigez-le seulement pour une bande mixte ; il est verrouillé au premier '
+                'enregistrement.',
+                style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+              const SizedBox(height: AgriSpacing.xs),
+              Row(
+                children: [
+                  for (final (libelle, cle, valeur, maj) in [
+                    ('Reproducteur', 'depart-repro', _departRepro, (int v) => _departRepro = v),
+                    ('Porcelet', 'depart-sevre', _departSevre, (int v) => _departSevre = v),
+                    ('Porc Marchand', 'depart-jeune', _departJeune, (int v) => _departJeune = v),
+                  ]) ...[
+                    Expanded(
+                      child: _champNombre(
+                        libelle: libelle,
+                        cle: cle,
+                        valeur: valeur ?? 0,
+                        surChangement: (v) => setState(() => maj(v)),
+                      ),
+                    ),
+                    if (cle != 'depart-jeune') const SizedBox(width: AgriSpacing.sm),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (etat.depart != null && etat.departDate != null) {
+      final d = etat.depart!;
+      widgets.add(
+        cadre(
+          modifiable: false,
+          enfant: Column(
+            key: const Key('porcs-depart-verrouille'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'EFFECTIF DE DÉPART PAR CATÉGORIE (VERROUILLÉ)',
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandForest,
+                ),
+              ),
+              Text(
+                'Effectif de départ fixé le ${date(etat.departDate!)} (au début de ce jour).',
+                style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+              const SizedBox(height: AgriSpacing.xs),
+              Row(
+                children: [
+                  for (final (libelle, valeur) in [
+                    ('Reproducteur', d.repro),
+                    ('Porcelet', d.sevre),
+                    ('Porc Marchand', d.jeune),
+                  ]) ...[
+                    Expanded(
+                      child: _champLecture(
+                        libelle: libelle,
+                        valeur: valeur == null ? '—' : '$valeur',
+                      ),
+                    ),
+                    if (libelle != 'Porc Marchand') const SizedBox(width: AgriSpacing.sm),
+                  ],
+                ],
+              ),
+              if (etat.mode == 'avant_depart')
+                Text(
+                  "Jour antérieur à l'effectif de départ fixé le ${date(etat.departDate!)} : les effectifs par "
+                  'catégorie ne sont pas calculés (—).',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AgriColors.errorDeep,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (motif != null) {
+      widgets.add(
+        Container(
+          key: const Key('porcs-depart-motif'),
+          margin: const EdgeInsets.only(top: AgriSpacing.xs),
+          padding: const EdgeInsets.all(AgriSpacing.sm),
+          decoration: BoxDecoration(
+            color: AgriColors.errorBg,
+            border: Border.all(color: AgriColors.errorDeep.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Text(
+            motif,
+            style: const TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: FontWeight.bold,
+              color: AgriColors.errorDeep,
+            ),
+          ),
+        ),
+      );
+    }
+    return [if (widgets.isNotEmpty) const SizedBox(height: AgriSpacing.md), ...widgets];
+  }
+
+  /// Motif D4 du départ saisi (`verifierDepart` du web), affiché en direct.
+  String? get _motifDepart => _departModifiable
+      ? EffectifParCategorie.verifierDepart(
+          EffectifCategories(
+            repro: _departRepro,
+            sevre: _departSevre,
+            jeune: _departJeune,
+          ),
+          _effectifPrecedent,
+        )
+      : null;
+
+  /// 🔁 15.57 — saisie Verrats / Truies Gestantes / Porcelets / Engraissement du web (QC5).
+  Widget _effectifsSaisis() {
+    return Row(
+      key: const Key('porcs-effectifs-saisis'),
+      children: [
+        for (final (libelle, cle, valeur, maj) in [
+          ('Verrats', 'effectif-verrats', _effectifVerrats, (int v) => _effectifVerrats = v),
+          ('Truies Gestantes', 'effectif-truies', _effectifTruies, (int v) => _effectifTruies = v),
+          ('Porcelets', 'effectif-porcelets', _effectifPorcelets, (int v) => _effectifPorcelets = v),
+          ('Engraissement', 'effectif-engraissement', _effectifEngraissement, (int v) => _effectifEngraissement = v),
+        ]) ...[
+          Expanded(
+            child: _champNombre(
+              libelle: libelle,
+              cle: cle,
+              valeur: valeur,
+              surChangement: (v) => setState(() => maj(v)),
+            ),
+          ),
+          if (cle != 'effectif-engraissement') const SizedBox(width: AgriSpacing.sm),
+        ],
       ],
     );
   }
@@ -1686,6 +1915,19 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
           donSevre: _dons['Porcelet']!,
           donJeune: _dons['Porc Marchand']!,
           passage: _passage.values.single,
+          departSaisi: _departModifiable
+              ? EffectifCategories(
+                  repro: _departRepro,
+                  sevre: _departSevre,
+                  jeune: _departJeune,
+                )
+              : null,
+        ),
+        effectifs: EffectifsSaisis(
+          m: _effectifVerrats,
+          f: _effectifTruies,
+          sevres: _effectifPorcelets,
+          smeres: _effectifEngraissement,
         ),
       );
     } on FicheRefusee catch (e) {

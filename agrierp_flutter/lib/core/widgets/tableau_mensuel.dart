@@ -187,15 +187,27 @@ class TableauMensuel extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(width: _largeurDate, child: _cellule(libelleDate, entete: true)),
-          for (final c in _toutes)
-            SizedBox(
-              width: c.largeur * _uniteLargeur,
-              child: _cellule(c.libelle, entete: true, centre: true),
-            ),
+          // 🔁 15.57 — casse du web : les colonnes SANS groupe (rowspan) en majuscules, les sous-colonnes d'un
+          // groupe en casse mixte (« Truies Gest. », « Jeunes »), comme les `<th>` des vues Blade.
+          for (final c in colonnesAvant) _enteteColonne(c, majuscules: true),
+          for (final g in groupes)
+            for (final c in g.colonnes) _enteteColonne(c, majuscules: false),
+          for (final c in colonnesSimples) _enteteColonne(c, majuscules: true),
         ],
       ),
     );
   }
+
+  Widget _enteteColonne(ColonneMensuelle c, {required bool majuscules}) =>
+      SizedBox(
+        width: c.largeur * _uniteLargeur,
+        child: _cellule(
+          c.libelle,
+          entete: true,
+          centre: true,
+          majuscules: majuscules,
+        ),
+      );
 
   Widget _ligne(int index) {
     final actif = index == jourActif;
@@ -234,11 +246,12 @@ class TableauMensuel extends StatelessWidget {
     bool entete = false,
     bool centre = false,
     bool gras = false,
+    bool majuscules = true,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Text(
-        entete ? texte.toUpperCase() : texte,
+        entete && majuscules ? texte.toUpperCase() : texte,
         textAlign: centre ? TextAlign.center : TextAlign.start,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(

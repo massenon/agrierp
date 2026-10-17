@@ -38,7 +38,12 @@ class VentilationJour {
     this.donSevre = 0,
     this.donJeune = 0,
     this.passage = 0,
+    this.departSaisi,
   });
+
+  /// 🔁 15.57 — départ par catégorie CORRIGÉ à l'écran (bande mixte), comme `departRepro/Sevre/Jeune` du web :
+  /// seulement tant que la bande n'a pas de chaîne ; contrôlé par `verifierDepart` (D4) avant écriture.
+  final EffectifCategories? departSaisi;
 
   final int mortRepro;
   final int mortSevre;
@@ -52,6 +57,23 @@ class VentilationJour {
 
   int get totalMorts => mortRepro + mortSevre + mortJeune;
   int get totalDons => donRepro + donSevre + donJeune;
+}
+
+/// 🔁 15.57 — effectifs SAISIS de la fiche (`effectif_m`, `effectif_f`, `effectif_sevres`, `effectif_smeres`),
+/// comme le web : Porcs = Verrats / Truies gestantes / Porcelets / Engraissement ; Escargots = Naissains /
+/// Engraissement / Bordés (la 4e colonne n'y est pas écrite, comme au web).
+class EffectifsSaisis {
+  const EffectifsSaisis({
+    required this.m,
+    required this.f,
+    required this.sevres,
+    this.smeres,
+  });
+
+  final int m;
+  final int f;
+  final int sevres;
+  final int? smeres;
 }
 
 /// Saisie refusée avant toute écriture, avec le motif du serveur (D3 : passage supérieur à la source).
@@ -185,6 +207,7 @@ class FicheJournaliereRepository {
     double? aliment,
     double? poidsMoyen,
     VentilationJour? ventilation,
+    EffectifsSaisis? effectifs,
   }) async {
     final date = _minuit(jour);
     final existante = await chargerJour(lotId, date);
@@ -194,9 +217,19 @@ class FicheJournaliereRepository {
       mort = ventilation.totalMorts;
       don = ventilation.totalDons;
     }
-    final departDeduit = ventilation == null
+    var departDeduit = ventilation == null
         ? null
         : await _departAEcrire(lotId, date);
+    // 🔁 15.57 — départ corrigé à l'écran : seulement sans chaîne, refusé avec le motif du serveur (D4).
+    final saisi = ventilation?.departSaisi;
+    if (saisi != null && departDeduit != null) {
+      final refus = EffectifParCategorie.verifierDepart(
+        saisi,
+        await effectifPrecedent(lotId, date),
+      );
+      if (refus != null) throw FicheRefusee(refus);
+      departDeduit = saisi;
+    }
     if (ventilation != null) {
       await _refuserPassageImpossible(
         lotId,
@@ -244,6 +277,16 @@ class FicheJournaliereRepository {
       ponteCasses: Value(ponteCasses),
       feedQtyKg: Value(aliment),
       weightSampleAvgG: Value(poidsMoyen),
+      // 🔁 15.57 — effectifs SAISIS (Verrats / Truies / Porcelets / Engraissement ; Naissains / Engraissement /
+      // Bordés), colonnes `effectif_m/f/sevres/smeres` du serveur. Absents : la fiche garde les siens.
+      effectifM: effectifs == null ? const Value.absent() : Value(effectifs.m),
+      effectifF: effectifs == null ? const Value.absent() : Value(effectifs.f),
+      effectifSevres: effectifs == null
+          ? const Value.absent()
+          : Value(effectifs.sevres),
+      effectifSmeres: effectifs?.smeres == null
+          ? const Value.absent()
+          : Value(effectifs!.smeres),
     );
     final ventilee = ventilation == null
         ? null
@@ -400,6 +443,24 @@ class FicheJournaliereRepository {
   /// bande d'espèce suivie sans chaîne), pour calculer l'aperçu du jour avec `calculerJour` — miroir de
   /// `categoriesJour` de la fiche web. null : catégories inconnues (avant le départ, départ refusé, stade
   /// sans catégorie).
+  /// 🔁 15.57 — état de la chaîne par catégorie pour ce jour (mode, départ et sa date), comme `categoriesJour`
+  /// du web : l'écran Porcs en tire la section « Effectif de départ par catégorie ».
+  Future<EtatJour?> etatCategories(String lotId, DateTime jour) async {
+    final bande = await (_db.select(
+      _db.livestockLots,
+    )..where((t) => t.id.equals(lotId))).getSingleOrNull();
+    if (bande == null) return null;
+    final fiches = await (_db.select(
+      _db.livestockDailyEntries,
+    )..where((t) => t.lotId.equals(lotId))).get();
+    return EffectifParCategorie.etatPourJour(
+      espece: EffectifParCategorie.especeDuCode(bande.speciesCode),
+      fiches: [for (final f in fiches) ficheChaine(f)],
+      initialQuantity: bande.initialQuantity,
+      jour: jour,
+    );
+  }
+
   Future<EffectifCategories?> veilleParCategorie(
     String lotId,
     DateTime jour,
@@ -408,15 +469,7 @@ class FicheJournaliereRepository {
       _db.livestockLots,
     )..where((t) => t.id.equals(lotId))).getSingleOrNull();
     if (bande == null) return null;
-    final fiches = await (_db.select(
-      _db.livestockDailyEntries,
-    )..where((t) => t.lotId.equals(lotId))).get();
-    final etat = EffectifParCategorie.etatPourJour(
-      espece: EffectifParCategorie.especeDuCode(bande.speciesCode),
-      fiches: [for (final f in fiches) ficheChaine(f)],
-      initialQuantity: bande.initialQuantity,
-      jour: jour,
-    );
+    final etat = (await etatCategories(lotId, jour))!;
     if (etat.mode == 'chaine') return etat.veille;
     if (etat.mode != 'sans_chaine') return null;
     return EffectifParCategorie.departDepuisStade(

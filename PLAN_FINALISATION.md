@@ -120,21 +120,22 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - Les rations d'une bande en engraissement restent justes (repli à 60 g), mais les libellés et `cleDuStade()` doivent suivre. Cela touche plus de 25 tests du poste.
 - **À livrer avec F0.96**, en mise en service simultanée (3.F4).
 
-### A13 🔧 Fiches hors lapins : écarts de STRUCTURE restants (audit F0.99, 17/10/2026)
+### A13 ✅ Fiches hors lapins : sections présentes d'un seul côté (audit F0.99, 17/10/2026)
 
-Le glossaire (libellés, catégories, règle des rations porcines, morts conservés) est aligné au ticket F0.99. Restent des sections présentes d'un seul côté. Article 0 : le web est le maître ; chaque ligne est à retirer du poste **ou** à ajouter au web, sur décision.
+Décision client du 17/10/2026 : « les sections doivent exister des deux côtés ». Livré aux tickets 15.56 et 15.57.
 
-| Fiche | Écart | Côté web | Côté poste |
+| Fiche | Section | Avant | Après |
 | --- | --- | --- | --- |
-| Porcs | Effectif de départ par catégorie + bandeau des anciens effectifs | présent | absent de l'écran (le dépôt le calcule) |
-| Porcs | Saisie Verrats / Truies gestantes / Porcelets / Engraissement (QC5) | présente | absente |
-| Pondeuses | Rationnement par stade, Pesée (variante B) | absents | présents |
-| Escargots | Effectifs saisis Naissains / Engraissement / Bordés | présents | absents |
-| Reproducteurs | Rationnement par stade (barème sans ligne « reproducteur » : total 0) | absent | présent |
-| Tous | Colonnes par catégorie du tableau mensuel (`effectif_m/f/sevres/smeres`) | remplies | « — » (non synchronisées) |
-| Tous | Casse des sous-en-têtes du tableau mensuel | casse mixte | MAJUSCULES (`TableauMensuel`) |
+| Pondeuses, Escargots, Reproducteurs | Dons par catégorie (le don sort du stock) | poste seul | web et poste (15.56) |
+| Pondeuses | Rationnement par stade, Pesée | poste seul | web et poste, règle commune `RationVolaille` |
+| Reproducteurs | Rationnement par stade | poste seul (0 g sans ligne au barème) | web et poste, « — » et la raison sans ligne |
+| Porcs | Effectif de départ par catégorie (modifiable, puis verrouillé) | web seul | web et poste |
+| Porcs | Verrats / Truies Gestantes / Porcelets / Engraissement | web seul | web et poste |
+| Escargots | Naissains / Engraissement / Bordés | web seul | web et poste |
+| Tous | Colonnes par catégorie du tableau mensuel | « — » au poste | valeurs synchronisées des deux côtés |
+| Tous | Casse des sous-en-têtes du tableau mensuel | MAJUSCULES au poste | casse mixte, comme le web |
 
-- **Web, incohérences internes signalées :** « Porc marchand » / « Porc Marchand » dans `fiche-porcs.blade.php` (invisible, CSS `uppercase`) ; `CategorieRationPorc::LIBELLES` jamais lu ; transferts « Sous-mères / Porcelet » dans la vue mais libellés par espèce dans le composant.
+- **Reste, signalé :** le web écrit « Porc marchand » / « Porc Marchand » dans `fiche-porcs.blade.php` (invisible, CSS `uppercase`) ; `CategorieRationPorc::LIBELLES` n'est jamais lu.
 
 ## Sprint 3 — Finalisation Élevage (web ↔ poste)
 

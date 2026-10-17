@@ -125,9 +125,11 @@ void main() {
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['REPRODUCTEUR (BORDÉ)', 'ENGRAISSEMENT', 'NAISSAIN']) {
+    for (final categorie in ['REPRODUCTEUR (BORDÉ)', 'NAISSAIN']) {
       expect(find.text(categorie), findsNWidgets(2), reason: '$categorie : Morts et Dons');
     }
+    // + la saisie « Engraissement » des effectifs (15.57).
+    expect(find.text('ENGRAISSEMENT'), findsNWidgets(3));
     expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
   });
 

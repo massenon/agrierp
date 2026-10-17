@@ -97,6 +97,12 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   /// 🔁 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que [_mortEnregistre]).
   int? _donEnregistre;
 
+  /// 🔁 15.57 — effectifs saisis du web : `effectif_m` Naissains, `effectif_f` Engraissement,
+  /// `effectif_sevres` Bordés (`FicheEscargots`).
+  int _effectifNaissains = 0;
+  int _effectifEngraissement = 0;
+  int _effectifBordes = 0;
+
   List<FeedRationStandard> _rations = const [];
 
   /// Journées du mois pour la bande choisie — le tableau de bas de fiche.
@@ -175,6 +181,9 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
         _dons[cle] = 0;
       }
       _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
+      _effectifNaissains = fiche?.effectifM ?? 0;
+      _effectifEngraissement = fiche?.effectifF ?? 0;
+      _effectifBordes = fiche?.effectifSevres ?? 0;
       _donEnregistre = (fiche?.don ?? 0) > 0 ? fiche!.don : null;
       _chargement = false;
     });
@@ -304,6 +313,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
                     ),
+                    const SizedBox(height: AgriSpacing.md),
+                    _effectifsSaisis(),
                     const SizedBox(height: AgriSpacing.md),
                     _effectif(),
                     const SizedBox(height: AgriSpacing.md),
@@ -503,18 +514,18 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
         GroupeColonnes(
           libelle: 'Effectif Final du Jour',
           colonnes: [
-            // ⚠️ Trois colonnes non synchronisées — voir le docblock.
-            const ColonneMensuelle(
+            // 🔁 15.57 — effectifs SAISIS synchronisés (`effectif_m/f/sevres`), comme le web ; « — » si non saisis.
+            ColonneMensuelle(
               libelle: 'Naissains',
               largeur: 1.3,
-              valeur: _nonSynchronise,
+              valeur: (i) => _fichesDuMois[i].effectifM?.toString() ?? '—',
             ),
-            const ColonneMensuelle(
+            ColonneMensuelle(
               libelle: 'Engraiss.',
               largeur: 1.2,
-              valeur: _nonSynchronise,
+              valeur: (i) => _fichesDuMois[i].effectifF?.toString() ?? '—',
             ),
-            const ColonneMensuelle(libelle: 'Bordés', valeur: _nonSynchronise),
+            ColonneMensuelle(libelle: 'Bordés', valeur: (i) => _fichesDuMois[i].effectifSevres?.toString() ?? '—'),
             ColonneMensuelle(
               libelle: 'Total',
               gras: true,
@@ -717,6 +728,30 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 🔁 15.57 — saisie Naissains / Engraissement / Bordés du web (`fiche-escargots.blade.php`).
+  Widget _effectifsSaisis() {
+    return Row(
+      key: const Key('escargots-effectifs-saisis'),
+      children: [
+        for (final (libelle, cle, valeur, maj) in [
+          ('Naissains', 'effectif-naissains', _effectifNaissains, (int v) => _effectifNaissains = v),
+          ('Engraissement', 'effectif-engraissement', _effectifEngraissement, (int v) => _effectifEngraissement = v),
+          ('Bordés', 'effectif-bordes', _effectifBordes, (int v) => _effectifBordes = v),
+        ]) ...[
+          Expanded(
+            child: _champNombre(
+              libelle: libelle,
+              cle: cle,
+              valeur: valeur,
+              surChangement: (v) => setState(() => maj(v)),
+            ),
+          ),
+          if (cle != 'effectif-bordes') const SizedBox(width: AgriSpacing.sm),
+        ],
+      ],
     );
   }
 
@@ -1614,6 +1649,11 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       don: _totalDons,
       ponteTotal: _oeufsTerre,
       poidsMoyen: _poidsMoyen,
+      effectifs: EffectifsSaisis(
+        m: _effectifNaissains,
+        f: _effectifEngraissement,
+        sevres: _effectifBordes,
+      ),
     );
 
     if (!mounted) return;

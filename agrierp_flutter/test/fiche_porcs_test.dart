@@ -142,9 +142,9 @@ void main() {
 
     expect(find.text('REPRODUCTEUR (TRUIE/VERRAT)'), findsOneWidget);
     expect(find.text('PORC MARCHAND / ENGRAISS.'), findsOneWidget);
-    expect(find.text('REPRODUCTEUR'), findsOneWidget, reason: 'bloc Dons');
-    expect(find.text('PORC MARCHAND'), findsOneWidget, reason: 'bloc Dons');
-    expect(find.text('PORCELET'), findsNWidgets(2), reason: 'Morts ET Dons');
+    expect(find.text('REPRODUCTEUR'), findsNWidgets(2), reason: 'bloc Dons + effectif de départ (15.57)');
+    expect(find.text('PORC MARCHAND'), findsNWidgets(2), reason: 'bloc Dons + effectif de départ (15.57)');
+    expect(find.text('PORCELET'), findsNWidgets(3), reason: 'Morts, Dons et effectif de départ (15.57)');
   });
 
   testWidgets('les libellés propres aux porcs sont repris tels quels', (

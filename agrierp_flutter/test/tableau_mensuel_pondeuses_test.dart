@@ -99,25 +99,25 @@ void main() {
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
+  testWidgets('toutes les colonnes du web sont là (sous-colonnes en casse mixte, 15.57)', (tester) async {
     await journee(4, recoltes: 435, casses: 15);
     await afficher(tester);
 
     for (final c in [
-      'EFF. DÉBUT',
-      'MORTS',
-      'TAUX MORT %',
-      'EFF. FIN',
-      'TOTAL (OR)',
-      'TAUX PONTE %',
-      'CASSÉS (OF)',
-      'COMM. (OR-OF)',
+      'Eff. Début',
+      'Morts',
+      'Taux Mort %',
+      'Eff. Fin',
+      'Total (OR)',
+      'Taux Ponte %',
+      'Cassés (OF)',
+      'Comm. (OR-OF)',
       // 🔁 F0.99 — sigles du web (`fiche-pondeuses.blade.php`).
       'DATE / JOUR',
       'SRH',
       'TS',
       'OS',
-      'STOCK FINAL',
+      'Stock Final',
       'TRAITEMENTS & RAPPELS',
     ]) {
       expect(find.text(c), findsOneWidget, reason: c);

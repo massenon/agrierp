@@ -98,22 +98,22 @@ void main() {
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
+  testWidgets('toutes les colonnes du web sont là (sous-colonnes en casse mixte, 15.57)', (tester) async {
     await journee(6, ne: 2);
     await afficher(tester);
 
     for (final c in [
       'DATE',
-      'ACHAT',
-      'NÉ',
-      'MORT',
-      'VENTE',
-      'DON',
-      'TRUIES GEST.',
-      'VERRATS',
-      'PORCELETS',
-      'ENGRAISS.',
-      'TOTAL',
+      'Achat',
+      'Né',
+      'Mort',
+      'Vente',
+      'Don',
+      'Truies Gest.',
+      'Verrats',
+      'Porcelets',
+      'Engraiss.',
+      'Total',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (KG)',
       'TRAITEMENTS & PROPHYLAXIE',

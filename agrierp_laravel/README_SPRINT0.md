@@ -21897,3 +21897,22 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 ### Mesures
 - `DonsToutesFichesTest` (7) : trois fiches × (effectif 60 − 3 = 57, stock 10 − 3 = 7) ; rechargement sans double retrait ; push 10 − 1 − 2 = 7, renvoi identique 7, correction 4 dons → 5. Suite Feature : 1 673 verts.
 - Poste : dons rétablis dans les tests des trois fiches, « un don saisi réduit aussitôt l'effectif final » (3), `morts_enregistres_test` étendu aux dons. Suite : 2 042 verts, 16 sautés, 0 rouge.
+
+---
+
+## Ticket 15.57 — Les sections de chaque fiche existent des deux côtés (17/10/2026)
+
+### Décision client
+« Les sections doivent exister des deux côtés, et vice versa » (17/10/2026) — écarts listés en A13 du plan.
+
+### Corrections
+- Règle commune `RationVolaille` (web `App\Support`, poste `ration_volaille.dart`) : lignes du barème avicole triées par libellé, effectif final sur la PREMIÈRE ligne contenant « pondeuse » ou « reproducteur », 0 ailleurs ; aucune ligne → « — » et la raison (la fiche Reproducteurs du poste affichait 0 g : le barème du semis n'a pas de ligne « reproducteur »).
+- Web : composant `x-ration-volaille` sur Pondeuses et Reproducteurs ; Pesée Pondeuses (poids général, taille d'échantillon, poids moyen, `weight_sample_avg_g`).
+- Poste Porcs : « Effectif de départ par catégorie » (pré-rempli depuis le stade, corrigeable sans chaîne, contrôlé par `verifierDepart` avec le message du serveur, refusé avant écriture, verrouillé ensuite avec sa date, mention « avant départ ») et saisie Verrats / Truies Gestantes / Porcelets / Engraissement (`effectif_m/f/sevres/smeres`).
+- Poste Escargots : saisie Naissains / Engraissement / Bordés.
+- Poste, tableaux mensuels : colonnes par catégorie remplies depuis les colonnes synchronisées (elles l'étaient déjà dans les deux sens ; seul l'affichage manquait) ; sous-colonnes des groupes en casse mixte comme le web.
+- Dépôt du poste : `EffectifsSaisis`, `VentilationJour.departSaisi`, `etatCategories()`.
+
+### Mesures
+- Web : `RationVolailleTest` (4). Suite Feature : 1 677 verts.
+- Poste : `ration_volaille_test.dart` (5, dont la parité EXÉCUTÉE sur 60 barèmes au hasard), `sections_deux_cotes_test.dart` (5, mutation vérifiée sur le refus du départ), tests mensuels à la casse du web. Suite : 2 052 verts, 16 sautés, 0 rouge.

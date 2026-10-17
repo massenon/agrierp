@@ -652,12 +652,12 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
         GroupeColonnes(
           libelle: 'Effectif Final du Jour',
           colonnes:
-              const [
-                // ⚠️ Quatre colonnes non synchronisées — voir le docblock.
-                ColonneMensuelle(libelle: 'M', valeur: _nonSynchronise),
-                ColonneMensuelle(libelle: 'F', valeur: _nonSynchronise),
-                ColonneMensuelle(libelle: 'Jeunes', valeur: _nonSynchronise),
-                ColonneMensuelle(libelle: 'S/Mères', valeur: _nonSynchronise),
+              [
+                // 🔁 15.57 — colonnes synchronisées (`effectif_m/f/sevres/smeres`), comme le web.
+                ColonneMensuelle(libelle: 'M', valeur: (i) => _fichesDuMois[i].effectifM?.toString() ?? '—'),
+                ColonneMensuelle(libelle: 'F', valeur: (i) => _fichesDuMois[i].effectifF?.toString() ?? '—'),
+                ColonneMensuelle(libelle: 'Jeunes', valeur: (i) => _fichesDuMois[i].effectifSevres?.toString() ?? '—'),
+                ColonneMensuelle(libelle: 'S/Mères', valeur: (i) => _fichesDuMois[i].effectifSmeres?.toString() ?? '—'),
               ] +
               [
                 ColonneMensuelle(
@@ -702,7 +702,6 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     );
   }
 
-  static String _nonSynchronise(int _) => '—';
 
   int? _indexDuJourCourant() {
     for (var i = 0; i < _fichesDuMois.length; i++) {

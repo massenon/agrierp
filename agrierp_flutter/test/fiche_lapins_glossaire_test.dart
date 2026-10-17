@@ -324,7 +324,7 @@ void main() {
   });
 
   group('tableau mensuel — « Jeunes » remplace « Sevrés »', () {
-    testWidgets('en-tête « JEUNES », distinct de « S/MÈRES »', (tester) async {
+    testWidgets('en-tête « Jeunes », distinct de « S/Mères » (casse du web)', (tester) async {
       await bande(stade: 'engraissement');
       final maintenant = DateTime.now();
       await db
@@ -341,8 +341,8 @@ void main() {
           );
       await afficher(tester);
 
-      expect(find.text('JEUNES'), findsOneWidget);
-      expect(find.text('S/MÈRES'), findsOneWidget);
+      expect(find.text('Jeunes'), findsOneWidget);
+      expect(find.text('S/Mères'), findsOneWidget);
       expect(find.text('SEVRÉS'), findsNothing);
       expect(find.text('Sevrés'), findsNothing);
     });
