@@ -227,5 +227,12 @@ class ReinitialisationDonneesService
         if (Schema::hasTable('treasury_accounts')) {
             DB::table('treasury_accounts')->update(['balance' => 0]);
         }
+
+        // 🔁 Ticket 15.53 — un exercice clôturé dont toutes les écritures (report à nouveau compris) viennent d'être
+        // effacées n'a plus rien à protéger : il est rouvert, sinon aucune saisie ne pourrait plus y être datée.
+        if (Schema::hasTable('fiscal_years')) {
+            DB::table('fiscal_years')->where('status', 'cloture')
+                ->update(['status' => 'ouvert', 'closed_at' => null, 'closed_by' => null, 'updated_at' => now()]);
+        }
     }
 }

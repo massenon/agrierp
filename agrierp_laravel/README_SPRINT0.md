@@ -21820,3 +21820,19 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 
 ### Mesures
 - `AlertesClocheTest` : +3 (délai 0 et 11 appliqués, défaut 3, réglage validé et refusé au caissier).
+
+---
+
+## Ticket 15.53 — Réouverture d'un exercice clôturé (17/10/2026)
+
+### Décision client
+« Si un exercice est clôturé, on peut le rouvrir » (17/10/2026). La clôture (10.6) était présentée comme irréversible.
+
+### Corrections
+- `ReopenFiscalYearAction` défait la clôture SANS RIEN EFFACER : le report à nouveau de N+1 est contre-passé (`ran_reversal`, même date, il reste au journal), les écritures de N sont déverrouillées (horodatées pour le tirage du poste), N repasse « ouvert ». Refus si N n'est pas clôturé ou si N+1 l'est (rouvrir N+1 d'abord).
+- Clôture d'Exercice : bouton « Rouvrir l'Exercice » sur un exercice clos, administrateur seulement (`manage-modules`, même droit que la déclôture d'un mois), modale de confirmation, journalisé `fiscal_year.reopened`. La modale de clôture ne dit plus « irréversible ».
+- Réinitialisation des données : les exercices clôturés sont rouverts (leurs écritures n'existent plus).
+- Dusk `FiscalYearClosureTest` : texte attendu de la modale mis à jour (non exécuté ici : Chrome et le serveur Dusk absents).
+
+### Mesures
+- `ReouvertureExerciceTest` (5), chiffres calculés à la main : report 1 000 000 → contre-passé → 0 ; correction de 250 000 puis nouvelle clôture → à-nouveau 1 250 000 ; refus si N+1 clos ; comptable refusé ; réinitialisation rouvre.
