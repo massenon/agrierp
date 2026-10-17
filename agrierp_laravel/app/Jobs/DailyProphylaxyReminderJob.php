@@ -103,7 +103,8 @@ class DailyProphylaxyReminderJob implements ShouldQueue
         Notification::create([
             'target_role' => 'animalier',
             'type' => 'prophylaxis_due',
-            'severity' => 'warning',
+            // Ticket 15.49 — `warning` est hors des gravités autorisées par la colonne (critique, moyen, info).
+            'severity' => 'moyen',
             'title' => $title,
             'message' => "{$treatment->treatment} — {$treatment->product_recommended}, {$treatment->dosage} — Bande {$lot->code}, {$lot->species->label}",
             'icon' => 'vaccines',

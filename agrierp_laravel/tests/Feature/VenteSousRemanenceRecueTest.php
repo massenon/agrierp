@@ -133,7 +133,8 @@ class VenteSousRemanenceRecueTest extends TestCase
         // ⚠️ SIGNALEE : sinon l'incident sanitaire reste muet.
         $alerte = Notification::where('type', 'sale_under_withdrawal')->first();
         $this->assertNotNull($alerte);
-        $this->assertEquals('error', $alerte->severity);
+        // Ticket 15.49 : `error` n'existe pas dans la colonne (MySQL strict refusait l'écriture) ; incident = critique.
+        $this->assertEquals('critique', $alerte->severity);
         $this->assertStringContainsString('CUN-2026-01', $alerte->message);
         $this->assertStringContainsString('rappel', $alerte->message);
     }

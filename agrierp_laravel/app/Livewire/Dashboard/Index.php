@@ -179,21 +179,15 @@ class Index extends Component
         // Aucun document du projet ne tranche la formule de l'ALERTE (la
         // maquette du tableau de bord n'affiche qu'un texte, « >10% »). En
         // choisir une ici sans mandat serait décider à la place du client.
+        // Ticket 15.49 — la règle vit désormais dans `AlertesElevageService` (même seuil, bandes archivées exclues),
+        // que la cloche partage : l'écran et la notification ne peuvent plus diverger.
         if (Schema::hasTable('livestock_daily_entries')) {
-            $recentEntries = \App\Models\LivestockDailyEntry::with('lot')
-                ->where('entry_date', '>=', now()->subDays(7))
-                ->get()
-                ->groupBy('lot_id');
-
-            foreach ($recentEntries as $lotId => $entries) {
-                $worst = $entries->sortByDesc(fn ($e) => $e->mortality_rate)->first();
-                if ($worst && $worst->mortality_rate >= 5 && $worst->lot) {
-                    $alerts[] = [
-                        'label' => "Mortalité anormale — Lot {$worst->lot->code} (".number_format($worst->mortality_rate, 1, ',', ' ').'%)',
-                        'severity' => 'critique',
-                        'link' => '/gestion-bandes',
-                    ];
-                }
+            foreach (app(\App\Services\AlertesElevageService::class)->mortalitesAnormales() as $worst) {
+                $alerts[] = [
+                    'label' => "Mortalité anormale — Lot {$worst->lot->code} (".number_format($worst->mortality_rate, 1, ',', ' ').'%)',
+                    'severity' => 'critique',
+                    'link' => '/gestion-bandes',
+                ];
             }
         }
 

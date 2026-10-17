@@ -21692,3 +21692,22 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 - Décision client du 17/10/2026 : onglet du Dashboard Élevage et titre de l'onglet (« Rentabilité de Lot »), fil d'Ariane et carte du hub, sur le web puis le poste à l'identique.
 - Écart ASSUMÉ au prototype, déclaré par page dans `fidelite_libelles_test.dart` (motif : décision client). Les clés internes (`bilan`, `dash-tab-bilan`) et les noms de fichiers ne changent pas.
 - Tests : `LibelleRentabiliteTest` (2, web) ; tests poste du dashboard, du bilan et des captures mis à jour.
+
+## Ticket 15.49 (Laravel) : ALERTES DE LA CLOCHE — VALEURS HORS COLONNE ET ALERTES JAMAIS ÉMISES
+
+### Constat
+- Trois écritures de notification utilisaient des valeurs ABSENTES des énumérations de la base : `severity = 'warning'` (rappel de prophylaxie), `severity = 'error'` (vente sous délai d'attente), `type = 'backup.reminder'` + `error`/`warning` (rappel de sauvegarde). MySQL strict les refuse ; SQLite (tests) les acceptait : un test verrouillait même `'error'`.
+- `sale_under_withdrawal` tombait dans la catégorie « Système ».
+- Jamais émises : stock sous seuil, mortalité anormale, soins planifiés à venir ou en retard (calendrier VMS), échecs de reproduction (indicateur « Alertes Réforme / Pertes »). Elles n'étaient qu'affichées sur leurs écrans.
+
+### Corrections
+- `Notification::TYPES` / `SEVERITES` : le modèle REFUSE toute valeur hors colonne (garde-fou visible en test). Écritures corrigées : `moyen`, `critique`, type `system`. Migration : type `reproduction_echec`.
+- `AlertesElevageService` + `DailyElevageAlertsJob` (06:05, Africa/Porto-Novo), une alerte par objet et par jour. Seuils EXISTANTS uniquement : `alert_threshold` ; pire jour ≥ 5 % sur 7 jours (règle du tableau de bord, désormais lue dans ce même service ; la divergence avec le cumul hebdomadaire « > 10 % » reste un ARBITRAGE CLIENT) ; cycle de reproduction en `echec`.
+- ⚠️ Fenêtre du rappel des soins planifiés : 3 jours, faute de toute durée dans la maquette ou la documentation (même valeur que le seuil d'autonomie) — **à confirmer par l'exploitant**.
+
+### Mesures
+- `AlertesClocheTest` (6) ; `VenteSousRemanenceRecueTest` corrigé (`critique`). Suite Feature : 1 635 verts (manifeste Vite construit, `storage:link` fait).
+
+### Non fait
+- Le poste n'émet aucune alerte hors ligne : elles descendent au tirage (règle serveur unique).
+- Aucune règle de réforme par âge n'existe nulle part : non inventée.
