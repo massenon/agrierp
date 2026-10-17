@@ -74,6 +74,8 @@ class ReinitialisationDonneesService
             'livestock_daily_entries', 'livestock_reproduction_events',
             'veterinary_records', 'veterinary_withdrawal_periods',
             'veterinary_calendar_events', 'infirmary_records',
+            // Ticket 15.50 : transferts entre bandes (15.46), oubliés.
+            'livestock_transfers',
             'transformations', 'animals', 'livestock_lots',
             // Ressources humaines
             'payslips', 'attendance_records', 'internship_absences',
@@ -81,8 +83,15 @@ class ReinitialisationDonneesService
             // Comptabilité
             'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
             'bank_statement_lines',
-            // Administration
-            'administrative_documents', 'archived_documents', 'correspondences',
+            // 🔴 Ticket 15.50 : les immobilisations PRÉSERVÉES alors que leurs écritures d'acquisition et
+            // d'amortissement étaient effacées — un registre sans aucune écriture pour le justifier.
+            'fixed_assets',
+            // Administration — 🔴 Ticket 15.50 : la liste nommait `correspondences`, table qui n'existe pas :
+            // les courriers s'appellent `mails`, et n'étaient JAMAIS vidés.
+            'administrative_documents', 'archived_documents', 'mails',
+            // 🔴 Ticket 15.50 : les notifications PRÉSERVÉES pointaient vers des bandes, produits et soins
+            // effacés (« Stock sous le seuil », « Mortalité anormale » d'une bande qui n'existe plus).
+            'notifications',
         ];
     }
 
@@ -96,12 +105,30 @@ class ReinitialisationDonneesService
     {
         return [
             'users', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions',
-            'role_has_permissions', 'company_settings', 'module_configs',
+            // Ticket 15.50 : `module_configs` n'existait pas — la table est `modules_config`.
+            'role_has_permissions', 'company_settings', 'modules_config',
             'chart_of_accounts', 'fiscal_years', 'treasury_accounts',
             'products', 'product_categories', 'livestock_species',
             'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards',
-            'cost_centers', 'income_tax_brackets', 'fixed_assets',
-            'audit_logs', 'notifications',
+            'cost_centers', 'income_tax_brackets',
+            // Ticket 15.50 : référentiels jamais classés (normes de croissance, modèles d'attestation, préfixes
+            // de numérotation de l'élevage).
+            'growth_standards', 'attestation_templates', 'elevage_numbering_settings',
+            'audit_logs',
+        ];
+    }
+
+    /**
+     * Ticket 15.50 — tables TECHNIQUES du cadriciel, ni vidées ni « préservées » au sens métier. ⚠️ Les jetons et
+     * sessions restent : les vider déconnecterait l'administrateur qui vient de lancer l'opération.
+     *
+     * @return array<int, string>
+     */
+    public static function tablesTechniques(): array
+    {
+        return [
+            'migrations', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs',
+            'sessions', 'password_reset_tokens', 'personal_access_tokens',
         ];
     }
 
@@ -129,6 +156,11 @@ class ReinitialisationDonneesService
                 }
 
                 $this->remettreLesSoldesAZero();
+
+                // Ticket 15.50 — la marque que les postes lisent au tirage (voir la migration).
+                if (Schema::hasColumn('company_settings', 'data_reset_at')) {
+                    DB::table('company_settings')->update(['data_reset_at' => now()]);
+                }
             });
         });
 

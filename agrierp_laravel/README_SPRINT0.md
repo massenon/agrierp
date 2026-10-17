@@ -21736,3 +21736,26 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 
 ### Non fait
 - Les fiches anciennes non ventilées ne sont PAS ventilées automatiquement : l'animalier les ventile à la ressaisie (aucune répartition ne peut être déduite sans fabriquer une donnée).
+
+---
+
+## Ticket 15.50 — Réinitialisation complète des données, propagée aux postes (17/10/2026)
+
+### Constat (mesuré en classant chaque table du schéma migré)
+- 🔴 La liste des tables vidées nommait `correspondences`, table inexistante : les courriers (`mails`) n'étaient JAMAIS vidés. La liste conservée nommait `module_configs` (la table est `modules_config`).
+- 🔴 Survivaient : `livestock_transfers` (15.46), `fixed_assets` (registre d'immobilisations sans plus aucune écriture d'acquisition ni d'amortissement), `notifications` (alertes pointant vers des bandes, produits et soins effacés).
+- Quinze tables n'étaient classées nulle part (dont `growth_standards`, `attestation_templates`, `elevage_numbering_settings` et les tables techniques).
+- 🔴 Un poste hors ligne pendant la réinitialisation gardait toutes les données effacées et RENVOYAIT ses saisies en attente : la réinitialisation était défaite à la reconnexion suivante.
+
+### Corrections
+- `ReinitialisationDonneesService` : courriers, transferts, immobilisations et notifications vidés ; référentiels jamais classés ajoutés aux conservés ; nouvelle liste `tablesTechniques()` (jetons et sessions conservés : l'administrateur n'est pas déconnecté).
+- Migration `2026_10_18_000003` : `company_settings.data_reset_at`, posé par la réinitialisation, servi au tirage (`data_reset_at`).
+- Envoi : un poste qui ne renvoie pas la marque connue est refusé EN BLOC (409, `MotifsRefusPush::reinitialisationNonVue`). Sans réinitialisation, rien n'est exigé (anciens postes inchangés).
+- Poste : à la marque inconnue, AVANT toute absorption et tout envoi, `purgerDonneesDActivite()` (36 tables d'activité, stock et trésorerie à 0, curseur effacé), puis tirage complet ; la perte des saisies en attente est ANNONCÉE avec leur nombre. Écran web : listes Supprimé / Conservé mises à jour, perte côté poste annoncée.
+
+### Mesures
+- `ReinitialisationCompleteTest` (6) : chaque table du schéma classée une seule fois, aucune table listée inexistante, vidage effectif, marque servie, 409 sans marque ou marque périmée, envoi accepté avec la marque, aucune exigence sans réinitialisation. Suite Feature : 1 641 verts.
+- Poste : `reinitialisation_poste_test.dart` (6), dont le classement de chaque table Drift. Suite : 1 982 verts, 32 ignorés, 3 rouges connus (A7).
+
+### Non fait — ARBITRAGE CLIENT
+- Un exercice CLÔTURÉ reste clôturé après réinitialisation (ses écritures, dont le report à nouveaux, sont effacées). La clôture est irréversible par conception : la rouvrir est une décision de l'exploitant, pas une conséquence automatique.

@@ -24,6 +24,10 @@ class EchecSynchronisation implements Exception {
             'Accès refusé par le serveur : votre compte est désactivé ou n\'a pas les droits nécessaires.',
       429 =>
         'Trop de synchronisations rapprochées : réessayez dans une minute.',
+      // Ticket 15.50 — envoi d'un poste qui n'a pas encore appliqué la réinitialisation du serveur.
+      409 =>
+        serveur ??
+            'Envoi refusé : les données du serveur ont été réinitialisées. Synchronisez de nouveau.',
       _ => null,
     };
   }
@@ -242,6 +246,9 @@ class SyncEngine {
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
+  /// Ticket 15.50 — instant de la dernière réinitialisation du serveur que CE poste a appliquée
+  /// (purge faite). Renvoyé à chaque envoi : le serveur refuse (409) celui d'un poste qui ne l'a pas.
+  static const cleReinitialisation = 'donnees_reinitialisees_le';
   static const cleJournalResync = 'journal_resync_f084bis';
   static const cleJournalResyncCreation = 'journal_resync_f085';
   static const cleJournalIncomplet = 'journal_incomplet';
@@ -307,6 +314,30 @@ class SyncEngine {
     );
 
     final corps = reponse.data ?? const <String, dynamic>{};
+
+    // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
+    // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
+    // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
+    // renverrait. La marque est notée aussitôt : la relance complète ci-dessous ne purge pas deux fois.
+    final reinitialisation = corps['data_reset_at'];
+    if (reinitialisation is String &&
+        reinitialisation != await _lireReglage(cleReinitialisation)) {
+      final perdus = await _db.purgerDonneesDActivite();
+      await _ecrireReglage(cleReinitialisation, reinitialisation);
+      final le = DateTime.parse(reinitialisation).toLocal();
+      final date =
+          '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
+      // Un poste neuf (jamais tiré, rien en attente) n'avait rien : aucun avertissement à lui faire lire.
+      if (perdus > 0 || etat?.lastPulledAt != null) {
+        _avertissements.add(
+          'Les données du serveur ont été réinitialisées le $date : celles de ce poste ont été '
+          'effacées${perdus > 0 ? ', dont $perdus saisie(s) qui n\'avai(en)t pas encore été envoyée(s)' : ''}.',
+        );
+      }
+      // Un tirage incrémental ne resservirait pas l'existant : tout redemander, une fois.
+      if (!toutRedemander) return _tirer(complet: true);
+    }
+
     var recus = 0;
     _journalManquants = 0;
     _journalSansDateCreation = false;
@@ -2965,6 +2996,8 @@ class SyncEngine {
       '/api/sync/push',
       data: {
         'device_id': _deviceId,
+        // Ticket 15.50 — la réinitialisation que ce poste a appliquée (absente : aucune).
+        'data_reset_at': ?await _lireReglage(cleReinitialisation),
         'livestock_daily_entries': [
           for (final (f, identite) in fichesEnvoyees)
             identite

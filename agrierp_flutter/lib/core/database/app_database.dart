@@ -1948,6 +1948,54 @@ class AppDatabase extends _$AppDatabase {
 
     return enAttente.read<int>('total');
   }
+
+  /// Ticket 15.50 — tables d'ACTIVITÉ effacées quand le serveur a été réinitialisé : le miroir de
+  /// `ReinitialisationDonneesService::tablesTransactionnelles()`, plus les tables du poste qui en
+  /// dérivent (créances fournisseurs, revenus de bande, conflits de synchronisation).
+  ///
+  /// ⚠️ LISTE EXPLICITE, comme au serveur : chaque table du schéma est classée dans
+  /// [tablesDActivite] OU [tablesConservees] — un test le vérifie, pour que la prochaine table
+  /// ajoutée ne soit pas oubliée sans bruit.
+  static const tablesDActivite = [
+    'livestock_lots', 'livestock_daily_entries', 'livestock_transfers',
+    'livestock_reproduction_events', 'veterinary_records', 'veterinary_withdrawal_periods',
+    'animals', 'lot_revenues',
+    'customers', 'receivables', 'customer_advances', 'customer_reminders',
+    'advance_imputations', 'sales', 'sale_lines',
+    'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
+    'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
+    'expenses', 'stock_adjustments',
+    'employees', 'internships', 'attendance_records',
+    'accounting_entries', 'accounting_entry_lines',
+    'mails', 'administrative_documents', 'archived_documents', 'notifications',
+    'sync_conflicts',
+  ];
+
+  /// Référentiels et réglages CONSERVÉS (préservés au serveur ; les comptes restent pour que la
+  /// connexion hors ligne survive à une purge suivie d'un tirage interrompu).
+  static const tablesConservees = [
+    'product_categories', 'products', 'feed_ration_standards', 'feed_types',
+    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
+    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories',
+    'company_settings', 'modules_config', 'attestation_templates',
+    'roles_applicatifs', 'utilisateurs', 'audit_logs',
+    'app_settings', 'sync_state',
+  ];
+
+  /// Efface les données d'activité, remet à zéro les soldes qui en dérivent (stock, trésorerie,
+  /// comme le serveur) et le curseur de tirage. Rend le nombre d'enregistrements EN ATTENTE perdus.
+  Future<int> purgerDonneesDActivite() async {
+    final perdus = await pendingCount();
+    await transaction(() async {
+      for (final table in tablesDActivite) {
+        await customStatement('DELETE FROM $table');
+      }
+      await customStatement('UPDATE products SET stock_qty = 0');
+      await customStatement('UPDATE treasury_accounts SET balance = 0');
+      await delete(syncState).go();
+    });
+    return perdus;
+  }
 }
 
 LazyDatabase _openConnection() {

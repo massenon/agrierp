@@ -163,6 +163,17 @@ class MotifsRefusPush
             .'votre rôle ne permet pas d\'envoyer. Elle reste sur le poste : un compte animalier doit la synchroniser.';
     }
 
+    /**
+     * Ticket 15.50 : le poste n'a pas encore tiré la réinitialisation des données — ses saisies en attente datent
+     * d'une base effacée depuis.
+     */
+    public static function reinitialisationNonVue(\DateTimeInterface $le): string
+    {
+        return 'Envoi refusé : les données du serveur ont été réinitialisées le '
+            .$le->format('d/m/Y à H:i').'. Mettez à jour le poste puis synchronisez : il effacera ses données '
+            .'antérieures avant tout nouvel envoi.';
+    }
+
     /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
     public static function roleInsuffisant(string $table): string
     {

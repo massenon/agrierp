@@ -69,6 +69,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\MotifsRefusPush;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Carbon;
 
 /**
  * GAP CRITIQUE COMBLÉ — `POST /api/sync/push` et `GET /api/sync/pull`,
@@ -902,6 +903,9 @@ class SyncController extends Controller
 
         return response()->json([
             'server_time' => now()->toIso8601String(),
+            // Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). Un poste qui ne le
+            // connaît pas purge ses données d'activité avant tout envoi.
+            'data_reset_at' => $entreprise?->data_reset_at?->toIso8601String(),
             'products' => $products,
             'product_categories' => $categories,
             'livestock_lots' => $lots,
@@ -974,6 +978,25 @@ class SyncController extends Controller
             if ($request->has($cle) && ! is_array($request->input($cle))) {
                 $request->request->remove($cle);
                 $clesInvalides[$cle] = 'La clé « '.$cle.' » doit être une liste d\'enregistrements : elle est ignorée.';
+            }
+        }
+
+        // 🔴→✅ TICKET 15.50 — UN POSTE QUI N'A PAS VU LA RÉINITIALISATION N'ENVOIE RIEN. Ses données en attente
+        // ont été saisies sur une base effacée depuis : les accepter ressusciterait bandes, ventes et écritures
+        // (une vente sur un produit au stock remis à 0, une fiche d'une bande disparue). Le poste à jour tire
+        // d'abord, voit la marque, purge, puis renvoie la marque qu'il connaît.
+        $reinitialisation = CompanySetting::query()->value('data_reset_at');
+        if ($reinitialisation !== null) {
+            $marque = Carbon::parse($reinitialisation);
+            $connue = $request->input('data_reset_at');
+            $aJour = is_string($connue) && rescue(
+                fn () => Carbon::parse($connue)->equalTo($marque), false, false,
+            );
+
+            if (! $aJour) {
+                return response()->json([
+                    'message' => MotifsRefusPush::reinitialisationNonVue($marque),
+                ], 409);
             }
         }
 
