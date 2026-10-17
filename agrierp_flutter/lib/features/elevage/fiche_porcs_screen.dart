@@ -56,6 +56,10 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   int _achat = 0;
   int _ne = 0;
   int _vente = 0;
+
+  /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
+  int _transfertEntree = 0;
+  int _transfertSortie = 0;
   int _effectifPrecedent = 0;
 
   final _morts = <String, int>{for (final c in _categories) c: 0};
@@ -131,6 +135,8 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
       _vente = fiche?.vente ?? 0;
+      _transfertEntree = fiche?.transfertEntree ?? 0;
+      _transfertSortie = fiche?.transfertSortie ?? 0;
       // ⚠️ LE TOTAL SE RECONSTITUE : moyenne (g) × effectif ÷ 1000. Reprendre
       // la moyenne telle quelle afficherait 5 Kg là où 500 ont été pesés —
       // le défaut corrigé côté serveur au ticket 14.60.
@@ -162,6 +168,8 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
     mort: _totalMorts,
     vente: _vente,
     don: _totalDons,
+    transfertEntree: _transfertEntree,
+    transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
 
   double? get _tauxMortalite => FicheJournaliereRepository.tauxMortalite(

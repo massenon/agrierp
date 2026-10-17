@@ -85,6 +85,7 @@ void main() {
     'product_categories',
     'livestock_lots',
     'livestock_daily_entries',
+    'livestock_transfers',
     'feed_ration_standards',
     'veterinary_withdrawal_periods',
     'prophylaxis_schedule_standards',

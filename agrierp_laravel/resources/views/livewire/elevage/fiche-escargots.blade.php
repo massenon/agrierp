@@ -39,13 +39,23 @@
                 <span class="material-symbols-outlined text-brand-emerald">edit_note</span>
                 <h3 class="font-bold text-base text-brand-forest">Saisie Journalière du Cheptel</h3>
             </div>
-            <div class="flex items-center gap-xs">
+            <div class="flex items-center gap-xs flex-wrap">
+                @if($this->lots->count() > 1)
+                    {{-- Ticket 15.47 (A11) : LA bande de la fiche, comme Lapins et Porcs. --}}
+                    <span class="text-xs text-outline font-semibold">Bande :</span>
+                    <select wire:model.live="bandeId" id="bande-fiche" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
+                        @foreach($this->lots as $lotChoix)
+                            <option value="{{ $lotChoix->id }}" @selected($lotChoix->id === $this->bande?->id)>{{ $lotChoix->code }}</option>
+                        @endforeach
+                    </select>
+                @endif
                 <span class="text-xs text-outline font-semibold">Date :</span>
                 <input type="date" wire:model.live="selectedDate" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
             </div>
         </div>
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Achats du jour</label>
@@ -77,6 +87,9 @@
 
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
+                @if($mortEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
                         <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur (Bordé)</label>

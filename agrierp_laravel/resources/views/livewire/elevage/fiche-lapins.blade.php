@@ -49,6 +49,7 @@
         @php $cat = $this->categoriesJour; $provende = $this->provendeCalculation; @endphp
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             @if($cat['depart_requis'] && $cat['ancien'])
                 {{-- D6 : une bande déjà saisie à la main n'est JAMAIS migrée automatiquement ; le départ reste à saisir. --}}
                 <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest">

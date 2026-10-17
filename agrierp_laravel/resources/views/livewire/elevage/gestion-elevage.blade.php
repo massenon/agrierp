@@ -39,6 +39,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md mb-lg">
         <x-nav-card href="/suivi-reproduction" icon="favorite" title="Suivi Reproduction" description="Saillies, palpations, mises bas, sevrages" />
         <x-nav-card href="/soins-vaccins-hub" icon="vaccines" title="Soins et Vaccins" description="Registre vétérinaire, calendrier, rémanence" />
-        <x-nav-card href="/elevage-dashboard" icon="dashboard" title="Dashboard Élevage" description="GMQ, bilan technico-économique, alertes" />
+        <x-nav-card href="/elevage-dashboard" icon="dashboard" title="Dashboard Élevage" description="GMQ, rentabilité, alertes" />
+        <x-nav-card href="/transferts-bandes" icon="swap_horiz" title="Transferts entre Bandes" description="Portées, sevrés, regroupements ; rattachement à la bande d'origine" />
     </div>
 </div>

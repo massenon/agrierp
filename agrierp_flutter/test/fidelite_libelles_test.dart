@@ -770,6 +770,15 @@ void main() {
   /// ⚠️ Une exemption n'est donc globale que si elle vaut VRAIMENT partout.
   /// Dans le doute, elle va ici.
   const exemptionsParPage = <String, Map<String, String>>{
+    // ── Ticket 15.48 — « Bilan Technico-Économique » devient « Rentabilité » (onglet et titre),
+    //    décision client du 17/10/2026, appliquée d'abord sur le web. Écart ASSUMÉ au prototype.
+    'elevage-dashboard.html': {
+      'Bilan Technico-Économique': 'renommé « Rentabilité » (décision client du 17/10/2026)',
+    },
+    'bilan-technico-economique.html': {
+      'Bilan Technico-Économique de Lot':
+          'renommé « Rentabilité de Lot » (décision client du 17/10/2026)',
+    },
     // ── Ticket F0.73 — les exemptions GLOBALES de l'écran Historique Avances
     //    (« Nouvelle Avance », « Imputer un Acompte », « Affecter », « Client * »,
     //    « Mode de Paiement »…) disaient « encaissement non embarqué » : fausses depuis

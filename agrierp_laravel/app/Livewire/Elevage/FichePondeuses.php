@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RecordEggProductionStockAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
@@ -45,6 +46,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePondeuses extends Component
 {
+    use AvecTransfertsDuJour;
     use AvecProphylaxieDuJour;
     use AvecSoinsDuMois;
 
@@ -66,9 +68,54 @@ class FichePondeuses extends Component
 
     public string $observations = '';
 
+    /**
+     * Ticket 15.47 (A11) — LA bande de la fiche, comme Lapins et Porcs (15.41). `null` = la première bande par
+     * code. Avant : `saveDay()` écrivait toujours sur la PREMIÈRE bande (ordre des UUID, imprévisible) et le
+     * tableau mensuel mêlait toutes les bandes, deux fiches du même jour s'y écrasant.
+     */
+    public ?string $bandeId = null;
+
+    /**
+     * Ticket 15.47 — morts déjà enregistrés pour le jour rechargé. La répartition Reproducteurs / Poulettes /
+     * Poussins n'est pas stockée (seul le total `mort` l'est) : sans ce total, ré-enregistrer le jour remettait
+     * ses morts à zéro. Il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $mortEnregistre = null;
+
     public function mount(): void
     {
         $this->selectedDate = now()->format('Y-m-d');
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedSelectedDate(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedBandeId(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function getBandeProperty(): ?LivestockLot
+    {
+        $lots = $this->lots;
+
+        return ($this->bandeId !== null ? $lots->firstWhere('id', $this->bandeId) : null) ?? $lots->first();
+    }
+
+    protected function bandeDeLaFiche()
+    {
+        return $this->bande;
+    }
+
+    /** Morts du jour : la répartition saisie, sinon le total déjà enregistré. */
+    private function mortDuJour(): int
+    {
+        $saisis = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
     }
 
     private function speciesCode(): string
@@ -82,6 +129,7 @@ class FichePondeuses extends Component
             ->where('stage', 'ponte')
             ->where('status', 'actif')
             ->where('is_active', true)
+            ->orderBy('code')
             ->get();
     }
 
@@ -117,17 +165,22 @@ class FichePondeuses extends Component
     /** Bandes du tableau mensuel (AvecSoinsDuMois). */
     protected function lotsDuTableauMensuel(): array
     {
-        return $this->lots->pluck('id')->all();
+        return [$this->bande?->id];
     }
 
+    /** Fiches du mois de LA bande de la fiche (ticket 15.47 : une bande par tableau, plus d'écrasement). */
     public function getMonthlyEntriesProperty()
     {
-        $lotIds = $this->lots->pluck('id');
+        $bande = $this->bande;
+
+        if (! $bande) {
+            return collect();
+        }
 
         // Ticket audit fidélité : eager-load treatmentProduct — colonne
         // "Traitements & Rappels" du prototype, trouvée manquante du
         // tableau mensuel (même écart que fiche-lapins.html).
-        return LivestockDailyEntry::whereIn('lot_id', $lotIds)
+        return LivestockDailyEntry::where('lot_id', $bande->id)
             ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
             ->with('treatmentProduct')
             ->orderBy('entry_date')
@@ -164,14 +217,19 @@ class FichePondeuses extends Component
         return range(1, now()->daysInMonth);
     }
 
+    /** Veille de LA bande : dernière fiche antérieure, sinon son effectif initial (point unique `previousEffectif`). */
     public function getPreviousEffectifProperty(): int
     {
-        $entry = LivestockDailyEntry::whereIn('lot_id', $this->lots->pluck('id'))
-            ->where('entry_date', '<', $this->selectedDate)
-            ->orderByDesc('entry_date')
-            ->first();
+        $bande = $this->bande;
 
-        return $entry?->effectif_final ?? (int) $this->lots->sum('initial_quantity');
+        if (! $bande) {
+            return 0;
+        }
+
+        $sonde = new LivestockDailyEntry(['lot_id' => $bande->id, 'entry_date' => $this->selectedDate]);
+        $sonde->setRelation('lot', $bande);
+
+        return $sonde->previousEffectif();
     }
 
     /**
@@ -190,7 +248,7 @@ class FichePondeuses extends Component
      */
     public function getVenteDuJourProperty(): int
     {
-        $lot = $this->lots->first();
+        $lot = $this->bande;
 
         if (! $lot) {
             return 0;
@@ -203,14 +261,14 @@ class FichePondeuses extends Component
 
     public function getEffectifFinalCalcProperty(): int
     {
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, 0);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
     {
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
@@ -266,20 +324,23 @@ class FichePondeuses extends Component
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
 
+        $this->reset(['mortRepro', 'mortPoulette', 'mortPoussin', 'mortEnregistre']);
+
         if ($entry) {
             $this->achat = $entry->achat;
             $this->ne = $entry->ne;
+            $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
             $this->oeufsRecoltes = $entry->ponte_total ?? 0;
             $this->oeufsCasses = $entry->ponte_casses ?? 0;
         } else {
-            $this->reset(['achat', 'ne', 'mortRepro', 'mortPoulette', 'mortPoussin', 'oeufsRecoltes', 'oeufsCasses']);
+            $this->reset(['achat', 'ne', 'oeufsRecoltes', 'oeufsCasses']);
         }
     }
 
     public function saveDay(): void
     {
         $this->authorize('manage-elevage');
-        $lot = $this->lots->first();
+        $lot = $this->bande;
 
         if (! $lot) {
             $this->dispatch('toast', message: "Aucune bande active au stade Ponte. Créez d'abord une bande.", type: 'error');
@@ -287,7 +348,7 @@ class FichePondeuses extends Component
             return;
         }
 
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;
 
         $dailyEntry = LivestockDailyEntry::updateOrCreate(

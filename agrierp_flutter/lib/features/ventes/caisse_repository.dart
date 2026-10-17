@@ -382,6 +382,9 @@ class CaisseRepository {
       mort: existante?.mort ?? 0,
       vente: vente,
       don: existante?.don ?? 0,
+      // Ticket 15.46 : transferts entre bandes du jour compris.
+      transfertEntree: existante?.transfertEntree ?? 0,
+      transfertSortie: existante?.transfertSortie ?? 0,
     );
 
     // ⚠️ F0.95 — FICHE CRÉÉE PAR LA VENTE SUR UNE BANDE À CHAÎNE : ses mouvements ventilés naissent

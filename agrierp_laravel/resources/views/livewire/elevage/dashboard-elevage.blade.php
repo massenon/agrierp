@@ -3,7 +3,8 @@
         :tabs="[
             ['key' => 'synthese', 'label' => 'Synthèse Globale', 'icon' => 'dashboard'],
             ['key' => 'gmq', 'label' => 'GMQ & Croissance', 'icon' => 'monitoring'],
-            ['key' => 'bilan', 'label' => 'Bilan Technico-Économique', 'icon' => 'account_balance_wallet'],
+            {{-- Libellé « Rentabilité » : décision client du 17/10/2026 (le prototype dit « Bilan Technico-Économique »). --}}
+            ['key' => 'bilan', 'label' => 'Rentabilité', 'icon' => 'account_balance_wallet'],
             ['key' => 'sanitaire', 'label' => 'Analyse Sanitaire', 'icon' => 'coronavirus'],
             ['key' => 'prevision', 'label' => 'Prévision de Croissance', 'icon' => 'query_stats'],
         ]"

@@ -72,6 +72,12 @@ class MouvementsJour {
     this.donSevre,
     this.donJeune,
     this.passage,
+    this.transfertEntreeRepro = 0,
+    this.transfertEntreeSevre = 0,
+    this.transfertEntreeJeune = 0,
+    this.transfertSortieRepro = 0,
+    this.transfertSortieSevre = 0,
+    this.transfertSortieJeune = 0,
   });
 
   final int? achat;
@@ -84,6 +90,15 @@ class MouvementsJour {
   final int? donSevre;
   final int? donJeune;
   final int? passage;
+
+  /// Ticket 15.46 — transferts entre bandes par catégorie : dérivés des transferts, donc toujours CONNUS
+  /// (0 sans transfert, jamais « inconnu »). Miroir de `transfert_entree_*` / `transfert_sortie_*`.
+  final int transfertEntreeRepro;
+  final int transfertEntreeSevre;
+  final int transfertEntreeJeune;
+  final int transfertSortieRepro;
+  final int transfertSortieSevre;
+  final int transfertSortieJeune;
 }
 
 /// Résultat d'UNE journée — miroir de `App\Support\EffectifCategoriesJour`.
@@ -145,6 +160,12 @@ class FicheChaine {
     this.catEffRepro,
     this.catEffSevre,
     this.catEffJeune,
+    this.transfertEntreeRepro = 0,
+    this.transfertEntreeSevre = 0,
+    this.transfertEntreeJeune = 0,
+    this.transfertSortieRepro = 0,
+    this.transfertSortieSevre = 0,
+    this.transfertSortieJeune = 0,
   });
 
   final String id;
@@ -166,6 +187,12 @@ class FicheChaine {
   final int? catEffRepro;
   final int? catEffSevre;
   final int? catEffJeune;
+  final int transfertEntreeRepro;
+  final int transfertEntreeSevre;
+  final int transfertEntreeJeune;
+  final int transfertSortieRepro;
+  final int transfertSortieSevre;
+  final int transfertSortieJeune;
 
   /// Départ COMPLET (les trois catégories) : c'est ce qui fait une tête de chaîne.
   bool get departComplet =>
@@ -186,6 +213,12 @@ class FicheChaine {
     donSevre: donSevre,
     donJeune: donJeune,
     passage: passage,
+    transfertEntreeRepro: transfertEntreeRepro,
+    transfertEntreeSevre: transfertEntreeSevre,
+    transfertEntreeJeune: transfertEntreeJeune,
+    transfertSortieRepro: transfertSortieRepro,
+    transfertSortieSevre: transfertSortieSevre,
+    transfertSortieJeune: transfertSortieJeune,
   );
 }
 
@@ -255,8 +288,9 @@ abstract final class EffectifParCategorie {
   /// Espèce suivie pour un code d'espèce de bande, null sinon (`especeDuLot`).
   static String? especeDuCode(String? code) => especes[code];
 
-  /// Effectif total de fin de journée — `LivestockDailyEntry::computeEffectifFinal` (14.63) :
-  /// `max(0, veille + achat + nés − (morts + ventes + dons))`.
+  /// Effectif total de fin de journée — `LivestockDailyEntry::computeEffectifFinal` (14.63, 15.46) :
+  /// `max(0, veille + achat + nés + entrées − (morts + ventes + dons + sorties))`, les entrées et sorties
+  /// étant les transferts entre bandes du jour (0 sans transfert).
   static int effectifFinal({
     required int precedent,
     required int achat,
@@ -264,7 +298,16 @@ abstract final class EffectifParCategorie {
     required int mort,
     required int vente,
     required int don,
-  }) => math.max(0, precedent + achat + ne - (mort + vente + don));
+    int transfertEntree = 0,
+    int transfertSortie = 0,
+  }) => math.max(
+    0,
+    precedent +
+        achat +
+        ne +
+        transfertEntree -
+        (mort + vente + don + transfertSortie),
+  );
 
   /// Effectifs par catégorie d'UNE journée (`calculerJour`).
   ///
@@ -282,17 +325,18 @@ abstract final class EffectifParCategorie {
     final estLapins = espece == lapins;
 
     // Reproducteur : ne change jamais de stade. Les achats de porcs lui reviennent (D11).
+    // Ticket 15.46 : transferts entre bandes par catégorie, comme au serveur.
     final repro = _appliquer(
       veille.repro,
-      estLapins ? const [] : [m.achat],
-      [m.mortRepro, m.donRepro],
+      [if (!estLapins) m.achat, m.transfertEntreeRepro],
+      [m.mortRepro, m.donRepro, m.transfertSortieRepro],
     );
 
     // Catégorie « sevre » (Jeune / Porcelet), avant passage : les lapins achetés y entrent, les nés aussi.
     final avant = _brut(
       veille.sevre,
-      estLapins ? [m.achat, m.ne] : [m.ne],
-      [m.mortSevre, m.donSevre],
+      [if (estLapins) m.achat, m.ne, m.transfertEntreeSevre],
+      [m.mortSevre, m.donSevre, m.transfertSortieSevre],
     );
 
     final passage = m.passage;
@@ -316,8 +360,8 @@ abstract final class EffectifParCategorie {
         : math.max(0, avant - passageApplique);
     final jeune = _appliquer(
       veille.jeune,
-      [passageApplique],
-      [m.vente, m.mortJeune, m.donJeune],
+      [passageApplique, m.transfertEntreeJeune],
+      [m.vente, m.mortJeune, m.donJeune, m.transfertSortieJeune],
     );
 
     bool? sommeDifferente;

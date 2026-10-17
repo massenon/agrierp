@@ -57,6 +57,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   28: [d.supplierPayments],
   31: [d.advanceImputations],
   32: [d.purchaseReturns, d.supplierRefunds, d.supplierCredits],
+  // Ticket 15.46 — transferts entre bandes.
+  39: [d.livestockTransfers],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -138,6 +140,21 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
       d.livestockDailyEntries.effectifSmeres,
     ])
       (d.livestockDailyEntries, c),
+  ],
+  // Ticket 15.46 — transferts entre bandes : colonnes dérivées des fiches, bande d'origine.
+  39: [
+    for (final c in [
+      d.livestockDailyEntries.transfertEntree,
+      d.livestockDailyEntries.transfertSortie,
+      d.livestockDailyEntries.transfertEntreeRepro,
+      d.livestockDailyEntries.transfertEntreeSevre,
+      d.livestockDailyEntries.transfertEntreeJeune,
+      d.livestockDailyEntries.transfertSortieRepro,
+      d.livestockDailyEntries.transfertSortieSevre,
+      d.livestockDailyEntries.transfertSortieJeune,
+    ])
+      (d.livestockDailyEntries, c),
+    (d.livestockLots, d.livestockLots.lotSourceId),
   ],
 };
 

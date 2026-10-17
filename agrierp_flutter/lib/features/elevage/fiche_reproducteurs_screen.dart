@@ -62,6 +62,10 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
 
   int _achat = 0;
   int _vente = 0;
+
+  /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
+  int _transfertEntree = 0;
+  int _transfertSortie = 0;
   int _effectifPrecedent = 0;
 
   int _oeufsCouves = 0;
@@ -147,6 +151,8 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _vente = fiche?.vente ?? 0;
+      _transfertEntree = fiche?.transfertEntree ?? 0;
+      _transfertSortie = fiche?.transfertSortie ?? 0;
       // ⚠️ `ponte_total` = œufs COUVÉS, `ne` = poussins NÉS (cf. serveur).
       _oeufsCouves = fiche?.ponteTotal ?? 0;
       _poussinsNes = fiche?.ne ?? 0;
@@ -175,6 +181,8 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
     mort: _totalMorts,
     vente: _vente,
     don: _totalDons,
+    transfertEntree: _transfertEntree,
+    transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
 
   /// Taux d'éclosion du jour : poussins nés ÷ œufs couvés × 100.

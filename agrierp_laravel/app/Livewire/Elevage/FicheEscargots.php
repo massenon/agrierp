@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
 use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
@@ -45,6 +46,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheEscargots extends Component
 {
+    use AvecTransfertsDuJour;
     use AvecSoinsDuMois;
 
     public string $selectedDate;
@@ -73,10 +75,53 @@ class FicheEscargots extends Component
 
     public bool $moduleEnabled = false;
 
+    /**
+     * Ticket 15.47 (A11) — LA bande de la fiche, comme Lapins et Porcs (15.41). Avant : `saveDay()` écrivait
+     * toujours sur la PREMIÈRE bande et le tableau mensuel mêlait toutes les bandes.
+     */
+    public ?string $bandeId = null;
+
+    /**
+     * Ticket 15.47 — morts déjà enregistrés pour le jour rechargé : la répartition Bordés / Engraissement /
+     * Naissains n'est pas stockée ; sans ce total, ré-enregistrer le jour remettait ses morts à zéro.
+     */
+    public ?int $mortEnregistre = null;
+
     public function mount(): void
     {
         $this->moduleEnabled = ModuleConfig::isEnabled('helico');
         $this->selectedDate = now()->format('Y-m-d');
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedSelectedDate(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedBandeId(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function getBandeProperty(): ?LivestockLot
+    {
+        $lots = $this->lots;
+
+        return ($this->bandeId !== null ? $lots->firstWhere('id', $this->bandeId) : null) ?? $lots->first();
+    }
+
+    protected function bandeDeLaFiche()
+    {
+        return $this->bande;
+    }
+
+    /** Morts du jour : la répartition saisie, sinon le total déjà enregistré. */
+    private function mortDuJour(): int
+    {
+        $saisis = $this->mortBorde + $this->mortEngraissement + $this->mortNaissain;
+
+        return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
     }
 
     public function getLotsProperty()
@@ -88,6 +133,7 @@ class FicheEscargots extends Component
         return LivestockLot::whereHas('species', fn ($q) => $q->where('code', 'helico'))
             ->where('status', 'actif')
             ->where('is_active', true)
+            ->orderBy('code')
             ->get();
     }
 
@@ -114,12 +160,19 @@ class FicheEscargots extends Component
     /** Bandes du tableau mensuel (AvecSoinsDuMois). */
     protected function lotsDuTableauMensuel(): array
     {
-        return $this->lots->pluck('id')->all();
+        return [$this->bande?->id];
     }
 
+    /** Fiches du mois de LA bande de la fiche (ticket 15.47 : une bande par tableau, plus d'écrasement). */
     public function getMonthlyEntriesProperty()
     {
-        $lotIds = $this->lots->pluck('id');
+        $bande = $this->bande;
+
+        if (! $bande) {
+            return collect();
+        }
+
+        $lotIds = [$bande->id];
 
         // Ticket audit fidélité : eager-load treatmentProduct — colonne
         // "Traitements & Prophylaxie" du prototype, trouvée manquante du
@@ -164,12 +217,17 @@ class FicheEscargots extends Component
 
     public function getPreviousEffectifProperty(): int
     {
-        $entry = LivestockDailyEntry::whereIn('lot_id', $this->lots->pluck('id'))
-            ->where('entry_date', '<', $this->selectedDate)
-            ->orderByDesc('entry_date')
-            ->first();
+        // Ticket 15.47 — veille de LA bande (point unique `previousEffectif`), plus celle de toutes les bandes.
+        $bande = $this->bande;
 
-        return $entry?->effectif_final ?? (int) $this->lots->sum('initial_quantity');
+        if (! $bande) {
+            return 0;
+        }
+
+        $sonde = new LivestockDailyEntry(['lot_id' => $bande->id, 'entry_date' => $this->selectedDate]);
+        $sonde->setRelation('lot', $bande);
+
+        return $sonde->previousEffectif();
     }
 
     /**
@@ -188,7 +246,7 @@ class FicheEscargots extends Component
      */
     public function getVenteDuJourProperty(): int
     {
-        $lot = $this->lots->first();
+        $lot = $this->bande;
 
         if (! $lot) {
             return 0;
@@ -201,14 +259,14 @@ class FicheEscargots extends Component
 
     public function getEffectifFinalCalcProperty(): int
     {
-        $mort = $this->mortBorde + $this->mortEngraissement + $this->mortNaissain;
+        $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->naissainsNes, $mort, $this->venteDuJour, 0);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->naissainsNes, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
     {
-        $mort = $this->mortBorde + $this->mortEngraissement + $this->mortNaissain;
+        $mort = $this->mortDuJour();
 
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
@@ -222,8 +280,10 @@ class FicheEscargots extends Component
     {
         $this->selectedDate = $date;
         $entry = $this->monthlyEntries->get($date);
+        $this->reset(['mortBorde', 'mortEngraissement', 'mortNaissain', 'mortEnregistre']);
 
         if ($entry) {
+            $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
             $this->achat = $entry->achat;
             $this->oeufsTerre = $entry->ponte_total ?? 0;
             $this->naissainsNes = $entry->ne;
@@ -236,14 +296,14 @@ class FicheEscargots extends Component
                 ? (int) round($entry->weight_sample_avg_g * $effectifFiche)
                 : null;
         } else {
-            $this->reset(['achat', 'oeufsTerre', 'naissainsNes', 'mortBorde', 'mortEngraissement', 'mortNaissain', 'effectifNaissains', 'effectifEngraissement', 'effectifBordes', 'peseeTotal']);
+            $this->reset(['achat', 'oeufsTerre', 'naissainsNes', 'effectifNaissains', 'effectifEngraissement', 'effectifBordes', 'peseeTotal']);
         }
     }
 
     public function saveDay(): void
     {
         $this->authorize('manage-elevage');
-        $lot = $this->lots->first();
+        $lot = $this->bande;
 
         if (! $lot) {
             $this->dispatch('toast', message: "Aucune bande active en héliciculture. Créez d'abord une bande.", type: 'error');
@@ -251,7 +311,7 @@ class FicheEscargots extends Component
             return;
         }
 
-        $mort = $this->mortBorde + $this->mortEngraissement + $this->mortNaissain;
+        $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;        // 🔴→✅ TICKET 14.37 — état AVANT enregistrement, pour n'appliquer
         // au stock que l'ÉCART. Une fiche se corrige : appliquer les
         // valeurs telles quelles compterait la production autant de fois

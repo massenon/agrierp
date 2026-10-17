@@ -392,7 +392,7 @@ void main() {
         await jeuDeReference();
         await afficher(tester);
 
-        expect(find.text('Bilan Technico-Économique de Lot'), findsOneWidget);
+        expect(find.text('Rentabilité de Lot'), findsOneWidget);
         expect(
           find.textContaining('Coûts, revenus et rentabilité réelle par bande'),
           findsOneWidget,

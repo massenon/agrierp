@@ -149,8 +149,58 @@ class LivestockDailyEntry extends Model
      * (50), seul l'effectif est borne. Rien n'est efface, la borne evite
      * seulement qu'un impossible se propage.
      */
-    public static function computeEffectifFinal(int $previousEffectif, int $achat, int $ne, int $mort, int $vente, int $don = 0): int
+    public static function computeEffectifFinal(
+        int $previousEffectif,
+        int $achat,
+        int $ne,
+        int $mort,
+        int $vente,
+        int $don = 0,
+        int $transfertEntree = 0,
+        int $transfertSortie = 0,
+    ): int {
+        // Ticket 15.46 — les transferts entre bandes entrent dans la MÊME formule : une entrée s'ajoute comme un
+        // achat, une sortie se retire comme une vente. 0 par défaut : sans transfert, rien ne change.
+        return max(0, $previousEffectif + $achat + $ne + $transfertEntree - ($mort + $vente + $don + $transfertSortie));
+    }
+
+    /**
+     * Ticket 15.46 — effectif final de CETTE fiche à partir de l'effectif de la veille, avec tous ses mouvements
+     * stockés, transferts compris. Point d'appel unique de la cascade et de l'envoi du poste.
+     */
+    public function effectifFinalDepuis(int $previousEffectif): int
     {
-        return max(0, $previousEffectif + $achat + $ne - ($mort + $vente + $don));
+        return self::computeEffectifFinal(
+            $previousEffectif,
+            (int) $this->achat,
+            (int) $this->ne,
+            (int) $this->mort,
+            (int) $this->vente,
+            (int) ($this->don ?? 0),
+            (int) ($this->transfert_entree ?? 0),
+            (int) ($this->transfert_sortie ?? 0),
+        );
+    }
+
+    /**
+     * Ticket 15.46 — mouvements de la fiche pour `EffectifParCategorieService::calculerJour`, transferts par
+     * catégorie compris (dérivés, donc toujours connus : 0 et non « inconnu »).
+     *
+     * @return array<string, ?int>
+     */
+    public function mouvementsParCategorie(): array
+    {
+        return [
+            'achat' => $this->achat, 'ne' => $this->ne, 'vente' => $this->vente,
+            'mort_repro' => $this->mort_repro, 'mort_sevre' => $this->mort_sevre, 'mort_jeune' => $this->mort_jeune,
+            'don_repro' => $this->don_repro, 'don_sevre' => $this->don_sevre, 'don_jeune' => $this->don_jeune,
+            'passage' => $this->passage_sevre_jeune,
+            'transfert_entree_repro' => (int) ($this->transfert_entree_repro ?? 0),
+            'transfert_entree_sevre' => (int) ($this->transfert_entree_sevre ?? 0),
+            'transfert_entree_jeune' => (int) ($this->transfert_entree_jeune ?? 0),
+            'transfert_sortie_repro' => (int) ($this->transfert_sortie_repro ?? 0),
+            'transfert_sortie_sevre' => (int) ($this->transfert_sortie_sevre ?? 0),
+            'transfert_sortie_jeune' => (int) ($this->transfert_sortie_jeune ?? 0),
+        ];
     }
 }

@@ -2,9 +2,14 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\TransferBetweenLotsAction;
 use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use App\Services\EffectifParCategorieService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -84,6 +89,13 @@ class GestionBandes extends Component
     public string $status = 'actif';
 
     /**
+     * Ticket 15.46 — bande d'origine FACULTATIVE : la nouvelle bande est constituée de sujets déjà comptés dans
+     * une autre (portée, sevrés). Sa création inscrit leur sortie de la bande d'origine (constitution), sinon ils
+     * seraient comptés deux fois dans « Effectif Total Vivant ». Vide pour un achat ou des animaux extérieurs.
+     */
+    public string $lot_origine_id = '';
+
+    /**
      * Produits candidats pour la bande sélectionnée.
      *
      * ⚠️ Restreints à l'ESPÈCE choisie, et les intrants écartés : on ne produit
@@ -123,6 +135,14 @@ class GestionBandes extends Component
                 ->distinct('lot_id')
                 ->count('lot_id'),
         ];
+    }
+
+    /** Ticket 15.46 — bandes vivantes de l'espèce choisie, candidates comme bande d'origine. */
+    public function getBandesOriginePossiblesProperty()
+    {
+        return $this->species_id === ''
+            ? collect()
+            : LivestockLot::where('species_id', $this->species_id)->where('is_active', true)->orderBy('code')->get();
     }
 
     public function getSpeciesOptionsProperty()
@@ -254,7 +274,7 @@ class GestionBandes extends Component
     {
         $this->authorize('manage-elevage');
 
-        $this->reset(['editingLotId', 'code', 'species_id', 'acquisition_cost']);
+        $this->reset(['editingLotId', 'code', 'species_id', 'acquisition_cost', 'lot_origine_id']);
         $this->stage = 'reproduction';
         $this->created_date = now()->format('Y-m-d');
         $this->quantity = 0;
@@ -272,9 +292,27 @@ class GestionBandes extends Component
             'created_date' => ['required', 'date'],
             'quantity' => ['required', 'integer', 'min:1'],
             'product_id' => ['nullable', 'exists:products,id'],
+            'lot_origine_id' => ['nullable', 'exists:livestock_lots,id'],
         ]);
 
-        LivestockLot::create([
+        try {
+            DB::transaction(fn () => $this->creerLaBande());
+        } catch (ValidationException $e) {
+            // La constitution est refusée (bande d'origine insuffisante…) : la bande n'est pas créée non plus.
+            $this->addError('lot_origine_id', collect($e->errors())->flatten()->first());
+
+            return;
+        }
+
+        AuditLog::record('livestock_lot.created', 'elevage');
+        $this->dispatch('close-modal', name: 'modal-create-bande');
+        $this->dispatch('toast', message: 'Bande créée avec succès.', type: 'success');
+        $this->reset(['code', 'species_id', 'quantity', 'acquisition_cost', 'product_id', 'lot_origine_id']);
+    }
+
+    private function creerLaBande(): void
+    {
+        $lot = LivestockLot::create([
             'code' => $this->code,
             'species_id' => $this->species_id,
             // Ticket 14.37 : ce que la bande produit, décidé par l'exploitant.
@@ -288,10 +326,19 @@ class GestionBandes extends Component
             'is_active' => true,
         ]);
 
-        AuditLog::record('livestock_lot.created', 'elevage');
-        $this->dispatch('close-modal', name: 'modal-create-bande');
-        $this->dispatch('toast', message: 'Bande créée avec succès.', type: 'success');
-        $this->reset(['code', 'species_id', 'quantity', 'acquisition_cost', 'product_id']);
+        if ($this->lot_origine_id !== '') {
+            app(TransferBetweenLotsAction::class)->execute([
+                'source_lot_id' => $this->lot_origine_id,
+                'target_lot_id' => $lot->id,
+                'transfer_date' => $lot->created_date->format('Y-m-d'),
+                'quantity' => $lot->initial_quantity,
+                'categorie' => EffectifParCategorieService::especeDuLot($lot->load('species')) !== null
+                    ? EffectifParCategorieService::categorieDuStade($lot->stage)
+                    : null,
+                'constitution' => true,
+                'motif' => 'Constitution de la bande '.$lot->code,
+            ], Auth::user());
+        }
     }
 
     public function editLot(string $id): void

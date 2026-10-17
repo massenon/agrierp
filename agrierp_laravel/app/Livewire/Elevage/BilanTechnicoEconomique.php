@@ -201,6 +201,6 @@ class BilanTechnicoEconomique extends Component
 
     public function render()
     {
-        return view('livewire.elevage.bilan-technico-economique', ['title' => 'Élevage > Bilan Technico-Économique']);
+        return view('livewire.elevage.bilan-technico-economique', ['title' => 'Élevage > Rentabilité']);
     }
 }

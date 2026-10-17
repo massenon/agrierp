@@ -1407,6 +1407,17 @@ class $LivestockLotsTable extends LivestockLots
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lotSourceIdMeta = const VerificationMeta(
+    'lotSourceId',
+  );
+  @override
+  late final GeneratedColumn<String> lotSourceId = GeneratedColumn<String>(
+    'lot_source_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1422,6 +1433,7 @@ class $LivestockLotsTable extends LivestockLots
     status,
     isActive,
     updatedAt,
+    lotSourceId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1531,6 +1543,15 @@ class $LivestockLotsTable extends LivestockLots
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('lot_source_id')) {
+      context.handle(
+        _lotSourceIdMeta,
+        lotSourceId.isAcceptableOrUnknown(
+          data['lot_source_id']!,
+          _lotSourceIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1592,6 +1613,10 @@ class $LivestockLotsTable extends LivestockLots
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       ),
+      lotSourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lot_source_id'],
+      ),
     );
   }
 
@@ -1622,6 +1647,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
   final String? status;
   final bool isActive;
   final DateTime? updatedAt;
+
+  /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
+  final String? lotSourceId;
   const LivestockLot({
     required this.id,
     required this.code,
@@ -1636,6 +1664,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     this.status,
     required this.isActive,
     this.updatedAt,
+    this.lotSourceId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1666,6 +1695,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || lotSourceId != null) {
+      map['lot_source_id'] = Variable<String>(lotSourceId);
     }
     return map;
   }
@@ -1699,6 +1731,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
+      lotSourceId: lotSourceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lotSourceId),
     );
   }
 
@@ -1721,6 +1756,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       status: serializer.fromJson<String?>(json['status']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      lotSourceId: serializer.fromJson<String?>(json['lotSourceId']),
     );
   }
   @override
@@ -1740,6 +1776,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       'status': serializer.toJson<String?>(status),
       'isActive': serializer.toJson<bool>(isActive),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'lotSourceId': serializer.toJson<String?>(lotSourceId),
     };
   }
 
@@ -1757,6 +1794,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     Value<String?> status = const Value.absent(),
     bool? isActive,
     Value<DateTime?> updatedAt = const Value.absent(),
+    Value<String?> lotSourceId = const Value.absent(),
   }) => LivestockLot(
     id: id ?? this.id,
     code: code ?? this.code,
@@ -1773,6 +1811,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     status: status.present ? status.value : this.status,
     isActive: isActive ?? this.isActive,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    lotSourceId: lotSourceId.present ? lotSourceId.value : this.lotSourceId,
   );
   LivestockLot copyWithCompanion(LivestockLotsCompanion data) {
     return LivestockLot(
@@ -1799,6 +1838,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       status: data.status.present ? data.status.value : this.status,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lotSourceId: data.lotSourceId.present
+          ? data.lotSourceId.value
+          : this.lotSourceId,
     );
   }
 
@@ -1817,7 +1859,8 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
           ..write('productId: $productId, ')
           ..write('status: $status, ')
           ..write('isActive: $isActive, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotSourceId: $lotSourceId')
           ..write(')'))
         .toString();
   }
@@ -1837,6 +1880,7 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     status,
     isActive,
     updatedAt,
+    lotSourceId,
   );
   @override
   bool operator ==(Object other) =>
@@ -1854,7 +1898,8 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
           other.productId == this.productId &&
           other.status == this.status &&
           other.isActive == this.isActive &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.lotSourceId == this.lotSourceId);
 }
 
 class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
@@ -1871,6 +1916,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
   final Value<String?> status;
   final Value<bool> isActive;
   final Value<DateTime?> updatedAt;
+  final Value<String?> lotSourceId;
   final Value<int> rowid;
   const LivestockLotsCompanion({
     this.id = const Value.absent(),
@@ -1886,6 +1932,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     this.status = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.lotSourceId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LivestockLotsCompanion.insert({
@@ -1902,6 +1949,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     this.status = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.lotSourceId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        code = Value(code),
@@ -1920,6 +1968,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     Expression<String>? status,
     Expression<bool>? isActive,
     Expression<DateTime>? updatedAt,
+    Expression<String>? lotSourceId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1936,6 +1985,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
       if (status != null) 'status': status,
       if (isActive != null) 'is_active': isActive,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (lotSourceId != null) 'lot_source_id': lotSourceId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1954,6 +2004,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     Value<String?>? status,
     Value<bool>? isActive,
     Value<DateTime?>? updatedAt,
+    Value<String?>? lotSourceId,
     Value<int>? rowid,
   }) {
     return LivestockLotsCompanion(
@@ -1970,6 +2021,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
       status: status ?? this.status,
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
+      lotSourceId: lotSourceId ?? this.lotSourceId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2016,6 +2068,9 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (lotSourceId.present) {
+      map['lot_source_id'] = Variable<String>(lotSourceId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2038,6 +2093,7 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
           ..write('status: $status, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('lotSourceId: $lotSourceId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -21944,6 +22000,96 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _transfertEntreeMeta = const VerificationMeta(
+    'transfertEntree',
+  );
+  @override
+  late final GeneratedColumn<int> transfertEntree = GeneratedColumn<int>(
+    'transfert_entree',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertSortieMeta = const VerificationMeta(
+    'transfertSortie',
+  );
+  @override
+  late final GeneratedColumn<int> transfertSortie = GeneratedColumn<int>(
+    'transfert_sortie',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertEntreeReproMeta =
+      const VerificationMeta('transfertEntreeRepro');
+  @override
+  late final GeneratedColumn<int> transfertEntreeRepro = GeneratedColumn<int>(
+    'transfert_entree_repro',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertEntreeSevreMeta =
+      const VerificationMeta('transfertEntreeSevre');
+  @override
+  late final GeneratedColumn<int> transfertEntreeSevre = GeneratedColumn<int>(
+    'transfert_entree_sevre',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertEntreeJeuneMeta =
+      const VerificationMeta('transfertEntreeJeune');
+  @override
+  late final GeneratedColumn<int> transfertEntreeJeune = GeneratedColumn<int>(
+    'transfert_entree_jeune',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertSortieReproMeta =
+      const VerificationMeta('transfertSortieRepro');
+  @override
+  late final GeneratedColumn<int> transfertSortieRepro = GeneratedColumn<int>(
+    'transfert_sortie_repro',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertSortieSevreMeta =
+      const VerificationMeta('transfertSortieSevre');
+  @override
+  late final GeneratedColumn<int> transfertSortieSevre = GeneratedColumn<int>(
+    'transfert_sortie_sevre',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertSortieJeuneMeta =
+      const VerificationMeta('transfertSortieJeune');
+  @override
+  late final GeneratedColumn<int> transfertSortieJeune = GeneratedColumn<int>(
+    'transfert_sortie_jeune',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -21980,6 +22126,14 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     effectifF,
     effectifSevres,
     effectifSmeres,
+    transfertEntree,
+    transfertSortie,
+    transfertEntreeRepro,
+    transfertEntreeSevre,
+    transfertEntreeJeune,
+    transfertSortieRepro,
+    transfertSortieSevre,
+    transfertSortieJeune,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -22231,6 +22385,78 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         ),
       );
     }
+    if (data.containsKey('transfert_entree')) {
+      context.handle(
+        _transfertEntreeMeta,
+        transfertEntree.isAcceptableOrUnknown(
+          data['transfert_entree']!,
+          _transfertEntreeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_sortie')) {
+      context.handle(
+        _transfertSortieMeta,
+        transfertSortie.isAcceptableOrUnknown(
+          data['transfert_sortie']!,
+          _transfertSortieMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_entree_repro')) {
+      context.handle(
+        _transfertEntreeReproMeta,
+        transfertEntreeRepro.isAcceptableOrUnknown(
+          data['transfert_entree_repro']!,
+          _transfertEntreeReproMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_entree_sevre')) {
+      context.handle(
+        _transfertEntreeSevreMeta,
+        transfertEntreeSevre.isAcceptableOrUnknown(
+          data['transfert_entree_sevre']!,
+          _transfertEntreeSevreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_entree_jeune')) {
+      context.handle(
+        _transfertEntreeJeuneMeta,
+        transfertEntreeJeune.isAcceptableOrUnknown(
+          data['transfert_entree_jeune']!,
+          _transfertEntreeJeuneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_sortie_repro')) {
+      context.handle(
+        _transfertSortieReproMeta,
+        transfertSortieRepro.isAcceptableOrUnknown(
+          data['transfert_sortie_repro']!,
+          _transfertSortieReproMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_sortie_sevre')) {
+      context.handle(
+        _transfertSortieSevreMeta,
+        transfertSortieSevre.isAcceptableOrUnknown(
+          data['transfert_sortie_sevre']!,
+          _transfertSortieSevreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_sortie_jeune')) {
+      context.handle(
+        _transfertSortieJeuneMeta,
+        transfertSortieJeune.isAcceptableOrUnknown(
+          data['transfert_sortie_jeune']!,
+          _transfertSortieJeuneMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -22378,6 +22604,38 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         DriftSqlType.int,
         data['${effectivePrefix}effectif_smeres'],
       ),
+      transfertEntree: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_entree'],
+      )!,
+      transfertSortie: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_sortie'],
+      )!,
+      transfertEntreeRepro: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_entree_repro'],
+      )!,
+      transfertEntreeSevre: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_entree_sevre'],
+      )!,
+      transfertEntreeJeune: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_entree_jeune'],
+      )!,
+      transfertSortieRepro: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_sortie_repro'],
+      )!,
+      transfertSortieSevre: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_sortie_sevre'],
+      )!,
+      transfertSortieJeune: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_sortie_jeune'],
+      )!,
     );
   }
 
@@ -22440,6 +22698,14 @@ class LivestockDailyEntry extends DataClass
   final int? effectifF;
   final int? effectifSevres;
   final int? effectifSmeres;
+  final int transfertEntree;
+  final int transfertSortie;
+  final int transfertEntreeRepro;
+  final int transfertEntreeSevre;
+  final int transfertEntreeJeune;
+  final int transfertSortieRepro;
+  final int transfertSortieSevre;
+  final int transfertSortieJeune;
   const LivestockDailyEntry({
     required this.id,
     required this.deviceId,
@@ -22475,6 +22741,14 @@ class LivestockDailyEntry extends DataClass
     this.effectifF,
     this.effectifSevres,
     this.effectifSmeres,
+    required this.transfertEntree,
+    required this.transfertSortie,
+    required this.transfertEntreeRepro,
+    required this.transfertEntreeSevre,
+    required this.transfertEntreeJeune,
+    required this.transfertSortieRepro,
+    required this.transfertSortieSevre,
+    required this.transfertSortieJeune,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -22561,6 +22835,14 @@ class LivestockDailyEntry extends DataClass
     if (!nullToAbsent || effectifSmeres != null) {
       map['effectif_smeres'] = Variable<int>(effectifSmeres);
     }
+    map['transfert_entree'] = Variable<int>(transfertEntree);
+    map['transfert_sortie'] = Variable<int>(transfertSortie);
+    map['transfert_entree_repro'] = Variable<int>(transfertEntreeRepro);
+    map['transfert_entree_sevre'] = Variable<int>(transfertEntreeSevre);
+    map['transfert_entree_jeune'] = Variable<int>(transfertEntreeJeune);
+    map['transfert_sortie_repro'] = Variable<int>(transfertSortieRepro);
+    map['transfert_sortie_sevre'] = Variable<int>(transfertSortieSevre);
+    map['transfert_sortie_jeune'] = Variable<int>(transfertSortieJeune);
     return map;
   }
 
@@ -22644,6 +22926,14 @@ class LivestockDailyEntry extends DataClass
       effectifSmeres: effectifSmeres == null && nullToAbsent
           ? const Value.absent()
           : Value(effectifSmeres),
+      transfertEntree: Value(transfertEntree),
+      transfertSortie: Value(transfertSortie),
+      transfertEntreeRepro: Value(transfertEntreeRepro),
+      transfertEntreeSevre: Value(transfertEntreeSevre),
+      transfertEntreeJeune: Value(transfertEntreeJeune),
+      transfertSortieRepro: Value(transfertSortieRepro),
+      transfertSortieSevre: Value(transfertSortieSevre),
+      transfertSortieJeune: Value(transfertSortieJeune),
     );
   }
 
@@ -22689,6 +22979,26 @@ class LivestockDailyEntry extends DataClass
       effectifF: serializer.fromJson<int?>(json['effectifF']),
       effectifSevres: serializer.fromJson<int?>(json['effectifSevres']),
       effectifSmeres: serializer.fromJson<int?>(json['effectifSmeres']),
+      transfertEntree: serializer.fromJson<int>(json['transfertEntree']),
+      transfertSortie: serializer.fromJson<int>(json['transfertSortie']),
+      transfertEntreeRepro: serializer.fromJson<int>(
+        json['transfertEntreeRepro'],
+      ),
+      transfertEntreeSevre: serializer.fromJson<int>(
+        json['transfertEntreeSevre'],
+      ),
+      transfertEntreeJeune: serializer.fromJson<int>(
+        json['transfertEntreeJeune'],
+      ),
+      transfertSortieRepro: serializer.fromJson<int>(
+        json['transfertSortieRepro'],
+      ),
+      transfertSortieSevre: serializer.fromJson<int>(
+        json['transfertSortieSevre'],
+      ),
+      transfertSortieJeune: serializer.fromJson<int>(
+        json['transfertSortieJeune'],
+      ),
     );
   }
   @override
@@ -22731,6 +23041,14 @@ class LivestockDailyEntry extends DataClass
       'effectifF': serializer.toJson<int?>(effectifF),
       'effectifSevres': serializer.toJson<int?>(effectifSevres),
       'effectifSmeres': serializer.toJson<int?>(effectifSmeres),
+      'transfertEntree': serializer.toJson<int>(transfertEntree),
+      'transfertSortie': serializer.toJson<int>(transfertSortie),
+      'transfertEntreeRepro': serializer.toJson<int>(transfertEntreeRepro),
+      'transfertEntreeSevre': serializer.toJson<int>(transfertEntreeSevre),
+      'transfertEntreeJeune': serializer.toJson<int>(transfertEntreeJeune),
+      'transfertSortieRepro': serializer.toJson<int>(transfertSortieRepro),
+      'transfertSortieSevre': serializer.toJson<int>(transfertSortieSevre),
+      'transfertSortieJeune': serializer.toJson<int>(transfertSortieJeune),
     };
   }
 
@@ -22769,6 +23087,14 @@ class LivestockDailyEntry extends DataClass
     Value<int?> effectifF = const Value.absent(),
     Value<int?> effectifSevres = const Value.absent(),
     Value<int?> effectifSmeres = const Value.absent(),
+    int? transfertEntree,
+    int? transfertSortie,
+    int? transfertEntreeRepro,
+    int? transfertEntreeSevre,
+    int? transfertEntreeJeune,
+    int? transfertSortieRepro,
+    int? transfertSortieSevre,
+    int? transfertSortieJeune,
   }) => LivestockDailyEntry(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -22818,6 +23144,14 @@ class LivestockDailyEntry extends DataClass
     effectifSmeres: effectifSmeres.present
         ? effectifSmeres.value
         : this.effectifSmeres,
+    transfertEntree: transfertEntree ?? this.transfertEntree,
+    transfertSortie: transfertSortie ?? this.transfertSortie,
+    transfertEntreeRepro: transfertEntreeRepro ?? this.transfertEntreeRepro,
+    transfertEntreeSevre: transfertEntreeSevre ?? this.transfertEntreeSevre,
+    transfertEntreeJeune: transfertEntreeJeune ?? this.transfertEntreeJeune,
+    transfertSortieRepro: transfertSortieRepro ?? this.transfertSortieRepro,
+    transfertSortieSevre: transfertSortieSevre ?? this.transfertSortieSevre,
+    transfertSortieJeune: transfertSortieJeune ?? this.transfertSortieJeune,
   );
   LivestockDailyEntry copyWithCompanion(LivestockDailyEntriesCompanion data) {
     return LivestockDailyEntry(
@@ -22883,6 +23217,30 @@ class LivestockDailyEntry extends DataClass
       effectifSmeres: data.effectifSmeres.present
           ? data.effectifSmeres.value
           : this.effectifSmeres,
+      transfertEntree: data.transfertEntree.present
+          ? data.transfertEntree.value
+          : this.transfertEntree,
+      transfertSortie: data.transfertSortie.present
+          ? data.transfertSortie.value
+          : this.transfertSortie,
+      transfertEntreeRepro: data.transfertEntreeRepro.present
+          ? data.transfertEntreeRepro.value
+          : this.transfertEntreeRepro,
+      transfertEntreeSevre: data.transfertEntreeSevre.present
+          ? data.transfertEntreeSevre.value
+          : this.transfertEntreeSevre,
+      transfertEntreeJeune: data.transfertEntreeJeune.present
+          ? data.transfertEntreeJeune.value
+          : this.transfertEntreeJeune,
+      transfertSortieRepro: data.transfertSortieRepro.present
+          ? data.transfertSortieRepro.value
+          : this.transfertSortieRepro,
+      transfertSortieSevre: data.transfertSortieSevre.present
+          ? data.transfertSortieSevre.value
+          : this.transfertSortieSevre,
+      transfertSortieJeune: data.transfertSortieJeune.present
+          ? data.transfertSortieJeune.value
+          : this.transfertSortieJeune,
     );
   }
 
@@ -22922,7 +23280,15 @@ class LivestockDailyEntry extends DataClass
           ..write('effectifM: $effectifM, ')
           ..write('effectifF: $effectifF, ')
           ..write('effectifSevres: $effectifSevres, ')
-          ..write('effectifSmeres: $effectifSmeres')
+          ..write('effectifSmeres: $effectifSmeres, ')
+          ..write('transfertEntree: $transfertEntree, ')
+          ..write('transfertSortie: $transfertSortie, ')
+          ..write('transfertEntreeRepro: $transfertEntreeRepro, ')
+          ..write('transfertEntreeSevre: $transfertEntreeSevre, ')
+          ..write('transfertEntreeJeune: $transfertEntreeJeune, ')
+          ..write('transfertSortieRepro: $transfertSortieRepro, ')
+          ..write('transfertSortieSevre: $transfertSortieSevre, ')
+          ..write('transfertSortieJeune: $transfertSortieJeune')
           ..write(')'))
         .toString();
   }
@@ -22963,6 +23329,14 @@ class LivestockDailyEntry extends DataClass
     effectifF,
     effectifSevres,
     effectifSmeres,
+    transfertEntree,
+    transfertSortie,
+    transfertEntreeRepro,
+    transfertEntreeSevre,
+    transfertEntreeJeune,
+    transfertSortieRepro,
+    transfertSortieSevre,
+    transfertSortieJeune,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -23001,7 +23375,15 @@ class LivestockDailyEntry extends DataClass
           other.effectifM == this.effectifM &&
           other.effectifF == this.effectifF &&
           other.effectifSevres == this.effectifSevres &&
-          other.effectifSmeres == this.effectifSmeres);
+          other.effectifSmeres == this.effectifSmeres &&
+          other.transfertEntree == this.transfertEntree &&
+          other.transfertSortie == this.transfertSortie &&
+          other.transfertEntreeRepro == this.transfertEntreeRepro &&
+          other.transfertEntreeSevre == this.transfertEntreeSevre &&
+          other.transfertEntreeJeune == this.transfertEntreeJeune &&
+          other.transfertSortieRepro == this.transfertSortieRepro &&
+          other.transfertSortieSevre == this.transfertSortieSevre &&
+          other.transfertSortieJeune == this.transfertSortieJeune);
 }
 
 class LivestockDailyEntriesCompanion
@@ -23040,6 +23422,14 @@ class LivestockDailyEntriesCompanion
   final Value<int?> effectifF;
   final Value<int?> effectifSevres;
   final Value<int?> effectifSmeres;
+  final Value<int> transfertEntree;
+  final Value<int> transfertSortie;
+  final Value<int> transfertEntreeRepro;
+  final Value<int> transfertEntreeSevre;
+  final Value<int> transfertEntreeJeune;
+  final Value<int> transfertSortieRepro;
+  final Value<int> transfertSortieSevre;
+  final Value<int> transfertSortieJeune;
   final Value<int> rowid;
   const LivestockDailyEntriesCompanion({
     this.id = const Value.absent(),
@@ -23076,6 +23466,14 @@ class LivestockDailyEntriesCompanion
     this.effectifF = const Value.absent(),
     this.effectifSevres = const Value.absent(),
     this.effectifSmeres = const Value.absent(),
+    this.transfertEntree = const Value.absent(),
+    this.transfertSortie = const Value.absent(),
+    this.transfertEntreeRepro = const Value.absent(),
+    this.transfertEntreeSevre = const Value.absent(),
+    this.transfertEntreeJeune = const Value.absent(),
+    this.transfertSortieRepro = const Value.absent(),
+    this.transfertSortieSevre = const Value.absent(),
+    this.transfertSortieJeune = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LivestockDailyEntriesCompanion.insert({
@@ -23113,6 +23511,14 @@ class LivestockDailyEntriesCompanion
     this.effectifF = const Value.absent(),
     this.effectifSevres = const Value.absent(),
     this.effectifSmeres = const Value.absent(),
+    this.transfertEntree = const Value.absent(),
+    this.transfertSortie = const Value.absent(),
+    this.transfertEntreeRepro = const Value.absent(),
+    this.transfertEntreeSevre = const Value.absent(),
+    this.transfertEntreeJeune = const Value.absent(),
+    this.transfertSortieRepro = const Value.absent(),
+    this.transfertSortieSevre = const Value.absent(),
+    this.transfertSortieJeune = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -23154,6 +23560,14 @@ class LivestockDailyEntriesCompanion
     Expression<int>? effectifF,
     Expression<int>? effectifSevres,
     Expression<int>? effectifSmeres,
+    Expression<int>? transfertEntree,
+    Expression<int>? transfertSortie,
+    Expression<int>? transfertEntreeRepro,
+    Expression<int>? transfertEntreeSevre,
+    Expression<int>? transfertEntreeJeune,
+    Expression<int>? transfertSortieRepro,
+    Expression<int>? transfertSortieSevre,
+    Expression<int>? transfertSortieJeune,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -23191,6 +23605,20 @@ class LivestockDailyEntriesCompanion
       if (effectifF != null) 'effectif_f': effectifF,
       if (effectifSevres != null) 'effectif_sevres': effectifSevres,
       if (effectifSmeres != null) 'effectif_smeres': effectifSmeres,
+      if (transfertEntree != null) 'transfert_entree': transfertEntree,
+      if (transfertSortie != null) 'transfert_sortie': transfertSortie,
+      if (transfertEntreeRepro != null)
+        'transfert_entree_repro': transfertEntreeRepro,
+      if (transfertEntreeSevre != null)
+        'transfert_entree_sevre': transfertEntreeSevre,
+      if (transfertEntreeJeune != null)
+        'transfert_entree_jeune': transfertEntreeJeune,
+      if (transfertSortieRepro != null)
+        'transfert_sortie_repro': transfertSortieRepro,
+      if (transfertSortieSevre != null)
+        'transfert_sortie_sevre': transfertSortieSevre,
+      if (transfertSortieJeune != null)
+        'transfert_sortie_jeune': transfertSortieJeune,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -23230,6 +23658,14 @@ class LivestockDailyEntriesCompanion
     Value<int?>? effectifF,
     Value<int?>? effectifSevres,
     Value<int?>? effectifSmeres,
+    Value<int>? transfertEntree,
+    Value<int>? transfertSortie,
+    Value<int>? transfertEntreeRepro,
+    Value<int>? transfertEntreeSevre,
+    Value<int>? transfertEntreeJeune,
+    Value<int>? transfertSortieRepro,
+    Value<int>? transfertSortieSevre,
+    Value<int>? transfertSortieJeune,
     Value<int>? rowid,
   }) {
     return LivestockDailyEntriesCompanion(
@@ -23267,6 +23703,14 @@ class LivestockDailyEntriesCompanion
       effectifF: effectifF ?? this.effectifF,
       effectifSevres: effectifSevres ?? this.effectifSevres,
       effectifSmeres: effectifSmeres ?? this.effectifSmeres,
+      transfertEntree: transfertEntree ?? this.transfertEntree,
+      transfertSortie: transfertSortie ?? this.transfertSortie,
+      transfertEntreeRepro: transfertEntreeRepro ?? this.transfertEntreeRepro,
+      transfertEntreeSevre: transfertEntreeSevre ?? this.transfertEntreeSevre,
+      transfertEntreeJeune: transfertEntreeJeune ?? this.transfertEntreeJeune,
+      transfertSortieRepro: transfertSortieRepro ?? this.transfertSortieRepro,
+      transfertSortieSevre: transfertSortieSevre ?? this.transfertSortieSevre,
+      transfertSortieJeune: transfertSortieJeune ?? this.transfertSortieJeune,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -23380,6 +23824,30 @@ class LivestockDailyEntriesCompanion
     if (effectifSmeres.present) {
       map['effectif_smeres'] = Variable<int>(effectifSmeres.value);
     }
+    if (transfertEntree.present) {
+      map['transfert_entree'] = Variable<int>(transfertEntree.value);
+    }
+    if (transfertSortie.present) {
+      map['transfert_sortie'] = Variable<int>(transfertSortie.value);
+    }
+    if (transfertEntreeRepro.present) {
+      map['transfert_entree_repro'] = Variable<int>(transfertEntreeRepro.value);
+    }
+    if (transfertEntreeSevre.present) {
+      map['transfert_entree_sevre'] = Variable<int>(transfertEntreeSevre.value);
+    }
+    if (transfertEntreeJeune.present) {
+      map['transfert_entree_jeune'] = Variable<int>(transfertEntreeJeune.value);
+    }
+    if (transfertSortieRepro.present) {
+      map['transfert_sortie_repro'] = Variable<int>(transfertSortieRepro.value);
+    }
+    if (transfertSortieSevre.present) {
+      map['transfert_sortie_sevre'] = Variable<int>(transfertSortieSevre.value);
+    }
+    if (transfertSortieJeune.present) {
+      map['transfert_sortie_jeune'] = Variable<int>(transfertSortieJeune.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -23423,6 +23891,768 @@ class LivestockDailyEntriesCompanion
           ..write('effectifF: $effectifF, ')
           ..write('effectifSevres: $effectifSevres, ')
           ..write('effectifSmeres: $effectifSmeres, ')
+          ..write('transfertEntree: $transfertEntree, ')
+          ..write('transfertSortie: $transfertSortie, ')
+          ..write('transfertEntreeRepro: $transfertEntreeRepro, ')
+          ..write('transfertEntreeSevre: $transfertEntreeSevre, ')
+          ..write('transfertEntreeJeune: $transfertEntreeJeune, ')
+          ..write('transfertSortieRepro: $transfertSortieRepro, ')
+          ..write('transfertSortieSevre: $transfertSortieSevre, ')
+          ..write('transfertSortieJeune: $transfertSortieJeune, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LivestockTransfersTable extends LivestockTransfers
+    with TableInfo<$LivestockTransfersTable, LivestockTransfer> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LivestockTransfersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $LivestockTransfersTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceLotIdMeta = const VerificationMeta(
+    'sourceLotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceLotId = GeneratedColumn<String>(
+    'source_lot_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetLotIdMeta = const VerificationMeta(
+    'targetLotId',
+  );
+  @override
+  late final GeneratedColumn<String> targetLotId = GeneratedColumn<String>(
+    'target_lot_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _transferDateMeta = const VerificationMeta(
+    'transferDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> transferDate = GeneratedColumn<DateTime>(
+    'transfer_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categorieMeta = const VerificationMeta(
+    'categorie',
+  );
+  @override
+  late final GeneratedColumn<String> categorie = GeneratedColumn<String>(
+    'categorie',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _constitutionMeta = const VerificationMeta(
+    'constitution',
+  );
+  @override
+  late final GeneratedColumn<bool> constitution = GeneratedColumn<bool>(
+    'constitution',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("constitution" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _motifMeta = const VerificationMeta('motif');
+  @override
+  late final GeneratedColumn<String> motif = GeneratedColumn<String>(
+    'motif',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    sourceLotId,
+    targetLotId,
+    transferDate,
+    quantity,
+    categorie,
+    constitution,
+    motif,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'livestock_transfers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LivestockTransfer> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('source_lot_id')) {
+      context.handle(
+        _sourceLotIdMeta,
+        sourceLotId.isAcceptableOrUnknown(
+          data['source_lot_id']!,
+          _sourceLotIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceLotIdMeta);
+    }
+    if (data.containsKey('target_lot_id')) {
+      context.handle(
+        _targetLotIdMeta,
+        targetLotId.isAcceptableOrUnknown(
+          data['target_lot_id']!,
+          _targetLotIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetLotIdMeta);
+    }
+    if (data.containsKey('transfer_date')) {
+      context.handle(
+        _transferDateMeta,
+        transferDate.isAcceptableOrUnknown(
+          data['transfer_date']!,
+          _transferDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_transferDateMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('categorie')) {
+      context.handle(
+        _categorieMeta,
+        categorie.isAcceptableOrUnknown(data['categorie']!, _categorieMeta),
+      );
+    }
+    if (data.containsKey('constitution')) {
+      context.handle(
+        _constitutionMeta,
+        constitution.isAcceptableOrUnknown(
+          data['constitution']!,
+          _constitutionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('motif')) {
+      context.handle(
+        _motifMeta,
+        motif.isAcceptableOrUnknown(data['motif']!, _motifMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LivestockTransfer map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LivestockTransfer(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $LivestockTransfersTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      sourceLotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_lot_id'],
+      )!,
+      targetLotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_lot_id'],
+      )!,
+      transferDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}transfer_date'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quantity'],
+      )!,
+      categorie: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categorie'],
+      ),
+      constitution: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}constitution'],
+      )!,
+      motif: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}motif'],
+      ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $LivestockTransfersTable createAlias(String alias) {
+    return $LivestockTransfersTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class LivestockTransfer extends DataClass
+    implements Insertable<LivestockTransfer> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String sourceLotId;
+  final String targetLotId;
+  final DateTime transferDate;
+  final int quantity;
+
+  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  final String? categorie;
+  final bool constitution;
+  final String? motif;
+  final bool isActive;
+  const LivestockTransfer({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.sourceLotId,
+    required this.targetLotId,
+    required this.transferDate,
+    required this.quantity,
+    this.categorie,
+    required this.constitution,
+    this.motif,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $LivestockTransfersTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['source_lot_id'] = Variable<String>(sourceLotId);
+    map['target_lot_id'] = Variable<String>(targetLotId);
+    map['transfer_date'] = Variable<DateTime>(transferDate);
+    map['quantity'] = Variable<int>(quantity);
+    if (!nullToAbsent || categorie != null) {
+      map['categorie'] = Variable<String>(categorie);
+    }
+    map['constitution'] = Variable<bool>(constitution);
+    if (!nullToAbsent || motif != null) {
+      map['motif'] = Variable<String>(motif);
+    }
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  LivestockTransfersCompanion toCompanion(bool nullToAbsent) {
+    return LivestockTransfersCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      sourceLotId: Value(sourceLotId),
+      targetLotId: Value(targetLotId),
+      transferDate: Value(transferDate),
+      quantity: Value(quantity),
+      categorie: categorie == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categorie),
+      constitution: Value(constitution),
+      motif: motif == null && nullToAbsent
+          ? const Value.absent()
+          : Value(motif),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory LivestockTransfer.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LivestockTransfer(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $LivestockTransfersTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      sourceLotId: serializer.fromJson<String>(json['sourceLotId']),
+      targetLotId: serializer.fromJson<String>(json['targetLotId']),
+      transferDate: serializer.fromJson<DateTime>(json['transferDate']),
+      quantity: serializer.fromJson<int>(json['quantity']),
+      categorie: serializer.fromJson<String?>(json['categorie']),
+      constitution: serializer.fromJson<bool>(json['constitution']),
+      motif: serializer.fromJson<String?>(json['motif']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $LivestockTransfersTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'sourceLotId': serializer.toJson<String>(sourceLotId),
+      'targetLotId': serializer.toJson<String>(targetLotId),
+      'transferDate': serializer.toJson<DateTime>(transferDate),
+      'quantity': serializer.toJson<int>(quantity),
+      'categorie': serializer.toJson<String?>(categorie),
+      'constitution': serializer.toJson<bool>(constitution),
+      'motif': serializer.toJson<String?>(motif),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  LivestockTransfer copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? sourceLotId,
+    String? targetLotId,
+    DateTime? transferDate,
+    int? quantity,
+    Value<String?> categorie = const Value.absent(),
+    bool? constitution,
+    Value<String?> motif = const Value.absent(),
+    bool? isActive,
+  }) => LivestockTransfer(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    sourceLotId: sourceLotId ?? this.sourceLotId,
+    targetLotId: targetLotId ?? this.targetLotId,
+    transferDate: transferDate ?? this.transferDate,
+    quantity: quantity ?? this.quantity,
+    categorie: categorie.present ? categorie.value : this.categorie,
+    constitution: constitution ?? this.constitution,
+    motif: motif.present ? motif.value : this.motif,
+    isActive: isActive ?? this.isActive,
+  );
+  LivestockTransfer copyWithCompanion(LivestockTransfersCompanion data) {
+    return LivestockTransfer(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      sourceLotId: data.sourceLotId.present
+          ? data.sourceLotId.value
+          : this.sourceLotId,
+      targetLotId: data.targetLotId.present
+          ? data.targetLotId.value
+          : this.targetLotId,
+      transferDate: data.transferDate.present
+          ? data.transferDate.value
+          : this.transferDate,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      categorie: data.categorie.present ? data.categorie.value : this.categorie,
+      constitution: data.constitution.present
+          ? data.constitution.value
+          : this.constitution,
+      motif: data.motif.present ? data.motif.value : this.motif,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LivestockTransfer(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('sourceLotId: $sourceLotId, ')
+          ..write('targetLotId: $targetLotId, ')
+          ..write('transferDate: $transferDate, ')
+          ..write('quantity: $quantity, ')
+          ..write('categorie: $categorie, ')
+          ..write('constitution: $constitution, ')
+          ..write('motif: $motif, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    sourceLotId,
+    targetLotId,
+    transferDate,
+    quantity,
+    categorie,
+    constitution,
+    motif,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LivestockTransfer &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.sourceLotId == this.sourceLotId &&
+          other.targetLotId == this.targetLotId &&
+          other.transferDate == this.transferDate &&
+          other.quantity == this.quantity &&
+          other.categorie == this.categorie &&
+          other.constitution == this.constitution &&
+          other.motif == this.motif &&
+          other.isActive == this.isActive);
+}
+
+class LivestockTransfersCompanion extends UpdateCompanion<LivestockTransfer> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> sourceLotId;
+  final Value<String> targetLotId;
+  final Value<DateTime> transferDate;
+  final Value<int> quantity;
+  final Value<String?> categorie;
+  final Value<bool> constitution;
+  final Value<String?> motif;
+  final Value<bool> isActive;
+  final Value<int> rowid;
+  const LivestockTransfersCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.sourceLotId = const Value.absent(),
+    this.targetLotId = const Value.absent(),
+    this.transferDate = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.categorie = const Value.absent(),
+    this.constitution = const Value.absent(),
+    this.motif = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LivestockTransfersCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String sourceLotId,
+    required String targetLotId,
+    required DateTime transferDate,
+    required int quantity,
+    this.categorie = const Value.absent(),
+    this.constitution = const Value.absent(),
+    this.motif = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       sourceLotId = Value(sourceLotId),
+       targetLotId = Value(targetLotId),
+       transferDate = Value(transferDate),
+       quantity = Value(quantity);
+  static Insertable<LivestockTransfer> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? sourceLotId,
+    Expression<String>? targetLotId,
+    Expression<DateTime>? transferDate,
+    Expression<int>? quantity,
+    Expression<String>? categorie,
+    Expression<bool>? constitution,
+    Expression<String>? motif,
+    Expression<bool>? isActive,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (sourceLotId != null) 'source_lot_id': sourceLotId,
+      if (targetLotId != null) 'target_lot_id': targetLotId,
+      if (transferDate != null) 'transfer_date': transferDate,
+      if (quantity != null) 'quantity': quantity,
+      if (categorie != null) 'categorie': categorie,
+      if (constitution != null) 'constitution': constitution,
+      if (motif != null) 'motif': motif,
+      if (isActive != null) 'is_active': isActive,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LivestockTransfersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? sourceLotId,
+    Value<String>? targetLotId,
+    Value<DateTime>? transferDate,
+    Value<int>? quantity,
+    Value<String?>? categorie,
+    Value<bool>? constitution,
+    Value<String?>? motif,
+    Value<bool>? isActive,
+    Value<int>? rowid,
+  }) {
+    return LivestockTransfersCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      sourceLotId: sourceLotId ?? this.sourceLotId,
+      targetLotId: targetLotId ?? this.targetLotId,
+      transferDate: transferDate ?? this.transferDate,
+      quantity: quantity ?? this.quantity,
+      categorie: categorie ?? this.categorie,
+      constitution: constitution ?? this.constitution,
+      motif: motif ?? this.motif,
+      isActive: isActive ?? this.isActive,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $LivestockTransfersTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (sourceLotId.present) {
+      map['source_lot_id'] = Variable<String>(sourceLotId.value);
+    }
+    if (targetLotId.present) {
+      map['target_lot_id'] = Variable<String>(targetLotId.value);
+    }
+    if (transferDate.present) {
+      map['transfer_date'] = Variable<DateTime>(transferDate.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<int>(quantity.value);
+    }
+    if (categorie.present) {
+      map['categorie'] = Variable<String>(categorie.value);
+    }
+    if (constitution.present) {
+      map['constitution'] = Variable<bool>(constitution.value);
+    }
+    if (motif.present) {
+      map['motif'] = Variable<String>(motif.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LivestockTransfersCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('sourceLotId: $sourceLotId, ')
+          ..write('targetLotId: $targetLotId, ')
+          ..write('transferDate: $transferDate, ')
+          ..write('quantity: $quantity, ')
+          ..write('categorie: $categorie, ')
+          ..write('constitution: $constitution, ')
+          ..write('motif: $motif, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -28919,6 +30149,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PurchaseLinesTable purchaseLines = $PurchaseLinesTable(this);
   late final $LivestockDailyEntriesTable livestockDailyEntries =
       $LivestockDailyEntriesTable(this);
+  late final $LivestockTransfersTable livestockTransfers =
+      $LivestockTransfersTable(this);
   late final $ProphylaxisScheduleStandardsTable prophylaxisScheduleStandards =
       $ProphylaxisScheduleStandardsTable(this);
   late final $VeterinaryRecordsTable veterinaryRecords =
@@ -28985,6 +30217,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     purchases,
     purchaseLines,
     livestockDailyEntries,
+    livestockTransfers,
     prophylaxisScheduleStandards,
     veterinaryRecords,
     sales,
@@ -29619,6 +30852,7 @@ typedef $$LivestockLotsTableCreateCompanionBuilder =
       Value<String?> status,
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
+      Value<String?> lotSourceId,
       Value<int> rowid,
     });
 typedef $$LivestockLotsTableUpdateCompanionBuilder =
@@ -29636,6 +30870,7 @@ typedef $$LivestockLotsTableUpdateCompanionBuilder =
       Value<String?> status,
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
+      Value<String?> lotSourceId,
       Value<int> rowid,
     });
 
@@ -29710,6 +30945,11 @@ class $$LivestockLotsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lotSourceId => $composableBuilder(
+    column: $table.lotSourceId,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -29787,6 +31027,11 @@ class $$LivestockLotsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get lotSourceId => $composableBuilder(
+    column: $table.lotSourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LivestockLotsTableAnnotationComposer
@@ -29846,6 +31091,11 @@ class $$LivestockLotsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get lotSourceId => $composableBuilder(
+    column: $table.lotSourceId,
+    builder: (column) => column,
+  );
 }
 
 class $$LivestockLotsTableTableManager
@@ -29892,6 +31142,7 @@ class $$LivestockLotsTableTableManager
                 Value<String?> status = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<String?> lotSourceId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockLotsCompanion(
                 id: id,
@@ -29907,6 +31158,7 @@ class $$LivestockLotsTableTableManager
                 status: status,
                 isActive: isActive,
                 updatedAt: updatedAt,
+                lotSourceId: lotSourceId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -29924,6 +31176,7 @@ class $$LivestockLotsTableTableManager
                 Value<String?> status = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<String?> lotSourceId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockLotsCompanion.insert(
                 id: id,
@@ -29939,6 +31192,7 @@ class $$LivestockLotsTableTableManager
                 status: status,
                 isActive: isActive,
                 updatedAt: updatedAt,
+                lotSourceId: lotSourceId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -39969,6 +41223,14 @@ typedef $$LivestockDailyEntriesTableCreateCompanionBuilder =
       Value<int?> effectifF,
       Value<int?> effectifSevres,
       Value<int?> effectifSmeres,
+      Value<int> transfertEntree,
+      Value<int> transfertSortie,
+      Value<int> transfertEntreeRepro,
+      Value<int> transfertEntreeSevre,
+      Value<int> transfertEntreeJeune,
+      Value<int> transfertSortieRepro,
+      Value<int> transfertSortieSevre,
+      Value<int> transfertSortieJeune,
       Value<int> rowid,
     });
 typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
@@ -40007,6 +41269,14 @@ typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
       Value<int?> effectifF,
       Value<int?> effectifSevres,
       Value<int?> effectifSmeres,
+      Value<int> transfertEntree,
+      Value<int> transfertSortie,
+      Value<int> transfertEntreeRepro,
+      Value<int> transfertEntreeSevre,
+      Value<int> transfertEntreeJeune,
+      Value<int> transfertSortieRepro,
+      Value<int> transfertSortieSevre,
+      Value<int> transfertSortieJeune,
       Value<int> rowid,
     });
 
@@ -40189,6 +41459,46 @@ class $$LivestockDailyEntriesTableFilterComposer
     column: $table.effectifSmeres,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<int> get transfertEntree => $composableBuilder(
+    column: $table.transfertEntree,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertSortie => $composableBuilder(
+    column: $table.transfertSortie,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertEntreeRepro => $composableBuilder(
+    column: $table.transfertEntreeRepro,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertEntreeSevre => $composableBuilder(
+    column: $table.transfertEntreeSevre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertEntreeJeune => $composableBuilder(
+    column: $table.transfertEntreeJeune,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertSortieRepro => $composableBuilder(
+    column: $table.transfertSortieRepro,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertSortieSevre => $composableBuilder(
+    column: $table.transfertSortieSevre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertSortieJeune => $composableBuilder(
+    column: $table.transfertSortieJeune,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$LivestockDailyEntriesTableOrderingComposer
@@ -40369,6 +41679,46 @@ class $$LivestockDailyEntriesTableOrderingComposer
     column: $table.effectifSmeres,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get transfertEntree => $composableBuilder(
+    column: $table.transfertEntree,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertSortie => $composableBuilder(
+    column: $table.transfertSortie,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertEntreeRepro => $composableBuilder(
+    column: $table.transfertEntreeRepro,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertEntreeSevre => $composableBuilder(
+    column: $table.transfertEntreeSevre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertEntreeJeune => $composableBuilder(
+    column: $table.transfertEntreeJeune,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertSortieRepro => $composableBuilder(
+    column: $table.transfertSortieRepro,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertSortieSevre => $composableBuilder(
+    column: $table.transfertSortieSevre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertSortieJeune => $composableBuilder(
+    column: $table.transfertSortieJeune,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LivestockDailyEntriesTableAnnotationComposer
@@ -40510,6 +41860,46 @@ class $$LivestockDailyEntriesTableAnnotationComposer
     column: $table.effectifSmeres,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get transfertEntree => $composableBuilder(
+    column: $table.transfertEntree,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertSortie => $composableBuilder(
+    column: $table.transfertSortie,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertEntreeRepro => $composableBuilder(
+    column: $table.transfertEntreeRepro,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertEntreeSevre => $composableBuilder(
+    column: $table.transfertEntreeSevre,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertEntreeJeune => $composableBuilder(
+    column: $table.transfertEntreeJeune,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertSortieRepro => $composableBuilder(
+    column: $table.transfertSortieRepro,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertSortieSevre => $composableBuilder(
+    column: $table.transfertSortieSevre,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertSortieJeune => $composableBuilder(
+    column: $table.transfertSortieJeune,
+    builder: (column) => column,
+  );
 }
 
 class $$LivestockDailyEntriesTableTableManager
@@ -40592,6 +41982,14 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> effectifF = const Value.absent(),
                 Value<int?> effectifSevres = const Value.absent(),
                 Value<int?> effectifSmeres = const Value.absent(),
+                Value<int> transfertEntree = const Value.absent(),
+                Value<int> transfertSortie = const Value.absent(),
+                Value<int> transfertEntreeRepro = const Value.absent(),
+                Value<int> transfertEntreeSevre = const Value.absent(),
+                Value<int> transfertEntreeJeune = const Value.absent(),
+                Value<int> transfertSortieRepro = const Value.absent(),
+                Value<int> transfertSortieSevre = const Value.absent(),
+                Value<int> transfertSortieJeune = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockDailyEntriesCompanion(
                 id: id,
@@ -40628,6 +42026,14 @@ class $$LivestockDailyEntriesTableTableManager
                 effectifF: effectifF,
                 effectifSevres: effectifSevres,
                 effectifSmeres: effectifSmeres,
+                transfertEntree: transfertEntree,
+                transfertSortie: transfertSortie,
+                transfertEntreeRepro: transfertEntreeRepro,
+                transfertEntreeSevre: transfertEntreeSevre,
+                transfertEntreeJeune: transfertEntreeJeune,
+                transfertSortieRepro: transfertSortieRepro,
+                transfertSortieSevre: transfertSortieSevre,
+                transfertSortieJeune: transfertSortieJeune,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -40666,6 +42072,14 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> effectifF = const Value.absent(),
                 Value<int?> effectifSevres = const Value.absent(),
                 Value<int?> effectifSmeres = const Value.absent(),
+                Value<int> transfertEntree = const Value.absent(),
+                Value<int> transfertSortie = const Value.absent(),
+                Value<int> transfertEntreeRepro = const Value.absent(),
+                Value<int> transfertEntreeSevre = const Value.absent(),
+                Value<int> transfertEntreeJeune = const Value.absent(),
+                Value<int> transfertSortieRepro = const Value.absent(),
+                Value<int> transfertSortieSevre = const Value.absent(),
+                Value<int> transfertSortieJeune = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockDailyEntriesCompanion.insert(
                 id: id,
@@ -40702,6 +42116,14 @@ class $$LivestockDailyEntriesTableTableManager
                 effectifF: effectifF,
                 effectifSevres: effectifSevres,
                 effectifSmeres: effectifSmeres,
+                transfertEntree: transfertEntree,
+                transfertSortie: transfertSortie,
+                transfertEntreeRepro: transfertEntreeRepro,
+                transfertEntreeSevre: transfertEntreeSevre,
+                transfertEntreeJeune: transfertEntreeJeune,
+                transfertSortieRepro: transfertSortieRepro,
+                transfertSortieSevre: transfertSortieSevre,
+                transfertSortieJeune: transfertSortieJeune,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -40731,6 +42153,364 @@ typedef $$LivestockDailyEntriesTableProcessedTableManager =
         >,
       ),
       LivestockDailyEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$LivestockTransfersTableCreateCompanionBuilder =
+    LivestockTransfersCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String sourceLotId,
+      required String targetLotId,
+      required DateTime transferDate,
+      required int quantity,
+      Value<String?> categorie,
+      Value<bool> constitution,
+      Value<String?> motif,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+typedef $$LivestockTransfersTableUpdateCompanionBuilder =
+    LivestockTransfersCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> sourceLotId,
+      Value<String> targetLotId,
+      Value<DateTime> transferDate,
+      Value<int> quantity,
+      Value<String?> categorie,
+      Value<bool> constitution,
+      Value<String?> motif,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+
+class $$LivestockTransfersTableFilterComposer
+    extends Composer<_$AppDatabase, $LivestockTransfersTable> {
+  $$LivestockTransfersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceLotId => $composableBuilder(
+    column: $table.sourceLotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetLotId => $composableBuilder(
+    column: $table.targetLotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get transferDate => $composableBuilder(
+    column: $table.transferDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categorie => $composableBuilder(
+    column: $table.categorie,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get constitution => $composableBuilder(
+    column: $table.constitution,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get motif => $composableBuilder(
+    column: $table.motif,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LivestockTransfersTableOrderingComposer
+    extends Composer<_$AppDatabase, $LivestockTransfersTable> {
+  $$LivestockTransfersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceLotId => $composableBuilder(
+    column: $table.sourceLotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetLotId => $composableBuilder(
+    column: $table.targetLotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get transferDate => $composableBuilder(
+    column: $table.transferDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categorie => $composableBuilder(
+    column: $table.categorie,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get constitution => $composableBuilder(
+    column: $table.constitution,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get motif => $composableBuilder(
+    column: $table.motif,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LivestockTransfersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LivestockTransfersTable> {
+  $$LivestockTransfersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceLotId => $composableBuilder(
+    column: $table.sourceLotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetLotId => $composableBuilder(
+    column: $table.targetLotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get transferDate => $composableBuilder(
+    column: $table.transferDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get categorie =>
+      $composableBuilder(column: $table.categorie, builder: (column) => column);
+
+  GeneratedColumn<bool> get constitution => $composableBuilder(
+    column: $table.constitution,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get motif =>
+      $composableBuilder(column: $table.motif, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$LivestockTransfersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LivestockTransfersTable,
+          LivestockTransfer,
+          $$LivestockTransfersTableFilterComposer,
+          $$LivestockTransfersTableOrderingComposer,
+          $$LivestockTransfersTableAnnotationComposer,
+          $$LivestockTransfersTableCreateCompanionBuilder,
+          $$LivestockTransfersTableUpdateCompanionBuilder,
+          (
+            LivestockTransfer,
+            BaseReferences<
+              _$AppDatabase,
+              $LivestockTransfersTable,
+              LivestockTransfer
+            >,
+          ),
+          LivestockTransfer,
+          PrefetchHooks Function()
+        > {
+  $$LivestockTransfersTableTableManager(
+    _$AppDatabase db,
+    $LivestockTransfersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LivestockTransfersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LivestockTransfersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LivestockTransfersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> sourceLotId = const Value.absent(),
+                Value<String> targetLotId = const Value.absent(),
+                Value<DateTime> transferDate = const Value.absent(),
+                Value<int> quantity = const Value.absent(),
+                Value<String?> categorie = const Value.absent(),
+                Value<bool> constitution = const Value.absent(),
+                Value<String?> motif = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LivestockTransfersCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                sourceLotId: sourceLotId,
+                targetLotId: targetLotId,
+                transferDate: transferDate,
+                quantity: quantity,
+                categorie: categorie,
+                constitution: constitution,
+                motif: motif,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String sourceLotId,
+                required String targetLotId,
+                required DateTime transferDate,
+                required int quantity,
+                Value<String?> categorie = const Value.absent(),
+                Value<bool> constitution = const Value.absent(),
+                Value<String?> motif = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LivestockTransfersCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                sourceLotId: sourceLotId,
+                targetLotId: targetLotId,
+                transferDate: transferDate,
+                quantity: quantity,
+                categorie: categorie,
+                constitution: constitution,
+                motif: motif,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LivestockTransfersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LivestockTransfersTable,
+      LivestockTransfer,
+      $$LivestockTransfersTableFilterComposer,
+      $$LivestockTransfersTableOrderingComposer,
+      $$LivestockTransfersTableAnnotationComposer,
+      $$LivestockTransfersTableCreateCompanionBuilder,
+      $$LivestockTransfersTableUpdateCompanionBuilder,
+      (
+        LivestockTransfer,
+        BaseReferences<
+          _$AppDatabase,
+          $LivestockTransfersTable,
+          LivestockTransfer
+        >,
+      ),
+      LivestockTransfer,
       PrefetchHooks Function()
     >;
 typedef $$ProphylaxisScheduleStandardsTableCreateCompanionBuilder =
@@ -43599,6 +45379,8 @@ class $AppDatabaseManager {
       $$PurchaseLinesTableTableManager(_db, _db.purchaseLines);
   $$LivestockDailyEntriesTableTableManager get livestockDailyEntries =>
       $$LivestockDailyEntriesTableTableManager(_db, _db.livestockDailyEntries);
+  $$LivestockTransfersTableTableManager get livestockTransfers =>
+      $$LivestockTransfersTableTableManager(_db, _db.livestockTransfers);
   $$ProphylaxisScheduleStandardsTableTableManager
   get prophylaxisScheduleStandards =>
       $$ProphylaxisScheduleStandardsTableTableManager(

@@ -56,8 +56,15 @@ class FicheJournaliereRepository {
     required int mort,
     required int vente,
     required int don,
+    int transfertEntree = 0,
+    int transfertSortie = 0,
   }) {
-    return effectifPrecedent + achat + ne - (mort + vente + don);
+    // Ticket 15.46 : les transferts entre bandes du jour entrent dans la même formule (0 sans transfert).
+    return effectifPrecedent +
+        achat +
+        ne +
+        transfertEntree -
+        (mort + vente + don + transfertSortie);
   }
 
   Future<List<LivestockLot>> bandesActives() {
@@ -148,6 +155,9 @@ class FicheJournaliereRepository {
       mort: mort,
       vente: vente,
       don: don,
+      // Ticket 15.46 : les transferts du jour restent comptés quand la fiche est ressaisie.
+      transfertEntree: existante?.transfertEntree ?? 0,
+      transfertSortie: existante?.transfertSortie ?? 0,
     );
 
     final ligne = LivestockDailyEntriesCompanion(
@@ -260,6 +270,12 @@ class FicheJournaliereRepository {
     catEffRepro: f.catEffRepro,
     catEffSevre: f.catEffSevre,
     catEffJeune: f.catEffJeune,
+    transfertEntreeRepro: f.transfertEntreeRepro,
+    transfertEntreeSevre: f.transfertEntreeSevre,
+    transfertEntreeJeune: f.transfertEntreeJeune,
+    transfertSortieRepro: f.transfertSortieRepro,
+    transfertSortieSevre: f.transfertSortieSevre,
+    transfertSortieJeune: f.transfertSortieJeune,
   );
 
   /// Une bande a une chaîne exploitable : espèce suivie (lapins, porcs) ET une de ses fiches porte
@@ -333,6 +349,8 @@ class FicheJournaliereRepository {
         mort: f.mort,
         vente: f.vente,
         don: f.don,
+        transfertEntree: f.transfertEntree,
+        transfertSortie: f.transfertSortie,
       );
       if (juste != f.effectifFinal) {
         await (_db.update(_db.livestockDailyEntries)

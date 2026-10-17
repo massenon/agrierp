@@ -157,6 +157,13 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
               _carte(icone, titre, sous, ecran),
               const SizedBox(height: AgriSpacing.md),
             ],
+            // Ticket 15.46 — écran dédié des transferts (accès rapide du hub web).
+            _carte(
+              Icons.swap_horiz,
+              'Transferts entre Bandes',
+              "Portées, sevrés, regroupements ; rattachement à la bande d'origine",
+              EcranPoste.transfertsBandes,
+            ),
           ],
         ),
       ),

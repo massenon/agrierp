@@ -21650,3 +21650,45 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 - **Au déploiement** : les jetons de plus de 90 jours deviennent invalides ; les postes concernés affichent « Session expirée : reconnectez-vous ».
 - Hors code (propriétaire du serveur) : changer `APP_KEY`, supprimer `agrierp.zip` du serveur, révoquer jetons et sessions, retirer `database/agrierp_db.sql` du dépôt et de l'historique.
 - Aucun test Dusk ; essai réel poste ↔ serveur non fait.
+
+## Ticket 15.46 (Laravel) + F0.100 (Flutter) : TRANSFERTS ENTRE BANDES ET CORRECTION DU DOUBLE COMPTAGE (A2, décision client du 17/10/2026 : écran dédié, bandes déjà saisies corrigées)
+
+### Constat
+- Aucun mouvement ne faisait passer des sujets d'une bande à une autre. Les nés d'une portée, saisis dans la fiche de la bande mère (`ne`), étaient recomptés dans la bande créée pour eux (`initial_quantity`) : « Effectif Total Vivant » comptait ces sujets DEUX fois (exemple vérifié en test : 18 animaux réels affichés 26).
+
+### Réalisé
+- **Source de vérité** : table `livestock_transfers` (UUID, archivage logique : un transfert s'annule, il ne se supprime jamais). Colonnes `transfert_entree` / `transfert_sortie` des fiches, et leur ventilation par catégorie, DÉRIVÉES de cette table comme `effectif_final` : jamais saisies, jamais reprises du poste. `livestock_lots.lot_source_id` = bande d'origine.
+- **Formule unique** : `computeEffectifFinal` et `calculerJour` comptent les entrées et sorties (veille + achats + nés + entrées − morts − ventes − dons − sorties). Tous les points de calcul passent par `effectifFinalDepuis()` / `mouvementsParCategorie()` : cascade, envoi du poste, Enregistrer Sujets, et l'aperçu des cinq fiches (trait `AvecTransfertsDuJour`). Ressaisir la fiche d'un jour de transfert ne l'efface plus.
+- **`TransferBetweenLotsAction`** : contrôles réels (même espèce, bandes non archivées, ni futur ni antérieur à la création, catégorie obligatoire pour lapins et porcs, effectif suffisant le jour même ET chaque jour suivant, total et catégorie). Report sur la fiche du jour, création de la fiche si besoin (départ déduit du stade pour une première fiche lapins/porcs), cascade.
+- **Correction des bandes existantes** : transfert « constitution » = sortie de la bande mère au jour de création de la bande cible, sans entrée dans la cible (son effectif initial les compte déjà). L'écran liste les « bandes à vérifier » (bande vivante sans origine, précédée d'une autre bande de la même espèce) avec un bouton « Rattacher à sa bande d'origine » : la filiation reste une décision de l'exploitant, rien n'est deviné. Gestion des Bandes : champ facultatif « Bande d'Origine » à la création, qui inscrit la constitution (refus = bande non créée).
+- **Écran web** `/transferts-bandes` (`elevage.transferts`, `can:view-elevage`, écritures `manage-elevage`), carte dans Gestion Élevage. Écran ABSENT du prototype : construit sur le web avec les composants partagés, puis porté.
+- **Synchronisation** : le tirage sert `livestock_transfers` ; l'envoi accepte `livestock_transfers` (`manage-elevage`), traité APRÈS les fiches, rejoué par l'Action (jamais fusionné), idempotent, annulation par `is_active: false`.
+- **Poste (Drift v39)** : table `LivestockTransfers`, colonnes dérivées, `lotSourceId`, palier de migration et entrée du test « toutes versions ». Formule et chaîne miroirs, cascade, caisse, cinq fiches. `TransfertsRepository` (mêmes contrôles, mêmes phrases, hors ligne), écran `TransfertsBandesScreen` (admin et animalier, ouvert depuis Gestion Élevage), absorbeur, envoi et acquittement.
+
+### Mesures
+- Laravel : `TransfertsEntreBandesTest` (12 tests). Mutations : retirer les transferts de l'aperçu Lapins fait échouer le test de ressaisie ; les retirer de `effectifFinalDepuis` fait échouer 6 tests sur 12.
+- Poste : `transferts_bandes_test.dart` (7), `transferts_sync_test.dart` (3), migration v39 couverte par `migration_toutes_versions_test.dart`. Un défaut réel trouvé en test : deux widgets de l'écran portaient la même clé.
+
+### Ce qui n'a PAS été fait / vérifié
+- La correction des données de PRODUCTION reste un geste de l'exploitant (écran « Bandes à vérifier ») : aucune filiation n'est déduite automatiquement.
+- Un transfert ne change pas le stade d'une bande ; le passage de stade reste celui de la fiche.
+- Aucun test Dusk.
+
+## Ticket 15.47 (Laravel) : FICHES PONDEUSES ET ESCARGOTS À PLUSIEURS BANDES (A11)
+
+### Constat
+- `saveDay()` écrivait toujours sur `lots->first()` (ordre des UUID, imprévisible) ; la veille était celle de TOUTES les bandes ; le tableau mensuel écrasait deux fiches du même jour ; et ré-enregistrer un jour remettait ses morts à zéro (leur répartition par catégorie n'est pas stockée, seul le total `mort` l'est).
+
+### Réalisé
+- Sélecteur de bande `bandeId` identique à Lapins et Porcs (15.41), bandes triées par code (comme le poste), veille par `previousEffectif()` de LA bande, tableau mensuel et vente du jour de LA bande, chargement du jour au montage et au changement de date ou de bande.
+- `mortEnregistre` : le total déjà enregistré est conservé tant qu'aucune répartition n'est ressaisie, avec un message à l'écran.
+- Poste : déjà conforme (sélecteur existant, tri par code).
+
+### Mesures
+- `FichesPondeusesEscargotsBandeTest` (4 tests), tous rouges sur l'ancien code.
+
+## Ticket 15.48 (Laravel) + F0.101 (Flutter) : « BILAN TECHNICO-ÉCONOMIQUE » DEVIENT « RENTABILITÉ »
+
+- Décision client du 17/10/2026 : onglet du Dashboard Élevage et titre de l'onglet (« Rentabilité de Lot »), fil d'Ariane et carte du hub, sur le web puis le poste à l'identique.
+- Écart ASSUMÉ au prototype, déclaré par page dans `fidelite_libelles_test.dart` (motif : décision client). Les clés internes (`bilan`, `dash-tab-bilan`) et les noms de fichiers ne changent pas.
+- Tests : `LibelleRentabiliteTest` (2, web) ; tests poste du dashboard, du bilan et des captures mis à jour.

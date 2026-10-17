@@ -73,6 +73,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   int _achat = 0;
   int _ne = 0;
   int _vente = 0;
+
+  /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
+  int _transfertEntree = 0;
+  int _transfertSortie = 0;
   int _effectifPrecedent = 0;
 
   int _oeufsRecoltes = 0;
@@ -158,6 +162,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
       _vente = fiche?.vente ?? 0;
+      _transfertEntree = fiche?.transfertEntree ?? 0;
+      _transfertSortie = fiche?.transfertSortie ?? 0;
       _oeufsRecoltes = fiche?.ponteTotal ?? 0;
       _oeufsCasses = fiche?.ponteCasses ?? 0;
       _poidsTotalPese = 0;
@@ -189,6 +195,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     mort: _totalMorts,
     vente: _vente,
     don: _totalDons,
+    transfertEntree: _transfertEntree,
+    transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
 
   int get _commercialisables => ProductionOeufsService.commercialisables(

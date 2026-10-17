@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RaiseFeedAutonomyAlertAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
@@ -100,6 +101,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheLapins extends Component
 {
+    use AvecTransfertsDuJour;
     use AvecDepartAutomatique;
     use AvecProphylaxieDuJour;
     use AvecSoinsDuMois;
@@ -389,7 +391,8 @@ class FicheLapins extends Component
             'mort_repro' => $this->mortRepro, 'mort_sevre' => $this->mortLapereau, 'mort_jeune' => $this->mortChair,
             'don_repro' => $this->donRepro, 'don_sevre' => $this->donLapereau, 'don_jeune' => $this->donChair,
             'passage' => $this->passage,
-        ], $this->effectifFinalCalc);
+            // Ticket 15.46 : transferts entre bandes du jour, par catégorie (dérivés, jamais saisis ici).
+        ] + $this->transfertsDuJour, $this->effectifFinalCalc);
 
         $sortie['resultat'] = $resultat;
         $sortie['repro'] = $resultat->repro;
@@ -527,7 +530,7 @@ class FicheLapins extends Component
         $mort = $this->mortRepro + $this->mortChair + $this->mortLapereau;
         $don = $this->donRepro + $this->donChair + $this->donLapereau;
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $don);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $don, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float

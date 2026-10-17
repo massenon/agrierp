@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
@@ -48,6 +49,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheReproducteurs extends Component
 {
+    use AvecTransfertsDuJour;
     use AvecProphylaxieDuJour;
 
     public string $selectedDate;
@@ -201,7 +203,7 @@ class FicheReproducteurs extends Component
     {
         $mort = $this->mortRepro + $this->mortPoulet + $this->mortPoussin;
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->poussinsNes, $mort, $this->venteDuJour, 0);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->poussinsNes, $mort, $this->venteDuJour, 0, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float

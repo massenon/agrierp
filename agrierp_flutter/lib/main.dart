@@ -21,6 +21,8 @@ import 'features/achats/fournisseurs_screen.dart';
 import 'features/achats/depenses_repository.dart';
 import 'features/achats/saisie_depenses_screen.dart';
 import 'features/elevage/dashboard_elevage_repository.dart';
+import 'features/elevage/transferts_bandes_screen.dart';
+import 'features/elevage/transferts_repository.dart';
 import 'features/elevage/dashboard_elevage_screen.dart';
 import 'features/elevage/fiche_escargots_screen.dart';
 import 'features/elevage/soins_vaccins_repository.dart';
@@ -224,6 +226,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final DashboardElevageRepository _dashboardElevage =
       DashboardElevageRepository(database: _db, soins: _soins);
 
+  late final TransfertsRepository _transferts = TransfertsRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+  );
+
   late final TableauDeBordRepository _tableauDeBord = TableauDeBordRepository(
     database: _db,
   );
@@ -320,6 +327,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           rapports: _rapports,
           tableauDeBord: _tableauDeBord,
           dashboardElevage: _dashboardElevage,
+          transferts: _transferts,
           reproduction: _reproduction,
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
@@ -367,6 +375,7 @@ class SocleAccueil extends StatefulWidget {
     required this.rapports,
     required this.tableauDeBord,
     required this.dashboardElevage,
+    required this.transferts,
     required this.reproduction,
     required this.soinsVaccins,
     required this.parametresElevage,
@@ -400,6 +409,7 @@ class SocleAccueil extends StatefulWidget {
   final RapportsRepository rapports;
   final TableauDeBordRepository tableauDeBord;
   final DashboardElevageRepository dashboardElevage;
+  final TransfertsRepository transferts;
   final SuiviReproductionRepository reproduction;
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
@@ -477,6 +487,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
     if (_ecran == EcranPoste.notifications) return ('', 'Notifications');
     if (_ecran == EcranPoste.aideEtAPropos) return ('', 'Aide & À Propos');
     if (_ecran == EcranPoste.ficheSujet) return ('Élevage', 'Fiche Sujet');
+    if (_ecran == EcranPoste.transfertsBandes) {
+      return ('PRODUCTION ÉLEVAGE & SOINS', 'Transferts entre Bandes');
+    }
     if (_ecran == EcranPoste.contactEditeur) {
       return ('', "Contactez l'Éditeur");
     }
@@ -643,6 +656,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           onOuvrir: (e) => setState(() => _ecran = e),
           // La cloche relit la base à chaque reconstruction : on la provoque.
           onModifie: () => setState(() {}),
+        ),
+        EcranPoste.transfertsBandes => TransfertsBandesScreen(
+          depot: widget.transferts,
         ),
         EcranPoste.dashboardElevage => DashboardElevageScreen(
           depot: widget.dashboardElevage,

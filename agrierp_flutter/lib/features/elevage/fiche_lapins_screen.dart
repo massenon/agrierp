@@ -87,6 +87,10 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
   int _ne = 0;
   int _vente = 0;
 
+  /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
+  int _transfertEntree = 0;
+  int _transfertSortie = 0;
+
   final _morts = <String, int>{
     'Reproducteur': 0,
     'Lapin de chair': 0,
@@ -124,6 +128,8 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
     mort: _totalMorts,
     vente: _vente,
     don: _totalDons,
+    transfertEntree: _transfertEntree,
+    transfertSortie: _transfertSortie,
   );
 
   @override
@@ -191,6 +197,8 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
       _vente = fiche?.vente ?? 0;
+      _transfertEntree = fiche?.transfertEntree ?? 0;
+      _transfertSortie = fiche?.transfertSortie ?? 0;
 
       // ⚠️ La ventilation par catégorie n'est pas persistée (voir docblock) :
       // au rechargement, le total relu est porté sur la première catégorie

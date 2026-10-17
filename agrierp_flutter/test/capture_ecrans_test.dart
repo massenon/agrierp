@@ -12,6 +12,7 @@ import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/elevage/transferts_repository.dart';
 import 'package:agrierp/features/elevage/dashboard_elevage_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
@@ -136,6 +137,7 @@ void main() {
       rapports: RapportsRepository(database: db),
       tableauDeBord: TableauDeBordRepository(database: db),
       dashboardElevage: DashboardElevageRepository(database: db, soins: soins),
+      transferts: TransfertsRepository(database: db, deviceId: poste),
       reproduction: SuiviReproductionRepository(database: db, deviceId: poste),
       soinsVaccins: SoinsVaccinsRepository(database: db, soins: soins),
       parametresElevage: ParametresElevageRepository(database: db),
@@ -386,7 +388,7 @@ void main() {
         );
     await t.tap(find.byKey(const Key('nav-dashboardElevage')));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('onglet-Bilan Technico-Économique')));
+    await t.tap(find.byKey(const Key('onglet-Rentabilité')));
     await t.pumpAndSettle();
     await capturer('bilan_technico_economique');
 

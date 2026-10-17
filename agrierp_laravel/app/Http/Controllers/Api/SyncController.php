@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AdjustStockAction;
+use App\Models\LivestockTransfer;
+use App\Actions\TransferBetweenLotsAction;
 use App\Actions\VerifySaleDateAction;
 use App\Exceptions\SaleDateRefusedException;
 use App\Actions\RecordPurchaseAction;
@@ -107,7 +109,7 @@ class SyncController extends Controller
         'purchase_orders', 'payables', 'employees', 'internships', 'chart_of_accounts', 'fiscal_years',
         'accounting_entries', 'accounting_entry_lines', 'company_settings', 'modules_config', 'roles',
         'users', 'audit_logs', 'notifications', 'lot_revenues', 'animals', 'livestock_species',
-        'attestation_templates', 'attestation_counts',
+        'attestation_templates', 'attestation_counts', 'livestock_transfers',
     ];
 
     /**
@@ -140,6 +142,13 @@ class SyncController extends Controller
                 return $ligne;
             });
         $dailyEntries = LivestockDailyEntry::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
+
+        // Ticket 15.46 — transferts entre bandes : source de vérité des colonnes `transfert_*` des fiches (servies
+        // ci-dessus avec la fiche). Le poste les affiche et peut en créer ou en annuler hors ligne.
+        $transferts = LivestockTransfer::query()
+            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->get(['id', 'source_lot_id', 'target_lot_id', 'transfer_date', 'quantity', 'categorie', 'constitution',
+                'motif', 'is_active', 'updated_at']);
 
         // 🔴→✅ TICKET 14.52 — LES RATIONS NORMATIVES DESCENDENT ENFIN.
         //
@@ -897,6 +906,7 @@ class SyncController extends Controller
             'product_categories' => $categories,
             'livestock_lots' => $lots,
             'livestock_daily_entries' => $dailyEntries,
+            'livestock_transfers' => $transferts,
             'feed_ration_standards' => $rations,
             'veterinary_withdrawal_periods' => $remanences,
             'prophylaxis_schedule_standards' => $prophylaxie,
@@ -994,6 +1004,7 @@ class SyncController extends Controller
             'supplier_refunds' => ['accepted' => [], 'rejected' => []],
             'customer_advances' => ['accepted' => [], 'rejected' => []],
             'advance_imputations' => ['accepted' => [], 'rejected' => []],
+            'livestock_transfers' => ['accepted' => [], 'rejected' => []],
             'referentiels_ignored' => 0,
         ];
 
@@ -1093,6 +1104,16 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket 15.46 — APRÈS les fiches : un transfert reporte ses sujets sur la fiche du jour ; si le poste a
+        // créé cette fiche (même envoi), elle doit exister avant, sinon le serveur en créerait une seconde.
+        if ($request->has('livestock_transfers')) {
+            $result['livestock_transfers'] = $this->pushTransferts(
+                $request->input('livestock_transfers'),
+                $request->user(),
+                $request->input('device_id'),
+            );
+        }
+
         if ($request->has('expenses')) {
             $result['expenses'] = $this->pushExpenses($request->input('expenses'));
         }
@@ -1186,6 +1207,7 @@ class SyncController extends Controller
      */
     private const PERMISSION_PAR_TABLE = [
         'livestock_daily_entries' => 'manage-elevage',
+        'livestock_transfers' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'veterinary_records' => 'manage-elevage',
         'expenses' => 'manage-achats',
@@ -1613,14 +1635,8 @@ class SyncController extends Controller
                 // et `previousEffectif()` n'a besoin que de `lot_id` et
                 // `entry_date`, deja poses par le `fill()` ci-dessus. Un
                 // premier `save()` sans effectif echouerait.
-                $record->effectif_final = LivestockDailyEntry::computeEffectifFinal(
-                    $record->previousEffectif(),
-                    (int) $record->achat,
-                    (int) $record->ne,
-                    (int) $record->mort,
-                    (int) $record->vente,
-                    (int) ($record->don ?? 0),
-                );
+                // Ticket 15.46 : transferts entre bandes compris (colonnes dérivées, jamais reprises du poste).
+                $record->effectif_final = $record->effectifFinalDepuis($record->previousEffectif());
 
                 $record->save();
 
@@ -2759,6 +2775,67 @@ class SyncController extends Controller
     /**
      * @param  array<string, true>  $fichesRecues  fiches acceptées dans le MÊME envoi (ticket 15.30)
      */
+    /**
+     * Ticket 15.46 — transferts entre bandes créés ou annulés au poste. Jamais fusionnés : un transfert nouveau
+     * est REJOUÉ par `TransferBetweenLotsAction` (mêmes contrôles d'effectif que l'écran web, fiches et cascade
+     * recalculées par le serveur) ; un transfert connu n'accepte qu'une annulation (`is_active: false`).
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>}
+     */
+    private function pushTransferts(array $transferts, $utilisateur, ?string $deviceId): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(TransferBetweenLotsAction::class);
+
+        foreach ($transferts as $donnees) {
+            $id = is_array($donnees) ? ($donnees['id'] ?? null) : null;
+
+            try {
+                $valides = validator(is_array($donnees) ? $donnees : [], [
+                    'id' => ['required', 'uuid'],
+                    'source_lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
+                    'target_lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
+                    'transfer_date' => ['required', 'date', 'before_or_equal:today'],
+                    'quantity' => ['required', 'integer', 'min:1'],
+                    'categorie' => ['nullable', 'in:repro,sevre,jeune'],
+                    'constitution' => ['nullable', 'boolean'],
+                    'motif' => ['nullable', 'string', 'max:255'],
+                    'is_active' => ['nullable', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $existant = LivestockTransfer::find($valides['id']);
+                $actif = (bool) ($valides['is_active'] ?? true);
+
+                if ($existant !== null) {
+                    if (! $actif && $existant->is_active) {
+                        $action->annuler($existant);
+                    }
+                    $accepted[] = $existant->id;
+
+                    continue;
+                }
+
+                if (! $actif) {
+                    // Créé puis annulé au poste avant tout envoi : rien à rejouer.
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                $action->execute(Arr::only($valides, [
+                    'source_lot_id', 'target_lot_id', 'transfer_date', 'quantity', 'categorie', 'constitution', 'motif',
+                ]), $utilisateur, $deviceId, $valides['id']);
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     /** Ticket S1 — champs d'une vente que le poste a le droit d'écrire (tous validés dans `pushSales`). */
     private const VENTE_CHAMPS_DU_POSTE = [
         'customer_id', 'payment_mode', 'subtotal', 'discount', 'total',

@@ -82,14 +82,7 @@ class RecordSaleOnFicheElevageAction
 
             if (! isset($fichesPortantDejaLaVente[$lotId.'|'.$jour])) {
                 $entry->vente = (int) $entry->vente + $qty;
-                $entry->effectif_final = LivestockDailyEntry::computeEffectifFinal(
-                    $entry->previousEffectif(),
-                    (int) $entry->achat,
-                    (int) $entry->ne,
-                    (int) $entry->mort,
-                    (int) $entry->vente,
-                    (int) $entry->don,
-                );
+                $entry->effectif_final = $entry->effectifFinalDepuis($entry->previousEffectif());
                 $entry->save();
             }
 
@@ -144,14 +137,8 @@ class RecordSaleOnFicheElevageAction
                 ->get();
 
             foreach ($suivantes as $fiche) {
-                $juste = LivestockDailyEntry::computeEffectifFinal(
-                    $courant,
-                    (int) $fiche->achat,
-                    (int) $fiche->ne,
-                    (int) $fiche->mort,
-                    (int) $fiche->vente,
-                    (int) $fiche->don,
-                );
+                // Ticket 15.46 : transferts entre bandes compris (`effectifFinalDepuis`).
+                $juste = $fiche->effectifFinalDepuis($courant);
 
                 if ((int) $fiche->effectif_final !== $juste) {
                     $fiche->effectif_final = $juste;

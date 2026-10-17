@@ -76,6 +76,10 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
 
   int _achat = 0;
   int _vente = 0;
+
+  /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
+  int _transfertEntree = 0;
+  int _transfertSortie = 0;
   int _effectifPrecedent = 0;
 
   int _oeufsTerre = 0;
@@ -149,6 +153,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       _fichesDuMois = mois;
       _achat = fiche?.achat ?? 0;
       _vente = fiche?.vente ?? 0;
+      _transfertEntree = fiche?.transfertEntree ?? 0;
+      _transfertSortie = fiche?.transfertSortie ?? 0;
       _oeufsTerre = fiche?.ponteTotal ?? 0;
       _naissainsNes = fiche?.ne ?? 0;
       _poidsTotalPese = 0;
@@ -175,6 +181,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
     mort: _totalMorts,
     vente: _vente,
     don: _totalDons,
+    transfertEntree: _transfertEntree,
+    transfertSortie: _transfertSortie,
   ).clamp(0, 1 << 30);
 
   /// Taux d'éclosion : naissains nés ÷ œufs récoltés × 100.

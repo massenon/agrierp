@@ -320,6 +320,8 @@ class SyncEngine {
     recus += await _absorberFichesJournalieres(
       corps['livestock_daily_entries'],
     );
+    // Ticket 15.46 — APRÈS les bandes : un transfert d'une bande inconnue est refusé.
+    recus += await _absorberTransferts(corps['livestock_transfers']);
     recus += await _absorberRations(corps['feed_ration_standards']);
     recus += await _absorberRemanences(corps['veterinary_withdrawal_periods']);
     recus += await _absorberProphylaxie(
@@ -506,12 +508,90 @@ class SyncEngine {
           status: Value(l['status'] as String?),
           isActive: Value(_bool(l['is_active'])),
           updatedAt: Value(_date(l['updated_at'])),
+          // Ticket 15.46 — bande d'origine ; clé absente (serveur antérieur) = valeur locale gardée.
+          lotSourceId: l.containsKey('lot_source_id')
+              ? Value(l['lot_source_id'] as String?)
+              : const Value.absent(),
         );
         b.insert(_db.livestockLots, ligne, onConflict: DoUpdate((_) => ligne));
       }
     });
 
     return lignes.length;
+  }
+
+  /// Ticket 15.46 — transferts entre bandes, FUSIONNÉS par identifiant. Un transfert `pending` ou en
+  /// `conflict` (créé ou annulé sur ce poste, pas encore acquitté) n'est jamais écrasé. Strict : un élément
+  /// illisible ou une bande inconnue refuse le lot entier (le curseur n'avance pas).
+  Future<int> _absorberTransferts(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    final transferts = <LivestockTransfersCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final source = l['source_lot_id'];
+      final cible = l['target_lot_id'];
+      final date = _date(l['transfer_date']);
+      final quantite = _entier(l['quantity']);
+      if (id is! String ||
+          source is! String ||
+          cible is! String ||
+          date == null ||
+          quantite == null ||
+          quantite < 1) {
+        throw FormatException(
+          'Transfert $id refusé : élément incomplet ou illisible.',
+        );
+      }
+      final categorie = l['categorie'];
+      if (categorie != null &&
+          !const ['repro', 'sevre', 'jeune'].contains(categorie)) {
+        throw FormatException(
+          'Transfert $id refusé : catégorie inconnue ($categorie).',
+        );
+      }
+      transferts.add(
+        LivestockTransfersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          sourceLotId: source,
+          targetLotId: cible,
+          transferDate: DateTime(date.year, date.month, date.day),
+          quantity: quantite,
+          categorie: Value(categorie as String?),
+          constitution: Value(_bool(l['constitution'])),
+          motif: Value(l['motif'] as String?),
+          isActive: Value(_bool(l['is_active'])),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final t in transferts) {
+        if (!connues.contains(t.sourceLotId.value) ||
+            !connues.contains(t.targetLotId.value)) {
+          throw FormatException(
+            'Transfert ${t.id.value} refusé : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.livestockTransfers,
+        )..where((x) => x.id.equals(t.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.livestockTransfers)
+            .insert(t, onConflict: DoUpdate((_) => t));
+      }
+    });
+
+    return transferts.length;
   }
 
   /// Fiches journalières du cheptel — FUSIONNÉES par identifiant (ticket F0.94).
@@ -604,6 +684,12 @@ class SyncEngine {
     Value<int?> optionnel(Map<String, dynamic> l, String cle, String id) =>
         l.containsKey(cle)
         ? Value(entier(l, cle, id, requis: false))
+        : const Value.absent();
+
+    /// Ticket 15.46 — colonne dérivée NOT NULL : absente = valeur locale gardée, nulle = 0.
+    Value<int> derive(Map<String, dynamic> l, String cle, String id) =>
+        l.containsKey(cle)
+        ? Value(entier(l, cle, id, requis: false) ?? 0)
         : const Value.absent();
 
     double? reel(Map<String, dynamic> l, String cle, String id) {
@@ -716,6 +802,15 @@ class SyncEngine {
           effectifF: optionnel(l, 'effectif_f', id),
           effectifSevres: optionnel(l, 'effectif_sevres', id),
           effectifSmeres: optionnel(l, 'effectif_smeres', id),
+          // Ticket 15.46 — transferts entre bandes, dérivés au serveur (NOT NULL à 0).
+          transfertEntree: derive(l, 'transfert_entree', id),
+          transfertSortie: derive(l, 'transfert_sortie', id),
+          transfertEntreeRepro: derive(l, 'transfert_entree_repro', id),
+          transfertEntreeSevre: derive(l, 'transfert_entree_sevre', id),
+          transfertEntreeJeune: derive(l, 'transfert_entree_jeune', id),
+          transfertSortieRepro: derive(l, 'transfert_sortie_repro', id),
+          transfertSortieSevre: derive(l, 'transfert_sortie_sevre', id),
+          transfertSortieJeune: derive(l, 'transfert_sortie_jeune', id),
         ),
       );
       // F0.95 — un serveur antérieur à 15.39 ne sert pas la ventilation : la resynchronisation
@@ -2784,12 +2879,18 @@ class SyncEngine {
       _db.supplierRefunds,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
+    final transferts = await (_db.select(
+      _db.livestockTransfers,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     _financiersAcquittes = 0;
     _courriersAcquittes = 0;
     _archivesAcquittees = 0;
     _documentsAcquittes = 0;
 
     if (fiches.isEmpty &&
+        transferts.isEmpty &&
         courriers.isEmpty &&
         archives.isEmpty &&
         documents.isEmpty &&
@@ -2870,6 +2971,8 @@ class SyncEngine {
                 ? _ficheIdentiteEnJson(f)
                 : _ficheEnJson(f, tete: tetes.contains(f.id)),
         ],
+        // Ticket 15.46 — traités par le serveur APRÈS les fiches du même envoi.
+        'livestock_transfers': transferts.map(_transfertEnJson).toList(),
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
@@ -2917,6 +3020,16 @@ class SyncEngine {
       (ids, statut) =>
           (_db.update(_db.livestockDailyEntries)..where((t) => t.id.isIn(ids)))
               .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'livestock_transfers',
+      corps['livestock_transfers'],
+      (ids, statut) =>
+          (_db.update(_db.livestockTransfers)..where((t) => t.id.isIn(ids)))
+              .write(LivestockTransfersCompanion(syncStatus: Value(statut))),
       motifs,
       (n) => rejete += n,
     );
@@ -3797,6 +3910,21 @@ class SyncEngine {
     'check_in': p.checkIn,
     'check_out': p.checkOut,
     'status': p.status,
+  };
+
+  /// Ticket 15.46 — transfert entre bandes tel que le serveur le rejoue (`TransferBetweenLotsAction`).
+  Map<String, dynamic> _transfertEnJson(LivestockTransfer t) => {
+    'id': t.id,
+    'source_lot_id': t.sourceLotId,
+    'target_lot_id': t.targetLotId,
+    'transfer_date': _jour(t.transferDate),
+    'quantity': t.quantity,
+    'categorie': t.categorie,
+    'constitution': t.constitution,
+    'motif': t.motif,
+    'is_active': t.isActive,
+    'device_id': t.deviceId,
+    'updated_at': t.updatedAt.toUtc().toIso8601String(),
   };
 
   Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {

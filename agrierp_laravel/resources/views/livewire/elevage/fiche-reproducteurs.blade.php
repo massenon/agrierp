@@ -38,6 +38,7 @@
         </div>
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande / Lot Concerné</label>

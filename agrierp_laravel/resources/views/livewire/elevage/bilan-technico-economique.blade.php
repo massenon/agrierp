@@ -1,7 +1,7 @@
 <div>
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm mb-md">
         <div>
-            <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">account_balance_wallet</span>Bilan Technico-Économique de Lot</h2>
+            <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">account_balance_wallet</span>Rentabilité de Lot</h2>
             <p class="text-xs text-outline mt-xs">Coûts, revenus et rentabilité réelle par bande — alimenté automatiquement par les achats, ventes et charges imputés à chaque lot.</p>
         </div>
         @if($this->lots->isNotEmpty())

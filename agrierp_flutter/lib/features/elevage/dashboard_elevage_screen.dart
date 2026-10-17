@@ -31,7 +31,8 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   static const onglets = <(String, IconData)>[
     ('Synthèse Globale', Icons.dashboard),
     ('GMQ & Croissance', Icons.show_chart),
-    ('Bilan Technico-Économique', Icons.account_balance_wallet),
+    // Libellé « Rentabilité » : décision client du 17/10/2026 (prototype : « Bilan Technico-Économique »).
+    ('Rentabilité', Icons.account_balance_wallet),
     ('Analyse Sanitaire', Icons.coronavirus),
     ('Prévision de Croissance', Icons.query_stats),
   ];
@@ -87,7 +88,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
                         'GMQ & Croissance' => _ongletGmq(large),
-                        'Bilan Technico-Économique' => _ongletBilan(),
+                        'Rentabilité' => _ongletBilan(),
                         'Analyse Sanitaire' => _ongletSanitaire(large),
                         'Prévision de Croissance' => _ongletPrevision(),
                         _ => _ongletSynthese(large),

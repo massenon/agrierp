@@ -148,6 +148,17 @@
                 @error('product_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 <p class="text-[10px] text-outline mt-xs">Les naissances entreront en stock sur ce produit ; mortalité et dons l'en retireront. Sélectionnez d'abord la filière.</p>
             </div>
+            <div>
+                <label for="bande-origine" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande d'Origine</label>
+                <select id="bande-origine" wire:model="lot_origine_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('lot_origine_id') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <option value="">-- Aucune (achat, animaux extérieurs) --</option>
+                    @foreach($this->bandesOriginePossibles as $origine)
+                        <option value="{{ $origine->id }}">{{ $origine->code }} ({{ number_format($origine->current_quantity, 0, ',', ' ') }})</option>
+                    @endforeach
+                </select>
+                @error('lot_origine_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                <p class="text-[10px] text-outline mt-xs">Portée ou sevrés déjà comptés dans une autre bande : ils en sortent le jour de création, pour n'être comptés qu'une fois.</p>
+            </div>
             <p class="text-[10px] text-outline bg-surface-zebra rounded-lg p-sm">Le suivi individuel par sujet (N° Lapine, etc.) se paramètre depuis Enregistrer Sujets, une fois la bande créée.</p>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>

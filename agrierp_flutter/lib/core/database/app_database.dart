@@ -174,6 +174,9 @@ class LivestockLots extends Table {
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
+  /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
+  TextColumn get lotSourceId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1004,6 +1007,24 @@ class CustomerReminders extends Table {
 //  TABLES SYNCHRONISABLES — SAISIES LOCALEMENT, POUSSÉES AU SERVEUR
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Ticket 15.46 (schéma v39) — TRANSFERT DE SUJETS ENTRE DEUX BANDES, miroir de `livestock_transfers`.
+///
+/// Source de vérité des colonnes `transfert_*` des fiches. Créé ou annulé au poste (`pending`), le serveur le
+/// REJOUE avec ses propres contrôles d'effectif ; jamais supprimé, annulé (`isActive = false`).
+/// `constitution` : la bande cible a été créée avec ces sujets (seule la sortie de la source est inscrite).
+class LivestockTransfers extends Table with SyncColumns {
+  TextColumn get sourceLotId => text().withLength(min: 36, max: 36)();
+  TextColumn get targetLotId => text().withLength(min: 36, max: 36)();
+  DateTimeColumn get transferDate => dateTime()();
+  IntColumn get quantity => integer()();
+
+  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  TextColumn get categorie => text().nullable()();
+  BoolColumn get constitution => boolean().withDefault(const Constant(false))();
+  TextColumn get motif => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
 /// Fiche journalière d'élevage. Règle serveur : **dernier écrivain gagne**,
 /// upsert sur l'UUID client.
 ///
@@ -1065,6 +1086,25 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get effectifF => integer().nullable()();
   IntColumn get effectifSevres => integer().nullable()();
   IntColumn get effectifSmeres => integer().nullable()();
+
+  // ── Ticket 15.46 (schéma v39) — TRANSFERTS ENTRE BANDES, DÉRIVÉS de `LivestockTransfers` ──
+  //
+  // Comme `effectif_final` : jamais saisis dans la fiche, jamais envoyés au serveur (il les recalcule).
+  // NOT NULL à 0 : une fiche sans transfert garde exactement son effectif.
+  IntColumn get transfertEntree => integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortie => integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeRepro =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeSevre =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeJeune =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieRepro =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieSevre =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieJeune =>
+      integer().withDefault(const Constant(0))();
 
   @override
   List<String> get customConstraints => ['UNIQUE (lot_id, entry_date)'];
@@ -1391,6 +1431,7 @@ class SyncState extends Table {
     Purchases,
     PurchaseLines,
     LivestockDailyEntries,
+    LivestockTransfers,
     ProphylaxisScheduleStandards,
     VeterinaryRecords,
     Sales,
@@ -1416,7 +1457,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 39;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1771,8 +1812,43 @@ class AppDatabase extends _$AppDatabase {
           await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
         }
       }
+
+      // v39 — transferts entre bandes (ticket 15.46) : table, colonnes dérivées des fiches, bande d'origine.
+      if (from < 39) {
+        if (!await _tableExiste(m, livestockTransfers)) {
+          await m.createTable(livestockTransfers);
+        }
+        for (final colonne in [
+          livestockDailyEntries.transfertEntree,
+          livestockDailyEntries.transfertSortie,
+          livestockDailyEntries.transfertEntreeRepro,
+          livestockDailyEntries.transfertEntreeSevre,
+          livestockDailyEntries.transfertEntreeJeune,
+          livestockDailyEntries.transfertSortieRepro,
+          livestockDailyEntries.transfertSortieSevre,
+          livestockDailyEntries.transfertSortieJeune,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
+        }
+        await _ajouterColonneSiAbsente(
+          m,
+          livestockLots,
+          livestockLots.lotSourceId,
+        );
+      }
     },
   );
+
+  /// Vrai si [table] existe déjà (un `createTable` d'un palier antérieur pose le schéma COURANT).
+  Future<bool> _tableExiste(Migrator m, TableInfo table) async {
+    final lignes = await m.database
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          variables: [Variable.withString(table.actualTableName)],
+        )
+        .get();
+    return lignes.isNotEmpty;
+  }
 
   /// État du moteur de synchronisation, **toutes lignes fusionnées**.
   ///
@@ -1864,7 +1940,9 @@ class AppDatabase extends _$AppDatabase {
       "(SELECT COUNT(*) FROM archived_documents WHERE sync_status <> 'synced') + "
       // TICKET F0.80 — un document administratif saisi ou retiré au poste n'existe (ou n'est
       // retiré) que sur ce poste tant que le serveur ne l'a pas acquitté.
-      "(SELECT COUNT(*) FROM administrative_documents WHERE sync_status <> 'synced') "
+      "(SELECT COUNT(*) FROM administrative_documents WHERE sync_status <> 'synced') + "
+      // Ticket 15.46 — un transfert entre bandes créé ou annulé au poste n'existe que sur ce poste.
+      "(SELECT COUNT(*) FROM livestock_transfers WHERE sync_status <> 'synced') "
       "AS total",
     ).getSingle();
 

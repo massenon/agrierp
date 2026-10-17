@@ -128,7 +128,7 @@ class _BilanTechnicoEconomiqueVueState
             SizedBox(width: AgriSpacing.xs),
             Flexible(
               child: Text(
-                'Bilan Technico-Économique de Lot',
+                'Rentabilité de Lot',
                 style: TextStyle(
                   fontSize: AgriTypography.lg,
                   fontWeight: AgriTypography.gras,

@@ -14,6 +14,12 @@ class LivestockLot extends Model
         'created_date', 'acquisition_cost', 'status', 'cost_center_id', 'is_active', 'product_id',
     ];
 
+    /** Ticket 15.46 — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés). */
+    public function lotSource()
+    {
+        return $this->belongsTo(self::class, 'lot_source_id');
+    }
+
     protected function casts(): array
     {
         return [

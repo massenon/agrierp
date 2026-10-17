@@ -170,14 +170,8 @@ class EnregistrerSujets extends Component
         $previousEffectif = $entry->previousEffectif();
 
         $entry->$field = ($entry->$field ?? 0) + $this->quantite;
-        $entry->effectif_final = LivestockDailyEntry::computeEffectifFinal(
-            $previousEffectif,
-            $entry->achat ?? 0,
-            $entry->ne ?? 0,
-            $entry->mort ?? 0,
-            $entry->vente ?? 0,
-            $entry->don ?? 0,
-        );
+        // Ticket 15.46 : transferts entre bandes compris.
+        $entry->effectif_final = $entry->effectifFinalDepuis($previousEffectif);
         // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — `increment()` ajoutait la quantité à la
         // bande quelle que soit la date, sans recalculer les fiches suivantes : une entrée
         // antidatée laissait les jours postérieurs (et donc la bande) désaccordés. Cascade

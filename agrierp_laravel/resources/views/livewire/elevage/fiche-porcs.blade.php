@@ -49,6 +49,7 @@
         @php $cat = $this->categoriesJour; $provende = $this->provendeCalculation; @endphp
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             @if($cat['depart_requis'] && $cat['ancien'])
                 {{-- D6 : les effectifs saisis à la main ne sont jamais repris ; le départ est déduit du stade de la bande (17/10/2026). --}}
                 <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest">

@@ -152,7 +152,7 @@ void main() {
     for (final onglet in [
       'Synthèse Globale',
       'GMQ & Croissance',
-      'Bilan Technico-Économique',
+      'Rentabilité',
       'Analyse Sanitaire',
       'Prévision de Croissance',
     ]) {
@@ -180,7 +180,7 @@ void main() {
     const panneaux = <String, String>{
       'Synthèse Globale': 'dash-tab-synthese',
       'GMQ & Croissance': 'dash-tab-gmq',
-      'Bilan Technico-Économique': 'dash-tab-bilan',
+      'Rentabilité': 'dash-tab-bilan',
       'Analyse Sanitaire': 'dash-tab-sanitaire',
       'Prévision de Croissance': 'dash-tab-prevision',
     };
