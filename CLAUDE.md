@@ -14,6 +14,7 @@ Ce fichier guide Claude Code (claude.ai/code) à la racine du monorepo AgriERP.
 
 ## Règles transverses
 
+- **Fidélité absolue web ↔ poste** (article 5 de la doctrine) : la vue Blade est le maître ; le poste reprend structure, composants, retours et logique métier à 100 %, prouvés par un garde-fou. Un critère absent du web se construit d'abord sur le web.
 - **Tout est en français** : prose, libellés, commentaires, noms de tests, messages de commit.
 - Le schéma est partagé : une table synchronisable modifiée côté Laravel (migrations) doit l'être aussi côté Flutter (`lib/core/database/app_database.dart`, puis `dart run build_runner build`), et inversement. Les clés primaires des tables synchronisables sont des UUID, jamais des entiers auto-incrémentés.
 - `agrierp_flutter/lib/core/database/app_database.g.dart` est généré : ne jamais l'éditer à la main.

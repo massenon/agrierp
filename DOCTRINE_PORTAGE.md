@@ -75,3 +75,49 @@ Contexte : la connexion Internet est instable en zone rurale (Adja-Ouèrè / Ikp
 3. Lire la vue Blade et le composant Livewire **en entier** avant de porter un écran ; ne jamais reconstruire de mémoire.
 4. Écrire le test qui aurait attrapé le défaut **avant** de le corriger.
 5. Ne jamais convertir des écrans en lot sans vérification intermédiaire.
+
+---
+
+## 5. Directive de fidélité absolue (adoptée le 17/10/2026)
+
+Objectif : **parité de 100 %** entre la vue Blade (maître) et l'écran Flutter : ergonomie, fonctionnalité, logique métier. Cette directive **précise** les articles 0 à 3 ; elle ne change pas l'architecture (couches, cascade unique, synchronisation différenciée, points de passage uniques du serveur). Quand un critère n'existe pas encore **sur le web**, il est d'abord construit sur le web, puis porté : le poste n'invente jamais un comportement que la vue Blade n'a pas (article 0).
+
+### 5.1 Structure et agencement
+
+| Critère | Exigence | État au 17/10/2026 |
+| --- | --- | --- |
+| Architecture de page | Même ordre des sections, même tableau de bord, même barre latérale, même barre supérieure | Appliqué : `_BarreLaterale.arborescence` reprend `sidebar.js` groupe par groupe ; ordre des sections vérifié par `conformite_structure_test.dart` |
+| Barre supérieure | Logo, recherche globale, sélecteurs, indicateur de caisse, cloche avec panneau interactif, menu de profil (avatar à initiales, rôle, menu déroulant aux mêmes entrées) | Partiel : recherche (`recherche-globale`), indicateur Sync, cloche à panneau présents dans `BarreSuperieure` ; parité des entrées du menu de profil **à auditer** écran par écran |
+| Barre latérale | Groupes, séparateurs, icônes conformes, filtrage RBAC dynamique | Appliqué : `PermissionsPoste` = `RBAC_PAGE_MAP` verbatim, masquage + `GardeEcran` |
+| Géométrie | Mêmes marges, `gap-*`, positions des logos et titres ; échelle typographique effective (Inter, `xs` = 13,6 px) | Appliqué via `agri_tokens.dart`, verrouillé par `conformite_portage_test.dart` |
+
+### 5.2 Composants et formulaires
+
+| Critère | Exigence | État |
+| --- | --- | --- |
+| Cartes et grilles | Même disposition des KPI, grilles et résumés | Appliqué : `CarteKpi` unique, nombre de cartes vérifié par `cartes_attendues.dart` |
+| Champs et modales | Même placement des champs, listes, formulaires et modales | Appliqué : `ModaleAgri` / `afficherModale` |
+| Listes avec recherche | Liste déroulante avec barre de recherche intégrée pour les listes longues (articles, clients) | **CIBLE COMMUNE** : aucune des deux surfaces ne l'a (pas de composant web). À construire d'abord en composant Blade partagé, puis en un widget Flutter unique |
+| Recherche, filtres, tris | Au même endroit que dans la vue Blade | Appliqué écran par écran (`x-datatable` porte la recherche côté web) |
+| Tableaux | Mêmes colonnes, en-têtes, cellules d'actions (voir, modifier, archiver), pagination 10/25 | Colonnes et en-têtes : appliqué (`conformite_structure_test.dart`). Pagination : **CIBLE COMMUNE** (aucun composant web, voir § 2) |
+
+### 5.3 Interactivité et retours
+
+| Critère | Exigence | État |
+| --- | --- | --- |
+| Onglets | Actif sur fond sombre, inactif sur fond clair, comme la vue web | À aligner sur les classes réelles de `tab-page.blade.php` ; le web n'a pas de helper `Onglets::classes()` : s'il est voulu, il naît côté web |
+| Modales | Largeurs adaptées, ✕ ou bouton dédié, jamais de dialogue natif | Appliqué et verrouillé |
+| Toasts | Mêmes moments, mêmes couleurs : vert succès, rouge erreur, ambre avertissement | Appliqué côté web (`toast-container.blade.php`) ; poste : `SnackBar` aux couleurs des jetons, moments **à auditer** |
+| États vides | Même icône, même texte exact que la vue | Appliqué là où `fidelite_libelles_test.dart` couvre la page ; à étendre |
+
+### 5.4 Logique métier et intégrité
+
+1. **Zéro invention de calcul.** Toute formule portée (reste dû, TVA, CUMP, amortissement, effectifs) produit **exactement** le résultat du Service Laravel, prouvé par un test croisé PHP ↔ Dart (`test/php_laravel.dart`, parité exécutée). *État : appliqué pour les effectifs par catégorie, la nature des comptes, le glossaire lapins (7 452 libellés, 0 écart) ; à étendre à chaque formule portée.*
+2. **Parité des refus.** Un refus du serveur (exception, 422, 409) est affiché avec **le message exact du domaine** (`MotifsRefusPush`, `message` de la réponse), jamais un message générique. *État : appliqué pour les conflits de synchronisation et `EchecSynchronisation` ; un refus local (ex. D3) reprend le libellé du serveur.*
+3. **Hors ligne d'abord, transaction unique.** Toute écriture (vente, dépense, mouvement) est enregistrée dans Drift **dans une seule transaction** ; la file `pending` envoie les **pièces sources brutes** ; le serveur reste seul maître de la comptabilité globale. *État : appliqué (modèle « fait + rejeu serveur », § 1.4).*
+
+### 5.5 Comment l'appliquer sans casser l'architecture
+
+- Un écart constaté devient un **ticket** (plan de finalisation), pas une retouche au passage.
+- L'ordre reste celui du § 4 : web d'abord si le critère manque sur le web, poste ensuite.
+- Chaque critère appliqué reçoit son **garde-fou** (test lu dans le code ou test croisé), sinon il n'est pas « appliqué ».
