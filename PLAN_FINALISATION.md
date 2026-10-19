@@ -278,7 +278,7 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | S-T10 | Inventaire du poste envoyé en QUANTITÉ COMPTÉE datée, l'écart calculé par le serveur sur son grand livre à cet instant (aujourd'hui : écart calculé sur le stock LOCAL, une vente faite ailleurs et pas encore descendue est comptée deux fois) | ✅ 19/10/2026 (Drift v46 ; écart = compté − stock du serveur à l'instant du comptage) |
 | S-T11 | Dates servies au poste lues en heure du Bénin quel que soit le réglage de Windows (aujourd'hui : décalage d'un jour sur un poste mal réglé — écarts de cohérence vus sur soins et avances) | ✅ 19/10/2026 (`HeureBenin`, point unique ; essai vert dans 4 fuseaux) |
 | S-T12 | Essai à cinq postes étendu : retours et remboursements fournisseurs, imputations, produits créés au poste, dépenses, session refusée (401/403), demande de synchronisation du web, plusieurs jours hors ligne | ✅ 19/10/2026 (6 graines × 2 fuseaux vertes ; 7 défauts corrigés) |
-| S-T13 | Caisse du web rejouée sur un interblocage MariaDB comme l'envoi des postes (exige de sortir l'appel MeCeF de la transaction, sinon la facture partirait deux fois) | 🔧 |
+| S-T13 | Caisse du web rejouée sur un interblocage MariaDB comme l'envoi des postes (exige de sortir l'appel MeCeF de la transaction, sinon la facture partirait deux fois) | ✅ 19/10/2026 (`TransactionRejouable`, `FacturationMecefService` ; graine 314 : interblocage réel rejoué) |
 | R-1 | « Réinitialisation des données » au poste comme au web (en ligne seulement, saisies en attente signalées, purge locale immédiate) | ✅ 19/10/2026 (mêmes verrous que le web : droit, mode démonstration, mot `REINITIALISER`) |
 | DEP-1 | Guide `GUIDE_DEPLOIEMENT.md` (cloner, tester, cPanel, cron) | ✅ 19/10/2026 (⚠️ second cron `queue:work` indispensable : tâches du matin mises en file) |
 
@@ -291,6 +291,7 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | D-CFG-3 | Recette = **le serveur de la ferme** (`https://agrierp.fermeolouwachegoun.com`) ; les données d'essai sont vidées ensuite par « Réinitialisation des données » (Paramètres, 15.50) — vérifiée le 19/10 sur le jeu de démonstration : 7 390 lignes d'activité → 0, référentiels gardés, stocks et trésorerie à 0, marque posée |
 | D-CFG-4 | En-têtes du tableau des stocks au poste **accentués comme le Blade** (« DÉSIGNATION », « CATÉGORIE ») |
 | D-R1 | Réinitialisation lancée au poste dont la réponse se perd : **accepté** — le poste purge au tirage suivant (règle 15.50) et la perte des saisies non envoyées est annoncée par l'avertissement de synchronisation |
+| D-MECEF-1 | ❓ **À trancher avec le client et la DGI** : une facture acceptée par le dispositif MeCeF dont la réponse se perd serait déclarée deux fois à la retransmission — seule la future passerelle réelle peut l'empêcher (identifiant de la vente comme clé d'idempotence, ou interrogation avant retransmission). Et : faut-il un bouton de retransmission pour une vente restée « En attente » (aujourd'hui seulement pour « Erreur MeCeF ») ? |
 
 | # | Ticket | Statut |
 |---|---|---|

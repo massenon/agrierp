@@ -22204,3 +22204,10 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Non corrigé (S-T13) : la caisse du web n'est pas rejouée sur un interblocage (MeCeF dans la transaction).
 - Mesures (branche entière) : Laravel 1 894 verts ; poste 2 610 verts, 17 sautés ; essai graine 42 vert sur la branche fusionnée ; série de l'agent : graines 42, 7, 314, 5, 13, 2026 × Porto-Novo / New York, 12/12.
 - À vérifier chez l'hébergeur : `post_max_size` et ModSecurity (une journée de ventes d'un poste est indivisible) ; connexion limitée à 5 par minute et par adresse (plus de 5 postes derrière une même adresse après une réinitialisation).
+
+### S-T13 — la caisse du web résiste aux interblocages ; MeCeF une seule fois
+- `TransactionRejouable` (point unique, caisse web ET envoi des postes) : rejoue jusqu'à 3 fois sur 1213 / 1205 (code reconnu même en français et enveloppé), jamais dans une transaction englobante ; au-delà, `TransactionInterbloqueeException` et message clair, rien d'écrit, panier conservé.
+- `FacturationMecefService` : MeCeF APRÈS la validation de la vente, une seule fois (vente relue sous verrou, jamais retransmise si `transmise`) — caisse, `Facturation::retryMecef`, envoi des postes. 🔴 Le bloc MeCeF était DANS la transaction de l'envoi rejouée depuis S-T9 : un envoi rejoué retransmettait les ventes de l'essai annulé (deux factures) — corrigé, test à l'appui.
+- Échec MeCeF : règle existante (7.1, 14.80) — la vente n'est jamais défaite, elle passe en `erreur` avec le bouton de retransmission ; avertissement à la caisse.
+- Mesures : Laravel 1 908 verts ; poste 2 610 verts, 17 sautés ; essai 314, 42, 7, 5 verts (graine 314 : un vrai interblocage sur la vente du web, rejoué) ; 17 mutants tués.
+- À trancher (D-MECEF-1) : double déclaration possible si le dispositif accepte et que la réponse se perd (passerelle réelle) ; bouton de retransmission pour une vente « En attente ».
