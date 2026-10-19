@@ -14,8 +14,8 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 | `AppId` propre (sinon il remplace TATACORA sur le même PC) | GUID propre `69B3D13F-…` | ✅ |
 | `AppName`, `AppPublisher`, `DefaultDirName`, `OutputBaseFilename` | AgriERP, Dr MASSENON Rhodes – Ferme École OLOUWACHEGOUN, `{autopf}\AgriERP`, `AgriERP-Setup-<version>` | ✅ |
 | Version lue dans `pubspec.yaml`, vérification des outils (Inno Setup, VC++) | oui (ticket A7) | ✅ |
-| Adresses des serveurs par version (dev, recette, production) | une adresse par défaut (production) réglable dans Paramètres du poste | 🟡 |
-| Refus de la version démo | rien | ❌ |
+| Adresses des serveurs par version (dev, recette, production) | S-T8 : `lib/core/config/environnement.dart`, choisi par `--dart-define=AGRIERP_ENV` (`build_windows.bat --env`, défaut production) ; toujours réglable dans Paramètres du poste. Adresse de recette **à confirmer** | ✅ |
+| Refus de la version démo | S-T8 : version `x.y.z-demo` de `pubspec.yaml` refusée en production par `build_windows.bat` et par `agrierp.iss` (`#error`) | ✅ |
 | Icône `app_icon.ico` | à vérifier sur la machine de compilation | 🟡 |
 
 ## 2. Principes de synchronisation
@@ -42,8 +42,8 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 | Seules les tables que le compte lit | non : le tirage sert les mêmes tables à tous les rôles (les écrans les filtrent) | ❌ |
 | Lignes d'un document descendues avec lui | oui depuis U4 / U8 (lignes de vente, d'achat, retours) | ✅ |
 | Identifiant du poste lié à son jeton | le jeton est nommé d'après le poste, mais `device_id` envoyé n'est **pas comparé** au nom du jeton : un poste peut signer au nom d'un autre | ❌ |
-| Bouton « Synchroniser » du serveur (demande lue toutes les 30 s) | non (H3 montre l'état des postes, ne les réveille pas) | ❌ |
-| Contrôle de cohérence (nombre et total par table et par jour) | non | ❌ |
+| Bouton « Synchroniser » du serveur (demande lue toutes les 30 s) | S-T6 : « Demander la synchronisation des postes » (tous, ou un poste) dans la modale H3 ; `GET /api/sync/demande` lu toutes les 30 s par la session ouverte, silencieux hors ligne ; demande valable 60 min | ✅ |
+| Contrôle de cohérence (nombre et total par table et par jour) | S-T6 : `GET /api/sync/coherence?depuis=`, table de correspondance unique (`CoherenceSynchronisationService::AGREGATS`, copiée et vérifiée au poste). Tables dont le poste tient un miroir complet ; **dépenses hors contrôle** (non tirées) | ✅ / 🟡 |
 
 ## 4. Poste
 
@@ -59,7 +59,7 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 | Descente : une page = une transaction, un élément fautif n'emporte pas la page | pas de pages ; un absorbeur strict refuse **tout le lot de sa table** si une ligne est incohérente (choix du projet, F0.51) | ✅ (autre choix) |
 | Un aligneur par table, dépendance pas encore arrivée = attente | un absorbeur par table, ordre de tirage fixe | ✅ |
 | Déclencheurs : démarrage, toutes les 5 min, après un geste important, demande du serveur | retour du réseau, intervalle (15 min par défaut, réglable), fermeture | 🟡 |
-| Écran : compteurs, « À traiter », contrôle de cohérence | modale et écran Synchronisation (compteurs, refusés, « Remettre en file ») ; pas de cohérence | 🟡 |
+| Écran : compteurs, « À traiter », contrôle de cohérence | modale et écran Synchronisation (compteurs, refusés, « Remettre en file ») ; S-T6 : « Contrôle de cohérence » (Poste / Serveur / Écart, jours conformes repliés) ; dernier contrôle de chaque poste dans la modale web | ✅ |
 
 ## 5. Questions de PO
 
@@ -75,9 +75,9 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 | Piège | AgriERP |
 |---|---|
 | Date métier ≠ date d'audit | ✅ `sold_at`, `updated_at` = instant de saisie (14.71, F0.31) |
-| Table de liaison qui ne touche pas `updated_at` (matrice des droits) | à vérifier : `role_has_permissions` ne date pas `roles` |
+| Table de liaison qui ne touche pas `updated_at` (matrice des droits) | S-T7 : le tirage sert `roles` en entier (le piège était masqué) ; toute écriture de `role_has_permissions` date désormais le rôle (`App\Models\Role`, `App\Models\Permission`) |
 | Horizon et horloges dans les tests | 🔴 corrigé (curseur) ; les tests de synchronisation automatique utilisent une horloge simulée unique |
-| Un seul écrivain par table au poste | pas de garde-fou |
+| Un seul écrivain par table au poste | S-T7 : `test/ecrivain_unique_test.dart` ; fiches (caisse, transferts) et archivage des soins ramenés à leur dépôt ; exception justifiée : `products.stock_qty` (miroir local du grand livre) |
 | Tests contre le vrai serveur | `sync_reel_test` (sauté sans serveur) + parités exécutées PHP ↔ Dart ; pas d'essai à plusieurs postes avec coupures |
 
 ## 7. Ce que je propose (tickets S-T, dans l'ordre de la note)

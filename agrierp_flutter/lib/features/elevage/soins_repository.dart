@@ -85,6 +85,24 @@ class SoinsRepository {
   /// Identifiant du poste — repris par `SoinsVaccinsRepository` pour l'infirmerie et le calendrier (H8b).
   String get deviceId => _deviceId;
 
+  /// `archiveSoin()` du web (ticket U3, décision client D-U3 du 19/10/2026) : `is_active = false`, la ligne
+  /// RESTE (archivage logique) et repart à l'envoi (`pending`), où le serveur l'archive et journalise
+  /// `veterinary_record.archived`. ⚠️ La période de rémanence créée par le soin n'est PAS touchée : au web non
+  /// plus, archiver un soin ne rend pas la bande vendable.
+  ///
+  /// Ticket S-T7 — déplacé de `SoinsVaccinsRepository` (qui délègue) : ce dépôt est le SEUL écrivain de
+  /// `veterinary_records` au poste (garde-fou `test/ecrivain_unique_test.dart`).
+  Future<void> archiverSoin(String id, {DateTime? quand}) =>
+      (_db.update(
+        _db.veterinaryRecords,
+      )..where((t) => t.id.equals(id))).write(
+        VeterinaryRecordsCompanion(
+          isActive: const Value(false),
+          syncStatus: const Value(SyncStatus.pending),
+          updatedAt: Value(quand ?? DateTime.now()),
+        ),
+      );
+
   /// Protocole prévu pour une espèce, tel que le serveur le sert.
   ///
   /// ⚠️ Jamais de traitement codé en dur : le protocole est éditable depuis

@@ -92,6 +92,8 @@ class ReinitialisationDonneesService
             // Ticket H3 — journal des tirages et envois des postes : après une réinitialisation, chaque poste purge
             // ses données et repart de zéro ; ses compteurs d'avant ne décrivent plus rien.
             'journal_synchronisation',
+            // Ticket S-T6 — demandes de synchronisation aux postes et contrôles de cohérence : même raison.
+            'demandes_synchronisation_servies', 'demandes_synchronisation', 'controles_coherence',
         ];
     }
 

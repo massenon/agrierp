@@ -15,7 +15,8 @@ import 'sync_engine.dart';
 ///  - l'**intervalle** (5 min par défaut depuis S-T3, réglable dans Paramètres du poste) ;
 ///  - un **geste important** ([gestes] : vente à la caisse, fiche journalière, soin — S-T3), après un délai
 ///    d'agrégation ([delaiAgregation]) : dix ventes en une minute font une ou deux synchronisations, pas dix ;
-///  - la **fermeture** de l'application ([avantFermeture]).
+///  - la **fermeture** de l'application ([avantFermeture]) ;
+///  - la **demande du serveur**, lue toutes les 30 s ([interrogerLeServeur], ticket S-T6).
 ///
 /// ⚠️ **LES RÉESSAIS NE CONCERNENT QUE LES ÉCHECS RÉESSAYABLES** ([estReessayable] : échec réseau et, depuis
 /// S-T1, erreur 5xx du serveur — un bogue serveur se corrige sans le poste) : 30 s, 2 min, 5 min, 15 min, puis
@@ -44,11 +45,26 @@ class SynchronisationAutomatique {
     this.onTermine,
     this.gestes,
     this.delaiAgregation = delaiAgregationParDefaut,
+    Future<bool> Function()? demandeDuServeur,
   }) : // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
        // ignore: prefer_initializing_formals
        _synchroniser = synchroniser,
        // ignore: prefer_initializing_formals
-       _changementsReseau = changementsReseau;
+       _changementsReseau = changementsReseau,
+       // ignore: prefer_initializing_formals
+       _demandeDuServeur = demandeDuServeur;
+
+  /// Ticket S-T6 — le serveur peut DEMANDER une synchronisation (bouton « Demander la synchronisation des postes »
+  /// du web) : la session ouverte l'interroge à cet intervalle (`GET /api/sync/demande`, [SyncEngine.demandeDuServeur])
+  /// et déclenche une synchronisation si une demande l'attend.
+  ///
+  /// ⚠️ SILENCIEUX : hors ligne (dernier état connu du réseau), la question n'est pas posée ; un échec rend « pas
+  /// de demande ». Jamais d'erreur à l'écran, jamais de réessai programmé : la question revient d'elle-même.
+  static const intervalleDemande = Duration(seconds: 30);
+
+  final Future<bool> Function()? _demandeDuServeur;
+  Timer? _minuterieDemande;
+  bool _interrogation = false;
 
   /// Ticket S-T3 — 5 min, comme la note TATACORA (15 min jusqu'ici).
   static const intervalleParDefaut = Duration(minutes: 5);
@@ -124,9 +140,30 @@ class SynchronisationAutomatique {
     });
     gestes?.addListener(_surGeste);
     if (aussitot) declencher();
+    if (_demandeDuServeur != null) {
+      _minuterieDemande = Timer.periodic(intervalleDemande, (_) => interrogerLeServeur());
+    }
+  }
+
+  /// Ticket S-T6 — une interrogation du serveur ; déclenche une synchronisation s'il en demande une. Ne lève jamais.
+  Future<void> interrogerLeServeur() async {
+    final demande = _demandeDuServeur;
+    // Hors ligne (dernier état connu), ou interrogation / synchronisation déjà en cours : rien à demander.
+    // Suspendue (401 / 403, S-T1) : la session est refusée, la question le serait aussi.
+    if (demande == null || _suspendue || _enLigne == false || _interrogation || _enCours) return;
+    _interrogation = true;
+    try {
+      if (await demande()) await declencher();
+    } catch (_) {
+      // Silencieux par construction : la question revient dans 30 s.
+    } finally {
+      _interrogation = false;
+    }
   }
 
   void arreter() {
+    _minuterieDemande?.cancel();
+    _minuterieDemande = null;
     _minuterie?.cancel();
     _minuterie = null;
     _reessai?.cancel();

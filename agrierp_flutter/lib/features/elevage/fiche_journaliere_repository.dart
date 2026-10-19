@@ -655,6 +655,161 @@ class FicheJournaliereRepository {
     );
   });
 
+  // ── Ticket S-T7 : ce dépôt est le SEUL écrivain des fiches journalières au poste ─────────────────────────────
+  //
+  // La vente (caisse) et le transfert entre bandes complètent la fiche du jour. Ils l'écrivaient eux-mêmes
+  // (`CaisseRepository._repercuterSurFiche`, `TransfertsRepository.reporterSurFiche`) : trois écrivains d'une même
+  // table synchronisable, chacun avec sa façon de créer la fiche, de la remettre en file et de dater la saisie. Les
+  // deux écritures sont déplacées ICI telles quelles (méthode TATACORA : « un seul écrivain par table » ; garde-fou
+  // `test/ecrivain_unique_test.dart`) ; caisse et transferts calculent ce qu'ils ont à reporter et appellent ce dépôt.
+
+  /// Répercute la vente sur la fiche du JOUR DE LA VENTE, puis recalcule les fiches suivantes (appelé par la caisse,
+  /// dans la transaction de la vente).
+  ///
+  /// ⚠️ LA FICHE EST COMPLÉTÉE, JAMAIS ÉCRASÉE : si l'animalier a déjà saisi
+  /// morts et naissances, la vente s'ajoute à ce qu'il a inscrit.
+  ///
+  /// ⚠️ L'EFFECTIF EST RECALCULÉ PAR LE MÊME POINT DE VÉRITÉ que la fiche et
+  /// que le serveur — jamais une soustraction réécrite ici.
+  ///
+  /// ⚠️ `saisie` horodate la fiche (instant de la SAISIE) ; `jour` est le jour de la vente.
+  Future<void> repercuterVente(
+    String lotId,
+    int quantite,
+    DateTime jour,
+    DateTime saisie,
+  ) async {
+    final existante =
+        await (_db.select(_db.livestockDailyEntries)
+              ..where((t) => t.lotId.equals(lotId) & t.entryDate.equals(jour)))
+            .getSingleOrNull();
+
+    // ⚠️ F0.95 — même formule que le serveur (`computeEffectifFinal`, bornée à 0, 14.63).
+    final vente = (existante?.vente ?? 0) + quantite;
+    final effectif = EffectifParCategorie.effectifFinal(
+      precedent: await effectifPrecedent(lotId, jour),
+      achat: existante?.achat ?? 0,
+      ne: existante?.ne ?? 0,
+      mort: existante?.mort ?? 0,
+      vente: vente,
+      don: existante?.don ?? 0,
+      // Ticket 15.46 : transferts entre bandes du jour compris.
+      transfertEntree: existante?.transfertEntree ?? 0,
+      transfertSortie: existante?.transfertSortie ?? 0,
+    );
+
+    // ⚠️ F0.95 — FICHE CRÉÉE PAR LA VENTE SUR UNE BANDE À CHAÎNE : ses mouvements ventilés naissent
+    // « connus à zéro » (`MOUVEMENTS_CONNUS_A_ZERO` du serveur, 15.39) — la vente ne porte ni mort ni
+    // don ; des null « inconnu » rendraient ses catégories inconnues. Fiche existante ou bande sans
+    // chaîne : rien n'est posé (colonnes absentes de l'écriture, donc intactes).
+    final zeros = existante == null && await aUneChaine(lotId)
+        ? const Value<int?>(0)
+        : const Value<int?>.absent();
+
+    await _db
+        .into(_db.livestockDailyEntries)
+        .insertOnConflictUpdate(
+          LivestockDailyEntriesCompanion(
+            id: Value(existante?.id ?? _uuid.v4()),
+            deviceId: Value(_deviceId),
+            // La fiche repart en file : son effectif vient de changer.
+            syncStatus: const Value(SyncStatus.pending),
+            updatedAt: Value(saisie),
+            lotId: Value(lotId),
+            entryDate: Value(jour),
+            achat: Value(existante?.achat ?? 0),
+            ne: Value(existante?.ne ?? 0),
+            mort: Value(existante?.mort ?? 0),
+            vente: Value(vente),
+            don: Value(existante?.don ?? 0),
+            effectifFinal: Value(effectif),
+            mortRepro: zeros,
+            mortSevre: zeros,
+            mortJeune: zeros,
+            donRepro: zeros,
+            donSevre: zeros,
+            donJeune: zeros,
+            passageSevreJeune: zeros,
+          ),
+        );
+
+    // 🔴→✅ F0.89 puis F0.95 — LA CASCADE EST CELLE DE CE DÉPÔT, UNIQUE (totaux bornés à 0, bande sur
+    // la DERNIÈRE fiche, catégories vente → Chair / Marchand). Le statut des fiches postérieures
+    // ne change pas : le serveur rejoue sa propre cascade et ne reprend jamais un dérivé du poste.
+    await recalculerEnCascade(lotId, jour);
+  }
+
+  /// Reporte sur la fiche (bande, [date]) les colonnes `transfert_*` calculées par `TransfertsRepository` (somme des
+  /// transferts ACTIFS du jour), puis recalcule l'effectif du jour et la cascade — miroir de
+  /// `TransferBetweenLotsAction::reporterSurFiche`.
+  ///
+  /// ⚠️ Une fiche CRÉÉE pour le transfert part au serveur (`pending`) : le serveur la reçoit avant le
+  /// transfert et la retrouve, au lieu d'en créer une seconde sous un autre identifiant.
+  Future<void> reporterTransferts(
+    String lotId,
+    DateTime date,
+    LivestockDailyEntriesCompanion colonnes,
+  ) async {
+    var fiche = await chargerJour(lotId, date);
+    if (fiche == null) {
+      if ((colonnes.transfertEntree.present ? colonnes.transfertEntree.value : 0) == 0 &&
+          (colonnes.transfertSortie.present ? colonnes.transfertSortie.value : 0) == 0) {
+        return;
+      }
+
+      final bande = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
+      final precedent = await effectifPrecedent(lotId, date);
+      var nouvelle = LivestockDailyEntriesCompanion.insert(
+        id: _uuid.v4(),
+        deviceId: _deviceId,
+        lotId: lotId,
+        entryDate: date,
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: DateTime.now(),
+      );
+      if (EffectifParCategorie.especeDuCode(bande?.speciesCode) != null) {
+        nouvelle = nouvelle.copyWith(
+          mortRepro: const Value(0),
+          mortSevre: const Value(0),
+          mortJeune: const Value(0),
+          donRepro: const Value(0),
+          donSevre: const Value(0),
+          donJeune: const Value(0),
+          passageSevreJeune: const Value(0),
+        );
+        // Première fiche d'une bande à catégories : départ DÉDUIT du stade (`departDepuisStade`).
+        final cat = EffectifParCategorie.categorieDuStade(bande?.stage);
+        if (cat != null && !await aUneChaine(lotId)) {
+          nouvelle = nouvelle.copyWith(
+            catDepartRepro: Value(cat == 'repro' ? precedent : 0),
+            catDepartSevre: Value(cat == 'sevre' ? precedent : 0),
+            catDepartJeune: Value(cat == 'jeune' ? precedent : 0),
+          );
+        }
+      }
+      await _db.into(_db.livestockDailyEntries).insert(nouvelle);
+      fiche = await chargerJour(lotId, date);
+    }
+
+    await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(fiche!.id)))
+        .write(colonnes);
+    final ajour = (await chargerJour(lotId, date))!;
+    final effectif = EffectifParCategorie.effectifFinal(
+      precedent: await effectifPrecedent(lotId, date),
+      achat: ajour.achat,
+      ne: ajour.ne,
+      mort: ajour.mort,
+      vente: ajour.vente,
+      don: ajour.don,
+      transfertEntree: ajour.transfertEntree,
+      transfertSortie: ajour.transfertSortie,
+    );
+    await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(ajour.id)))
+        .write(LivestockDailyEntriesCompanion(effectifFinal: Value(effectif)));
+
+    await recalculerEnCascade(lotId, date);
+  }
+
   /// Rations normatives d'une espèce, telles que le serveur les sert.
   ///
   /// ⚠️ JAMAIS DE GRAMMAGE CODÉ EN DUR. Ces valeurs sont éditables depuis

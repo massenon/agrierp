@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shared;
 
+use App\Services\DemandeSynchronisationService;
 use App\Services\JournalSynchronisationService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
@@ -30,6 +31,32 @@ class EtatSynchronisationPostes extends Component
     {
         $this->authorize('manage-users');
         unset($this->postes);
+    }
+
+    /**
+     * Ticket S-T6 — « Demander la synchronisation des postes » : dépose une demande que chaque poste connecté lit dans
+     * les 30 secondes, puis synchronise. `$poste` nul : tous les postes ; sinon le seul poste nommé (nom de son jeton,
+     * qui doit figurer dans la liste affichée).
+     *
+     * ⚠️ Le serveur n'envoie toujours rien lui-même (décision du Sprint 0) : il DEMANDE, et c'est le poste qui tire et
+     * envoie. Un poste hors ligne ne lira la demande qu'à son retour, si elle est encore valide.
+     */
+    public function demander(?string $poste = null): void
+    {
+        $this->authorize('manage-users');
+
+        if ($poste !== null && ! $this->postes->contains(fn ($ligne) => $ligne['poste'] === $poste)) {
+            $this->dispatch('toast', message: 'Poste inconnu du serveur : demande non envoyée.', type: 'error');
+
+            return;
+        }
+
+        app(DemandeSynchronisationService::class)->demander($poste, auth()->user());
+
+        $this->dispatch('toast', message: $poste === null
+            ? 'Demande envoyée : les postes connectés synchroniseront dans les 30 secondes.'
+            : "Demande envoyée au poste {$poste} : il synchronisera dans les 30 secondes s'il est connecté.",
+            type: 'success');
     }
 
     public function render()

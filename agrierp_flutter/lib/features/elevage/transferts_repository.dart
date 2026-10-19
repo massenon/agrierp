@@ -207,61 +207,9 @@ class TransfertsRepository {
       transfertSortieJeune: Value(somme(sorties, 'jeune')),
     );
 
-    var fiche = await _fiches.chargerJour(lotId, date);
-    if (fiche == null) {
-      if (somme(entrees) == 0 && somme(sorties) == 0) return;
-
-      final bande = await _bande(lotId);
-      final precedent = await _fiches.effectifPrecedent(lotId, date);
-      var nouvelle = LivestockDailyEntriesCompanion.insert(
-        id: _uuid.v4(),
-        deviceId: _deviceId,
-        lotId: lotId,
-        entryDate: date,
-        syncStatus: const Value(SyncStatus.pending),
-        updatedAt: DateTime.now(),
-      );
-      if (EffectifParCategorie.especeDuCode(bande?.speciesCode) != null) {
-        nouvelle = nouvelle.copyWith(
-          mortRepro: const Value(0),
-          mortSevre: const Value(0),
-          mortJeune: const Value(0),
-          donRepro: const Value(0),
-          donSevre: const Value(0),
-          donJeune: const Value(0),
-          passageSevreJeune: const Value(0),
-        );
-        // Première fiche d'une bande à catégories : départ DÉDUIT du stade (`departDepuisStade`).
-        final cat = categorieDuStade(bande?.stage);
-        if (cat != null && !await _fiches.aUneChaine(lotId)) {
-          nouvelle = nouvelle.copyWith(
-            catDepartRepro: Value(cat == 'repro' ? precedent : 0),
-            catDepartSevre: Value(cat == 'sevre' ? precedent : 0),
-            catDepartJeune: Value(cat == 'jeune' ? precedent : 0),
-          );
-        }
-      }
-      await _db.into(_db.livestockDailyEntries).insert(nouvelle);
-      fiche = await _fiches.chargerJour(lotId, date);
-    }
-
-    await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(fiche!.id)))
-        .write(colonnes);
-    final ajour = (await _fiches.chargerJour(lotId, date))!;
-    final effectif = EffectifParCategorie.effectifFinal(
-      precedent: await _fiches.effectifPrecedent(lotId, date),
-      achat: ajour.achat,
-      ne: ajour.ne,
-      mort: ajour.mort,
-      vente: ajour.vente,
-      don: ajour.don,
-      transfertEntree: ajour.transfertEntree,
-      transfertSortie: ajour.transfertSortie,
-    );
-    await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(ajour.id)))
-        .write(LivestockDailyEntriesCompanion(effectifFinal: Value(effectif)));
-
-    await _fiches.recalculerEnCascade(lotId, date);
+    // Ticket S-T7 — la fiche n'est écrite QUE par son dépôt (un seul écrivain par table) : création si besoin,
+    // colonnes de transfert, effectif du jour et cascade, tels qu'ils étaient écrits ici.
+    await _fiches.reporterTransferts(lotId, date, colonnes);
   }
 
   Future<LivestockLot?> _bande(String id) => (_db.select(

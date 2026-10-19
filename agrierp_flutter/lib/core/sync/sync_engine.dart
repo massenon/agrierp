@@ -130,6 +130,32 @@ class SyncEngine {
     return etats.any((e) => e != ConnectivityResult.none);
   }
 
+  /// Ticket S-T6 — le serveur demande-t-il une synchronisation à ce poste (bouton « Demander la synchronisation des
+  /// postes » du web) ? La lecture marque la demande servie au serveur : elle ne sert qu'une fois.
+  ///
+  /// ⚠️ NE LÈVE JAMAIS : hors ligne, serveur injoignable, session expirée ou réponse inattendue rendent `false`. Cette
+  /// question est posée toutes les 30 s sans geste de l'utilisateur ; une erreur rouge à chaque fois apprendrait à
+  /// ignorer les alertes (`SynchronisationAutomatique`).
+  Future<bool> demandeDuServeur() async {
+    try {
+      final reponse = await _client.get<Map<String, dynamic>>('/api/sync/demande');
+      return reponse.data?['demande'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ticket S-T6 — comptes du serveur par table et par jour depuis [depuis] (`AAAA-MM-JJ`), pour le contrôle de
+  /// cohérence de l'écran Synchronisation. Lève en cas d'échec : c'est un geste de l'utilisateur, qui doit savoir
+  /// que le contrôle n'a pas pu se faire.
+  Future<Map<String, dynamic>> coherenceDuServeur(String depuis) async {
+    final reponse = await _client.get<Map<String, dynamic>>(
+      '/api/sync/coherence',
+      queryParameters: {'depuis': depuis},
+    );
+    return reponse.data ?? const <String, dynamic>{};
+  }
+
   /// Ticket H13 — la tentative en cours. Un second appelant (bouton « Synchroniser maintenant » pendant une
   /// synchronisation automatique) reçoit la MÊME tentative : deux tirages entremêlés écriraient deux fois le
   /// curseur, et deux envois simultanés acquitteraient deux fois les mêmes lignes.

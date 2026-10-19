@@ -614,6 +614,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
       synchroniser: widget.engine.synchroniser,
       changementsReseau: reseau,
       intervalle: intervalle,
+      // Ticket S-T6 — « Demander la synchronisation des postes » du web, lue toutes les 30 s.
+      demandeDuServeur: widget.engine.demandeDuServeur,
       // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
       onTermine: () {
         if (mounted) setState(() => _versionTirage++);

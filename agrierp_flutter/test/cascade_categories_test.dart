@@ -423,8 +423,18 @@ void main() {
           'lib/features/ventes/caisse_repository.dart',
         ).readAsStringSync();
         expect(source.contains('_recalculerEnCascade'), isFalse);
-        expect(source.contains('recalculerEnCascade('), isTrue);
+        // Ticket S-T7 — la caisse n'écrit plus la fiche : elle la confie à son dépôt (un seul écrivain par
+        // table), dont `repercuterVente` passe par LA cascade unique.
+        expect(source.contains('.repercuterVente('), isTrue);
         expect(source.contains('calculerEffectifFinal('), isFalse);
+        final depot = File(
+          'lib/features/elevage/fiche_journaliere_repository.dart',
+        ).readAsStringSync();
+        final repercuter = depot.substring(
+          depot.indexOf('Future<void> repercuterVente('),
+          depot.indexOf('Future<void> reporterTransferts('),
+        );
+        expect(repercuter.contains('await recalculerEnCascade(lotId, jour);'), isTrue);
       },
     );
   });

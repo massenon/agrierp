@@ -15,16 +15,66 @@ rem    build_windows.bat              chaine complete (analyse + tests + build +
 rem    build_windows.bat --sans-tests saute flutter test (deconseille avant une livraison)
 rem    build_windows.bat --sans-installateur  produit seulement le dossier Release
 rem                                   (sans ce drapeau, Inno Setup absent = ECHEC)
+rem    build_windows.bat --env recette    environnement : dev, recette ou production
+rem                                   (defaut : production ; aussi --env=recette)
+rem
+rem  Ticket S-T8 - ENVIRONNEMENT ET VERSION DEMO
+rem    - L'environnement fixe l'adresse du serveur par defaut du poste
+rem      (lib/core/config/environnement.dart), passee a la compilation par
+rem      --dart-define=AGRIERP_ENV=<env>. Un environnement inconnu est REFUSE.
+rem    - Une VERSION DEMO est une version de pubspec.yaml qui porte le suffixe
+rem      -demo (1.2.0-demo+3, 1.2.0-demo.2+3). Elle est REFUSEE en production :
+rem      un installateur de demonstration remis a la ferme enverrait ses saisies
+rem      de demonstration au vrai serveur. Tout autre suffixe est invalide.
+rem    - Hors production, le nom de l'installateur porte l'environnement :
+rem      AgriERP-Setup-<version>-<env>.exe.
 rem ============================================================================
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 set "SANS_TESTS=0"
 set "SANS_INSTALLATEUR=0"
-for %%a in (%*) do (
-  if /i "%%~a"=="--sans-tests" set "SANS_TESTS=1"
-  if /i "%%~a"=="--sans-installateur" set "SANS_INSTALLATEUR=1"
+set "ENVIRONNEMENT=production"
+
+rem --- Arguments : shift decale aussi le parametre 0, d ou le cd plus haut ------
+:arguments
+if "%~1"=="" goto :arguments_lus
+if /i "%~1"=="--sans-tests" (
+  set "SANS_TESTS=1"
+  shift
+  goto :arguments
 )
+if /i "%~1"=="--sans-installateur" (
+  set "SANS_INSTALLATEUR=1"
+  shift
+  goto :arguments
+)
+rem  cmd coupe aussi sur "=" : --env=recette arrive comme --env puis recette.
+if /i "%~1"=="--env" (
+  if "%~2"=="" (
+    echo [ERREUR] --env attend une valeur : dev, recette ou production.
+    exit /b 1
+  )
+  set "ENVIRONNEMENT=%~2"
+  shift
+  shift
+  goto :arguments
+)
+echo [ERREUR] Argument inconnu : %~1
+echo          Arguments permis : --sans-tests, --sans-installateur, --env dev^|recette^|production
+exit /b 1
+:arguments_lus
+
+rem --- Environnement : exactement les codes de lib/core/config/environnement.dart
+set "ENV_RETENU="
+for %%e in (dev recette production) do (
+  if /i "!ENVIRONNEMENT!"=="%%e" set "ENV_RETENU=%%e"
+)
+if not defined ENV_RETENU (
+  echo [ERREUR] Environnement "%ENVIRONNEMENT%" inconnu : dev, recette ou production.
+  exit /b 1
+)
+set "ENVIRONNEMENT=%ENV_RETENU%"
 
 rem --- Version lue dans pubspec.yaml (ligne "version: 1.0.0+1") ---------------
 set "VERSION="
@@ -34,12 +84,45 @@ if not defined VERSION (
   exit /b 1
 )
 for /f "tokens=1 delims=+" %%v in ("%VERSION%") do set "VERSION_COURTE=%%v"
+
+rem  Ticket S-T8 : x.y.z, eventuellement suivi de -demo ou -demo.N (version demo).
+set "VERSION_NUM="
+set "SUFFIXE="
+for /f "tokens=1,* delims=-" %%a in ("%VERSION_COURTE%") do (
+  set "VERSION_NUM=%%a"
+  set "SUFFIXE=%%b"
+)
 rem  Ticket A7 / D2 : une version mal formee donnerait un installateur au nom faux.
-echo %VERSION_COURTE%| findstr /r /x "[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*" >nul || (
-  echo [ERREUR] Version "%VERSION_COURTE%" invalide dans pubspec.yaml : attendu x.y.z+n.
+echo %VERSION_NUM%| findstr /r /x "[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*" >nul || (
+  echo [ERREUR] Version "%VERSION_COURTE%" invalide dans pubspec.yaml : attendu x.y.z+n ou x.y.z-demo+n.
   exit /b 1
 )
-echo === AgriERP Desktop %VERSION% ===
+rem  ATTENTION : aucun tube dans un bloc entre parentheses ici, car le cote gauche d un tube
+rem  s execute dans un cmd fils SANS expansion retardee : une variable retardee y resterait telle quelle.
+set "DEMO=0"
+set "DEBUT="
+set "RESTE="
+if not defined SUFFIXE goto :suffixe_lu
+set "DEBUT=%SUFFIXE:~0,4%"
+set "RESTE=%SUFFIXE:~4%"
+if /i not "%DEBUT%"=="demo" goto :version_invalide
+if not defined RESTE goto :suffixe_demo
+echo %RESTE%| findstr /r /x "\.[0-9][0-9]*" >nul || goto :version_invalide
+:suffixe_demo
+set "DEMO=1"
+:suffixe_lu
+
+rem  Ticket S-T8 : JAMAIS de version demo en production.
+if "%DEMO%"=="1" if /i "%ENVIRONNEMENT%"=="production" (
+  echo [ERREUR] Version demo "%VERSION_COURTE%" : construction refusee pour la production.
+  echo          Retirez le suffixe -demo de pubspec.yaml, ou construisez avec --env recette ou --env dev.
+  exit /b 1
+)
+
+set "NOM_INSTALLATEUR=AgriERP-Setup-%VERSION_COURTE%"
+if /i not "%ENVIRONNEMENT%"=="production" set "NOM_INSTALLATEUR=%NOM_INSTALLATEUR%-%ENVIRONNEMENT%"
+
+echo === AgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
 
 where flutter >nul 2>nul || (echo [ERREUR] Flutter introuvable dans le PATH. & exit /b 1)
 
@@ -65,8 +148,8 @@ if "%SANS_TESTS%"=="1" (
 )
 
 echo.
-echo [5/6] Compilation release...
-call flutter build windows --release || goto :echec
+echo [5/6] Compilation release ^(environnement %ENVIRONNEMENT%^)...
+call flutter build windows --release --dart-define=AGRIERP_ENV=%ENVIRONNEMENT% || goto :echec
 set "SORTIE=build\windows\x64\runner\Release"
 if not exist "%SORTIE%\agrierp.exe" (
   echo [ERREUR] %SORTIE%\agrierp.exe absent apres la compilation.
@@ -106,15 +189,19 @@ if not defined ISCC (
   echo          Installez-le, ou relancez avec --sans-installateur pour le seul dossier Release.
   goto :echec
 )
-"%ISCC%" /Q /DAppVersion=%VERSION_COURTE% installer\agrierp.iss || goto :echec
-if not exist "installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe" (
-  echo [ERREUR] installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe absent apres Inno Setup.
+"%ISCC%" /Q /DAppVersion=%VERSION_COURTE% /DAppVersionNum=%VERSION_NUM% /DAppEnv=%ENVIRONNEMENT% /DNomInstallateur=%NOM_INSTALLATEUR% installer\agrierp.iss || goto :echec
+if not exist "installer\Output\%NOM_INSTALLATEUR%.exe" (
+  echo [ERREUR] installer\Output\%NOM_INSTALLATEUR%.exe absent apres Inno Setup.
   goto :echec
 )
 
 echo.
-echo === Termine : installer\Output\AgriERP-Setup-%VERSION_COURTE%.exe ===
+echo === Termine : installer\Output\%NOM_INSTALLATEUR%.exe ===
 exit /b 0
+
+:version_invalide
+echo [ERREUR] Version "%VERSION_COURTE%" invalide dans pubspec.yaml : seul le suffixe -demo ou -demo.N est permis.
+exit /b 1
 
 :echec
 echo.

@@ -458,16 +458,10 @@ class SoinsVaccinsRepository {
   /// RESTE (archivage logique) et repart à l'envoi (`pending`), où le serveur l'archive et journalise
   /// `veterinary_record.archived`. ⚠️ La période de rémanence créée par le soin n'est PAS touchée : au web non
   /// plus, archiver un soin ne rend pas la bande vendable.
+  ///
+  /// Ticket S-T7 — l'écriture vit dans [SoinsRepository.archiverSoin], seul écrivain de `veterinary_records`.
   Future<void> archiverSoin(String id, {DateTime? quand}) =>
-      (database.update(
-        database.veterinaryRecords,
-      )..where((t) => t.id.equals(id))).write(
-        VeterinaryRecordsCompanion(
-          isActive: const Value(false),
-          syncStatus: const Value(SyncStatus.pending),
-          updatedAt: Value(quand ?? DateTime.now()),
-        ),
-      );
+      soins.archiverSoin(id, quand: quand);
 
   // ── Infirmerie (H8b) ────────────────────────────────────────────────────────────────────────────────────
 

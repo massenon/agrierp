@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AnimalController;
 use App\Http\Controllers\Api\AttestationController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SupervisionSynchronisationController;
 use App\Http\Controllers\Api\SyncController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,4 +59,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     // compte laissent la marge d'une relance manuelle répétée sans permettre d'épuiser le serveur.
     Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:30,1');
     Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
+
+    // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du
+    // serveur pour le contrôle de cohérence. Compteurs de débit PROPRES (3e paramètre) : sans préfixe, tous les
+    // `throttle:N,1` d'un compte partagent la même clé, et l'interrogation régulière mangerait le crédit du tirage.
+    Route::get('/sync/demande', [SupervisionSynchronisationController::class, 'demande'])
+        ->middleware('throttle:6,1,sync-demande');
+    Route::get('/sync/coherence', [SupervisionSynchronisationController::class, 'coherence'])
+        ->middleware('throttle:10,1,sync-coherence');
 });

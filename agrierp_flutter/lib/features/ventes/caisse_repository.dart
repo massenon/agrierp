@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
-import '../elevage/effectif_par_categorie.dart';
 import '../elevage/fiche_journaliere_repository.dart';
 
 /// Ligne du panier de caisse.
@@ -361,83 +360,21 @@ class CaisseRepository {
 
   /// Répercute la vente sur la fiche du JOUR DE LA VENTE, puis recalcule les fiches suivantes.
   ///
-  /// ⚠️ LA FICHE EST COMPLÉTÉE, JAMAIS ÉCRASÉE : si l'animalier a déjà saisi
-  /// morts et naissances, la vente s'ajoute à ce qu'il a inscrit.
-  ///
-  /// ⚠️ L'EFFECTIF EST RECALCULÉ PAR LE MÊME POINT DE VÉRITÉ que la fiche et
-  /// que le serveur — jamais une soustraction réécrite ici.
-  ///
-  /// ⚠️ `saisie` horodate la fiche (instant de la SAISIE) ; `jour` est le jour de la vente.
+  /// Ticket S-T7 — la fiche n'est écrite QUE par son dépôt (un seul écrivain par table au poste) :
+  /// [FicheJournaliereRepository.repercuterVente] porte désormais l'écriture qui vivait ici, telle quelle
+  /// (fiche complétée jamais écrasée, effectif par le point de vérité unique, cascade du dépôt). Le même
+  /// générateur d'identifiants est transmis : une fiche créée par la vente garde l'identifiant que la caisse
+  /// lui aurait donné.
   Future<void> _repercuterSurFiche(
     String lotId,
     int quantite,
     DateTime jour,
     DateTime saisie,
-  ) async {
-    final existante =
-        await (_db.select(_db.livestockDailyEntries)
-              ..where((t) => t.lotId.equals(lotId) & t.entryDate.equals(jour)))
-            .getSingleOrNull();
-
-    final depot = FicheJournaliereRepository(
-      database: _db,
-      deviceId: _deviceId,
-    );
-
-    // ⚠️ F0.95 — même formule que le serveur (`computeEffectifFinal`, bornée à 0, 14.63).
-    final vente = (existante?.vente ?? 0) + quantite;
-    final effectif = EffectifParCategorie.effectifFinal(
-      precedent: await depot.effectifPrecedent(lotId, jour),
-      achat: existante?.achat ?? 0,
-      ne: existante?.ne ?? 0,
-      mort: existante?.mort ?? 0,
-      vente: vente,
-      don: existante?.don ?? 0,
-      // Ticket 15.46 : transferts entre bandes du jour compris.
-      transfertEntree: existante?.transfertEntree ?? 0,
-      transfertSortie: existante?.transfertSortie ?? 0,
-    );
-
-    // ⚠️ F0.95 — FICHE CRÉÉE PAR LA VENTE SUR UNE BANDE À CHAÎNE : ses mouvements ventilés naissent
-    // « connus à zéro » (`MOUVEMENTS_CONNUS_A_ZERO` du serveur, 15.39) — la vente ne porte ni mort ni
-    // don ; des null « inconnu » rendraient ses catégories inconnues. Fiche existante ou bande sans
-    // chaîne : rien n'est posé (colonnes absentes de l'écriture, donc intactes).
-    final zeros = existante == null && await depot.aUneChaine(lotId)
-        ? const Value<int?>(0)
-        : const Value<int?>.absent();
-
-    await _db
-        .into(_db.livestockDailyEntries)
-        .insertOnConflictUpdate(
-          LivestockDailyEntriesCompanion(
-            id: Value(existante?.id ?? _uuid.v4()),
-            deviceId: Value(_deviceId),
-            // La fiche repart en file : son effectif vient de changer.
-            syncStatus: const Value(SyncStatus.pending),
-            updatedAt: Value(saisie),
-            lotId: Value(lotId),
-            entryDate: Value(jour),
-            achat: Value(existante?.achat ?? 0),
-            ne: Value(existante?.ne ?? 0),
-            mort: Value(existante?.mort ?? 0),
-            vente: Value(vente),
-            don: Value(existante?.don ?? 0),
-            effectifFinal: Value(effectif),
-            mortRepro: zeros,
-            mortSevre: zeros,
-            mortJeune: zeros,
-            donRepro: zeros,
-            donSevre: zeros,
-            donJeune: zeros,
-            passageSevreJeune: zeros,
-          ),
-        );
-
-    // 🔴→✅ F0.89 puis F0.95 — LA CASCADE EST CELLE DU DÉPÔT, UNIQUE (totaux bornés à 0, bande sur
-    // la DERNIÈRE fiche, catégories vente → Chair / Marchand). Le statut des fiches postérieures
-    // ne change pas : le serveur rejoue sa propre cascade et ne reprend jamais un dérivé du poste.
-    await depot.recalculerEnCascade(lotId, jour);
-  }
+  ) => FicheJournaliereRepository(
+    database: _db,
+    deviceId: _deviceId,
+    uuid: _uuid,
+  ).repercuterVente(lotId, quantite, jour, saisie);
 
   static DateTime _minuit(DateTime d) => DateTime(d.year, d.month, d.day);
 

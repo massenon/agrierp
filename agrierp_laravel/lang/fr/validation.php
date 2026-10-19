@@ -229,6 +229,8 @@ return [
         'date' => 'date',
         'debitAccountId' => 'compte débité',
         'decision' => 'décision',
+        // Ticket S-T6 — date de départ du contrôle de cohérence (`GET /api/sync/coherence`).
+        'depuis' => 'date de départ du contrôle',
         'description' => 'description',
         'device_name' => 'nom du poste',
         'due_date' => 'date d\'échéance',

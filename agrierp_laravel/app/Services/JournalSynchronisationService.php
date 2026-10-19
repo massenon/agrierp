@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ControleCoherence;
 use App\Models\JournalSynchronisation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -73,7 +74,7 @@ class JournalSynchronisationService
     /**
      * Un poste par jeton Sanctum non expiré, du plus récemment vu au plus ancien.
      *
-     * @return Collection<int, array{poste: string, utilisateur: string, dernier_contact: ?Carbon, dernier_envoi: ?Carbon, acceptes: ?int, refuses: ?int, etat: string, libelle_etat: string}>
+     * @return Collection<int, array{poste: string, utilisateur: string, dernier_contact: ?Carbon, dernier_envoi: ?Carbon, dernier_controle: ?Carbon, acceptes: ?int, refuses: ?int, etat: string, libelle_etat: string}>
      */
     public function etatDesPostes(?Carbon $maintenant = null): Collection
     {
@@ -95,11 +96,18 @@ class JournalSynchronisationService
                 $contact = $jeton->last_used_at;
                 [$etat, $libelle] = $this->etat($envoi, $contact ?? $jeton->created_at, $maintenant);
 
+                // Ticket S-T6 — dernier contrôle de cohérence demandé par ce poste (le résultat reste au poste).
+                $controle = ControleCoherence::query()
+                    ->where('poste', $jeton->name)
+                    ->latest('created_at')
+                    ->value('created_at');
+
                 return [
                     'poste' => $jeton->name,
                     'utilisateur' => $jeton->tokenable?->name ?? '—',
                     'dernier_contact' => $contact,
                     'dernier_envoi' => $envoi?->created_at,
+                    'dernier_controle' => $controle === null ? null : Carbon::parse($controle),
                     'acceptes' => $envoi?->nb_acceptes,
                     'refuses' => $envoi?->nb_refuses,
                     'etat' => $etat,
