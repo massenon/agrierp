@@ -273,8 +273,8 @@ void main() {
   }
 
   /// Deux libellés se comparent sans accent ni casse : la maquette écrit
-  /// « Designation » ici et « Désignation » là, et cet écart-là est déjà suivi
-  /// par l'arbitrage client ouvert sur les huit `<th>` de `gestion-stocks`.
+  /// « Designation » ici et « Désignation » là ; l'arbitrage sur les `<th>` de `gestion-stocks` est tranché
+  /// (décision client du 19/10/2026 : accentués comme le Blade — tableau, puis journal au ticket U11).
   String normaliser(String libelle) {
     const accents = {
       'à': 'a',

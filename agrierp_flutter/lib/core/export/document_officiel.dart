@@ -61,7 +61,34 @@ class DocumentOfficiel {
     this.entetes = const [],
     this.filigrane,
     this.noteDePied,
+    this.fichier,
   });
+
+  /// 🔴→✅ Ticket U11 — NOM DU FICHIER PDF, celui que le web donne au même export (`streamDownload(…, 'stocks-'.
+  /// now()->format('Y-m-d').'.pdf')`), avec deux marques remplacées à l'édition par la date du poste :
+  /// `{jour}` → `AAAA-MM-JJ`, `{mois}` → `AAAA-MM` (voir [nomPdf]). `null` : le web n'édite pas ce document (nom
+  /// tiré du titre, horodaté).
+  final String? fichier;
+
+  /// Nom proposé à la boîte d'impression (« Enregistrer au format PDF ») : [fichier] daté, sinon le titre réduit
+  /// en tirets et horodaté à la minute. 🔴 Avant U11, TOUS les PDF du poste portaient le nom du classeur
+  /// (`…-AAAAMMJJ-HHMM.xlsx`) : extension fausse et nom différent du web.
+  static String nomPdf(DocumentOfficiel document, DateTime maintenant) {
+    String deux(int n) => n.toString().padLeft(2, '0');
+    final mois = '${maintenant.year}-${deux(maintenant.month)}';
+    final modele = document.fichier;
+    if (modele != null) {
+      return modele
+          .replaceAll('{jour}', '$mois-${deux(maintenant.day)}')
+          .replaceAll('{mois}', mois);
+    }
+    final base = document.titre
+        .replaceAll(RegExp(r'[^A-Za-zÀ-ÿ0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+    return '$base-${maintenant.year}${deux(maintenant.month)}${deux(maintenant.day)}'
+        '-${deux(maintenant.hour)}${deux(maintenant.minute)}.pdf';
+  }
 
   /// `opts.title` — repris tel quel du bouton d'export de chaque rapport.
   final String titre;

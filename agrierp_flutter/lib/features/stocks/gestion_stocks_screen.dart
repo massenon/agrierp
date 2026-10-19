@@ -92,10 +92,13 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   DonneesStocks? _donnees;
 
   // Formulaire d'ajustement.
-  String? _produitChoisi;
+  /// `''` = « -- Sélectionner -- » : aucun produit présélectionné, comme au web (ticket U11).
+  String _produitChoisi = '';
   String _motif = '';
   final _physique = TextEditingController();
-  String? _erreur;
+
+  /// Erreurs de validation de l'ajustement, par champ (`produit`, `physique`) — `@error` du Blade.
+  Map<String, String> _erreursAjustement = const {};
 
   /// Quantité de la modale « Ajouter Stock » (ticket U10) : gardée par l'écran, la modale se ferme en animation.
   final _quantiteAjout = TextEditingController();
@@ -116,12 +119,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   Future<void> _charger() async {
     final donnees = await widget.depot.charger();
     if (!mounted) return;
-    setState(() {
-      _donnees = donnees;
-      _produitChoisi ??= donnees.lignes.isEmpty
-          ? null
-          : donnees.lignes.first.produit.id;
-    });
+    setState(() => _donnees = donnees);
   }
 
   @override
@@ -173,24 +171,36 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
     child: Row(
       children: [
-        const Icon(SymbolesAgri.inventory_2, size: 26, color: AgriColors.brandEmerald),
-        const SizedBox(width: AgriSpacing.xs),
         Expanded(
           // ⚠️ **« Gestion des Stocks », le titre de la PAGE.**
           // « Gestion Stocks » est le libellé de l'ENTRÉE DE MENU
           // (`sidebar.js`) : les deux existent dans la maquette, à deux
           // endroits différents. Reprendre celui du menu pour titrer la
           // page remplace un libellé validé par un autre.
+          // Ticket U11 — l'icône est DANS le titre (`h2 … flex items-center gap-xs`) ; le sous-titre court sous
+          // l'ensemble, aligné sur l'icône, comme au web.
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Gestion des Stocks',
-                style: TextStyle(
-                  fontSize: large ? 24 : 20,
-                  fontWeight: FontWeight.bold,
-                  color: AgriColors.onSurface,
-                ),
+              Row(
+                children: [
+                  const Icon(
+                    SymbolesAgri.inventory_2,
+                    size: 26,
+                    color: AgriColors.brandEmerald,
+                  ),
+                  const SizedBox(width: AgriSpacing.xs),
+                  Flexible(
+                    child: Text(
+                      'Gestion des Stocks',
+                      style: TextStyle(
+                        fontSize: large ? 24 : 20,
+                        fontWeight: FontWeight.bold,
+                        color: AgriColors.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: AgriSpacing.xs),
               // Ticket U9 — sous-titre du Blade.
@@ -234,7 +244,8 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   );
 
   Widget _kpis(DonneesStocks d, bool large) => GridView.count(
-    crossAxisCount: large ? 4 : 2,
+    // Ticket U11 — `grid-cols-2 md:grid-cols-4` du Blade : quatre colonnes dès 768 px (le poste attendait 1 024 px).
+    crossAxisCount: AgriBreakpoints.moyen(context) ? 4 : 2,
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
     mainAxisSpacing: AgriSpacing.md,
@@ -356,18 +367,11 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  /// ⚠️⚠️ **QUATRE EN-TÊTES SANS ACCENT — C'EST LA MAQUETTE, PAS UNE FAUTE
-  /// DE FRAPPE DE PORTAGE.** `gestion-stocks.html` écrit `Designation`,
-  /// `Categorie`, `Reference` et `Quantite` dans ses `<th>`, alors que ses
-  /// PROPRES modales écrivent `Désignation *` et `Catégorie *`.
+  /// En-têtes de colonne du Blade (`text-[10px] text-outline font-bold uppercase`).
   ///
-  /// ⚠️ **INCOHÉRENCE DU PROTOTYPE, SIGNALÉE ET NON TRANCHÉE.** Sur les 102
-  /// pages : `Catégorie` 16 fois contre `Categorie` 2, `Désignation` 7 contre
-  /// 2, `Quantité` 4 contre 1, `Référence` 3 contre 3. Les formes accentuées
-  /// dominent largement, et cette page est l'une des rares à ne pas les
-  /// porter. Les accentuer ici serait pourtant harmoniser en silence une
-  /// incohérence du template — c'est au client de trancher.
-  /// **ARBITRAGE CLIENT** : accentuer les huit `<th>` fautifs du prototype ?
+  /// ✅ **ACCENTUÉS COMME LE BLADE** (décision client du 19/10/2026, « tout en concordance ») : « DÉSIGNATION »,
+  /// « CATÉGORIE » (tableau) puis, au ticket U11, « RÉFÉRENCE » et « QUANTITÉ » (journal). La maquette les écrivait
+  /// sans accent ; le Blade, maître, les accentue.
   static const _enteteColonne = TextStyle(
     fontSize: 10,
     fontWeight: FontWeight.bold,
@@ -573,14 +577,15 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       ],
                     ),
                   ),
+                  // Ticket U11 — état vide du Blade : centré, `text-outline`, taille du corps (16 px), sans italique.
                   if (lignes.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(AgriSpacing.lg),
                       child: Text(
                         'Aucun produit pour le moment.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: AgriTypography.xs,
-                          fontStyle: FontStyle.italic,
+                          fontSize: AgriTypography.base,
                           color: AgriColors.outline,
                         ),
                       ),
@@ -809,7 +814,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       ),
                       Expanded(
                         flex: 2,
-                        child: Text('REFERENCE', style: _enteteColonne),
+                        child: Text('RÉFÉRENCE', style: _enteteColonne),
                       ),
                       Expanded(
                         flex: 4,
@@ -826,7 +831,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          'QUANTITE',
+                          'QUANTITÉ',
                           textAlign: TextAlign.right,
                           style: _enteteColonne,
                         ),
@@ -842,14 +847,15 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     ],
                   ),
                 ),
+                // Ticket U11 — état vide du Blade : centré, `text-outline`, taille du corps (16 px), sans italique.
                 if (d.journal.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(AgriSpacing.lg),
                     child: Text(
                       'Aucun mouvement enregistré pour le moment.',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: AgriTypography.xs,
-                        fontStyle: FontStyle.italic,
+                        fontSize: AgriTypography.base,
                         color: AgriColors.outline,
                       ),
                     ),
@@ -965,215 +971,261 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
 
   // ── Onglet 3 : Ajustement / Correction ────────────────────────────────────
 
+  /// 🔴→✅ Ticket U11 — l'onglet du BLADE, champ pour champ : carte `max-w-xl p-lg`, titre `text-sm`, « Produit »
+  /// sur « -- Sélectionner -- » (jamais le premier produit présélectionné), « Stock théorique » « — » sans produit,
+  /// « Stock physique constaté », encadré « Écart calculé », « Motif de l'écart » FACULTATIF avec ses deux groupes,
+  /// bouton pleine largeur, texte d'aide dessous. Erreurs de validation sous leur champ (`@error`), toasts du web.
   Widget _ongletAjustement(DonneesStocks d) {
     final choisi = d.lignes
         .where((l) => l.produit.id == _produitChoisi)
         .map((l) => l.produit)
         .firstOrNull;
 
-    final theorique = choisi?.stockQty ?? 0;
     final ecart = StocksRepository.ecartCalcule(
       theorique: choisi?.stockQty,
       physique: double.tryParse(_physique.text.trim()),
     );
 
-    return Container(
-      padding: const EdgeInsets.all(AgriSpacing.lg),
-      decoration: BoxDecoration(
-        color: AgriColors.surfaceCard,
-        border: Border.all(color: AgriColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            "Saisir un ajustement d'inventaire",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AgriColors.brandForest,
-            ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        // `max-w-xl` : 36 rem.
+        constraints: const BoxConstraints(maxWidth: 576),
+        child: Container(
+          key: const Key('carte-ajustement'),
+          padding: const EdgeInsets.all(AgriSpacing.lg),
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+            boxShadow: AgriShadows.sm,
           ),
-          const SizedBox(height: AgriSpacing.md),
-          _etiquette('Produit'),
-          Container(
-            key: const Key('adj-produit'),
-            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
-            decoration: BoxDecoration(
-              border: Border.all(color: AgriColors.outlineVariant),
-              borderRadius: BorderRadius.circular(AgriRadius.lg),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _produitChoisi,
-                isExpanded: true,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AgriColors.onSurface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "Saisir un ajustement d'inventaire",
+                style: TextStyle(
+                  fontSize: AgriTypography.sm,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandForest,
                 ),
-                items: [
-                  for (final l in d.lignes)
-                    DropdownMenuItem(
-                      value: l.produit.id,
-                      // ⚠️ Le stock théorique figure dans le libellé, comme
-                      // dans la maquette : l'opérateur compare sans changer
-                      // d'écran.
-                      child: Text(
-                        '${l.produit.name} (Théorique : '
-                        '${PmpService.quantite(l.produit.stockQty)})',
-                        overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              _etiquette('Produit'),
+              _cadreListe(
+                cle: 'adj-produit',
+                enErreur: _erreursAjustement['produit'] != null,
+                liste: DropdownButton<String>(
+                  value: _produitChoisi,
+                  isExpanded: true,
+                  style: const TextStyle(
+                    fontSize: AgriTypography.sm,
+                    color: AgriColors.onSurface,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('-- Sélectionner --'),
+                    ),
+                    for (final l in d.lignes)
+                      DropdownMenuItem(
+                        value: l.produit.id,
+                        // Le stock théorique figure dans le libellé, comme au web : l'opérateur compare sans
+                        // changer d'écran.
+                        child: Text(
+                          '${l.produit.name} (Théorique : '
+                          '${PmpService.quantite(l.produit.stockQty)})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _produitChoisi = v ?? ''),
+                ),
+              ),
+              if (_erreursAjustement['produit'] != null)
+                _erreurChamp('adj-erreur-produit', _erreursAjustement['produit']!),
+              const SizedBox(height: AgriSpacing.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _etiquette('Stock théorique'),
+                        // `{{ $this->adjSelectedProduct ? … : '—' }}`.
+                        _champLecture(
+                          key: const Key('adj-theorique'),
+                          valeur: choisi == null
+                              ? '—'
+                              : PmpService.quantite(choisi.stockQty),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AgriSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _etiquette('Stock physique constaté'),
+                        TextField(
+                          key: const Key('adj-physique'),
+                          controller: _physique,
+                          keyboardType: TextInputType.number,
+                          decoration: _decoration(
+                            enErreur: _erreursAjustement['physique'] != null,
+                          ),
+                          style: const TextStyle(fontSize: AgriTypography.sm),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        if (_erreursAjustement['physique'] != null)
+                          _erreurChamp(
+                            'adj-erreur-physique',
+                            _erreursAjustement['physique']!,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              // 🔴→✅ Ticket U10 — l'encadré du Blade (`bg-surface-zebra rounded-lg p-sm text-center`) :
+              // `{{ $adjDiff > 0 ? '+' : '' }}{{ $adjDiff }}`, soit « 0 » tant que rien n'est saisi (jamais « — »),
+              // rouge si négatif, vert si positif, vert forêt à zéro.
+              Container(
+                padding: const EdgeInsets.all(AgriSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AgriColors.surfaceZebra,
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Écart calculé'.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AgriColors.outline,
                       ),
                     ),
-                ],
-                onChanged: (v) => setState(() {
-                  _produitChoisi = v;
-                  _erreur = null;
-                }),
-              ),
-            ),
-          ),
-          const SizedBox(height: AgriSpacing.md),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _etiquette('Stock théorique'),
-                    _champLecture(
-                      key: const Key('adj-theorique'),
-                      valeur: PmpService.quantite(theorique),
+                    Text(
+                      StocksRepository.ecartAffiche(ecart),
+                      key: const Key('adj-ecart'),
+                      style: TextStyle(
+                        fontSize: AgriTypography.xl,
+                        fontWeight: FontWeight.w800,
+                        color: ecart < 0
+                            ? AgriColors.errorDeep
+                            : ecart > 0
+                            ? AgriColors.brandEmerald
+                            : AgriColors.brandForest,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AgriSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _etiquette('Stock physique constaté'),
-                    TextField(
-                      key: const Key('adj-physique'),
-                      controller: _physique,
-                      keyboardType: TextInputType.number,
-                      decoration: _decoration(),
-                      style: const TextStyle(fontSize: 14),
-                      onChanged: (_) => setState(() => _erreur = null),
+              const SizedBox(height: AgriSpacing.md),
+              _etiquette("Motif de l'écart"),
+              _cadreListe(
+                cle: 'adj-motif',
+                liste: DropdownButton<String>(
+                  value: _motif,
+                  isExpanded: true,
+                  style: const TextStyle(
+                    fontSize: AgriTypography.sm,
+                    color: AgriColors.onSurface,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text("-- Sélectionner selon le sens de l'écart --"),
                     ),
+                    // Les deux `<optgroup>` du Blade : un intitulé non sélectionnable, puis ses motifs.
+                    for (final (groupe, motifs) in const [
+                      ('Écart négatif (perte)', StocksRepository.motifsPerte),
+                      ('Écart positif (surplus)', StocksRepository.motifsSurplus),
+                    ]) ...[
+                      DropdownMenuItem(
+                        enabled: false,
+                        value: '§$groupe',
+                        child: Text(
+                          groupe,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AgriColors.outline,
+                          ),
+                        ),
+                      ),
+                      for (final m in motifs)
+                        DropdownMenuItem(
+                          value: m,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: AgriSpacing.md),
+                            child: Text(m),
+                          ),
+                        ),
+                    ],
                   ],
+                  onChanged: (v) => setState(() => _motif = v ?? ''),
                 ),
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              // `w-full py-sm rounded-lg bg-brand-emerald … font-bold text-xs`.
+              ElevatedButton(
+                key: const Key('adj-valider'),
+                onPressed: _validerAjustement,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AgriColors.brandEmerald,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  ),
+                ),
+                child: const Text(
+                  "Valider l'ajustement",
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              // Texte d'aide du Blade, mot pour mot (`gestion_stocks_u11_test.dart` le lit dans la vue).
+              const Text(
+                "Si l'écart est négatif, une écriture de charge exceptionnelle (compte 657) est générée "
+                'automatiquement, valorisée au PMP.',
+                key: Key('adj-aide'),
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
               ),
             ],
           ),
-          const SizedBox(height: AgriSpacing.md),
-          // 🔴→✅ Ticket U10 — l'encadré du Blade (`bg-surface-zebra rounded-lg p-sm text-center`) :
-          // `{{ $adjDiff > 0 ? '+' : '' }}{{ $adjDiff }}`, soit « 0 » tant que rien n'est saisi (jamais « — »),
-          // rouge si négatif, vert si positif, vert forêt à zéro.
-          Container(
-            padding: const EdgeInsets.all(AgriSpacing.sm),
-            decoration: BoxDecoration(
-              color: AgriColors.surfaceZebra,
-              borderRadius: BorderRadius.circular(AgriRadius.lg),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'Écart calculé'.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.outline,
-                  ),
-                ),
-                Text(
-                  StocksRepository.ecartAffiche(ecart),
-                  key: const Key('adj-ecart'),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: ecart < 0
-                        ? AgriColors.errorDeep
-                        : ecart > 0
-                        ? AgriColors.brandEmerald
-                        : AgriColors.brandForest,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AgriSpacing.md),
-          _etiquette("Motif de l'écart"),
-          Container(
-            key: const Key('adj-motif'),
-            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
-            decoration: BoxDecoration(
-              border: Border.all(color: AgriColors.outlineVariant),
-              borderRadius: BorderRadius.circular(AgriRadius.lg),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _motif,
-                isExpanded: true,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AgriColors.onSurface,
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text("-- Sélectionner selon le sens de l'écart --"),
-                  ),
-                  for (final m in StocksRepository.motifs)
-                    DropdownMenuItem(value: m, child: Text(m)),
-                ],
-                onChanged: (v) => setState(() {
-                  _motif = v ?? '';
-                  _erreur = null;
-                }),
-              ),
-            ),
-          ),
-          if (_erreur != null) ...[
-            const SizedBox(height: AgriSpacing.sm),
-            Text(
-              _erreur!,
-              key: const Key('adj-erreur'),
-              style: const TextStyle(
-                fontSize: AgriTypography.xs,
-                color: AgriColors.errorDeep,
-              ),
-            ),
-          ],
-          const SizedBox(height: AgriSpacing.lg),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              key: const Key('adj-valider'),
-              onPressed: _validerAjustement,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AgriColors.brandEmerald,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AgriSpacing.lg,
-                  vertical: AgriSpacing.sm,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AgriRadius.lg),
-                ),
-              ),
-              child: const Text(
-                "Valider l'ajustement",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+
+  /// Cadre d'une liste déroulante du Blade (`h-11 px-md border rounded-lg`), bord rouge si le champ est en erreur
+  /// (`is-invalid`).
+  Widget _cadreListe({
+    required String cle,
+    required Widget liste,
+    bool enErreur = false,
+  }) => Container(
+    key: Key(cle),
+    height: 44,
+    padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+    decoration: BoxDecoration(
+      color: AgriColors.surfaceCard,
+      border: Border.all(
+        color: enErreur ? AgriColors.errorRed : AgriColors.outlineVariant,
+      ),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+    ),
+    child: DropdownButtonHideUnderline(child: liste),
+  );
 
   // ── Exporter, Ajouter Stock (ticket U10) ──────────────────────────────────
 
@@ -1329,41 +1381,76 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
+  /// 🔴→✅ Ticket U11 — `GestionStocks::validateAdjustment()`, pas pour pas :
+  ///   1. validation du web (produit obligatoire, stock physique numérique ≥ 0 ; le motif est FACULTATIF) — les
+  ///      erreurs s'affichent sous leur champ, rien n'est écrit ;
+  ///   2. écart NUL (arrondi au centième, `$diff == 0`) → toast d'avertissement « Aucun écart détecté — rien à
+  ///      ajuster. », rien n'est écrit, le formulaire reste tel quel ;
+  ///   3. sinon l'écart est enregistré (en attente d'envoi : le serveur le rejoue), puis le toast du web
+  ///      ([StocksRepository.messageAjustement]) et le formulaire remis à vide (`reset([...])`) : produit sur
+  ///      « -- Sélectionner -- », stock physique et motif vides.
   Future<void> _validerAjustement() async {
-    final produit = _produitChoisi;
-    final physique = double.tryParse(_physique.text.trim());
+    final donnees = _donnees;
+    if (donnees == null) return;
+    final produitId = _produitChoisi;
+    final produit = donnees.lignes
+        .where((l) => l.produit.id == produitId)
+        .firstOrNull;
 
-    if (produit == null || physique == null) {
-      setState(() => _erreur = 'Indiquez le stock physique constaté.');
+    final erreurs = StocksRepository.validerAjustement(
+      productId: produitId,
+      physique: _physique.text,
+      produitConnu: produit != null,
+    );
+    setState(() => _erreursAjustement = erreurs);
+    if (erreurs.isNotEmpty) return;
+
+    final physique = double.parse(_physique.text.trim());
+    final ecart = StocksRepository.ecartCalcule(
+      theorique: produit!.produit.stockQty,
+      physique: physique,
+    );
+    if (ecart == 0) {
+      ToastAgri.afficher(
+        context,
+        StocksRepository.messageEcartNul,
+        type: TypeToast.avertissement,
+      );
       return;
     }
 
     try {
       await widget.depot.enregistrerEcart(
-        productId: produit,
+        productId: produitId,
         stockPhysique: physique,
         motif: _motif,
       );
     } on ArgumentError catch (e) {
-      setState(() => _erreur = '${e.message}');
+      setState(() => _erreursAjustement = {'produit': '${e.message}'});
       return;
     }
+    final comptes = await widget.depot.comptesDePerte();
+    final retour = StocksRepository.messageAjustement(
+      ecart: ecart,
+      pmp: produit.pmp,
+      comptesDePerte: comptes,
+    );
 
     _physique.clear();
     setState(() {
+      _produitChoisi = '';
       _motif = '';
-      _erreur = null;
+      _erreursAjustement = const {};
     });
     await _charger();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Écart enregistré. Il partira au prochain tirage, et le serveur '
-            'recalculera le solde depuis son propre état.',
-          ),
-        ),
+      ToastAgri.afficher(
+        context,
+        retour.message,
+        type: retour.avertissement
+            ? TypeToast.avertissement
+            : TypeToast.succes,
       );
     }
   }
@@ -1407,15 +1494,22 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  InputDecoration _decoration() => InputDecoration(
-    isDense: true,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: AgriSpacing.md,
-      vertical: 12,
-    ),
-    border: OutlineInputBorder(
+  /// [enErreur] : bord rouge (`is-invalid` du Blade).
+  InputDecoration _decoration({bool enErreur = false}) {
+    final bord = OutlineInputBorder(
       borderRadius: BorderRadius.circular(AgriRadius.lg),
-      borderSide: const BorderSide(color: AgriColors.outlineVariant),
-    ),
-  );
+      borderSide: BorderSide(
+        color: enErreur ? AgriColors.errorRed : AgriColors.outlineVariant,
+      ),
+    );
+    return InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AgriSpacing.md,
+        vertical: 12,
+      ),
+      border: bord,
+      enabledBorder: bord,
+    );
+  }
 }

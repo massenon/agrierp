@@ -169,22 +169,25 @@ class StocksRepository {
   /// Horloge injectée (tests) : borne le mois des « Écarts d'Inventaire ».
   final DateTime Function() _horloge;
 
-  /// Les huit motifs d'écart de la maquette, dans son ordre.
-  ///
-  /// ⚠️ Le menu de la maquette invite à choisir « selon le sens de l'écart » :
-  /// les quatre premiers correspondent à un manquant, les quatre suivants à
-  /// un excédent. La liste est recopiée telle quelle — l'appariement au sens
-  /// n'est écrit nulle part, et l'inventer restreindrait à tort la saisie.
-  static const motifs = [
+  /// Ticket U11 — les deux `<optgroup>` du Blade, dans son ordre : « Écart négatif (perte) » (cinq motifs) puis
+  /// « Écart positif (surplus) » (trois). Le poste les présentait à plat, et sa note parlait de « quatre + quatre ».
+  /// Le groupe guide le choix sans le restreindre : le web accepte tout motif quel que soit le sens de l'écart.
+  static const motifsPerte = [
     'Casse de matériel',
     'Vol / Disparition',
     'Mortalité non déclarée',
     "Erreur de pesée d'approvisionnement",
     'Péremption dépassée',
+  ];
+
+  static const motifsSurplus = [
     'Naissance non répertoriée',
     'Surplus de livraison',
     "Erreur d'inventaire antérieur",
   ];
+
+  /// Les huit motifs d'écart, dans l'ordre du Blade.
+  static const motifs = [...motifsPerte, ...motifsSurplus];
 
   /// `GestionStocks::getStockRowsProperty()` : recherche (`str_contains` en minuscules sur le nom OU le SKU, texte
   /// tel que saisi) puis filtre de catégorie (identifiant). Le tableau ET l'export lisent cette liste.
@@ -215,6 +218,97 @@ class StocksRepository {
   static String ecartAffiche(double ecart) =>
       '${ecart > 0 ? '+' : ''}${PmpService.flottant(ecart)}';
 
+  /// 🔴→✅ Ticket U11 — RÈGLES DE L'ONGLET « AJUSTEMENT / CORRECTION » DU WEB (`GestionStocks::validateAdjustment()`),
+  /// messages de `lang/fr/validation.php` avec les noms de champ du web (`adjProductId` → « produit »,
+  /// `adjPhysical` → « stock physique constaté ») : `adjProductId` `required|exists:products,id`, `adjPhysical`
+  /// `required|numeric|min:0`. Rend les erreurs par champ (`produit`, `physique`), vide si tout est valable.
+  ///
+  /// ⚠️ **LE MOTIF N'EST PAS OBLIGATOIRE** : le web ne le valide pas (`$this->adjReason ?: null`). Le poste
+  /// l'exigeait — un comptage sans motif choisi, accepté au web, était refusé ici.
+  static Map<String, String> validerAjustement({
+    required String? productId,
+    required String physique,
+    bool produitConnu = true,
+  }) {
+    final erreurs = <String, String>{};
+    if (productId == null || productId.isEmpty) {
+      erreurs['produit'] = 'Le champ produit est obligatoire.';
+    } else if (!produitConnu) {
+      erreurs['produit'] =
+          "La valeur sélectionnée pour le champ produit n'existe pas.";
+    }
+    final texte = physique.trim();
+    final valeur = double.tryParse(texte);
+    if (texte.isEmpty) {
+      erreurs['physique'] =
+          'Le champ stock physique constaté est obligatoire.';
+    } else if (valeur == null || !valeur.isFinite) {
+      erreurs['physique'] =
+          'Le champ stock physique constaté doit être un nombre.';
+    } else if (valeur < 0) {
+      erreurs['physique'] =
+          'Le champ stock physique constaté doit être au moins égal à 0.';
+    }
+    return erreurs;
+  }
+
+  /// `validateAdjustment()` : un écart nul (`$diff == 0`, écart ARRONDI au centième) n'écrit rien et le dit.
+  static const messageEcartNul = 'Aucun écart détecté — rien à ajuster.';
+
+  /// 🔴→✅ Ticket U11 — LE TOAST DU WEB APRÈS UN AJUSTEMENT, branche pour branche (`validateAdjustment()`) :
+  ///
+  ///   écart positif → « Ajustement enregistré — écart positif de N. Aucune écriture : … » (succès) ;
+  ///   perte chiffrée → « Ajustement enregistré — perte de X FCFA portée en charge exceptionnelle (débit 657 /
+  ///     crédit 601). » (avertissement), X = `number_format(round(|écart| × PMP, 2), 0, ',', ' ')`, la règle de
+  ///     `RecordStockAdjustmentEntryAction` (PMP connu et positif, valeur ≥ 0,01, comptes 657 et 601 au plan) ;
+  ///   sinon → « … ATTENTION : perte non comptabilisée … » (avertissement).
+  ///
+  /// ⚠️ **AU POSTE, LA PERTE EST CHIFFRÉE SUR SON ÉTAT LOCAL.** L'écriture, elle, est passée par le SERVEUR à la
+  /// réception (`pushStockAdjustments` → `RecordStockAdjustmentEntryAction`), sur SON état : si le stock ou le PMP
+  /// du produit ont bougé entre-temps (vente ou achat saisis ailleurs), le montant écrit peut différer de celui
+  /// annoncé ici. [comptesDePerte] `null` (plan comptable jamais tiré par ce compte) vaut « présents » : le plan
+  /// SYSCOHADA du serveur les porte d'origine (`ChartOfAccountsSeeder`).
+  static ({String message, bool avertissement}) messageAjustement({
+    required double ecart,
+    required double? pmp,
+    required bool? comptesDePerte,
+  }) {
+    if (ecart > 0) {
+      return (
+        message:
+            'Ajustement enregistré — écart positif de ${PmpService.flottant(ecart)}. Aucune écriture : un excédent '
+            'signale une entrée non saisie, jamais un gain.',
+        avertissement: false,
+      );
+    }
+    final valeur = pmp == null || pmp <= 0
+        ? null
+        : PmpService.arrondi(ecart.abs() * pmp, 2);
+    if (valeur != null && valeur >= 0.01 && comptesDePerte != false) {
+      return (
+        message:
+            'Ajustement enregistré — perte de ${PmpService.francs(valeur)} FCFA portée en charge exceptionnelle '
+            '(débit 657 / crédit 601).',
+        avertissement: true,
+      );
+    }
+    return (
+      message:
+          "Ajustement enregistré — ATTENTION : perte non comptabilisée (aucun coût d'achat connu pour ce produit, ou "
+          'compte manquant). À régulariser au Journal Comptable.',
+      avertissement: true,
+    );
+  }
+
+  /// Les comptes 657 (charges exceptionnelles) et 601 (achats) existent-ils au plan comptable du poste ? `null` si
+  /// le poste ne détient aucun plan comptable (table servie avec `view-comptabilite` seulement).
+  Future<bool?> comptesDePerte() async {
+    final comptes = await database.select(database.chartOfAccounts).get();
+    if (comptes.isEmpty) return null;
+    final codes = {for (final c in comptes) c.code};
+    return codes.contains('657') && codes.contains('601');
+  }
+
   /// 🔴→✅ Ticket U10 — « Exporter » : le document de `exportStocksPdf()` (vue `exports.gestion-stocks`), lignes
   /// FILTRÉES comme à l'écran. Titre « Gestion des Stocks — Tableau & Valorisation », sous-titre « État au
   /// jj/mm/aaaa », sept colonnes (sans « Actions »), cellules du Blade d'export : stock `number_format(…, 2, ',', ' ')`
@@ -226,6 +320,7 @@ class StocksRepository {
     String deux(int n) => n.toString().padLeft(2, '0');
     return DocumentOfficiel(
       titre: 'Gestion des Stocks — Tableau & Valorisation',
+      fichier: 'stocks-{jour}.pdf',
       sousTitre:
           'État au ${deux(maintenant.day)}/${deux(maintenant.month)}/${maintenant.year}',
       entetes: const [
@@ -455,9 +550,7 @@ class StocksRepository {
       );
     }
 
-    if (motif.isEmpty) {
-      throw ArgumentError("Le motif de l'écart est obligatoire.");
-    }
+    // Ticket U11 — le motif est FACULTATIF, comme au web (`$this->adjReason ?: null`) : plus de refus ici.
 
     final id = _uuid.v4();
 

@@ -77,6 +77,8 @@ void main() {
     await tester.ensureVisible(find.text('Enregistrer ce Jour'));
     await tester.tap(find.text('Enregistrer ce Jour'));
     await tester.pumpAndSettle();
+    // Ticket U11 — la fiche Pondeuses répond par le toast du web, retiré après 3,5 s.
+    await tester.pump(const Duration(seconds: 4));
 
     final fiche = await db.select(db.livestockDailyEntries).getSingle();
     // Recalcul indépendant : 50 au départ − 3 morts − 2 dons.

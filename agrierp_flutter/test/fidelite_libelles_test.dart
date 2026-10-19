@@ -1090,12 +1090,23 @@ void main() {
       'Effectif Malade': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
       'Tableau 1 : Recensement Hebdomadaire': 'Ticket U10 : le Blade fait foi — « Tableau 1 : Recensement »',
       'Tableau 3 : Suivi Intégral de la Ponte': 'Ticket U10 : le Blade fait foi — « Tableau 3 : Suivi de la Ponte »',
+      // Ticket U11 — l'onglet du Blade n'a ni bouton « Filtrer la Période » ni sa modale : la période se règle dans la
+      // barre du hub, l'export par ses boutons.
+      'Filtrer la Période': 'Ticket U11 : le Blade fait foi — bouton absent de l onglet web (période réglée par le hub)',
+      'Générer': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Période — Du *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Période — Au *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Format *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Annuler': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
     },
 
     'gestion-stocks.html': {
       // Décision client du 19/10/2026 : en-têtes accentués comme le Blade (« Désignation », « Catégorie »).
       'Designation': 'accentué comme le Blade (décision client du 19/10/2026)',
       'Categorie': 'accentué comme le Blade (décision client du 19/10/2026)',
+      // Ticket U11 — même décision pour les en-têtes du Journal des Mouvements (« Référence », « Quantité » au Blade).
+      'Reference': 'accentué comme le Blade (décision client du 19/10/2026, ticket U11)',
+      'Quantite': 'accentué comme le Blade (décision client du 19/10/2026, ticket U11)',
       // « Il n'y a rien à recalculer au poste » : le PMP est tenu par le
       // serveur.
       'Recalculer PMP': 'le PMP est calculé par le serveur, pas au poste',
@@ -1351,6 +1362,9 @@ void main() {
     final absentes = <String>[];
     for (final page in portages.keys) {
       if (!inventaireMaquette[page]!.contains(libelle)) continue;
+      // Ticket U11 — une absence EXPLIQUÉE par une exemption de la page (« le Blade fait foi ») n'est pas masquée
+      // par l'exemption globale : elle ne compte ni présente ni absente.
+      if (exemptionsParPage[page]?.containsKey(libelle) ?? false) continue;
       final code = portages[page]!
           .map((c) => chainesDe(File(c).readAsStringSync()))
           .join('\n');

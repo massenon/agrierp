@@ -733,6 +733,7 @@ class DocumentsAvances {
 
     return DocumentOfficiel(
       titre: 'Historique des Avances Clients',
+      fichier: 'avances-{jour}.pdf',
       sousTitre: 'Acomptes et réservations de commandes',
       entetes: const [
         'Client',

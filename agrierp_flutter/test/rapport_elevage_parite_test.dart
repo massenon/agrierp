@@ -21,6 +21,9 @@ import 'php_laravel.dart';
 ///    produire les MÊMES cellules et les MÊMES valeurs sur le même jeu : ventilation absente, sexe et montant de vente
 ///    (absents compris), traitement d'un produit, dose, symptômes (« », « 0 », absents → « RAS »), fiches hors
 ///    période (fiche précédente de la mortalité), bandes à effectif initial, fiche à effectif nul.
+/// 3. 🔴→✅ **Ticket U11 — l'ordre** : deux fiches du même jour sortent par identifiant croissant des deux côtés
+///    (`orderBy('id')` au web, [RapportsRepository.ordreDesFiches] au poste) ; les lignes se comparent telles qu'elles
+///    sortent, Tableau 3 compris, et la « fiche la plus ancienne » de la mortalité hebdo est la même.
 void main() {
   final blade = File(
     '$dossierLaravel/resources/views/livewire/rapports/elevage-synth.blade.php',
@@ -133,7 +136,7 @@ void main() {
   });
 
   test(
-    'parité exécutée U10 : Tableaux 1 et 2 et indicateurs du poste = ceux rendus par le Blade, avec et sans filtre',
+    'parité exécutée U10 / U11 : Tableaux 1, 2 et 3 et indicateurs du poste = ceux rendus par le Blade, dans le même ordre, avec et sans filtre',
     () async {
       var graine = 1709;
       int hasard(int n) =>
@@ -150,9 +153,40 @@ void main() {
       final produits = ['Ivermectine 1 %', 'Vitamines AD3E'];
       final fiches = <Map<String, Object?>>[];
       final vus = <String>{};
-      // Fiche la plus ancienne de juillet UNIQUE (le web ne définit pas l'ordre de deux fiches du même jour) : PON-A
-      // le 2 juillet ; aucune autre fiche de juillet avant le 3.
+      // Ticket U11 — identifiants FIXÉS des deux côtés (le serveur reprend celui du poste) : l'ordre de deux fiches du
+      // même jour est désormais défini (identifiant croissant) et comparé tel quel.
+      String identifiant() => [
+        for (final n in [8, 4, 4, 4, 12])
+          [
+            for (var k = 0; k < n; k++)
+              '0123456789abcdef'[hasard(16)],
+          ].join(),
+      ].join('-');
+      // Ticket U11 — DEUX fiches le 2 juillet, jour le plus ancien de juillet (PON-A et POR-C) : la « plus ancienne »
+      // de la mortalité hebdo est celle de plus petit identifiant, et les deux surfaces doivent choisir la même.
       fiches.add({
+        'id': identifiant(),
+        'bande': 2,
+        'date': jour(7, 2),
+        'achat': 0,
+        'ne': 0,
+        'mort': 9,
+        'vente': 0,
+        'effectif': 71,
+        'ponte': 12,
+        'm': null,
+        'f': null,
+        'smeres': null,
+        'sevres': null,
+        'sexe': null,
+        'montant': null,
+        'traitement': null,
+        'dose': null,
+        'symptomes': null,
+      });
+      vus.add('2 ${jour(7, 2)}');
+      fiches.add({
+        'id': identifiant(),
         'bande': 0,
         'date': jour(7, 2),
         'achat': 0,
@@ -179,6 +213,7 @@ void main() {
         final date = jour(mois, j);
         if (!vus.add('$b $date')) continue;
         fiches.add({
+          'id': identifiant(),
           'bande': b,
           'date': date,
           'achat': hasard(4),
@@ -234,18 +269,22 @@ void main() {
                 speciesId: uuid('espece'),
                 speciesCode: const Value('aviculture'),
                 stage: const Value('ponte'),
+                createdDate: Value(DateTime(2026, 1, 5)),
                 initialQuantity: Value(bandes[b]['initial']! as int),
               ),
             );
       }
-      for (var f = 0; f < fiches.length; f++) {
-        final x = fiches[f];
+      // ⚠️ Ticket U11 — fiches insérées par identifiant DÉCROISSANT : sans le second critère de tri, un tri stable
+      // garderait l'ordre d'insertion, l'inverse de celui du web.
+      final parIdDecroissant = [...fiches]
+        ..sort((a, b) => (b['id']! as String).compareTo(a['id']! as String));
+      for (final x in parIdDecroissant) {
         final t = x['traitement'] as int?;
         await db
             .into(db.livestockDailyEntries)
             .insert(
               LivestockDailyEntriesCompanion.insert(
-                id: uuid('fiche-$f-'),
+                id: x['id']! as String,
                 deviceId: 'serveur',
                 syncStatus: const Value(SyncStatus.synced),
                 updatedAt: DateTime(2026, 8, 1),
@@ -274,13 +313,8 @@ void main() {
 
       final depot = RapportsRepository(database: db);
 
-      // L'ordre de deux fiches du même jour n'est pas défini au web : lignes triées par jour décroissant puis bande.
-      List<List<String>> trie(List<List<String>> lignes) =>
-          [...lignes]..sort((a, b) {
-            String iso(String d) => d.split('/').reversed.join();
-            final parJour = iso(b[0]).compareTo(iso(a[0]));
-            return parJour != 0 ? parJour : a[1].compareTo(b[1]);
-          });
+      // Ticket U11 — l'ordre est défini des deux côtés (jour décroissant, puis identifiant) : les lignes se comparent
+      // TELLES QU'ELLES SORTENT, sans retri.
       List<List<String>> lignes(Object? brut) => [
         for (final l in brut! as List) (l as List).cast<String>(),
       ];
@@ -297,14 +331,21 @@ void main() {
         );
 
         expect(
-          trie([for (final l in d.elevageT1) l.cellules]),
-          trie(lignes(web['t1'])),
+          [for (final l in d.elevageT1) l.cellules],
+          lignes(web['t1']),
           reason: '$cas — Tableau 1',
         );
         expect(
-          trie([for (final l in d.elevageT2) l.cellules]),
-          trie(lignes(web['t2'])),
+          [for (final l in d.elevageT2) l.cellules],
+          lignes(web['t2']),
           reason: '$cas — Tableau 2',
+        );
+        // Ticket U11 — Tableau 3 (fiches à ponte > 0), dans le même ordre ; sans produit œufs, soldes à zéro des
+        // deux côtés.
+        expect(
+          [for (final l in d.elevageT3) l.cellules],
+          lignes(web['t3']),
+          reason: '$cas — Tableau 3',
         );
         expect(
           [
@@ -322,6 +363,16 @@ void main() {
       final t1 = lignes((sortie['toutes'] as Map)['t1']);
       final t2 = lignes((sortie['toutes'] as Map)['t2']);
       expect(t1.length, greaterThan(15));
+      expect(
+        t1.length - {for (final l in t1) l[0]}.length,
+        greaterThan(1),
+        reason: 'plusieurs jours portent deux fiches (ordre du second critère)',
+      );
+      expect(
+        lignes((sortie['toutes'] as Map)['t3']).length,
+        greaterThan(5),
+        reason: 'Tableau 3 non vide',
+      );
       expect(
         t1.where((l) => l[2] == ''),
         isNotEmpty,
@@ -382,6 +433,7 @@ foreach ($entree['fiches'] as $f) {
         'treatment_product_id' => $f['traitement'] === null ? null : $produits[$f['traitement']]->id,
         'treatment_dose' => $f['dose'], 'symptomes' => $f['symptomes'],
     ]);
+    $e->id = $f['id'];
     $e->save();
 }
 function cellules(string $html, int $colonnes): array {
@@ -417,7 +469,8 @@ foreach (['toutes' => '', 'PON-A' => $bandes[0]->id] as $cas => $lot) {
         ->set('lotFilter', $lot);
     $t1 = $composant->set('activeTable', 't1')->html();
     $t2 = $composant->set('activeTable', 't2')->html();
-    $sortie[$cas] = ['t1' => cellules($t1, 10), 't2' => cellules($t2, 9), 'kpis' => indicateurs($t1)];
+    $t3 = $composant->set('activeTable', 't3')->html();
+    $sortie[$cas] = ['t1' => cellules($t1, 10), 't2' => cellules($t2, 9), 't3' => cellules($t3, 11), 'kpis' => indicateurs($t1)];
 }
 echo json_encode($sortie, JSON_UNESCAPED_UNICODE);
 ''';

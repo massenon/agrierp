@@ -1232,20 +1232,66 @@ void main() {
       ]);
     });
 
-    testWidgets('la modale de période exige un format', (tester) async {
+    /// 🔴→✅ Ticket U11 — l'onglet du Blade : ni en-tête de la maquette, ni « Filtrer la Période » et sa modale, ni
+    /// paire PDF / Excel propre ; il commence par son filtre « Lot / Souche ». La période et l'export restent ceux du
+    /// hub, comme au web.
+    testWidgets('⚠️ U11 — l onglet Rapport Élevage est celui du Blade, sans « Filtrer la Période »', (
+      tester,
+    ) async {
       await afficher(tester);
       await ouvrir(tester, 'Rapport Élevage');
 
-      await tester.tap(find.byKey(const Key('elevage-filtrer-periode')));
+      expect(find.text('Filtrer la Période'), findsNothing);
+      expect(find.byKey(const Key('rapport-export-pdf')), findsNothing);
+      expect(find.byKey(const Key('rapport-export-excel')), findsNothing);
+      expect(find.text('Rapport Élevage — Synthèse Détaillée'), findsNothing);
+      expect(find.text('Lot / Souche : Tous'), findsOneWidget);
+      // Le filtre précède les indicateurs.
+      expect(
+        tester.getTopLeft(find.byKey(const Key('elevage-lot'))).dy,
+        lessThan(
+          tester
+              .getTopLeft(find.byKey(const Key('kpi-Production Totale (Œufs)')))
+              .dy,
+        ),
+      );
+
+      // L'export passe par le hub, comme au web (`exportPdf()` → `ElevageSynth::exportReport()`).
+      await tester.tap(find.byKey(const Key('hub-export-pdf')));
       await tester.pumpAndSettle();
+      expect(imprimes.single.titre, 'Rapport Élevage — Synthèse Détaillée');
+    });
 
-      expect(find.text('Filtrer la Période'), findsWidgets);
+    /// 🔴→✅ Ticket U11 — en-tête et barre du hub web (`rapports-exports-hub.blade.php`) ; période par défaut du 1er
+    /// au DERNIER jour du mois (`RapportsExportsHub::mount()`).
+    testWidgets('U11 — en-tête, boutons et période du hub sont ceux du web', (
+      tester,
+    ) async {
+      await afficher(tester);
 
-      await tester.tap(find.byKey(const Key('exp-elevage-generer')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Le champ « Format » est obligatoire.'), findsOneWidget);
-      expect(imprimes, isEmpty);
+      expect(
+        find.text(
+          'États financiers et opérationnels de la Ferme École OLOUWACHEGOUN.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Centre de décision'), findsNothing);
+      expect(find.text('Exporter Excel'), findsOneWidget);
+      // `maintenant` = 25/08/2026 : du 01/08/2026 au 31/08/2026.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('hub-filter-du')),
+          matching: find.text('01/08/2026'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('hub-filter-au')),
+          matching: find.text('31/08/2026'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('la recherche filtre les lignes affichées', (tester) async {

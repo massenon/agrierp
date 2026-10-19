@@ -139,6 +139,7 @@ abstract final class SymbolesAgri {
   static const IconData query_stats = IconData(0xe4fc, fontFamily: famille);
   static const IconData receipt = IconData(0xe8b0, fontFamily: famille);
   static const IconData receipt_long = IconData(0xef6e, fontFamily: famille);
+  static const IconData redeem = IconData(0xe8b1, fontFamily: famille);
   static const IconData remove = IconData(0xe15b, fontFamily: famille);
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restart_alt = IconData(0xf053, fontFamily: famille);
@@ -157,10 +158,10 @@ abstract final class SymbolesAgri {
   static const IconData shield = IconData(0xe75b, fontFamily: famille);
   static const IconData shopping_cart = IconData(0xe547, fontFamily: famille);
   static const IconData show_chart = IconData(0xe6e1, fontFamily: famille);
+  static const IconData skull = IconData(0xf89a, fontFamily: famille);
   static const IconData smartphone = IconData(0xe0d4, fontFamily: famille);
   static const IconData ssid_chart = IconData(0xeb66, fontFamily: famille);
   static const IconData star = IconData(0xe838, fontFamily: famille);
-  static const IconData summarize = IconData(0xf071, fontFamily: famille);
   static const IconData support_agent = IconData(0xf0e2, fontFamily: famille);
   static const IconData swap_horiz = IconData(0xe8d4, fontFamily: famille);
   static const IconData sync = IconData(0xe627, fontFamily: famille);

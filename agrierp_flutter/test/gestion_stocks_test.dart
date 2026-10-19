@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/stocks/gestion_stocks_screen.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
@@ -89,6 +90,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Ticket U11 — l'onglet Ajustement s'ouvre sur « -- Sélectionner -- » : le produit se choisit.
+  Future<void> choisir(WidgetTester tester, String libelle) async {
+    await tester.tap(find.byKey(const Key('adj-produit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(libelle).last);
+    await tester.pumpAndSettle();
+  }
+
   group('dépôt', () {
     /// ⚠️⚠️ LE CŒUR DU TICKET : le poste sait enfin saisir un écart.
     test('⚠️⚠️ un manquant produit une SORTIE en file d envoi', () async {
@@ -148,15 +157,16 @@ void main() {
       );
     });
 
-    test('le motif est obligatoire', () async {
-      expect(
-        () => depot.enregistrerEcart(
-          productId: provende,
-          stockPhysique: 40,
-          motif: '',
-        ),
-        throwsA(isA<ArgumentError>()),
+    /// 🔴→✅ Ticket U11 — le web ne valide pas le motif (`$this->adjReason ?: null`) : le poste non plus.
+    test('U11 — le motif est facultatif, comme au web', () async {
+      final ecart = await depot.enregistrerEcart(
+        productId: provende,
+        stockPhysique: 40,
+        motif: '',
       );
+
+      expect(ecart.type, 'sortie');
+      expect(ecart.quantity, 5);
     });
 
     /// 🔴→✅ Le badge « en attente » compte l'ajustement : la table figure
@@ -435,6 +445,7 @@ void main() {
     ) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       // ⚠️ Le libellé porte le théorique, comme dans la maquette : l'opérateur
       // compare sans changer d'écran.
@@ -451,6 +462,7 @@ void main() {
     testWidgets("l'écart se calcule à la saisie", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
@@ -464,6 +476,7 @@ void main() {
     testWidgets("un excédent s'affiche avec son signe", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '52');
       await tester.pumpAndSettle();
@@ -486,24 +499,28 @@ void main() {
       }
     });
 
-    testWidgets("sans motif, l'ajustement est refusé avec sa raison", (
+    /// 🔴→✅ Ticket U11 — le motif est facultatif au web : sans motif, l'ajustement passe.
+    testWidgets("U11 — sans motif, l'ajustement est accepté comme au web", (
       tester,
     ) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('adj-valider')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('adj-erreur')), findsOneWidget);
-      expect(await db.select(db.stockAdjustments).get(), isEmpty);
+      expect(find.byKey(const Key('adj-erreur-produit')), findsNothing);
+      expect(await db.select(db.stockAdjustments).get(), hasLength(1));
+      ToastAgri.toutRetirer();
     });
 
     testWidgets("l'ajustement validé apparaît au journal", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
@@ -513,6 +530,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('adj-valider')));
       await tester.pumpAndSettle();
+      // Le toast du web se retire seul après 3,5 s.
+      await tester.pump(ToastAgri.duree);
 
       await ouvrir(tester, 'Journal des Mouvements');
 
@@ -574,11 +593,12 @@ void main() {
 
       for (final colonne in [
         'DATE / HEURE',
-        'REFERENCE',
+        // Ticket U11 — accentués comme le Blade.
+        'RÉFÉRENCE',
         'PRODUIT',
         'TYPE',
         'MOTIF',
-        'QUANTITE',
+        'QUANTITÉ',
         'VALEUR',
       ]) {
         expect(find.text(colonne), findsOneWidget, reason: colonne);

@@ -352,7 +352,14 @@ class FichePondeuses extends Component
     {
         $this->traitementsCoches = [];   // une case cochée ne survit pas à un changement de jour
         $this->selectedDate = $date;
-        $entry = $this->monthlyEntries->get($date);
+        // 🔴→✅ Ticket U11 — la fiche du jour CHOISI, même hors du mois en cours. `monthlyEntries` ne porte que le
+        // mois courant : choisir le 28 du mois précédent vidait le formulaire alors que la fiche existait, et
+        // « Enregistrer ce Jour » l'écrasait avec des zéros (achats, nés, œufs). Le poste charge la fiche de
+        // n'importe quel jour (`FicheJournaliereRepository::chargerJour`) : même règle.
+        $entry = $this->monthlyEntries->get($date)
+            ?? ($this->bande
+                ? LivestockDailyEntry::where('lot_id', $this->bande->id)->whereDate('entry_date', $date)->first()
+                : null);
 
         $this->reset(['mortRepro', 'mortPoulette', 'mortPoussin', 'mortEnregistre', 'donRepro', 'donPoulette', 'donPoussin', 'donEnregistre']);
 

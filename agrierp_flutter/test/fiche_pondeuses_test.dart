@@ -9,11 +9,13 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.14 — FICHE PONDEUSES (`fiche-volailles-pondeuses.html`).
+import 'package:agrierp/core/widgets/toast_agri.dart';
+
+/// Ticket F0.14 — FICHE PONDEUSES ; 🔁 ticket U11 : le BLADE (`fiche-pondeuses.blade.php`) est la référence de mise
+/// en page, plus la maquette (`fiche_pondeuses_blade_test.dart` lit la vue et exécute le PHP).
 ///
-/// ⚠️⚠️ Deux choses sont protégées ici. D'abord **la conformité à la maquette**
-/// — ordre des sections et libellés au mot près, la maquette étant la référence
-/// de mise en page. Ensuite **l'entrée réelle des plateaux au stock local** :
+/// ⚠️⚠️ Deux choses sont protégées ici. D'abord **la conformité au Blade**
+/// — ordre des sections et libellés au mot près. Ensuite **l'entrée réelle des plateaux au stock local** :
 /// sans elle, la caisse du poste refuserait de vendre des œufs qu'il vient de
 /// récolter, tant qu'aucune synchronisation n'a eu lieu.
 void main() {
@@ -221,37 +223,34 @@ void main() {
     },
   );
 
-  testWidgets("⚠️ l'ordre des sections suit la maquette", (tester) async {
+  // 🔁 Ticket U11 — l'ordre des sections du Blade (la maquette avait « Attribution Bâtiments » et un bloc de
+  // prophylaxie à elle).
+  testWidgets("⚠️ U11 — l'ordre des sections suit le Blade", (tester) async {
+    tester.view.physicalSize = const Size(1600, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await afficher(tester);
 
-    final positions = [
-      y(
-        tester,
-        "WORKFLOW RÉCOLTE & STOCK D'ŒUFS (COMBINE LES FICHES OFFICIELLES DE LA FERME)",
-      ),
-      y(tester, 'MORTS PAR CATÉGORIE'),
-      y(tester, 'DONS PAR CATÉGORIE'),
-      y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
-      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
-      y(tester, 'POIDS MOYEN CONSTATÉ'),
-      y(
-        tester,
-        'Traitements & Prophylaxie Avicole Automatiques Prévus pour ce Jour',
-      ),
-      y(
-        tester,
-        'Attribution Bâtiments & Parcs Volailles Traités (Cochés par défaut)',
-      ),
+    final libelles = [
+      'Saisie Journalière Ponte & Cheptel',
+      'ACHATS / ENTRÉES DU JOUR',
+      "WORKFLOW RÉCOLTE & STOCK D'ŒUFS",
+      'MORTS PAR CATÉGORIE',
+      'DONS PAR CATÉGORIE',
+      'EFFECTIF FINAL DU JOUR',
+      'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)',
+      'POIDS GÉNÉRAL PESÉ (G)',
+      'STOCK ŒUFS & PLATEAUX (30) — JOUR SÉLECTIONNÉ',
+      'TRAITEMENTS & RAPPELS',
+      'OBSERVATIONS',
+      'Enregistrer ce Jour',
+      'CHEPTEL DU JOUR',
     ];
-
+    final positions = [
+      for (final l in libelles) tester.getTopLeft(find.text(l).first).dy,
+    ];
     final trie = [...positions]..sort();
-    expect(
-      positions,
-      equals(trie),
-      reason:
-          'ordre : Œufs, Morts, Dons, Effectif, Rationnement, '
-          'Pesée, Prophylaxie, Attribution',
-    );
+    expect(positions, equals(trie), reason: libelles.join(' → '));
   });
 
   // 🔁 F0.99 — catégories des morts du WEB (`fiche-pondeuses.blade.php`), Dons sur les mêmes catégories (15.56).
@@ -284,10 +283,35 @@ void main() {
       find.textContaining('14 Plateaux (0 œufs vrac)', findRichText: true),
       findsOneWidget,
     );
+    // Ticket U11 — le nom du produit œufs, comme le Blade (`{{ $this->eggProduct->name }}`).
     expect(
-      find.textContaining('+14 Plateaux au Stock Produits', findRichText: true),
+      find.textContaining(
+        '+14 Plateaux (Œufs de table (plateau))',
+        findRichText: true,
+      ),
       findsOneWidget,
     );
+  });
+
+  /// 🔴→✅ Ticket U11 — `getTauxPonteCalcProperty()` / `getMortalityRateCalcProperty()` du web : divisés par l'effectif
+  /// de la VEILLE (480, effectif initial, aucune fiche antérieure), « 0,0 % » sans saisie — le poste divisait la
+  /// ponte par l'effectif FINAL et affichait « — ». Calcul à la main : 435 ÷ 480 × 100 = 90,625 → « 90,6 % » ;
+  /// 1 mort ÷ 480 × 100 = 0,208… → « 0,2 % ».
+  testWidgets('⚠️ U11 — taux du jour : ceux du web, sur l effectif de la veille', (tester) async {
+    await afficher(tester);
+
+    String valeur(String cle) => tester.widget<Text>(find.byKey(Key(cle))).data!;
+    expect(valeur('champ-taux-ponte'), '0,0 %');
+    expect(valeur('taux-mortalite-jour'), '0,0 %');
+
+    await tester.enterText(find.byKey(const Key('champ-oeufs-pondus-0')), '435');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-Poulette-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-Poulette-1')));
+    await tester.pumpAndSettle();
+
+    expect(valeur('champ-taux-ponte'), '90,6 %');
+    expect(valeur('taux-mortalite-jour'), '0,2 %');
   });
 
   testWidgets('un mort saisi réduit aussitôt l effectif final', (tester) async {
@@ -328,6 +352,9 @@ void main() {
       await tester.ensureVisible(bouton);
       await tester.tap(bouton);
       await tester.pumpAndSettle();
+      // Ticket U11 — le toast du web.
+      expect(find.text('Jour enregistré avec succès.'), findsOneWidget);
+      await tester.pump(ToastAgri.duree);
 
       final produit = await (db.select(
         db.products,
@@ -346,31 +373,20 @@ void main() {
     },
   );
 
-  testWidgets('les libellés des boutons sont ceux de la maquette', (
+  // 🔁 Ticket U11 — le Blade n'a ni « Réinitialiser » ni « Attribution Bâtiments & Parcs Volailles Traités » ; il a
+  // « Exporter PDF » dans l'en-tête.
+  testWidgets('⚠️ U11 — boutons et sections du Blade, plus ceux de la maquette', (
     tester,
   ) async {
     await afficher(tester);
 
     expect(find.text('Enregistrer ce Jour'), findsOneWidget);
-    expect(find.text('Réinitialiser'), findsOneWidget);
+    expect(find.text('Exporter PDF'), findsOneWidget);
+    expect(find.text('Réinitialiser'), findsNothing);
+    expect(find.textContaining('Attribution Bâtiments'), findsNothing);
+    expect(find.textContaining('COMBINE LES FICHES'), findsNothing);
+    expect(find.text('(Pré-rempli de J-1)'), findsNothing);
   });
-
-  testWidgets(
-    "⚠️ la section Attribution est là et dit que son référentiel manque",
-    (tester) async {
-      await afficher(tester);
-
-      expect(
-        find.textContaining('Aucun référentiel de bâtiments'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('Bâtiment P1'),
-        findsNothing,
-        reason: 'recopier les bâtiments de la maquette inventerait une donnée',
-      );
-    },
-  );
 
   testWidgets('sans bande de ponte, l écran le dit au lieu de rester vide', (
     tester,

@@ -6,7 +6,6 @@ import '../../core/export/export_tableur.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
-import '../../core/widgets/modale_agri.dart';
 import '../stocks/pmp_service.dart';
 import 'rapports_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -115,7 +114,9 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     // ⚠️ Le mois EN COURS, pas le juillet 2026 figé des pages de démonstration.
     final aujourdHui = _maintenant;
     _du = DateTime(aujourdHui.year, aujourdHui.month, 1);
-    _au = aujourdHui;
+    // 🔴→✅ Ticket U11 — `RapportsExportsHub::mount()` : du 1er au DERNIER jour du mois (`endOfMonth()`), et non
+    // jusqu'à aujourd'hui — une fiche ou une pièce datée de la fin du mois figure au rapport du web dès sa saisie.
+    _au = DateTime(aujourdHui.year, aujourdHui.month + 1, 0);
 
     _charger();
   }
@@ -173,80 +174,133 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
   // ── En-tête et barre de filtre du hub ─────────────────────────────────────
 
-  Widget _enteteHub(bool large) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          const Icon(SymbolesAgri.summarize, size: 26, color: AgriColors.brandEmerald),
-          const SizedBox(width: AgriSpacing.xs),
-          Expanded(
-            child: Text(
-              'Rapports & Exports',
-              style: TextStyle(
-                fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
-                fontWeight: AgriTypography.gras,
-                color: AgriColors.onSurface,
+  /// 🔴→✅ Ticket U11 — en-tête de `rapports-exports-hub.blade.php` : icône `bar_chart`, titre « Rapports & Exports »,
+  /// sous-titre du web, filet bas (`border-b pb-md`). Le poste gardait l'icône et le sous-titre de la maquette
+  /// (« Centre de décision stratégique — … »).
+  Widget _enteteHub(bool large) => Container(
+    padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(SymbolesAgri.bar_chart, size: 26, color: AgriColors.brandEmerald),
+            const SizedBox(width: AgriSpacing.xs),
+            Expanded(
+              child: Text(
+                'Rapports & Exports',
+                style: TextStyle(
+                  fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
+                  fontWeight: AgriTypography.gras,
+                  color: AgriColors.onSurface,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      const SizedBox(height: AgriSpacing.xs),
-      const Text(
-        'Centre de décision stratégique — états comptables, financiers, '
-        'zootechniques et commerciaux.',
-        style: TextStyle(
-          fontSize: AgriTypography.xs,
-          color: AgriColors.outline,
+          ],
         ),
-      ),
-    ],
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          'États financiers et opérationnels de la Ferme École OLOUWACHEGOUN.',
+          key: Key('hub-sous-titre'),
+          style: TextStyle(
+            fontSize: AgriTypography.xs,
+            color: AgriColors.outline,
+          ),
+        ),
+      ],
+    ),
   );
 
+  /// 🔴→✅ Ticket U11 — barre de filtre du hub web : carte blanche (`bg-white p-md`), « Du » « au » « Au », puis, à
+  /// droite (`ml-auto`), « Exporter PDF » et « Exporter Excel » en boutons à bord fin, arrondis (`rounded-full`),
+  /// texte vert forêt. Le poste affichait la barre de la maquette (fond zébré, icône calendrier, PDF plein, « Excel »).
   Widget _barreFiltre() => Container(
-    padding: const EdgeInsets.all(AgriSpacing.sm),
+    padding: const EdgeInsets.all(AgriSpacing.md),
     decoration: BoxDecoration(
-      color: AgriColors.surfaceZebra,
+      color: AgriColors.surfaceCard,
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
     child: Wrap(
       spacing: AgriSpacing.sm,
       runSpacing: AgriSpacing.sm,
+      alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(SymbolesAgri.calendar_month, size: 18, color: AgriColors.outline),
-        _champDate('hub-filter-du', _du, (v) {
-          setState(() => _du = v);
-          _charger();
-        }),
-        const Text(
-          'au',
-          style: TextStyle(
-            fontSize: AgriTypography.xs,
-            color: AgriColors.outline,
-          ),
+        Wrap(
+          spacing: AgriSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _champDate('hub-filter-du', _du, (v) {
+              setState(() => _du = v);
+              _charger();
+            }),
+            const Text(
+              'au',
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                color: AgriColors.outline,
+              ),
+            ),
+            _champDate('hub-filter-au', _au, (v) {
+              setState(() => _au = v);
+              _charger();
+            }),
+          ],
         ),
-        _champDate('hub-filter-au', _au, (v) {
-          setState(() => _au = v);
-          _charger();
-        }),
-        _boutonExport(
-          cle: 'hub-export-pdf',
-          libelle: 'Exporter PDF',
-          icone: SymbolesAgri.picture_as_pdf,
-          plein: true,
-          surAppui: _exporterPdf,
-        ),
-        _boutonExport(
-          cle: 'hub-export-excel',
-          libelle: 'Excel',
-          icone: SymbolesAgri.table_view,
-          plein: false,
-          surAppui: _exporterTableur,
+        Wrap(
+          spacing: AgriSpacing.xs,
+          children: [
+            _boutonHub(
+              cle: 'hub-export-pdf',
+              libelle: 'Exporter PDF',
+              icone: SymbolesAgri.picture_as_pdf,
+              surAppui: _exporterPdf,
+            ),
+            _boutonHub(
+              cle: 'hub-export-excel',
+              libelle: 'Exporter Excel',
+              icone: SymbolesAgri.table_view,
+              surAppui: _exporterTableur,
+            ),
+          ],
         ),
       ],
+    ),
+  );
+
+  /// Bouton d'export du hub web : `border border-outline-variant text-brand-forest font-bold text-xs px-md py-sm
+  /// rounded-full`, icône 18 px.
+  Widget _boutonHub({
+    required String cle,
+    required String libelle,
+    required IconData icone,
+    required VoidCallback surAppui,
+  }) => OutlinedButton.icon(
+    key: Key(cle),
+    onPressed: surAppui,
+    icon: Icon(icone, size: 18),
+    label: Text(
+      libelle,
+      style: const TextStyle(
+        fontSize: AgriTypography.xs,
+        fontWeight: AgriTypography.gras,
+      ),
+    ),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: AgriColors.brandForest,
+      backgroundColor: AgriColors.surfaceCard,
+      side: const BorderSide(color: AgriColors.outlineVariant),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AgriSpacing.md,
+        vertical: AgriSpacing.sm,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AgriRadius.full),
+      ),
     ),
   );
 
@@ -579,37 +633,14 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
   // ── Onglet 5 : Rapport Élevage ────────────────────────────────────────────
 
+  /// 🔴→✅ Ticket U11 — l'onglet du BLADE (`elevage-synth.blade.php`), sans l'en-tête de la maquette : ni titre
+  /// « Rapport Élevage — Synthèse Détaillée », ni bouton « Filtrer la Période » et sa modale (Du / Au / Format,
+  /// « Générer »), ni paire PDF / Excel propre à l'onglet. Au web, la période se règle dans la barre du hub (Du … au …)
+  /// et l'export par ses boutons « Exporter PDF » / « Exporter Excel » ; l'onglet commence par son filtre
+  /// « Lot / Souche » (`mt-md`, puis `mb-md`).
   Widget _ongletElevage(DonneesRapports d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _enteteRapport(
-        'Rapport Élevage — Synthèse Détaillée',
-        'Restitution fidèle des registres manuscrits — recensement, mouvements '
-            "et suivi de ponte, alimentée automatiquement depuis les fiches "
-            "d'élevage.",
-        SymbolesAgri.pets,
-        large,
-        actionSupplementaire: OutlinedButton.icon(
-          key: const Key('elevage-filtrer-periode'),
-          onPressed: _ouvrirFiltrePeriode,
-          icon: const Icon(SymbolesAgri.tune, size: 18),
-          label: const Text(
-            'Filtrer la Période',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: AgriTypography.gras,
-            ),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AgriColors.brandForest,
-            side: const BorderSide(color: AgriColors.outlineVariant),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AgriRadius.full),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: AgriSpacing.md),
       // 🔴→✅ Ticket U10 — le filtre « Lot / Souche » du Blade, au-dessus des indicateurs : « Lot / Souche : Tous »
       // puis les bandes ACTIVES par code ; il s'applique aux indicateurs et aux trois tableaux.
       Align(
@@ -648,24 +679,56 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
-      _grilleKpi(
-        large,
-        const [
-          ('Production Totale (Œufs)', null, AgriColors.brandEmerald),
-          ('Taux de Ponte Moyen', null, AgriColors.infoBlue),
-          ('Taux de Mortalité Hebdo', null, AgriColors.errorRed),
-          ('CA Ventes du Lot', null, AgriColors.accentYellow),
-        ],
-        // 🔴→✅ Ticket U10 — valeurs du Blade : `number_format(production, 0, ',', ' ')`, `taux.' %'` (flottant PHP)
-        // ou « — », `number_format(CA, 0, ',', ' ')` puis « FCFA » (toujours un montant).
-        [
-          PmpService.francs(d.indicateurs.productionTotale.toDouble()),
-          IndicateursElevage.taux(d.indicateurs.tauxPonteMoyen),
-          IndicateursElevage.taux(d.indicateurs.mortaliteHebdo),
-          '${PmpService.francs(d.indicateurs.chiffreAffaires)} FCFA',
-        ],
+      // 🔴→✅ Ticket U10 — valeurs du Blade : `number_format(production, 0, ',', ' ')`, `taux.' %'` (flottant PHP)
+      // ou « — », `number_format(CA, 0, ',', ' ')` puis « FCFA » (toujours un montant).
+      // Ticket U11 — grille du Blade (`grid-cols-2 md:grid-cols-4 gap-md mb-md`) : les quatre cartes se partagent la
+      // largeur, sans icône ; « FCFA » en petite unité après le montant, comme le `<span class="text-xs">` du web.
+      LayoutBuilder(
+        builder: (context, contraintes) {
+          final colonnes = AgriBreakpoints.moyen(context) ? 4 : 2;
+          final largeur =
+              (contraintes.maxWidth - (colonnes - 1) * AgriSpacing.md) /
+              colonnes;
+          Widget carte(String libelle, Color lisere, String valeur, {String? unite}) => SizedBox(
+            width: largeur,
+            child: CarteKpi(
+              key: Key('kpi-$libelle'),
+              libelle: libelle,
+              valeur: valeur,
+              unite: unite,
+              couleurLisere: lisere,
+            ),
+          );
+          return Wrap(
+            spacing: AgriSpacing.md,
+            runSpacing: AgriSpacing.md,
+            children: [
+              carte(
+                'Production Totale (Œufs)',
+                AgriColors.brandEmerald,
+                PmpService.francs(d.indicateurs.productionTotale.toDouble()),
+              ),
+              carte(
+                'Taux de Ponte Moyen',
+                AgriColors.infoBlue,
+                IndicateursElevage.taux(d.indicateurs.tauxPonteMoyen),
+              ),
+              carte(
+                'Taux de Mortalité Hebdo',
+                AgriColors.errorRed,
+                IndicateursElevage.taux(d.indicateurs.mortaliteHebdo),
+              ),
+              carte(
+                'CA Ventes du Lot',
+                AgriColors.accentYellow,
+                PmpService.francs(d.indicateurs.chiffreAffaires),
+                unite: 'FCFA',
+              ),
+            ],
+          );
+        },
       ),
-      const SizedBox(height: AgriSpacing.lg),
+      const SizedBox(height: AgriSpacing.md),
       _pilulesElevage(),
       const SizedBox(height: AgriSpacing.md),
       switch (_tableauElevage) {
@@ -708,12 +771,28 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.only(bottom: AgriSpacing.sm),
-              child: Text(
-                'Les quatre colonnes de stock (SRH / TS / OS / Stock Final) '
-                'sont des soldes de ferme, en plateaux : le stock d\'œufs est '
-                'tenu au niveau du produit, rien ne distingue l\'œuf issu '
-                'd\'une bande de celui issu d\'une autre. Deux bandes '
-                'pondeuses le même jour affichent donc le même solde.',
+              // Ticket U11 — « <strong>ferme</strong> » du Blade, en gras.
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text:
+                          'Les quatre colonnes de stock (SRH / TS / OS / Stock Final) '
+                          'sont des soldes de ',
+                    ),
+                    TextSpan(
+                      text: 'ferme',
+                      style: TextStyle(fontWeight: AgriTypography.gras),
+                    ),
+                    TextSpan(
+                      text:
+                          ', en plateaux : le stock d\'œufs est '
+                          'tenu au niveau du produit, rien ne distingue l\'œuf issu '
+                          'd\'une bande de celui issu d\'une autre. Deux bandes '
+                          'pondeuses le même jour affichent donc le même solde.',
+                    ),
+                  ],
+                ),
                 key: Key('legende-elevage-t3'),
                 style: TextStyle(
                   fontSize: 10,
@@ -746,10 +825,8 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
               child: Text(
                 'Formules : Taux de Ponte % = (OR × 100) ÷ Effectif Fin — '
                 'Total Stock (TS) = (OR−OF) + SRH — Stock Final = TS − OS',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.outline,
-                ),
+                // Ticket U11 — `text-[10px]` du Blade, comme les pieds des Tableaux 1 et 2.
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
               ),
             ),
           ],
@@ -901,6 +978,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     return switch (_onglet) {
       'État de Trésorerie' => DocumentOfficiel(
         titre: 'État de Trésorerie',
+        fichier: 'tresorerie-{jour}.pdf',
         sousTitre: 'Évolution des soldes Caisse et Banque',
         entetes: const ['Date', 'Solde Caisse', 'Solde Banque', 'Solde Total'],
         lignes: [
@@ -926,6 +1004,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
       'Créances Clients' => DocumentOfficiel(
         titre: 'Rapport des Créances Clients',
+        fichier: 'creances-{jour}.pdf',
         sousTitre: 'Synthèse des sommes dues par les clients',
         entetes: const ['Client', 'Montant Dû', 'Échéance'],
         lignes: [
@@ -935,6 +1014,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
       'Dettes Fournisseurs' => DocumentOfficiel(
         titre: 'Rapport des Dettes Fournisseurs',
+        fichier: 'dettes-{jour}.pdf',
         sousTitre: 'Synthèse des sommes dues aux fournisseurs',
         entetes: const ['Fournisseur', 'Montant Dû', 'Échéance'],
         lignes: [
@@ -946,6 +1026,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       // période en sous-titre, trois tableaux et leurs colonnes, mêmes cellules qu'à l'écran (lot filtré compris).
       'Rapport Élevage' => DocumentOfficiel(
         titre: 'Rapport Élevage — Synthèse Détaillée',
+        fichier: 'rapport-elevage-{jour}.pdf',
         sousTitre:
             '${RapportsRepository.date(d.du)} au ${RapportsRepository.date(d.au)}',
         lignes: [
@@ -998,6 +1079,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
       'Rapport de Stocks' => DocumentOfficiel(
         titre: 'Rapport de Synthèse des Stocks',
+        fichier: 'rapport-stocks-{jour}.pdf',
         sousTitre: 'Valorisation et alertes de seuil par catégorie',
         entetes: const ['Catégorie', 'Valeur Stock', 'Sous Seuil'],
         lignes: [
@@ -1007,6 +1089,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
       _ => DocumentOfficiel(
         titre: 'État des Recettes et Dépenses',
+        fichier: 'recettes-depenses-{jour}.pdf',
         sousTitre: 'Synthèse financière de la période',
         lignes: [
           const BandeDocument('RECETTES'),
@@ -1069,128 +1152,6 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     );
   }
 
-  // ── Modale « Filtrer la Période » ─────────────────────────────────────────
-
-  /// ⚠️ **LE FORMAT EST UN CHOIX DE LA MAQUETTE, PAS UN DÉCOR.** Son formulaire
-  /// impose « Du », « Au » et « Format » ; « Générer » édite en PDF ou en
-  /// classeur selon ce choix. Le champ « Lot / Souche » y est facultatif.
-  Future<void> _ouvrirFiltrePeriode() async {
-    var du = _du;
-    var au = _au;
-    String? format;
-    String? erreur;
-
-    // ⚠️ `modal-create-rapport-elevage-synth` de `rapport-elevage-synth.html`
-    // l.348 : panneau `max-w-lg`, barre de titre avec ✕, pied séparé par un
-    // filet, boutons « Annuler » puis « Générer ».
-    final choix = await afficherModale<String>(
-      context: context,
-      constructeur: (context) => StatefulBuilder(
-        builder: (context, rafraichir) => ModaleAgri(
-          titre: 'Filtrer la Période',
-          largeur: LargeurModale.lg,
-          contenu: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _etiquette('Période — Du *'),
-              _champDate('exp-elevage-du', du, (v) => rafraichir(() => du = v)),
-              const SizedBox(height: AgriSpacing.md),
-              _etiquette('Période — Au *'),
-              _champDate('exp-elevage-au', au, (v) => rafraichir(() => au = v)),
-              const SizedBox(height: AgriSpacing.md),
-              // ⚠️ « Lot / Souche » de la maquette n'est PAS repris : ses deux
-              // options sont figées sur les bandes de démonstration, et le
-              // rapport porte déjà toutes les bandes du poste avec leur code
-              // en colonne. Un filtre à options inventées vaudrait moins que
-              // pas de filtre du tout.
-              _etiquette('Format *'),
-              DropdownButtonFormField<String>(
-                key: const Key('exp-elevage-format'),
-                initialValue: format,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  hintText: '-- Sélectionner --',
-                ),
-                style: const TextStyle(
-                  fontSize: AgriTypography.sm,
-                  color: AgriColors.onSurface,
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'PDF', child: Text('PDF')),
-                  DropdownMenuItem(
-                    value: 'Excel (CSV)',
-                    child: Text('Excel (CSV)'),
-                  ),
-                ],
-                onChanged: (v) => rafraichir(() => format = v),
-              ),
-              if (erreur != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: AgriSpacing.sm),
-                  child: Text(
-                    erreur!,
-                    style: const TextStyle(
-                      fontSize: AgriTypography.xs,
-                      color: AgriColors.errorDeep,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            BoutonModaleSecondaire(
-              libelle: 'Annuler',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            BoutonModalePrimaire(
-              key: const Key('exp-elevage-generer'),
-              libelle: 'Générer',
-              onPressed: () {
-                if (format == null) {
-                  rafraichir(
-                    () => erreur = 'Le champ « Format » est obligatoire.',
-                  );
-                  return;
-                }
-                Navigator.of(context).pop(format);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (choix == null || !mounted) return;
-
-    setState(() {
-      _du = du;
-      _au = au;
-      _onglet = 'Rapport Élevage';
-    });
-    await _charger();
-
-    if (choix == 'PDF') {
-      await _exporterPdf();
-    } else {
-      await _exporterTableur();
-    }
-  }
-
-  Widget _etiquette(String texte) => Padding(
-    padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
-    child: Text(
-      texte,
-      style: const TextStyle(
-        fontSize: 10,
-        fontWeight: AgriTypography.gras,
-        letterSpacing: 0.8,
-        color: AgriColors.brandForest,
-      ),
-    ),
-  );
-
   // ── Blocs partagés ────────────────────────────────────────────────────────
 
   /// En-tête d'un rapport : son titre, sa légende, et SA PROPRE paire de
@@ -1199,9 +1160,8 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     String titre,
     String legende,
     IconData icone,
-    bool large, {
-    Widget? actionSupplementaire,
-  }) => Column(
+    bool large,
+  ) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Row(
@@ -1239,7 +1199,6 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         spacing: AgriSpacing.xs,
         runSpacing: AgriSpacing.xs,
         children: [
-          ?actionSupplementaire,
           _boutonExport(
             cle: 'rapport-export-pdf',
             libelle: 'PDF',
@@ -1503,7 +1462,8 @@ class EditeursRapports {
 
     await Printing.layoutPdf(
       onLayout: (_) => octets,
-      name: ExportTableur.nomFichier(document.titre, maintenant),
+      // Ticket U11 — le nom du web (`stocks-AAAA-MM-JJ.pdf`…), plus celui du classeur en `.xlsx`.
+      name: DocumentOfficiel.nomPdf(document, maintenant),
     );
     return null;
   }

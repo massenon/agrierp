@@ -1004,10 +1004,14 @@ class _SocleAccueilState extends State<SocleAccueil> {
           depot: widget.fiches,
           soins: widget.soins,
         ),
+        // Ticket U11 — « Exporter PDF » et le lien « Transferts entre Bandes » du Blade.
         EcranPoste.fichePondeuses => FichePondeusesScreen(
           depot: widget.fiches,
           soins: widget.soins,
           production: widget.production,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
         ),
       },
     );

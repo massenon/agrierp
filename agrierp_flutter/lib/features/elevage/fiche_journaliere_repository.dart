@@ -116,6 +116,10 @@ class FicheJournaliereRepository {
   final String _deviceId;
   final Uuid _uuid;
 
+  /// Ticket U11 — la base, en LECTURE, pour le tableau du mois et les indicateurs de la fiche Pondeuses
+  /// (`MoisPondeuses`) ; toute écriture reste dans ce dépôt.
+  AppDatabase get database => _db;
+
   /// Ticket S-T3 — une fiche journalière enregistrée est un geste important (voir [GestesImportants]).
   /// `null` : aucun signal (dépôts internes de la caisse et des transferts, qui signalent eux-mêmes ou non).
   final GestesImportants? _gestes;

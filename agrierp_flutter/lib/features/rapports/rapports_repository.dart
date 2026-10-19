@@ -1,8 +1,7 @@
-import 'package:drift/drift.dart' show OrderingTerm, OrderingMode;
-
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
+import '../elevage/effectif_precedent.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 
@@ -175,14 +174,9 @@ class RapportsRepository {
       maintenant: HeureBenin.maintenant(),
     );
 
-    final fiches =
-        await (database.select(database.livestockDailyEntries)..orderBy([
-              (t) => OrderingTerm(
-                expression: t.entryDate,
-                mode: OrderingMode.desc,
-              ),
-            ]))
-            .get();
+    // Ticket U11 — ordre du web (`orderByDesc('entry_date')->orderBy('id')`), appliqué par [ordreDesFiches].
+    final fiches = (await database.select(database.livestockDailyEntries).get())
+      ..sort(ordreDesFiches);
 
     // 🔴→✅ Ticket U10 — `ElevageSynth::baseQuery()` : fiches de la période et de la bande filtrée. ⚠️ Une fiche
     // REFUSÉE par le serveur (`conflict`) n'existe pas au web : elle ne compte nulle part (règle U8) ; une fiche en
@@ -373,6 +367,21 @@ class RapportsRepository {
 
   // ── Onglet 5 : Rapport Élevage ────────────────────────────────────────────
 
+  /// 🔴→✅ Ticket U11 — ORDRE DES FICHES DU RAPPORT, celui du web (`ElevageSynth::baseQuery()` :
+  /// `orderByDesc('entry_date')->orderBy('id')`) : le jour le plus récent d'abord, puis, entre deux fiches du même
+  /// jour (deux bandes), l'identifiant croissant. Sans second critère, l'ordre de deux fiches du même jour dépendait
+  /// du moteur de base (et `List.sort` de Dart n'est pas stable) : les tableaux et la fiche « la plus ancienne » de
+  /// la mortalité hebdo pouvaient différer d'une surface à l'autre.
+  ///
+  /// ⚠️ Les identifiants sont des UUID en minuscules (le poste et `HasUuids` du serveur) : la comparaison binaire
+  /// de Dart et la collation `utf8mb4_unicode_ci` du serveur les rangent de la même façon.
+  static int ordreDesFiches(LivestockDailyEntry a, LivestockDailyEntry b) {
+    final parJour = JournalStocks.jour(
+      b.entryDate,
+    ).compareTo(JournalStocks.jour(a.entryDate));
+    return parJour != 0 ? parJour : a.id.compareTo(b.id);
+  }
+
   /// 🔴→✅ Ticket U10 — Tableau 1 « Recensement » du BLADE (`elevage-synth.blade.php`), dix colonnes : Date, Lot /
   /// Souche, Effectif M, Effectif F, Sous Mères, Sevrés, Achats, Nés, Morts, Effectif Final.
   ///
@@ -459,7 +468,7 @@ class RapportsRepository {
     final pondeuses = [
       for (final f in periode)
         if ((f.ponteTotal ?? 0) > 0) f,
-    ]..sort((a, b) => b.entryDate.compareTo(a.entryDate));
+    ]..sort(ordreDesFiches);
 
     // `getLedgerOeufsProperty()` : une ligne du grand livre par JOUR affiché, production commercialisable du jour
     // agrégée une seule fois.
@@ -561,9 +570,16 @@ class RapportsRepository {
     ];
 
     final morts = periode.fold<int>(0, (t, f) => t + f.mort);
-    // `$entries->sortBy('entry_date')->first()` : tri STABLE croissant de la liste décroissante.
+    // `$entries->sortBy('entry_date')->first()` : tri STABLE croissant de la liste triée par [ordreDesFiches] —
+    // entre deux fiches du même jour, l'identifiant croissant reste en tête (ticket U11 ; `List.sort` de Dart n'est
+    // pas stable : le second critère est écrit).
     final croissant = [...periode]
-      ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
+      ..sort((a, b) {
+        final parJour = JournalStocks.jour(
+          a.entryDate,
+        ).compareTo(JournalStocks.jour(b.entryDate));
+        return parJour != 0 ? parJour : a.id.compareTo(b.id);
+      });
     final premiere = croissant.isEmpty ? null : croissant.first;
     final debut = premiere == null
         ? 0
@@ -586,29 +602,13 @@ class RapportsRepository {
 
   /// `LivestockDailyEntry::previousEffectif()` : effectif final de la fiche de la même bande au jour STRICTEMENT
   /// antérieur le plus récent, sinon `initial_quantity` de la bande, sinon 0.
+  ///
+  /// Ticket U11 — la règle vit dans `elevage/effectif_precedent.dart`, partagée avec la fiche Pondeuses.
   static int effectifPrecedent(
     LivestockDailyEntry fiche,
     List<LivestockDailyEntry> toutes,
     List<LivestockLot> bandes,
-  ) {
-    final jour = JournalStocks.jour(fiche.entryDate);
-    LivestockDailyEntry? precedente;
-    for (final f in toutes) {
-      if (f.lotId != fiche.lotId ||
-          f.id == fiche.id ||
-          !JournalStocks.jour(f.entryDate).isBefore(jour)) {
-        continue;
-      }
-      if (precedente == null || f.entryDate.isAfter(precedente.entryDate)) {
-        precedente = f;
-      }
-    }
-    if (precedente != null) return precedente.effectifFinal;
-    for (final b in bandes) {
-      if (b.id == fiche.lotId) return b.initialQuantity;
-    }
-    return 0;
-  }
+  ) => effectifPrecedentDe(fiche, toutes, bandes);
 
   // ── Onglet 6 : Rapport de Stocks ──────────────────────────────────────────
 

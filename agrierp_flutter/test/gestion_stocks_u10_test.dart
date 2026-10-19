@@ -397,6 +397,13 @@ void main() {
 
         await tester.enterText(find.byKey(const Key('adj-physique')), '47.5');
         await tester.pumpAndSettle();
+        // Ticket U11 — aucun produit présélectionné (« -- Sélectionner -- ») : `getAdjDiffProperty()` rend 0.
+        expect(ecart().data, '0');
+
+        await tester.tap(find.byKey(const Key('adj-produit')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.textContaining('Aliment ponte 25kg (Théorique').last);
+        await tester.pumpAndSettle();
         expect(ecart().data, '+2.5');
       },
     );

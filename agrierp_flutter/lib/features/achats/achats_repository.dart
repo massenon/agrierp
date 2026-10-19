@@ -135,6 +135,7 @@ class DocumentsAchats {
 
     return DocumentOfficiel(
       titre: 'Liste des Achats',
+      fichier: 'achats-{jour}.pdf',
       sousTitre: 'Historique des achats et bons de commande',
       entetes: const [
         'Référence Achat',
