@@ -22092,3 +22092,11 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - **U6** : le web n'impose que `required|date` à la date d'entrée à l'infirmerie ; `pushInfirmerie` exigeait `before_or_equal:today` et le poste bornait à aujourd'hui. Mêmes règles partout ; même alignement pour la date du Nouveau Soin (`soinDate`, `record_date`). Tests qui lisent les règles du web et du serveur.
 - Mesures : Laravel 1 747 verts ; poste 2 287 verts, 16 sautés, `flutter analyze` propre ; 12 mutants tués (agent) + 1 (date du soin).
 - Reste : la modale d'archivage du poste empile ses boutons (gabarit `ModaleConfirmation` du poste) là où le Blade les aligne ; textes identiques.
+
+### U8 — écarts restants relevés par U4
+- **Gestion des stocks au poste** : PMP, valeur, valorisation totale, écarts en FCFA, journal = formules de `GestionStocks` (un seul `PmpService`, partagé avec le Tableau de bord) ; « — » pour un produit jamais acheté, « 0 FCFA » sans aucun achat comme le web ; parité exécutée. 🔴 Défaut du web : « Écarts d'Inventaire » ne lisait que le type `adjustment` ; les inventaires du poste (type `inventaire`) n'y figuraient jamais (`EcartsInventairePosteTest`).
+- **Achats** : colonne Catégorie = catégorie produit de la première ligne (liste et PDF) ; carte « Écarts / Retours » = nombre de LIGNES de retour ; `purchase_returns` servis au tirage avec leurs achats (`SyncRetoursAchatsTest`), absorbeur strict, resynchronisation unique `retours_resync_u8` ; parité exécutée sur le vrai tirage.
+- **Tableau 3 de la ponte** : la colonne OS ne compte que les ventes du jour de la fiche (défaut antérieur : toutes les ventes de la bande) ; une vente refusée ne sort rien.
+- **Tableau de bord** : règle écrite — compte ce que le web compte (`synced`) plus ce qui part (`pending`) ; une pièce refusée (`conflict`) ne compte nulle part (CA, Dépenses, Résultat, courbe, ventes porcines, Top 5, PMP).
+- Mesures (branche fusionnée) : Laravel 1 754 verts ; poste 2 308 verts, 16 sautés ; 17 mutants tués.
+- Reste : « Rotation du Stock » « — » et écarts d'inventaire saisis ailleurs absents du poste (`stock_movements` ne descend pas) ; Tableau 3 du web en plateaux à l'échelle de la ferme, celui du poste par bande en œufs ; tri et pastilles du tableau des stocks du poste.
