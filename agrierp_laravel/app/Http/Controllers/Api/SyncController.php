@@ -25,6 +25,7 @@ use App\Models\LivestockSpecies;
 use App\Models\Notification;
 use App\Services\AttestationService;
 use App\Services\EffectifParCategorieService;
+use App\Services\FusionReferentielsService;
 use App\Services\JournalSynchronisationService;
 use App\Services\LotRevenueService;
 use App\Services\ProductCatalogService;
@@ -1243,9 +1244,10 @@ class SyncController extends Controller
             'veterinary_calendar_events' => ['accepted' => [], 'rejected' => []],
             'purchases' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
-            'products' => ['accepted' => [], 'rejected' => []],
-            'suppliers' => ['accepted' => [], 'rejected' => []],
-            'customers' => ['accepted' => [], 'rejected' => []],
+            // Ticket S-T5 — `merged` : créations du poste fusionnées avec une fiche existante (voir `FusionReferentielsService`).
+            'products' => ['accepted' => [], 'rejected' => [], 'merged' => []],
+            'suppliers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
+            'customers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'mails' => ['accepted' => [], 'rejected' => []],
             'archived_documents' => ['accepted' => [], 'rejected' => []],
             'administrative_documents' => ['accepted' => [], 'rejected' => []],
@@ -1323,13 +1325,13 @@ class SyncController extends Controller
         // ⚠️ LES FOURNISSEURS ET LES PRODUITS D'ABORD (15.15, 15.17) : un achat ou un
         // règlement du même envoi peut viser un fournisseur créé au poste à l'instant.
         if ($request->has('suppliers')) {
-            $result['suppliers'] = $this->pushSuppliers($request->input('suppliers'), $request->user());
+            $result['suppliers'] = $this->pushSuppliers($request->input('suppliers'), $request->user(), $this->nomDuPoste($request));
         }
 
         // ⚠️ LES CLIENTS AUSSI D'ABORD (15.18) : une vente ou un règlement du même envoi
         // peut viser un client créé au poste à l'instant.
         if ($request->has('customers')) {
-            $result['customers'] = $this->pushCustomers($request->input('customers'), $request->user());
+            $result['customers'] = $this->pushCustomers($request->input('customers'), $request->user(), $this->nomDuPoste($request));
         }
 
         // ⚠️ COURRIERS (15.23) : aucune dépendance, aucun ordre à respecter. `mails` S'ÉCRIT AU
@@ -1356,7 +1358,7 @@ class SyncController extends Controller
         // d'un acompte est reçu au poste, le serveur n'a aucun moyen de le deviner.
         if ($request->has('customer_advances')) {
             $result['customer_advances'] = $this->pushCustomerAdvances(
-                $request->input('customer_advances'),
+                $this->envoiTraduit($request, 'customer_advances'),
                 $request->user(),
                 $request->input('device_id'),
             );
@@ -1366,12 +1368,12 @@ class SyncController extends Controller
         // envoi peut porter sur un produit créé au poste à l'instant. Traité après,
         // il serait refusé « produit inconnu » alors qu'il est dans le même paquet.
         if ($request->has('products')) {
-            $result['products'] = $this->pushProducts($request->input('products'), $request->user());
+            $result['products'] = $this->pushProducts($request->input('products'), $request->user(), $this->nomDuPoste($request));
         }
 
         if ($request->has('livestock_daily_entries')) {
             $result['livestock_daily_entries'] = $this->pushDailyEntries(
-                $request->input('livestock_daily_entries'),
+                $this->envoiTraduit($request, 'livestock_daily_entries'),
                 ! $request->user()?->can('manage-elevage'),
             );
         }
@@ -1391,14 +1393,14 @@ class SyncController extends Controller
         }
 
         if ($request->has('purchases')) {
-            $result['purchases'] = $this->pushPurchases($request->input('purchases'));
+            $result['purchases'] = $this->pushPurchases($this->envoiTraduit($request, 'purchases'));
         }
 
         // ⚠️ APRÈS les achats : un règlement peut viser la dette que l'achat du même
         // envoi vient de créer.
         if ($request->has('supplier_payments')) {
             $result['supplier_payments'] = $this->pushSupplierPayments(
-                $request->input('supplier_payments'),
+                $this->envoiTraduit($request, 'supplier_payments'),
                 $request->user(),
                 $request->input('device_id'),
             );
@@ -1418,7 +1420,7 @@ class SyncController extends Controller
         // ⚠️ APRÈS les retours (15.20) : un remboursement peut viser la créance que le retour du même envoi vient d'ouvrir.
         if ($request->has('supplier_refunds')) {
             $result['supplier_refunds'] = $this->pushSupplierRefunds(
-                $request->input('supplier_refunds'),
+                $this->envoiTraduit($request, 'supplier_refunds'),
                 $request->user(),
                 $request->input('device_id'),
             );
@@ -1432,7 +1434,7 @@ class SyncController extends Controller
             // ⚠️ 15.30 : les fiches ACCEPTÉES de ce même envoi sont transmises aux ventes, pour que
             // la vente ne rajoute pas sur une fiche ce que cette fiche porte déjà (double comptage).
             $result['sales'] = $this->pushSales(
-                $request->input('sales'),
+                $this->envoiTraduit($request, 'sales'),
                 $this->fichesAcceptees($result['livestock_daily_entries']['accepted'] ?? []),
             );
         }
@@ -1463,7 +1465,7 @@ class SyncController extends Controller
 
         if ($request->has('stock_adjustments')) {
             $result['stock_adjustments'] = $this->pushStockAdjustments(
-                $request->input('stock_adjustments'),
+                $this->envoiTraduit($request, 'stock_adjustments'),
                 $this->identifiantsDeRetours($request->input('purchase_returns', [])),
             );
         }
@@ -1481,6 +1483,29 @@ class SyncController extends Controller
         app(JournalSynchronisationService::class)->envoi($request, $result);
 
         return response()->json($result);
+    }
+
+    /**
+     * Ticket S-T5 — les enregistrements d'une table d'envoi, références aux clients, fournisseurs et produits FUSIONNÉS
+     * traduites vers l'identifiant du serveur. ⚠️ Appelé pour CHAQUE table de `FusionReferentielsService::REFERENCES`
+     * (un garde-fou le vérifie), et APRÈS `pushSuppliers` / `pushCustomers` / `pushProducts` du même envoi : une vente
+     * peut viser le client que ce même envoi vient de fusionner.
+     */
+    private function envoiTraduit(Request $request, string $table): mixed
+    {
+        return app(FusionReferentielsService::class)->traduireEnvoi($table, $request->input($table));
+    }
+
+    /** Ticket S-T5 — le poste qui parle : nom de son jeton Sanctum (S-T2), sinon le `device_id` envoyé. */
+    private function nomDuPoste(Request $request): ?string
+    {
+        $jeton = $request->user()?->currentAccessToken();
+        if ($jeton instanceof PersonalAccessToken && is_string($jeton->getAttribute('name')) && $jeton->getAttribute('name') !== '') {
+            return $jeton->getAttribute('name');
+        }
+        $envoye = $request->input('device_id');
+
+        return is_string($envoye) && $envoye !== '' ? Str::limit($envoye, 250, '') : null;
     }
 
     /**
@@ -2415,12 +2440,17 @@ class SyncController extends Controller
      *
      * ⚠️ Un renvoi du même `id` est un succès (modification) : le poste peut
      * renvoyer ce dont il n'a pas reçu l'accusé sans créer de doublon.
+     *
+     * Ticket S-T5 — un produit CRÉÉ au poste que le serveur connaît déjà (même nom, catégorie, unité et filière,
+     * `FusionReferentielsService`) n'est pas créé une seconde fois : acquitté ET rendu dans `merged`.
      */
-    private function pushProducts(array $produits, $utilisateur): array
+    private function pushProducts(array $produits, $utilisateur, ?string $poste = null): array
     {
         $accepted = [];
         $rejected = [];
+        $merged = [];
         $service = app(ProductCatalogService::class);
+        $fusion = app(FusionReferentielsService::class);
 
         foreach ($produits as $data) {
             $id = $data['id'] ?? null;
@@ -2436,6 +2466,14 @@ class SyncController extends Controller
                     throw ValidationException::withMessages(['id' => 'Identifiant de produit invalide.']);
                 }
 
+                // Ticket S-T5 — renvoi d'un identifiant déjà fusionné : même réponse, rien d'écrit.
+                if ($deja = $fusion->correspondance('products', $id)) {
+                    $accepted[] = $id;
+                    $merged[] = $deja;
+
+                    continue;
+                }
+
                 $existant = Product::find($id);
 
                 $valides = validator(
@@ -2444,6 +2482,14 @@ class SyncController extends Controller
                     $service->messages() + MotifsRefusPush::messages(),
                     MotifsRefusPush::attributs(),
                 )->validate();
+
+                // Ticket S-T5 — création d'un produit que le serveur connaît déjà (même clé naturelle) : fusion.
+                if ($existant === null && ($fusionne = $fusion->fusionnerCreation('products', $id, $valides, $poste, $utilisateur->id))) {
+                    $accepted[] = $id;
+                    $merged[] = $fusionne;
+
+                    continue;
+                }
 
                 $existant === null
                     ? $service->creer($valides, $id)
@@ -2455,7 +2501,7 @@ class SyncController extends Controller
             }
         }
 
-        return ['accepted' => $accepted, 'rejected' => $rejected];
+        return ['accepted' => $accepted, 'rejected' => $rejected, 'merged' => $merged];
     }
 
     /**
@@ -2465,12 +2511,17 @@ class SyncController extends Controller
      * la main : mêmes règles que la page web (`SupplierCatalogService`), droit
      * `manage-achats`, `id` du poste conservé. Un renvoi du même `id` est une
      * modification, jamais un doublon. Archiver = `is_active: false`.
+     *
+     * Ticket S-T5 — une fiche CRÉÉE au poste que le serveur connaît déjà (même nom, même téléphone,
+     * `FusionReferentielsService`) n'est pas créée une seconde fois : acquittée ET rendue dans `merged`.
      */
-    private function pushSuppliers(array $fournisseurs, $utilisateur): array
+    private function pushSuppliers(array $fournisseurs, $utilisateur, ?string $poste = null): array
     {
         $accepted = [];
         $rejected = [];
+        $merged = [];
         $service = app(\App\Services\SupplierCatalogService::class);
+        $fusion = app(FusionReferentielsService::class);
 
         foreach ($fournisseurs as $data) {
             $id = $data['id'] ?? null;
@@ -2486,8 +2537,25 @@ class SyncController extends Controller
                     throw ValidationException::withMessages(['id' => 'Identifiant de fournisseur invalide.']);
                 }
 
+                // Ticket S-T5 — renvoi d'un identifiant déjà fusionné (accusé perdu, ou poste ancien qui modifie ou
+                // archive SA copie) : même réponse, RIEN d'écrit sur la fiche partagée.
+                if ($deja = $fusion->correspondance('suppliers', $id)) {
+                    $accepted[] = $id;
+                    $merged[] = $deja;
+
+                    continue;
+                }
+
                 $valides = validator($data, $service->regles(), MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
                 $existant = \App\Models\Supplier::find($id);
+
+                // Ticket S-T5 — création d'une fiche que le serveur connaît déjà (même clé naturelle) : fusion.
+                if ($existant === null && ($fusionne = $fusion->fusionnerCreation('suppliers', $id, $valides, $poste, $utilisateur->id))) {
+                    $accepted[] = $id;
+                    $merged[] = $fusionne;
+
+                    continue;
+                }
 
                 $existant === null
                     ? $service->creer($valides, $id)
@@ -2499,7 +2567,7 @@ class SyncController extends Controller
             }
         }
 
-        return ['accepted' => $accepted, 'rejected' => $rejected];
+        return ['accepted' => $accepted, 'rejected' => $rejected, 'merged' => $merged];
     }
 
     /**
@@ -2509,12 +2577,17 @@ class SyncController extends Controller
      * `manage-ventes`, `id` du poste conservé. Un renvoi du même `id` est une modification,
      * jamais un doublon. Archiver = `is_active: false`. Le plafond de crédit ne se lit pas
      * dans l'envoi : un poste ne relève pas le plafond d'un client.
+     *
+     * Ticket S-T5 — une fiche CRÉÉE au poste que le serveur connaît déjà (même nom, même téléphone ; jamais sans
+     * téléphone, `FusionReferentielsService`) n'est pas créée une seconde fois : acquittée ET rendue dans `merged`.
      */
-    private function pushCustomers(array $clients, $utilisateur): array
+    private function pushCustomers(array $clients, $utilisateur, ?string $poste = null): array
     {
         $accepted = [];
         $rejected = [];
+        $merged = [];
         $service = app(\App\Services\CustomerCatalogService::class);
+        $fusion = app(FusionReferentielsService::class);
 
         foreach ($clients as $data) {
             $id = $data['id'] ?? null;
@@ -2530,8 +2603,25 @@ class SyncController extends Controller
                     throw ValidationException::withMessages(['id' => 'Identifiant de client invalide.']);
                 }
 
+                // Ticket S-T5 — renvoi d'un identifiant déjà fusionné (accusé perdu, ou poste ancien qui modifie ou
+                // archive SA copie) : même réponse, RIEN d'écrit sur la fiche partagée.
+                if ($deja = $fusion->correspondance('customers', $id)) {
+                    $accepted[] = $id;
+                    $merged[] = $deja;
+
+                    continue;
+                }
+
                 $valides = validator($data, $service->regles(), MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
                 $existant = \App\Models\Customer::find($id);
+
+                // Ticket S-T5 — création d'une fiche que le serveur connaît déjà (même clé naturelle) : fusion.
+                if ($existant === null && ($fusionne = $fusion->fusionnerCreation('customers', $id, $valides, $poste, $utilisateur->id))) {
+                    $accepted[] = $id;
+                    $merged[] = $fusionne;
+
+                    continue;
+                }
 
                 $existant === null
                     ? $service->creer($valides, $id)
@@ -2543,7 +2633,7 @@ class SyncController extends Controller
             }
         }
 
-        return ['accepted' => $accepted, 'rejected' => $rejected];
+        return ['accepted' => $accepted, 'rejected' => $rejected, 'merged' => $merged];
     }
 
     /**

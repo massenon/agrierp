@@ -117,6 +117,8 @@ class AuditLog extends Model
         'customer.created' => 'Client créé',
         'customer.updated' => 'Client modifié',
         'customer.archived' => 'Client archivé',
+        // Ticket S-T5 — création d'un poste fusionnée avec une fiche existante (même clé naturelle).
+        'customer.merged' => 'Client du poste fusionné avec une fiche existante',
         'customer_reminder.sent_' => 'Relance client envoyée',
         'credit_note.created' => 'Avoir créé',
         'credit_note.treated' => 'Avoir traité',
@@ -128,6 +130,7 @@ class AuditLog extends Model
         'supplier.created' => 'Fournisseur créé',
         'supplier.updated' => 'Fournisseur modifié',
         'supplier.archived' => 'Fournisseur archivé',
+        'supplier.merged' => 'Fournisseur du poste fusionné avec une fiche existante',
         'supplier_refund.recorded' => 'Remboursement fournisseur enregistré',
         'payable.payment_recorded' => 'Règlement fournisseur enregistré',
         // Ticket 15.19 — avances clients (clés posées depuis le Sprint 4, jamais libellées).
@@ -141,6 +144,7 @@ class AuditLog extends Model
         'product.created' => 'Produit créé',
         'product.updated' => 'Produit modifié',
         'product.archived' => 'Produit archivé',
+        'product.merged' => 'Produit du poste fusionné avec une fiche existante',
         'product.threshold_updated' => "Seuil d'alerte modifié",
         'stock.adjusted' => 'Stock ajusté',
         'stock.manual_addition' => 'Ajout manuel de stock',

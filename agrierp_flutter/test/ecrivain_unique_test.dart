@@ -19,8 +19,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// ont été déplacées dans `FicheJournaliereRepository.repercuterVente` / `reporterTransferts` et
 /// `SoinsRepository.archiverSoin`.
 void main() {
-  /// Le moteur : tirage (absorbeurs) et acquittement de l'envoi écrivent toutes les tables.
-  const moteur = {'lib/core/sync/sync_engine.dart'};
+  /// Le moteur : tirage (absorbeurs) et acquittement de l'envoi écrivent toutes les tables. Ticket S-T5 : la fusion
+  /// par clé naturelle (`fusion_referentiels.dart`) fait partie de l'acquittement — elle remplace l'identifiant d'un
+  /// client, fournisseur ou produit fusionné au serveur dans la fiche et dans toutes ses références.
+  const moteur = {'lib/core/sync/sync_engine.dart', 'lib/core/sync/fusion_referentiels.dart'};
 
   /// Dépôt propriétaire de chaque table envoyée (`AppDatabase.tablesEnvoyees`).
   const proprietaires = <String, String>{

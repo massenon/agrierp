@@ -94,6 +94,9 @@ class ReinitialisationDonneesService
             'journal_synchronisation',
             // Ticket S-T6 — demandes de synchronisation aux postes et contrôles de cohérence : même raison.
             'demandes_synchronisation_servies', 'demandes_synchronisation', 'controles_coherence',
+            // Ticket S-T5 — correspondances d'identifiants des postes : après une réinitialisation, les postes purgent
+            // leurs données ; les identifiants qu'elles traduisaient ne seront plus jamais envoyés.
+            'correspondances_identifiants',
         ];
     }
 

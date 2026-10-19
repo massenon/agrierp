@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import 'fusion_referentiels.dart';
 
 /// Ticket S3 — refus du serveur, avec un message que l'écran affiche tel quel.
 class EchecSynchronisation implements Exception {
@@ -4462,6 +4463,11 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // ⚠️⚠️ TICKET S-T5 — LE POSTE APPREND L'IDENTIFIANT DU SERVEUR. Un produit, un fournisseur ou un client créé ici
+    // que le serveur connaissait déjà (même clé naturelle) est acquitté ET rendu dans `merged` : l'identifiant local
+    // est remplacé partout (fiche et références, une transaction), APRÈS son acquittement ci-dessus.
+    await FusionReferentiels(_db).appliquerReponse(corps);
+
     // ⚠️ Un courrier accepté n'a pas encore sa référence : elle descend au tirage de
     // confirmation (voir [synchroniser]).
     final courriersAcceptes = await _acquitter(
@@ -4809,6 +4815,10 @@ class SyncEngine {
             : fusion[key] = <String, dynamic>{'accepted': <Object?>[], 'rejected': <Object?>[]};
         for (final cote in const ['accepted', 'rejected']) {
           (cible[cote] as List).addAll((value[cote] as List?) ?? const []);
+        }
+        // Ticket S-T5 — fusions par clé naturelle (`products`, `suppliers`, `customers`), mises bout à bout.
+        if (value['merged'] is List) {
+          (cible.putIfAbsent('merged', () => <Object?>[]) as List).addAll(value['merged'] as List);
         }
       } else if (value is num && deja is num) {
         fusion[key] = deja + value;
