@@ -76,7 +76,7 @@ class ApiProduitsTest extends TestCase
     private function pousser(string $u, array ...$produits)
     {
         return $this->avec($u)->postJson('/api/sync/push', [
-            'device_id' => 'poste-test',
+            'device_id' => 'poste-'.$u, // S-T2 : le poste du jeton (voir `avec`)
             'products' => $produits,
         ])->assertOk();
     }
@@ -171,7 +171,7 @@ class ApiProduitsTest extends TestCase
         $p = $this->corps(['stock_qty' => 10]);
 
         $r = $this->avec('magasin')->postJson('/api/sync/push', [
-            'device_id' => 'poste-test',
+            'device_id' => 'poste-magasin', // S-T2 : le poste du jeton (voir `avec`)
             // ⚠️ L'ajustement est listé AVANT le produit : l'ordre du paquet ne compte
             // pas, le serveur traite les produits d'abord.
             'stock_adjustments' => [[

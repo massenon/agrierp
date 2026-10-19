@@ -10,9 +10,17 @@ import '../database/sync_columns.dart';
 
 /// Ticket S3 — refus du serveur, avec un message que l'écran affiche tel quel.
 class EchecSynchronisation implements Exception {
-  const EchecSynchronisation(this.message);
+  const EchecSynchronisation(this.message, {this.statut});
 
   final String message;
+
+  /// Ticket S-T1 — statut HTTP du refus (`null` : inconnu). La synchronisation automatique s'arrête sur un
+  /// 401 / 403 ([estSessionRefusee]) jusqu'à une nouvelle connexion.
+  final int? statut;
+
+  /// Ticket S-T1 — session expirée (401) ou accès refusé (403) : retenter sans se reconnecter ne servirait à
+  /// rien, et chaque tentative refusée serait une ligne de plus au journal du serveur.
+  bool get estSessionRefusee => statut == 401 || statut == 403;
 
   /// Message pour un statut HTTP de refus ; `null` pour toute autre erreur (relancée telle quelle).
   static String? motifHttp(int? statut, Object? corps) {
@@ -157,7 +165,9 @@ class SyncEngine {
         e.response?.statusCode,
         e.response?.data,
       );
-      if (motif != null) throw EchecSynchronisation(motif);
+      if (motif != null) {
+        throw EchecSynchronisation(motif, statut: e.response?.statusCode);
+      }
       rethrow;
     }
     var tire = tire0;
@@ -4584,13 +4594,36 @@ class SyncEngine {
   /// au plus part TEL QUEL, en une requête : rien ne change pour le cas courant.
   @visibleForTesting
   static List<Map<String, dynamic>> decouperEnLots(Map<String, dynamic> envoi) {
+    final lignes = envoi.values.whereType<List>().fold<int>(0, (n, l) => n + l.length);
+    if (lignes <= tailleLot) return [envoi];
+
+    final (entete, unites) = _unitesDe(envoi);
+    final lots = <Map<String, dynamic>>[];
+    var courant = <(String, Object?)>[];
+    void fermer() {
+      if (courant.isEmpty) return;
+      lots.add(_assembler(entete, courant));
+      courant = [];
+    }
+
+    for (final unite in unites) {
+      if (courant.isNotEmpty && courant.length + unite.length > tailleLot) fermer();
+      courant.addAll(unite);
+    }
+    fermer();
+    return lots;
+  }
+
+  /// En-tête (clés qui ne sont pas des listes : `device_id`, `data_reset_at`) et UNITÉS INDIVISIBLES de [envoi],
+  /// dans l'ordre du serveur : une ligne, ou une JOURNÉE couplée entière (fiches, transferts et ventes du jour,
+  /// voir [_couplees]). Ni [decouperEnLots] ni [envoyerEnIsolant] ne coupent jamais une unité.
+  static (Map<String, dynamic>, List<List<(String, Object?)>>) _unitesDe(
+    Map<String, dynamic> envoi,
+  ) {
     final entete = {
       for (final e in envoi.entries)
         if (e.value is! List) e.key: e.value,
     };
-    final lignes = envoi.values.whereType<List>().fold<int>(0, (n, l) => n + l.length);
-    if (lignes <= tailleLot) return [envoi];
-
     final unites = <List<(String, Object?)>>[];
     final couplees = {for (final (t, _) in _couplees) t};
     final tables = [
@@ -4618,25 +4651,19 @@ class SyncEngine {
         unites.add([(table, ligne)]);
       }
     }
+    return (entete, unites);
+  }
 
-    final lots = <Map<String, dynamic>>[];
-    var courant = <(String, Object?)>[];
-    void fermer() {
-      if (courant.isEmpty) return;
-      final lot = Map<String, dynamic>.of(entete);
-      for (final (t, ligne) in courant) {
-        (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
-      }
-      lots.add(lot);
-      courant = [];
+  /// Un lot : l'en-tête, puis chaque ligne sous sa table (une table vide ne part pas).
+  static Map<String, dynamic> _assembler(
+    Map<String, dynamic> entete,
+    Iterable<(String, Object?)> lignes,
+  ) {
+    final lot = Map<String, dynamic>.of(entete);
+    for (final (t, ligne) in lignes) {
+      (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
     }
-
-    for (final unite in unites) {
-      if (courant.isNotEmpty && courant.length + unite.length > tailleLot) fermer();
-      courant.addAll(unite);
-    }
-    fermer();
-    return lots;
+    return lot;
   }
 
   /// Réponses des lots fusionnées table par table (acceptés et refusés mis bout à bout, compteurs additionnés),
@@ -4647,20 +4674,103 @@ class SyncEngine {
     Map<String, dynamic> envoi,
   ) async {
     final fusion = <String, dynamic>{};
-    final lots = decouperEnLots(envoi);
-    for (var i = 0; i < lots.length; i++) {
+    var recu = false;
+    for (final lot in decouperEnLots(envoi)) {
       try {
-        final reponse = await _client.post<Map<String, dynamic>>(
-          '/api/sync/push',
-          data: lots[i],
+        await envoyerEnIsolant(
+          lot,
+          (l) async =>
+              (await _client.post<Map<String, dynamic>>('/api/sync/push', data: l)).data ??
+              const <String, dynamic>{},
+          (reponse) {
+            recu = true;
+            fusionnerReponse(fusion, reponse);
+          },
         );
-        fusionnerReponse(fusion, reponse.data ?? const {});
       } catch (e, pile) {
-        if (i == 0) rethrow;
+        if (!recu) rethrow;
         return (fusion, e, pile);
       }
     }
     return (fusion, null, null);
+  }
+
+  /// ⚠️⚠️ Ticket S-T1 — UNE 422 OU UNE 413 SUR UN LOT ENTIER COUPE LE LOT EN DEUX, récursivement, jusqu'à isoler
+  /// la ou les unités fautives. Un refus ligne à ligne arrive en 200 avec `rejected` : ce cas-là ne passe pas ici.
+  /// Une 422 / 413 de LOT ENTIER (requête invalide dans son ensemble, corps trop gros pour le serveur) refusait
+  /// jusqu'ici les 49 lignes saines avec la fautive, à chaque tentative, sans jamais dire laquelle.
+  ///
+  /// [poster] envoie un lot et rend la réponse ; [recevoir] reçoit chaque réponse dans l'ordre d'envoi, y compris
+  /// le refus fabriqué ici ([refusDUnite]) pour une unité isolée qui provoque encore la 422 / 413 : elle passe en
+  /// `conflict` avec un motif français, et l'utilisateur la corrige puis la remet en file, comme tout refus.
+  ///
+  /// ⚠️⚠️ **LA COUPE NE PASSE JAMAIS AU MILIEU D'UNE JOURNÉE COUPLÉE** ([_unitesDe]) : une vente séparée de la
+  /// fiche de son jour serait comptée deux fois (15.30). Une journée couplée qui provoque seule la 422 passe
+  /// ENTIÈRE en `conflict`. Toute autre erreur (réseau, 5xx, 401, 403…) remonte telle quelle.
+  @visibleForTesting
+  static Future<void> envoyerEnIsolant(
+    Map<String, dynamic> lot,
+    Future<Map<String, dynamic>> Function(Map<String, dynamic> lot) poster,
+    void Function(Map<String, dynamic> reponse) recevoir,
+  ) async {
+    final Map<String, dynamic> reponse;
+    try {
+      reponse = await poster(lot);
+    } on DioException catch (e) {
+      final statut = e.response?.statusCode;
+      if (statut != 422 && statut != 413) rethrow;
+      final (entete, unites) = _unitesDe(lot);
+      if (unites.isEmpty) rethrow;
+      if (unites.length == 1) {
+        recevoir(refusDUnite(unites.single, statut!, e.response?.data));
+        return;
+      }
+      final milieu = unites.length ~/ 2;
+      await envoyerEnIsolant(
+        _assembler(entete, unites.take(milieu).expand((u) => u)),
+        poster,
+        recevoir,
+      );
+      await envoyerEnIsolant(
+        _assembler(entete, unites.skip(milieu).expand((u) => u)),
+        poster,
+        recevoir,
+      );
+      return;
+    }
+    recevoir(reponse);
+  }
+
+  /// Ticket S-T1 — réponse fabriquée pour une unité isolée que le serveur refuse encore en 422 / 413 : chaque
+  /// ligne est rendue en `rejected` sous sa table, avec « Refusée par le serveur : requête invalide (422) » (ou
+  /// « envoi trop volumineux (413) ») suivi du message du serveur s'il en donne un.
+  @visibleForTesting
+  static Map<String, dynamic> refusDUnite(
+    List<(String, Object?)> unite,
+    int statut,
+    Object? corps,
+  ) {
+    final message = corps is Map && corps['message'] is String
+        ? (corps['message'] as String).trim()
+        : '';
+    final cause = statut == 413
+        ? 'Refusée par le serveur : envoi trop volumineux (413)'
+        : 'Refusée par le serveur : requête invalide (422)';
+    final motif = message.isEmpty ? '$cause.' : '$cause — $message';
+    final reponse = <String, dynamic>{};
+    for (final (table, ligne) in unite) {
+      final cible =
+          reponse.putIfAbsent(
+                table,
+                () => <String, dynamic>{'accepted': <Object?>[], 'rejected': <Object?>[]},
+              )
+              as Map<String, dynamic>;
+      (cible['rejected'] as List).add({
+        'id': ligne is Map ? ligne['id']?.toString() : null,
+        'reason': motif,
+      });
+    }
+    return reponse;
   }
 
   @visibleForTesting

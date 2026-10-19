@@ -174,6 +174,17 @@ class MotifsRefusPush
             .'antérieures avant tout nouvel envoi.';
     }
 
+    /**
+     * Ticket S-T2 (méthode TATACORA) : le `device_id` envoyé n'est pas le poste auquel le jeton a été délivré — un
+     * poste ne signe pas au nom d'un autre.
+     */
+    public static function posteDifferentDuJeton(string $envoye, string $jeton): string
+    {
+        return 'Synchronisation refusée : ce jeton a été délivré au poste « '.$jeton.' », mais la requête se '
+            .'présente comme le poste « '.$envoye.' ». Un poste ne peut pas synchroniser au nom d\'un autre : '
+            .'reconnectez-vous depuis ce poste. Les saisies en attente restent sur le poste.';
+    }
+
     /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
     public static function roleInsuffisant(string $table): string
     {

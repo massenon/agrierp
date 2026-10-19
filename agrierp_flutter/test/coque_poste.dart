@@ -29,16 +29,34 @@ import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
 import 'package:agrierp/features/ventes/ventes_devis_repository.dart';
 import 'package:agrierp/main.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show Key, Listenable;
 
 /// Coque complète du poste (`SocleAccueil` : barre latérale, barre supérieure, écran) sur une base [db], pour les
 /// tests du châssis (tickets H1, H2) et les captures (`capture_ecrans_test.dart`).
-SocleAccueil coqueDeTest(AppDatabase db, {String poste = 'poste-audit', Dio? client}) {
+///
+/// Ticket S-T3 — [changementsReseau] active la synchronisation automatique de la session (sans lui, aucune), avec
+/// [engine], [gestes] et [synchroniserALOuverture] comme dans `AgriErpApp`.
+SocleAccueil coqueDeTest(
+  AppDatabase db, {
+  String poste = 'poste-audit',
+  Dio? client,
+  SyncEngine? engine,
+  Stream<List<ConnectivityResult>>? changementsReseau,
+  Listenable? gestes,
+  bool synchroniserALOuverture = true,
+  Key? key,
+}) {
   final soins = SoinsRepository(database: db, deviceId: poste);
   final dio = client ?? Dio();
   return SocleAccueil(
+    key: key,
+    changementsReseau: changementsReseau,
+    gestes: gestes,
+    synchroniserALOuverture: synchroniserALOuverture,
     database: db,
-    engine: SyncEngine(database: db, client: dio, deviceId: poste),
+    engine: engine ?? SyncEngine(database: db, client: dio, deviceId: poste),
     auth: AuthService(client: dio, deviceName: poste),
     fiches: FicheJournaliereRepository(database: db, deviceId: poste),
     caisse: CaisseRepository(database: db, deviceId: poste),

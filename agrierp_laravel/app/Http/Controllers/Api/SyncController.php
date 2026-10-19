@@ -74,6 +74,7 @@ use App\Support\MotifsRefusPush;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * GAP CRITIQUE COMBLÉ — `POST /api/sync/push` et `GET /api/sync/pull`,
@@ -137,6 +138,11 @@ class SyncController extends Controller
     public function pull(Request $request): JsonResponse
     {
         $request->validate(['since' => ['nullable', 'date']]);
+
+        // Ticket S-T2 — le poste ne l'envoie pas au tirage aujourd'hui ; s'il l'envoie, il doit être celui du jeton.
+        if ($refus = $this->refusPosteDifferentDuJeton($request)) {
+            return $refus;
+        }
 
         $since = $request->filled('since') ? $request->date('since') : null;
 
@@ -1181,6 +1187,13 @@ class SyncController extends Controller
      */
     public function push(Request $request): JsonResponse
     {
+        // 🔴→✅ TICKET S-T2 — UN POSTE NE SIGNE PAS AU NOM D'UN AUTRE. Le `device_id` envoyé était écrit tel quel sur
+        // les avances, règlements, retours, remboursements, imputations et transferts : un poste pouvait les attribuer
+        // à un autre. Refusé AVANT tout traitement (rien n'est écrit, rien n'est journalisé).
+        if ($refus = $this->refusPosteDifferentDuJeton($request)) {
+            return $refus;
+        }
+
         // ⚠️ TICKET 15.26 — UNE CLÉ DONT LA VALEUR N'EST PAS UNE LISTE (`"mails": "x"`) FAISAIT
         // ÉCHOUER TOUT L'ENVOI EN 500 (TypeError sur le paramètre `array` du traitement). Elle est
         // maintenant retirée de la requête AVANT tout traitement et signalée dans `cles_invalides`
@@ -1488,6 +1501,38 @@ class SyncController extends Controller
         'sales' => 'manage-ventes',
         'stock_adjustments' => 'manage-stocks',
     ];
+
+    /**
+     * Ticket S-T2 (méthode TATACORA) — le `device_id` envoyé doit être le NOM DU JETON Sanctum courant : le jeton est
+     * délivré au poste à la connexion (`AuthController::login`, nommé d'après `device_name`), et c'est lui seul qui
+     * dit quel poste parle. Refus 403, avec un motif français, sinon. Le journal de synchronisation (H3) lit déjà le
+     * nom du jeton, jamais la valeur envoyée.
+     *
+     * ⚠️ PORTÉE : la vérification s'applique quand le jeton est un vrai jeton de poste — une ligne de
+     * `personal_access_tokens` portant un nom. Un jeton transitoire (`Sanctum::actingAs`, `actingAs($u, 'sanctum')`
+     * des tests, session web d'un `TransientToken`) ne nomme aucun poste : il n'y a rien à comparer. Un `device_id`
+     * absent ou vide n'est pas comparé non plus (rien n'est signé au nom de personne ; les enregistrements gardent
+     * le leur).
+     */
+    private function refusPosteDifferentDuJeton(Request $request): ?JsonResponse
+    {
+        $envoye = $request->input('device_id');
+        if (! is_string($envoye) || $envoye === '') {
+            return null;
+        }
+
+        $jeton = $request->user()?->currentAccessToken();
+        if (! $jeton instanceof PersonalAccessToken || ! $jeton->exists) {
+            return null;
+        }
+
+        $nom = $jeton->getAttribute('name');
+        if (! is_string($nom) || $nom === '' || hash_equals($nom, $envoye)) {
+            return null;
+        }
+
+        return response()->json(['message' => MotifsRefusPush::posteDifferentDuJeton($envoye, $nom)], 403);
+    }
 
     /**
      * Ticket S1 — retire de la requête les enregistrements que le rôle de l'utilisateur ne permet pas d'écrire,

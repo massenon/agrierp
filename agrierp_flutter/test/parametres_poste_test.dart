@@ -132,7 +132,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SYNCHRONISATION AUTOMATIQUE'), findsOneWidget);
-    expect(find.text('Toutes les 15 minutes'), findsOneWidget);
+    // Ticket S-T3 — 5 minutes par défaut, et l'écran le dit.
+    expect(find.text('Toutes les 5 minutes'), findsOneWidget);
+    expect(find.textContaining('Toutes les 5 minutes par défaut.'), findsOneWidget);
+    expect(find.textContaining('quelques secondes après une vente, une fiche journalière ou un soin'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('intervalle-synchronisation')));
     await tester.pumpAndSettle();

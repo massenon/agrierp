@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/sync/gestes_importants.dart';
 
 /// Soins vétérinaires saisis au poste.
 ///
@@ -66,14 +67,20 @@ class SoinsRepository {
     required AppDatabase database,
     required String deviceId,
     Uuid? uuid,
+    GestesImportants? gestes,
   }) : _db = database,
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
-       _uuid = uuid ?? const Uuid();
+       _uuid = uuid ?? const Uuid(),
+       // ignore: prefer_initializing_formals
+       _gestes = gestes;
 
   final AppDatabase _db;
   final String _deviceId;
   final Uuid _uuid;
+
+  /// Ticket S-T3 — un soin enregistré est un geste important (voir [GestesImportants]). `null` : aucun signal.
+  final GestesImportants? _gestes;
 
   /// Identifiant du poste — repris par `SoinsVaccinsRepository` pour l'infirmerie et le calendrier (H8b).
   String get deviceId => _deviceId;
@@ -309,6 +316,9 @@ class SoinsRepository {
       );
     });
 
+    // Ticket S-T3 — APRÈS la transaction : le soin et sa rémanence sont écrits.
+    _gestes?.signaler();
+
     return (await (_db.select(
       _db.veterinaryRecords,
     )..where((t) => t.id.equals(soinId))).getSingle());
@@ -374,6 +384,8 @@ class SoinsRepository {
     });
 
     if (crees.isEmpty) return const [];
+    // Ticket S-T3 — des soins viennent d'être écrits (rien n'est signalé si tout était déjà administré).
+    _gestes?.signaler();
     return (_db.select(
       _db.veterinaryRecords,
     )..where((t) => t.id.isIn(crees))).get();

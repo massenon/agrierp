@@ -239,9 +239,14 @@ class _ParametresPosteScreenState extends State<ParametresPosteScreen> {
                   ),
                   const SizedBox(height: AgriSpacing.xs),
                   const Text(
-                    'Le poste se synchronise aussi au retour du réseau et à '
-                    'la fermeture. Après un échec réseau, il réessaie après '
-                    '30 s, 2 min, 5 min, 15 min, puis toutes les heures.',
+                    'Toutes les 5 minutes par défaut. Le poste se synchronise '
+                    'aussi à l\'ouverture de la session, quelques secondes '
+                    'après une vente, une fiche journalière ou un soin, au '
+                    'retour du réseau et à la fermeture. Après un échec '
+                    'réseau ou une erreur du serveur, il réessaie après '
+                    '30 s, 2 min, 5 min, 15 min, puis toutes les heures. Une '
+                    'session expirée ou un accès refusé arrête la '
+                    'synchronisation automatique jusqu\'à la reconnexion.',
                     style: TextStyle(fontSize: 11, color: AgriColors.outline),
                   ),
                 ],

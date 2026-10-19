@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/sync/gestes_importants.dart';
 import 'effectif_par_categorie.dart';
 
 /// Ticket F0.95 — compte rendu de [FicheJournaliereRepository.recalculerEnCascade].
@@ -100,16 +101,23 @@ class FicheJournaliereRepository {
     required AppDatabase database,
     required String deviceId,
     Uuid? uuid,
+    GestesImportants? gestes,
   }) : _db = database,
        // `prefer_initializing_formals` suggere `this._deviceId` : Dart
        // l'interdit sur un parametre NOMME prive.
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
-       _uuid = uuid ?? const Uuid();
+       _uuid = uuid ?? const Uuid(),
+       // ignore: prefer_initializing_formals
+       _gestes = gestes;
 
   final AppDatabase _db;
   final String _deviceId;
   final Uuid _uuid;
+
+  /// Ticket S-T3 — une fiche journalière enregistrée est un geste important (voir [GestesImportants]).
+  /// `null` : aucun signal (dépôts internes de la caisse et des transferts, qui signalent eux-mêmes ou non).
+  final GestesImportants? _gestes;
 
   /// Point de vérité unique du calcul — jamais recopié dans un écran.
   static int calculerEffectifFinal({
@@ -371,6 +379,9 @@ class FicheJournaliereRepository {
     // Pondeuses / Escargots, corrigé des deux côtés : cascade unique (F0.95), jours suivants
     // recalculés, bande = DERNIÈRE fiche.
     await recalculerEnCascade(lotId, date);
+
+    // Ticket S-T3 — la fiche et sa cascade sont écrites : elles peuvent partir.
+    _gestes?.signaler();
 
     return (await chargerJour(lotId, date))!;
   }

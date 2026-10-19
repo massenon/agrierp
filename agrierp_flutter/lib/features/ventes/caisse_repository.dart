@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/sync/gestes_importants.dart';
 import '../elevage/effectif_par_categorie.dart';
 import '../elevage/fiche_journaliere_repository.dart';
 
@@ -59,15 +60,22 @@ class CaisseRepository {
     required String deviceId,
     Uuid? uuid,
     DateTime Function()? maintenant,
+    GestesImportants? gestes,
   }) : _db = database,
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
        _uuid = uuid ?? const Uuid(),
-       maintenant = maintenant ?? DateTime.now;
+       maintenant = maintenant ?? DateTime.now,
+       // ignore: prefer_initializing_formals
+       _gestes = gestes;
 
   final AppDatabase _db;
   final String _deviceId;
   final Uuid _uuid;
+
+  /// Ticket S-T3 — une vente enregistrée est un geste important : la synchronisation automatique la pousse
+  /// après un court délai d'agrégation. `null` : aucun signal.
+  final GestesImportants? _gestes;
 
   /// Horloge du poste — injectable pour les tests (F0.89). C'est elle qui dit « aujourd'hui » à
   /// l'écran, aux bornes du calendrier et à l'horodatage de la saisie : une seule source.
@@ -342,6 +350,9 @@ class CaisseRepository {
         }
       }
     });
+
+    // Ticket S-T3 — APRÈS la transaction : la vente est écrite, elle peut partir.
+    _gestes?.signaler();
 
     return (await (_db.select(
       _db.sales,

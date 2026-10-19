@@ -13,6 +13,7 @@ import 'core/config/parametres_poste.dart';
 import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
+import 'core/sync/gestes_importants.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
 import 'core/widgets/acces_rapide.dart';
@@ -175,19 +176,26 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceName: widget.identifiantPoste,
   );
 
+  /// Ticket S-T3 — point unique des gestes importants (vente, fiche journalière, soin) : les dépôts le
+  /// signalent, la synchronisation automatique de la session l'écoute.
+  final GestesImportants _gestes = GestesImportants();
+
   late final FicheJournaliereRepository _fiches = FicheJournaliereRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final CaisseRepository _caisse = CaisseRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final SoinsRepository _soins = SoinsRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final ProductionOeufsService _production = ProductionOeufsService(
@@ -307,6 +315,10 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
   bool _premierDemarrage = false;
 
+  /// Ticket S-T3 — l'accueil synchronise à son ouverture, sauf juste après l'écran de premier démarrage, qui
+  /// vient de proposer (et le plus souvent de faire) cette synchronisation.
+  bool _synchroniserALOuverture = true;
+
   @override
   void initState() {
     super.initState();
@@ -320,6 +332,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
       setState(() {
         _sessionOuverte = ouverte;
         _premierDemarrage = neuf;
+        _synchroniserALOuverture = true;
       });
     }
   }
@@ -330,12 +343,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
       setState(() {
         _sessionOuverte = true;
         _premierDemarrage = neuf;
+        _synchroniserALOuverture = true;
       });
     }
   }
 
   @override
   void dispose() {
+    _gestes.dispose();
     _db.close();
     super.dispose();
   }
@@ -365,7 +380,10 @@ class _AgriErpAppState extends State<AgriErpApp> {
           depot: _demarrage,
           engine: _engine,
           utilisateur: _auth.utilisateur?.nom ?? '—',
-          onTermine: () => setState(() => _premierDemarrage = false),
+          onTermine: () => setState(() {
+            _premierDemarrage = false;
+            _synchroniserALOuverture = false;
+          }),
         ),
         true => SocleAccueil(
           database: _db,
@@ -402,6 +420,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           identifiantPoste: widget.identifiantPoste,
           onDeconnecte: () => setState(() => _sessionOuverte = false),
           changementsReseau: Connectivity().onConnectivityChanged,
+          gestes: _gestes,
+          synchroniserALOuverture: _synchroniserALOuverture,
         ),
       },
     );
@@ -452,6 +472,8 @@ class SocleAccueil extends StatefulWidget {
     required this.identifiantPoste,
     this.onDeconnecte,
     this.changementsReseau,
+    this.gestes,
+    this.synchroniserALOuverture = true,
   });
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
@@ -460,6 +482,14 @@ class SocleAccueil extends StatefulWidget {
   /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
   /// châssis, qui n'ont pas de plateforme native pour la connectivité).
   final Stream<List<ConnectivityResult>>? changementsReseau;
+
+  /// Ticket S-T3 — gestes importants signalés par les dépôts (vente, fiche, soin) : chacun déclenche la
+  /// synchronisation automatique, après son délai d'agrégation.
+  final Listenable? gestes;
+
+  /// Ticket S-T3 — synchronisation automatique dès l'ouverture de l'accueil (session ouverte). Faux juste après
+  /// l'écran de premier démarrage, qui synchronise déjà.
+  final bool synchroniserALOuverture;
 
   final AppDatabase database;
   final SyncEngine engine;
@@ -568,6 +598,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   /// Ticket H13 (B2) — synchronisation automatique de la session : retour du réseau, intervalle réglé dans
   /// Paramètres du poste, réessais après un échec réseau. Arrêtée à la déconnexion (le socle est démonté).
+  /// S-T3 : aussi à l'ouverture de la session et après un geste important. S-T1 : un 401 / 403 la suspend
+  /// jusqu'à la fin de CETTE session — la reconnexion monte un socle neuf, donc une instance neuve.
   SynchronisationAutomatique? _automatique;
 
   /// Ticket H13 — la fermeture par le système (Alt+F4) envoie aussi ce qui attend.
@@ -586,7 +618,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
       onTermine: () {
         if (mounted) setState(() => _versionTirage++);
       },
-    )..demarrer();
+      gestes: widget.gestes,
+    )..demarrer(aussitot: widget.synchroniserALOuverture);
     _cycleDeVie = AppLifecycleListener(
       onExitRequested: () async {
         if ((await _restantsAEnvoyer()) > 0) await _automatique?.avantFermeture();

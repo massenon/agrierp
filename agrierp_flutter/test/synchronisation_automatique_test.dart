@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket H13 (décisions D-SYNC-3 et B2) — synchronisation automatique du poste.
 ///
-/// ⚠️ Les minuteries sont celles de `testWidgets` (temps simulé) : 15 minutes ou une heure s'y écoulent en
+/// ⚠️ Les minuteries sont celles de `testWidgets` (temps simulé) : 5 minutes ou une heure s'y écoulent en
 /// une ligne, et une minuterie oubliée en fin de test fait échouer le test — ce qui vérifie aussi [arreter].
 void main() {
   const aboutie = SyncOutcome(tire: 1, accepte: 0, rejete: 0);
@@ -75,19 +75,19 @@ void main() {
       a.arreter();
     });
 
-    testWidgets('toutes les 15 minutes par défaut', (t) async {
+    testWidgets('toutes les 5 minutes par défaut (S-T3, note TATACORA)', (t) async {
       final a = automatique(() async => aboutie)..demarrer();
-      expect(a.intervalle, const Duration(minutes: 15));
+      expect(a.intervalle, const Duration(minutes: 5));
 
-      await avancer(t, const Duration(minutes: 31));
-      expect(appels, [const Duration(minutes: 15), const Duration(minutes: 30)]);
+      await avancer(t, const Duration(minutes: 11));
+      expect(appels, [const Duration(minutes: 5), const Duration(minutes: 10)]);
       a.arreter();
     });
 
     testWidgets('chaque tentative aboutie relit la barre (onTermine)', (t) async {
       var relectures = 0;
       final a = automatique(() async => aboutie, onTermine: () => relectures++)..demarrer();
-      await avancer(t, const Duration(minutes: 15));
+      await avancer(t, const Duration(minutes: 5));
       expect(relectures, 1);
       a.arreter();
     });
@@ -113,7 +113,7 @@ void main() {
       expect(a.reessaiProgramme, const Duration(seconds: 30));
 
       await avancer(t, const Duration(hours: 3));
-      // Dates cumulées : 0 → +30 s → +2 min → +5 min → +15 min → +1 h → +1 h. L'intervalle de 15 min ne
+      // Dates cumulées : 0 → +30 s → +2 min → +5 min → +15 min → +1 h → +1 h. L'intervalle de 5 min ne
       // court-circuite jamais un réessai programmé.
       expect(appels, [
         Duration.zero,
@@ -143,17 +143,20 @@ void main() {
       a.arreter();
     });
 
-    testWidgets('⚠️ un REFUS du serveur n\'est pas réessayé : il reste en « Refusés »', (t) async {
+    testWidgets('⚠️ un REFUS du serveur (4xx) n\'est pas réessayé : seul l\'intervalle relance', (t) async {
       final a = automatique(
-        () async => throw const EchecSynchronisation('Session expirée : reconnectez-vous.'),
+        () async => throw const EchecSynchronisation('Trop de synchronisations rapprochées.', statut: 429),
       )..demarrer();
       reseau.add([ConnectivityResult.none]);
       reseau.add([ConnectivityResult.wifi]);
       await t.pump();
       expect(a.reessaiProgramme, isNull);
+      expect(a.suspendue, isFalse, reason: 'seuls 401 et 403 arrêtent la synchronisation automatique');
 
-      await avancer(t, const Duration(minutes: 14));
-      expect(appels, hasLength(1), reason: 'seul l\'intervalle relancera');
+      await avancer(t, const Duration(minutes: 4));
+      expect(appels, hasLength(1), reason: 'aucun réessai à 30 s');
+      await avancer(t, const Duration(minutes: 1));
+      expect(appels, hasLength(2), reason: 'l\'intervalle relance');
       a.arreter();
     });
 
@@ -281,12 +284,18 @@ void main() {
       expect(identical(moteur.synchroniser(), premiere), isFalse);
     });
 
-    test('intervalle : 15 min par défaut, valeur proposée retenue, valeur hors choix ignorée', () async {
+    test('intervalle : 5 min par défaut (S-T3), valeur proposée retenue, valeur hors choix ignorée', () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
       final parametres = ParametresPoste(database: db);
 
-      expect(await parametres.intervalleSynchronisation(), const Duration(minutes: 15));
+      expect(ParametresPoste.intervallesProposes, [5, 15, 30, 60]);
+      expect(await parametres.intervalleSynchronisation(), const Duration(minutes: 5));
+      expect(
+        Duration(minutes: ParametresPoste.intervalleParDefaut),
+        SynchronisationAutomatique.intervalleParDefaut,
+        reason: 'un seul défaut, au réglage comme au moteur',
+      );
       await parametres.definirIntervalleSynchronisation(30);
       expect(await parametres.intervalleSynchronisation(), const Duration(minutes: 30));
       await parametres.definirIntervalleSynchronisation(0);
@@ -296,7 +305,7 @@ void main() {
       await db.into(db.appSettings).insertOnConflictUpdate(
         AppSettingsCompanion.insert(key: ParametresPoste.cleIntervalleSynchronisation, value: '0'),
       );
-      expect(await parametres.intervalleSynchronisation(), const Duration(minutes: 15));
+      expect(await parametres.intervalleSynchronisation(), const Duration(minutes: 5));
     });
   });
 }

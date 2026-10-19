@@ -29,9 +29,10 @@ class ParametresPoste {
   static const cleIntervalleSynchronisation =
       'poste.intervalle_synchronisation_minutes';
 
-  /// Choix proposés à l'écran ; 15 min par défaut (décision D-SYNC-3).
+  /// Choix proposés à l'écran ; 5 min par défaut depuis S-T3 (note TATACORA ; 15 min jusqu'ici, D-SYNC-3).
+  /// ⚠️ Un intervalle déjà choisi par l'administrateur (15, 30, 60) est conservé : seul le défaut change.
   static const intervallesProposes = [5, 15, 30, 60];
-  static const intervalleParDefaut = 15;
+  static const intervalleParDefaut = 5;
 
   /// Valeur de départ : le serveur de production de la ferme.
   ///
@@ -86,7 +87,7 @@ class ParametresPoste {
     await _ecrire(cleAdresseServeur, propre);
   }
 
-  /// ⚠️ Une valeur absente, illisible ou hors des choix proposés retombe sur 15 min : un intervalle nul ou
+  /// ⚠️ Une valeur absente, illisible ou hors des choix proposés retombe sur 5 min : un intervalle nul ou
   /// négatif lancerait une synchronisation en boucle.
   Future<Duration> intervalleSynchronisation() async {
     final minutes = int.tryParse(await _lire(cleIntervalleSynchronisation) ?? '');
