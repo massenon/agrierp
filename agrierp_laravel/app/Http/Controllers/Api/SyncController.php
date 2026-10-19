@@ -995,11 +995,11 @@ class SyncController extends Controller
         // curseur `since` (`updated_at`). Une ligne de quelques champs par vente, achat, ponte ou ajustement : la
         // table croît comme les ventes et les achats réunis, servis de la même façon depuis U4.
         //
-        // ⚠️ RECOUVREMENT DE DEUX MINUTES SOUS LE CURSEUR. `server_time` est lu APRÈS toutes les requêtes du tirage : un
-        // mouvement écrit pendant ce tirage (une vente encaissée au web à cet instant) porte un `updated_at` antérieur
-        // au curseur sans avoir été lu, et un journal immuable ne serait JAMAIS resservi — le poste perdrait une
-        // sortie pour toujours (F0.84-bis a rencontré le cas réel sur le journal comptable). Les lignes déjà reçues
-        // sont resservies pendant deux minutes : l'absorbeur du poste remplace par identifiant, sans doublon.
+        // ⚠️ RECOUVREMENT DE DEUX MINUTES SOUS LE CURSEUR, EN PLUS DE CELUI DE TOUT LE TIRAGE. Le curseur est pris au
+        // début du tirage, reculé de `HORIZON_TIRAGE_SECONDES` (voir `pull`) ; un journal immuable n'est jamais
+        // resservi par une modification, et une sortie perdue l'est pour toujours (F0.84-bis a rencontré le cas réel
+        // sur le journal comptable) : il garde donc une marge plus large, contre une transaction lente à se valider.
+        // Les lignes déjà reçues reviennent pendant deux minutes : l'absorbeur du poste remplace par identifiant.
         //
         // ⚠️ COLONNES DU CALCUL ET DE L'AFFICHAGE DU JOURNAL, RIEN D'AUTRE (ni horodatages techniques, ni auteur).
         // `movement_date` est servie en HEURE MURALE du serveur ('Y-m-d H:i:s') : le web compare des JOURS

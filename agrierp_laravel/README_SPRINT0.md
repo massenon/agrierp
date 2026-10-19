@@ -22103,3 +22103,11 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 
 ### D-U8 — Mobile Money dans la Trésorerie du Tableau de bord
 - Légende de la carte Trésorerie : « Caisse : X F · Banque : Y F · Mobile Money : Z F », au web et au poste (comptes actifs ; le poste ne reçoit que ceux-là). Le poste écrivait les montants sans « F » : aligné sur le web.
+
+### U9 — mouvements de stock au poste
+- Serveur : `stock_movements` servie au tirage (colonnes du calcul seulement, date en heure murale, recouvrement de 2 min en plus de celui du tirage : un journal immuable n'est jamais resservi), ignorée à l'envoi ; index sur `updated_at` (migration `2026_10_19_000002`). `SyncMouvementsStockTest` (5).
+- Poste : Drift v44 `StockMovements` (lecture seule, table d'activité vidée par la réinitialisation), absorbeur strict, resynchronisation unique `mouvements_resync_u9`. `JournalStocks` transpose une fois les formules du web : écarts d'inventaire (`adjustment` + `inventaire`), rotation (`StockRotationService`), journal des 100 derniers, grand livre des œufs (`EggStockLedgerService`).
+- Saisies `pending` PROJETÉES selon la règle du serveur qui les recevra (jamais écrites ; disparaissent dès qu'un mouvement descendu porte la même pièce) ; `conflict` ne compte nulle part.
+- Tableau des stocks aligné sur le Blade (tri par nom façon MySQL, pastilles « Critique » / « Normal », « Entrée non saisie »…) ; Tableau 3 = celui du web (11 colonnes dont « Lot », plateaux, ferme). Parités exécutées : Gestion des stocks entière, Tableau 3 rendu par le Blade, cellule par cellule. 24 mutants tués.
+- Mesures (branche) : Laravel 1 762 verts ; poste 2 334 verts, 16 sautés.
+- Délais connus : une vente, un achat ou une fiche acquittés manquent à la rotation et au Tableau 3 jusqu'au tirage suivant (jamais comptés deux fois). Écarts restants : ticket U10.
