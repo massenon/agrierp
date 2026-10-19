@@ -55,6 +55,7 @@ class BarreSuperieure extends StatelessWidget {
     this.onContact,
     this.onParametres,
     this.onDeconnexion,
+    this.recherche,
     this.nonLues,
     this.recentes = const [],
     this.onNotifications,
@@ -88,6 +89,10 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Ticket H1 — « Déconnexion », sous un séparateur, en `text-error-deep` comme au web. `null` : non proposée.
   final VoidCallback? onDeconnexion;
+
+  /// Ticket H1b — champ de recherche globale (`RechercheGlobaleChamp`, défini dans `features/` : `core/` ne dépend
+  /// pas des écrans). `null` : champ inerte d'origine.
+  final Widget? recherche;
 
   /// Groupe de la barre latérale — première partie du fil d'Ariane.
   final String groupe;
@@ -157,7 +162,7 @@ class BarreSuperieure extends StatelessWidget {
           // le poste n'en embarque qu'une poignée. Le champ est donc présent et
           // à sa place, mais annonce sa portée au lieu de promettre une
           // recherche qu'il ne peut pas rendre.
-          SizedBox(
+          if (recherche != null) recherche! else SizedBox(
             width: 220,
             height: 34,
             child: TextField(

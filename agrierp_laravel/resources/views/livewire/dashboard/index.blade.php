@@ -6,7 +6,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
             <div>
                 <h2 class="text-xl lg:text-2xl font-bold text-on-surface">Bienvenue, {{ auth()->user()->name }} 👋</h2>
-                <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }}</p>
+                <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }} · {{ $this->details['exercice'] ? 'Exercice '.$this->details['exercice'].' actif' : 'Aucun exercice ouvert' }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-xs">
                 <a href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
@@ -59,7 +59,8 @@
             :caption="isset($this->kpis['ca']['previous']) ? 'Mois précédent : '.number_format($this->kpis['ca']['previous'], 0, ',', ' ').' F'.($pctChange($this->kpis['ca']['value'], $this->kpis['ca']['previous']) ? ' ('.$pctChange($this->kpis['ca']['value'], $this->kpis['ca']['previous']).')' : '') : null" />
         <x-kpi-card label="Trésorerie" icon="account_balance_wallet" color="blue" unit="FCFA"
             :pending="$this->kpis['tresorerie']['pending']" :pending-since="$this->kpis['tresorerie']['since'] ?? null"
-            :value="isset($this->kpis['tresorerie']['value']) ? number_format($this->kpis['tresorerie']['value'], 0, ',', ' ') : null" />
+            :value="isset($this->kpis['tresorerie']['value']) ? number_format($this->kpis['tresorerie']['value'], 0, ',', ' ') : null"
+            :caption="isset($this->kpis['tresorerie']['value']) ? 'Caisse : '.number_format($this->details['caisse'], 0, ',', ' ').' F · Banque : '.number_format($this->details['banque'], 0, ',', ' ').' F' : null" />
         <x-kpi-card label="Dépenses" icon="shopping_cart" color="maize" unit="FCFA"
             :pending="$this->kpis['depenses']['pending']" :pending-since="$this->kpis['depenses']['since'] ?? null"
             :value="isset($this->kpis['depenses']['value']) ? number_format($this->kpis['depenses']['value'], 0, ',', ' ') : null"
@@ -76,7 +77,8 @@
             :value="isset($this->kpis['dettes']['value']) ? number_format($this->kpis['dettes']['value'], 0, ',', ' ') : null" />
         <x-kpi-card label="Stock Critique" icon="warning" color="red" unit="produits"
             :pending="$this->kpis['stock_critique']['pending']" :pending-since="$this->kpis['stock_critique']['since'] ?? null"
-            :value="$this->kpis['stock_critique']['value'] ?? null" />
+            :value="$this->kpis['stock_critique']['value'] ?? null"
+            :caption="isset($this->kpis['stock_critique']['value']) ? ($this->details['produits_critiques'] === [] ? 'Aucun produit sous son seuil' : implode(', ', $this->details['produits_critiques'])) : null" />
         <x-kpi-card label="Effectif Animaux" icon="pets" color="emerald" unit="têtes"
             :pending="$this->kpis['effectif_animaux']['pending']" :pending-since="$this->kpis['effectif_animaux']['since'] ?? null"
             :value="isset($this->kpis['effectif_animaux']['value']) ? number_format($this->kpis['effectif_animaux']['value'], 0, ',', ' ') : null" />

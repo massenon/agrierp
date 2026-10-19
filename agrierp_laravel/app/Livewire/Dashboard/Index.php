@@ -332,6 +332,28 @@ class Index extends Component
         return ['pending' => false, 'value' => $computeValue()];
     }
 
+    /**
+     * Ticket H11 (décision D-H-maquette du 19/10/2026) — détails que le poste affichait et que le web n'avait pas,
+     * construits ici pour que les deux côtés soient identiques : soldes Caisse / Banque sous la Trésorerie, trois
+     * premiers produits sous leur seuil sous « Stock Critique », exercice ouvert dans l'en-tête.
+     *
+     * @return array{caisse: float, banque: float, produits_critiques: array<int, string>, exercice: ?int}
+     */
+    public function getDetailsProperty(): array
+    {
+        $soldes = \App\Models\TreasuryAccount::where('is_active', true)
+            ->selectRaw('type, SUM(balance) as total')->groupBy('type')->pluck('total', 'type');
+
+        return [
+            'caisse' => (float) ($soldes['caisse'] ?? 0),
+            'banque' => (float) ($soldes['banque'] ?? 0),
+            'produits_critiques' => \App\Models\Product::where('is_active', true)
+                ->whereColumn('stock_qty', '<=', 'alert_threshold')
+                ->orderBy('name')->limit(3)->pluck('name')->all(),
+            'exercice' => \App\Models\FiscalYear::current()?->year,
+        ];
+    }
+
     public function render()
     {
         return view('livewire.dashboard.index', ['title' => 'Tableau de Bord']);

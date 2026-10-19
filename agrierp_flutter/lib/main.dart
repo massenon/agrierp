@@ -9,6 +9,8 @@ import 'core/database/app_database.dart';
 import 'core/export/pdf_recu.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/widgets/acces_rapide.dart';
+import 'features/recherche/recherche_globale_champ.dart';
+import 'features/recherche/recherche_globale_repository.dart';
 import 'core/widgets/modale_agri.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
@@ -503,6 +505,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   String get _role => widget.auth.utilisateur?.role ?? '';
 
+  late final _recherche = RechercheGlobaleRepository(database: widget.database);
+
   @override
   void initState() {
     super.initState();
@@ -596,6 +600,12 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     // Ticket H1 — comme au web, « Paramètres » mène à Paramètres Général : l'écran se garde
                     // lui-même (`GardeEcran`) si le rôle n'y a pas droit, comme la route web refuse.
                     onParametres: () => setState(() => _ecran = EcranPoste.parametresGeneraux),
+                    // Ticket H1b — recherche globale sur la base locale, avec les droits du web.
+                    recherche: RechercheGlobaleChamp(
+                      depot: _recherche,
+                      role: _role,
+                      onNaviguer: (e) => setState(() => _ecran = e),
+                    ),
                     onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
                   ),
                 ),
