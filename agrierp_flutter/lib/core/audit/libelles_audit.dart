@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 134 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 135 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -128,6 +128,7 @@ class LibellesAudit {
     'api.sync_push': 'Synchronisation — données envoyées par un appareil',
     'sync.appairage_revoque': 'Appairage d\'un poste révoqué',
     'sale.negative_stock_received': 'Vente reçue d\'un poste : stock passé sous zéro',
+    'sale.mecef_failed_on_sync': 'Vente reçue d\'un poste : échec de la transmission MeCeF',
     'reproduction_event.updated_from_device': 'Cycle de reproduction mis à jour depuis un poste',
     'attestation.generated.employe': 'Attestation de travail générée',
     'attestation.generated.stagiaire': 'Attestation de stage générée',

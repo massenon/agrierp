@@ -198,6 +198,10 @@ class AuditLog extends Model
         // Ticket CFG-1 — onglet Postes & Appairage : jetons d'un poste supprimés.
         'sync.appairage_revoque' => "Appairage d'un poste révoqué",
         'sale.negative_stock_received' => 'Vente reçue d\'un poste : stock passé sous zéro',
+        // Ticket U14 — écrit par l'envoi des postes quand la facture d'une vente reçue n'a pas pu être transmise au
+        // MeCeF (vente gardée, statut « erreur », retransmission depuis Facturation). Il était écrit avant S-T13 sans
+        // libellé : le journal d'audit montrait la clé technique.
+        'sale.mecef_failed_on_sync' => 'Vente reçue d\'un poste : échec de la transmission MeCeF',
         'reproduction_event.updated_from_device' => 'Cycle de reproduction mis à jour depuis un poste',
         'attestation.generated.employe' => 'Attestation de travail générée',
         'attestation.generated.stagiaire' => 'Attestation de stage générée',

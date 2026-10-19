@@ -1796,7 +1796,14 @@ class SyncController extends Controller
         // les ventes de son essai annulé — deux factures pour une vente. Et son `catch (\Throwable)` pouvait avaler un
         // interblocage survenu en écrivant le statut. Une vente reçue est désormais facturée une fois, l'envoi validé.
         foreach ($this->ventesAFacturer as $venteRecue) {
-            app(FacturationMecefService::class)->facturer($venteRecue);
+            $facture = app(FacturationMecefService::class)->facturer($venteRecue);
+
+            // 🔴→✅ Ticket U14 — l'échec de la facture d'une vente reçue redevient une ligne du journal d'audit, comme
+            // avant S-T13 (qui avait sorti l'appel de la transaction et perdu cette trace) : la vente est gardée, en
+            // « Erreur MeCeF », et le journal dit qu'elle vient d'un poste. Libellé dans `AuditLog::ACTION_LABELS`.
+            if (! $facture['transmise'] && ! $facture['deja']) {
+                AuditLog::record('sale.mecef_failed_on_sync', 'facturation');
+            }
         }
 
         // 🔴→✅ Ticket U13 — ALERTE D'AUTONOMIE ALIMENTAIRE des fiches saisies au poste, comme `saveDay()` au web : APRÈS
