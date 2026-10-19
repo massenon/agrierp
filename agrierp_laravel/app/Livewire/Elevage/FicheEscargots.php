@@ -176,7 +176,9 @@ class FicheEscargots extends Component
         return [
             'effectif_total' => (int) $this->lots->sum('current_quantity'),
             'naissains_mois' => (int) $totalNaissains,
-            'taux_eclosion' => $totalOeufs > 0 ? round(($totalNaissains / $totalOeufs) * 100, 1) : 0.0,
+            // 🔴→✅ Ticket U12a — sans un seul œuf pondu, le taux d'éclosion du mois est INCONNU (« — »), jamais 0,0 % :
+            // un zéro se lit « aucune éclosion », alors que rien n'a été mis en terre.
+            'taux_eclosion' => $totalOeufs > 0 ? round(($totalNaissains / $totalOeufs) * 100, 1) : null,
             'taux_mortalite_mois' => $totalEffectifDepart > 0 ? round(($totalMorts / $totalEffectifDepart) * 100, 1) : 0.0,
         ];
     }
@@ -303,7 +305,13 @@ class FicheEscargots extends Component
     public function loadDay(string $date): void
     {
         $this->selectedDate = $date;
-        $entry = $this->monthlyEntries->get($date);
+        // 🔴→✅ Ticket U12a — la fiche du jour CHOISI, même hors du mois en cours (défaut trouvé en U11 sur la fiche
+        // Pondeuses, présent ici aussi). `monthlyEntries` ne porte que le mois courant : choisir le 28 du mois
+        // précédent vidait le formulaire alors que la fiche existait, et « Enregistrer ce Jour » l'écrasait avec des
+        // zéros (achats, œufs pondus, naissains, effectifs saisis). Le poste charge la fiche de n'importe quel jour.
+        $bande = $this->bande;
+        $entry = $this->monthlyEntries->get($date)
+            ?? ($bande ? LivestockDailyEntry::where('lot_id', $bande->id)->whereDate('entry_date', $date)->first() : null);
         $this->reset(['mortBorde', 'mortEngraissement', 'mortNaissain', 'mortEnregistre', 'donBorde', 'donEngraissement', 'donNaissain', 'donEnregistre']);
 
         if ($entry) {

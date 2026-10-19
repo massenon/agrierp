@@ -13,7 +13,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-lg">
         <x-kpi-card label="Effectif Total Vivant" icon="grid_view" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" caption="Reproducteurs, Poussins & Goliath" />
-        <x-kpi-card label="Taux d'Éclosion Couvoir" icon="egg" color="blue" :value="number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" caption="Ratio : Poussins Nés ÷ Œufs Couvés" />
+        <x-kpi-card label="Taux d'Éclosion Couvoir" icon="egg" color="blue" :value="$this->kpis['taux_eclosion'] === null ? '—' : number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" caption="Ratio : Poussins Nés ÷ Œufs Couvés" />
         <x-kpi-card label="Poussins Nés (Éclosion)" icon="child_care" color="maize" :value="$this->kpis['poussins_nes']" caption="Cumul naissances au couvoir" />
         <x-kpi-card label="Taux de Mortalité" icon="trending_down" color="red" :value="number_format($this->kpis['taux_mortalite_mois'], 1, ',', ' ').' %'" caption="Seuil critique < 5%" />
     </div>
@@ -146,7 +146,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Poussins Nés − (Morts + Dons)</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Poussins Nés − (Morts + Ventes + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>

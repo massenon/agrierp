@@ -8,7 +8,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.15 — FICHE PORCS (`fiche-porcs.html`).
+/// Ticket F0.15 — FICHE PORCS (`fiche-porcs.html`), 🔁 ticket U12a : mise en page du Blade (`fiche-porcs.blade.php`).
 ///
 /// ⚠️⚠️ Le point le plus délicat de cette fiche est **l'unité** : c'est la
 /// SEULE à peser en kilos, alors que la colonne de stockage
@@ -87,10 +87,10 @@ void main() {
   double y(WidgetTester tester, String texte) =>
       tester.getTopLeft(find.text(texte)).dy;
 
-  // ── Conformité à la maquette ───────────────────────────────────────────
+  // ── Conformité au Blade (ticket U12a) ──────────────────────────────────
 
   testWidgets(
-    'les quatre cartes KPI sont celles de la maquette, dans son ordre',
+    'les quatre cartes KPI sont celles du Blade, dans son ordre',
     (tester) async {
       await afficher(tester);
 
@@ -109,29 +109,26 @@ void main() {
     },
   );
 
-  testWidgets("⚠️ l'ordre des sections suit la maquette", (tester) async {
+  testWidgets("⚠️ l'ordre des sections suit le Blade", (tester) async {
     await afficher(tester);
 
     final positions = [
+      y(tester, 'Saisie Journalière du Cheptel Porcin'),
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
+      y(tester, 'PASSAGE DE STADE (PORCELET → PORC MARCHAND)'),
+      y(tester, 'EFFECTIF DE DÉPART PAR CATÉGORIE (DÉDUIT DU STADE DE LA BANDE)'),
+      y(tester, 'VERRATS'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
       y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE PORCIN (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
-      y(tester, 'Traitements & Soins Porcins Automatiques Prévus pour ce Jour'),
-      y(
-        tester,
-        'Attribution Logettes & Porcheries Traitées (Cochées par défaut)',
-      ),
+      y(tester, 'SUIVI CLINIQUE & PROPHYLAXIE'),
+      y(tester, 'Enregistrer ce Jour'),
     ];
 
-    expect(
-      positions,
-      equals([...positions]..sort()),
-      reason:
-          'ordre maquette : Morts, Dons, Effectif, Rationnement, Pesée, '
-          'Soins, Attribution',
-    );
+    expect(positions, equals([...positions]..sort()), reason: 'ordre du Blade');
+    // Absente du Blade : retirée avec la maquette.
+    expect(find.textContaining('Attribution Logettes'), findsNothing);
   });
 
   // 🔁 F0.99 — libellés du WEB : les morts disent « Reproducteur (Truie/Verrat) » et « Porc marchand /
@@ -158,7 +155,7 @@ void main() {
     // ⚠️ EN KILOS — seule fiche à cette échelle.
     expect(find.text('POIDS GÉNÉRAL PESÉ (KG)'), findsOneWidget);
     expect(find.text('Enregistrer ce Jour'), findsOneWidget);
-    expect(find.text('Réinitialiser'), findsOneWidget);
+    expect(find.text('Réinitialiser'), findsNothing);
   });
 
   // ── L'unité, le point qui fait mal ─────────────────────────────────────
@@ -168,11 +165,12 @@ void main() {
   ) async {
     await afficher(tester);
 
-    await tester.enterText(find.byKey(const Key('champ-pesee-0')), '850');
+    await tester.ensureVisible(find.byKey(const Key('champ-pesee')));
+    await tester.enterText(find.byKey(const Key('champ-pesee')), '850');
     await tester.pumpAndSettle();
 
     expect(
-      tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data,
+      tester.widget<Text>(find.byKey(const Key('champ-poids-moyen'))).data,
       '8.5 Kg',
       reason: 'une conversion de trop afficherait 0,0085 ou 8500',
     );
@@ -183,7 +181,8 @@ void main() {
     (tester) async {
       await afficher(tester);
 
-      await tester.enterText(find.byKey(const Key('champ-pesee-0')), '850');
+      await tester.ensureVisible(find.byKey(const Key('champ-pesee')));
+      await tester.enterText(find.byKey(const Key('champ-pesee')), '850');
       await tester.pumpAndSettle();
 
       final bouton = find.byKey(const Key('bouton-enregistrer'));
@@ -200,7 +199,11 @@ void main() {
       );
 
       // Et le champ du total réaffiche bien un TOTAL, pas la moyenne.
-      expect(find.byKey(const Key('champ-pesee-850')), findsOneWidget);
+      final champ = tester.widget<TextField>(
+        find.descendant(of: find.byKey(const Key('champ-pesee')), matching: find.byType(TextField)),
+      );
+      expect(champ.controller!.text, '850');
+      await tester.pump(const Duration(seconds: 4));
     },
   );
 
@@ -208,9 +211,9 @@ void main() {
     await afficher(tester);
 
     expect(
-      tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data,
+      tester.widget<Text>(find.byKey(const Key('champ-poids-moyen'))).data,
       '—',
-      reason: '0 Kg se lirait « des porcs sans poids »',
+      reason: '0 Kg se lirait « des porcs sans poids » (🔴→✅ U12a : le web affichait « 0 Kg », corrigé)',
     );
   });
 
@@ -223,8 +226,8 @@ void main() {
         .widget<Text>(find.byKey(const Key('effectif-final')))
         .data;
 
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Porcelet-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Porcelet-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-sevre-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-sevre-1')));
     await tester.pumpAndSettle();
 
     final apres = tester
@@ -246,20 +249,13 @@ void main() {
     },
   );
 
-  testWidgets("⚠️ la section Attribution dit que son référentiel manque", (
+  testWidgets("⚠️ la section Attribution de la maquette n'est plus rendue (absente du Blade)", (
     tester,
   ) async {
     await afficher(tester);
 
-    expect(
-      find.textContaining('Aucun référentiel de logettes'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('Logette L1'),
-      findsNothing,
-      reason: 'recopier les logettes de la maquette inventerait une donnée',
-    );
+    expect(find.textContaining('Aucun référentiel de logettes'), findsNothing);
+    expect(find.textContaining('Logette L1'), findsNothing);
   });
 
   testWidgets('sans bande porcine, l écran le dit au lieu de rester vide', (
@@ -269,7 +265,7 @@ void main() {
 
     await afficher(tester);
 
-    expect(find.textContaining('Aucune bande porcine active'), findsOneWidget);
+    expect(find.text('Aucune bande active en porciculture pour le moment.'), findsOneWidget);
   });
 
   // ── 🔁 F0.99 — rationnement par catégorie, comme le web (15.42) ─────────────────
@@ -286,7 +282,7 @@ void main() {
 
     expect(texte(tester, 'ration-libelle-marchand'), 'Porc Marchand');
     expect(texte(tester, 'ration-effectif-marchand'), '100');
-    expect(texte(tester, 'ration-grammes-marchand'), '${100 * 600} g');
+    expect(texte(tester, 'ration-provende-marchand'), '${100 * 600} g');
     expect(texte(tester, 'ration-effectif-porcelet'), '0');
     expect(texte(tester, 'ration-effectif-reproducteur'), '0');
     expect(texte(tester, 'total-provende'), '60000 g (60 Kg)');
@@ -306,8 +302,8 @@ void main() {
   testWidgets('un mort Porc Marchand saisi réduit aussitôt sa ligne', (tester) async {
     await afficher(tester);
 
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Porc Marchand-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Porc Marchand-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-jeune-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-jeune-1')));
     await tester.pumpAndSettle();
 
     expect(texte(tester, 'ration-effectif-marchand'), '99');
@@ -320,7 +316,7 @@ void main() {
 
     for (final c in ['porcelet', 'marchand', 'reproducteur']) {
       expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
-      expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
+      expect(texte(tester, 'ration-provende-$c'), '—', reason: c);
     }
     expect(texte(tester, 'total-provende'), '—');
   });
@@ -330,7 +326,7 @@ void main() {
         .write(const FeedRationStandardsCompanion(rationGPerDay: Value(650)));
     await afficher(tester);
 
-    expect(texte(tester, 'ration-g-marchand'), '650 g/j');
+    expect(texte(tester, 'ration-normative-marchand'), '650 g/j');
     expect(texte(tester, 'total-provende'), '${100 * 650} g (65 Kg)');
   });
 
@@ -338,7 +334,7 @@ void main() {
     await (db.delete(db.feedRationStandards)..where((t) => t.stageLabel.equals('Jeune porc'))).go();
     await afficher(tester);
 
-    expect(texte(tester, 'ration-g-marchand'), '600 g/j');
+    expect(texte(tester, 'ration-normative-marchand'), '600 g/j');
     expect(texte(tester, 'total-provende'), '60000 g (60 Kg)');
   });
 }

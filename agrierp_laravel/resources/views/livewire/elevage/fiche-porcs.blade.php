@@ -288,7 +288,8 @@
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté</label>
                         <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
-                            {{ $peseeTotalKg && $this->effectifFinalCalc > 0 ? number_format($peseeTotalKg / $this->effectifFinalCalc, 1) : 0 }} Kg
+                            {{-- Ticket U12a : « — » sans pesée (comme Lapins), jamais « 0 Kg » — un zéro se lit comme un poids mesuré. --}}
+                            {{ $peseeTotalKg && $this->effectifFinalCalc > 0 ? number_format($peseeTotalKg / $this->effectifFinalCalc, 1).' Kg' : '—' }}
                         </div>
                     </div>
                 </div>

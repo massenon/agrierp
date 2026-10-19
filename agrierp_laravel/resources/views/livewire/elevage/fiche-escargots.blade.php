@@ -22,7 +22,7 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-lg">
         <x-kpi-card label="Effectif Total Vivant" icon="bug_report" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" />
         <x-kpi-card label="Naissains Nés (mois)" icon="child_care" color="blue" :value="$this->kpis['naissains_mois']" />
-        <x-kpi-card label="Taux d'Éclosion Naissains" icon="egg_alt" color="maize" :value="number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" />
+        <x-kpi-card label="Taux d'Éclosion Naissains" icon="egg_alt" color="maize" :value="$this->kpis['taux_eclosion'] === null ? '—' : number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" />
         <x-kpi-card label="Taux de Mortalité" icon="trending_down" color="red" :value="number_format($this->kpis['taux_mortalite_mois'], 1, ',', ' ').' %'" />
     </div>
 
@@ -170,7 +170,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final du Jour</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − (Morts + Dons)</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − (Morts + Ventes + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>

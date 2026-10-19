@@ -873,62 +873,9 @@ class FicheJournaliereRepository {
         .get();
   }
 
-  /// Indicateurs du mois affichés en tête de fiche.
-  ///
-  /// ⚠️ MÊMES FORMULES QUE LE SERVEUR (`FicheLapins::getKpisProperty`) :
-  /// effectif = somme des `current_quantity` des bandes ; naissances = somme
-  /// des `ne` du mois ; taux de mortalité = morts du mois ÷ somme des effectifs
-  /// de DÉPART de chaque journée — pas ÷ l'effectif courant, qui donnerait un
-  /// taux différent du web pour les mêmes données.
-  ///
-  /// ⚠️ **« GÉNITEURS (M/F) » N'EST PAS CALCULABLE ICI** : le serveur le tire de
-  /// `effectif_m` / `effectif_f`, deux colonnes que le contrat de
-  /// synchronisation ne descend pas. L'écran affiche un tiret et le dit, plutôt
-  /// qu'un zéro qui se lirait « plus aucun géniteur ».
-  Future<({int effectif, int naissances, double? tauxMortalite})>
-  indicateursDuMois({
-    required List<LivestockLot> bandes,
-    DateTime? quand,
-  }) async {
-    final maintenant = quand ?? HeureBenin.maintenant();
-    final debut = DateTime(maintenant.year, maintenant.month, 1);
-    final finExclue = DateTime(maintenant.year, maintenant.month + 1, 1);
-
-    final effectif = bandes.fold<int>(0, (t, b) => t + b.currentQuantity);
-
-    if (bandes.isEmpty) {
-      return (effectif: 0, naissances: 0, tauxMortalite: null);
-    }
-
-    final ids = bandes.map((b) => b.id).toList();
-
-    final fiches =
-        await (_db.select(_db.livestockDailyEntries)..where(
-              (t) =>
-                  t.lotId.isIn(ids) &
-                  t.entryDate.isBiggerOrEqualValue(debut) &
-                  t.entryDate.isSmallerThanValue(finExclue),
-            ))
-            .get();
-
-    var naissances = 0;
-    var morts = 0;
-    var effectifsDepart = 0;
-
-    for (final fiche in fiches) {
-      naissances += fiche.ne;
-      morts += fiche.mort;
-      effectifsDepart += await effectifPrecedent(fiche.lotId, fiche.entryDate);
-    }
-
-    return (
-      effectif: effectif,
-      naissances: naissances,
-      tauxMortalite: effectifsDepart > 0
-          ? (morts / effectifsDepart) * 100
-          : null,
-    );
-  }
+  // 🔁 Ticket U12a — `indicateursDuMois()` (cartes de la fiche Lapins) est retiré : les cartes des fiches Lapins,
+  // Porcs, Reproducteurs et Escargots sont celles de `getKpisProperty()` du web, calculées par `MoisFiche.indicateurs`
+  // (« Géniteurs (M/F) » compris : `effectif_m` / `effectif_f` sont synchronisés depuis 15.57).
 
   /// Provende servie pour une catégorie : effectif × ration, en grammes.
   ///

@@ -8,11 +8,11 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Sprint 0 Flutter — écran de saisie journalière.
+/// Sprint 0 Flutter, 🔁 ticket U12a (mise en page du Blade) — écran de saisie journalière des lapins.
 ///
-/// Deux comportements sont vérifiés à l'écran plutôt que dans le dépôt, parce
-/// que c'est là qu'ils peuvent se perdre : le champ « Ventes » doit rester
-/// inaccessible à la saisie, et l'effectif doit se recalculer à chaque geste.
+/// Les comportements sont vérifiés à l'écran plutôt que dans le dépôt, parce que c'est là qu'ils peuvent se perdre :
+/// le champ « Ventes » reste inaccessible à la saisie, l'effectif, la provende et le poids moyen se recalculent à
+/// chaque geste.
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
@@ -51,120 +51,99 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  String texte(WidgetTester tester, String cle) => tester.widget<Text>(find.byKey(Key(cle))).data!;
+
+  Future<void> toucher(WidgetTester tester, String cle) async {
+    await tester.ensureVisible(find.byKey(Key(cle)));
+    await tester.tap(find.byKey(Key(cle)));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('l effectif de depart de la bande est affiche', (tester) async {
     await afficher(tester);
 
-    expect(find.byKey(const Key('effectif-final')), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.byKey(const Key('effectif-final'))).data,
-      '40',
-    );
+    expect(texte(tester, 'effectif-final'), '40');
   });
 
-  /// ⚠️ « VENTES » VIENT DE LA CAISSE : le champ doit rester en lecture seule.
-  /// Le rendre saisissable ouvrirait deux sources pour un même chiffre.
+  /// ⚠️ « VENTES » VIENT DE LA CAISSE : une valeur affichée, aucun champ de saisie (`readonly` du Blade).
   testWidgets('le champ Ventes reste en lecture seule', (tester) async {
     await afficher(tester);
 
-    final champ = tester.widget<TextFormField>(
-      find.byKey(const Key('champ-vente-0')),
+    expect(texte(tester, 'champ-ventes'), '0');
+    expect(
+      find.descendant(of: find.byKey(const Key('champ-ventes')), matching: find.byType(TextField)),
+      findsNothing,
     );
-
-    expect(champ.initialValue, '0');
-
-    // ⚠️ L'ASSERTION PORTE SUR LE CHAMP LUI-MEME, pas sur un decompte des
-    // champs saisissables : ce decompte cassait des qu'une section etait
-    // ajoutee a l'ecran, sans que la propriete verifiee change.
-    final verrouille = tester.widget<TextField>(
-      find.descendant(
-        of: find.byKey(const Key('champ-vente-0')),
-        matching: find.byType(TextField),
-      ),
-    );
-
-    expect(verrouille.readOnly, isTrue);
-    expect(find.text('Alimenté par la caisse'), findsOneWidget);
+    expect(find.text('(POS, réel)'), findsOneWidget);
   });
 
-  /// L'effectif se recalcule sans enregistrement, comme dans la maquette.
+  /// L'effectif se recalcule sans enregistrement, comme au web (`wire:model.live`).
   testWidgets('un mort saisi diminue l effectif a l ecran', (tester) async {
     await afficher(tester);
 
-    // Un pas « + » sur la catégorie Reproducteur des morts.
-    await tester.ensureVisible(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first,
-    );
-    await tester.tap(find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first);
-    await tester.pump();
+    await toucher(tester, 'pas-mort-repro-1');
 
+    expect(texte(tester, 'effectif-final'), '39');
+  });
+
+  /// D9 (`getAvertissementMortsProperty`) : des morts supérieurs à la veille ne bloquent pas — l'effectif est ramené
+  /// à 0 et l'écran le dit, mot pour mot comme le web.
+  testWidgets('D9 — morts supérieurs à la veille : plancher à 0 et avertissement du web', (tester) async {
+    await afficher(tester);
+
+    final champ = find.byKey(const Key('compteur-mort-repro'));
+    await tester.ensureVisible(champ);
+    await tester.enterText(champ, '45');
+    await tester.pumpAndSettle();
+
+    expect(texte(tester, 'effectif-final'), '0');
     expect(
-      tester.widget<Text>(find.byKey(const Key('effectif-final'))).data,
-      '39',
+      find.text(
+        "Morts du jour (45) supérieurs à l'effectif de la veille (40) : l'effectif est ramené à 0, vérifiez la saisie.",
+      ),
+      findsOneWidget,
     );
   });
 
-  /// ⚠️ Le compteur ne descend pas sous zéro : un nombre de morts négatif
-  /// gonflerait l'effectif au lieu de le réduire.
+  /// ⚠️ Le compteur ne descend pas sous zéro (`max(0, … - 1)` du Blade).
   testWidgets('le compteur ne passe jamais sous zero', (tester) async {
     await afficher(tester);
 
-    await tester.ensureVisible(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}--1')).first,
-    );
-    await tester.tap(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}--1')).first,
-    );
-    await tester.pump();
+    await toucher(tester, 'pas-mort-repro--1');
 
-    expect(
-      tester.widget<Text>(find.byKey(const Key('effectif-final'))).data,
-      '40',
-      reason: 'aucun mort negatif ne doit gonfler l effectif',
-    );
+    expect(texte(tester, 'effectif-final'), '40', reason: 'aucun mort negatif ne doit gonfler l effectif');
   });
 
-  testWidgets('enregistrer met la journee en file de synchronisation', (
-    tester,
-  ) async {
+  testWidgets('enregistrer met la journee en file de synchronisation', (tester) async {
     await afficher(tester);
 
-    await tester.ensureVisible(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first,
-    );
-    await tester.tap(find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first);
-    await tester.pump();
-
-    // Le bouton est sous la ligne de flottaison du viewport de test : sans
-    // ce defilement, le tap porte dans le vide et le test verifierait un
-    // enregistrement qui n'a jamais eu lieu.
-    await tester.ensureVisible(find.byKey(const Key('bouton-enregistrer')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('bouton-enregistrer')));
-    await tester.tap(find.byKey(const Key('bouton-enregistrer')));
-    await tester.pumpAndSettle();
+    await toucher(tester, 'pas-mort-repro-1');
+    await toucher(tester, 'bouton-enregistrer');
 
     expect(await db.pendingCount(), 1);
 
     final fiche = await depot.chargerJour(bande, HeureBenin.maintenant());
     expect(fiche!.mort, 1);
+    expect(fiche.mortRepro, 1);
     expect(fiche.effectifFinal, 39);
+    expect(find.text('Jour enregistré avec succès.'), findsOneWidget);
+    // Le toast se retire après 3,5 s.
+    await tester.pump(const Duration(seconds: 4));
   });
 
-  /// ⚠️ SANS RATIONS SYNCHRONISÉES, le tableau ne s'invente pas des
-  /// grammages : il dit d'où ils viennent.
-  testWidgets('sans rations, le tableau renvoie a la synchronisation', (
-    tester,
-  ) async {
+  /// Sans barème synchronisé, le web retombe sur les rations de SECOURS du serveur (`RATIONS_DE_SECOURS`), et le
+  /// poste aussi ; une bande sans stade laisse ses catégories inconnues (« — »), jamais 0.
+  testWidgets('sans barème, les rations de secours ; sans stade, « — »', (tester) async {
     await afficher(tester);
 
-    expect(find.textContaining('Rationnement indisponible'), findsOneWidget);
+    expect(find.text('120 g/j'), findsOneWidget);
+    expect(find.text('60 g/j'), findsOneWidget);
+    expect(find.text('30 g/j'), findsOneWidget);
+    expect(texte(tester, 'total-provende'), '—');
   });
 
-  /// Le total est calculé sur la ration descendue du serveur, et affiché en
-  /// grammes ET en kilos comme dans la maquette.
-  testWidgets('la provende totale suit la ration du referentiel', (
-    tester,
-  ) async {
+  /// Le total est calculé sur la ration descendue du serveur, en grammes ET en kilos (`round(total / 1000, 2)`).
+  testWidgets('la provende totale suit la ration du referentiel', (tester) async {
     await db
         .into(db.feedRationStandards)
         .insert(
@@ -181,14 +160,11 @@ void main() {
 
     await afficher(tester);
 
-    // 40 sujets x 60 g = 2 400 g, soit 2.4 Kg.
-    expect(
-      tester.widget<Text>(find.byKey(const Key('total-provende'))).data,
-      '2400 g (2.4 Kg)',
-    );
+    // 40 sujets × 60 g = 2 400 g, soit 2.4 Kg.
+    expect(texte(tester, 'total-provende'), '2400 g (2.4 Kg)');
   });
 
-  /// La provende suit l'effectif en direct : un mort de plus, 60 g de moins.
+  /// La provende suit l'effectif en direct : un mort Jeune de plus, 60 g de moins.
   testWidgets('un mort saisi reduit aussitot la provende', (tester) async {
     await db
         .into(db.feedRationStandards)
@@ -205,79 +181,54 @@ void main() {
     );
 
     await afficher(tester);
+    await toucher(tester, 'pas-mort-jeune-1');
 
-    await tester.ensureVisible(
-      find.byKey(Key('pas-${'Jeune'.hashCode}-1')).first,
-    );
-    await tester.tap(find.byKey(Key('pas-${'Jeune'.hashCode}-1')).first);
-    await tester.pump();
-
-    expect(
-      tester.widget<Text>(find.byKey(const Key('total-provende'))).data,
-      '2340 g (2.3 Kg)',
-    );
+    expect(texte(tester, 'total-provende'), '2340 g (2.34 Kg)');
   });
 
   /// ⚠️ Tant que rien n'est pesé, le poids moyen affiche « — » et non « 0 g ».
   testWidgets('sans pesee, le poids moyen affiche un tiret', (tester) async {
     await afficher(tester);
 
-    expect(tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data, '—');
-    expect(
-      tester.widget<Text>(find.byKey(const Key('taille-echantillon'))).data,
-      '40',
-      reason: 'la taille d echantillon suit l effectif final',
-    );
+    expect(texte(tester, 'champ-poids-moyen'), '—');
+    expect(texte(tester, 'champ-taille-echantillon'), '40', reason: 'la taille d echantillon suit l effectif final');
   });
 
-  /// La pesée se convertit en direct, comme dans la maquette.
+  /// La pesée se convertit en direct : `round(pesée ÷ effectif final).' g'`.
   testWidgets('le poids moyen se calcule a la saisie', (tester) async {
     await afficher(tester);
 
-    await tester.enterText(find.byKey(const Key('champ-pesee-0')), '3500');
+    await tester.ensureVisible(find.byKey(const Key('champ-pesee')));
+    await tester.enterText(find.byKey(const Key('champ-pesee')), '3500');
     await tester.pumpAndSettle();
 
-    // 3500 g repartis sur 40 sujets.
-    expect(
-      tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data,
-      '88 g',
-    );
+    // 3 500 g répartis sur 40 sujets = 87,5 → 88 g.
+    expect(texte(tester, 'champ-poids-moyen'), '88 g');
   });
 
   /// ⚠️ LE DIVISEUR SUIT L'EFFECTIF : saisir un mort change le poids moyen.
-  /// Le figer ferait diverger l'affichage du calcul enregistré.
   testWidgets('un mort saisi change aussitot le poids moyen', (tester) async {
     await afficher(tester);
 
-    await tester.enterText(find.byKey(const Key('champ-pesee-0')), '3900');
+    await tester.ensureVisible(find.byKey(const Key('champ-pesee')));
+    await tester.enterText(find.byKey(const Key('champ-pesee')), '3900');
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data,
-      '98 g',
-    );
+    expect(texte(tester, 'champ-poids-moyen'), '98 g');
 
-    await tester.ensureVisible(
-      find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first,
-    );
-    await tester.tap(find.byKey(Key('pas-${'Reproducteur'.hashCode}-1')).first);
-    await tester.pumpAndSettle();
+    await toucher(tester, 'pas-mort-repro-1');
 
-    // 3900 g sur 39 sujets.
-    expect(
-      tester.widget<Text>(find.byKey(const Key('poids-moyen'))).data,
-      '100 g',
-    );
+    // 3 900 g sur 39 sujets.
+    expect(texte(tester, 'champ-poids-moyen'), '100 g');
   });
 
-  /// Sans bande sur le poste, l'écran dit d'où elles viennent plutôt que
-  /// d'afficher un formulaire vide inutilisable.
-  testWidgets('sans bande, l ecran renvoie a la synchronisation', (
-    tester,
-  ) async {
+  /// Sans bande, la carte du Blade : « Aucune bande active en cuniculture pour le moment. » et son lien.
+  testWidgets('sans bande, la carte du Blade', (tester) async {
     await db.delete(db.livestockLots).go();
 
     await afficher(tester);
 
-    expect(find.textContaining('proviennent du serveur'), findsOneWidget);
+    expect(find.text('Aucune bande active en cuniculture pour le moment.'), findsOneWidget);
+    expect(find.text('Créer une bande depuis Bandes & Sujets →'), findsOneWidget);
+    expect(find.byKey(const Key('bouton-enregistrer')), findsNothing);
   });
 }

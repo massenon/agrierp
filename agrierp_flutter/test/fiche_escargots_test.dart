@@ -8,15 +8,15 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.17 — FICHE ESCARGOTS (`fiche-escargots.html`).
+/// Ticket F0.17 — FICHE ESCARGOTS (`fiche-escargots.html`), 🔁 ticket U12a : mise en page du Blade
+/// (`fiche-escargots.blade.php`).
 ///
 /// ⚠️⚠️ Deux singularités de cette fiche.
 ///
-/// 1. **Aucun barème de ration n'existe pour l'héliciculture** : la section
-///    reste un bandeau d'attente, jamais un tableau à zéro — qui se lirait
-///    « aucune provende à servir ».
-/// 2. **La maquette porte deux champs « Naissains Nés »** dont un seul alimente
-///    l'effectif : une saisie dans l'autre se perdait en silence.
+/// 1. **Aucun barème de ration n'existe pour l'héliciculture** : la section reste en attente (`x-module-pending`),
+///    jamais un tableau à zéro — qui se lirait « aucune provende à servir ».
+/// 2. **La maquette portait deux champs « Naissains Nés »** dont un seul alimentait l'effectif ; le Blade n'en a qu'un
+///    (« Naissains Nés (Éclosion) ») : le poste aussi.
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
@@ -50,6 +50,14 @@ void main() {
     soins = SoinsRepository(database: db, deviceId: 'poste-test');
 
     await bande();
+    // `ModuleConfig::isEnabled('helico')` : éteint par défaut, la fiche n'affiche alors que sa carte « non activé ».
+    await db.into(db.modulesConfig).insert(
+      ModulesConfigCompanion.insert(
+        id: 'dddddddd-1111-4111-8111-dddddddddddd',
+        speciesCode: 'helico',
+        isEnabled: const Value(true),
+      ),
+    );
   });
 
   tearDown(() async => db.close());
@@ -63,67 +71,60 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  double y(WidgetTester tester, String texte) =>
-      tester.getTopLeft(find.text(texte)).dy;
+  double y(WidgetTester tester, String texte) => tester.getTopLeft(find.text(texte)).dy;
 
-  String? lecture(WidgetTester tester, String cle) =>
-      tester.widget<Text>(find.byKey(Key('lecture-$cle'))).data;
+  String? lecture(WidgetTester tester, String cle) => tester.widget<Text>(find.byKey(Key('champ-$cle'))).data;
 
-  // ── Conformité à la maquette ───────────────────────────────────────────
+  Future<void> saisir(WidgetTester tester, String cle, String valeur) async {
+    await tester.ensureVisible(find.byKey(Key('champ-$cle')));
+    await tester.enterText(find.byKey(Key('champ-$cle')), valeur);
+    await tester.pumpAndSettle();
+  }
 
-  testWidgets(
-    'les quatre cartes KPI sont celles de la maquette, dans son ordre',
-    (tester) async {
-      await afficher(tester);
+  String effectif(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('effectif-final'))).data!;
 
-      final libelles = [
-        'EFFECTIF ESCARGOTS TOTAL',
-        'NAISSAINS NÉS (MOIS)',
-        "TAUX D'ÉCLOSION NAISSAINS",
-        'TAUX DE MORTALITÉ',
-      ];
-      for (final l in libelles) {
-        expect(find.text(l), findsOneWidget, reason: l);
-      }
+  // ── Conformité au Blade (ticket U12a) ──────────────────────────────────
 
-      final positions = libelles.map((l) => y(tester, l)).toList();
-      expect(positions, equals([...positions]..sort()));
-    },
-  );
+  testWidgets('les quatre cartes KPI sont celles du Blade, dans son ordre', (tester) async {
+    await afficher(tester);
 
-  testWidgets("⚠️ l'ordre des sections suit la maquette", (tester) async {
+    final libelles = [
+      'EFFECTIF TOTAL VIVANT',
+      'NAISSAINS NÉS (MOIS)',
+      "TAUX D'ÉCLOSION NAISSAINS",
+      'TAUX DE MORTALITÉ',
+    ];
+    for (final l in libelles) {
+      expect(find.text(l), findsOneWidget, reason: l);
+    }
+
+    final positions = libelles.map((l) => y(tester, l)).toList();
+    expect(positions, equals([...positions]..sort()));
+  });
+
+  testWidgets("⚠️ l'ordre des sections suit le Blade", (tester) async {
     await afficher(tester);
 
     final positions = [
+      y(tester, 'Saisie Journalière du Cheptel'),
       y(tester, 'ACHATS DU JOUR'),
-      y(tester, 'ŒUFS RÉCOLTÉS (PONDOIRS TERRE)'),
+      y(tester, 'ŒUFS PONDUS (EN TERRE)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
-      y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
+      y(tester, 'BORDÉS'),
+      y(tester, 'EFFECTIF FINAL DU JOUR'),
+      y(tester, 'RATIONNEMENT FARINE CALCIQUE & FOURRAGE'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
-      y(
-        tester,
-        'Soins, Hygrométrie & Entretien du Substrat Prévus pour ce Jour',
-      ),
-      y(
-        tester,
-        'Attribution Parcs & Fosses en Terre Traités (Cochés par défaut)',
-      ),
+      y(tester, 'ENTRETIEN & HYGROMÉTRIE'),
+      y(tester, 'OBSERVATIONS'),
+      y(tester, 'Enregistrer ce Jour'),
     ];
 
-    expect(
-      positions,
-      equals([...positions]..sort()),
-      reason:
-          'ordre : Entrées, Pondoirs, Morts, Dons, Effectif, '
-          'Pesée, Soins, Attribution',
-    );
+    expect(positions, equals([...positions]..sort()), reason: 'ordre du Blade');
   });
 
   // 🔁 F0.99 — catégories des morts du WEB (`fiche-escargots.blade.php`), Dons sur les mêmes catégories (15.56).
-  testWidgets('les trois catégories du web portent les morts ET les dons', (
-    tester,
-  ) async {
+  testWidgets('les trois catégories du web portent les morts ET les dons', (tester) async {
     await afficher(tester);
 
     for (final categorie in ['REPRODUCTEUR (BORDÉ)', 'NAISSAIN']) {
@@ -136,20 +137,18 @@ void main() {
 
   // ── Le barème manquant ─────────────────────────────────────────────────
 
-  testWidgets(
-    "⚠️⚠️ sans barème hélicicole, un bandeau d'attente et non un tableau à zéro",
-    (tester) async {
-      await afficher(tester);
+  testWidgets("⚠️⚠️ sans barème hélicicole, la section d'attente du Blade et non un tableau à zéro", (tester) async {
+    await afficher(tester);
 
-      expect(find.textContaining('barème non fourni'), findsOneWidget);
-      // Un tableau à zéro se lirait « aucune provende à servir ».
-      expect(find.text('PROVENDE SERVIE (G)'), findsNothing);
-    },
-  );
+    expect(
+      find.text('Le calcul du rationnement sera alimenté en données réelles dès sa mise en œuvre.'),
+      findsOneWidget,
+    );
+    // Un tableau à zéro se lirait « aucune provende à servir ».
+    expect(find.text('Provende Servie (g)'), findsNothing);
+  });
 
-  testWidgets('si un barème est un jour fourni, le tableau apparaît', (
-    tester,
-  ) async {
+  testWidgets('même avec un barème hélicicole, le Blade garde la section en attente', (tester) async {
     await db
         .into(db.feedRationStandards)
         .insert(
@@ -163,166 +162,105 @@ void main() {
 
     await afficher(tester);
 
-    expect(find.textContaining('barème non fourni'), findsNothing);
-    expect(find.text('PROVENDE SERVIE (G)'), findsOneWidget);
-    // 2000 escargots × 2 g = 4000 g.
-    expect(find.text('4000 g'), findsOneWidget);
+    // `x-module-pending` sans condition au web : le poste ne calcule pas une provende que le web n'affiche pas.
+    expect(find.byKey(const Key('rationnement-en-attente')), findsOneWidget);
+    expect(find.text('Provende Servie (g)'), findsNothing);
   });
 
-  // ── Les deux champs « Naissains Nés » ──────────────────────────────────
+  // ── Un seul champ « Naissains Nés » (Blade) ────────────────────────────
 
-  testWidgets(
-    "⚠️⚠️ les deux champs « Naissains Nés » de la maquette restent cohérents",
-    (tester) async {
-      await afficher(tester);
-
-      // La maquette en porte deux, dont un seul alimentait l'effectif : saisir
-      // dans l'un doit se refléter dans l'autre, sinon une saisie se perd.
-      await tester.enterText(
-        find.byKey(const Key('champ-naissains-entree-0')),
-        '150',
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('champ-naissains-nes-150')), findsOneWidget);
-    },
-  );
-
-  testWidgets("⚠️ les naissains nés augmentent l'effectif final", (
-    tester,
-  ) async {
+  testWidgets("⚠️ un seul champ « Naissains Nés » : le second champ de la maquette n'est pas au Blade", (tester) async {
     await afficher(tester);
 
-    final avant = tester
-        .widget<Text>(find.byKey(const Key('effectif-final')))
-        .data;
+    expect(find.text('NAISSAINS NÉS (ÉCLOSION)'), findsOneWidget);
+    expect(find.text('NAISSAINS NÉS (ÉCLOSION JOUR)'), findsNothing);
+  });
 
-    await tester.enterText(
-      find.byKey(const Key('champ-naissains-nes-0')),
-      '150',
-    );
-    await tester.pumpAndSettle();
+  testWidgets("⚠️ les naissains nés augmentent l'effectif final", (tester) async {
+    await afficher(tester);
 
-    final apres = tester
-        .widget<Text>(find.byKey(const Key('effectif-final')))
-        .data;
+    final avant = effectif(tester);
+    await saisir(tester, 'naissains-nes', '150');
 
-    expect(int.parse(apres!), int.parse(avant!) + 150);
+    expect(int.parse(effectif(tester)), int.parse(avant) + 150);
   });
 
   // ── Le taux d'éclosion ─────────────────────────────────────────────────
 
-  testWidgets("⚠️ sans œuf récolté, le taux d'éclosion affiche un tiret", (
-    tester,
-  ) async {
+  testWidgets("sans œuf pondu, le taux d'éclosion du jour vaut « 0,0 % », comme au web", (tester) async {
     await afficher(tester);
 
-    expect(lecture(tester, 'taux-eclosion'), '—');
+    expect(lecture(tester, 'taux-eclosion'), '0,0 %');
   });
 
-  testWidgets('150 naissains de 200 œufs récoltés font 75,0 %', (tester) async {
+  testWidgets('150 naissains de 200 œufs pondus font 75,0 %', (tester) async {
     await afficher(tester);
 
-    await tester.enterText(find.byKey(const Key('champ-oeufs-terre-0')), '200');
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('champ-naissains-nes-0')),
-      '150',
-    );
-    await tester.pumpAndSettle();
+    await saisir(tester, 'oeufs-terre', '200');
+    await saisir(tester, 'naissains-nes', '150');
 
-    expect(lecture(tester, 'taux-eclosion'), '75.0 %');
+    expect(lecture(tester, 'taux-eclosion'), '75,0 %');
   });
 
   // ── Correspondance des colonnes ────────────────────────────────────────
 
-  testWidgets(
-    '⚠️⚠️ les œufs récoltés vont dans ponteTotal, les naissains dans ne',
-    (tester) async {
-      await afficher(tester);
+  testWidgets('⚠️⚠️ les œufs pondus vont dans ponteTotal, les naissains dans ne', (tester) async {
+    await afficher(tester);
 
-      await tester.enterText(
-        find.byKey(const Key('champ-oeufs-terre-0')),
-        '200',
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('champ-naissains-nes-0')),
-        '150',
-      );
-      await tester.pumpAndSettle();
+    await saisir(tester, 'oeufs-terre', '200');
+    await saisir(tester, 'naissains-nes', '150');
 
-      final bouton = find.byKey(const Key('bouton-enregistrer'));
-      await tester.ensureVisible(bouton);
-      await tester.tap(bouton);
-      await tester.pumpAndSettle();
+    final bouton = find.byKey(const Key('bouton-enregistrer'));
+    await tester.ensureVisible(bouton);
+    await tester.tap(bouton);
+    await tester.pumpAndSettle();
 
-      final fiche = await depot.chargerJour(bandeId, HeureBenin.maintenant());
-      expect(fiche?.ponteTotal, 200, reason: 'les œufs récoltés aux pondoirs');
-      expect(fiche?.ne, 150, reason: 'les naissains nés');
-    },
-  );
+    final fiche = await depot.chargerJour(bandeId, HeureBenin.maintenant());
+    expect(fiche?.ponteTotal, 200, reason: 'les œufs pondus en terre');
+    expect(fiche?.ne, 150, reason: 'les naissains nés');
+    expect(find.text('Jour enregistré avec succès.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+  });
 
   testWidgets('un mort saisi réduit aussitôt l effectif final', (tester) async {
     await afficher(tester);
 
-    final avant = tester
-        .widget<Text>(find.byKey(const Key('effectif-final')))
-        .data;
-
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Naissain-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Naissain-1')));
+    final avant = effectif(tester);
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-naissain-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-naissain-1')));
     await tester.pumpAndSettle();
 
-    final apres = tester
-        .widget<Text>(find.byKey(const Key('effectif-final')))
-        .data;
-
-    expect(int.parse(apres!), int.parse(avant!) - 1);
+    expect(int.parse(effectif(tester)), int.parse(avant) - 1);
   });
 
-  // ── Écarts assumés ─────────────────────────────────────────────────────
+  // ── Retirés avec la maquette ───────────────────────────────────────────
 
-  testWidgets("la section Attribution dit que son référentiel manque", (
-    tester,
-  ) async {
+  testWidgets('ni « Attribution Parcs », ni protocole du jour, ni « Réinitialiser » (absents du Blade)', (tester) async {
     await afficher(tester);
 
-    expect(
-      find.textContaining('Aucun référentiel de parcs et fosses'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Aucun référentiel de parcs et fosses'), findsNothing);
     expect(find.textContaining('Fosse F1'), findsNothing);
+    expect(find.byKey(const Key('prophylaxie-du-jour')), findsNothing);
+    expect(find.text('Réinitialiser'), findsNothing);
   });
 
-  testWidgets(
-    "sans bande hélicicole, l'écran rappelle que le module est désactivé par défaut",
-    (tester) async {
-      await bande(codeEspece: 'cuniculture');
+  testWidgets('sans bande hélicicole, la carte du Blade', (tester) async {
+    await bande(codeEspece: 'cuniculture');
 
-      await afficher(tester);
+    await afficher(tester);
 
-      expect(
-        find.textContaining('Aucune bande hélicicole active'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('module désactivé par défaut'),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Aucune bande active en héliciculture pour le moment.'), findsOneWidget);
+  });
 
   // 🔁 15.56 — un don fait quitter le sujet : l'effectif final baisse aussitôt, comme sur le web.
   testWidgets('un don saisi réduit aussitôt l effectif final', (tester) async {
     await afficher(tester);
 
-    final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
-    await tester.ensureVisible(find.byKey(const Key('pas-don-Naissain-1')));
-    await tester.tap(find.byKey(const Key('pas-don-Naissain-1')));
+    final avant = effectif(tester);
+    await tester.ensureVisible(find.byKey(const Key('pas-don-naissain-1')));
+    await tester.tap(find.byKey(const Key('pas-don-naissain-1')));
     await tester.pumpAndSettle();
-    final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
 
-    expect(int.parse(apres!), int.parse(avant!) - 1);
+    expect(int.parse(effectif(tester)), int.parse(avant) - 1);
   });
 }

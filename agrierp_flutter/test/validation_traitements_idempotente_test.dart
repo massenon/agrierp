@@ -309,17 +309,23 @@ void main() {
     });
   });
 
-  group('les cinq fiches passent par le dépôt idempotent', () {
+  group('les fiches à protocole du jour passent par le dépôt idempotent', () {
     // ⚠️ Lecture du SOURCE, comme `conformite_portage_test.dart` : un retour
     // à la boucle sur l'instantané `_protocole` rend l'écran visuellement
     // identique, et seul le double clic le trahirait.
+    // 🔁 Ticket U12a — Lapins et Porcs partagent la vue du Blade (`fiche_categories_vue.dart`) ; la fiche Escargots
+    // n'a plus de protocole du jour : son Blade n'a pas `x-prophylaxie-du-jour` (vérifié ci-dessous).
     const fiches = [
-      'fiche_lapins_screen.dart',
-      'fiche_porcs_screen.dart',
-      'fiche_escargots_screen.dart',
+      'fiche_categories_vue.dart',
       'fiche_pondeuses_screen.dart',
       'fiche_reproducteurs_screen.dart',
     ];
+
+    test('fiche_escargots_screen.dart : aucun protocole du jour, comme son Blade', () {
+      final source = File('lib/features/elevage/fiche_escargots_screen.dart').readAsStringSync();
+      expect(source, isNot(contains('_validerTraitements')));
+      expect(source, isNot(contains('ProphylaxieDuJourFiche(')));
+    });
 
     String corpsDeValider(String source) {
       final debut = source.indexOf(

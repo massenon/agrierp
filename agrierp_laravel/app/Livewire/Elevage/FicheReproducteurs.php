@@ -98,6 +98,19 @@ class FicheReproducteurs extends Component
     {
         $this->selectedDate = now()->format('Y-m-d');
         $this->selectedLotId = $this->lots->first()?->id ?? '';
+        // 🔴→✅ Ticket U12a — le jour du jour s'ouvre avec SES valeurs (vente du POS, saisie précédente), comme les
+        // autres fiches : sans ce chargement, le formulaire s'ouvrait à zéro et « Enregistrer ce Jour » écrasait la
+        // fiche du jour (achats, œufs couvés, poussins nés) avec ces zéros.
+        $this->loadDay($this->selectedDate);
+    }
+
+    /**
+     * 🔴→✅ Ticket U12a — changer la date CHARGE le jour choisi. Le champ « Date : » (`wire:model.live`) changeait la
+     * date sans recharger le formulaire : les valeurs du jour précédemment affiché s'enregistraient sur le nouveau.
+     */
+    public function updatedSelectedDate(): void
+    {
+        $this->loadDay($this->selectedDate);
     }
 
     public function getLotsProperty()
@@ -134,7 +147,10 @@ class FicheReproducteurs extends Component
 
         return [
             'effectif_total' => (int) $this->lots->sum('current_quantity'),
-            'taux_eclosion' => $totalCouves > 0 ? round(($totalNes / $totalCouves) * 100, 1) : 85.0,
+            // 🔴→✅ Ticket U12a — sans un seul œuf couvé, le taux d'éclosion du mois est INCONNU (« — »). Le web
+            // affichait 85,0 % : la valeur de DÉMONSTRATION de la maquette, présentée comme un taux calculé (le même
+            // défaut que le ticket 14.61 avait corrigé pour le taux du jour).
+            'taux_eclosion' => $totalCouves > 0 ? round(($totalNes / $totalCouves) * 100, 1) : null,
             'poussins_nes' => (int) $totalNes,
             'taux_mortalite_mois' => $totalEffectifDepart > 0 ? round(($totalMorts / $totalEffectifDepart) * 100, 1) : 0.0,
         ];
@@ -280,7 +296,12 @@ class FicheReproducteurs extends Component
     {
         $this->traitementsCoches = [];   // une case cochée ne survit pas à un changement de jour
         $this->selectedDate = $date;
-        $entry = $this->monthlyEntries->get($date);
+        // 🔴→✅ Ticket U12a — la fiche du jour CHOISI, même hors du mois en cours (défaut de la fiche Pondeuses, U11) :
+        // `monthlyEntries` ne porte que le mois courant, un jour du mois précédent s'ouvrait vide et s'écrasait.
+        $entry = $this->monthlyEntries->get($date)
+            ?? ($this->selectedLotId !== ''
+                ? LivestockDailyEntry::where('lot_id', $this->selectedLotId)->whereDate('entry_date', $date)->first()
+                : null);
 
         $this->reset(['mortRepro', 'mortPoulet', 'mortPoussin', 'mortEnregistre', 'donRepro', 'donPoulet', 'donPoussin', 'donEnregistre']);
 

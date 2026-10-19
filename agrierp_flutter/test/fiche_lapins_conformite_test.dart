@@ -7,9 +7,9 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.13 — CONFORMITÉ À LA MAQUETTE `fiche-lapins.html`.
+/// Ticket F0.13 — CONFORMITÉ À LA MAQUETTE `fiche-lapins.html`, 🔁 ticket U12a : au BLADE (`fiche-lapins.blade.php`).
 ///
-/// ⚠️⚠️ **LA MAQUETTE EST LA RÉFÉRENCE DE MISE EN PAGE.** Ordre des sections,
+/// ⚠️⚠️ **LE BLADE EST LA RÉFÉRENCE DE MISE EN PAGE** (doctrine, article 5). Ordre des sections,
 /// libellés et ponctuation s'y prennent tels quels. Un écran qui « fonctionne »
 /// mais range ses blocs autrement n'est pas une conversion : l'animalier qui a
 /// appris la fiche papier puis la maquette ne retrouve plus ses repères.
@@ -92,84 +92,49 @@ void main() {
     },
   );
 
-  testWidgets("l'ordre complet des sections suit la maquette", (tester) async {
+  /// 🔁 Ticket U12a — l'ordre des sections est celui du Blade (`fiche-lapins.blade.php`) ; « Attribution Cages… » et
+  /// « Réinitialiser », absents du Blade, sont retirés.
+  testWidgets("l'ordre complet des sections suit le Blade", (tester) async {
     await afficher(tester);
 
     final positions = [
+      y(tester, 'Saisie Journalière du Cheptel'),
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
+      y(tester, 'SEVRAGE DU JOUR (SOUS-MÈRES → JEUNE)'),
+      y(tester, 'EFFECTIF DE DÉPART PAR CATÉGORIE (DÉDUIT DU STADE DE LA BANDE)'),
+      y(tester, 'EFFECTIF MÂLES'),
       y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
-      y(
-        tester,
-        'RATIONNEMENT & PROVENDE SERVIE PAR CATÉGORIE (EN GRAMMES G/J)',
-      ),
+      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR CATÉGORIE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
-      y(tester, 'Traitements & Prophylaxie Automatiques Prévus pour ce Jour'),
-      y(tester, 'Attribution Cages & Bandes Traitées (Cochées par défaut)'),
+      y(tester, 'TRAITEMENTS & PROPHYLAXIE'),
+      y(tester, 'OBSERVATIONS / NOTES ADDITIONNELLES'),
+      y(tester, 'Enregistrer ce Jour'),
     ];
 
     final trie = [...positions]..sort();
-    expect(
-      positions,
-      equals(trie),
-      reason:
-          'ordre maquette : Morts, Dons, Effectif, Rationnement, '
-          'Pesée, Traitements, Attribution',
-    );
+    expect(positions, equals(trie), reason: 'ordre du Blade');
   });
 
-  testWidgets('les libellés des boutons sont ceux de la maquette', (
-    tester,
-  ) async {
+  testWidgets('les libellés des boutons sont ceux du Blade, sans « Réinitialiser »', (tester) async {
     await afficher(tester);
 
-    // ⚠️ « Enregistrer ce Jour », pas « Enregistrer la journée » : une
-    // reformulation reste un écart de libellé.
+    // ⚠️ « Enregistrer ce Jour », pas « Enregistrer la journée » : une reformulation reste un écart de libellé.
     expect(find.text('Enregistrer ce Jour'), findsOneWidget);
-    expect(find.text('Réinitialiser'), findsOneWidget);
+    expect(find.text('Exporter PDF'), findsOneWidget);
+    expect(find.text('Réinitialiser'), findsNothing);
   });
 
+  testWidgets('⚠️ la section Attribution de la maquette n est plus rendue (absente du Blade)', (tester) async {
+    await afficher(tester);
+
+    expect(find.textContaining('Attribution Cages'), findsNothing);
+    expect(find.textContaining('Cage C1'), findsNothing);
+  });
+
+  /// Le bloc KPI ouvre la fiche, comme au Blade : quatre indicateurs, dans son ordre.
   testWidgets(
-    "⚠️ « Réinitialiser » vide le formulaire et ne supprime rien en base",
-    (tester) async {
-      await afficher(tester);
-
-      await tester.enterText(find.byKey(const Key('champ-achat-0')), '7');
-      await tester.pumpAndSettle();
-
-      final bouton = find.byKey(const Key('bouton-reinitialiser'));
-      await tester.ensureVisible(bouton);
-      await tester.tap(bouton);
-      await tester.pumpAndSettle();
-
-      // La bande est toujours là : réinitialiser le formulaire n'efface pas de
-      // données zootechniques.
-      expect(await db.select(db.livestockLots).get(), hasLength(1));
-    },
-  );
-
-  testWidgets(
-    "⚠️ la section Attribution est présente et dit que son référentiel manque",
-    (tester) async {
-      await afficher(tester);
-
-      expect(
-        find.text('Attribution Cages & Bandes Traitées (Cochées par défaut)'),
-        findsOneWidget,
-      );
-      // Recopier les quatre cages de la maquette inventerait un référentiel :
-      // l'animalier cocherait des cages qui n'existent nulle part.
-      expect(find.textContaining('Aucun référentiel de cages'), findsOneWidget);
-      expect(find.textContaining('Cage C1'), findsNothing);
-    },
-  );
-
-  /// ⚠️⚠️ LE BLOC KPI MANQUAIT ENTIÈREMENT. La maquette ouvre la fiche par
-  /// quatre indicateurs ; cet écran — le premier construit, avant la règle de
-  /// conformité — passait directement au formulaire. Les quatre fiches
-  /// suivantes les ont ; celle-ci ne les avait pas.
-  testWidgets(
-    'les quatre cartes KPI de la maquette sont présentes, dans son ordre',
+    'les quatre cartes KPI du Blade sont présentes, dans son ordre',
     (tester) async {
       await afficher(tester);
 
@@ -183,24 +148,24 @@ void main() {
         expect(find.text(l), findsOneWidget, reason: l);
       }
 
-      final positions = libelles.map((l) => y(tester, l)).toList();
+      final positions = libelles.map((l) => tester.getTopLeft(find.text(l)).dx).toList();
       expect(positions, equals([...positions]..sort()));
     },
   );
 
-  /// ⚠️ « GÉNITEURS (M/F) » N'EST PAS CALCULABLE AU POSTE : le serveur le tire
-  /// de `effectif_m` / `effectif_f`, que la synchronisation ne descend pas. Un
-  /// zéro se lirait « plus aucun géniteur » — sur une bande de reproduction,
-  /// c'est un contresens.
-  testWidgets("⚠️ « Géniteurs (M/F) » affiche un tiret et dit pourquoi", (
-    tester,
-  ) async {
+  /// 🔁 Ticket U12a — « Géniteurs (M/F) » se calcule au poste comme au web (Σ `effectif_m` / Σ `effectif_f` de la
+  /// DERNIÈRE fiche de chaque bande) : les deux colonnes sont synchronisées depuis 15.57. Sans fiche : « 0 / 0 ».
+  testWidgets('« Géniteurs (M/F) » : la somme des effectifs saisis, comme au web', (tester) async {
     await afficher(tester);
 
-    expect(find.text('non synchronisé'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byKey(const Key('kpi-Géniteurs (M/F)')), matching: find.text('0 / 0')),
+      findsOneWidget,
+    );
+    expect(find.text('non synchronisé'), findsNothing);
   });
 
-  /// Les cartes précèdent le formulaire, comme dans la maquette.
+  /// Les cartes précèdent le formulaire, comme dans le Blade.
   testWidgets('les KPI précèdent la saisie journalière', (tester) async {
     await afficher(tester);
 

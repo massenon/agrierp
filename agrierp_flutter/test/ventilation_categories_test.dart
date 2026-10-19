@@ -204,12 +204,18 @@ void main() {
           FichePorcsScreen(depot: depot, soins: soins),
         );
 
-        Text compteur(String c) =>
-            tester.widget<Text>(find.byKey(Key('compteur-mort-$c')));
-        expect(compteur('Reproducteur').data, '1');
-        expect(compteur('Porc Marchand').data, '2');
-        expect(compteur('Porcelet').data, '0');
-        expect(find.byKey(const Key('porcs-non-ventilee')), findsNothing);
+        // 🔁 U12a — compteurs du Blade (« − [champ] + »), par emplacement : `repro`, `jeune` (Porc Marchand),
+        // `sevre` (Porcelet).
+        String compteur(String c) => tester
+            .widget<TextField>(
+              find.descendant(of: find.byKey(Key('compteur-mort-$c')), matching: find.byType(TextField)),
+            )
+            .controller!
+            .text;
+        expect(compteur('repro'), '1');
+        expect(compteur('jeune'), '2');
+        expect(compteur('sevre'), '0');
+        expect(find.byKey(const Key('fiche-ancienne')), findsNothing);
       },
     );
 
@@ -228,14 +234,16 @@ void main() {
           FicheLapinsScreen(depot: depot, soins: soins),
         );
 
-        expect(find.byKey(const Key('lapins-non-ventilee')), findsOneWidget);
-        // Aucune catégorie inventée : les compteurs restent à 0, le total ancien est annoncé.
-        // `valeur-…` existe dans les blocs Morts ET Dons : on lit tous les compteurs.
-        for (final c in ['Reproducteur', 'Jeune', 'Sous-mères']) {
-          for (final t in tester.widgetList<Text>(
-            find.byKey(Key('valeur-${c.hashCode}')),
-          )) {
-            expect(t.data, '0', reason: c);
+        // 🔁 U12a — l'encadré du Blade (« Fiche ancienne non ventilée par catégorie : 3 mort(s) et 0 don(s)… »).
+        expect(find.byKey(const Key('fiche-ancienne')), findsOneWidget);
+        expect(find.textContaining('Fiche ancienne non ventilée par catégorie : 3 mort(s) et 0 don(s)'), findsOneWidget);
+        // Aucune catégorie inventée : les compteurs Morts ET Dons restent à 0, le total ancien est annoncé.
+        for (final bloc in ['mort', 'don']) {
+          for (final c in ['repro', 'jeune', 'sevre']) {
+            final champ = tester.widget<TextField>(
+              find.descendant(of: find.byKey(Key('compteur-$bloc-$c')), matching: find.byType(TextField)),
+            );
+            expect(champ.controller!.text, '0', reason: '$bloc $c');
           }
         }
 
@@ -243,9 +251,12 @@ void main() {
         await tester.tap(find.text('Enregistrer ce Jour'));
         await tester.pumpAndSettle();
 
+        // Refusé comme au web : « ventilez-les (Reproducteur / Jeune / Sous-mères) avant d'enregistrer. »
+        expect(find.textContaining('Cette fiche porte des morts ou des dons non ventilés par catégorie'), findsOneWidget);
         final f = await fiche();
         expect(f.mort, 3, reason: 'les 3 morts anciens ne sont pas effacés');
         expect(f.mortRepro, isNull, reason: 'aucune ventilation fabriquée');
+        await tester.pump(const Duration(seconds: 4));
       },
     );
   });

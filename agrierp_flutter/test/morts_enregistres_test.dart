@@ -99,6 +99,14 @@ void main() {
 
   testWidgets('Escargots : les morts et dons du jour survivent au ré-enregistrement', (tester) async {
     await bandeEtFiche(espece: 'helico', stade: 'engraissement');
+    // 🔁 U12a — la fiche Escargots suit `ModuleConfig::isEnabled('helico')` du web : module activé ici.
+    await db.into(db.modulesConfig).insert(
+      ModulesConfigCompanion.insert(
+        id: 'dddddddd-9999-4999-8999-dddddddddddd',
+        speciesCode: 'helico',
+        isEnabled: const Value(true),
+      ),
+    );
     await afficherEtEnregistrer(tester, FicheEscargotsScreen(depot: depot, soins: soins));
   });
 

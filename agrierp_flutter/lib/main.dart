@@ -951,9 +951,15 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.parametres => _parametresGeneraux(
           ongletInitial: ParametresGenerauxScreen.ongletAppairage,
         ),
+        // Ticket U12a — « Exporter PDF », lien « Transferts entre Bandes » et « Commander Stock » du Blade.
         EcranPoste.ficheElevage => FicheLapinsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
         EcranPoste.gestionElevage => GestionElevageScreen(
           onOuvrir: (e) => setState(() => _ecran = e),
@@ -994,17 +1000,31 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.saisieDepenses => SaisieDepensesScreen(
           depot: widget.depenses,
         ),
+        // Ticket U12a — « Exporter PDF », liens du Blade (transferts, retour à Gestion Élevage, commande de stock).
         EcranPoste.ficheEscargots => FicheEscargotsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onRetourGestion: () =>
+              setState(() => _ecran = EcranPoste.gestionElevage),
         ),
         EcranPoste.ficheReproducteurs => FicheReproducteursScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
         ),
         EcranPoste.fichePorcs => FichePorcsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
         // Ticket U11 — « Exporter PDF » et le lien « Transferts entre Bandes » du Blade.
         EcranPoste.fichePondeuses => FichePondeusesScreen(

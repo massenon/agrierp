@@ -158,8 +158,8 @@ void main() {
         await afficher(tester);
 
         expect(texte(tester, 'ration-effectif-chair'), '40');
-        expect(texte(tester, 'ration-g-chair'), '70 g/j');
-        expect(texte(tester, 'ration-grammes-chair'), '2800 g');
+        expect(texte(tester, 'ration-normative-chair'), '70 g/j');
+        expect(texte(tester, 'ration-provende-chair'), '2800 g');
         // Recalcul indépendant : 40 sujets × 70 g.
         expect(texte(tester, 'total-provende'), '${40 * 70} g (2.8 Kg)');
       },
@@ -171,7 +171,7 @@ void main() {
       await afficher(tester);
 
       expect(texte(tester, 'ration-effectif-chair'), '40');
-      expect(texte(tester, 'ration-g-chair'), '70 g/j');
+      expect(texte(tester, 'ration-normative-chair'), '70 g/j');
       expect(texte(tester, 'total-provende'), '2800 g (2.8 Kg)');
     });
 
@@ -184,8 +184,8 @@ void main() {
         final avant = [
           for (final c in ['reproducteur', 'sous_meres', 'chair']) ...[
             texte(tester, 'ration-effectif-$c'),
-            texte(tester, 'ration-g-$c'),
-            texte(tester, 'ration-grammes-$c'),
+            texte(tester, 'ration-normative-$c'),
+            texte(tester, 'ration-provende-$c'),
           ],
           texte(tester, 'total-provende'),
         ];
@@ -208,8 +208,8 @@ void main() {
         final apres = [
           for (final c in ['reproducteur', 'sous_meres', 'chair']) ...[
             texte(tester, 'ration-effectif-$c'),
-            texte(tester, 'ration-g-$c'),
-            texte(tester, 'ration-grammes-$c'),
+            texte(tester, 'ration-normative-$c'),
+            texte(tester, 'ration-provende-$c'),
           ],
           texte(tester, 'total-provende'),
         ];
@@ -225,7 +225,7 @@ void main() {
         await bareme(const [('Reproducteur', 150), ('Sous-mères', 40)]);
         await afficher(tester);
 
-        expect(texte(tester, 'ration-g-chair'), '60 g/j');
+        expect(texte(tester, 'ration-normative-chair'), '60 g/j');
         expect(texte(tester, 'total-provende'), '${40 * 60} g (2.4 Kg)');
       },
     );
@@ -243,7 +243,7 @@ void main() {
         await afficher(tester);
 
         expect(find.byKey(const Key('ration-libelle-chair')), findsOneWidget);
-        final g = texte(tester, 'ration-g-chair');
+        final g = texte(tester, 'ration-normative-chair');
         final ration = int.parse(g.replaceAll(' g/j', ''));
         expect(
           texte(tester, 'total-provende').startsWith('${40 * ration} g'),
@@ -263,11 +263,11 @@ void main() {
 
         for (final c in ['reproducteur', 'sous_meres']) {
           expect(texte(tester, 'ration-effectif-$c'), '0', reason: c);
-          expect(texte(tester, 'ration-grammes-$c'), '0 g', reason: c);
+          expect(texte(tester, 'ration-provende-$c'), '0 g', reason: c);
         }
         // La ration normative reste celle du barème.
-        expect(texte(tester, 'ration-g-reproducteur'), '150 g/j');
-        expect(texte(tester, 'ration-g-sous_meres'), '40 g/j');
+        expect(texte(tester, 'ration-normative-reproducteur'), '150 g/j');
+        expect(texte(tester, 'ration-normative-sous_meres'), '40 g/j');
       },
     );
 
@@ -280,7 +280,7 @@ void main() {
 
         expect(texte(tester, 'ration-effectif-reproducteur'), '40');
         expect(texte(tester, 'ration-effectif-chair'), '0');
-        expect(texte(tester, 'total-provende'), '${40 * 150} g (6.0 Kg)');
+        expect(texte(tester, 'total-provende'), '${40 * 150} g (6 Kg)');
       },
     );
 
@@ -304,7 +304,7 @@ void main() {
 
       for (final c in ['reproducteur', 'sous_meres', 'chair']) {
         expect(texte(tester, 'ration-effectif-$c'), '—', reason: c);
-        expect(texte(tester, 'ration-grammes-$c'), '—', reason: c);
+        expect(texte(tester, 'ration-provende-$c'), '—', reason: c);
       }
       expect(texte(tester, 'total-provende'), '—');
     });
@@ -317,8 +317,8 @@ void main() {
         await afficher(tester);
 
         expect(texte(tester, 'ration-effectif-chair'), '0');
-        expect(texte(tester, 'ration-grammes-chair'), '0 g');
-        expect(texte(tester, 'total-provende'), '0 g (0.0 Kg)');
+        expect(texte(tester, 'ration-provende-chair'), '0 g');
+        expect(texte(tester, 'total-provende'), '0 g (0 Kg)');
       },
     );
   });
@@ -354,7 +354,9 @@ void main() {
       final maquette = File(
         '$dossierPrototype/fiche-lapins.html',
       );
+      // 🔁 U12a — les libellés sont dans l'écran (configuration du Blade) et la vue commune Lapins / Porcs.
       final ecran = File('lib/features/elevage/fiche_lapins_screen.dart');
+      final vue = File('lib/features/elevage/fiche_categories_vue.dart');
 
       test('la maquette dit encore « Espèce » / « Lapereau » / « Sevrés » : '
           'l\'écran suit la décision client, pas la maquette', () {
@@ -363,7 +365,7 @@ void main() {
           return;
         }
         final html = maquette.readAsStringSync();
-        final code = ecran.readAsStringSync();
+        final code = ecran.readAsStringSync() + vue.readAsStringSync();
 
         // Si la maquette est alignée un jour, cet écart n'en est plus un :
         // retirer ce test plutôt que le laisser décrire un passé.
@@ -374,7 +376,7 @@ void main() {
 
         expect(code, contains("'Catégorie'"));
         expect(code, contains("'Jeunes'"));
-        expect(code, contains('PAR CATÉGORIE'));
+        expect(code, contains('Provende Servie par Catégorie'));
         expect(code, isNot(contains("'Espèce'")));
         expect(code, isNot(contains("'Sevrés'")));
       });
