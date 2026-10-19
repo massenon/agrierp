@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 127 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 130 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -53,6 +53,7 @@ class LibellesAudit {
     'customer.created': 'Client créé',
     'customer.updated': 'Client modifié',
     'customer.archived': 'Client archivé',
+    'customer.merged': 'Client du poste fusionné avec une fiche existante',
     'customer_reminder.sent_': 'Relance client envoyée',
     'credit_note.created': 'Avoir créé',
     'credit_note.treated': 'Avoir traité',
@@ -64,6 +65,7 @@ class LibellesAudit {
     'supplier.created': 'Fournisseur créé',
     'supplier.updated': 'Fournisseur modifié',
     'supplier.archived': 'Fournisseur archivé',
+    'supplier.merged': 'Fournisseur du poste fusionné avec une fiche existante',
     'supplier_refund.recorded': 'Remboursement fournisseur enregistré',
     'payable.payment_recorded': 'Règlement fournisseur enregistré',
     'customer_advance.created': 'Avance client enregistrée',
@@ -76,6 +78,7 @@ class LibellesAudit {
     'product.created': 'Produit créé',
     'product.updated': 'Produit modifié',
     'product.archived': 'Produit archivé',
+    'product.merged': 'Produit du poste fusionné avec une fiche existante',
     'product.threshold_updated': 'Seuil d\'alerte modifié',
     'stock.adjusted': 'Stock ajusté',
     'stock.manual_addition': 'Ajout manuel de stock',
