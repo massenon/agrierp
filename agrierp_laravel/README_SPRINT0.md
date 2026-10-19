@@ -22161,3 +22161,7 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Mesures : Laravel 1 844 verts ; poste 2 507 verts, 17 sautés (dont l'essai sans serveur) ; 9 corrections désactivées une à une : chaque fois un test rouge.
 - ⚠️ **Déploiement : le SERVEUR d'abord**, les postes ensuite (un poste S-T9 face à un ancien serveur laisserait non comptées les ventes faites sur une fiche déjà synchronisée).
 - Reste : S-T10 (inventaire calculé sur un stock local périmé), S-T11 (fuseau horaire du poste) ; non exercés par l'essai : retours et remboursements fournisseurs, imputations, produits créés au poste, dépenses, sessions refusées, demande du web, plusieurs jours hors ligne, vrai poste Windows.
+
+### Décisions du client (19/10/2026, nuit) — recette, réinitialisation, en-têtes
+- Recette = serveur de la ferme (`environnement.dart`) : les essais se font sur la production, puis « Réinitialisation des données » (Paramètres, 15.50) vide les données d'essai. **Vérifiée en réel** sur le jeu de démonstration : 7 390 lignes d'activité dans 35 tables → 0 ; 1 506 lignes de référentiels gardées dans 20 tables ; stocks et trésorerie à 0 ; bandes supprimées ; exercice ouvert et 4 utilisateurs gardés ; marque `data_reset_at` posée (les postes purgent au tirage suivant). Le test « chaque table du schéma est classée une seule fois » couvre les tables ajoutées aujourd'hui (demandes de synchronisation, contrôles de cohérence, correspondances, etc.).
+- En-têtes « DÉSIGNATION » / « CATÉGORIE » du tableau des stocks au poste accentués comme le Blade.

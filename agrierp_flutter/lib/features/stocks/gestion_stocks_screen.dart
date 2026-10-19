@@ -523,11 +523,12 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                         ),
                         Expanded(
                           flex: 4,
-                          child: Text('DESIGNATION', style: _enteteColonne),
+                          // Décision client du 19/10/2026 : accentués comme le Blade (« Désignation » en `uppercase`), plus la maquette.
+                          child: Text('DÉSIGNATION', style: _enteteColonne),
                         ),
                         Expanded(
                           flex: 3,
-                          child: Text('CATEGORIE', style: _enteteColonne),
+                          child: Text('CATÉGORIE', style: _enteteColonne),
                         ),
                         Expanded(
                           flex: 2,

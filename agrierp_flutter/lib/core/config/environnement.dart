@@ -14,12 +14,11 @@ enum Environnement {
   /// Poste du développeur : `php artisan serve --port=8002` (`APP_URL` du `.env`, `agrierp_laravel/CLAUDE.md`).
   developpement('dev', 'Développement', 'http://127.0.0.1:8002'),
 
-  /// Serveur de recette.
-  ///
-  /// ⚠️ À CONFIRMER PAR LE CLIENT : aucun serveur de recette n'est déclaré à ce jour. Le sous-domaine ci-dessous est
-  /// une PROPOSITION sur le domaine de la ferme ; tant qu'il n'existe pas, un poste de recette se règle à la main dans
-  /// Paramètres du poste.
-  recette('recette', 'Recette', 'https://recette.agrierp.fermeolouwachegoun.com'),
+  /// Serveur de recette — décision client du 19/10/2026 : **le serveur de la ferme lui-même**. Les essais se font sur
+  /// la production, puis les données d'essai sont vidées par « Réinitialisation des données » (Paramètres, ticket
+  /// 15.50) avant la mise en service. ⚠️ Un poste de recette parle donc à la VRAIE base : ce qu'il saisit y reste
+  /// jusqu'à la réinitialisation.
+  recette('recette', 'Recette', 'https://agrierp.fermeolouwachegoun.com'),
 
   /// Serveur de la ferme — décision client du 17/10/2026 (« le serveur est hébergé à
   /// https://agrierp.fermeolouwachegoun.com »).

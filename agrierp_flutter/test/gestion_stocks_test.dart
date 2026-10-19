@@ -366,8 +366,8 @@ void main() {
       // prototype, reproduite et signalée, jamais harmonisée en silence.
       for (final colonne in [
         'CODE',
-        'DESIGNATION',
-        'CATEGORIE',
+        'DÉSIGNATION',
+        'CATÉGORIE',
         'STOCK',
         'PMP UNIT.',
         'VALEUR',

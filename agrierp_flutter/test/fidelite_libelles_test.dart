@@ -1093,6 +1093,9 @@ void main() {
     },
 
     'gestion-stocks.html': {
+      // Décision client du 19/10/2026 : en-têtes accentués comme le Blade (« Désignation », « Catégorie »).
+      'Designation': 'accentué comme le Blade (décision client du 19/10/2026)',
+      'Categorie': 'accentué comme le Blade (décision client du 19/10/2026)',
       // « Il n'y a rien à recalculer au poste » : le PMP est tenu par le
       // serveur.
       'Recalculer PMP': 'le PMP est calculé par le serveur, pas au poste',
