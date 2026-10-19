@@ -1055,6 +1055,30 @@ void main() {
       await nettoyer(tester);
     });
 
+    test('Nouveau Soin : même règle au web et à l envoi, aucune borne haute', () {
+      final regle = RegExp(r"'soinDate' => \[([^\]]*)\]").firstMatch(_livewire!)!.group(1)!;
+      expect(regle, "'required', 'date'", reason: 'règle du web (maître)');
+      final push = _controleur!.substring(_controleur!.indexOf('private function pushVeterinaryRecords('));
+      final envoi = RegExp(r"'record_date' => \[([^\]]*)\]").firstMatch(push)!.group(1)!;
+      expect(envoi, regle, reason: 'l envoi applique la règle du web');
+    }, skip: _sautWeb || _controleur == null);
+
+    testWidgets('la modale Nouveau Soin propose une date future, comme le web', (tester) async {
+      await afficher(tester);
+      await tester.tap(find.byKey(const Key('nouveau-soin')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('soin-date')));
+      await tester.tap(find.byKey(const Key('soin-date')));
+      await tester.pumpAndSettle();
+
+      final selecteur = tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
+      expect(selecteur.lastDate.isAfter(aujourdhui.add(const Duration(days: 365))), isTrue,
+          reason: 'le poste refusait toute date de soin postérieure à aujourd hui');
+      Navigator.of(tester.element(find.byType(DatePickerDialog))).pop();
+      await tester.pumpAndSettle();
+      await nettoyer(tester);
+    });
+
     test('une entrée datée dans le futur s enregistre et part telle quelle', () async {
       final demain = jourDe(3);
       final id = await depot.enregistrerEntreeInfirmerie(

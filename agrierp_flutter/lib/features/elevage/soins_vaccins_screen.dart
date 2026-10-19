@@ -1226,7 +1226,9 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
               _champDate(
                 cle: 'soin-date',
                 date: date,
-                dernier: DateTime.now(),
+                // Décision D-U6 étendue (« pas de divergence ») — le web accepte une date future (`'soinDate' =>
+                // ['required', 'date']`), l'envoi aussi (`record_date` : `required|date`) : le poste de même.
+                dernier: DateTime(DateTime.now().year + 5, 12, 31),
                 surChoix: (d) => rafraichir(() => date = d),
               ),
               const SizedBox(height: AgriSpacing.md),
