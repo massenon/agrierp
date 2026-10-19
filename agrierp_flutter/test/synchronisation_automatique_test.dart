@@ -145,7 +145,7 @@ void main() {
 
     testWidgets('⚠️ un REFUS du serveur (4xx) n\'est pas réessayé : seul l\'intervalle relance', (t) async {
       final a = automatique(
-        () async => throw const EchecSynchronisation('Trop de synchronisations rapprochées.', statut: 429),
+        () async => throw const EchecSynchronisation('Envoi refusé : les données du serveur ont été réinitialisées.', statut: 409),
       )..demarrer();
       reseau.add([ConnectivityResult.none]);
       reseau.add([ConnectivityResult.wifi]);

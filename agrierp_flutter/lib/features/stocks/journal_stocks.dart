@@ -89,7 +89,7 @@ class RotationStock {
 ///    (`reference_type`, `reference_id`) : c'est la trace que le serveur l'a rejouée (renvoi sans accusé de
 ///    réception compris). Une saisie acquittée (`synced`) n'est plus projetée : le serveur l'a, son mouvement
 ///    descend. Pour un ajustement, au TIRAGE DE CONFIRMATION qui suit l'envoi (les écarts ne manquent jamais) ;
-///    pour une vente, un achat, une fiche, au tirage suivant (synchronisation automatique, 15 min par défaut) —
+///    pour une vente, un achat, une fiche, au tirage suivant (synchronisation automatique, 5 min par défaut) —
 ///    entre les deux, ce mouvement manque à la rotation et au Tableau 3, jamais compté deux fois. Projeter aussi les
 ///    pièces acquittées serait pire : une pièce ancienne dont le serveur n'a gardé aucun mouvement (fiche d'avant
 ///    14.59, ajustement d'avant 14.74) serait comptée pour toujours.

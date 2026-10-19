@@ -22118,3 +22118,10 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Fiche Pondeuses : SRH, TS, OS, Stock Final du jour sélectionné depuis le grand livre, comme le web.
 - Mesures : Laravel 1 766 verts ; poste 2 363 verts, 16 sautés ; 28 mutants tués sur 29 (le survivant est sans effet observable).
 - Restes mineurs : ticket U11.
+
+## Méthode TATACORA transposée (D-SYNC-1 confirmée) — S-T1, S-T2, S-T3 (19/10/2026)
+- **S-T1** (poste) : 5xx et 429 réessayées comme un échec réseau (`estReessayable`) ; 401 / 403 : la synchronisation automatique est suspendue jusqu'à la reconnexion (le bouton reste possible et dit pourquoi) ; 422 / 413 sur un lot : coupe en deux récursive par UNITÉS indivisibles (une ligne, ou une journée couplée fiches + transferts + ventes), l'unité fautive passe en `conflict` avec le motif « Refusée par le serveur : requête invalide (422) — … ».
+- **S-T2** (serveur) : `device_id` ≠ nom du jeton Sanctum → 403 « posteDifferentDuJeton », rien d'écrit ni de journalisé (jetons transitoires des tests exclus, documenté). `ApiProduitsTest` envoyait un autre poste que son jeton : aligné.
+- **S-T3** (poste) : synchronisation à l'ouverture de session (pas après le premier démarrage, qui synchronise déjà), après un geste important (`GestesImportants` injecté dans la caisse, la fiche journalière et les soins ; agrégation 5 s), intervalle par défaut 5 min.
+- Mesures : Laravel 1 771 verts ; poste 2 390 verts, 16 sautés ; 18 mutants tués.
+- Reste : une synchronisation manuelle réussie après un 403 ne relance pas l'automatique (il reprend à la reconnexion) ; le signal de `validerTraitementsDuJour` n'est pas couvert par un test.

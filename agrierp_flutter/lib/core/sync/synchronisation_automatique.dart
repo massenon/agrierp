@@ -212,9 +212,10 @@ class SynchronisationAutomatique {
     }
   }
 
-  /// Ticket S-T1 — échec à RÉESSAYER plus tard : un échec de liaison ([estEchecReseau]) ou une erreur 5xx du
-  /// serveur (bogue ou panne du serveur, qui se corrige sans le poste). Un refus (4xx, ou motif dans
-  /// `rejected`) ne l'est pas.
+  /// Ticket S-T1 — échec à RÉESSAYER plus tard : un échec de liaison ([estEchecReseau]), une erreur 5xx du
+  /// serveur (bogue ou panne du serveur, qui se corrige sans le poste), ou une 429 (débit dépassé — notamment
+  /// après l'isolement d'une ligne fautive, qui coûte une douzaine de requêtes : elle passe d'elle-même). Un
+  /// refus (autre 4xx, ou motif dans `rejected`) ne l'est pas.
   static bool estReessayable(Object erreur) {
     if (estEchecReseau(erreur)) return true;
     final statut = switch (erreur) {
@@ -222,7 +223,7 @@ class SynchronisationAutomatique {
       EchecSynchronisation(:final statut) => statut,
       _ => null,
     };
-    return statut != null && statut >= 500 && statut <= 599;
+    return statut != null && (statut == 429 || (statut >= 500 && statut <= 599));
   }
 
   /// Échec de LIAISON (serveur injoignable, délai dépassé), par opposition à un refus du serveur.

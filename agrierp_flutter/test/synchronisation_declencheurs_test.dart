@@ -86,8 +86,8 @@ void main() {
       a.arreter();
     });
 
-    testWidgets('une 4xx (422, 429) n est pas réessayée', (t) async {
-      for (final statut in [422, 429]) {
+    testWidgets('une 4xx (422, 409) n est pas réessayée ; une 429 l est (débit passager)', (t) async {
+      for (final statut in [422, 409]) {
         appels.clear();
         final a = automatique(() async => throw http(statut))..demarrer(aussitot: true);
         await t.pump();
@@ -95,6 +95,11 @@ void main() {
         expect(a.suspendue, isFalse, reason: '$statut');
         a.arreter();
       }
+      appels.clear();
+      final debit = automatique(() async => throw http(429))..demarrer(aussitot: true);
+      await t.pump();
+      expect(debit.reessaiProgramme, const Duration(seconds: 30), reason: '429 : débit passager, réessayé');
+      debit.arreter();
     });
 
     for (final statut in [401, 403]) {
@@ -138,11 +143,14 @@ void main() {
       reprise.arreter();
     });
 
-    test('réessayable : réseau et 5xx ; ni 4xx, ni refus nommé 401 / 403, ni bogue local', () {
+    test('réessayable : réseau, 5xx et 429 ; ni autre 4xx, ni refus nommé 401 / 403, ni bogue local', () {
       expect(SynchronisationAutomatique.estReessayable(http(500)), isTrue);
       expect(SynchronisationAutomatique.estReessayable(http(502)), isTrue);
       expect(SynchronisationAutomatique.estReessayable(http(599)), isTrue);
       expect(SynchronisationAutomatique.estReessayable(const EchecSynchronisation('x', statut: 503)), isTrue);
+      // Débit dépassé (après l'isolement d'une ligne fautive, par exemple) : passager, réessayé.
+      expect(SynchronisationAutomatique.estReessayable(http(429)), isTrue);
+      expect(SynchronisationAutomatique.estReessayable(const EchecSynchronisation('x', statut: 429)), isTrue);
       expect(
         SynchronisationAutomatique.estReessayable(
           DioException(requestOptions: RequestOptions(path: '/'), type: DioExceptionType.connectionError),
@@ -150,7 +158,7 @@ void main() {
         isTrue,
       );
 
-      for (final statut in [400, 404, 409, 413, 422, 429]) {
+      for (final statut in [400, 404, 409, 413, 422]) {
         expect(SynchronisationAutomatique.estReessayable(http(statut)), isFalse, reason: '$statut');
       }
       expect(SynchronisationAutomatique.estReessayable(sessionExpiree), isFalse);
