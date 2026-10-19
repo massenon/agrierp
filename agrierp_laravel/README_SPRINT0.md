@@ -22111,3 +22111,10 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Tableau des stocks aligné sur le Blade (tri par nom façon MySQL, pastilles « Critique » / « Normal », « Entrée non saisie »…) ; Tableau 3 = celui du web (11 colonnes dont « Lot », plateaux, ferme). Parités exécutées : Gestion des stocks entière, Tableau 3 rendu par le Blade, cellule par cellule. 24 mutants tués.
 - Mesures (branche) : Laravel 1 762 verts ; poste 2 334 verts, 16 sautés.
 - Délais connus : une vente, un achat ou une fiche acquittés manquent à la rotation et au Tableau 3 jusqu'au tirage suivant (jamais comptés deux fois). Écarts restants : ticket U10.
+
+### U10 — derniers écarts Stocks, Rapport élevage, Fiche Pondeuses
+- Gestion des stocks : export PDF du web, modale « Ajouter Stock » (`manage-stocks`) écrite en `stock_adjustments` pending `manual_addition` daté ; 🔴 au serveur, `pushStockAdjustments` traitait un ajout comme une perte et ignorait la date : il le rejoue désormais comme `submitAjouterStock` (entrée, date du mouvement, aucune écriture comptable, audit `stock.manual_addition` — `SyncAjoutStockPosteTest`). Lien « Configurer les Seuils d'Alerte », icône Modifier, écart « 0 », icônes des cartes (sablier).
+- Rapport élevage : filtre « Lot / Souche », libellés des onglets, Tableaux 1 et 2 et indicateurs du Blade (parité exécutée avec le rendu Livewire), PDF du web ; fiches refusées exclues. Drift v45 : vendeur de sexe, montant de vente, traitement, dose, symptômes des fiches tirés du serveur (jamais envoyés), resynchronisation unique `fiches_resync_u10`.
+- Fiche Pondeuses : SRH, TS, OS, Stock Final du jour sélectionné depuis le grand livre, comme le web.
+- Mesures : Laravel 1 766 verts ; poste 2 363 verts, 16 sautés ; 28 mutants tués sur 29 (le survivant est sans effet observable).
+- Restes mineurs : ticket U11.
