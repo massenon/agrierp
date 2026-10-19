@@ -23,8 +23,22 @@ class JournalSynchronisationService
     /** Clés du tirage qui ne sont pas des enregistrements (identifiants, constantes) : non comptées. */
     private const CLES_NON_COMPTEES = ['accounting_entry_ids', 'expense_categories'];
 
-    /** @param  array<string, mixed>  $reponse  corps du tirage */
-    public function tirage(Request $request, array $reponse): void
+    /**
+     * @param  array<string, mixed>  $reponse  corps du tirage (de sa DERNIÈRE page s'il est paginé)
+     * @param  int  $pagesPrecedentes  enregistrements servis par les pages précédentes (ticket S-T4 : un tirage
+     *                                 paginé fait UNE ligne de journal, à sa dernière page, toutes pages comptées)
+     */
+    public function tirage(Request $request, array $reponse, int $pagesPrecedentes = 0): void
+    {
+        $this->ecrire($request, 'tirage', $pagesPrecedentes + $this->compter($reponse), 0, 0);
+    }
+
+    /**
+     * Enregistrements servis par un corps de tirage (une page).
+     *
+     * @param  array<string, mixed>  $reponse
+     */
+    public function compter(array $reponse): int
     {
         $recus = 0;
         foreach ($reponse as $cle => $valeur) {
@@ -33,7 +47,7 @@ class JournalSynchronisationService
             }
         }
 
-        $this->ecrire($request, 'tirage', $recus, 0, 0);
+        return $recus;
     }
 
     /** @param  array<string, mixed>  $resultat  corps de la réponse d'envoi */

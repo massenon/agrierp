@@ -144,6 +144,7 @@ Client-side invariants, each paid for once:
 - ⚠️ **Nothing is marked `synced` before the server acknowledges it.** Marking on send makes a record lost in transit vanish from the queue: the device believes it synchronised and it exists nowhere.
 - ⚠️ **`SyncStatus.conflict` exists beyond the CDC's `pending|synced`** — a server rejection returned to `pending` would be retried forever in silence.
 - ⚠️ **The pull cursor comes from the server (`server_time`)**, never from the device clock. A slow clock re-requests the same changes forever; a fast one skips them permanently.
+- ⚠️ **Le tirage est paginé (S-T4)** : `_tirer` suit `page_suivante`, absorbe CHAQUE page dans une transaction (`_absorberPage`) et n'avance le curseur qu'après la dernière. Le serveur ne sert que les tables que le compte lit ; `PerimetreTirage` les garde, et une table AJOUTÉE à cet ensemble (rôle, droits ou utilisateur changés) impose un tirage complet, une fois. Une table qui n'est plus servie n'est jamais vidée.
 - ⚠️ **`updatedAt` is the instant of ENTRY, not of sending.** A device offline for three days would otherwise stamp everything at reconnection and beat more recent entries made elsewhere.
 - ⚠️ **Rejections are carried all the way to the user.** The server answers table by table with accepted AND rejected ids with reasons, precisely so a rejection does not disappear silently.
 - ⚠️ **Offline is not an error** — it is this farm's normal operating mode. A red error on every attempt teaches the user to ignore alerts, including real ones.

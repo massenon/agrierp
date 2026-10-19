@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/sync/agregats_coherence.dart';
+import '../../core/sync/perimetre_tirage.dart';
 
 /// Nombre de lignes et total d'un jour, d'un côté.
 class TotauxJour {
@@ -181,28 +182,35 @@ class ControleCoherenceRepository {
   }
 
   /// Compare les deux côtés, table par table dans l'ordre de [AgregatsCoherence.tables].
+  ///
+  /// Ticket S-T4 — [perimetre] : tables que le serveur sert à ce compte (dernier tirage, [PerimetreTirage]). Une
+  /// table HORS du périmètre n'est pas contrôlée : le poste n'en reçoit plus les lignes (le grand livre des stocks
+  /// n'est pas servi au caissier), et l'écart serait permanent sans rien dire d'une perte. `null` : périmètre
+  /// inconnu (toutes les tables ont été reçues), toutes sont contrôlées.
   static List<TableCoherence> comparer(
     Map<String, Map<String, TotauxJour>> poste,
-    Map<String, Map<String, TotauxJour>> serveur,
-  ) {
+    Map<String, Map<String, TotauxJour>> serveur, {
+    Set<String>? perimetre,
+  }) {
     return [
       for (final a in AgregatsCoherence.tables)
-        () {
-          final cotePoste = poste[a.table] ?? const <String, TotauxJour>{};
-          final coteServeur = serveur[a.table] ?? const <String, TotauxJour>{};
-          final jours = {...cotePoste.keys, ...coteServeur.keys}.toList()
-            ..sort((x, y) => y.compareTo(x));
-          final lignes = [
-            for (final j in jours)
-              LigneCoherence(jour: j, poste: cotePoste[j], serveur: coteServeur[j]),
-          ];
-          return TableCoherence(
-            table: a.table,
-            libelle: a.libelle,
-            ecarts: [for (final l in lignes) if (!l.conforme) l],
-            conformes: [for (final l in lignes) if (l.conforme) l],
-          );
-        }(),
+        if (perimetre == null || perimetre.contains(a.table))
+          () {
+            final cotePoste = poste[a.table] ?? const <String, TotauxJour>{};
+            final coteServeur = serveur[a.table] ?? const <String, TotauxJour>{};
+            final jours = {...cotePoste.keys, ...coteServeur.keys}.toList()
+              ..sort((x, y) => y.compareTo(x));
+            final lignes = [
+              for (final j in jours)
+                LigneCoherence(jour: j, poste: cotePoste[j], serveur: coteServeur[j]),
+            ];
+            return TableCoherence(
+              table: a.table,
+              libelle: a.libelle,
+              ecarts: [for (final l in lignes) if (!l.conforme) l],
+              conformes: [for (final l in lignes) if (l.conforme) l],
+            );
+          }(),
     ];
   }
 
@@ -220,7 +228,11 @@ class ControleCoherenceRepository {
 
     return ResultatCoherence(
       depuis: DateTime(debut.year, debut.month, debut.day),
-      tables: comparer(local, lireServeur(corps)),
+      tables: comparer(
+        local,
+        lireServeur(corps),
+        perimetre: await PerimetreTirage.lire(_db),
+      ),
     );
   }
 }

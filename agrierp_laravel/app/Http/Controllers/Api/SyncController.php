@@ -74,6 +74,9 @@ use App\Support\MessagesErreurFr;
 use App\Support\MotifsRefusPush;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -131,18 +134,168 @@ class SyncController extends Controller
     public const HORIZON_TIRAGE_SECONDES = 5;
 
     /**
+     * Ticket S-T4 — taille d'une page du tirage paginé, en LIGNES servies : une pièce compte pour elle-même plus
+     * chacune de ses lignes (lignes de vente, d'achat, de retour, d'écriture), car elle ne se coupe jamais. Le poste
+     * peut demander moins (`taille`), jamais plus que [TAILLE_PAGE_MAXIMUM].
+     */
+    public const TAILLE_PAGE = 1000;
+
+    public const TAILLE_PAGE_MAXIMUM = 5000;
+
+    /** Ticket S-T4 — `updated_at` absent (ligne écrite hors Eloquent) : rangée en tête de l'ordre des pages. */
+    private const MAJ_NULLE = '1970-01-01 00:00:00';
+
+    /**
+     * 🔴→✅ TICKET S-T4 (méthode TATACORA) — TABLES QUE LE COMPTE LIT : la correspondance UNIQUE table tirée →
+     * permission(s) de LECTURE, en face de [PERMISSION_PAR_TABLE] (permissions d'ÉCRITURE à l'envoi).
+     *
+     *  - `null` : table du FONCTIONNEMENT DE BASE, servie à tout compte ;
+     *  - liste : servie si l'utilisateur a AU MOINS UNE de ces permissions (`$user->can()`, Spatie : la matrice des
+     *    droits du web s'applique telle qu'elle est en base, pas telle que le seeder l'a créée).
+     *
+     * ⚠️⚠️ LE TABLEAU DE BORD EST OUVERT AUX QUATRE RÔLES (route web `auth` seul ; `dashboard.html` est dans les
+     * quatre listes de `RBAC_PAGE_MAP`, recopiée par `PermissionsPoste`) et il lit les ventes et leurs lignes, les
+     * achats et leurs lignes, les clients, créances et dettes, les bandes, leurs fiches et les cycles de
+     * reproduction, les produits et catégories, la trésorerie et les exercices : ces tables sont donc de BASE, même
+     * pour l'animalier ou le comptable. Les retirer viderait les cartes du tableau de bord sans rien dire. De même :
+     * `users` (Mon Profil), `notifications` (la cloche, tous rôles), `audit_logs` (servi à tous, mais VIDE sans
+     * `manage-users` — ticket S3, inchangé : une liste vide, et non une clé absente, purge un poste partagé),
+     * `roles`, `company_settings` et `modules_config` (petits référentiels lus partout).
+     *
+     * ⚠️ UNE PIÈCE ET SES LIGNES ONT LA MÊME PERMISSION (`sales` / `sale_lines`, `purchases` / `purchase_lines` /
+     * `purchase_returns`, `accounting_entries` / `accounting_entry_lines` / `accounting_entry_ids`) : elles
+     * descendent ensemble ou pas du tout (U4, U8, F0.84).
+     *
+     * ⚠️ LISTE CROISÉE AVEC LES ÉCRANS DU POSTE : `agrierp_flutter/test/perimetre_tirage_test.dart` lit CE tableau
+     * (une entrée par ligne, sous cette forme exacte) et vérifie, pour chacun des quatre rôles, que toute table lue
+     * par un écran que le rôle ouvre lui est servie. L'ordre est celui des clés de la réponse.
+     *
+     * ⚠️ PORTÉE : ne s'applique qu'au tirage PAGINÉ (`page`), celui des postes à jour. Un poste antérieur, qui
+     * n'envoie pas `page`, reçoit la réponse complète d'avant S-T4 : il ne saurait pas qu'un changement de rôle lui
+     * impose une resynchronisation (voir `tables_servies`).
+     *
+     * @var array<string, array<int, string>|null>
+     */
+    public const PERMISSIONS_DE_TIRAGE = [
+        'products' => null,
+        'product_categories' => null,
+        'livestock_lots' => null,
+        'livestock_daily_entries' => null,
+        'livestock_transfers' => ['view-elevage'],
+        'feed_ration_standards' => ['view-elevage', 'view-ventes'],
+        'growth_standards' => ['view-elevage'],
+        'veterinary_withdrawal_periods' => ['view-elevage', 'view-ventes'],
+        'prophylaxis_schedule_standards' => ['view-elevage'],
+        'veterinary_records' => ['view-elevage'],
+        'infirmary_records' => ['view-elevage'],
+        'veterinary_calendar_events' => ['view-elevage'],
+        'livestock_reproduction_events' => null,
+        'customers' => null,
+        'receivables' => null,
+        'customer_advances' => ['view-ventes'],
+        'customer_reminders' => ['view-ventes'],
+        'feed_types' => ['view-elevage'],
+        'elevage_numbering' => ['view-elevage'],
+        'suppliers' => ['view-achats', 'view-rapports'],
+        'purchases' => null,
+        'purchase_lines' => null,
+        'purchase_returns' => null,
+        'supplier_credits' => ['view-achats'],
+        'purchase_orders' => ['view-achats'],
+        'payables' => null,
+        'employees' => ['view-rh'],
+        'internships' => ['view-rh'],
+        'attendance_records' => ['view-rh'],
+        'mails' => ['view-administration'],
+        'administrative_documents' => ['view-administration'],
+        'archived_documents' => ['view-administration'],
+        'chart_of_accounts' => ['view-comptabilite'],
+        'fiscal_years' => null,
+        'accounting_entries' => ['view-comptabilite'],
+        'accounting_entry_lines' => ['view-comptabilite'],
+        'accounting_entry_ids' => ['view-comptabilite'],
+        'company_settings' => null,
+        'modules_config' => null,
+        'roles' => null,
+        'users' => null,
+        'audit_logs' => null,
+        'notifications' => null,
+        'lot_revenues' => ['view-elevage'],
+        'animals' => ['view-elevage'],
+        'livestock_species' => ['view-elevage', 'view-stocks'],
+        'attestation_templates' => ['view-rh'],
+        'attestation_counts' => ['view-rh'],
+        'sales' => null,
+        'sale_lines' => null,
+        'stock_movements' => ['view-elevage', 'view-stocks', 'view-rapports'],
+        'treasury_accounts' => null,
+        'expense_categories' => ['view-achats'],
+    ];
+
+    /**
+     * Ticket S-T4 — tables servies à ce compte, dans l'ordre de la réponse (voir [PERMISSIONS_DE_TIRAGE]).
+     *
+     * @return array<int, string>
+     */
+    public static function tablesServies(?Authorizable $utilisateur): array
+    {
+        $servies = [];
+        foreach (self::PERMISSIONS_DE_TIRAGE as $table => $permissions) {
+            if ($permissions === null
+                || ($utilisateur !== null && collect($permissions)->contains(fn (string $p) => $utilisateur->can($p)))) {
+                $servies[] = $table;
+            }
+        }
+
+        return $servies;
+    }
+
+    /**
      * GET /api/sync/pull?since=2026-08-11T00:00:00Z
      * Renvoie tout ce qui a changé côté serveur depuis `since`, groupé
      * par table. `since` absent ou vide = synchronisation initiale
      * complète (première connexion d'un appareil).
+     *
+     * 🔴→✅ TICKET S-T4 (méthode TATACORA) — TIRAGE PAGINÉ ET LIMITÉ AUX TABLES QUE LE COMPTE LIT. Un poste resté
+     * longtemps hors ligne recevait tout en UNE réponse (délai de réception de 30 s du client, mémoire). Avec `page`
+     * (`page=1`, puis `page=n&curseur_page=<jeton rendu par la page précédente>`, `taille` facultative) :
+     *
+     *  - la PAGE 1 porte toutes les tables NON paginées (référentiels, tables servies en entier : leur sémantique de
+     *    remplacement complet est gardée, elles ne se découpent jamais), `data_reset_at` et `tables_servies` ;
+     *  - les tables d'HISTORIQUE ([famillesPaginees] : fiches, transferts, soins, infirmerie, calendrier, cycles,
+     *    achats + lignes + retours, ventes + lignes, grand livre des stocks, journal comptable + lignes) se découpent
+     *    PAR PIÈCE, au curseur composite (`updated_at`, `id`) : une pièce descend avec TOUTES ses lignes (U4, U8 :
+     *    l'absorbeur strict du poste refuserait une ligne d'une pièce non servie) ;
+     *  - `server_time` (instant du DÉBUT de la page 1, reculé de l'horizon) et `accounting_entry_ids` ne viennent
+     *    qu'à la DERNIÈRE page (`page_suivante: null`). Le poste n'avance son curseur qu'après avoir absorbé toutes les
+     *    pages ; un échec au milieu le fait repartir du curseur précédent (rien de perdu ; ce qui revient est remplacé
+     *    par identifiant) ;
+     *  - les pièces servies sont celles d'AVANT la page 1 (`updated_at` < son début, sauf le journal : voir
+     *    [famillesPaginees]) : ce qui s'écrit pendant le tirage descend au suivant, jamais avec un produit ou une
+     *    bande que la page 1 n'a pas pu servir ;
+     *  - seules les tables que le compte lit sont servies ([PERMISSIONS_DE_TIRAGE]), et `tables_servies` les nomme à
+     *    chaque page : le poste compare à celles de son dernier tirage et repart SANS `since` si une table s'ajoute
+     *    (changement de rôle, de droits ou d'utilisateur) — sinon l'historique de cette table antérieur au curseur
+     *    ne lui parviendrait jamais.
+     *
+     * ⚠️ COMPATIBILITÉ : sans `page`, la réponse est celle d'avant S-T4, complète et non filtrée (poste antérieur).
      */
     public function pull(Request $request): JsonResponse
     {
-        $request->validate(['since' => ['nullable', 'date']]);
+        $request->validate([
+            'since' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'curseur_page' => ['nullable', 'string'],
+            'taille' => ['nullable', 'integer', 'min:1', 'max:'.self::TAILLE_PAGE_MAXIMUM],
+        ]);
 
         // Ticket S-T2 — le poste ne l'envoie pas au tirage aujourd'hui ; s'il l'envoie, il doit être celui du jeton.
         if ($refus = $this->refusPosteDifferentDuJeton($request)) {
             return $refus;
+        }
+
+        if ($request->filled('page') || $request->filled('curseur_page')) {
+            return $this->tiragePagine($request);
         }
 
         $since = $request->filled('since') ? $request->date('since') : null;
@@ -156,995 +309,1292 @@ class SyncController extends Controller
         // insertions-ou-mises-à-jour et ne touchent jamais une saisie locale en attente.
         $curseur = now()->subSeconds(self::HORIZON_TIRAGE_SECONDES);
 
-        $products = Product::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
-        $categories = ProductCategory::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
-        // ⚠️ TICKET F0.14 — LE CODE ESPÈCE ACCOMPAGNE LA BANDE. Le poste n'a
-        // pas de table des espèces : sans ce champ, il ne peut pas appliquer
-        // le garde-fou « aviculture + stade ponte » qui empêche une ponte
-        // d'escargots d'entrer au stock d'œufs de table (ticket 14.59). Il
-        // devrait deviner à partir du seul stade — et se tromper.
-        $lots = LivestockLot::with('species')
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->get()
-            ->map(function (LivestockLot $lot) {
-                $ligne = $lot->toArray();
-                unset($ligne['species']);
-                $ligne['species_code'] = $lot->species?->code;
-
-                return $ligne;
-            });
-        $dailyEntries = LivestockDailyEntry::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
-
-        // Ticket 15.46 — transferts entre bandes : source de vérité des colonnes `transfert_*` des fiches (servies
-        // ci-dessus avec la fiche). Le poste les affiche et peut en créer ou en annuler hors ligne.
-        $transferts = LivestockTransfer::query()
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->get(['id', 'source_lot_id', 'target_lot_id', 'transfer_date', 'quantity', 'categorie', 'constitution',
-                'motif', 'is_active', 'updated_at']);
-
-        // 🔴→✅ TICKET 14.52 — LES RATIONS NORMATIVES DESCENDENT ENFIN.
-        //
-        // `feed_ration_standards` est un référentiel ÉDITABLE (écran
-        // Paramètres > Élevage) : la ferme peut corriger une ration. Il
-        // n'était pourtant pas servi par ce point d'entrée, ce qui ne
-        // laissait au client Flutter que deux options, toutes deux
-        // mauvaises — coder les grammages en dur et diverger en silence le
-        // jour d'une correction, ou renoncer au calcul de provende.
-        //
-        // ⚠️ PAS DE FILTRE `since` ICI. La table compte une dizaine de
-        // lignes et sert de base à un calcul affiché : un appareil qui
-        // n'aurait jamais tiré depuis une modification garderait des
-        // grammages périmés sans le savoir. Le coût d'un envoi complet à
-        // chaque tirage est négligeable devant ce risque.
-        // ⚠️ Ticket 14.55 — une ration ARCHIVÉE ne descend plus au poste. Le
-        // référentiel y étant remplacé à chaque tirage, elle en disparaît donc
-        // proprement, tout en restant restaurable côté serveur.
-        $rations = FeedRationStandard::where('is_active', true)
-            ->orderBy('species_code')->orderBy('stage_label')->get();
-
-        // 🔴→✅ TICKET 14.53 — LA RÉMANENCE VÉTÉRINAIRE DESCEND AU POSTE.
-        //
-        // ⚠️ C'EST UN BLOCAGE DE SANTÉ PUBLIQUE, PAS UN CONFORT. La caisse web
-        // REFUSE une vente issue d'une bande sous rémanence (délai d'attente
-        // après traitement) : vendre cette viande exposerait le consommateur à
-        // des résidus d'antibiotiques. Le poste Desktop, lui, encaisse HORS
-        // LIGNE — sans ces périodes, il n'avait aucun moyen de connaître
-        // l'interdiction et l'aurait donc laissée passer.
-        //
-        // Servies SANS filtre `since`, pour la même raison que les rations :
-        // un poste qui n'aurait rien tiré depuis un traitement récent ignorerait
-        // le blocage le plus important.
-        // 🔴→✅ TICKET 14.54 — LE CALENDRIER PROPHYLACTIQUE ET LE REGISTRE
-        // DESCENDENT AU POSTE. Sans eux, la fiche d'élevage Desktop ne pouvait
-        // afficher ni les traitements PRÉVUS du jour ni ceux déjà administrés :
-        // les montrer vides aurait laissé croire à une absence de soin à faire.
-        //
-        // ⚠️ Le calendrier est servi SANS filtre `since` — une dizaine de
-        // lignes qui pilotent un affichage sanitaire, et un poste resté hors
-        // ligne depuis une correction proposerait sinon un protocole périmé.
-        $prophylaxie = ProphylaxisScheduleStandard::where('is_active', true)
-            ->orderBy('species_code')
-            ->orderBy('period_label')
-            ->get();
-
-        // ⚠️ SANS FILTRE `since` : la liste est courte et le poste doit
-        // toujours pouvoir proposer un compte payeur, meme apres un tirage
-        // incremental ou rien n'a change.
-        $comptesTresorerie = \App\Models\TreasuryAccount::query()
-            ->where('is_active', true)
-            ->orderBy('label')
-            ->get(['id', 'label', 'account_code', 'type', 'balance']);
-
-        // Ticket U3 (décision D-U3 du 19/10/2026 : archivage d'un soin au poste comme au web) — `is_active` est servi.
-        // Tirage complet : les soins ACTIFS seuls (un poste neuf n'a que faire des archivés). Tirage incrémental : tout
-        // soin modifié depuis `since`, ARCHIVÉS COMPRIS — sans eux, un poste ne saurait jamais qu'un soin a été
-        // archivé au web et le compterait encore (registre, coût sanitaire, protocole du jour).
-        $soins = VeterinaryRecord::query()
-            ->when(
-                $since,
-                fn ($q) => $q->where('updated_at', '>', $since),
-                fn ($q) => $q->where('is_active', true),
-            )
-            ->get();
-
-        // Ticket U2 (décision D-U2 du 19/10/2026) — OBJECTIFS DE GMQ : une seule source, `growth_standards`, au web ET
-        // au poste (le poste et le Dashboard Élevage web portaient des constantes). Référentiel en lecture seule,
-        // servi COMPLET à chaque tirage (une dizaine de lignes) : comme les rations, un poste resté hors ligne ne doit
-        // pas garder un objectif périmé. Le poste remplace l'ensemble.
-        $objectifsCroissance = \App\Models\GrowthStandard::query()
-            ->orderBy('species_code')->orderBy('stage_label')
-            ->get(['id', 'species_code', 'stage_label', 'gmq_min_g_per_day', 'gmq_max_g_per_day']);
-
-        $remanences = VeterinaryWithdrawalPeriod::query()
-            ->whereDate('end_date', '>=', now()->toDateString())
-            ->orderBy('end_date')
-            ->get();
-
-        // Ticket H8b (décision D-H8 du 19/10/2026) — l'infirmerie et le calendrier vétérinaire PLANIFIÉ descendent au
-        // poste : sans eux, l'onglet « Suivi Sanitaire » et le calendrier restaient vides hors ligne.
-        $infirmerie = \App\Models\InfirmaryRecord::query()
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->get();
-        $calendrierVeterinaire = \App\Models\VeterinaryCalendarEvent::query()
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->get();
-
-        // 🔴→✅ TICKET 14.72 — LE CYCLE DE REPRODUCTION DESCEND AU POSTE.
-        //
-        // `livestock_reproduction_events` est la SEULE table du systeme qui
-        // suive une femelle NOMMEE (R1, R2… / T1, T2…) : les fiches
-        // journalieres ne connaissent que des agregats de bande. Sans elle, le
-        // poste ne pouvait ni afficher l'ecran Suivi Reproduction, ni — defaut
-        // deja signale par `SoinsRepository` — calculer le jour de cycle d'une
-        // bande en reproduction, dont le protocole se compte depuis la
-        // DERNIERE SAILLIE.
-        //
-        // ⚠️ LES CYCLES EN COURS DESCENDENT SANS FILTRE `since`, meme regle
-        // que les remanences : une gestation ouverte il y a trois semaines n'a
-        // pas bouge depuis, donc un tirage incremental la manquerait — et
-        // c'est precisement l'evenement qu'un poste doit connaitre. Seul
-        // l'historique clos est filtre.
-        // 🔴→✅ TICKET 14.75 — LE FICHIER CLIENTS ET LES CREANCES DESCENDENT.
-        //
-        // ⚠️⚠️ TROIS TABLES REELLES, RIEN AU POSTE. `customers` (10 lignes),
-        // `receivables` (51) et `customer_advances` (4) existent depuis les
-        // premiers sprints ; aucune ne figurait dans la charge du tirage.
-        // Consequences accumulees sur les ecrans deja livres :
-        //   • la caisse ne peut nommer aucun client — `sales.customer_id`
-        //     part rempli ou vide, jamais choisi ;
-        //   • l'historique des ventes affiche « Client non synchronise » ;
-        //   • « Encours Creances » est un tiret sur le Tableau de Bord ET sur
-        //     l'historique des ventes ;
-        //   • tout le hub « Clients et Creances » etait impossible a batir.
-        //
-        // ⚠️ `customers` S'ECRIT AU POSTE DEPUIS 15.18 (/sync/push, `pushCustomers`),
-        // et descend desormais AVEC son e-mail. Les creances et les relances restent
-        // servies en lecture seule : une creance se solde par un encaissement ou une
-        // imputation d'avance, jamais par une edition.
-        //
-        // ⚠️ `customer_advances` S'ECRIT AU POSTE DEPUIS 15.19 (`pushCustomerAdvances`), avec ses
-        // imputations (`advance_imputations`). Le tirage sert toutes les colonnes de l'avance,
-        // dont `treasury_account_id`, `payment_mode`, `motif` et `device_id`.
-        //
-        // ⚠️ LE TIRAGE EST INCREMENTAL (`since`) et SANS FILTRE `is_active` : un client
-        // archive descend avec `is_active = false`. Le poste FUSIONNE par identifiant ;
-        // l'ancien « tout effacer puis reinserer » ne gardait que le delta (F0.72).
-        $clients = Customer::query()
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'email', 'city', 'credit_limit', 'is_active']);
-
-        // ⚠️ SANS FILTRE `since` POUR CE QUI RESTE DU. Une facture echue il y a
-        // trois mois n'a plus bouge depuis : un tirage incremental la
-        // manquerait, et c'est precisement celle qu'il faut relancer. Meme
-        // raisonnement que les remanences et les cycles en cours.
-        $creances = Receivable::query()
-            ->where(function ($q) use ($since) {
-                $q->whereColumn('amount_paid', '<', 'amount');
-                if ($since) {
-                    $q->orWhere('updated_at', '>', $since);
-                }
-            })
-            ->orderBy('due_date')
-            ->get();
-
-        $avances = CustomerAdvance::query()
-            ->where('is_active', true)
-            ->orderByDesc('advance_date')
-            ->get();
-
-        // 🔴→✅ TICKET 14.76 — LES RELANCES DEJA FAITES DESCENDENT.
-        //
-        // ⚠️⚠️ SANS ELLES, LE POSTE RELANCE DEUX FOIS. La table existe et
-        // vit : `RelancesClients` (web) l'alimente a chaque envoi WhatsApp,
-        // mail ou SMS. Un poste qui l'ignore montre une file de relance ou
-        // rien ne distingue le debiteur relance ce matin de celui qu'on n'a
-        // jamais contacte — et le KPI « Relances Effectuees » de la maquette
-        // n'a aucune source.
-        //
-        // ⚠️ SANS FILTRE `since`, comme les creances : une relance faite il y
-        // a trois semaines n'a plus bouge depuis, et c'est justement celle qui
-        // dit qu'il ne faut pas rappeler aujourd'hui.
-        //
-        // ⚠️ SERVIE EN LECTURE SEULE. Envoyer une relance suppose le reseau ET
-        // le canal mail du serveur (`CustomerReminderMail`) : le poste hors
-        // ligne ne peut pas le faire, et l'y autoriser creerait des relances
-        // que `customer_reminders` n'enregistrerait jamais.
-        $relances = CustomerReminder::query()
-            ->orderByDesc('reminder_date')
-            ->get(['id', 'customer_id', 'receivable_id', 'channel', 'reminder_date', 'message']);
-
-        // 🔴→✅ TICKET 14.77 — LES DEUX DERNIERS REFERENTIELS D'ELEVAGE.
-        //
-        // ⚠️ LE POSTE N'A PAS DE TABLE DES ESPECES : le libelle voyage AVEC le
-        // type d'aliment, comme le code espece voyage avec la bande (F0.14).
-        // Sans lui, la colonne « Espece Cible » de l'ecran Parametres Elevage
-        // n'aurait qu'un UUID a afficher.
-        $provendes = FeedType::with('species')
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get()
-            ->map(function (FeedType $type) {
-                return [
-                    'id' => $type->id,
-                    'name' => $type->name,
-                    'species_id' => $type->species_id,
-                    'species_code' => $type->species?->code,
-                    'species_label' => $type->species?->label,
-                    'standard_bag_weight_kg' => $type->standard_bag_weight_kg,
-                    'price_per_kg' => $type->price_per_kg,
-                ];
-            });
-
-        // 🔴→✅ TICKET 14.78 — LE DOMAINE ACHAT DESCEND AU POSTE.
-        //
-        // ⚠️⚠️ SANS LES FOURNISSEURS, LE POSTE NE PEUT RIEN ACHETER HORS LIGNE.
-        // C'est la meme dependance que les clients pour la caisse (14.75) : un
-        // achat sans fournisseur serait rejete a l'envoi, et l'operateur ne
-        // comprendrait pas pourquoi.
-        $fournisseurs = Supplier::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'category', 'phone', 'email', 'address']);
-
-        // ⚠️ LE NOM DU FOURNISSEUR ET SA CATEGORIE VOYAGENT AVEC L'ACHAT. Le
-        // poste doit pouvoir afficher la liste meme si le fournisseur a ete
-        // archive depuis — et le referentiel, lui, ne sert que les actifs.
-        //
-        // ⚠️ LE STATUT SE CALCULE ICI, PAS AU POSTE : « Dette fournisseur » des
-        // qu'une dette reste ouverte sur la piece, « Paye entierement » sinon.
-        // Le poste ne recoit pas `payables` — deux regles de statut donneraient
-        // deux listes differentes pour la meme ferme.
-        $dettesParAchat = Payable::query()
-            ->whereColumn('amount_paid', '<', 'amount')
-            ->pluck('purchase_id')
-            ->filter()
-            ->flip();
-
-        // Ticket U4 (D-U4) — un achat dont une LIGNE a changé depuis `since` redescend aussi : ses lignes
-        // ne voyagent qu'avec lui (voir `$lignesAchat` plus bas). Ticket U8 : de même pour une ligne de RETOUR
-        // (voir `$retoursAchat`).
-        $achats = Purchase::with('supplier')
-            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)
-                ->orWhereHas('returns', fn ($r) => $r->where('updated_at', '>', $since))))
-            ->orderByDesc('purchase_date')
-            ->get()
-            ->map(fn (Purchase $achat) => [
-                'id' => $achat->id,
-                'supplier_id' => $achat->supplier_id,
-                'supplier_name' => $achat->supplier?->name,
-                'supplier_category' => $achat->supplier?->category,
-                'payment_mode' => $achat->payment_mode,
-                'total' => $achat->total,
-                'purchase_date' => $achat->purchase_date?->format('Y-m-d'),
-                'has_debt' => $dettesParAchat->has($achat->id),
-                // Ticket 15.20 : marqueur de RETOUR (descend via `updated_at`, touché par le retour) et part déjà
-                // payée devenue créance sur le fournisseur (409). Le poste ne calcule ni l'un ni l'autre.
-                'returned_at' => $achat->returned_at?->toIso8601String(),
-                'supplier_credit' => $achat->supplier_credit,
-            ]);
-
-        // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES ACHATS SERVIS DESCENDENT AVEC EUX.
-        //
-        // ⚠️⚠️ AU MÊME CURSEUR QUE LEUR PIÈCE, ET SEULEMENT POUR LES PIÈCES SERVIES : TOUTES les lignes de chaque
-        // achat de `$achats` (un achat modifié, ou dont une ligne l'est, renvoie la liste COMPLÈTE de ses lignes —
-        // le poste remplace alors celles qu'il tient, et une ligne retirée ici disparaît là-bas), JAMAIS une ligne
-        // d'un achat non servi (le poste la refuserait : pièce inconnue). Sans elles, le PMP (`computePmp()`, Σ
-        // qty × unit_price ÷ Σ qty sur TOUTES les lignes d'achat) et la marge du Top 5 étaient incalculables au
-        // poste. `unit_price` est ici un VRAI prix unitaire (contrairement aux lignes de vente).
-        $lignesAchat = $this->lignesDesPieces(
-            \App\Models\PurchaseLine::class,
-            'purchase_id',
-            $achats->pluck('id'),
-            fn ($ligne) => [
-                'id' => $ligne->id,
-                'purchase_id' => $ligne->purchase_id,
-                'product_id' => $ligne->product_id,
-                'product_name' => $ligne->product?->name,
-                'qty' => (float) $ligne->qty,
-                'unit_price' => (float) $ligne->unit_price,
-            ],
-        );
-
-        // 🔴→✅ TICKET U8 — LES LIGNES DE RETOUR DES ACHATS SERVIS DESCENDENT AVEC EUX.
-        //
-        // La carte « Écarts / Retours » de la liste des achats compte des LIGNES de retour (`PurchaseReturn::count()` :
-        // une ligne par ligne d'achat retournée, `PurchaseReturnService`) ; le poste, qui ne les recevait pas,
-        // comptait des achats retournés. Même règle que `$lignesAchat` : TOUTES les lignes de retour de chaque achat
-        // servi, au même curseur, JAMAIS une d'un achat non servi. `return_batch_id` est l'identifiant du RETOUR
-        // (celui que le poste a fourni s'il l'a saisi) ; `return_date` manque aux retours d'avant le ticket 15.20 :
-        // la date d'enregistrement en tient lieu, jamais une date inventée.
-        $retoursAchat = $this->lignesDesPieces(
-            \App\Models\PurchaseReturn::class,
-            'purchase_id',
-            $achats->pluck('id'),
-            fn ($retour) => [
-                'id' => $retour->id,
-                'purchase_id' => $retour->purchase_id,
-                'return_batch_id' => $retour->return_batch_id,
-                'purchase_line_id' => $retour->purchase_line_id,
-                'product_id' => $retour->product_id,
-                'qty' => (float) $retour->qty,
-                'reason' => $retour->reason,
-                'return_date' => ($retour->return_date ?? $retour->created_at)?->format('Y-m-d'),
-            ],
-        );
-
-        // Ticket 15.20 (D8) : créance OUVERTE par fournisseur (part payée des achats retournés - remboursements déjà
-        // encaissés). Servie CALCULÉE, sans filtre `since` (comme les dettes) : le poste en a besoin pour ne pas
-        // proposer un remboursement que le serveur plafonnerait. Seuls les fournisseurs > 0 sont listés.
-        $creancesFournisseurs = Supplier::query()
-            ->whereIn('id', Purchase::whereNotNull('returned_at')->where('supplier_credit', '>', 0)->pluck('supplier_id'))
-            ->get(['id', 'name'])
-            ->map(fn (Supplier $f) => [
-                'supplier_id' => $f->id,
-                'supplier_name' => $f->name,
-                'open_credit' => app(\App\Services\SupplierRefundService::class)->creanceOuverte($f->id),
-            ])
-            ->filter(fn (array $c) => $c['open_credit'] > 0)
-            ->values();
-
-        // ⚠️ LE MONTANT D'UN BON DE COMMANDE N'EST PAS STOCKE : il se somme sur
-        // ses lignes. Le servir calcule evite que le poste le recompose a sa
-        // facon — et que les deux surfaces affichent deux estimations.
-        $bonsCommande = PurchaseOrder::with(['supplier', 'lines'])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (PurchaseOrder $bon) => [
-                'id' => $bon->id,
-                'supplier_id' => $bon->supplier_id,
-                'supplier_name' => $bon->supplier?->name,
-                'expected_delivery_date' => $bon->expected_delivery_date?->format('Y-m-d'),
-                'status' => $bon->status,
-                'created_at' => $bon->created_at?->toIso8601String(),
-                // ⚠️ LA COLONNE S'APPELLE `estimated_unit_price`, PAS
-                // `unit_price` — c'est un PRIX ESTIME, la commande n'etant pas
-                // encore livree. Ecrit `unit_price` par habitude, le total
-                // valait 0 pour un bon de 405 000 FCFA : pas un tiret, un
-                // CHIFFRE FAUX, que rien a l'ecran n'aurait signale.
-                'estimated_total' => $bon->lines->sum(
-                    fn ($ligne) => (float) $ligne->qty * (float) $ligne->estimated_unit_price
-                ),
-            ]);
-
-        // 🔴→✅ TICKET 14.84 — LES PARAMETRES GENERAUX DESCENDENT.
-        //
-        // ⚠️⚠️ AUCUN SECRET NE QUITTE LE SERVEUR. `company_settings` porte
-        // `smtp_password_encrypted`, `twilio_auth_token_encrypted` et
-        // `vonage_api_secret_encrypted` : un poste vole donnerait acces au
-        // compte SMS et a la boite mail de la ferme. Seule l'IDENTITE de
-        // l'entreprise et ses TAUX descendent — jamais un identifiant de
-        // service, meme chiffre.
-        $entreprise = CompanySetting::query()->first();
-        $identite = $entreprise === null ? null : [
-            'company_name' => $entreprise->company_name,
-            'promoter_name' => $entreprise->promoter_name,
-            'address' => $entreprise->address,
-            'phone' => $entreprise->phone,
-            'email' => $entreprise->email,
-            'ifu' => $entreprise->ifu,
-            'rccm' => $entreprise->rccm,
-            'tva_enabled' => $entreprise->tva_enabled,
-            'tva_default_rate' => $entreprise->tva_default_rate,
-            // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
-            'rappel_soins_jours' => $entreprise->rappel_soins_jours,
-        ];
-
-        // ⚠️⚠️ UN MODULE DESACTIVE DOIT DISPARAITRE DE L'ECRAN, PAS SEULEMENT
-        // DE LA BASE. `modules_config` dit quelles especes la ferme exploite :
-        // l'heliciculture est desactivee ici, et le poste continuait de
-        // proposer la fiche Escargots. La maquette, elle, masque les blocs
-        // `data-module="helico"`.
-        $modules = ModuleConfig::query()
-            ->orderBy('species_code')
-            ->get(['id', 'species_code', 'is_enabled']);
-
-        // ⚠️⚠️ `App\Models\Role`, JAMAIS `Spatie\Permission\Models\Role`.
-        // Le modele de Spatie n'a pas `HasUuids` : il declare sa cle
-        // auto-incrementee et Eloquent CASTE alors `roles.id` en entier. Un
-        // UUID « 01a01168-... » devient « 1 » — les quatre roles descendaient
-        // au poste avec le MEME identifiant, et la relation `permissions` ne
-        // retrouvait plus aucune ligne du pivot. Le projet avait deja documente
-        // ce piege sur le seeder (voir `App\Models\Role`) ; ce tirage l'a
-        // repete. Le poste l'a signale au premier tirage reel : contrainte
-        // d'unicite violee sur `roles_applicatifs.id`.
-        $roles = Role::query()
-            ->with('permissions:id,name')
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($role) => [
-                'id' => (string) $role->id,
-                'name' => $role->name,
-                'permissions' => $role->permissions->pluck('name')->all(),
-            ]);
-
-        // ⚠️ NI MOT DE PASSE NI JETON : la liste sert a SAVOIR QUI travaille
-        // sur la ferme, pas a s'authentifier.
-        $utilisateurs = User::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'username', 'email', 'is_active'])
-            ->map(fn (User $u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'username' => $u->username,
-                'email' => $u->email,
-                'is_active' => $u->is_active,
-                'role' => $u->getRoleNames()->first(),
-            ]);
-
-        // ⚠️ TICKET 15.10 — LES NOTIFICATIONS DESCENDENT ENFIN AU POSTE.
-        //
-        // Elles vivaient uniquement côté web : la cloche du poste n'avait ni
-        // compteur ni liste. Seules celles que l'UTILISATEUR DU JETON peut voir
-        // sont servies (`visibleTo` : adressées à lui ou diffusées à l'un de ses
-        // rôles) — jamais celles d'un autre. La CATÉGORIE est calculée ici, par
-        // le modèle : la recopier au poste ferait dériver deux tables dès
-        // l'ajout d'un type.
-        //
-        // ⚠️ PAS DE FILTRE `since`, ET BORNE A 200 : l'état « lue » et la
-        // suppression changent sans toucher `created_at`, et un tirage
-        // incrémental ne les verrait pas. Le poste remplace l'ensemble.
-        $notifications = Notification::query()
-            ->visibleTo($request->user())
-            ->latest('created_at')
-            ->limit(200)
-            ->get()
-            ->map(fn (Notification $n) => [
-                'id' => $n->id,
-                'type' => $n->type,
-                'category' => $n->category,
-                'severity' => $n->severity,
-                'title' => $n->title,
-                'message' => $n->message,
-                'link_url' => $n->link_url,
-                'is_read' => $n->is_read,
-                'created_at' => $n->created_at?->toIso8601String(),
-            ]);
-
-        // ⚠️ TICKET 15.12 — LES REVENUS PAR BANDE DESCENDENT, CALCULÉS ICI.
-        //
-        // Le poste ne reçoit des ventes serveur que l'en-tête (`$factures`, sans
-        // lignes) : il ne sait pas quelle bande a vendu quoi, et un revenu par
-        // bande recalculé au poste ne compterait que SES ventes. Le chiffre est
-        // donc produit par `LotRevenueService` — le même que la page web — et
-        // servi tel quel : ventes validées, nettes des avoirs traités.
-        //
-        // ⚠️ PAS DE FILTRE `since` : un avoir traité ou une annulation changent le
-        // revenu sans toucher la ligne de vente. Le poste remplace l'ensemble.
-        $revenusParBande = collect(app(LotRevenueService::class)->forLots())
-            ->flatMap(fn (array $lignes, string $lotId) => collect($lignes)->map(fn (array $l) => [
-                'lot_id' => $lotId,
-                'product_id' => $l['product_id'],
-                'label' => $l['label'],
-                'amount' => $l['montant'],
-            ]))
-            ->values();
-
-        // ⚠️ TICKET 15.13 — LES MODÈLES D'ATTESTATION ET LE NOMBRE D'ATTESTATIONS
-        // ÉMISES DESCENDENT.
-        //
-        // Les deux modèles (employé, stagiaire) sont TOUJOURS servis : `forType`
-        // crée le modèle par défaut s'il n'existe pas, pour que le poste ne
-        // découvre jamais « aucun modèle » sur une ferme neuve.
-        //
-        // ⚠️ LE COMPTEUR EST UN DÉCOMPTE D'AUDIT, PAS UNE TABLE : Laravel n'a pas de
-        // table d'attestations émises, seulement les lignes `attestation.generated.*`.
-        // Le poste ne détient que les cent dernières lignes d'audit de la ferme ; il
-        // ne peut donc pas recompter — le serveur le fait sur l'historique entier.
-        $modelesAttestation = collect(AttestationService::TYPES)
-            ->map(fn (string $type) => AttestationTemplate::forType($type))
-            ->map(fn (AttestationTemplate $m) => [
-                'id' => $m->id,
-                'type' => $m->type,
-                'body_text' => $m->body_text,
-            ])
-            ->values();
-        $compteursAttestation = app(AttestationService::class)->compteurs();
-
-        // ⚠️ TICKET 15.14 — LES SUJETS SUIVIS INDIVIDUELLEMENT DESCENDENT.
-        //
-        // Sans eux le poste ne connaissait aucun sujet NOMMÉ : seulement les
-        // références texte (« R1 », « LAP-2026-0143 ») des saillies. Il ne pouvait
-        // donc pas ouvrir la fiche d'un reproducteur.
-        //
-        // ⚠️ TOUS LES SUJETS, SORTIS COMPRIS : la fiche d'un animal vendu ou mort
-        // reste consultable (c'est son historique). Pas de filtre `since` — un
-        // changement de cage ou de statut doit redescendre, et la table (des
-        // reproducteurs, pas du cheptel) reste petite. Le poste remplace l'ensemble.
-        //
-        // ⚠️ LE LIBELLÉ D'ESPÈCE ET LE CODE DE LA BANDE VOYAGENT AVEC LE SUJET : le
-        // poste n'a pas de table des espèces, et la bande peut ne pas lui être
-        // descendue.
-        $sujets = Animal::query()
-            ->with(['species:id,label', 'lot:id,code'])
-            ->orderBy('identifier')
-            ->get()
-            ->map(fn (Animal $a) => [
-                'id' => $a->id,
-                'identifier' => $a->identifier,
-                'species_label' => $a->species?->label,
-                'lot_id' => $a->lot_id,
-                'lot_code' => $a->lot?->code,
-                'category' => $a->category,
-                'sex' => $a->sex,
-                'breed' => $a->breed,
-                'birth_date' => $a->birth_date?->format('Y-m-d'),
-                'entry_date' => $a->entry_date?->format('Y-m-d'),
-                'origin' => $a->origin,
-                'cage' => $a->cage,
-                'status' => $a->status,
-                'exit_date' => $a->exit_date?->format('Y-m-d'),
-                'exit_reason' => $a->exit_reason,
-                'is_active' => $a->is_active,
-            ]);
-
-        // ⚠️ TICKET 15.15 — LES ESPÈCES D'ÉLEVAGE ACTIVES DESCENDENT.
-        //
-        // Le formulaire « Ajouter un Produit » propose la « Filière d'élevage »
-        // (`products.species_id`) ; le poste n'avait aucune table des espèces. Seules
-        // celles que la ferme exploite sont servies (`enabled()` : module actif) —
-        // proposer une espèce éteinte laisserait créer un produit pour une filière
-        // que l'exploitant a désactivée. Pas de filtre `since` : table de quelques
-        // lignes, remplacée à chaque tirage.
-        $especes = LivestockSpecies::query()
-            ->enabled()
-            ->orderBy('label')
-            ->get(['id', 'code', 'label'])
-            ->map(fn (LivestockSpecies $e) => [
-                'id' => $e->id,
-                'code' => $e->code,
-                'label' => $e->label,
-            ]);
-
-        // ⚠️ BORNE A 100 LIGNES : la table grossit d'une ligne par action et
-        // n'a d'interet, au poste, que pour les dernieres.
-        // 🔴→✅ TICKET S3 — LE JOURNAL D'AUDIT (qui a fait quoi, depuis quelle adresse IP) est réservé aux comptes
-        // qui gèrent les utilisateurs, comme son écran web. Les autres postes reçoivent une liste vide.
-        $auditLogs = AuditLog::query()
-            ->when(! $request->user()?->can('manage-users'), fn ($q) => $q->whereRaw('1 = 0'))
-            ->with('user:id,name')
-            ->orderByDesc('created_at')
-            ->limit(100)
-            ->get()
-            ->map(fn (AuditLog $log) => [
-                'id' => $log->id,
-                'user_name' => $log->user?->name,
-                'action' => $log->action,
-                'module' => $log->module,
-                'ip_address' => $log->ip_address,
-                'created_at' => $log->created_at?->toIso8601String(),
-            ]);
-
-        // 🔴→✅ TICKET 14.83 — LE JOURNAL COMPTABLE DESCEND AU POSTE.
-        //
-        // ⚠️⚠️ LES ETATS LISENT LE JOURNAL, JAMAIS DES TABLES METIER
-        // DISJOINTES. C'est la regle du projet depuis l'origine : un Grand
-        // Livre ou une Balance recomposes a partir des ventes et des achats
-        // donneraient deux comptabilites differentes pour la meme ferme. Pour
-        // que le poste puisse AFFICHER ces etats, il lui faut donc le journal
-        // lui-meme — pas des agregats prepares.
-        //
-        // ⚠️ VOLUME MAITRISE : 34 comptes, 516 ecritures, 1337 lignes pour
-        // l'exercice ouvert. Le filtre `since` porte sur les ecritures ; les
-        // comptes et l'exercice, eux, descendent en entier — sans le plan
-        // comptable, une ligne d'ecriture n'a qu'un UUID a montrer.
-        $plan = ChartOfAccount::query()
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->get(['id', 'code', 'label', 'class']);
-
-        $exercices = FiscalYear::query()
-            ->orderByDesc('year')
-            ->get(['id', 'year', 'start_date', 'end_date', 'status'])
-            ->map(fn (FiscalYear $e) => [
-                'id' => $e->id,
-                'year' => $e->year,
-                'start_date' => $e->start_date?->format('Y-m-d'),
-                'end_date' => $e->end_date?->format('Y-m-d'),
-                'status' => $e->status,
-            ]);
-
-        $ecritures = AccountingEntry::query()
-            ->where('is_active', true)
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
-            ->orderByDesc('entry_date')
-            ->get(['id', 'fiscal_year_id', 'entry_date', 'reference', 'source_type', 'is_locked', 'created_at'])
-            ->map(fn (AccountingEntry $e) => [
-                'id' => $e->id,
-                'fiscal_year_id' => $e->fiscal_year_id,
-                // ⚠️ 'Y-m-d', jamais un instant : meme piege que le pointage.
-                'entry_date' => $e->entry_date?->format('Y-m-d'),
-                // 🔴→✅ TICKET 15.29 — `FinancialReportService::grandLivre` departage deux pieces du
-                // MEME JOUR par `created_at`. Sans lui le poste ne peut pas reproduire l'ordre du
-                // serveur (et donc le solde progressif de chaque ligne). Instant de CREATION : il ne
-                // bouge jamais (≠ `updated_at`, que `updateManual` fait avancer par `touch()`).
-                'created_at' => $e->created_at?->toIso8601String(),
-                'reference' => $e->reference,
-                'source_type' => $e->source_type,
-                'is_locked' => $e->is_locked,
-            ]);
-
-        // 🔴→✅ TICKET 15.28 — LE POSTE DOIT POUVOIR RETIRER UNE ECRITURE.
-        //
-        // ⚠️⚠️ Le tirage ci-dessus ne sert que les ecritures ACTIVES modifiees depuis `since` :
-        // une ecriture ARCHIVEE (ou supprimee physiquement par une reinitialisation / une
-        // restauration de sauvegarde) en SORT, et le poste, qui fusionne sans jamais rien
-        // supprimer, la gardait pour toujours — comptee par son Journal, son Grand Livre et sa
-        // Balance, sans aucune erreur. Contrat : `accounting_entry_ids` = identifiants de TOUTES
-        // les ecritures actives, SANS filtre `since` (516 UUID, ~20 Ko). Le poste retire ce qui
-        // n'y figure plus. Ne depend d'aucun tirage complet : un tirage incremental suffit.
-        //
-        // ⚠️ Le contrat sur les LIGNES : une ecriture servie arrive avec TOUTES ses lignes
-        // courantes (`updateManual` supprime et recree les lignes, nouveaux ids) ; le poste
-        // remplace les lignes de cette ecriture par celles-la.
-        $idsEcrituresActives = AccountingEntry::query()
-            ->where('is_active', true)
-            ->orderBy('id')
-            ->pluck('id')
-            ->values();
-
-        // ⚠️ LES LIGNES SUIVENT LEURS ECRITURES : servir les unes sans les
-        // autres donnerait un journal desequilibre, ou des lignes orphelines
-        // que le poste ne saurait rattacher.
-        // ⚠️ TICKET 15.28-bis : PAR PAQUETS DE 5 000. Un `whereIn` de 33 000 identifiants dépasse la
-        // limite de variables de la requête (SQLite ~32 766 ; MySQL 65 535 placeholders) : le tirage
-        // entier échouait. Le résultat est identique (mêmes lignes, même contenu).
-        $lignesEcriture = $ecritures->pluck('id')->chunk(5_000)->flatMap(
-            fn ($paquet) => AccountingEntryLine::query()
-                ->whereIn('entry_id', $paquet->values())
-                ->get(['id', 'entry_id', 'account_id', 'cost_center_id', 'debit', 'credit'])
-        )->values();
-
-        // 🔴→✅ TICKET 14.82 — LE SECRETARIAT DESCEND AU POSTE.
-        //
-        // ⚠️ Au 09/10/2026 (tickets 15.23, 15.24, 15.25), `mails`, `archived_documents` et
-        // `administrative_documents` s'ECRIVENT au poste (`pushMails`, `pushArchivedDocuments`,
-        // `pushAdministrativeDocuments`) : aucune de ces trois tables n'est plus en consultation pure.
-        // Aucune piece jointe, en-tete officielle ni signature n'est portee par ces tables.
-        //
-        // ⚠️ LES DATES SE SERVENT EN 'Y-m-d', jamais en instant : le meme
-        // piege que le pointage (14.81) et l'echeance de creance (14.75).
-        //
-        // ⚠️ TICKET 15.23 — `mails` S'ECRIT AU POSTE (`pushMails`). Le tirage sert tous les
-        // courriers ACTIFS (complet, non incrémental, comme avant) ET les courriers ARCHIVÉS
-        // depuis `since` avec `is_active = false` : sans eux, un poste qui fusionne par
-        // identifiant ne saurait jamais qu'un courrier a été archivé ailleurs. `updated_at`
-        // est servi (instant ISO) pour que le poste départage une version locale d'une
-        // version serveur. Les dates restent en 'Y-m-d'.
-        $courriers = Correspondence::query()
-            ->where(function ($q) use ($since) {
-                $q->where('is_active', true);
-                if ($since) {
-                    $q->orWhere('updated_at', '>', $since);
-                }
-            })
-            ->orderByDesc('mail_date')
-            ->get()
-            ->map(fn (Correspondence $c) => [
-                'id' => $c->id,
-                'reference' => $c->reference,
-                'type' => $c->type,
-                'subject' => $c->subject,
-                'party' => $c->party,
-                'mail_date' => $c->mail_date?->format('Y-m-d'),
-                'is_active' => (bool) $c->is_active,
-                'updated_at' => $c->updated_at?->toIso8601String(),
-            ]);
-
-        // ⚠️ TICKET 15.25 — `administrative_documents` S'ECRIT AU POSTE
-        // (`pushAdministrativeDocuments`), mêmes principes que `mails` et `archived_documents` :
-        // tous les documents ACTIFS à chaque tirage, PLUS les RETIRÉS (`is_active = false`) dont
-        // `updated_at > since`. `is_active` et `updated_at` (ISO 8601) sont servis. Dates en 'Y-m-d'.
-        $documentsAdministratifs = AdministrativeDocument::query()
-            ->where(function ($q) use ($since) {
-                $q->where('is_active', true);
-                if ($since) {
-                    $q->orWhere('updated_at', '>', $since);
-                }
-            })
-            ->orderByDesc('doc_date')
-            ->get()
-            ->map(fn (AdministrativeDocument $d) => [
-                'id' => $d->id,
-                'title' => $d->title,
-                'type' => $d->type,
-                'beneficiary' => $d->beneficiary,
-                'doc_date' => $d->doc_date?->format('Y-m-d'),
-                'status' => $d->status,
-                'is_active' => (bool) $d->is_active,
-                'updated_at' => $d->updated_at?->toIso8601String(),
-            ]);
-
-        // ⚠️ TICKET 15.24 — `archived_documents` S'ECRIT AU POSTE (`pushArchivedDocuments`),
-        // mêmes principes que `mails` : tous les documents ACTIFS à chaque tirage, PLUS les
-        // RETIRÉS (`is_active = false`) dont `updated_at > since`. `is_active` et `updated_at`
-        // (ISO 8601) sont servis. Le STATUT n'est PAS servi : il se déduit de `expiry_date`
-        // (règle `ArchivedDocument::statutPour`, seuil 30 jours). Dates en 'Y-m-d'.
-        $archives = ArchivedDocument::query()
-            ->where(function ($q) use ($since) {
-                $q->where('is_active', true);
-                if ($since) {
-                    $q->orWhere('updated_at', '>', $since);
-                }
-            })
-            ->orderByDesc('archived_date')
-            ->get()
-            ->map(fn (ArchivedDocument $a) => [
-                'id' => $a->id,
-                'title' => $a->title,
-                'category' => $a->category,
-                'archived_date' => $a->archived_date?->format('Y-m-d'),
-                'expiry_date' => $a->expiry_date?->format('Y-m-d'),
-                'is_active' => (bool) $a->is_active,
-                'updated_at' => $a->updated_at?->toIso8601String(),
-            ]);
-
-        // 🔴→✅ TICKET 14.81 — LE PERSONNEL ET SON POINTAGE DESCENDENT.
-        //
-        // ⚠️⚠️ LE POINTAGE EST L'ACTE DE TERRAIN PAR EXCELLENCE : il se fait a
-        // 7 h a la ferme, ou le reseau n'est pas. Sans les employes au poste,
-        // il n'y a personne a pointer ; sans les pointages deja saisis, le
-        // chef d'equipe repointe quelqu'un que le web connait deja.
-        $employes = Employee::query()
-            ->where('is_active', true)
-            ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status'])
-            // 🔴→✅ TICKET S3 — LE SALAIRE NE DESCEND QU'AUX RÔLES RH. Il partait vers tout poste connecté,
-            // caissier compris. Sans `view-rh`, le poste reçoit `null` et affiche « — » (salaire inconnu).
-            ->each(function (Employee $employe) use ($request) {
-                if (! $request->user()?->can('view-rh')) {
-                    $employe->base_salary = null;
-                }
-            });
-
-        // ⚠️ UN STAGIAIRE N'EST PAS UN EMPLOYE : la table est autonome, sans
-        // relation vers `employees` — c'est aussi pourquoi la feuille de
-        // pointage ne le couvre pas (ses absences vivent dans
-        // `internship_absences`).
-        $stagiaires = Internship::query()
-            ->orderByDesc('start_date')
-            ->get();
-
-        // ⚠️ BORNE A 60 JOURS, ET C'EST DELIBERE. La table porte deja 870
-        // lignes et grossit d'une par employe et par jour : la servir en
-        // entier alourdirait chaque tirage pour une donnee que personne ne
-        // consulte au-dela du mois courant. Le poste a besoin du mois en
-        // cours pour ne pas repointer ; l'historique vit sur le web.
-        $pointages = AttendanceRecord::query()
-            ->where('is_active', true)
-            ->where('attendance_date', '>=', now()->subDays(60)->toDateString())
-            ->orderByDesc('attendance_date')
-            ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status'])
-            ->map(fn (AttendanceRecord $p) => [
-                'id' => $p->id,
-                'employee_id' => $p->employee_id,
-                // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent
-                // serialise une colonne `date` en « 2026-08-16T23:00:00Z » : le
-                // 17 aout local devient le 16 a 23 h UTC, et un poste qui lit
-                // l'instant sans le ramener a l'heure locale pointe la veille.
-                // Le meme piege a deja coute une echeance de creance (14.75).
-                'attendance_date' => $p->attendance_date?->format('Y-m-d'),
-                'check_in' => $p->check_in,
-                'check_out' => $p->check_out,
-                'status' => $p->status,
-            ]);
-
-        // 🔴→✅ TICKET 14.80 — LES FACTURES DESCENDENT AU POSTE.
-        //
-        // ⚠️⚠️ UNE FACTURE EST UNE VENTE, il n'existe pas de table `invoices` :
-        // `sales.mecef_status` et `sales.mecef_qr_ref` portent la
-        // normalisation fiscale (ticket 7.1). Sans ce bloc, l'ecran
-        // Facturation du poste n'aurait montre que les ventes encaissees SUR
-        // CE POSTE — la caissiere aurait cru la ferme a 3 factures le mois ou
-        // elle en a 40, et n'aurait jamais vu qu'une transmission a echoue.
-        //
-        // ⚠️ FILTRE `since` : contrairement aux creances, une vente ancienne
-        // n'a pas besoin de redescendre a chaque tirage. Le premier tirage les
-        // apporte toutes, les suivants n'apportent que les nouvelles et celles
-        // dont le statut MeCeF a change — une retransmission reussie touche
-        // `updated_at`, donc elle redescend.
-        //
-        // ⚠️ LE NOM DU CLIENT VOYAGE AVEC LA FACTURE : le poste a bien la table
-        // `customers` (14.75), mais une vente au comptant n'a pas de client, et
-        // une vente d'un client archive doit rester nommee.
-        // Ticket U4 (D-U4) — une vente dont une LIGNE a changé depuis `since` redescend aussi (voir `$lignesVente`).
-        $factures = Sale::with('customer')
-            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)))
-            ->orderByEffectiveDate()
-            ->get()
-            ->map(fn (Sale $vente) => [
-                'id' => $vente->id,
-                'customer_id' => $vente->customer_id,
-                'customer_name' => $vente->customer?->name,
-                'payment_mode' => $vente->payment_mode,
-                'total' => $vente->total,
-                'status' => $vente->status,
-                'mecef_status' => $vente->mecef_status,
-                'mecef_qr_ref' => $vente->mecef_qr_ref,
-                'sold_at' => $vente->date_effective?->toIso8601String(),
-            ]);
-
-        // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES VENTES SERVIES DESCENDENT AVEC ELLES.
-        //
-        // Même règle que `$lignesAchat` : toutes les lignes de chaque vente servie, aucune d'une vente non servie.
-        // Sans elles, le Top 5 des produits et les « Ventes (mois) » porcines du Tableau de bord du poste ne
-        // comptaient que les ventes saisies SUR CE POSTE, quand le web les compte toutes.
-        // ⚠️ `manual_total_amount` EST LA SOURCE DE VÉRITÉ DU MONTANT de la ligne ; `unit_price` n'en est que
-        // l'affichage dérivé (`manual_total_amount / qty`) : les deux sont servis tels que stockés.
-        $lignesVente = $this->lignesDesPieces(
-            \App\Models\SaleLine::class,
-            'sale_id',
-            $factures->pluck('id'),
-            fn ($ligne) => [
-                'id' => $ligne->id,
-                'sale_id' => $ligne->sale_id,
-                'product_id' => $ligne->product_id,
-                'lot_id' => $ligne->lot_id,
-                'qty' => (float) $ligne->qty,
-                'unit_price' => (float) $ligne->unit_price,
-                'manual_total_amount' => (float) $ligne->manual_total_amount,
-            ],
-        );
-
-        // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
-        //
-        // Trois écrans du web le lisent et le poste ne pouvait pas les reproduire : « Rotation du Stock »
-        // (`StockRotationService` : sorties de vente du mois et soldes reconstruits), « Écarts d'Inventaire »
-        // (`GestionStocks::TYPES_ECART_INVENTAIRE` du mois, saisis au web OU sur n'importe quel poste) et le Tableau 3
-        // de la ponte (`EggStockLedgerService` : SRH, OS, Stock Final en plateaux, soldes de FERME).
-        //
-        // ⚠️⚠️ C'EST UN JOURNAL ÉCRIT PAR LE SERVEUR SEUL : `AdjustStockAction` en est le point de passage unique. Au
-        // poste c'est un référentiel en LECTURE SEULE — jamais envoyé, et ignoré (compté) s'il l'était (voir `push`).
-        // Un ajustement saisi au poste part dans `stock_adjustments`, que le serveur REJOUE ; le mouvement qui en naît
-        // porte `reference_id` = identifiant de la ligne du poste, et c'est lui qui redescend ici.
-        //
-        // ⚠️ MÊME MÉCANISME QUE LES AUTRES TABLES D'HISTORIQUE (ventes, fiches) : tout au premier tirage, puis au
-        // curseur `since` (`updated_at`). Une ligne de quelques champs par vente, achat, ponte ou ajustement : la
-        // table croît comme les ventes et les achats réunis, servis de la même façon depuis U4.
-        //
-        // ⚠️ RECOUVREMENT DE DEUX MINUTES SOUS LE CURSEUR, EN PLUS DE CELUI DE TOUT LE TIRAGE. Le curseur est pris au
-        // début du tirage, reculé de `HORIZON_TIRAGE_SECONDES` (voir `pull`) ; un journal immuable n'est jamais
-        // resservi par une modification, et une sortie perdue l'est pour toujours (F0.84-bis a rencontré le cas réel
-        // sur le journal comptable) : il garde donc une marge plus large, contre une transaction lente à se valider.
-        // Les lignes déjà reçues reviennent pendant deux minutes : l'absorbeur du poste remplace par identifiant.
-        //
-        // ⚠️ COLONNES DU CALCUL ET DE L'AFFICHAGE DU JOURNAL, RIEN D'AUTRE (ni horodatages techniques, ni auteur).
-        // `movement_date` est servie en HEURE MURALE du serveur ('Y-m-d H:i:s') : le web compare des JOURS
-        // (`whereDate`), et un instant UTC lu par un poste réglé sur un autre fuseau changerait le jour d'un mouvement
-        // de fin de soirée — donc le mois d'un écart ou la ligne d'une ponte.
-        $mouvementsStock = \App\Models\StockMovement::query()
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since->copy()->subMinutes(2)))
-            ->orderBy('movement_date')
-            ->orderBy('id')
-            ->get(['id', 'product_id', 'type', 'quantity', 'reference_type', 'reference_id', 'reason', 'movement_date'])
-            ->map(fn ($m) => [
-                'id' => $m->id,
-                'product_id' => $m->product_id,
-                'type' => $m->type,
-                'quantity' => (float) $m->quantity,
-                'reference_type' => $m->reference_type,
-                'reference_id' => $m->reference_id,
-                'reason' => $m->reason,
-                'movement_date' => $m->movement_date?->format('Y-m-d H:i:s'),
-            ]);
-
-        // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
-        //
-        // ⚠️ MEME REGLE QUE LES CREANCES CLIENTS (14.75) : seul ce qui RESTE
-        // DU est servi, SANS filtre `since`. Une dette echue il y a trois mois
-        // n'a plus bouge depuis — et c'est precisement celle que le
-        // fournisseur va reclamer. Le poste remplacant sa table a chaque
-        // tirage, une dette soldee entre-temps en disparait proprement.
-        //
-        // ⚠️ LE NOM DU FOURNISSEUR VOYAGE AVEC LA DETTE : sans lui, la colonne
-        // « Fournisseur » de l'ecran Dettes n'aurait qu'un UUID a afficher.
-        $dettes = Payable::with('supplier')
-            ->whereColumn('amount_paid', '<', 'amount')
-            ->orderBy('due_date')
-            ->get()
-            ->map(fn (Payable $dette) => [
-                'id' => $dette->id,
-                'supplier_id' => $dette->supplier_id,
-                'supplier_name' => $dette->supplier?->name,
-                'purchase_id' => $dette->purchase_id,
-                'amount' => $dette->amount,
-                'amount_paid' => $dette->amount_paid,
-                'due_date' => $dette->due_date?->format('Y-m-d'),
-                'status' => $dette->status,
-            ]);
-
-        // ⚠️ TABLE SINGLETON — une seule ligne, `current()` la cree au besoin.
-        // Ces prefixes nomment les animaux sur le terrain (R1, T1, LOT-VOL-1) :
-        // un poste qui les ignore proposerait sa propre convention, et deux
-        // registres de la meme ferme ne se liraient plus ensemble.
-        $numerotation = ElevageNumberingSetting::current()->only([
-            'bande_format', 'lapine_prefix', 'male_prefix', 'truie_prefix',
-            'verrat_prefix', 'portee_prefix', 'volaille_prefix', 'parc_prefix',
-            'escargot_prefix',
-        ]);
-
-        $reproduction = $since
-            ? LivestockReproductionEvent::query()
-                ->where(fn ($q) => $q->where('status', 'en_cours')
-                    ->orWhere('updated_at', '>', $since))
-                ->orderByDesc('saillie_date')
-                ->get()
-            : LivestockReproductionEvent::query()
-                ->orderByDesc('saillie_date')
-                ->get();
-
         $reponse = [
             'server_time' => $curseur->toIso8601String(),
             // Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). Un poste qui ne le
             // connaît pas purge ses données d'activité avant tout envoi.
-            'data_reset_at' => $entreprise?->data_reset_at?->toIso8601String(),
-            'products' => $products,
-            'product_categories' => $categories,
-            'livestock_lots' => $lots,
-            'livestock_daily_entries' => $dailyEntries,
-            'livestock_transfers' => $transferts,
-            'feed_ration_standards' => $rations,
-            'growth_standards' => $objectifsCroissance,
-            'veterinary_withdrawal_periods' => $remanences,
-            'prophylaxis_schedule_standards' => $prophylaxie,
-            'veterinary_records' => $soins,
-            'infirmary_records' => $infirmerie,
-            'veterinary_calendar_events' => $calendrierVeterinaire,
-            'livestock_reproduction_events' => $reproduction,
-            'customers' => $clients,
-            'receivables' => $creances,
-            'customer_advances' => $avances,
-            'customer_reminders' => $relances,
-            'feed_types' => $provendes,
-            'elevage_numbering' => $numerotation,
-            'suppliers' => $fournisseurs,
-            'purchases' => $achats,
-            // Ticket U4 (D-U4) — lignes des achats servis ci-dessus, et d'eux seuls.
-            'purchase_lines' => $lignesAchat,
-            // Ticket U8 — lignes de retour des achats servis ci-dessus, et d'eux seuls.
-            'purchase_returns' => $retoursAchat,
-            'supplier_credits' => $creancesFournisseurs,
-            'purchase_orders' => $bonsCommande,
-            'payables' => $dettes,
-            'employees' => $employes,
-            'internships' => $stagiaires,
-            'attendance_records' => $pointages,
-            'mails' => $courriers,
-            'administrative_documents' => $documentsAdministratifs,
-            'archived_documents' => $archives,
-            'chart_of_accounts' => $plan,
-            'fiscal_years' => $exercices,
-            'accounting_entries' => $ecritures,
-            'accounting_entry_lines' => $lignesEcriture,
-            'accounting_entry_ids' => $idsEcrituresActives,
-            'company_settings' => $identite,
-            'modules_config' => $modules,
-            'roles' => $roles,
-            'users' => $utilisateurs,
-            'audit_logs' => $auditLogs,
-            'notifications' => $notifications,
-            'lot_revenues' => $revenusParBande,
-            'animals' => $sujets,
-            'livestock_species' => $especes,
-            'attestation_templates' => $modelesAttestation,
-            'attestation_counts' => $compteursAttestation,
-            'sales' => $factures,
-            // Ticket U4 (D-U4) — lignes des ventes servies ci-dessus, et d'elles seules.
-            'sale_lines' => $lignesVente,
-            // Ticket U9 — grand livre des stocks, en lecture seule au poste.
-            'stock_movements' => $mouvementsStock,
-            // ⚠️ TICKET 14.62 — CE QU'IL FAUT POUR SAISIR UNE DEPENSE HORS
-            // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
-            // QUI paie ; sans la liste des comptes de charge, il devrait la
-            // recopier et les deux listes divergeraient au premier ajout.
-            'treasury_accounts' => $comptesTresorerie,
-            'expense_categories' => \App\Models\Expense::CATEGORIES,
+            'data_reset_at' => $this->instantDeReinitialisation(),
         ];
+        foreach ($this->tablesNonPaginees($request, $since) as $cle => $calcul) {
+            $reponse[$cle] = $calcul();
+        }
+        foreach ($this->famillesPaginees($since) as $famille) {
+            $requete = $famille['requete']();
+            if (isset($famille['historique'])) {
+                $requete = $famille['historique']($requete);
+            }
+            $reponse += $this->servirPieces($famille, $requete->get());
+        }
+        $reponse['accounting_entry_ids'] = $this->idsDesEcrituresActives();
+        $reponse = $this->dansLOrdreDuTirage($reponse);
 
         // Ticket H3 — chaque tirage est journalisé par poste (modale « Synchronisation » du web).
         app(JournalSynchronisationService::class)->tirage($request, $reponse);
 
         return response()->json($reponse);
+    }
+
+    /**
+     * Ticket S-T4 — une page du tirage paginé (voir `pull`).
+     */
+    private function tiragePagine(Request $request): JsonResponse
+    {
+        $etat = $this->etatDePage($request);
+        if ($etat instanceof JsonResponse) {
+            return $etat;
+        }
+
+        $premiere = $etat === null;
+        if ($premiere) {
+            // Même curseur que le tirage complet (début, reculé de l'horizon), pris AVANT la première requête et
+            // rendu à la dernière page seulement. `debut` borne les pièces servies par toutes les pages.
+            $debut = now();
+            $etat = [
+                'utilisateur' => (string) $request->user()?->getAuthIdentifier(),
+                'debut' => $debut->format('Y-m-d H:i:s'),
+                'curseur' => $debut->copy()->subSeconds(self::HORIZON_TIRAGE_SECONDES)->toIso8601String(),
+                'since' => $request->filled('since') ? (string) $request->input('since') : null,
+                'famille' => 0,
+                'apres' => null,
+                'recus' => 0,
+            ];
+        }
+
+        // `since` est celui de la PAGE 1, porté par le jeton : toutes les pages d'un tirage lisent le même.
+        $since = $etat['since'] !== null ? Date::parse($etat['since']) : null;
+        $servies = self::tablesServies($request->user());
+
+        $reponse = ['page' => (int) $request->input('page', 1), 'tables_servies' => $servies];
+
+        if ($premiere) {
+            $reponse['data_reset_at'] = $this->instantDeReinitialisation();
+            foreach ($this->tablesNonPaginees($request, $since) as $cle => $calcul) {
+                if (in_array($cle, $servies, true)) {
+                    $reponse[$cle] = $calcul();
+                }
+            }
+        }
+
+        $familles = $this->famillesPaginees($since);
+        $budget = (int) $request->input('taille', self::TAILLE_PAGE);
+        $poidsPage = 0;
+        $suite = null;
+        for ($i = $etat['famille']; $i < count($familles); $i++) {
+            $famille = $familles[$i];
+            if (! in_array($famille['cle'], $servies, true)) {
+                continue;
+            }
+            $apres = $i === $etat['famille'] ? $etat['apres'] : null;
+            if ($budget <= 0) {
+                $suite = [$i, $apres];
+                break;
+            }
+
+            [$servi, $poids, $reste, $position] = $this->pageDeFamille($famille, $apres, $budget, $etat['debut'], $poidsPage === 0);
+            $reponse += $servi;
+            $budget -= $poids;
+            $poidsPage += $poids;
+            if ($reste) {
+                $suite = [$i, $position];
+                break;
+            }
+        }
+
+        // Chaque page porte TOUTES les clés paginées du périmètre (liste vide si elle n'en sert rien) : une clé ABSENTE
+        // veut dire « table non servie à ce compte », jamais « rien sur cette page ».
+        foreach ($familles as $famille) {
+            if (in_array($famille['cle'], $servies, true)) {
+                $reponse[$famille['cle']] ??= collect();
+                foreach (array_keys($famille['lignes'] ?? []) as $cle) {
+                    $reponse[$cle] ??= collect();
+                }
+            }
+        }
+
+        $journal = app(JournalSynchronisationService::class);
+        if ($suite === null) {
+            // DERNIÈRE PAGE : le journal comptable est complet au poste, la liste des écritures actives peut le
+            // corriger (F0.84) ; le curseur est enfin rendu.
+            if (in_array('accounting_entry_ids', $servies, true)) {
+                $reponse['accounting_entry_ids'] = $this->idsDesEcrituresActives();
+            }
+            $reponse['server_time'] = $etat['curseur'];
+            $reponse['page_suivante'] = null;
+            $reponse = $this->dansLOrdreDuTirage($reponse);
+            // Ticket H3 — UNE ligne de journal par tirage, toutes pages comptées (pas une par page).
+            $journal->tirage($request, $reponse, $etat['recus']);
+        } else {
+            $reponse['page_suivante'] = Crypt::encryptString(json_encode([
+                ...$etat,
+                'famille' => $suite[0],
+                'apres' => $suite[1],
+                'recus' => $etat['recus'] + $journal->compter($reponse),
+            ], JSON_THROW_ON_ERROR));
+            $reponse = $this->dansLOrdreDuTirage($reponse);
+        }
+
+        return response()->json($reponse);
+    }
+
+    /**
+     * Ticket S-T4 — état porté par `curseur_page` (chiffré par la clé de l'application : le poste ne le lit ni ne
+     * le fabrique). `null` : page 1. Jeton illisible, d'un autre compte ou mal formé → 422, et le poste reprend
+     * son tirage depuis le début.
+     *
+     * @return array<string, mixed>|JsonResponse|null
+     */
+    private function etatDePage(Request $request): array|JsonResponse|null
+    {
+        if (! $request->filled('curseur_page')) {
+            return null;
+        }
+
+        try {
+            $etat = json_decode(Crypt::decryptString((string) $request->input('curseur_page')), true, 8, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            $etat = null;
+        }
+
+        $apres = $etat['apres'] ?? null;
+        $valide = is_array($etat)
+            && ($etat['utilisateur'] ?? null) === (string) $request->user()?->getAuthIdentifier()
+            && is_string($etat['debut'] ?? null)
+            && is_string($etat['curseur'] ?? null)
+            && (! isset($etat['since']) || is_string($etat['since']))
+            && is_int($etat['famille'] ?? null)
+            && is_int($etat['recus'] ?? null)
+            && ($apres === null || (is_array($apres) && count($apres) === 2
+                && is_string($apres[0] ?? null) && is_string($apres[1] ?? null)));
+
+        if (! $valide) {
+            return response()->json([
+                'message' => 'Page de tirage illisible : la synchronisation doit reprendre depuis le début.',
+            ], 422);
+        }
+
+        $etat['since'] ??= null;
+
+        return $etat;
+    }
+
+    /**
+     * Ticket S-T4 — une tranche d'une famille paginée : au plus `$budget` lignes (pièces + leurs lignes), JAMAIS une
+     * pièce coupée de ses lignes. Une page VIDE ([$pageVide]) prend toujours sa première pièce, même si ses lignes
+     * dépassent le budget (sinon elle ne descendrait jamais) ; une page déjà entamée la laisse à la suivante.
+     *
+     * Ordre et curseur de page : (`updated_at`, `id`) de la PIÈCE ; `updated_at` absent est rangé en tête
+     * ([MAJ_NULLE]). Une pièce modifiée pendant le tirage passe après le début de la page 1 : elle sort de ce tirage
+     * (borne `debut`) et descend au suivant (son `updated_at` dépasse le curseur rendu).
+     *
+     * @param  array<string, mixed>  $famille
+     * @param  array{0: string, 1: string}|null  $apres
+     * @return array{0: array<string, Collection>, 1: int, 2: bool, 3: array{0: string, 1: string}|null}  pièces et
+     *                                lignes servies, leur poids, s'il en reste, position de la dernière servie
+     */
+    private function pageDeFamille(array $famille, ?array $apres, int $budget, string $debut, bool $pageVide): array
+    {
+        $requete = $famille['requete']();
+        $modele = $requete->getModel();
+        $maj = $modele->qualifyColumn('updated_at');
+        $id = $modele->getQualifiedKeyName();
+        $ordre = "COALESCE({$maj}, '".self::MAJ_NULLE."')";
+
+        if (! ($famille['sansBorne'] ?? false)) {
+            $requete->where(fn ($q) => $q->whereNull($maj)->orWhere($maj, '<', $debut));
+        }
+        if ($apres !== null) {
+            [$majApres, $idApres] = $apres;
+            $requete->where(fn ($q) => $q->whereRaw("{$ordre} > ?", [$majApres])
+                ->orWhere(fn ($e) => $e->whereRaw("{$ordre} = ?", [$majApres])->where($id, '>', $idApres)));
+        }
+
+        $lot = $requete->orderByRaw("{$ordre} asc")->orderBy($id)->limit($budget + 1)->get()->values();
+        $reste = $lot->count() > $budget;
+        $lot = $lot->take($budget)->values();
+
+        $servi = $this->servirPieces($famille, $lot);
+
+        $lignesParPiece = [];
+        foreach ($famille['lignes'] ?? [] as $cle => [$cleDePiece]) {
+            foreach ($servi[$cle] as $ligne) {
+                $piece = (string) data_get($ligne, $cleDePiece);
+                $lignesParPiece[$piece] = ($lignesParPiece[$piece] ?? 0) + 1;
+            }
+        }
+
+        $gardees = 0;
+        $poids = 0;
+        foreach ($lot as $piece) {
+            $poidsPiece = 1 + ($lignesParPiece[(string) $piece->getKey()] ?? 0);
+            if (($gardees > 0 || ! $pageVide) && $poids + $poidsPiece > $budget) {
+                $reste = true;
+                break;
+            }
+            $gardees++;
+            $poids += $poidsPiece;
+        }
+
+        if ($gardees < $lot->count()) {
+            $lot = $lot->take($gardees)->values();
+            $gardes = $lot->map(fn ($piece) => (string) $piece->getKey())->flip();
+            $servi[$famille['cle']] = $servi[$famille['cle']]->take($gardees)->values();
+            foreach ($famille['lignes'] ?? [] as $cle => [$cleDePiece]) {
+                $servi[$cle] = $servi[$cle]
+                    ->filter(fn ($ligne) => $gardes->has((string) data_get($ligne, $cleDePiece)))
+                    ->values();
+            }
+        }
+
+        $derniere = $lot->last();
+        $position = $derniere === null
+            ? $apres
+            : [(string) ($derniere->getRawOriginal('updated_at') ?? self::MAJ_NULLE), (string) $derniere->getKey()];
+
+        return [$servi, $poids, $reste, $position];
+    }
+
+    /**
+     * Ticket S-T4 — une famille paginée servie : ses pièces (sérialisées par `enJson` si elle en a un) et, pour
+     * chaque clé de lignes, TOUTES les lignes de ces pièces, et d'elles seules.
+     *
+     * @param  array<string, mixed>  $famille
+     * @return array<string, Collection>
+     */
+    private function servirPieces(array $famille, Collection $pieces): array
+    {
+        $servies = isset($famille['enJson']) ? $pieces->map($famille['enJson']) : $pieces;
+        $reponse = [$famille['cle'] => $servies];
+        foreach ($famille['lignes'] ?? [] as $cle => [, $lire]) {
+            $reponse[$cle] = $lire($servies->pluck('id'));
+        }
+
+        return $reponse;
+    }
+
+    /**
+     * Ticket S-T4 — clés de la réponse dans l'ordre d'avant S-T4 (celui de [PERMISSIONS_DE_TIRAGE]), précédées des
+     * clés de service et suivies de `page_suivante`.
+     *
+     * @param  array<string, mixed>  $reponse
+     * @return array<string, mixed>
+     */
+    private function dansLOrdreDuTirage(array $reponse): array
+    {
+        $ordre = ['page', 'server_time', 'data_reset_at', 'tables_servies', ...array_keys(self::PERMISSIONS_DE_TIRAGE)];
+        $ordonnee = [];
+        foreach ($ordre as $cle) {
+            if (array_key_exists($cle, $reponse)) {
+                $ordonnee[$cle] = $reponse[$cle];
+            }
+        }
+
+        return $ordonnee + $reponse;
+    }
+
+    /** Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). */
+    private function instantDeReinitialisation(): ?string
+    {
+        return CompanySetting::query()->first()?->data_reset_at?->toIso8601String();
+    }
+
+    /**
+     * 🔴→✅ TICKET 15.28 — LE POSTE DOIT POUVOIR RETIRER UNE ECRITURE.
+     *
+     * ⚠️⚠️ Le tirage ne sert que les ecritures ACTIVES modifiees depuis `since` : une ecriture ARCHIVEE (ou
+     * supprimee physiquement par une reinitialisation / une restauration de sauvegarde) en SORT, et le poste, qui
+     * fusionne sans jamais rien supprimer, la gardait pour toujours — comptee par son Journal, son Grand Livre et sa
+     * Balance, sans aucune erreur. Contrat : `accounting_entry_ids` = identifiants de TOUTES les ecritures actives,
+     * SANS filtre `since` (516 UUID, ~20 Ko). Le poste retire ce qui n'y figure plus. Ne depend d'aucun tirage
+     * complet : un tirage incremental suffit.
+     *
+     * ⚠️ Le contrat sur les LIGNES : une ecriture servie arrive avec TOUTES ses lignes courantes (`updateManual`
+     * supprime et recree les lignes, nouveaux ids) ; le poste remplace les lignes de cette ecriture par celles-la.
+     *
+     * Ticket S-T4 : au tirage paginé, la liste vient à la DERNIÈRE page seulement, quand toutes les écritures servies
+     * sont absorbées.
+     */
+    private function idsDesEcrituresActives(): Collection
+    {
+        return AccountingEntry::query()
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->pluck('id')
+            ->values();
+    }
+
+    /**
+     * Tables NON paginées, dans l'ordre de la réponse : chacune est calculée seulement si elle est servie (closure).
+     * Référentiels et tables servies EN ENTIER (remplacement complet au poste) : elles ne se découpent jamais, et
+     * descendent toutes à la page 1 du tirage paginé (ticket S-T4).
+     *
+     * @return array<string, \Closure>
+     */
+    private function tablesNonPaginees(Request $request, ?Carbon $since): array
+    {
+        return [
+            'products' => fn () => Product::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get(),
+            'product_categories' => fn () => ProductCategory::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get(),
+            // ⚠️ TICKET F0.14 — LE CODE ESPÈCE ACCOMPAGNE LA BANDE. Le poste n'a
+            // pas de table des espèces : sans ce champ, il ne peut pas appliquer
+            // le garde-fou « aviculture + stade ponte » qui empêche une ponte
+            // d'escargots d'entrer au stock d'œufs de table (ticket 14.59). Il
+            // devrait deviner à partir du seul stade — et se tromper.
+            'livestock_lots' => fn () => LivestockLot::with('species')
+                ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                ->get()
+                ->map(function (LivestockLot $lot) {
+                    $ligne = $lot->toArray();
+                    unset($ligne['species']);
+                    $ligne['species_code'] = $lot->species?->code;
+
+                    return $ligne;
+                }),
+
+            // 🔴→✅ TICKET 14.52 — LES RATIONS NORMATIVES DESCENDENT ENFIN.
+            //
+            // `feed_ration_standards` est un référentiel ÉDITABLE (écran
+            // Paramètres > Élevage) : la ferme peut corriger une ration. Il
+            // n'était pourtant pas servi par ce point d'entrée, ce qui ne
+            // laissait au client Flutter que deux options, toutes deux
+            // mauvaises — coder les grammages en dur et diverger en silence le
+            // jour d'une correction, ou renoncer au calcul de provende.
+            //
+            // ⚠️ PAS DE FILTRE `since` ICI. La table compte une dizaine de
+            // lignes et sert de base à un calcul affiché : un appareil qui
+            // n'aurait jamais tiré depuis une modification garderait des
+            // grammages périmés sans le savoir. Le coût d'un envoi complet à
+            // chaque tirage est négligeable devant ce risque.
+            // ⚠️ Ticket 14.55 — une ration ARCHIVÉE ne descend plus au poste. Le
+            // référentiel y étant remplacé à chaque tirage, elle en disparaît donc
+            // proprement, tout en restant restaurable côté serveur.
+            'feed_ration_standards' => fn () => FeedRationStandard::where('is_active', true)
+                ->orderBy('species_code')->orderBy('stage_label')->get(),
+
+            // Ticket U2 (décision D-U2 du 19/10/2026) — OBJECTIFS DE GMQ : une seule source, `growth_standards`, au web ET
+            // au poste (le poste et le Dashboard Élevage web portaient des constantes). Référentiel en lecture seule,
+            // servi COMPLET à chaque tirage (une dizaine de lignes) : comme les rations, un poste resté hors ligne ne doit
+            // pas garder un objectif périmé. Le poste remplace l'ensemble.
+            'growth_standards' => fn () => \App\Models\GrowthStandard::query()
+                ->orderBy('species_code')->orderBy('stage_label')
+                ->get(['id', 'species_code', 'stage_label', 'gmq_min_g_per_day', 'gmq_max_g_per_day']),
+
+            // 🔴→✅ TICKET 14.53 — LA RÉMANENCE VÉTÉRINAIRE DESCEND AU POSTE.
+            //
+            // ⚠️ C'EST UN BLOCAGE DE SANTÉ PUBLIQUE, PAS UN CONFORT. La caisse web
+            // REFUSE une vente issue d'une bande sous rémanence (délai d'attente
+            // après traitement) : vendre cette viande exposerait le consommateur à
+            // des résidus d'antibiotiques. Le poste Desktop, lui, encaisse HORS
+            // LIGNE — sans ces périodes, il n'avait aucun moyen de connaître
+            // l'interdiction et l'aurait donc laissée passer.
+            //
+            // Servies SANS filtre `since`, pour la même raison que les rations :
+            // un poste qui n'aurait rien tiré depuis un traitement récent ignorerait
+            // le blocage le plus important.
+            'veterinary_withdrawal_periods' => fn () => VeterinaryWithdrawalPeriod::query()
+                ->whereDate('end_date', '>=', now()->toDateString())
+                ->orderBy('end_date')
+                ->get(),
+
+            // 🔴→✅ TICKET 14.54 — LE CALENDRIER PROPHYLACTIQUE ET LE REGISTRE
+            // DESCENDENT AU POSTE. Sans eux, la fiche d'élevage Desktop ne pouvait
+            // afficher ni les traitements PRÉVUS du jour ni ceux déjà administrés :
+            // les montrer vides aurait laissé croire à une absence de soin à faire.
+            //
+            // ⚠️ Le calendrier est servi SANS filtre `since` — une dizaine de
+            // lignes qui pilotent un affichage sanitaire, et un poste resté hors
+            // ligne depuis une correction proposerait sinon un protocole périmé.
+            'prophylaxis_schedule_standards' => fn () => ProphylaxisScheduleStandard::where('is_active', true)
+                ->orderBy('species_code')
+                ->orderBy('period_label')
+                ->get(),
+
+            // 🔴→✅ TICKET 14.75 — LE FICHIER CLIENTS ET LES CREANCES DESCENDENT.
+            //
+            // ⚠️⚠️ TROIS TABLES REELLES, RIEN AU POSTE. `customers` (10 lignes),
+            // `receivables` (51) et `customer_advances` (4) existent depuis les
+            // premiers sprints ; aucune ne figurait dans la charge du tirage.
+            // Consequences accumulees sur les ecrans deja livres :
+            //   • la caisse ne peut nommer aucun client — `sales.customer_id`
+            //     part rempli ou vide, jamais choisi ;
+            //   • l'historique des ventes affiche « Client non synchronise » ;
+            //   • « Encours Creances » est un tiret sur le Tableau de Bord ET sur
+            //     l'historique des ventes ;
+            //   • tout le hub « Clients et Creances » etait impossible a batir.
+            //
+            // ⚠️ `customers` S'ECRIT AU POSTE DEPUIS 15.18 (/sync/push, `pushCustomers`),
+            // et descend desormais AVEC son e-mail. Les creances et les relances restent
+            // servies en lecture seule : une creance se solde par un encaissement ou une
+            // imputation d'avance, jamais par une edition.
+            //
+            // ⚠️ `customer_advances` S'ECRIT AU POSTE DEPUIS 15.19 (`pushCustomerAdvances`), avec ses
+            // imputations (`advance_imputations`). Le tirage sert toutes les colonnes de l'avance,
+            // dont `treasury_account_id`, `payment_mode`, `motif` et `device_id`.
+            //
+            // ⚠️ LE TIRAGE EST INCREMENTAL (`since`) et SANS FILTRE `is_active` : un client
+            // archive descend avec `is_active = false`. Le poste FUSIONNE par identifiant ;
+            // l'ancien « tout effacer puis reinserer » ne gardait que le delta (F0.72).
+            'customers' => fn () => Customer::query()
+                ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'email', 'city', 'credit_limit', 'is_active']),
+
+            // ⚠️ SANS FILTRE `since` POUR CE QUI RESTE DU. Une facture echue il y a
+            // trois mois n'a plus bouge depuis : un tirage incremental la
+            // manquerait, et c'est precisement celle qu'il faut relancer. Meme
+            // raisonnement que les remanences et les cycles en cours.
+            'receivables' => fn () => Receivable::query()
+                ->where(function ($q) use ($since) {
+                    $q->whereColumn('amount_paid', '<', 'amount');
+                    if ($since) {
+                        $q->orWhere('updated_at', '>', $since);
+                    }
+                })
+                ->orderBy('due_date')
+                ->get(),
+
+            'customer_advances' => fn () => CustomerAdvance::query()
+                ->where('is_active', true)
+                ->orderByDesc('advance_date')
+                ->get(),
+
+            // 🔴→✅ TICKET 14.76 — LES RELANCES DEJA FAITES DESCENDENT.
+            //
+            // ⚠️⚠️ SANS ELLES, LE POSTE RELANCE DEUX FOIS. La table existe et
+            // vit : `RelancesClients` (web) l'alimente a chaque envoi WhatsApp,
+            // mail ou SMS. Un poste qui l'ignore montre une file de relance ou
+            // rien ne distingue le debiteur relance ce matin de celui qu'on n'a
+            // jamais contacte — et le KPI « Relances Effectuees » de la maquette
+            // n'a aucune source.
+            //
+            // ⚠️ SANS FILTRE `since`, comme les creances : une relance faite il y
+            // a trois semaines n'a plus bouge depuis, et c'est justement celle qui
+            // dit qu'il ne faut pas rappeler aujourd'hui.
+            //
+            // ⚠️ SERVIE EN LECTURE SEULE. Envoyer une relance suppose le reseau ET
+            // le canal mail du serveur (`CustomerReminderMail`) : le poste hors
+            // ligne ne peut pas le faire, et l'y autoriser creerait des relances
+            // que `customer_reminders` n'enregistrerait jamais.
+            'customer_reminders' => fn () => CustomerReminder::query()
+                ->orderByDesc('reminder_date')
+                ->get(['id', 'customer_id', 'receivable_id', 'channel', 'reminder_date', 'message']),
+
+            // 🔴→✅ TICKET 14.77 — LES DEUX DERNIERS REFERENTIELS D'ELEVAGE.
+            //
+            // ⚠️ LE POSTE N'A PAS DE TABLE DES ESPECES : le libelle voyage AVEC le
+            // type d'aliment, comme le code espece voyage avec la bande (F0.14).
+            // Sans lui, la colonne « Espece Cible » de l'ecran Parametres Elevage
+            // n'aurait qu'un UUID a afficher.
+            'feed_types' => fn () => FeedType::with('species')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function (FeedType $type) {
+                    return [
+                        'id' => $type->id,
+                        'name' => $type->name,
+                        'species_id' => $type->species_id,
+                        'species_code' => $type->species?->code,
+                        'species_label' => $type->species?->label,
+                        'standard_bag_weight_kg' => $type->standard_bag_weight_kg,
+                        'price_per_kg' => $type->price_per_kg,
+                    ];
+                }),
+
+            // ⚠️ TABLE SINGLETON — une seule ligne, `current()` la cree au besoin.
+            // Ces prefixes nomment les animaux sur le terrain (R1, T1, LOT-VOL-1) :
+            // un poste qui les ignore proposerait sa propre convention, et deux
+            // registres de la meme ferme ne se liraient plus ensemble.
+            'elevage_numbering' => fn () => ElevageNumberingSetting::current()->only([
+                'bande_format', 'lapine_prefix', 'male_prefix', 'truie_prefix',
+                'verrat_prefix', 'portee_prefix', 'volaille_prefix', 'parc_prefix',
+                'escargot_prefix',
+            ]),
+
+            // 🔴→✅ TICKET 14.78 — LE DOMAINE ACHAT DESCEND AU POSTE.
+            //
+            // ⚠️⚠️ SANS LES FOURNISSEURS, LE POSTE NE PEUT RIEN ACHETER HORS LIGNE.
+            // C'est la meme dependance que les clients pour la caisse (14.75) : un
+            // achat sans fournisseur serait rejete a l'envoi, et l'operateur ne
+            // comprendrait pas pourquoi.
+            'suppliers' => fn () => Supplier::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'category', 'phone', 'email', 'address']),
+
+            // Ticket 15.20 (D8) : créance OUVERTE par fournisseur (part payée des achats retournés - remboursements déjà
+            // encaissés). Servie CALCULÉE, sans filtre `since` (comme les dettes) : le poste en a besoin pour ne pas
+            // proposer un remboursement que le serveur plafonnerait. Seuls les fournisseurs > 0 sont listés.
+            'supplier_credits' => fn () => Supplier::query()
+                ->whereIn('id', Purchase::whereNotNull('returned_at')->where('supplier_credit', '>', 0)->pluck('supplier_id'))
+                ->get(['id', 'name'])
+                ->map(fn (Supplier $f) => [
+                    'supplier_id' => $f->id,
+                    'supplier_name' => $f->name,
+                    'open_credit' => app(\App\Services\SupplierRefundService::class)->creanceOuverte($f->id),
+                ])
+                ->filter(fn (array $c) => $c['open_credit'] > 0)
+                ->values(),
+
+            // ⚠️ LE MONTANT D'UN BON DE COMMANDE N'EST PAS STOCKE : il se somme sur
+            // ses lignes. Le servir calcule evite que le poste le recompose a sa
+            // facon — et que les deux surfaces affichent deux estimations.
+            'purchase_orders' => fn () => PurchaseOrder::with(['supplier', 'lines'])
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn (PurchaseOrder $bon) => [
+                    'id' => $bon->id,
+                    'supplier_id' => $bon->supplier_id,
+                    'supplier_name' => $bon->supplier?->name,
+                    'expected_delivery_date' => $bon->expected_delivery_date?->format('Y-m-d'),
+                    'status' => $bon->status,
+                    'created_at' => $bon->created_at?->toIso8601String(),
+                    // ⚠️ LA COLONNE S'APPELLE `estimated_unit_price`, PAS
+                    // `unit_price` — c'est un PRIX ESTIME, la commande n'etant pas
+                    // encore livree. Ecrit `unit_price` par habitude, le total
+                    // valait 0 pour un bon de 405 000 FCFA : pas un tiret, un
+                    // CHIFFRE FAUX, que rien a l'ecran n'aurait signale.
+                    'estimated_total' => $bon->lines->sum(
+                        fn ($ligne) => (float) $ligne->qty * (float) $ligne->estimated_unit_price
+                    ),
+                ]),
+
+            // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
+            //
+            // ⚠️ MEME REGLE QUE LES CREANCES CLIENTS (14.75) : seul ce qui RESTE
+            // DU est servi, SANS filtre `since`. Une dette echue il y a trois mois
+            // n'a plus bouge depuis — et c'est precisement celle que le
+            // fournisseur va reclamer. Le poste remplacant sa table a chaque
+            // tirage, une dette soldee entre-temps en disparait proprement.
+            //
+            // ⚠️ LE NOM DU FOURNISSEUR VOYAGE AVEC LA DETTE : sans lui, la colonne
+            // « Fournisseur » de l'ecran Dettes n'aurait qu'un UUID a afficher.
+            'payables' => fn () => Payable::with('supplier')
+                ->whereColumn('amount_paid', '<', 'amount')
+                ->orderBy('due_date')
+                ->get()
+                ->map(fn (Payable $dette) => [
+                    'id' => $dette->id,
+                    'supplier_id' => $dette->supplier_id,
+                    'supplier_name' => $dette->supplier?->name,
+                    'purchase_id' => $dette->purchase_id,
+                    'amount' => $dette->amount,
+                    'amount_paid' => $dette->amount_paid,
+                    'due_date' => $dette->due_date?->format('Y-m-d'),
+                    'status' => $dette->status,
+                ]),
+
+            // 🔴→✅ TICKET 14.81 — LE PERSONNEL ET SON POINTAGE DESCENDENT.
+            //
+            // ⚠️⚠️ LE POINTAGE EST L'ACTE DE TERRAIN PAR EXCELLENCE : il se fait a
+            // 7 h a la ferme, ou le reseau n'est pas. Sans les employes au poste,
+            // il n'y a personne a pointer ; sans les pointages deja saisis, le
+            // chef d'equipe repointe quelqu'un que le web connait deja.
+            'employees' => fn () => Employee::query()
+                ->where('is_active', true)
+                ->orderBy('last_name')
+                ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status'])
+                // 🔴→✅ TICKET S3 — LE SALAIRE NE DESCEND QU'AUX RÔLES RH. Il partait vers tout poste connecté,
+                // caissier compris. Sans `view-rh`, le poste reçoit `null` et affiche « — » (salaire inconnu).
+                ->each(function (Employee $employe) use ($request) {
+                    if (! $request->user()?->can('view-rh')) {
+                        $employe->base_salary = null;
+                    }
+                }),
+
+            // ⚠️ UN STAGIAIRE N'EST PAS UN EMPLOYE : la table est autonome, sans
+            // relation vers `employees` — c'est aussi pourquoi la feuille de
+            // pointage ne le couvre pas (ses absences vivent dans
+            // `internship_absences`).
+            'internships' => fn () => Internship::query()
+                ->orderByDesc('start_date')
+                ->get(),
+
+            // ⚠️ BORNE A 60 JOURS, ET C'EST DELIBERE. La table porte deja 870
+            // lignes et grossit d'une par employe et par jour : la servir en
+            // entier alourdirait chaque tirage pour une donnee que personne ne
+            // consulte au-dela du mois courant. Le poste a besoin du mois en
+            // cours pour ne pas repointer ; l'historique vit sur le web.
+            'attendance_records' => fn () => AttendanceRecord::query()
+                ->where('is_active', true)
+                ->where('attendance_date', '>=', now()->subDays(60)->toDateString())
+                ->orderByDesc('attendance_date')
+                ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status'])
+                ->map(fn (AttendanceRecord $p) => [
+                    'id' => $p->id,
+                    'employee_id' => $p->employee_id,
+                    // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent
+                    // serialise une colonne `date` en « 2026-08-16T23:00:00Z » : le
+                    // 17 aout local devient le 16 a 23 h UTC, et un poste qui lit
+                    // l'instant sans le ramener a l'heure locale pointe la veille.
+                    // Le meme piege a deja coute une echeance de creance (14.75).
+                    'attendance_date' => $p->attendance_date?->format('Y-m-d'),
+                    'check_in' => $p->check_in,
+                    'check_out' => $p->check_out,
+                    'status' => $p->status,
+                ]),
+
+            // 🔴→✅ TICKET 14.82 — LE SECRETARIAT DESCEND AU POSTE.
+            //
+            // ⚠️ Au 09/10/2026 (tickets 15.23, 15.24, 15.25), `mails`, `archived_documents` et
+            // `administrative_documents` s'ECRIVENT au poste (`pushMails`, `pushArchivedDocuments`,
+            // `pushAdministrativeDocuments`) : aucune de ces trois tables n'est plus en consultation pure.
+            // Aucune piece jointe, en-tete officielle ni signature n'est portee par ces tables.
+            //
+            // ⚠️ LES DATES SE SERVENT EN 'Y-m-d', jamais en instant : le meme
+            // piege que le pointage (14.81) et l'echeance de creance (14.75).
+            //
+            // ⚠️ TICKET 15.23 — `mails` S'ECRIT AU POSTE (`pushMails`). Le tirage sert tous les
+            // courriers ACTIFS (complet, non incrémental, comme avant) ET les courriers ARCHIVÉS
+            // depuis `since` avec `is_active = false` : sans eux, un poste qui fusionne par
+            // identifiant ne saurait jamais qu'un courrier a été archivé ailleurs. `updated_at`
+            // est servi (instant ISO) pour que le poste départage une version locale d'une
+            // version serveur. Les dates restent en 'Y-m-d'.
+            'mails' => fn () => Correspondence::query()
+                ->where(function ($q) use ($since) {
+                    $q->where('is_active', true);
+                    if ($since) {
+                        $q->orWhere('updated_at', '>', $since);
+                    }
+                })
+                ->orderByDesc('mail_date')
+                ->get()
+                ->map(fn (Correspondence $c) => [
+                    'id' => $c->id,
+                    'reference' => $c->reference,
+                    'type' => $c->type,
+                    'subject' => $c->subject,
+                    'party' => $c->party,
+                    'mail_date' => $c->mail_date?->format('Y-m-d'),
+                    'is_active' => (bool) $c->is_active,
+                    'updated_at' => $c->updated_at?->toIso8601String(),
+                ]),
+
+            // ⚠️ TICKET 15.25 — `administrative_documents` S'ECRIT AU POSTE
+            // (`pushAdministrativeDocuments`), mêmes principes que `mails` et `archived_documents` :
+            // tous les documents ACTIFS à chaque tirage, PLUS les RETIRÉS (`is_active = false`) dont
+            // `updated_at > since`. `is_active` et `updated_at` (ISO 8601) sont servis. Dates en 'Y-m-d'.
+            'administrative_documents' => fn () => AdministrativeDocument::query()
+                ->where(function ($q) use ($since) {
+                    $q->where('is_active', true);
+                    if ($since) {
+                        $q->orWhere('updated_at', '>', $since);
+                    }
+                })
+                ->orderByDesc('doc_date')
+                ->get()
+                ->map(fn (AdministrativeDocument $d) => [
+                    'id' => $d->id,
+                    'title' => $d->title,
+                    'type' => $d->type,
+                    'beneficiary' => $d->beneficiary,
+                    'doc_date' => $d->doc_date?->format('Y-m-d'),
+                    'status' => $d->status,
+                    'is_active' => (bool) $d->is_active,
+                    'updated_at' => $d->updated_at?->toIso8601String(),
+                ]),
+
+            // ⚠️ TICKET 15.24 — `archived_documents` S'ECRIT AU POSTE (`pushArchivedDocuments`),
+            // mêmes principes que `mails` : tous les documents ACTIFS à chaque tirage, PLUS les
+            // RETIRÉS (`is_active = false`) dont `updated_at > since`. `is_active` et `updated_at`
+            // (ISO 8601) sont servis. Le STATUT n'est PAS servi : il se déduit de `expiry_date`
+            // (règle `ArchivedDocument::statutPour`, seuil 30 jours). Dates en 'Y-m-d'.
+            'archived_documents' => fn () => ArchivedDocument::query()
+                ->where(function ($q) use ($since) {
+                    $q->where('is_active', true);
+                    if ($since) {
+                        $q->orWhere('updated_at', '>', $since);
+                    }
+                })
+                ->orderByDesc('archived_date')
+                ->get()
+                ->map(fn (ArchivedDocument $a) => [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'category' => $a->category,
+                    'archived_date' => $a->archived_date?->format('Y-m-d'),
+                    'expiry_date' => $a->expiry_date?->format('Y-m-d'),
+                    'is_active' => (bool) $a->is_active,
+                    'updated_at' => $a->updated_at?->toIso8601String(),
+                ]),
+
+            // 🔴→✅ TICKET 14.83 — LE JOURNAL COMPTABLE DESCEND AU POSTE.
+            //
+            // ⚠️⚠️ LES ETATS LISENT LE JOURNAL, JAMAIS DES TABLES METIER
+            // DISJOINTES. C'est la regle du projet depuis l'origine : un Grand
+            // Livre ou une Balance recomposes a partir des ventes et des achats
+            // donneraient deux comptabilites differentes pour la meme ferme. Pour
+            // que le poste puisse AFFICHER ces etats, il lui faut donc le journal
+            // lui-meme — pas des agregats prepares.
+            //
+            // ⚠️ VOLUME MAITRISE : 34 comptes, 516 ecritures, 1337 lignes pour
+            // l'exercice ouvert. Le filtre `since` porte sur les ecritures ; les
+            // comptes et l'exercice, eux, descendent en entier — sans le plan
+            // comptable, une ligne d'ecriture n'a qu'un UUID a montrer.
+            'chart_of_accounts' => fn () => ChartOfAccount::query()
+                ->where('is_active', true)
+                ->orderBy('code')
+                ->get(['id', 'code', 'label', 'class']),
+
+            'fiscal_years' => fn () => FiscalYear::query()
+                ->orderByDesc('year')
+                ->get(['id', 'year', 'start_date', 'end_date', 'status'])
+                ->map(fn (FiscalYear $e) => [
+                    'id' => $e->id,
+                    'year' => $e->year,
+                    'start_date' => $e->start_date?->format('Y-m-d'),
+                    'end_date' => $e->end_date?->format('Y-m-d'),
+                    'status' => $e->status,
+                ]),
+
+            // 🔴→✅ TICKET 14.84 — LES PARAMETRES GENERAUX DESCENDENT.
+            //
+            // ⚠️⚠️ AUCUN SECRET NE QUITTE LE SERVEUR. `company_settings` porte
+            // `smtp_password_encrypted`, `twilio_auth_token_encrypted` et
+            // `vonage_api_secret_encrypted` : un poste vole donnerait acces au
+            // compte SMS et a la boite mail de la ferme. Seule l'IDENTITE de
+            // l'entreprise et ses TAUX descendent — jamais un identifiant de
+            // service, meme chiffre.
+            'company_settings' => function () {
+                $entreprise = CompanySetting::query()->first();
+
+                return $entreprise === null ? null : [
+                    'company_name' => $entreprise->company_name,
+                    'promoter_name' => $entreprise->promoter_name,
+                    'address' => $entreprise->address,
+                    'phone' => $entreprise->phone,
+                    'email' => $entreprise->email,
+                    'ifu' => $entreprise->ifu,
+                    'rccm' => $entreprise->rccm,
+                    'tva_enabled' => $entreprise->tva_enabled,
+                    'tva_default_rate' => $entreprise->tva_default_rate,
+                    // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
+                    'rappel_soins_jours' => $entreprise->rappel_soins_jours,
+                ];
+            },
+
+            // ⚠️⚠️ UN MODULE DESACTIVE DOIT DISPARAITRE DE L'ECRAN, PAS SEULEMENT
+            // DE LA BASE. `modules_config` dit quelles especes la ferme exploite :
+            // l'heliciculture est desactivee ici, et le poste continuait de
+            // proposer la fiche Escargots. La maquette, elle, masque les blocs
+            // `data-module="helico"`.
+            'modules_config' => fn () => ModuleConfig::query()
+                ->orderBy('species_code')
+                ->get(['id', 'species_code', 'is_enabled']),
+
+            // ⚠️⚠️ `App\Models\Role`, JAMAIS `Spatie\Permission\Models\Role`.
+            // Le modele de Spatie n'a pas `HasUuids` : il declare sa cle
+            // auto-incrementee et Eloquent CASTE alors `roles.id` en entier. Un
+            // UUID « 01a01168-... » devient « 1 » — les quatre roles descendaient
+            // au poste avec le MEME identifiant, et la relation `permissions` ne
+            // retrouvait plus aucune ligne du pivot. Le projet avait deja documente
+            // ce piege sur le seeder (voir `App\Models\Role`) ; ce tirage l'a
+            // repete. Le poste l'a signale au premier tirage reel : contrainte
+            // d'unicite violee sur `roles_applicatifs.id`.
+            'roles' => fn () => Role::query()
+                ->with('permissions:id,name')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($role) => [
+                    'id' => (string) $role->id,
+                    'name' => $role->name,
+                    'permissions' => $role->permissions->pluck('name')->all(),
+                ]),
+
+            // ⚠️ NI MOT DE PASSE NI JETON : la liste sert a SAVOIR QUI travaille
+            // sur la ferme, pas a s'authentifier.
+            'users' => fn () => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'username', 'email', 'is_active'])
+                ->map(fn (User $u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'username' => $u->username,
+                    'email' => $u->email,
+                    'is_active' => $u->is_active,
+                    'role' => $u->getRoleNames()->first(),
+                ]),
+
+            // ⚠️ BORNE A 100 LIGNES : la table grossit d'une ligne par action et
+            // n'a d'interet, au poste, que pour les dernieres.
+            // 🔴→✅ TICKET S3 — LE JOURNAL D'AUDIT (qui a fait quoi, depuis quelle adresse IP) est réservé aux comptes
+            // qui gèrent les utilisateurs, comme son écran web. Les autres postes reçoivent une liste vide.
+            'audit_logs' => fn () => AuditLog::query()
+                ->when(! $request->user()?->can('manage-users'), fn ($q) => $q->whereRaw('1 = 0'))
+                ->with('user:id,name')
+                ->orderByDesc('created_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (AuditLog $log) => [
+                    'id' => $log->id,
+                    'user_name' => $log->user?->name,
+                    'action' => $log->action,
+                    'module' => $log->module,
+                    'ip_address' => $log->ip_address,
+                    'created_at' => $log->created_at?->toIso8601String(),
+                ]),
+
+            // ⚠️ TICKET 15.10 — LES NOTIFICATIONS DESCENDENT ENFIN AU POSTE.
+            //
+            // Elles vivaient uniquement côté web : la cloche du poste n'avait ni
+            // compteur ni liste. Seules celles que l'UTILISATEUR DU JETON peut voir
+            // sont servies (`visibleTo` : adressées à lui ou diffusées à l'un de ses
+            // rôles) — jamais celles d'un autre. La CATÉGORIE est calculée ici, par
+            // le modèle : la recopier au poste ferait dériver deux tables dès
+            // l'ajout d'un type.
+            //
+            // ⚠️ PAS DE FILTRE `since`, ET BORNE A 200 : l'état « lue » et la
+            // suppression changent sans toucher `created_at`, et un tirage
+            // incrémental ne les verrait pas. Le poste remplace l'ensemble.
+            'notifications' => fn () => Notification::query()
+                ->visibleTo($request->user())
+                ->latest('created_at')
+                ->limit(200)
+                ->get()
+                ->map(fn (Notification $n) => [
+                    'id' => $n->id,
+                    'type' => $n->type,
+                    'category' => $n->category,
+                    'severity' => $n->severity,
+                    'title' => $n->title,
+                    'message' => $n->message,
+                    'link_url' => $n->link_url,
+                    'is_read' => $n->is_read,
+                    'created_at' => $n->created_at?->toIso8601String(),
+                ]),
+
+            // ⚠️ TICKET 15.12 — LES REVENUS PAR BANDE DESCENDENT, CALCULÉS ICI.
+            //
+            // Le poste ne reçoit des ventes serveur que l'en-tête (`$factures`, sans
+            // lignes) : il ne sait pas quelle bande a vendu quoi, et un revenu par
+            // bande recalculé au poste ne compterait que SES ventes. Le chiffre est
+            // donc produit par `LotRevenueService` — le même que la page web — et
+            // servi tel quel : ventes validées, nettes des avoirs traités.
+            //
+            // ⚠️ PAS DE FILTRE `since` : un avoir traité ou une annulation changent le
+            // revenu sans toucher la ligne de vente. Le poste remplace l'ensemble.
+            'lot_revenues' => fn () => collect(app(LotRevenueService::class)->forLots())
+                ->flatMap(fn (array $lignes, string $lotId) => collect($lignes)->map(fn (array $l) => [
+                    'lot_id' => $lotId,
+                    'product_id' => $l['product_id'],
+                    'label' => $l['label'],
+                    'amount' => $l['montant'],
+                ]))
+                ->values(),
+
+            // ⚠️ TICKET 15.14 — LES SUJETS SUIVIS INDIVIDUELLEMENT DESCENDENT.
+            //
+            // Sans eux le poste ne connaissait aucun sujet NOMMÉ : seulement les
+            // références texte (« R1 », « LAP-2026-0143 ») des saillies. Il ne pouvait
+            // donc pas ouvrir la fiche d'un reproducteur.
+            //
+            // ⚠️ TOUS LES SUJETS, SORTIS COMPRIS : la fiche d'un animal vendu ou mort
+            // reste consultable (c'est son historique). Pas de filtre `since` — un
+            // changement de cage ou de statut doit redescendre, et la table (des
+            // reproducteurs, pas du cheptel) reste petite. Le poste remplace l'ensemble.
+            //
+            // ⚠️ LE LIBELLÉ D'ESPÈCE ET LE CODE DE LA BANDE VOYAGENT AVEC LE SUJET : le
+            // poste n'a pas de table des espèces, et la bande peut ne pas lui être
+            // descendue.
+            'animals' => fn () => Animal::query()
+                ->with(['species:id,label', 'lot:id,code'])
+                ->orderBy('identifier')
+                ->get()
+                ->map(fn (Animal $a) => [
+                    'id' => $a->id,
+                    'identifier' => $a->identifier,
+                    'species_label' => $a->species?->label,
+                    'lot_id' => $a->lot_id,
+                    'lot_code' => $a->lot?->code,
+                    'category' => $a->category,
+                    'sex' => $a->sex,
+                    'breed' => $a->breed,
+                    'birth_date' => $a->birth_date?->format('Y-m-d'),
+                    'entry_date' => $a->entry_date?->format('Y-m-d'),
+                    'origin' => $a->origin,
+                    'cage' => $a->cage,
+                    'status' => $a->status,
+                    'exit_date' => $a->exit_date?->format('Y-m-d'),
+                    'exit_reason' => $a->exit_reason,
+                    'is_active' => $a->is_active,
+                ]),
+
+            // ⚠️ TICKET 15.15 — LES ESPÈCES D'ÉLEVAGE ACTIVES DESCENDENT.
+            //
+            // Le formulaire « Ajouter un Produit » propose la « Filière d'élevage »
+            // (`products.species_id`) ; le poste n'avait aucune table des espèces. Seules
+            // celles que la ferme exploite sont servies (`enabled()` : module actif) —
+            // proposer une espèce éteinte laisserait créer un produit pour une filière
+            // que l'exploitant a désactivée. Pas de filtre `since` : table de quelques
+            // lignes, remplacée à chaque tirage.
+            'livestock_species' => fn () => LivestockSpecies::query()
+                ->enabled()
+                ->orderBy('label')
+                ->get(['id', 'code', 'label'])
+                ->map(fn (LivestockSpecies $e) => [
+                    'id' => $e->id,
+                    'code' => $e->code,
+                    'label' => $e->label,
+                ]),
+
+            // ⚠️ TICKET 15.13 — LES MODÈLES D'ATTESTATION ET LE NOMBRE D'ATTESTATIONS
+            // ÉMISES DESCENDENT.
+            //
+            // Les deux modèles (employé, stagiaire) sont TOUJOURS servis : `forType`
+            // crée le modèle par défaut s'il n'existe pas, pour que le poste ne
+            // découvre jamais « aucun modèle » sur une ferme neuve.
+            //
+            // ⚠️ LE COMPTEUR EST UN DÉCOMPTE D'AUDIT, PAS UNE TABLE : Laravel n'a pas de
+            // table d'attestations émises, seulement les lignes `attestation.generated.*`.
+            // Le poste ne détient que les cent dernières lignes d'audit de la ferme ; il
+            // ne peut donc pas recompter — le serveur le fait sur l'historique entier.
+            'attestation_templates' => fn () => collect(AttestationService::TYPES)
+                ->map(fn (string $type) => AttestationTemplate::forType($type))
+                ->map(fn (AttestationTemplate $m) => [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'body_text' => $m->body_text,
+                ])
+                ->values(),
+            'attestation_counts' => fn () => app(AttestationService::class)->compteurs(),
+
+            // ⚠️ SANS FILTRE `since` : la liste est courte et le poste doit
+            // toujours pouvoir proposer un compte payeur, meme apres un tirage
+            // incremental ou rien n'a change.
+            // ⚠️ TICKET 14.62 — CE QU'IL FAUT POUR SAISIR UNE DEPENSE HORS
+            // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
+            // QUI paie ; sans la liste des comptes de charge, il devrait la
+            // recopier et les deux listes divergeraient au premier ajout.
+            'treasury_accounts' => fn () => \App\Models\TreasuryAccount::query()
+                ->where('is_active', true)
+                ->orderBy('label')
+                ->get(['id', 'label', 'account_code', 'type', 'balance']),
+            'expense_categories' => fn () => \App\Models\Expense::CATEGORIES,
+        ];
+    }
+
+    /**
+     * Ticket S-T4 — tables d'HISTORIQUE, servies par pièce : en entier au tirage complet, découpées en pages au tirage
+     * paginé (voir [pageDeFamille]). Une famille :
+     *  - `cle` : clé de la réponse ; `requete` : la requête et son filtre `since` (inchangés depuis avant S-T4) ;
+     *  - `historique` : l'ordre du tirage complet d'avant S-T4 (le tirage paginé ordonne par (`updated_at`, `id`)) ;
+     *  - `enJson` : sérialisation de la pièce (aucune : le modèle tel quel) ;
+     *  - `lignes` : clé de la réponse → [colonne de la pièce, lecture de TOUTES les lignes des pièces servies] ;
+     *  - `sansBorne` : la pièce n'est pas bornée au début du tirage (journal comptable, voir plus bas).
+     *
+     * ⚠️ L'ordre des familles est celui des pages : aucune ne dépend d'une autre (bandes, produits, exercices et plan
+     * comptable descendent à la page 1). Le journal vient en DERNIER : sa liste d'écritures actives est servie juste
+     * après lui, à la dernière page.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function famillesPaginees(?Carbon $since): array
+    {
+        $dettesParAchat = null;
+
+        return [
+            [
+                'cle' => 'livestock_daily_entries',
+                'requete' => fn () => LivestockDailyEntry::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+            ],
+            [
+                // Ticket 15.46 — transferts entre bandes : source de vérité des colonnes `transfert_*` des fiches (servies
+                // ci-dessus avec la fiche). Le poste les affiche et peut en créer ou en annuler hors ligne.
+                'cle' => 'livestock_transfers',
+                'requete' => fn () => LivestockTransfer::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'source_lot_id', 'target_lot_id', 'transfer_date', 'quantity', 'categorie', 'constitution',
+                        'motif', 'is_active', 'updated_at']),
+            ],
+            [
+                // Ticket U3 (décision D-U3 du 19/10/2026 : archivage d'un soin au poste comme au web) — `is_active` est
+                // servi. Tirage complet : les soins ACTIFS seuls (un poste neuf n'a que faire des archivés). Tirage
+                // incrémental : tout soin modifié depuis `since`, ARCHIVÉS COMPRIS — sans eux, un poste ne saurait jamais
+                // qu'un soin a été archivé au web et le compterait encore (registre, coût sanitaire, protocole du jour).
+                'cle' => 'veterinary_records',
+                'requete' => fn () => VeterinaryRecord::query()
+                    ->when(
+                        $since,
+                        fn ($q) => $q->where('updated_at', '>', $since),
+                        fn ($q) => $q->where('is_active', true),
+                    ),
+            ],
+            [
+                // Ticket H8b (décision D-H8 du 19/10/2026) — l'infirmerie et le calendrier vétérinaire PLANIFIÉ descendent
+                // au poste : sans eux, l'onglet « Suivi Sanitaire » et le calendrier restaient vides hors ligne.
+                'cle' => 'infirmary_records',
+                'requete' => fn () => \App\Models\InfirmaryRecord::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+            ],
+            [
+                'cle' => 'veterinary_calendar_events',
+                'requete' => fn () => \App\Models\VeterinaryCalendarEvent::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+            ],
+            [
+                // 🔴→✅ TICKET 14.72 — LE CYCLE DE REPRODUCTION DESCEND AU POSTE.
+                //
+                // `livestock_reproduction_events` est la SEULE table du systeme qui
+                // suive une femelle NOMMEE (R1, R2… / T1, T2…) : les fiches
+                // journalieres ne connaissent que des agregats de bande. Sans elle, le
+                // poste ne pouvait ni afficher l'ecran Suivi Reproduction, ni — defaut
+                // deja signale par `SoinsRepository` — calculer le jour de cycle d'une
+                // bande en reproduction, dont le protocole se compte depuis la
+                // DERNIERE SAILLIE.
+                //
+                // ⚠️ LES CYCLES EN COURS DESCENDENT SANS FILTRE `since`, meme regle
+                // que les remanences : une gestation ouverte il y a trois semaines n'a
+                // pas bouge depuis, donc un tirage incremental la manquerait — et
+                // c'est precisement l'evenement qu'un poste doit connaitre. Seul
+                // l'historique clos est filtre.
+                'cle' => 'livestock_reproduction_events',
+                'requete' => fn () => $since
+                    ? LivestockReproductionEvent::query()
+                        ->where(fn ($q) => $q->where('status', 'en_cours')
+                            ->orWhere('updated_at', '>', $since))
+                    : LivestockReproductionEvent::query(),
+                'historique' => fn ($q) => $q->orderByDesc('saillie_date'),
+            ],
+            [
+                // ⚠️ LE NOM DU FOURNISSEUR ET SA CATEGORIE VOYAGENT AVEC L'ACHAT. Le
+                // poste doit pouvoir afficher la liste meme si le fournisseur a ete
+                // archive depuis — et le referentiel, lui, ne sert que les actifs.
+                //
+                // ⚠️ LE STATUT SE CALCULE ICI, PAS AU POSTE : « Dette fournisseur » des
+                // qu'une dette reste ouverte sur la piece, « Paye entierement » sinon.
+                // Le poste ne recoit pas `payables` — deux regles de statut donneraient
+                // deux listes differentes pour la meme ferme.
+                //
+                // Ticket U4 (D-U4) — un achat dont une LIGNE a changé depuis `since` redescend aussi : ses lignes
+                // ne voyagent qu'avec lui (voir `purchase_lines`). Ticket U8 : de même pour une ligne de RETOUR
+                // (voir `purchase_returns`).
+                'cle' => 'purchases',
+                'requete' => fn () => Purchase::with('supplier')
+                    ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)
+                        ->orWhereHas('returns', fn ($r) => $r->where('updated_at', '>', $since)))),
+                'historique' => fn ($q) => $q->orderByDesc('purchase_date'),
+                'enJson' => function (Purchase $achat) use (&$dettesParAchat) {
+                    $dettesParAchat ??= Payable::query()
+                        ->whereColumn('amount_paid', '<', 'amount')
+                        ->pluck('purchase_id')
+                        ->filter()
+                        ->flip();
+
+                    return [
+                        'id' => $achat->id,
+                        'supplier_id' => $achat->supplier_id,
+                        'supplier_name' => $achat->supplier?->name,
+                        'supplier_category' => $achat->supplier?->category,
+                        'payment_mode' => $achat->payment_mode,
+                        'total' => $achat->total,
+                        'purchase_date' => $achat->purchase_date?->format('Y-m-d'),
+                        'has_debt' => $dettesParAchat->has($achat->id),
+                        // Ticket 15.20 : marqueur de RETOUR (descend via `updated_at`, touché par le retour) et part déjà
+                        // payée devenue créance sur le fournisseur (409). Le poste ne calcule ni l'un ni l'autre.
+                        'returned_at' => $achat->returned_at?->toIso8601String(),
+                        'supplier_credit' => $achat->supplier_credit,
+                    ];
+                },
+                'lignes' => [
+                    // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES ACHATS SERVIS DESCENDENT AVEC EUX.
+                    //
+                    // ⚠️⚠️ AU MÊME CURSEUR QUE LEUR PIÈCE, ET SEULEMENT POUR LES PIÈCES SERVIES : TOUTES les lignes de
+                    // chaque achat servi (un achat modifié, ou dont une ligne l'est, renvoie la liste COMPLÈTE de ses
+                    // lignes — le poste remplace alors celles qu'il tient, et une ligne retirée ici disparaît là-bas),
+                    // JAMAIS une ligne d'un achat non servi (le poste la refuserait : pièce inconnue). Sans elles, le PMP
+                    // (`computePmp()`, Σ qty × unit_price ÷ Σ qty sur TOUTES les lignes d'achat) et la marge du Top 5
+                    // étaient incalculables au poste. `unit_price` est ici un VRAI prix unitaire (contrairement aux
+                    // lignes de vente).
+                    'purchase_lines' => ['purchase_id', fn (Collection $ids) => $this->lignesDesPieces(
+                        \App\Models\PurchaseLine::class,
+                        'purchase_id',
+                        $ids,
+                        fn ($ligne) => [
+                            'id' => $ligne->id,
+                            'purchase_id' => $ligne->purchase_id,
+                            'product_id' => $ligne->product_id,
+                            'product_name' => $ligne->product?->name,
+                            'qty' => (float) $ligne->qty,
+                            'unit_price' => (float) $ligne->unit_price,
+                        ],
+                    )],
+                    // 🔴→✅ TICKET U8 — LES LIGNES DE RETOUR DES ACHATS SERVIS DESCENDENT AVEC EUX.
+                    //
+                    // La carte « Écarts / Retours » de la liste des achats compte des LIGNES de retour
+                    // (`PurchaseReturn::count()` : une ligne par ligne d'achat retournée, `PurchaseReturnService`) ; le
+                    // poste, qui ne les recevait pas, comptait des achats retournés. Même règle que `purchase_lines` :
+                    // TOUTES les lignes de retour de chaque achat servi, au même curseur, JAMAIS une d'un achat non servi.
+                    // `return_batch_id` est l'identifiant du RETOUR (celui que le poste a fourni s'il l'a saisi) ;
+                    // `return_date` manque aux retours d'avant le ticket 15.20 : la date d'enregistrement en tient lieu,
+                    // jamais une date inventée.
+                    'purchase_returns' => ['purchase_id', fn (Collection $ids) => $this->lignesDesPieces(
+                        \App\Models\PurchaseReturn::class,
+                        'purchase_id',
+                        $ids,
+                        fn ($retour) => [
+                            'id' => $retour->id,
+                            'purchase_id' => $retour->purchase_id,
+                            'return_batch_id' => $retour->return_batch_id,
+                            'purchase_line_id' => $retour->purchase_line_id,
+                            'product_id' => $retour->product_id,
+                            'qty' => (float) $retour->qty,
+                            'reason' => $retour->reason,
+                            'return_date' => ($retour->return_date ?? $retour->created_at)?->format('Y-m-d'),
+                        ],
+                    )],
+                ],
+            ],
+            [
+                // 🔴→✅ TICKET 14.80 — LES FACTURES DESCENDENT AU POSTE.
+                //
+                // ⚠️⚠️ UNE FACTURE EST UNE VENTE, il n'existe pas de table `invoices` :
+                // `sales.mecef_status` et `sales.mecef_qr_ref` portent la
+                // normalisation fiscale (ticket 7.1). Sans ce bloc, l'ecran
+                // Facturation du poste n'aurait montre que les ventes encaissees SUR
+                // CE POSTE — la caissiere aurait cru la ferme a 3 factures le mois ou
+                // elle en a 40, et n'aurait jamais vu qu'une transmission a echoue.
+                //
+                // ⚠️ FILTRE `since` : contrairement aux creances, une vente ancienne
+                // n'a pas besoin de redescendre a chaque tirage. Le premier tirage les
+                // apporte toutes, les suivants n'apportent que les nouvelles et celles
+                // dont le statut MeCeF a change — une retransmission reussie touche
+                // `updated_at`, donc elle redescend.
+                //
+                // ⚠️ LE NOM DU CLIENT VOYAGE AVEC LA FACTURE : le poste a bien la table
+                // `customers` (14.75), mais une vente au comptant n'a pas de client, et
+                // une vente d'un client archive doit rester nommee.
+                // Ticket U4 (D-U4) — une vente dont une LIGNE a changé depuis `since` redescend aussi (voir `sale_lines`).
+                'cle' => 'sales',
+                'requete' => fn () => Sale::with('customer')
+                    ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since))),
+                'historique' => fn ($q) => $q->orderByEffectiveDate(),
+                'enJson' => fn (Sale $vente) => [
+                    'id' => $vente->id,
+                    'customer_id' => $vente->customer_id,
+                    'customer_name' => $vente->customer?->name,
+                    'payment_mode' => $vente->payment_mode,
+                    'total' => $vente->total,
+                    'status' => $vente->status,
+                    'mecef_status' => $vente->mecef_status,
+                    'mecef_qr_ref' => $vente->mecef_qr_ref,
+                    'sold_at' => $vente->date_effective?->toIso8601String(),
+                ],
+                'lignes' => [
+                    // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES VENTES SERVIES DESCENDENT AVEC ELLES.
+                    //
+                    // Même règle que `purchase_lines` : toutes les lignes de chaque vente servie, aucune d'une vente non
+                    // servie. Sans elles, le Top 5 des produits et les « Ventes (mois) » porcines du Tableau de bord du
+                    // poste ne comptaient que les ventes saisies SUR CE POSTE, quand le web les compte toutes.
+                    // ⚠️ `manual_total_amount` EST LA SOURCE DE VÉRITÉ DU MONTANT de la ligne ; `unit_price` n'en est que
+                    // l'affichage dérivé (`manual_total_amount / qty`) : les deux sont servis tels que stockés.
+                    'sale_lines' => ['sale_id', fn (Collection $ids) => $this->lignesDesPieces(
+                        \App\Models\SaleLine::class,
+                        'sale_id',
+                        $ids,
+                        fn ($ligne) => [
+                            'id' => $ligne->id,
+                            'sale_id' => $ligne->sale_id,
+                            'product_id' => $ligne->product_id,
+                            'lot_id' => $ligne->lot_id,
+                            'qty' => (float) $ligne->qty,
+                            'unit_price' => (float) $ligne->unit_price,
+                            'manual_total_amount' => (float) $ligne->manual_total_amount,
+                        ],
+                    )],
+                ],
+            ],
+            [
+                // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
+                //
+                // Trois écrans du web le lisent et le poste ne pouvait pas les reproduire : « Rotation du Stock »
+                // (`StockRotationService` : sorties de vente du mois et soldes reconstruits), « Écarts d'Inventaire »
+                // (`GestionStocks::TYPES_ECART_INVENTAIRE` du mois, saisis au web OU sur n'importe quel poste) et le
+                // Tableau 3 de la ponte (`EggStockLedgerService` : SRH, OS, Stock Final en plateaux, soldes de FERME).
+                //
+                // ⚠️⚠️ C'EST UN JOURNAL ÉCRIT PAR LE SERVEUR SEUL : `AdjustStockAction` en est le point de passage unique.
+                // Au poste c'est un référentiel en LECTURE SEULE — jamais envoyé, et ignoré (compté) s'il l'était (voir
+                // `push`). Un ajustement saisi au poste part dans `stock_adjustments`, que le serveur REJOUE ; le
+                // mouvement qui en naît porte `reference_id` = identifiant de la ligne du poste, et c'est lui qui
+                // redescend ici.
+                //
+                // ⚠️ MÊME MÉCANISME QUE LES AUTRES TABLES D'HISTORIQUE (ventes, fiches) : tout au premier tirage, puis au
+                // curseur `since` (`updated_at`). Une ligne de quelques champs par vente, achat, ponte ou ajustement : la
+                // table croît comme les ventes et les achats réunis, servis de la même façon depuis U4.
+                //
+                // ⚠️ RECOUVREMENT DE DEUX MINUTES SOUS LE CURSEUR, EN PLUS DE CELUI DE TOUT LE TIRAGE. Le curseur est pris
+                // au début du tirage, reculé de `HORIZON_TIRAGE_SECONDES` (voir `pull`) ; un journal immuable n'est jamais
+                // resservi par une modification, et une sortie perdue l'est pour toujours (F0.84-bis a rencontré le cas
+                // réel sur le journal comptable) : il garde donc une marge plus large, contre une transaction lente à se
+                // valider. Les lignes déjà reçues reviennent pendant deux minutes : l'absorbeur du poste remplace par
+                // identifiant.
+                //
+                // ⚠️ COLONNES DU CALCUL ET DE L'AFFICHAGE DU JOURNAL, RIEN D'AUTRE (ni horodatages techniques, ni auteur ;
+                // `updated_at` n'est lu que pour le curseur de page de S-T4, jamais servi). `movement_date` est servie en
+                // HEURE MURALE du serveur ('Y-m-d H:i:s') : le web compare des JOURS (`whereDate`), et un instant UTC lu
+                // par un poste réglé sur un autre fuseau changerait le jour d'un mouvement de fin de soirée — donc le mois
+                // d'un écart ou la ligne d'une ponte.
+                'cle' => 'stock_movements',
+                'requete' => fn () => \App\Models\StockMovement::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since->copy()->subMinutes(2)))
+                    ->select(['id', 'product_id', 'type', 'quantity', 'reference_type', 'reference_id', 'reason',
+                        'movement_date', 'updated_at']),
+                'historique' => fn ($q) => $q->orderBy('movement_date')->orderBy('id'),
+                'enJson' => fn ($m) => [
+                    'id' => $m->id,
+                    'product_id' => $m->product_id,
+                    'type' => $m->type,
+                    'quantity' => (float) $m->quantity,
+                    'reference_type' => $m->reference_type,
+                    'reference_id' => $m->reference_id,
+                    'reason' => $m->reason,
+                    'movement_date' => $m->movement_date?->format('Y-m-d H:i:s'),
+                ],
+            ],
+            [
+                // Ticket 14.83 — le journal comptable (voir `chart_of_accounts`) : les écritures ACTIVES modifiées depuis
+                // `since`, avec toutes leurs lignes.
+                //
+                // ⚠️ Ticket S-T4 — SANS BORNE au début du tirage : une ligne d'écriture ne renvoie qu'à un compte (servi à
+                // la page 1, jamais vérifié contre le plan au poste) et la liste des écritures actives
+                // (`accounting_entry_ids`) est lue juste après la dernière page du journal. Bornées, les écritures
+                // passées pendant un long tirage y figureraient sans avoir été servies : le poste relancerait alors
+                // tout le journal (F0.84-bis).
+                'cle' => 'accounting_entries',
+                'requete' => fn () => AccountingEntry::query()
+                    ->where('is_active', true)
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'fiscal_year_id', 'entry_date', 'reference', 'source_type', 'is_locked', 'created_at',
+                        'updated_at']),
+                'historique' => fn ($q) => $q->orderByDesc('entry_date'),
+                'sansBorne' => true,
+                'enJson' => fn (AccountingEntry $e) => [
+                    'id' => $e->id,
+                    'fiscal_year_id' => $e->fiscal_year_id,
+                    // ⚠️ 'Y-m-d', jamais un instant : meme piege que le pointage.
+                    'entry_date' => $e->entry_date?->format('Y-m-d'),
+                    // 🔴→✅ TICKET 15.29 — `FinancialReportService::grandLivre` departage deux pieces du
+                    // MEME JOUR par `created_at`. Sans lui le poste ne peut pas reproduire l'ordre du
+                    // serveur (et donc le solde progressif de chaque ligne). Instant de CREATION : il ne
+                    // bouge jamais (≠ `updated_at`, que `updateManual` fait avancer par `touch()`).
+                    'created_at' => $e->created_at?->toIso8601String(),
+                    'reference' => $e->reference,
+                    'source_type' => $e->source_type,
+                    'is_locked' => $e->is_locked,
+                ],
+                'lignes' => [
+                    // ⚠️ LES LIGNES SUIVENT LEURS ECRITURES : servir les unes sans les
+                    // autres donnerait un journal desequilibre, ou des lignes orphelines
+                    // que le poste ne saurait rattacher.
+                    // ⚠️ TICKET 15.28-bis : PAR PAQUETS DE 5 000. Un `whereIn` de 33 000 identifiants dépasse la
+                    // limite de variables de la requête (SQLite ~32 766 ; MySQL 65 535 placeholders) : le tirage
+                    // entier échouait. Le résultat est identique (mêmes lignes, même contenu).
+                    'accounting_entry_lines' => ['entry_id', fn (Collection $ids) => $ids->chunk(5_000)->flatMap(
+                        fn ($paquet) => AccountingEntryLine::query()
+                            ->whereIn('entry_id', $paquet->values())
+                            ->get(['id', 'entry_id', 'account_id', 'cost_center_id', 'debit', 'credit'])
+                    )->values()],
+                ],
+            ],
+        ];
     }
 
     /**

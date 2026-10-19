@@ -118,7 +118,7 @@ Only 5 routes are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-
 
 ### Offline sync (Flutter ↔ Laravel)
 
-`routes/api.php`: `POST /api/auth/login` (throttled 5/min), then Sanctum-guarded `/api/auth/logout`, `/api/auth/me`, `GET /api/sync/pull?since=…`, `POST /api/sync/push`. Conflict resolution in `SyncController` is **differentiated by data nature**, never a blanket last-writer-wins:
+`routes/api.php`: `POST /api/auth/login` (throttled 5/min), then Sanctum-guarded `/api/auth/logout`, `/api/auth/me`, `GET /api/sync/pull?since=…`, `POST /api/sync/push`. Depuis le ticket S-T4, le tirage est **paginé** quand le poste envoie `page` (`page=1`, puis `curseur_page=<jeton>`) : tables entières à la page 1, tables d'historique découpées par pièce (jamais une ligne sans sa pièce) au curseur (`updated_at`, `id`), `server_time` à la dernière page seulement, et seules les tables que le compte lit (`SyncController::PERMISSIONS_DE_TIRAGE`, croisée avec les écrans du poste par `agrierp_flutter/test/perimetre_tirage_test.dart`). Sans `page` : la réponse complète et non filtrée d'avant (postes anciens). Conflict resolution in `SyncController` is **differentiated by data nature**, never a blanket last-writer-wins:
 
 | Data | Rule |
 |---|---|

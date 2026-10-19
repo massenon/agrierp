@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
 import 'fusion_referentiels.dart';
+import 'perimetre_tirage.dart';
 
 /// Ticket S3 — refus du serveur, avec un message que l'écran affiche tel quel.
 class EchecSynchronisation implements Exception {
@@ -398,7 +399,24 @@ class SyncEngine {
   ///
   /// [complet] : tirage SANS `since`. Il sert (1) à la resynchronisation unique du journal,
   /// (2) à la relance unique quand le serveur annonce des écritures actives que le poste n'a
-  /// pas, (3) au tirage qui suit un journal resté incomplet.
+  /// pas, (3) au tirage qui suit un journal resté incomplet, (4) au tirage qui suit un
+  /// changement de périmètre (ticket S-T4, voir [PerimetreTirage]).
+  ///
+  /// 🔴→✅ TICKET S-T4 (méthode TATACORA) — TIRAGE PAGINÉ. Un poste resté longtemps hors ligne
+  /// recevait tout en UNE réponse (délai de réception de 30 s, mémoire). Le poste demande la page 1
+  /// (`page=1`), puis chaque page suivante avec le jeton que le serveur lui rend (`page_suivante`),
+  /// jusqu'à `page_suivante: null` :
+  ///  - ⚠️⚠️ CHAQUE PAGE EST ABSORBÉE DANS UNE TRANSACTION : un absorbeur strict qui refuse une
+  ///    ligne annule TOUTE la page, jamais une moitié ;
+  ///  - ⚠️⚠️ LE CURSEUR N'AVANCE QU'APRÈS LA DERNIÈRE PAGE (`server_time` n'y vient qu'elle). Un
+  ///    échec au milieu (réseau, refus) laisse le curseur précédent : le tirage suivant repart de
+  ///    lui, et ce que les pages déjà absorbées ont écrit revient, remplacé par identifiant (rien de
+  ///    perdu, aucun doublon) ;
+  ///  - une pièce descend toujours AVEC ses lignes, dans la même page (le serveur ne la coupe pas) ;
+  ///  - les resynchronisations uniques (F0.84-bis à U10) gardent leur logique : leur réglage n'est
+  ///    écrit qu'après la dernière page ;
+  ///  - un serveur antérieur à S-T4 ignore `page` et répond en une fois (sans `page_suivante`) :
+  ///    cette réponse est la seule page.
   Future<int> _tirer({bool complet = false}) async {
     // ⚠️ Lecture TOLÉRANTE : voir `etatDeSynchronisation` (table dupliquée).
     final etat = await _db.etatDeSynchronisation();
@@ -427,45 +445,186 @@ class SyncEngine {
         !resyncRetoursFaite ||
         !resyncMouvementsFaite ||
         !resyncFichesU10Faite;
-
-    final reponse = await _client.get<Map<String, dynamic>>(
-      '/api/sync/pull',
-      queryParameters: {
-        if (!toutRedemander && etat?.lastPulledAt != null)
-          'since': etat!.lastPulledAt!.toUtc().toIso8601String(),
-      },
-    );
-
-    final corps = reponse.data ?? const <String, dynamic>{};
-
-    // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
-    // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
-    // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
-    // renverrait. La marque est notée aussitôt : la relance complète ci-dessous ne purge pas deux fois.
-    final reinitialisation = corps['data_reset_at'];
-    if (reinitialisation is String &&
-        reinitialisation != await _lireReglage(cleReinitialisation)) {
-      final perdus = await _db.purgerDonneesDActivite();
-      await _ecrireReglage(cleReinitialisation, reinitialisation);
-      final le = DateTime.parse(reinitialisation).toLocal();
-      final date =
-          '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
-      // Un poste neuf (jamais tiré, rien en attente) n'avait rien : aucun avertissement à lui faire lire.
-      if (perdus > 0 || etat?.lastPulledAt != null) {
-        _avertissements.add(
-          'Les données du serveur ont été réinitialisées le $date : celles de ce poste ont été '
-          'effacées${perdus > 0 ? ', dont $perdus saisie(s) qui n\'avai(en)t pas encore été envoyée(s)' : ''}.',
-        );
-      }
-      // Un tirage incrémental ne resservirait pas l'existant : tout redemander, une fois.
-      if (!toutRedemander) return _tirer(complet: true);
-    }
+    final since = !toutRedemander && etat?.lastPulledAt != null
+        ? etat!.lastPulledAt!.toUtc().toIso8601String()
+        : null;
 
     var recus = 0;
     _journalManquants = 0;
     _journalSansDateCreation = false;
     _fichesSansVentilation = false;
     _fichesSansColonnesRapport = false;
+
+    // Ticket S-T4 — ce que les pages ont apporté : clés vues (contrôles « serveur antérieur à… »), périmètre (tables
+    // servies à TOUTES les pages), dernière page (curseur).
+    var corps = const <String, dynamic>{};
+    final cles = <String>{};
+    Set<String>? perimetre;
+    var pagine = false;
+    String? jeton;
+
+    for (var page = 1; ; page++) {
+      final reponse = await _client.get<Map<String, dynamic>>(
+        '/api/sync/pull',
+        queryParameters: {
+          'since': ?since,
+          'page': page,
+          'curseur_page': ?jeton,
+        },
+      );
+
+      corps = reponse.data ?? const <String, dynamic>{};
+      pagine = corps.containsKey('page_suivante');
+      final servies = PerimetreTirage.depuisReponse(corps);
+
+      if (page == 1) {
+        // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
+        // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
+        // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
+        // renverrait. La marque est notée aussitôt : la relance complète ci-dessous ne purge pas deux fois.
+        final reinitialisation = corps['data_reset_at'];
+        if (reinitialisation is String &&
+            reinitialisation != await _lireReglage(cleReinitialisation)) {
+          final perdus = await _db.purgerDonneesDActivite();
+          await _ecrireReglage(cleReinitialisation, reinitialisation);
+          final le = DateTime.parse(reinitialisation).toLocal();
+          final date =
+              '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
+          // Un poste neuf (jamais tiré, rien en attente) n'avait rien : aucun avertissement à lui faire lire.
+          if (perdus > 0 || etat?.lastPulledAt != null) {
+            _avertissements.add(
+              'Les données du serveur ont été réinitialisées le $date : celles de ce poste ont été '
+              'effacées${perdus > 0 ? ', dont $perdus saisie(s) qui n\'avai(en)t pas encore été envoyée(s)' : ''}.',
+            );
+          }
+          // Un tirage incrémental ne resservirait pas l'existant : tout redemander, une fois.
+          if (!toutRedemander) return _tirer(complet: true);
+        }
+
+        // Ticket S-T4 — RÈGLE DU CHANGEMENT DE RÔLE (voir [PerimetreTirage]) : une table servie maintenant et pas
+        // au tirage précédent n'a jamais été tirée jusqu'au curseur. Rien n'est absorbé de cette page : le tirage
+        // repart, complet, une fois (sans `since`, la règle ne se redéclenche pas).
+        if (since != null &&
+            servies != null &&
+            PerimetreTirage.elargi(await PerimetreTirage.lire(_db), servies)) {
+          return _tirer(complet: true);
+        }
+      }
+
+      if (servies != null) {
+        perimetre = perimetre == null ? servies : perimetre.intersection(servies);
+      }
+      cles.addAll(corps.keys);
+
+      final aAbsorber = corps;
+      await _db.transaction(() async {
+        recus += await _absorberPage(aAbsorber);
+      });
+
+      final suivante = corps['page_suivante'];
+      if (!pagine || suivante == null) break;
+      // Un jeton vide, ou le même que celui qui vient d'être servi, ferait tourner le tirage sans fin.
+      if (suivante is! String || suivante.isEmpty || suivante == jeton) {
+        throw const FormatException(
+          'Tirage refusé : jeton de la page suivante illisible.',
+        );
+      }
+      jeton = suivante;
+    }
+
+    // ⚠️ F0.84-bis : le serveur annonce des écritures actives que le poste n'a pas (cas réel :
+    // créée entre la requête et `server_time`, donc plus jamais servie par `since`). UNE relance,
+    // sans `since` — jamais une boucle. La relance note elle-même le curseur.
+    if (_journalManquants > 0 && !complet) {
+      return recus + await _tirer(complet: true);
+    }
+    if (_journalManquants > 0) {
+      await _ecrireReglage(cleJournalIncomplet, '1');
+      _avertissements.add(
+        'Journal comptable incomplet : $_journalManquants écriture(s) annoncée(s) '
+        'par le serveur manquent encore sur ce poste. Les états peuvent être faux ; '
+        'la prochaine synchronisation redemandera tout le journal.',
+      );
+    } else if (etaitIncomplet) {
+      await _effacerReglage(cleJournalIncomplet);
+    }
+    if (!resyncFaite) {
+      await _ecrireReglage(cleJournalResync, '1');
+    }
+    // F0.85 : la date de création n'est « rapportée » que si le serveur la sert.
+    if (!resyncCreationFaite && !_journalSansDateCreation) {
+      await _ecrireReglage(cleJournalResyncCreation, '1');
+    }
+    // F0.94 : écrit seulement ICI, après TOUS les absorbeurs — un lot de fiches refusé lève une
+    // `FormatException` plus haut, et la resynchronisation sera retentée au tirage suivant.
+    if (!resyncFichesFaite) {
+      await _ecrireReglage(cleFichesResync, '1');
+    }
+    // F0.95 : même place, et seulement si le serveur sert la ventilation par catégorie.
+    if (!resyncCategoriesFaite && !_fichesSansVentilation) {
+      await _ecrireReglage(cleFichesResyncCategories, '1');
+    }
+    // U10 : même place, et seulement si les fiches servies portent les colonnes du Rapport Élevage.
+    if (!resyncFichesU10Faite && !_fichesSansColonnesRapport) {
+      await _ecrireReglage(cleFichesResyncU10, '1');
+    }
+    // U4, U8, U9 : « serveur antérieur » se lit à une pièce servie SANS ses lignes (ou des produits sans leur
+    // grand livre). ⚠️ Ticket S-T4 — un serveur qui PAGINE est postérieur à U10 : la question ne se pose plus, et
+    // une table simplement NON SERVIE à ce compte (le grand livre des stocks n'est pas servi au caissier) ne doit
+    // pas laisser croire à un serveur ancien — la resynchronisation unique resterait sinon à refaire à chaque tirage.
+    // U4 : même place, et seulement si les ventes et achats servis l'ont été avec leurs lignes.
+    final lignesNonServies =
+        !pagine &&
+        ((cles.contains('sales') && !cles.contains('sale_lines')) ||
+            (cles.contains('purchases') && !cles.contains('purchase_lines')));
+    if (!resyncLignesFaite && !lignesNonServies) {
+      await _ecrireReglage(cleLignesResync, '1');
+    }
+    // U8 : même place, et seulement si les achats servis l'ont été avec leurs retours.
+    if (!resyncRetoursFaite &&
+        !(!pagine &&
+            cles.contains('purchases') &&
+            !cles.contains('purchase_returns'))) {
+      await _ecrireReglage(cleRetoursResync, '1');
+    }
+
+    // U9 : même place, et seulement si le serveur sert le grand livre des stocks. Un serveur qui sert les produits
+    // SANS leur grand livre est antérieur à U9 : le tirage reste complet tant que cela dure (même règle que U4 pour
+    // les pièces servies sans leurs lignes).
+    if (!resyncMouvementsFaite &&
+        !(!pagine &&
+            cles.contains('products') &&
+            !cles.contains('stock_movements'))) {
+      await _ecrireReglage(cleMouvementsResync, '1');
+    }
+
+    // Ticket S-T4 — le périmètre de CE tirage, gardé pour le suivant. Une réponse non paginée (serveur antérieur)
+    // a servi toutes les tables : périmètre inconnu, rien à resynchroniser au prochain élargissement.
+    if (pagine && perimetre != null) {
+      await PerimetreTirage.ecrire(_db, perimetre);
+    } else if (!pagine) {
+      await PerimetreTirage.effacer(_db);
+    }
+
+    // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
+    // Une tablette dont l'horloge retarde redemanderait sans cesse les mêmes
+    // changements ; une qui avance en sauterait définitivement.
+    // Ticket S-T4 : `server_time` n'est servi qu'à la DERNIÈRE page — celle que `corps` tient ici.
+    final horlogeServeur = corps['server_time'];
+    if (horlogeServeur is String) {
+      await _db.noterEtatDeSynchronisation(
+        tire: DateTime.parse(horlogeServeur),
+      );
+    }
+
+    return recus;
+  }
+
+  /// Ticket S-T4 — une page du tirage, absorbée table par table dans l'ordre des dépendances (l'appelant
+  /// l'enveloppe dans UNE transaction). Une clé ABSENTE (table non servie à ce compte, ou pas sur cette page) ne
+  /// touche à rien : chaque absorbeur l'ignore.
+  Future<int> _absorberPage(Map<String, dynamic> corps) async {
+    var recus = 0;
 
     recus += await _absorberCategories(corps['product_categories']);
     recus += await _absorberProduits(corps['products']);
@@ -548,76 +707,6 @@ class SyncEngine {
     recus += await _absorberCompteursAttestation(corps['attestation_counts']);
     recus += await _absorberComptesTresorerie(corps['treasury_accounts']);
     recus += await _absorberCategoriesDepense(corps['expense_categories']);
-
-    // ⚠️ F0.84-bis : le serveur annonce des écritures actives que le poste n'a pas (cas réel :
-    // créée entre la requête et `server_time`, donc plus jamais servie par `since`). UNE relance,
-    // sans `since` — jamais une boucle. La relance note elle-même le curseur.
-    if (_journalManquants > 0 && !complet) {
-      return recus + await _tirer(complet: true);
-    }
-    if (_journalManquants > 0) {
-      await _ecrireReglage(cleJournalIncomplet, '1');
-      _avertissements.add(
-        'Journal comptable incomplet : $_journalManquants écriture(s) annoncée(s) '
-        'par le serveur manquent encore sur ce poste. Les états peuvent être faux ; '
-        'la prochaine synchronisation redemandera tout le journal.',
-      );
-    } else if (etaitIncomplet) {
-      await _effacerReglage(cleJournalIncomplet);
-    }
-    if (!resyncFaite) {
-      await _ecrireReglage(cleJournalResync, '1');
-    }
-    // F0.85 : la date de création n'est « rapportée » que si le serveur la sert.
-    if (!resyncCreationFaite && !_journalSansDateCreation) {
-      await _ecrireReglage(cleJournalResyncCreation, '1');
-    }
-    // F0.94 : écrit seulement ICI, après TOUS les absorbeurs — un lot de fiches refusé lève une
-    // `FormatException` plus haut, et la resynchronisation sera retentée au tirage suivant.
-    if (!resyncFichesFaite) {
-      await _ecrireReglage(cleFichesResync, '1');
-    }
-    // F0.95 : même place, et seulement si le serveur sert la ventilation par catégorie.
-    if (!resyncCategoriesFaite && !_fichesSansVentilation) {
-      await _ecrireReglage(cleFichesResyncCategories, '1');
-    }
-    // U10 : même place, et seulement si les fiches servies portent les colonnes du Rapport Élevage.
-    if (!resyncFichesU10Faite && !_fichesSansColonnesRapport) {
-      await _ecrireReglage(cleFichesResyncU10, '1');
-    }
-    // U4 : même place, et seulement si les ventes et achats servis l'ont été avec leurs lignes.
-    final lignesNonServies =
-        (corps.containsKey('sales') && !corps.containsKey('sale_lines')) ||
-        (corps.containsKey('purchases') &&
-            !corps.containsKey('purchase_lines'));
-    if (!resyncLignesFaite && !lignesNonServies) {
-      await _ecrireReglage(cleLignesResync, '1');
-    }
-    // U8 : même place, et seulement si les achats servis l'ont été avec leurs retours.
-    if (!resyncRetoursFaite &&
-        !(corps.containsKey('purchases') &&
-            !corps.containsKey('purchase_returns'))) {
-      await _ecrireReglage(cleRetoursResync, '1');
-    }
-
-    // U9 : même place, et seulement si le serveur sert le grand livre des stocks. Un serveur qui sert les produits
-    // SANS leur grand livre est antérieur à U9 : le tirage reste complet tant que cela dure (même règle que U4 pour
-    // les pièces servies sans leurs lignes).
-    if (!resyncMouvementsFaite &&
-        !(corps.containsKey('products') &&
-            !corps.containsKey('stock_movements'))) {
-      await _ecrireReglage(cleMouvementsResync, '1');
-    }
-
-    // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
-    // Une tablette dont l'horloge retarde redemanderait sans cesse les mêmes
-    // changements ; une qui avance en sauterait définitivement.
-    final horlogeServeur = corps['server_time'];
-    if (horlogeServeur is String) {
-      await _db.noterEtatDeSynchronisation(
-        tire: DateTime.parse(horlogeServeur),
-      );
-    }
 
     return recus;
   }

@@ -57,7 +57,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
 
     // Ticket S1 — débit borné : un poste synchronise toutes les quelques minutes ; 30 appels par minute et par
     // compte laissent la marge d'une relance manuelle répétée sans permettre d'épuiser le serveur.
-    Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:30,1');
+    // Ticket S-T4 — le tirage est PAGINÉ : un poste resté longtemps hors ligne fait une requête par page. Sous le
+    // compteur commun (30 / min, partagé avec l'envoi), son tirage tomberait en 429 au milieu, repartirait de la
+    // page 1 et ne finirait jamais. Compteur PROPRE, à 120 pages par minute (120 000 lignes au plus).
+    Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:120,1,sync-pull');
     Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
 
     // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du

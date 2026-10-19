@@ -206,12 +206,24 @@ void main() {
       expect(debut, greaterThan(-1));
       expect(reponse, greaterThan(debut));
       final bloc = source.substring(reponse, fin);
+      // Ticket S-T4 : les TABLES sont nommées une fois, dans `PERMISSIONS_DE_TIRAGE` (une entrée par table servie,
+      // dans l'ordre de la réponse) ; `$reponse = [ … ]` ne porte plus que le curseur et la marque de
+      // réinitialisation.
+      final debutTables = source.indexOf(
+        'public const PERMISSIONS_DE_TIRAGE = [',
+      );
+      expect(debutTables, greaterThan(-1));
+      final tables = source.substring(
+        debutTables,
+        source.indexOf('];', debutTables),
+      );
       final servies = {
-        for (final m in RegExp(
-          r"^\s*'(\w+)'\s*=>",
-          multiLine: true,
-        ).allMatches(bloc))
-          m.group(1)!,
+        for (final texte in [bloc, tables])
+          for (final m in RegExp(
+            r"^\s*'(\w+)'\s*=>",
+            multiLine: true,
+          ).allMatches(texte))
+            m.group(1)!,
       };
 
       expect(
