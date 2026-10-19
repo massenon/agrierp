@@ -22177,3 +22177,11 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Poste : 9e onglet du hub Paramètres (après « Audit Logs », comme au web), Blade repris bloc par bloc ; hors ligne : boutons inactifs ; saisies `pending`/`conflict` des tables effacées annoncées table par table, case à cocher obligatoire ; après succès, purge IMMÉDIATE (`SyncEngine.appliquerReinitialisation`, partagée avec la propagation 15.50) puis tirage complet ; aucune synchronisation ne s'intercale.
 - Mesures (branche, avec S-T10/S-T11) : Laravel 1 863 verts ; poste 2 548 verts, 17 sautés ; 25 mutants tués.
 - À trancher : réponse du serveur perdue alors que la réinitialisation a eu lieu → le poste purge au tirage suivant (règle 15.50), la perte des saisies est annoncée par l'avertissement de synchronisation, pas par l'onglet.
+
+### U11 — derniers petits écarts (Ajustement, PDF, Rapport élevage, Fiche Pondeuses)
+- Ajustement des stocks au poste : validations du web (motif FACULTATIF), écart nul refusé avec l'avertissement du web, toasts du web, « -- Sélectionner -- », aide du Blade.
+- Noms des PDF : ceux du web (`stocks-AAAA-MM-JJ.pdf`, rapports, plan comptable, journal, grand livre, balance, achats, avances, fiche) ; 🔴 le poste proposait jusqu'ici `….xlsx` pour TOUS ses PDF.
+- Rapport élevage : en-tête du Blade (plus de « Filtrer la Période »), ordre déterministe de deux fiches du même jour (identifiant croissant, web et poste).
+- Fiche Pondeuses : mise en page du Blade, tous les jours du mois, « Traitements & Rappels », taux divisés par l'effectif de la VEILLE (le poste divisait par l'effectif final) ; parité PHP sur deux bandes. 🔴 Web : `loadDay()` affichait à vide la fiche d'une date hors du mois courant et « Enregistrer ce Jour » l'écrasait avec des zéros — corrigé (`FichePondeusesJourHorsMoisTest`). Texte d'aide des stocks : l'écriture de perte est active depuis 14.41.
+- Mesures (branche, avec S-T10/S-T11 et R-1) : Laravel 1 865 verts ; poste 2 570 verts, 17 sautés.
+- Reste : ticket U12.
