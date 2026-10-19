@@ -22003,3 +22003,26 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Marge du Top 5 « — » au poste et Top 5 / ventes porcines limités aux lignes saisies sur le poste : `sale_lines` et `purchase_lines` ne descendent pas.
 - Colonne « Morts S/Mère » (ajout du poste, Suivi Reproduction) : elle affiche `nes_morts` ; à confirmer avec le client.
 - Icônes : Material Icons pleines au poste, Material Symbols Outlined au web (reste de H1).
+
+## Tickets H7 (fin), H8 et H8b (poste), H11 (web) (19/10/2026)
+
+### Poste
+- **H7 (fin)** : le moteur envoie les étapes du cycle avec la saillie (`palpation_date`, `mise_bas_date_actual`, `nes_vivants`, `nes_morts`, `status`) ; les actions Palpation / Mise bas / Clôture sont ouvertes et le bandeau de restriction disparaît.
+- **H8 Soins et vaccins** : registre aux six colonnes du Blade (+ « Statut »), « CODE (Espèce) », montants « 12 500 FCFA », message vide exact, modale Nouveau Soin (largeur sm, exemples, aide de la rémanence), messages du composant en `ToastAgri`.
+- **H8b (D-H8)** : Drift v41, tables `infirmary_records` et `veterinary_calendar_events` (UUID, colonnes de synchronisation), absorbeurs stricts qui n'écrasent jamais une saisie en attente, envoi et relance ; onglet Suivi Sanitaire complet (4 KPI, Réintégrer / Décès), calendrier J → J+13 et « Planifier une Intervention ».
+
+### Web (H11, décision D-H-maquette)
+- Ajouts du poste construits au web, formules reprises des écrans Flutter : courbe « Croissance (GMQ) par Espèce », cartes de filière, rappels VMS calculés, filtre d'espèce et cartes GMQ, prévision à horizons (Dashboard Élevage) ; jalon « Boîte à nid J+28 », colonnes Sevrés / Morts S/Mère / Poids Moyen / Cages, « Bandes suivies », bandeaux de cycle Volailles / Escargots (Suivi Reproduction) ; recherche, filtres et colonne « Statut » du registre des soins.
+- Les ajouts vivent dans `livewire/elevage/ajouts-poste/` ; fonte d'icônes régénérée (`flag`, `show_chart`) ; `sw.js` en `agrierp-v3`.
+- Les garde-fous du poste qui lisent le Blade du registre suivent le Blade enrichi : 7 colonnes (dernière « Statut »), deux messages vides (avec ou sans critères), modale lue à partir de son `<x-modal>`.
+
+### Mesures
+- Laravel : suite Feature 1 711 verts.
+- Poste : `flutter analyze` propre ; `soins_infirmerie_calendrier_test.dart` 25 verts ; suite complète relancée après la fusion H11.
+
+### Non fait / réserves
+- « Importer » / « Exporter PDF » du registre des soins : non construits au web (inertes au poste).
+- Archiver un soin reste impossible au poste (`is_active` absent du poste et non accepté à l'envoi).
+- La modale Infirmerie du poste refuse les dates futures ; le web les accepte.
+- « En retard » du calendrier dès minuit, comme le web.
+- Les objectifs GMQ sont des constantes du poste, pas `growth_standards`.

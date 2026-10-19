@@ -502,14 +502,16 @@ void main() {
   }
 
   group('H8 — registre', () {
-    testWidgets('les six colonnes du Blade, dans son ordre, puis « Statut » (ajout du poste)', (tester) async {
+    // Ticket H11 : « Statut », ajout du poste, est désormais construit AU WEB aussi — 7 colonnes des deux côtés.
+    testWidgets('les sept colonnes du Blade, dans son ordre (« Statut » construit au web, H11)', (tester) async {
       final colonnes = _colonnes(_section('registre'));
-      expect(colonnes, hasLength(6), reason: 'Blade : $colonnes');
+      expect(colonnes, hasLength(7), reason: 'Blade : $colonnes');
+      expect(colonnes.last.toLowerCase(), 'statut');
       await soins.enregistrer(lotId: lapins, typeAction: 'Vaccination', produit: 'Alfamec', cout: 12500);
 
       await afficher(tester);
 
-      colonnesDansLOrdre(tester, [...colonnes, 'Statut']);
+      colonnesDansLOrdre(tester, colonnes);
       // Cellule « CODE (Libellé espèce) » et coût « 12 500 FCFA ».
       expect(find.text('LOT-LAP-01 (Lapins)'), findsOneWidget);
       expect(find.text('12 500 FCFA'), findsOneWidget);
@@ -517,9 +519,12 @@ void main() {
     }, skip: _sautWeb);
 
     testWidgets('registre vide : le message exact du Blade', (tester) async {
-      final vides = _tous(_section('registre'), r'text-center text-outline">([^<]+)</td>');
+      // Ticket H11 : le web choisit entre deux messages selon le filtre ; sans filtre, le second.
+      final cellule = _tous(_section('registre'), r'text-center text-outline">([^<]+)</td>').single;
+      final messages = RegExp(r"'([^']+)'").allMatches(cellule).map((m) => m.group(1)!).toList();
+      expect(messages, ['— Aucun soin au registre pour ces critères —', 'Aucun soin enregistré pour le moment.']);
       await afficher(tester);
-      expect(find.text(vides.single), findsOneWidget);
+      expect(find.text(messages.last), findsOneWidget);
       await nettoyer(tester);
     }, skip: _sautWeb);
 
@@ -536,7 +541,9 @@ void main() {
     });
 
     testWidgets('la modale Nouveau Soin : libellés, exemples, options et aide du Blade ; largeur sm', (tester) async {
-      final section = _section('registre');
+      // La MODALE seule : depuis le ticket H11, l'onglet porte aussi la barre de recherche du registre.
+      final onglet = _section('registre');
+      final section = onglet.substring(onglet.indexOf('<x-modal name="modal-nouveau-soin"'));
       await afficher(tester);
       await tester.tap(find.byKey(const Key('nouveau-soin')));
       await tester.pumpAndSettle();
