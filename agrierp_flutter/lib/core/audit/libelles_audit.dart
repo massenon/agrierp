@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 117 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 127 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -66,6 +66,10 @@ class LibellesAudit {
     'supplier.archived': 'Fournisseur archivé',
     'supplier_refund.recorded': 'Remboursement fournisseur enregistré',
     'payable.payment_recorded': 'Règlement fournisseur enregistré',
+    'customer_advance.created': 'Avance client enregistrée',
+    'customer_advance.updated': 'Avance client modifiée',
+    'customer_advance.imputed': 'Avance client imputée sur une créance',
+    'customer_advance.archived': 'Avance client archivée',
     'expense.created': 'Dépense enregistrée',
     'expense.updated': 'Dépense modifiée',
     'expense.archived': 'Dépense archivée',
@@ -99,6 +103,10 @@ class LibellesAudit {
     'prophylaxis_schedule.saved': 'Calendrier de prophylaxie enregistré',
     'prophylaxis_schedule.deleted': 'Calendrier de prophylaxie supprimé',
     'elevage_numbering.updated': 'Numérotation élevage modifiée',
+    'feed_ration_standard.archived': 'Barème de rationnement archivé',
+    'feed_type.archived': 'Type d\'aliment archivé',
+    'prophylaxis_schedule.archived': 'Calendrier de prophylaxie archivé',
+    'rappel_soins.updated': 'Délai de rappel des soins modifié',
     'employee.created': 'Employé créé',
     'employee.updated': 'Employé modifié',
     'employee.archived': 'Employé archivé',
@@ -112,6 +120,8 @@ class LibellesAudit {
     'api.login': 'Connexion API (appareil Flutter)',
     'api.logout': 'Déconnexion API (appareil Flutter)',
     'api.sync_push': 'Synchronisation — données envoyées par un appareil',
+    'sale.negative_stock_received': 'Vente reçue d\'un poste : stock passé sous zéro',
+    'reproduction_event.updated_from_device': 'Cycle de reproduction mis à jour depuis un poste',
     'attestation.generated.employe': 'Attestation de travail générée',
     'attestation.generated.stagiaire': 'Attestation de stage générée',
     'attestation_template.updated': 'Modèle d\'attestation modifié',

@@ -168,6 +168,11 @@ class AuditLog extends Model
         'prophylaxis_schedule.saved' => 'Calendrier de prophylaxie enregistré',
         'prophylaxis_schedule.deleted' => 'Calendrier de prophylaxie supprimé',
         'elevage_numbering.updated' => 'Numérotation élevage modifiée',
+        // Ticket H9b — l'écran web et le poste ARCHIVENT (14.55) : ces clés s'affichaient brutes au journal.
+        'feed_ration_standard.archived' => 'Barème de rationnement archivé',
+        'feed_type.archived' => "Type d'aliment archivé",
+        'prophylaxis_schedule.archived' => 'Calendrier de prophylaxie archivé',
+        'rappel_soins.updated' => 'Délai de rappel des soins modifié',
         'employee.created' => 'Employé créé',
         'employee.updated' => 'Employé modifié',
         'employee.archived' => 'Employé archivé',

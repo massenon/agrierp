@@ -22042,3 +22042,24 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 
 ### Mesures
 - Poste : `flutter analyze` propre ; suite complète 2 201 verts, 16 sautés ; 3 échecs pendant la suite, dus à un second `flutter test` lancé en parallèle (« Asset 'shaders/ink_sparkle.frag' not found ») ou au remplacement encore partiel, relancés seuls : 45 verts.
+
+## Tickets H9 et H9b (poste), H10 (19/10/2026)
+
+### H9 / H9b — Paramètres Élevage modifiables au poste comme au web (décision D-H9)
+- Drift v42 : `is_active`, `sync_status`, `updated_at` sur rations, prophylaxie et provendes ; `sync_status` et `updated_at` sur la numérotation et l'entreprise (+ `rappel_soins_jours`) ; `created_at` sur la prophylaxie (tri du web).
+- Moteur : absorbeurs stricts qui n'écrasent jamais une ligne `pending` / `conflict` ; une ligne `synced` que le serveur ne sert plus est archivée au poste (une ration archivée au web restait active au poste) ; envoi au format exact de `RecordParametresElevageFromDeviceAction`, acquittement de la seule version partie, refus en `conflict` avec motif, relance.
+- Écran aligné sur le Blade (onglets, colonnes, formats, modales, suppression = archivage, « Rappel des soins planifiés », numérotation enregistrable, toasts). Droit `manage-elevage` via `PermissionsPoste.peut`, vérifié contre `RolesAndPermissionsSeeder`. Rations, protocole de soins et prix moyen de provende ne lisent plus que les lignes actives.
+- Garde-fou `parametres_elevage_blade_test.dart` ; la page `parametres-elevage.html` quitte les comparaisons à la maquette (le Blade fait foi).
+
+### Web
+- 🔴 `AuditLog` n'avait pas de libellé pour `feed_ration_standard.archived`, `feed_type.archived`, `prophylaxis_schedule.archived`, `rappel_soins.updated` (le web archive depuis 14.55) : le journal montrait la clé technique. Libellés ajoutés ; `libelles_audit.dart` régénéré, qui avait aussi six libellés de retard (avances clients, stock négatif reçu, cycle mis à jour depuis un poste).
+
+### H10
+- Un garde-fou lisant le Blade existe pour chaque écran H4 à H9 (voir le plan).
+
+### Mesures
+- Poste : `flutter analyze` propre ; suite complète 2 238 verts, 16 sautés. Laravel : 1 711 verts.
+
+### Non fait / réserves
+- Le bilan web calcule le prix moyen de provende sur TOUS les types, archivés compris ; le poste sur les actifs.
+- Tri de la prophylaxie : le web trie sur `created_at` seul (ordre non garanti à égalité) ; le poste départage par jour de cycle puis libellé.
