@@ -22,3 +22,6 @@ __pycache__/
 /database/*.sql
 *.zip
 .env.dusk.local
+
+# Copies de travail des agents Claude Code (worktrees) : jamais versionnées.
+.claude/worktrees/
