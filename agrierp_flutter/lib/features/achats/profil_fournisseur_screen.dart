@@ -4,6 +4,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
 import 'fournisseurs_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/profile-fournisseur.html` → Profil Fournisseur.
 ///
@@ -130,7 +131,7 @@ class _ProfilFournisseurScreenState extends State<ProfilFournisseurScreen> {
                     child: TextButton.icon(
                       key: const Key('profil-retour'),
                       onPressed: widget.onRetour,
-                      icon: const Icon(Icons.arrow_back, size: 16),
+                      icon: const Icon(SymbolesAgri.arrow_back, size: 16),
                       label: const Text(
                         'Retour',
                         style: TextStyle(fontSize: AgriTypography.xs),

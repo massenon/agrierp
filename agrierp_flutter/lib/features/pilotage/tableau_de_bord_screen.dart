@@ -4,6 +4,7 @@ import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'tableau_de_bord_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Tableau de Bord — ticket H5 : **la vue Blade `livewire/dashboard/index.blade.php` fait foi** (article 5).
 ///
@@ -166,13 +167,13 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       children: [
         _boutonPlein(
           key: const Key('action-vente'),
-          icone: Icons.point_of_sale,
+          icone: SymbolesAgri.point_of_sale,
           libelle: 'Enregistrer une Vente',
           onPressed: widget.onEnregistrerVente,
         ),
         _boutonClair(
           key: const Key('action-elevage'),
-          icone: Icons.pets,
+          icone: SymbolesAgri.pets,
           libelle: 'Élevage',
           onPressed: widget.onElevage,
         ),
@@ -224,7 +225,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final d = _donnees!;
     final dates = Row(
       children: [
-        const Icon(Icons.calendar_month, size: 18, color: AgriColors.outline),
+        const Icon(SymbolesAgri.calendar_month, size: 18, color: AgriColors.outline),
         const SizedBox(width: AgriSpacing.xs),
         Expanded(child: _champDate(const Key('date-du'), d.debutPeriode)),
         const Padding(
@@ -285,7 +286,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         const SizedBox(width: AgriSpacing.xs),
         _boutonPlein(
           key: const Key('export-pdf'),
-          icone: Icons.picture_as_pdf,
+          icone: SymbolesAgri.picture_as_pdf,
           libelle: 'PDF',
           onPressed: cible == null || widget.onOuvrir == null
               ? null
@@ -356,7 +357,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.chiffreAffaires,
         unite: 'FCFA',
         detail: d.legendeChiffreAffaires ?? '',
-        icone: Icons.trending_up,
+        icone: SymbolesAgri.trending_up,
         barre: AgriColors.brandEmerald,
       ),
       _carteKpi(
@@ -365,7 +366,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         unite: 'FCFA',
         // Ajout du poste, gardé (décision client du 19/10/2026).
         detail: 'Caisse : ${_nombre(caisse)} · Banque : ${_nombre(banque)}',
-        icone: Icons.account_balance_wallet,
+        icone: SymbolesAgri.account_balance_wallet,
         barre: AgriColors.infoBlue,
         couleurIcone: AgriColors.infoBlue,
       ),
@@ -374,7 +375,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.depenses,
         unite: 'FCFA',
         detail: d.legendeDepenses ?? '',
-        icone: Icons.shopping_cart,
+        icone: SymbolesAgri.shopping_cart,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.brandForest,
       ),
@@ -383,7 +384,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.resultatNet,
         unite: 'FCFA',
         detail: d.legendeResultatNet ?? '',
-        icone: Icons.savings,
+        icone: SymbolesAgri.savings,
         barre: AgriColors.brandEmerald,
       ),
       _carteKpi(
@@ -391,7 +392,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.creances,
         unite: 'FCFA',
         detail: '',
-        icone: Icons.request_quote,
+        icone: SymbolesAgri.request_quote,
         barre: AgriColors.errorRed,
         couleurIcone: AgriColors.errorRed,
       ),
@@ -400,7 +401,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.dettes,
         unite: 'FCFA',
         detail: '',
-        icone: Icons.local_shipping,
+        icone: SymbolesAgri.local_shipping,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.brandForest,
       ),
@@ -412,7 +413,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         detail: d.produitsSousSeuil.isEmpty
             ? 'Aucun produit sous son seuil'
             : d.produitsSousSeuil.take(3).map((p) => p.name).join(', '),
-        icone: Icons.warning,
+        icone: SymbolesAgri.warning,
         barre: AgriColors.errorRed,
         couleurIcone: AgriColors.errorRed,
       ),
@@ -422,7 +423,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         unite: 'têtes',
         // Ajout du poste, gardé (décision client du 19/10/2026).
         detail: 'Au dernier tirage',
-        icone: Icons.pets,
+        icone: SymbolesAgri.pets,
         barre: AgriColors.brandEmerald,
       ),
     ];
@@ -554,7 +555,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.warning, size: 18, color: couleur),
+              Icon(SymbolesAgri.warning, size: 18, color: couleur),
               const SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -620,9 +621,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   }
 
   static const _iconesEspeces = {
-    'Lapins': Icons.cruelty_free,
-    'Volailles': Icons.egg,
-    'Porcs': Icons.pets,
+    'Lapins': SymbolesAgri.cruelty_free,
+    'Volailles': SymbolesAgri.egg,
+    'Porcs': SymbolesAgri.pets,
   };
 
   Widget _carteEspece(CarteEspece carte) {
@@ -652,7 +653,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           Row(
             children: [
               Icon(
-                _iconesEspeces[carte.titre] ?? Icons.pets,
+                _iconesEspeces[carte.titre] ?? SymbolesAgri.pets,
                 size: 20,
                 color: AgriColors.brandEmerald,
               ),
@@ -747,7 +748,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
     return _bloc(
       titre: 'Statistiques de Ventes',
-      icone: Icons.bar_chart,
+      icone: SymbolesAgri.bar_chart,
       apresTitre: Text(
         '${DateTime.now().year}',
         style: const TextStyle(
@@ -869,7 +870,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
     return _bloc(
       titre: 'Transactions Récentes',
-      icone: Icons.receipt_long,
+      icone: SymbolesAgri.receipt_long,
       // `<a href="/ventes-devis">Voir tout</a>`.
       apresTitre: InkWell(
         key: const Key('tx-voir-tout'),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../theme/agri_tokens.dart';
+import '../theme/symboles_agri.dart';
 
 /// Les trois types de `components/toast-container.blade.php` (`$dispatch('toast', type: …)`).
 enum TypeToast { succes, erreur, avertissement }
@@ -121,9 +122,9 @@ class _ToastVisible extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (fond, texte, icone) = switch (type) {
-      TypeToast.succes => (AgriColors.brandEmerald, Colors.white, Icons.check_circle),
-      TypeToast.erreur => (AgriColors.errorRed, Colors.white, Icons.error),
-      TypeToast.avertissement => (AgriColors.accentYellow, AgriColors.brandForest, Icons.warning),
+      TypeToast.succes => (AgriColors.brandEmerald, Colors.white, SymbolesAgri.check_circle),
+      TypeToast.erreur => (AgriColors.errorRed, Colors.white, SymbolesAgri.error),
+      TypeToast.avertissement => (AgriColors.accentYellow, AgriColors.brandForest, SymbolesAgri.warning),
     };
 
     return TweenAnimationBuilder<double>(

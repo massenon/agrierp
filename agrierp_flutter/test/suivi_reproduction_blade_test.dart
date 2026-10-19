@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
 import 'coque_poste.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket H7 — SUIVI REPRODUCTION DU POSTE ALIGNÉ SUR LE BLADE (le maître, doctrine art. 5).
 ///
@@ -49,19 +50,19 @@ final bool _sansBlade =
 
 /// Icônes Material Symbols du Blade → icônes Flutter du poste (mêmes noms).
 const _icones = <String, IconData>{
-  'cruelty_free': Icons.cruelty_free,
-  'egg': Icons.egg,
-  'pets': Icons.pets,
-  'bug_report': Icons.bug_report,
-  'favorite': Icons.favorite,
-  'event': Icons.event,
-  'child_care': Icons.child_care,
-  'warning': Icons.warning,
-  'egg_alt': Icons.egg_alt,
-  'edit_note': Icons.edit_note,
-  'add_circle': Icons.add_circle,
-  'event_repeat': Icons.event_repeat,
-  'arrow_forward': Icons.arrow_forward,
+  'cruelty_free': SymbolesAgri.cruelty_free,
+  'egg': SymbolesAgri.egg,
+  'pets': SymbolesAgri.pets,
+  'bug_report': SymbolesAgri.bug_report,
+  'favorite': SymbolesAgri.favorite,
+  'event': SymbolesAgri.event,
+  'child_care': SymbolesAgri.child_care,
+  'warning': SymbolesAgri.warning,
+  'egg_alt': SymbolesAgri.egg_alt,
+  'edit_note': SymbolesAgri.edit_note,
+  'add_circle': SymbolesAgri.add_circle,
+  'event_repeat': SymbolesAgri.event_repeat,
+  'arrow_forward': SymbolesAgri.arrow_forward,
 };
 
 /// Lecture du Blade : chaque expression qu'il emploie est résolue pour une filière donnée.
@@ -479,7 +480,7 @@ void main() {
             ...etapes.map((e) => e.$1),
           ]);
           expect(
-            find.descendant(of: rappel, matching: find.byIcon(Icons.arrow_forward)),
+            find.descendant(of: rappel, matching: find.byIcon(SymbolesAgri.arrow_forward)),
             findsNWidgets(etapes.length - 1),
           );
           // L'étape active du Blade est la seule en vert.

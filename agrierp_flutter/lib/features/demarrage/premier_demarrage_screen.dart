@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'premier_demarrage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ticket F0.98 — écran du PREMIER DÉMARRAGE, affiché après la connexion sur un poste qui n'a jamais
 /// synchronisé (hors maquette, demandé par le client). ⚠️ NON BLOQUANT : « Plus tard » ouvre l'application.
@@ -93,7 +94,7 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            fait ? Icons.check_circle : Icons.pending,
+            fait ? SymbolesAgri.check_circle : SymbolesAgri.pending,
             size: 20,
             color: fait ? AgriColors.brandEmerald : AgriColors.errorDeep,
           ),

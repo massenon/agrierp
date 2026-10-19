@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../fenetre/fenetre_poste.dart';
 import '../theme/agri_tokens.dart';
 import 'modale_agri.dart';
+import '../theme/symboles_agri.dart';
 
 /// Aperçu d'une notification pour le menu de la cloche.
 ///
@@ -137,7 +138,7 @@ class BarreSuperieure extends StatelessWidget {
             // latérale ».
             iconSize: 22,
             color: AgriColors.outline,
-            icon: const Icon(Icons.menu_open),
+            icon: const Icon(SymbolesAgri.menu_open),
             tooltip: 'Afficher/Masquer la barre latérale',
           ),
           const SizedBox(width: AgriSpacing.xs),
@@ -176,7 +177,7 @@ class BarreSuperieure extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'Recherche (application web)',
                 hintStyle: const TextStyle(fontSize: 11.5),
-                prefixIcon: const Icon(Icons.search, size: 16),
+                prefixIcon: const Icon(SymbolesAgri.search, size: 16),
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
                 enabled: false,
@@ -225,7 +226,7 @@ class BarreSuperieure extends StatelessWidget {
             key: const Key('fenetre-reduire'),
             iconSize: 18,
             color: AgriColors.outline,
-            icon: const Icon(Icons.remove),
+            icon: const Icon(SymbolesAgri.remove),
             tooltip: 'Réduire',
             onPressed: FenetrePoste.reduire,
           ),
@@ -233,7 +234,7 @@ class BarreSuperieure extends StatelessWidget {
             key: const Key('fenetre-fermer'),
             iconSize: 18,
             color: AgriColors.errorDeep,
-            icon: const Icon(Icons.close),
+            icon: const Icon(SymbolesAgri.close),
             tooltip: 'Fermer AgriERP',
             onPressed: () => _confirmerFermeture(context),
           ),
@@ -250,7 +251,7 @@ class BarreSuperieure extends StatelessWidget {
         key: cle,
         iconSize: 20,
         color: AgriColors.outline,
-        icon: const Icon(Icons.notifications_none),
+        icon: const Icon(SymbolesAgri.notifications_none),
         tooltip: "Notifications — sur l'application web",
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -359,7 +360,7 @@ class BarreSuperieure extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.all(8),
             child: Icon(
-              Icons.notifications_none,
+              SymbolesAgri.notifications_none,
               size: 22,
               color: AgriColors.outline,
             ),
@@ -400,7 +401,7 @@ class BarreSuperieure extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const Icon(
-          Icons.account_circle,
+          SymbolesAgri.account_circle,
           size: 22,
           color: AgriColors.brandForest,
         ),
@@ -418,7 +419,7 @@ class BarreSuperieure extends StatelessWidget {
         ],
         if (_entreesCompte.isNotEmpty)
           const Icon(
-            Icons.expand_more,
+            SymbolesAgri.expand_more,
             size: 16,
             color: AgriColors.brandForest,
           ),
@@ -480,24 +481,24 @@ class BarreSuperieure extends StatelessWidget {
       (
         'profil',
         'menu-compte-profil',
-        Icons.person,
+        SymbolesAgri.person,
         'Mon Profil',
         onMonProfil!,
       ),
     if (onAide != null)
-      ('aide', 'menu-compte-aide', Icons.help, 'Aide & À Propos', onAide!),
+      ('aide', 'menu-compte-aide', SymbolesAgri.help, 'Aide & À Propos', onAide!),
     if (onContact != null)
       (
         'contact',
         'menu-compte-contact',
-        Icons.support_agent,
+        SymbolesAgri.support_agent,
         "Contactez l'Éditeur",
         onContact!,
       ),
     if (onParametres != null)
-      ('parametres', 'menu-compte-parametres', Icons.settings, 'Paramètres', onParametres!),
+      ('parametres', 'menu-compte-parametres', SymbolesAgri.settings, 'Paramètres', onParametres!),
     if (onDeconnexion != null)
-      ('deconnexion', 'menu-compte-deconnexion', Icons.logout, 'Déconnexion', onDeconnexion!),
+      ('deconnexion', 'menu-compte-deconnexion', SymbolesAgri.logout, 'Déconnexion', onDeconnexion!),
   ];
 
   /// Badge sur le modèle de celui de la cloche (`notification-bell.blade.php`) : 16 px, 9 px gras, plafonné à
@@ -516,7 +517,7 @@ class BarreSuperieure extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.all(8),
-              child: Icon(Icons.sync, size: 22, color: AgriColors.outline),
+              child: Icon(SymbolesAgri.sync, size: 22, color: AgriColors.outline),
             ),
             if (enAttente > 0)
               Positioned(

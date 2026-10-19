@@ -78,3 +78,12 @@ flutter:
     - assets/images/logo.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+
+  # Ticket H1 — LES ICÔNES DU WEB : Material Symbols Outlined (style `material-symbols-outlined`, FILL 0), et
+  # non les Material Icons pleines de Flutter. Sous-ensemble tiré de la fonte complète du web par
+  # `outils/icones_poste.py` (classe `SymbolesAgri`), axes figés au réglage du web (FILL 0, wght 400).
+  # Licence Apache 2.0, comme au web.
+  fonts:
+    - family: MaterialSymbolsOutlined
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsOutlined.ttf

@@ -4,6 +4,7 @@ import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'notifications_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/notifications.html` → Centre de Notifications.
 ///
@@ -153,7 +154,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Row(
           children: [
             const Icon(
-              Icons.notifications,
+              SymbolesAgri.notifications,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -194,21 +195,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         libelle: 'Non Lues',
         valeur: '${d.nonLues}',
         couleurLisere: AgriColors.errorRed,
-        icone: Icons.mark_email_unread,
+        icone: SymbolesAgri.mark_email_unread,
         couleurIcone: AgriColors.errorRed,
       ),
       CarteKpi(
         libelle: 'Critiques',
         valeur: '${d.critiques}',
         couleurLisere: AgriColors.accentYellow,
-        icone: Icons.warning,
+        icone: SymbolesAgri.warning,
         couleurIcone: AgriColors.brandForest,
       ),
       CarteKpi(
         libelle: 'Total (30 jours)',
         valeur: '${d.total30Jours}',
         couleurLisere: AgriColors.brandEmerald,
-        icone: Icons.notifications,
+        icone: SymbolesAgri.notifications,
       ),
     ],
   );
@@ -238,7 +239,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 decoration: InputDecoration(
                   hintText: 'Rechercher un message...',
                   hintStyle: const TextStyle(fontSize: AgriTypography.xs),
-                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIcon: const Icon(SymbolesAgri.search, size: 18),
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   border: OutlineInputBorder(
@@ -323,7 +324,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Row(
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),
@@ -463,7 +464,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               children: [
                 _action(
                   Key('lue-$i'),
-                  Icons.check_circle,
+                  SymbolesAgri.check_circle,
                   'Marquer comme lue',
                   AgriColors.brandEmerald,
                   () => _agir(
@@ -474,14 +475,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 if (ecran != null && widget.onOuvrir != null)
                   _action(
                     Key('resoudre-$i'),
-                    Icons.arrow_forward,
+                    SymbolesAgri.arrow_forward,
                     'Résoudre',
                     AgriColors.infoBlue,
                     () => widget.onOuvrir!(ecran),
                   ),
                 _action(
                   Key('suppr-$i'),
-                  Icons.delete,
+                  SymbolesAgri.delete,
                   'Supprimer',
                   AgriColors.outline,
                   () => _agir(

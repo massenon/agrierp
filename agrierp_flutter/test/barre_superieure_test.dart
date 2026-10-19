@@ -2,6 +2,7 @@ import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket F0.25 — BARRE SUPÉRIEURE.
 ///
@@ -70,10 +71,10 @@ void main() {
   // Ticket H1 — comme au web, la bascule garde TOUJOURS l'icône `menu_open`.
   testWidgets('la bascule du menu garde l icône du web', (tester) async {
     await afficher(tester);
-    expect(find.byIcon(Icons.menu_open), findsOneWidget);
+    expect(find.byIcon(SymbolesAgri.menu_open), findsOneWidget);
 
     await afficher(tester, menuOuvert: false);
-    expect(find.byIcon(Icons.menu_open), findsOneWidget);
+    expect(find.byIcon(SymbolesAgri.menu_open), findsOneWidget);
   });
 
   testWidgets('la bascule prévient le socle', (tester) async {

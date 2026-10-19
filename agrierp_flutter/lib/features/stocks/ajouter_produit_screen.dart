@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'produits_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/ajouter-produit.html` → « Ajouter un Produit » / « Modifier le
 /// Produit » (Laravel : `Livewire\Stocks\AjouterProduit`).
@@ -178,7 +179,7 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
               Row(
                 children: [
                   Icon(
-                    _creation ? Icons.add_box : Icons.edit,
+                    _creation ? SymbolesAgri.add_box : SymbolesAgri.edit,
                     color: AgriColors.brandForest,
                   ),
                   const SizedBox(width: AgriSpacing.sm),

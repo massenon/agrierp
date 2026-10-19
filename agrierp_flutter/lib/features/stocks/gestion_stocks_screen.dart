@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'stocks_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/gestion-stocks.html` → Gestion Stocks.
 ///
@@ -117,7 +118,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
     child: Row(
       children: [
-        const Icon(Icons.inventory_2, size: 26, color: AgriColors.brandEmerald),
+        const Icon(SymbolesAgri.inventory_2, size: 26, color: AgriColors.brandEmerald),
         const SizedBox(width: AgriSpacing.xs),
         Expanded(
           // ⚠️ **« Gestion des Stocks », le titre de la PAGE.**
@@ -281,7 +282,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   key: const Key('stock-recherche'),
                   decoration: const InputDecoration(
                     isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 18),
+                    prefixIcon: Icon(SymbolesAgri.search, size: 18),
                     hintText: 'Rechercher un produit...',
                     hintStyle: TextStyle(fontSize: AgriTypography.xs),
                     border: OutlineInputBorder(),
@@ -317,8 +318,8 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   ),
                 ),
               ),
-              _boutonInerte(Icons.file_download, 'Exporter'),
-              _boutonInerte(Icons.upload_file, 'Importer'),
+              _boutonInerte(SymbolesAgri.file_download, 'Exporter'),
+              _boutonInerte(SymbolesAgri.upload_file, 'Importer'),
             ],
           ),
         ),
@@ -462,7 +463,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           flex: 2,
           child: Opacity(
             opacity: 0.4,
-            child: Icon(Icons.edit, size: 16, color: AgriColors.outline),
+            child: Icon(SymbolesAgri.edit, size: 16, color: AgriColors.outline),
           ),
         ),
       ],

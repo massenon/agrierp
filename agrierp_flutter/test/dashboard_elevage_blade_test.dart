@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
 import 'php_laravel.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket H6 — DASHBOARD ÉLEVAGE DU POSTE ALIGNÉ SUR LE BLADE (le Blade fait foi, Doctrine art. 5).
 ///
@@ -207,11 +208,11 @@ void main() {
       // Correspondance Material Symbols → Icons. ⚠️ `monitoring` n'existe pas dans `Icons` :
       // `ssid_chart` (axes et ligne brisée) est le glyphe le plus proche.
       const icones = {
-        'dashboard': Icons.dashboard,
-        'monitoring': Icons.ssid_chart,
-        'account_balance_wallet': Icons.account_balance_wallet,
-        'coronavirus': Icons.coronavirus,
-        'query_stats': Icons.query_stats,
+        'dashboard': SymbolesAgri.dashboard,
+        'monitoring': SymbolesAgri.ssid_chart,
+        'account_balance_wallet': SymbolesAgri.account_balance_wallet,
+        'coronavirus': SymbolesAgri.coronavirus,
+        'query_stats': SymbolesAgri.query_stats,
       };
 
       await afficher(tester);

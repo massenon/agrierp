@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'parametres_generaux_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/parametres-hub.html` → Paramètres Général.
 ///
@@ -30,12 +31,12 @@ class ParametresGenerauxScreen extends StatefulWidget {
 
   /// Les six onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Rôles & Permissions', Icons.admin_panel_settings),
-    ("Données de l'Entreprise", Icons.domain),
-    ('Modules Actifs', Icons.tune),
-    ('Gestion Utilisateurs', Icons.manage_accounts),
-    ('Modes de Paiement', Icons.account_balance_wallet),
-    ('Audit Logs', Icons.security),
+    ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
+    ("Données de l'Entreprise", SymbolesAgri.domain),
+    ('Modules Actifs', SymbolesAgri.tune),
+    ('Gestion Utilisateurs', SymbolesAgri.manage_accounts),
+    ('Modes de Paiement', SymbolesAgri.account_balance_wallet),
+    ('Audit Logs', SymbolesAgri.security),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -211,20 +212,20 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           libelle: 'Rôles configurés',
           valeur: '${d.roles.length}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.shield,
+          icone: SymbolesAgri.shield,
         ),
         CarteKpi(
           libelle: 'Utilisateurs assignés',
           valeur: '${d.utilisateurs.length}',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.group,
+          icone: SymbolesAgri.group,
           couleurIcone: AgriColors.infoBlue,
         ),
         CarteKpi(
           libelle: 'Modules couverts',
           valeur: '${ParametresGenerauxScreen.permissionsMatrice.length}',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.apps,
+          icone: SymbolesAgri.apps,
           couleurIcone: AgriColors.brandForest,
         ),
         // ⚠️ LES SAUVEGARDES NE DESCENDENT PAS : ce sont des fichiers `.sql`
@@ -236,7 +237,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: '—',
           legende: 'Sauvegardes gardées sur le serveur',
           couleurLisere: AgriColors.outline,
-          icone: Icons.backup,
+          icone: SymbolesAgri.backup,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -305,7 +306,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   Widget _droit(bool accorde) => Align(
     alignment: Alignment.centerLeft,
     child: Icon(
-      accorde ? Icons.check_circle : Icons.remove,
+      accorde ? SymbolesAgri.check_circle : SymbolesAgri.remove,
       size: 16,
       color: accorde ? AgriColors.brandEmerald : AgriColors.outline,
     ),
@@ -446,10 +447,10 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   };
 
   static const _iconesModules = <ModuleEspece, IconData>{
-    ModuleEspece.cuniculture: Icons.cruelty_free,
-    ModuleEspece.aviculture: Icons.egg,
-    ModuleEspece.porciculture: Icons.pets,
-    ModuleEspece.helico: Icons.bug_report,
+    ModuleEspece.cuniculture: SymbolesAgri.cruelty_free,
+    ModuleEspece.aviculture: SymbolesAgri.egg,
+    ModuleEspece.porciculture: SymbolesAgri.pets,
+    ModuleEspece.helico: SymbolesAgri.bug_report,
   };
 
   Widget _ongletModules(DonneesParametresGeneraux d, bool large) => Column(
@@ -528,7 +529,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                 ),
                 const SizedBox(width: AgriSpacing.sm),
                 Icon(
-                  d.moduleActif(module) ? Icons.toggle_on : Icons.toggle_off,
+                  d.moduleActif(module) ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
                   size: 28,
                   color: d.moduleActif(module)
                       ? AgriColors.brandEmerald
@@ -571,13 +572,13 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           libelle: 'Utilisateurs actifs',
           valeur: '${d.utilisateursActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.group,
+          icone: SymbolesAgri.group,
         ),
         CarteKpi(
           libelle: 'Rôles définis',
           valeur: '${d.roles.length}',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.badge,
+          icone: SymbolesAgri.badge,
           couleurIcone: AgriColors.infoBlue,
         ),
       ]),
@@ -657,16 +658,16 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   /// Les trois familles de comptes, dans l'ordre de la maquette, avec le
   /// `type` que le serveur leur donne.
   static const _famillesTresorerie = <(String, String, IconData)>[
-    ('Caisse Physique (531)', 'caisse', Icons.payments),
+    ('Caisse Physique (531)', 'caisse', SymbolesAgri.payments),
     (
       'Comptes Bancaires - Multi-Banques (521)',
       'banque',
-      Icons.account_balance,
+      SymbolesAgri.account_balance,
     ),
     (
       'Mobile Money - Multi-Opérateurs (5212)',
       'mobile_money',
-      Icons.smartphone,
+      SymbolesAgri.smartphone,
     ),
   ];
 
@@ -688,14 +689,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: _montant(d.soldeDe('caisse')),
           unite: 'F',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.payments,
+          icone: SymbolesAgri.payments,
         ),
         CarteKpi(
           libelle: 'Solde Banques (521)',
           valeur: _montant(d.soldeDe('banque')),
           unite: 'F',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.account_balance,
+          icone: SymbolesAgri.account_balance,
           couleurIcone: AgriColors.infoBlue,
         ),
         CarteKpi(
@@ -703,7 +704,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: _montant(d.soldeDe('mobile_money')),
           unite: 'F',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.smartphone,
+          icone: SymbolesAgri.smartphone,
           couleurIcone: AgriColors.brandForest,
         ),
       ]),
@@ -823,7 +824,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: d.auditRecent ? '${d.evenements24h}' : '—',
           legende: d.auditRecent ? null : 'Dernier tirage il y a plus de 24 h',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.history,
+          icone: SymbolesAgri.history,
         ),
         CarteKpi(
           libelle: 'Connexions échouées',
@@ -832,7 +833,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           couleurLisere: d.connexionsEchouees > 0
               ? AgriColors.errorRed
               : AgriColors.outline,
-          icone: Icons.lock,
+          icone: SymbolesAgri.lock,
           couleurIcone: d.connexionsEchouees > 0
               ? AgriColors.errorRed
               : AgriColors.outline,
@@ -1066,7 +1067,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -1087,7 +1088,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

@@ -8,6 +8,7 @@ import 'categorie_ration_porc.dart';
 import 'effectif_par_categorie.dart';
 import 'fiche_journaliere_repository.dart';
 import 'soins_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fiche-porcs.html` → Saisie Journalière du Cheptel Porcin.
 ///
@@ -354,7 +355,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               _carte(
                 titre:
                     'Saisie Journalière du Cheptel Porcin — ${_libelleJour()}',
-                icone: Icons.edit_note,
+                icone: SymbolesAgri.edit_note,
                 enfant: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -362,7 +363,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Morts par catégorie',
-                      icone: Icons.dangerous_outlined,
+                      icone: SymbolesAgri.dangerous,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
@@ -370,7 +371,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
+                      icone: SymbolesAgri.card_giftcard,
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
@@ -399,7 +400,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Passage de stade (Porcelet → Porc Marchand)',
-                      icone: Icons.trending_up,
+                      icone: SymbolesAgri.trending_up,
                       couleur: AgriColors.brandForest,
                       fond: AgriColors.surfaceZebra,
                       valeurs: _passage,
@@ -439,7 +440,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
   Widget _enTete() {
     return Row(
       children: [
-        const Icon(Icons.pets, color: AgriColors.brandEmerald, size: 26),
+        const Icon(SymbolesAgri.pets, color: AgriColors.brandEmerald, size: 26),
         const SizedBox(width: AgriSpacing.xs),
         const Expanded(
           child: Text(
@@ -482,7 +483,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               largeur: largeur,
               libelle: 'Effectif Porcins Vivants',
               valeur: '$_effectifFinal',
-              icone: Icons.pets,
+              icone: SymbolesAgri.pets,
               couleur: AgriColors.brandEmerald,
             ),
             // ⚠️ TIRET, PAS UN CHIFFRE. La ventilation truies / verrats /
@@ -492,14 +493,14 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               largeur: largeur,
               libelle: 'Truies Gestantes / Verrats',
               valeur: '—',
-              icone: Icons.favorite,
+              icone: SymbolesAgri.favorite,
               couleur: AgriColors.infoBlue,
             ),
             _carteKpi(
               largeur: largeur,
               libelle: 'Porcelets sous Mère',
               valeur: '—',
-              icone: Icons.child_care,
+              icone: SymbolesAgri.child_care,
               couleur: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
@@ -509,7 +510,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
               valeur: _tauxMortalite == null
                   ? '—'
                   : '${_tauxMortalite!.toStringAsFixed(1)}%',
-              icone: Icons.trending_down,
+              icone: SymbolesAgri.trending_down,
               couleur: AgriColors.errorRed,
             ),
           ],
@@ -694,7 +695,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
       ),
       child: const Column(
         children: [
-          Icon(Icons.sync_problem, size: 32, color: AgriColors.outline),
+          Icon(SymbolesAgri.sync_problem, size: 32, color: AgriColors.outline),
           SizedBox(height: AgriSpacing.sm),
           Text(
             'Aucune bande porcine active sur ce poste.',
@@ -1319,7 +1320,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.restaurant, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.restaurant, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1511,7 +1512,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.vaccines, size: 18, color: AgriColors.infoBlue),
+              const Icon(SymbolesAgri.vaccines, size: 18, color: AgriColors.infoBlue),
               const SizedBox(width: AgriSpacing.xs),
               const Expanded(
                 child: Text(
@@ -1615,7 +1616,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                 onPressed: _traitementsCoches.isEmpty || _validationEnCours
                     ? null
                     : _validerTraitements,
-                icon: const Icon(Icons.check_circle_outline, size: 16),
+                icon: const Icon(SymbolesAgri.check_circle_outline, size: 16),
                 label: const Text(
                   "Valider l'Administration de tous ces Traitements Aujourd'hui",
                   textAlign: TextAlign.center,
@@ -1629,8 +1630,8 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
                 children: [
                   Icon(
                     protocole.enAttente > 0
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
+                        ? SymbolesAgri.error_outline
+                        : SymbolesAgri.check_circle_outline,
                     size: 13,
                     color: protocole.enAttente > 0
                         ? AgriColors.errorDeep
@@ -1775,7 +1776,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.home_work, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.home_work, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1836,7 +1837,7 @@ class _FichePorcsScreenState extends State<FichePorcsScreen> {
           FilledButton.icon(
             key: const Key('bouton-enregistrer'),
             onPressed: _bande == null ? null : _enregistrer,
-            icon: const Icon(Icons.save, size: 18),
+            icon: const Icon(SymbolesAgri.save, size: 18),
             label: const Text(
               'Enregistrer ce Jour',
               style: TextStyle(

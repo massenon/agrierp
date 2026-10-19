@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'attestations_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Livraison d'une attestation : voir [LivraisonPdf], partagée avec la fiche
 /// sujet. Conservée sous ce nom pour les appelants existants.
@@ -61,8 +62,8 @@ class AttestationsVue extends StatefulWidget {
 
 class _AttestationsVueState extends State<AttestationsVue> {
   static const onglets = <(String, String, IconData)>[
-    ('generer', 'Générer une Attestation', Icons.description),
-    ('modeles', 'Personnaliser les Modèles', Icons.edit_note),
+    ('generer', 'Générer une Attestation', SymbolesAgri.description),
+    ('modeles', 'Personnaliser les Modèles', SymbolesAgri.edit_note),
   ];
 
   // En-tête du certificat — celui de la page web (RCCM de la directive officielle,
@@ -315,7 +316,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
         Row(
           children: [
             const Icon(
-              Icons.workspace_premium,
+              SymbolesAgri.workspace_premium,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -450,13 +451,13 @@ class _AttestationsVueState extends State<AttestationsVue> {
           Row(
             children: [
               Expanded(
-                child: _boutonType('employe', Icons.badge, 'Employé Permanent'),
+                child: _boutonType('employe', SymbolesAgri.badge, 'Employé Permanent'),
               ),
               const SizedBox(width: AgriSpacing.sm),
               Expanded(
                 child: _boutonType(
                   'stagiaire',
-                  Icons.school,
+                  SymbolesAgri.school,
                   'Stagiaire en Formation',
                 ),
               ),
@@ -577,7 +578,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
           FilledButton.icon(
             key: const Key('att-generer'),
             onPressed: _enCours ? null : _generer,
-            icon: const Icon(Icons.description, size: 18),
+            icon: const Icon(SymbolesAgri.description, size: 18),
             label: const Text(
               "Générer l'Attestation",
               style: TextStyle(
@@ -603,7 +604,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
                 child: OutlinedButton.icon(
                   key: const Key('att-imprimer'),
                   onPressed: () => widget.imprimer(_dernierPdf!),
-                  icon: const Icon(Icons.print, size: 18),
+                  icon: const Icon(SymbolesAgri.print, size: 18),
                   label: const Text('Imprimer'),
                 ),
               ),
@@ -661,7 +662,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
           erreur: _erreurs.containsKey(champ),
           fin: IconButton(
             key: Key('$cle-calendrier'),
-            icon: const Icon(Icons.calendar_today, size: 16),
+            icon: const Icon(SymbolesAgri.calendar_today, size: 16),
             onPressed: () async {
               final choisie = await showDatePicker(
                 context: context,
@@ -792,7 +793,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
               child: Center(
                 child: Opacity(
                   opacity: 0.05,
-                  child: const Icon(Icons.agriculture, size: 220),
+                  child: const Icon(SymbolesAgri.agriculture, size: 220),
                 ),
               ),
             ),
@@ -810,7 +811,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.agriculture,
+                      SymbolesAgri.agriculture,
                       size: 36,
                       color: AgriColors.brandEmerald,
                     ),
@@ -941,7 +942,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),
@@ -966,13 +967,13 @@ class _AttestationsVueState extends State<AttestationsVue> {
   Widget _modelesOnglet(bool large) {
     final employe = _carteModele(
       'employe',
-      Icons.badge,
+      SymbolesAgri.badge,
       'Modèle - Attestation de Travail (Employé)',
       'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]',
     );
     final stagiaire = _carteModele(
       'stagiaire',
-      Icons.school,
+      SymbolesAgri.school,
       'Modèle - Attestation de Stage (Stagiaire)',
       'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], '
           '[DATE_DEBUT], [DATE_FIN]',

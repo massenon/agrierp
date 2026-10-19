@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'cartes_attendues.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket F0.51 — PARAMÈTRES GÉNÉRAL (`parametres-hub.html`, six onglets).
 ///
@@ -364,7 +365,7 @@ void main() {
       await afficher(tester);
 
       // `comptable` : Dashboard (commun) + Comptabilité, rien d'autre.
-      expect(find.byIcon(Icons.check_circle), findsNWidgets(9 + 2));
+      expect(find.byIcon(SymbolesAgri.check_circle), findsNWidgets(9 + 2));
     });
 
     testWidgets('⚠️ la dernière sauvegarde porte un tiret motivé', (
@@ -416,8 +417,8 @@ void main() {
         expect(find.byKey(Key('module-${module.code}')), findsOne);
       }
       expect(find.text('FUTUR'), findsOne);
-      expect(find.byIcon(Icons.toggle_on), findsNWidgets(3));
-      expect(find.byIcon(Icons.toggle_off), findsOne);
+      expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(3));
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsOne);
     });
 
     testWidgets('un utilisateur désactivé porte le mot de la maquette', (

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/permissions_poste.dart';
 import '../theme/agri_tokens.dart';
+import '../theme/symboles_agri.dart';
 
 /// Ticket H1 — BOUTON FLOTTANT ET PANNEAU « ACCÈS RAPIDE », transposés de `layouts/app.blade.php:219-247` (le
 /// maître). 🔴 Ils n'existaient pas au poste : les fiches d'espèce n'étaient atteignables que par Gestion Élevage.
@@ -30,29 +31,29 @@ class AccesRapide {
     (
       AgriColors.brandEmerald,
       [
-        (Icons.cruelty_free, 'Fiche Lapins', EcranPoste.ficheElevage),
-        (Icons.egg, 'Fiche Pondeuses', EcranPoste.fichePondeuses),
-        (Icons.egg_alt, 'Fiche Volailles Reproducteurs', EcranPoste.ficheReproducteurs),
-        (Icons.pets, 'Fiche Porcs', EcranPoste.fichePorcs),
-        (Icons.bug_report, 'Fiche Escargots', EcranPoste.ficheEscargots),
+        (SymbolesAgri.cruelty_free, 'Fiche Lapins', EcranPoste.ficheElevage),
+        (SymbolesAgri.egg, 'Fiche Pondeuses', EcranPoste.fichePondeuses),
+        (SymbolesAgri.egg_alt, 'Fiche Volailles Reproducteurs', EcranPoste.ficheReproducteurs),
+        (SymbolesAgri.pets, 'Fiche Porcs', EcranPoste.fichePorcs),
+        (SymbolesAgri.bug_report, 'Fiche Escargots', EcranPoste.ficheEscargots),
       ],
     ),
     (
       AgriColors.infoBlue,
       [
-        (Icons.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
-        (Icons.vaccines, 'Calendrier Soins & Vaccins', EcranPoste.soinsEtVaccins),
+        (SymbolesAgri.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
+        (SymbolesAgri.vaccines, 'Calendrier Soins & Vaccins', EcranPoste.soinsEtVaccins),
       ],
     ),
     (
       AgriColors.brandForest,
       [
-        (Icons.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
-        (Icons.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
-        (Icons.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
-        (Icons.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
-        (Icons.account_balance, 'Comptabilité', EcranPoste.comptabilite),
-        (Icons.picture_as_pdf, 'Rapports et Exports', EcranPoste.rapportsEtExports),
+        (SymbolesAgri.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
+        (SymbolesAgri.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
+        (SymbolesAgri.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
+        (SymbolesAgri.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
+        (SymbolesAgri.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+        (SymbolesAgri.picture_as_pdf, 'Rapports et Exports', EcranPoste.rapportsEtExports),
       ],
     ),
   ];
@@ -102,7 +103,7 @@ class BoutonAccesRapide extends StatelessWidget {
             child: const SizedBox(
               width: 48,
               height: 48,
-              child: Icon(Icons.apps, size: 24, color: Colors.white),
+              child: Icon(SymbolesAgri.apps, size: 24, color: Colors.white),
             ),
           ),
         ),
@@ -139,7 +140,7 @@ class _Panneau extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.apps, size: 20, color: AgriColors.accentYellow),
+                    const Icon(SymbolesAgri.apps, size: 20, color: AgriColors.accentYellow),
                     const SizedBox(width: AgriSpacing.xs),
                     const Expanded(
                       child: Text(
@@ -152,7 +153,7 @@ class _Panneau extends StatelessWidget {
                       tooltip: 'Fermer',
                       iconSize: 20,
                       color: Colors.white.withValues(alpha: 0.80),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(SymbolesAgri.close),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],

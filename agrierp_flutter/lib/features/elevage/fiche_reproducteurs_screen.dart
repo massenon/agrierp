@@ -7,6 +7,7 @@ import '../../core/widgets/tableau_mensuel.dart';
 import 'fiche_journaliere_repository.dart';
 import 'ration_volaille.dart';
 import 'soins_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fiche-volailles-reproducteurs.html` → Suivi Reproducteurs
 /// & Goliath.
@@ -253,7 +254,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
               _carte(
                 titre:
                     'Saisie Journalière Reproducteurs & Goliath — ${_libelleJour()}',
-                icone: Icons.edit_note,
+                icone: SymbolesAgri.edit_note,
                 enfant: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -280,7 +281,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                     ],
                     _blocCategories(
                       titre: 'Morts par catégorie',
-                      icone: Icons.dangerous_outlined,
+                      icone: SymbolesAgri.dangerous,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
@@ -305,7 +306,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                     ],
                     _blocCategories(
                       titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
+                      icone: SymbolesAgri.card_giftcard,
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
@@ -342,7 +343,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   Widget _enTete() {
     return const Row(
       children: [
-        Icon(Icons.egg_alt, color: AgriColors.brandEmerald, size: 26),
+        Icon(SymbolesAgri.egg_alt, color: AgriColors.brandEmerald, size: 26),
         SizedBox(width: AgriSpacing.xs),
         Expanded(
           child: Text(
@@ -373,7 +374,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
               largeur: largeur,
               libelle: 'Effectif Total Vivant',
               valeur: '$_effectifFinal',
-              icone: Icons.grid_view,
+              icone: SymbolesAgri.grid_view,
               couleur: AgriColors.brandEmerald,
             ),
             _carteKpi(
@@ -382,14 +383,14 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
               valeur: _tauxEclosion == null
                   ? '—'
                   : '${_tauxEclosion!.toStringAsFixed(1)}%',
-              icone: Icons.egg,
+              icone: SymbolesAgri.egg,
               couleur: AgriColors.infoBlue,
             ),
             _carteKpi(
               largeur: largeur,
               libelle: 'Poussins Nés (Éclosion)',
               valeur: '$_poussinsNes',
-              icone: Icons.child_care,
+              icone: SymbolesAgri.child_care,
               couleur: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
@@ -399,7 +400,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
               valeur: _tauxMortalite == null
                   ? '—'
                   : '${_tauxMortalite!.toStringAsFixed(1)}%',
-              icone: Icons.trending_down,
+              icone: SymbolesAgri.trending_down,
               couleur: AgriColors.errorRed,
             ),
           ],
@@ -551,7 +552,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       ),
       child: const Column(
         children: [
-          Icon(Icons.sync_problem, size: 32, color: AgriColors.outline),
+          Icon(SymbolesAgri.sync_problem, size: 32, color: AgriColors.outline),
           SizedBox(height: AgriSpacing.sm),
           Text(
             'Aucune bande avicole hors ponte sur ce poste.',
@@ -1041,7 +1042,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.restaurant, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.restaurant, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1261,7 +1262,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.vaccines, size: 18, color: AgriColors.infoBlue),
+              const Icon(SymbolesAgri.vaccines, size: 18, color: AgriColors.infoBlue),
               const SizedBox(width: AgriSpacing.xs),
               const Expanded(
                 child: Text(
@@ -1369,7 +1370,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                 onPressed: _traitementsCoches.isEmpty || _validationEnCours
                     ? null
                     : _validerTraitements,
-                icon: const Icon(Icons.check_circle_outline, size: 16),
+                icon: const Icon(SymbolesAgri.check_circle_outline, size: 16),
                 label: const Text(
                   "Valider l'Administration de tous ces Traitements Aujourd'hui",
                   textAlign: TextAlign.center,
@@ -1383,8 +1384,8 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
                 children: [
                   Icon(
                     protocole.enAttente > 0
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
+                        ? SymbolesAgri.error_outline
+                        : SymbolesAgri.check_circle_outline,
                     size: 13,
                     color: protocole.enAttente > 0
                         ? AgriColors.errorDeep
@@ -1529,7 +1530,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.home_work, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.home_work, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1590,7 +1591,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
           FilledButton.icon(
             key: const Key('bouton-enregistrer'),
             onPressed: _bande == null ? null : _enregistrer,
-            icon: const Icon(Icons.save, size: 18),
+            icon: const Icon(SymbolesAgri.save, size: 18),
             label: const Text(
               'Enregistrer ce Jour',
               style: TextStyle(

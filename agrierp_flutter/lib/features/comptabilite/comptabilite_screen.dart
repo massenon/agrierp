@@ -6,6 +6,7 @@ import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/comptabilite-hub.html` → Comptabilité.
 ///
@@ -43,16 +44,16 @@ class ComptabiliteScreen extends StatefulWidget {
 
 /// Les neuf cartes du hub, dans l'ordre de la maquette.
 enum PageComptable {
-  hub('Comptabilité', Icons.account_balance),
-  planComptable('Plan Comptable', Icons.list_alt),
-  journal('Journal Comptable', Icons.menu_book),
-  grandLivre('Grand Livre', Icons.auto_stories),
-  balance('Balance Générale', Icons.balance),
-  etatsFinanciers('États Financiers', Icons.assessment),
-  cloture('Clôture Périodique & Annuelle', Icons.lock_clock),
-  analytique('Comptabilité Analytique', Icons.pie_chart),
-  tva('Déclaration TVA', Icons.receipt_long),
-  rapprochement('Rapprochement Bancaire', Icons.account_balance_wallet);
+  hub('Comptabilité', SymbolesAgri.account_balance),
+  planComptable('Plan Comptable', SymbolesAgri.list_alt),
+  journal('Journal Comptable', SymbolesAgri.menu_book),
+  grandLivre('Grand Livre', SymbolesAgri.auto_stories),
+  balance('Balance Générale', SymbolesAgri.balance),
+  etatsFinanciers('États Financiers', SymbolesAgri.assessment),
+  cloture('Clôture Périodique & Annuelle', SymbolesAgri.lock_clock),
+  analytique('Comptabilité Analytique', SymbolesAgri.pie_chart),
+  tva('Déclaration TVA', SymbolesAgri.receipt_long),
+  rapprochement('Rapprochement Bancaire', SymbolesAgri.account_balance_wallet);
 
   const PageComptable(this.libelle, this.icone);
 
@@ -172,7 +173,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       child: TextButton.icon(
         key: const Key('retour-hub'),
         onPressed: () => setState(() => _page = PageComptable.hub),
-        icon: const Icon(Icons.arrow_back, size: 18),
+        icon: const Icon(SymbolesAgri.arrow_back, size: 18),
         label: const Text(
           'Comptabilité',
           style: TextStyle(
@@ -200,14 +201,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
               ? 'Exercice non synchronisé'
               : 'Exercice ${d.exerciceOuvert!.year}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.menu_book,
+          icone: SymbolesAgri.menu_book,
         ),
         CarteKpi(
           libelle: 'Total Débit',
           valeur: _montant(d.totalDebit),
           unite: 'FCFA',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.trending_up,
+          icone: SymbolesAgri.trending_up,
           couleurIcone: AgriColors.infoBlue,
         ),
         CarteKpi(
@@ -215,7 +216,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           valeur: _montant(d.totalCredit),
           unite: 'FCFA',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.trending_down,
+          icone: SymbolesAgri.trending_down,
           couleurIcone: AgriColors.brandForest,
         ),
         // ⚠️⚠️ UN DÉSÉQUILIBRE N'EST PAS UNE ERREUR COMPTABLE. Le serveur
@@ -230,7 +231,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           couleurLisere: d.ecrituresIncompletes > 0
               ? AgriColors.accentYellow
               : AgriColors.brandEmerald,
-          icone: Icons.sync_problem,
+          icone: SymbolesAgri.sync_problem,
           couleurIcone: AgriColors.brandForest,
         ),
       ]),
@@ -322,7 +323,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           libelle: 'Comptes actifs',
           valeur: '${d.comptesActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.menu_book,
+          icone: SymbolesAgri.menu_book,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -332,7 +333,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           // l'année courante laisserait croire qu'un exercice l'est.
           valeur: '${d.anneeExerciceOuvert ?? '—'}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.event,
+          icone: SymbolesAgri.event,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -414,7 +415,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           libelle: 'Écritures (mois)',
           valeur: '${d.ecrituresDuMois(DateTime.now())}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.receipt_long,
+          icone: SymbolesAgri.receipt_long,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -424,7 +425,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           unite: 'F',
           legende: 'Journal reçu au poste',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.arrow_downward,
+          icone: SymbolesAgri.arrow_downward,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -434,7 +435,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           unite: 'F',
           legende: 'Journal reçu au poste',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.arrow_upward,
+          icone: SymbolesAgri.arrow_upward,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -746,7 +747,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 style: const TextStyle(fontSize: AgriTypography.xs),
                 decoration: const InputDecoration(
                   isDense: true,
-                  prefixIcon: Icon(Icons.search, size: 18),
+                  prefixIcon: Icon(SymbolesAgri.search, size: 18),
                   hintText: 'Rechercher un libellé, une pièce...',
                   border: OutlineInputBorder(),
                 ),
@@ -1052,7 +1053,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning, size: 20, color: AgriColors.errorDeep),
+                Icon(SymbolesAgri.warning, size: 20, color: AgriColors.errorDeep),
                 SizedBox(width: AgriSpacing.sm),
                 Expanded(
                   child: Column(
@@ -1219,7 +1220,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       OutlinedButton.icon(
         key: Key(cle),
         onPressed: onPressed,
-        icon: const Icon(Icons.picture_as_pdf, size: 18),
+        icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
         style: OutlinedButton.styleFrom(
           foregroundColor: AgriColors.brandForest,
           side: const BorderSide(color: AgriColors.outlineVariant),
@@ -1530,7 +1531,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -1547,7 +1548,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

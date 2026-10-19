@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'clients_creances_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ouvre « Nouveau Client » (`existant == null`) ou « Modifier le Client ».
 ///
@@ -199,7 +200,7 @@ class _ModaleArchivageClients extends StatelessWidget {
       message:
           '$sujet sera marqué(e) comme archivé(e) (statut inactif). '
           "Aucune suppression définitive n'est effectuée.",
-      icone: Icons.archive,
+      icone: SymbolesAgri.archive,
       actions: [
         BoutonModaleSecondaire(
           libelle: 'Annuler',

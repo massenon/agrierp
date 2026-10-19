@@ -8,6 +8,7 @@ import 'fiche_journaliere_repository.dart';
 import 'ration_volaille.dart';
 import 'production_oeufs_service.dart';
 import 'soins_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fiche-volailles-pondeuses.html` → Saisie Journalière Ponte
 /// & Cheptel.
@@ -264,7 +265,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
             else
               _carte(
                 titre: 'Saisie Journalière Ponte & Cheptel — ${_libelleJour()}',
-                icone: Icons.edit_note,
+                icone: SymbolesAgri.edit_note,
                 enfant: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -291,7 +292,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                     ],
                     _blocCategories(
                       titre: 'Morts par catégorie',
-                      icone: Icons.dangerous_outlined,
+                      icone: SymbolesAgri.dangerous,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
@@ -316,7 +317,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                     ],
                     _blocCategories(
                       titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
+                      icone: SymbolesAgri.card_giftcard,
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
@@ -353,7 +354,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   Widget _enTete() {
     return Row(
       children: [
-        const Icon(Icons.egg, color: AgriColors.brandEmerald, size: 26),
+        const Icon(SymbolesAgri.egg, color: AgriColors.brandEmerald, size: 26),
         const SizedBox(width: AgriSpacing.xs),
         const Expanded(
           child: Text(
@@ -399,7 +400,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
               largeur: largeur,
               libelle: 'Effectif Pondeuses Vivantes',
               valeur: '$_effectifFinal',
-              icone: Icons.pets,
+              icone: SymbolesAgri.pets,
               couleur: AgriColors.brandEmerald,
             ),
             _carteKpi(
@@ -408,7 +409,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
               valeur: _tauxPonte == null
                   ? '—'
                   : '${_tauxPonte!.toStringAsFixed(1)}%',
-              icone: Icons.egg,
+              icone: SymbolesAgri.egg,
               couleur: AgriColors.infoBlue,
             ),
             _carteKpi(
@@ -421,7 +422,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
               valeur: _produitOeufs == null
                   ? '—'
                   : '${_produitOeufs!.stockQty.round()} Plateaux',
-              icone: Icons.grid_view,
+              icone: SymbolesAgri.grid_view,
               couleur: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
@@ -431,7 +432,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
               valeur: _tauxMortalite == null
                   ? '—'
                   : '${_tauxMortalite!.toStringAsFixed(1)}%',
-              icone: Icons.trending_down,
+              icone: SymbolesAgri.trending_down,
               couleur: AgriColors.errorRed,
             ),
           ],
@@ -633,7 +634,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       ),
       child: const Column(
         children: [
-          Icon(Icons.sync_problem, size: 32, color: AgriColors.outline),
+          Icon(SymbolesAgri.sync_problem, size: 32, color: AgriColors.outline),
           SizedBox(height: AgriSpacing.sm),
           Text(
             'Aucune bande active au stade Ponte sur ce poste.',
@@ -827,7 +828,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.egg, size: 18, color: Color(0xFFB45309)),
+              Icon(SymbolesAgri.egg, size: 18, color: Color(0xFFB45309)),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1170,7 +1171,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.restaurant, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.restaurant, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1391,7 +1392,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.vaccines, size: 18, color: AgriColors.infoBlue),
+              const Icon(SymbolesAgri.vaccines, size: 18, color: AgriColors.infoBlue),
               const SizedBox(width: AgriSpacing.xs),
               const Expanded(
                 child: Text(
@@ -1496,7 +1497,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                 onPressed: _traitementsCoches.isEmpty || _validationEnCours
                     ? null
                     : _validerTraitements,
-                icon: const Icon(Icons.check_circle_outline, size: 16),
+                icon: const Icon(SymbolesAgri.check_circle_outline, size: 16),
                 label: const Text(
                   "Valider l'Administration de Tous les Traitements du Jour",
                   textAlign: TextAlign.center,
@@ -1510,8 +1511,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                 children: [
                   Icon(
                     protocole.enAttente > 0
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
+                        ? SymbolesAgri.error_outline
+                        : SymbolesAgri.check_circle_outline,
                     size: 13,
                     color: protocole.enAttente > 0
                         ? AgriColors.errorDeep
@@ -1659,7 +1660,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.home_work, size: 18, color: AgriColors.brandEmerald),
+              Icon(SymbolesAgri.home_work, size: 18, color: AgriColors.brandEmerald),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(
@@ -1720,7 +1721,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
           FilledButton.icon(
             key: const Key('bouton-enregistrer'),
             onPressed: _bande == null ? null : _enregistrer,
-            icon: const Icon(Icons.save, size: 18),
+            icon: const Icon(SymbolesAgri.save, size: 18),
             label: const Text(
               'Enregistrer ce Jour',
               style: TextStyle(

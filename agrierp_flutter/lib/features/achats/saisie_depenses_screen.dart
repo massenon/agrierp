@@ -5,6 +5,7 @@ import '../../core/database/sync_columns.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'depenses_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/saisie-depenses.html` → Saisie des Dépenses.
 ///
@@ -110,7 +111,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   Widget _enTete() {
     return const Row(
       children: [
-        Icon(Icons.payments, color: AgriColors.brandEmerald, size: 26),
+        Icon(SymbolesAgri.payments, color: AgriColors.brandEmerald, size: 26),
         SizedBox(width: AgriSpacing.xs),
         Expanded(
           child: Text(
@@ -139,7 +140,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.bar_chart, size: 18, color: AgriColors.brandEmerald),
+                Icon(SymbolesAgri.bar_chart, size: 18, color: AgriColors.brandEmerald),
                 SizedBox(width: AgriSpacing.xs),
                 Text(
                   'Indicateurs de performance',
@@ -160,7 +161,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   largeur: largeur,
                   libelle: 'Dépenses du mois',
                   valeur: '${_montantFormate(_totalDuMois)} F',
-                  icone: Icons.payments,
+                  icone: SymbolesAgri.payments,
                   couleur: AgriColors.brandEmerald,
                   note: 'saisies sur ce poste',
                 ),
@@ -171,7 +172,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   largeur: largeur,
                   libelle: 'Charges Fixes',
                   valeur: '—',
-                  icone: Icons.event_repeat,
+                  icone: SymbolesAgri.event_repeat,
                   couleur: AgriColors.infoBlue,
                   note: 'classement à arbitrer',
                 ),
@@ -179,7 +180,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   largeur: largeur,
                   libelle: 'Charges Variables',
                   valeur: '—',
-                  icone: Icons.trending_down,
+                  icone: SymbolesAgri.trending_down,
                   couleur: AgriColors.accentYellow,
                   couleurIcone: AgriColors.brandForest,
                   note: 'classement à arbitrer',
@@ -223,7 +224,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
             const Row(
               children: [
                 Icon(
-                  Icons.add_circle,
+                  SymbolesAgri.add_circle,
                   color: AgriColors.brandEmerald,
                   size: 20,
                 ),
@@ -320,7 +321,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                 child: FilledButton.icon(
                   key: const Key('bouton-enregistrer-depense'),
                   onPressed: _enregistrement ? null : _enregistrer,
-                  icon: const Icon(Icons.save, size: 18),
+                  icon: const Icon(SymbolesAgri.save, size: 18),
                   label: const Text('Enregistrer la Dépense'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AgriColors.brandEmerald,
@@ -476,7 +477,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
           ),
           child: const Row(
             children: [
-              Icon(Icons.add_a_photo, size: 18, color: AgriColors.outline),
+              Icon(SymbolesAgri.add_a_photo, size: 18, color: AgriColors.outline),
               SizedBox(width: AgriSpacing.xs),
               Expanded(
                 child: Text(

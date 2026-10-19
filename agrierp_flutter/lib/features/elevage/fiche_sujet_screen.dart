@@ -5,6 +5,7 @@ import '../../core/database/app_database.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'sujets_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/animal-details.html` → Fiche Sujet.
 ///
@@ -191,7 +192,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
   Widget _boutonRetour() => TextButton.icon(
     key: const Key('sujet-retour'),
     onPressed: widget.onRetour,
-    icon: const Icon(Icons.arrow_back, size: 16),
+    icon: const Icon(SymbolesAgri.arrow_back, size: 16),
     label: const Text('Retour', style: TextStyle(fontSize: AgriTypography.xs)),
   );
 
@@ -216,7 +217,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
             child: OutlinedButton.icon(
               key: const Key('sujet-imprimer'),
               onPressed: () => widget.imprimer(_dernierPdf!),
-              icon: const Icon(Icons.print, size: 18),
+              icon: const Icon(SymbolesAgri.print, size: 18),
               label: const Text('Imprimer'),
             ),
           ),
@@ -266,7 +267,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
               borderRadius: BorderRadius.circular(AgriRadius.lg),
             ),
             child: const Icon(
-              Icons.pets,
+              SymbolesAgri.pets,
               size: 36,
               color: AgriColors.brandEmerald,
             ),
@@ -308,7 +309,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
           OutlinedButton.icon(
             key: const Key('sujet-exporter'),
             onPressed: _enCours ? null : _exporter,
-            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
             label: const Text(
               'Exporter PDF',
               style: TextStyle(
@@ -359,7 +360,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
       child: Row(
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),
@@ -451,7 +452,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.badge, size: 18, color: AgriColors.brandForest),
+              Icon(SymbolesAgri.badge, size: 18, color: AgriColors.brandForest),
               SizedBox(width: AgriSpacing.xs),
               Text(
                 'Identification',
@@ -508,7 +509,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.qr_code_2, size: 18, color: AgriColors.brandForest),
+              Icon(SymbolesAgri.qr_code_2, size: 18, color: AgriColors.brandForest),
               SizedBox(width: AgriSpacing.xs),
               Text(
                 'QR Code Sujet',
@@ -590,7 +591,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Icon(
-              Icons.info_outline,
+              SymbolesAgri.info,
               size: 18,
               color: AgriColors.infoBlue,
             ),
@@ -803,7 +804,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
     child: Column(
       children: [
         const Icon(
-          Icons.hourglass_empty,
+          SymbolesAgri.hourglass_empty,
           size: 44,
           color: AgriColors.outlineVariant,
         ),

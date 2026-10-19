@@ -6,6 +6,7 @@ import '../widgets/carte_kpi.dart';
 import '../widgets/modale_agri.dart';
 import '../widgets/toast_agri.dart';
 import 'sync_engine.dart';
+import '../theme/symboles_agri.dart';
 
 /// Ticket H2 — MODALE « SYNCHRONISATION » du poste, ouverte par le bouton de la barre supérieure
 /// (PRD `docs/prd/synchronisation-barre-superieure.md`, EF2, EF4-EF6, EF14).
@@ -147,7 +148,7 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
                   key: const Key('sync-en-attente'),
                   libelle: "En attente d'envoi",
                   valeur: c == null ? '—' : '${c.aEnvoyer}',
-                  icone: Icons.cloud_upload,
+                  icone: SymbolesAgri.cloud_upload,
                   couleurLisere: AgriColors.accentYellow,
                 ),
               ),
@@ -157,7 +158,7 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
                   key: const Key('sync-refuses'),
                   libelle: 'Refusés par le serveur',
                   valeur: c == null ? '—' : '${c.refuses}',
-                  icone: Icons.block,
+                  icone: SymbolesAgri.block,
                   couleurLisere: AgriColors.errorRed,
                   couleurValeur: (c?.refuses ?? 0) > 0 ? AgriColors.errorDeep : AgriColors.onSurface,
                 ),
@@ -171,7 +172,7 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
                   // inconnue du poste.
                   valeur: _etat?.lastSucceededAt == null ? '—' : horodatage(_etat!.lastSucceededAt!),
                   tailleValeur: AgriTypography.sm,
-                  icone: Icons.cloud_done,
+                  icone: SymbolesAgri.cloud_done,
                   couleurLisere: AgriColors.brandEmerald,
                 ),
               ),
@@ -211,9 +212,9 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
 
   Widget _liaison(bool? enLigne) {
     final (texte, couleur, icone) = switch (enLigne) {
-      true => ('En ligne', AgriColors.brandEmerald, Icons.wifi),
-      false => ('Hors ligne', AgriColors.outline, Icons.wifi_off),
-      null => ('—', AgriColors.outline, Icons.wifi_find),
+      true => ('En ligne', AgriColors.brandEmerald, SymbolesAgri.wifi),
+      false => ('Hors ligne', AgriColors.outline, SymbolesAgri.wifi_off),
+      null => ('—', AgriColors.outline, SymbolesAgri.wifi_find),
     };
     return Row(
       key: const Key('sync-liaison'),

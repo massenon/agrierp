@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ouvre « Générer un Document » (`existant == null`) ou « Modifier — Documents
 /// Administratifs » (`documents-administratifs.html`).
@@ -303,7 +304,7 @@ class _ModaleRetraitDocument extends StatelessWidget {
       message:
           "L'enregistrement sera marqué comme archivé (statut inactif). "
           "Aucune suppression définitive n'est effectuée.",
-      icone: Icons.archive,
+      icone: SymbolesAgri.archive,
       couleurIcone: AgriColors.errorDeep,
       actions: [
         BoutonModaleSecondaire(

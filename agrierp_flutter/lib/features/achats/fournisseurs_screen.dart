@@ -7,6 +7,7 @@ import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
 import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fournisseurs.html` → Fournisseurs.
 ///
@@ -38,9 +39,9 @@ class FournisseursScreen extends StatefulWidget {
 class _FournisseursScreenState extends State<FournisseursScreen> {
   /// Les trois onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Ajouter Fournisseur', Icons.person_add),
-    ('Fiches Fournisseurs', Icons.contact_page),
-    ('Dettes Fournisseurs', Icons.account_balance_wallet),
+    ('Ajouter Fournisseur', SymbolesAgri.person_add),
+    ('Fiches Fournisseurs', SymbolesAgri.contact_page),
+    ('Dettes Fournisseurs', SymbolesAgri.account_balance_wallet),
   ];
 
   String _onglet = onglets.first.$1;
@@ -179,7 +180,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
           libelle: 'Fournisseurs actifs',
           valeur: '${d.fournisseursActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.local_shipping,
+          icone: SymbolesAgri.local_shipping,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -191,7 +192,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
           valeur: d.nouveauxDuMois == null ? '—' : '${d.nouveauxDuMois}',
           legende: "Date d'entrée non transmise au poste",
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.person_add,
+          icone: SymbolesAgri.person_add,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -271,7 +272,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
           libelle: 'Fournisseurs actifs',
           valeur: '${d.fournisseursActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.local_shipping,
+          icone: SymbolesAgri.local_shipping,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -281,7 +282,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
           unite: 'F',
           legende: 'Achats présents sur ce poste',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.payments,
+          icone: SymbolesAgri.payments,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -379,7 +380,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
             ElevatedButton.icon(
               key: const Key('enregistrer-reglement'),
               onPressed: () => _ouvrirReglement(d),
-              icon: const Icon(Icons.payments, size: 18),
+              icon: const Icon(SymbolesAgri.payments, size: 18),
               label: const Text(
                 '+ Enregistrer un Règlement',
                 style: TextStyle(
@@ -402,7 +403,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
             valeur: _montant(d.ardoiseTotale),
             unite: 'FCFA',
             couleurLisere: AgriColors.errorRed,
-            icone: Icons.account_balance_wallet,
+            icone: SymbolesAgri.account_balance_wallet,
             couleurIcone: AgriColors.errorRed,
           ),
           CarteKpi(
@@ -410,7 +411,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
             valeur: '${d.echues(jour)}',
             legende: 'Échéance dépassée',
             couleurLisere: AgriColors.accentYellow,
-            icone: Icons.schedule,
+            icone: SymbolesAgri.schedule,
             couleurIcone: AgriColors.brandForest,
           ),
           CarteKpi(
@@ -418,7 +419,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
             valeur: '${d.fournisseurs.length}',
             legende: 'Partenaires actifs',
             couleurLisere: AgriColors.brandEmerald,
-            icone: Icons.groups,
+            icone: SymbolesAgri.groups,
           ),
         ]),
         const SizedBox(height: AgriSpacing.md),
@@ -538,7 +539,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   }) => ElevatedButton.icon(
     key: Key(cle),
     onPressed: () => _ouvrirFiche(null),
-    icon: const Icon(Icons.add_circle, size: 18),
+    icon: const Icon(SymbolesAgri.add_circle, size: 18),
     label: const Text(
       'Nouveau Fournisseur',
       style: TextStyle(
@@ -578,14 +579,14 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
         key: Key('modifier-fiche-${f.id}'),
         tooltip: 'Modifier',
         onPressed: () => _ouvrirFiche(f),
-        icon: const Icon(Icons.edit, size: 16),
+        icon: const Icon(SymbolesAgri.edit, size: 16),
         color: AgriColors.outline,
       ),
       IconButton(
         key: Key('archiver-fiche-${f.id}'),
         tooltip: 'Archiver',
         onPressed: () => _archiver(f),
-        icon: const Icon(Icons.archive, size: 16),
+        icon: const Icon(SymbolesAgri.archive, size: 16),
         color: AgriColors.outline,
       ),
     ],
@@ -722,7 +723,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -739,7 +740,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'ajouter_produit_screen.dart';
 import 'produits_repository.dart';
 import 'stocks_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/catalogue-produits.html` → Catalogue Produits.
 ///
@@ -47,8 +48,8 @@ class CatalogueProduitsScreen extends StatefulWidget {
 class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
   /// Les deux onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Voir le Catalogue', Icons.category),
-    ("Seuils d'Alerte", Icons.notifications_active),
+    ('Voir le Catalogue', SymbolesAgri.category),
+    ("Seuils d'Alerte", SymbolesAgri.notifications_active),
   ];
 
   String _onglet = onglets.first.$1;
@@ -197,7 +198,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
       children: [
         _entete(
           titre: 'Catalogue Produits',
-          icone: Icons.category,
+          icone: SymbolesAgri.category,
           sousTitre:
               "Vue d'ensemble visuelle de l'offre commerciale de la ferme.",
           large: large,
@@ -249,7 +250,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
                 key: const Key('catalogue-recherche'),
                 decoration: const InputDecoration(
                   isDense: true,
-                  prefixIcon: Icon(Icons.search, size: 18),
+                  prefixIcon: Icon(SymbolesAgri.search, size: 18),
                   hintText: 'Rechercher un produit ou un SKU...',
                   hintStyle: TextStyle(fontSize: AgriTypography.xs),
                   border: OutlineInputBorder(),
@@ -264,7 +265,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
               key: const Key('vue-grille'),
               onPressed: () => setState(() => _grille = true),
               icon: Icon(
-                Icons.grid_view,
+                SymbolesAgri.grid_view,
                 size: 20,
                 color: _grille ? AgriColors.brandEmerald : AgriColors.outline,
               ),
@@ -273,7 +274,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
               key: const Key('vue-liste'),
               onPressed: () => setState(() => _grille = false),
               icon: Icon(
-                Icons.view_list,
+                SymbolesAgri.view_list,
                 size: 20,
                 color: _grille ? AgriColors.outline : AgriColors.brandEmerald,
               ),
@@ -518,7 +519,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
                               : () => setState(
                                   () => _formulaire = lignes[i].produit.id,
                                 ),
-                          icon: const Icon(Icons.edit, size: 16),
+                          icon: const Icon(SymbolesAgri.edit, size: 16),
                           color: AgriColors.outline,
                         ),
                       ),
@@ -565,7 +566,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         const Expanded(
           child: Text(
@@ -585,7 +586,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
           onPressed: widget.produits == null
               ? null
               : () => setState(() => _formulaire = ''),
-          icon: const Icon(Icons.add_circle, size: 18),
+          icon: const Icon(SymbolesAgri.add_circle, size: 18),
           label: const Text(
             'Nouveau Produit',
             style: TextStyle(
@@ -626,7 +627,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
       children: [
         _entete(
           titre: "Seuils d'Alerte",
-          icone: Icons.notifications_active,
+          icone: SymbolesAgri.notifications_active,
           sousTitre: 'Surveillance des niveaux de réapprovisionnement.',
           large: large,
         ),
@@ -778,7 +779,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
                         child: Opacity(
                           opacity: 0.4,
                           child: Icon(
-                            Icons.edit,
+                            SymbolesAgri.edit,
                             size: 16,
                             color: AgriColors.outline,
                           ),

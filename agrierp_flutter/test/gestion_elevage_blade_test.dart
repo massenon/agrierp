@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket H4 — GESTION ÉLEVAGE DU POSTE ALIGNÉ SUR LE BLADE.
 ///
@@ -58,17 +59,17 @@ void main() {
 
   /// Nom Material Symbols du Blade → icône du poste.
   const icones = <String, IconData>{
-    'pets': Icons.pets,
-    'layers': Icons.layers,
-    'warning': Icons.warning,
-    'monitor_heart': Icons.monitor_heart,
-    'cruelty_free': Icons.cruelty_free,
-    'egg': Icons.egg,
-    'bug_report': Icons.bug_report,
-    'favorite': Icons.favorite,
-    'vaccines': Icons.vaccines,
-    'dashboard': Icons.dashboard,
-    'swap_horiz': Icons.swap_horiz,
+    'pets': SymbolesAgri.pets,
+    'layers': SymbolesAgri.layers,
+    'warning': SymbolesAgri.warning,
+    'monitor_heart': SymbolesAgri.monitor_heart,
+    'cruelty_free': SymbolesAgri.cruelty_free,
+    'egg': SymbolesAgri.egg,
+    'bug_report': SymbolesAgri.bug_report,
+    'favorite': SymbolesAgri.favorite,
+    'vaccines': SymbolesAgri.vaccines,
+    'dashboard': SymbolesAgri.dashboard,
+    'swap_horiz': SymbolesAgri.swap_horiz,
   };
 
   /// Couleurs de `kpi-card.blade.php` : `$variants[$color]` → (liseré, icône).
@@ -247,7 +248,7 @@ void main() {
       expect(find.descendant(of: carte, matching: find.text('Fiches Escargots')), findsOneWidget);
       expect(find.descendant(of: carte, matching: find.text(decoder(description))), findsOneWidget);
       // Grisé : icône `text-outline`, et non émeraude.
-      final icone = t.widget<Icon>(find.descendant(of: carte, matching: find.byIcon(Icons.bug_report)));
+      final icone = t.widget<Icon>(find.descendant(of: carte, matching: find.byIcon(SymbolesAgri.bug_report)));
       expect(icone.color, AgriColors.outline);
       // Les autres espèces restent : le Blade ne conditionne QUE l'héliciculture.
       for (final ecran in [EcranPoste.ficheElevage, EcranPoste.fichePondeuses, EcranPoste.ficheReproducteurs, EcranPoste.fichePorcs]) {
@@ -357,7 +358,7 @@ void main() {
 
       expect(ouverts, isEmpty);
       expect(find.text(GestionElevageScreen.messageBandesWeb), findsOneWidget);
-      expect(find.byIcon(Icons.warning), findsWidgets);
+      expect(find.byIcon(SymbolesAgri.warning), findsWidgets);
       // Le toast se retire seul après 3,5 s, comme au web.
       await t.pump(ToastAgri.duree);
       expect(find.text(GestionElevageScreen.messageBandesWeb), findsNothing);

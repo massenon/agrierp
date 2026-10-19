@@ -4,6 +4,7 @@ import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../demarrage/premier_demarrage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
 ///
@@ -196,21 +197,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       _champ(
                         libelle: "NOM D'UTILISATEUR OU EMAIL",
                         controleur: _identifiant,
-                        icone: Icons.person_outline,
+                        icone: SymbolesAgri.person_outline,
                         indice: 'admin ou dg@olouwachegoun.bj',
                       ),
                       const SizedBox(height: AgriSpacing.md),
                       _champ(
                         libelle: 'MOT DE PASSE',
                         controleur: _motDePasse,
-                        icone: Icons.lock_outline,
+                        icone: SymbolesAgri.lock_outline,
                         indice: 'AgriERP@2026',
                         masque: !_motDePasseVisible,
                         suffixe: IconButton(
                           icon: Icon(
                             _motDePasseVisible
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+                                ? SymbolesAgri.visibility_off
+                                : SymbolesAgri.visibility,
                             size: 18,
                             color: AgriColors.outline,
                           ),
@@ -384,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               )
             else
-              const Icon(Icons.lock_open, size: 16),
+              const Icon(SymbolesAgri.lock_open, size: 16),
             const SizedBox(width: AgriSpacing.sm),
             const Text(
               'SE CONNECTER',
@@ -422,7 +423,7 @@ class _PanneauFerme extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.agriculture,
+                SymbolesAgri.agriculture,
                 color: AgriColors.accentYellow,
                 size: 26,
               ),
@@ -489,13 +490,13 @@ class _BarreSuperieure extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: null,
-          icon: const Icon(Icons.dark_mode, size: 16),
+          icon: const Icon(SymbolesAgri.dark_mode, size: 16),
           label: const Text('Mode sombre', style: TextStyle(fontSize: 11)),
         ),
         const SizedBox(width: AgriSpacing.sm),
         OutlinedButton.icon(
           onPressed: null,
-          icon: const Icon(Icons.translate, size: 16),
+          icon: const Icon(SymbolesAgri.translate, size: 16),
           label: const Text('Français', style: TextStyle(fontSize: 11)),
         ),
         const SizedBox(width: AgriSpacing.sm),
@@ -524,7 +525,7 @@ class _EnTeteMarque extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.agriculture,
+              SymbolesAgri.agriculture,
               color: AgriColors.brandEmerald,
               size: 38,
             ),
@@ -585,13 +586,13 @@ class _BandeauModules extends StatelessWidget {
   const _BandeauModules();
 
   static const _icones = [
-    Icons.local_florist,
-    Icons.account_balance,
-    Icons.point_of_sale,
-    Icons.inventory_2,
-    Icons.pets,
-    Icons.analytics,
-    Icons.settings,
+    SymbolesAgri.local_florist,
+    SymbolesAgri.account_balance,
+    SymbolesAgri.point_of_sale,
+    SymbolesAgri.inventory_2,
+    SymbolesAgri.pets,
+    SymbolesAgri.analytics,
+    SymbolesAgri.settings,
   ];
 
   @override
@@ -633,7 +634,7 @@ class _BandeauErreur extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_clock, size: 18, color: AgriColors.errorDeep),
+          const Icon(SymbolesAgri.lock_clock, size: 18, color: AgriColors.errorDeep),
           const SizedBox(width: AgriSpacing.sm),
           Expanded(
             child: Text(

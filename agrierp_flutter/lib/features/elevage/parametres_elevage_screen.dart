@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import 'parametres_elevage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/parametres-elevage.html` → Paramètres Élevage.
 ///
@@ -30,10 +31,10 @@ class ParametresElevageScreen extends StatefulWidget {
 class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
   /// Les quatre onglets, dans l'ordre de la maquette (l.93-105).
   static const onglets = <(String, IconData)>[
-    ('Fiche de Rationnement (g/j)', Icons.restaurant),
-    ('Calendriers de Prophylaxie', Icons.event_repeat),
-    ('Types de Provende', Icons.inventory_2),
-    ('Numérotation Bandes & Sujets', Icons.tag),
+    ('Fiche de Rationnement (g/j)', SymbolesAgri.restaurant),
+    ('Calendriers de Prophylaxie', SymbolesAgri.event_repeat),
+    ('Types de Provende', SymbolesAgri.inventory_2),
+    ('Numérotation Bandes & Sujets', SymbolesAgri.tag),
   ];
 
   String _onglet = onglets.first.$1;
@@ -157,7 +158,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     children: [
       _entete(
         'Fiche de Rationnement des Animaux',
-        Icons.restaurant,
+        SymbolesAgri.restaurant,
         'Consommation journalière théorique par tête exprimée en '
             'Grammes (g/j).',
         large,
@@ -218,7 +219,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
       children: [
         _entete(
           'Calendriers de Prophylaxie & Traitements Récurrents',
-          Icons.event_repeat,
+          SymbolesAgri.event_repeat,
           'Programme médical type par espèce. Alimente "Traitements Prévus" '
               'et les alertes du Dashboard.',
           large,
@@ -360,7 +361,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     children: [
       _entete(
         'Catalogue des Types de Provende',
-        Icons.inventory_2,
+        SymbolesAgri.inventory_2,
         "Gestion des types d'aliments servis en ferme avec conditionnement "
             'et prix indicatif au Kilogramme.',
         large,
@@ -440,7 +441,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
       children: [
         _entete(
           'Numérotation des Bandes & Sujets Par Espèce',
-          Icons.tag,
+          SymbolesAgri.tag,
           'Formatage des identifiants générés sur le terrain (ex: BANDE B1, '
               "BANDE B2...) et préfixes individuels par catégorie d'animaux.",
           large,
@@ -470,7 +471,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                   n.bandeFormat,
                   apercu: _serie(n.bandeFormat, ['1', '2', '3']),
                 ),
-                _groupe('Cuniculture (Lapins)', Icons.cruelty_free, [
+                _groupe('Cuniculture (Lapins)', SymbolesAgri.cruelty_free, [
                   _prefixe(
                     'Lapines Reproductrices (R1..Rn)',
                     n.lapinePrefix,
@@ -482,7 +483,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                     apercu: _serie(n.malePrefix, ['1', '2', '3']),
                   ),
                 ]),
-                _groupe('Porciculture (Porcs)', Icons.pets, [
+                _groupe('Porciculture (Porcs)', SymbolesAgri.pets, [
                   _prefixe(
                     'Truies Reproductrices (T1..Tn)',
                     n.truiePrefix,
@@ -499,7 +500,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                     apercu: _serie(n.porteePrefix, ['1', '2', '3']),
                   ),
                 ]),
-                _groupe('Aviculture (Volailles & Pondeuses)', Icons.egg, [
+                _groupe('Aviculture (Volailles & Pondeuses)', SymbolesAgri.egg, [
                   _prefixe(
                     'Préfixe Lots Volailles / Pondeuses',
                     n.volaillePrefix,
@@ -511,7 +512,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                     apercu: _serie(n.parcPrefix, ['A', 'B'], separateur: ' '),
                   ),
                 ]),
-                _groupe('Héliciculture (Escargots)', Icons.bug_report, [
+                _groupe('Héliciculture (Escargots)', SymbolesAgri.bug_report, [
                   _prefixe(
                     'Préfixe Parcs / Fosses Escargots',
                     n.escargotPrefix,
@@ -741,7 +742,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -766,7 +767,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

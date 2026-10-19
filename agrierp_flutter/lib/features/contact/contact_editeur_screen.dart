@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import 'contact_editeur_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/contact-editeur.html` → Contactez l'Éditeur.
 ///
@@ -37,8 +38,8 @@ class ContactEditeurScreen extends StatefulWidget {
 
 class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
   static const onglets = <(String, String, IconData)>[
-    ('message', 'Envoyer un Message', Icons.mail),
-    ('bug', 'Signaler un Bug', Icons.bug_report),
+    ('message', 'Envoyer un Message', SymbolesAgri.mail),
+    ('bug', 'Signaler un Bug', SymbolesAgri.bug_report),
   ];
 
   BrouillonContact get _b => widget.brouillon;
@@ -175,7 +176,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
         Row(
           children: [
             const Icon(
-              Icons.support_agent,
+              SymbolesAgri.support_agent,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -298,7 +299,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
     const SizedBox(height: AgriSpacing.md),
     _bouton(
       const Key('contact-envoyer'),
-      Icons.send,
+      SymbolesAgri.send,
       'Envoyer le Message',
       AgriColors.brandEmerald,
     ),
@@ -329,7 +330,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
     const SizedBox(height: AgriSpacing.md),
     _bouton(
       const Key('contact-signaler'),
-      Icons.bug_report,
+      SymbolesAgri.bug_report,
       'Signaler le Bug',
       AgriColors.errorRed,
     ),
@@ -517,7 +518,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),
@@ -571,7 +572,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
           ),
           const SizedBox(height: AgriSpacing.md),
           _ligneCoordonnee(
-            Icons.person,
+            SymbolesAgri.person,
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -595,17 +596,17 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
           ),
           for (final (i, e) in ContactEditeurRepository.editeurEmails.indexed)
             _ligneCoordonnee(
-              i == 0 ? Icons.mail : Icons.alternate_email,
+              i == 0 ? SymbolesAgri.mail : SymbolesAgri.alternate_email,
               Text(e, style: texte),
             ),
           for (final (i, t)
               in ContactEditeurRepository.editeurTelephones.indexed)
             _ligneCoordonnee(
-              i == 0 ? Icons.call : Icons.smartphone,
+              i == 0 ? SymbolesAgri.call : SymbolesAgri.smartphone,
               Text(t, style: texte),
             ),
           _ligneCoordonnee(
-            Icons.schedule,
+            SymbolesAgri.schedule,
             const Text(ContactEditeurRepository.editeurHoraires, style: texte),
           ),
         ],
@@ -630,7 +631,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
         ),
         const SizedBox(height: AgriSpacing.sm),
         _ligneCoordonnee(
-          Icons.bug_report,
+          SymbolesAgri.bug_report,
           const Text.rich(
             TextSpan(
               style: TextStyle(
@@ -655,7 +656,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
           ),
         ),
         _ligneCoordonnee(
-          Icons.balance,
+          SymbolesAgri.balance,
           const Text.rich(
             TextSpan(
               style: TextStyle(
@@ -705,7 +706,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
       children: [
         const Row(
           children: [
-            Icon(Icons.lightbulb, size: 18, color: AgriColors.infoBlue),
+            Icon(SymbolesAgri.lightbulb, size: 18, color: AgriColors.infoBlue),
             SizedBox(width: AgriSpacing.xs),
             Text(
               'Avant de nous contacter',

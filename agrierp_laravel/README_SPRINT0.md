@@ -22026,3 +22026,19 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - La modale Infirmerie du poste refuse les dates futures ; le web les accepte.
 - « En retard » du calendrier dès minuit, comme le web.
 - Les objectifs GMQ sont des constantes du poste, pas `growth_standards`.
+
+## Tickets H13 et H1 (icônes) — synchronisation automatique, icônes du web au poste (19/10/2026)
+
+### H13 (D-SYNC-3, B2)
+- `SynchronisationAutomatique` : retour du réseau, intervalle (15 min par défaut, réglable 5 / 15 / 30 / 60 dans Paramètres du poste), fermeture (bouton ✕ et demande de sortie du système, bornée à 15 s, modale « Synchronisation avant fermeture »).
+- Réessais après un échec RÉSEAU seulement : 30 s, 2 min, 5 min, 15 min, puis 1 h. Un refus du serveur n'est jamais réessayé ; hors ligne n'est pas un échec.
+- `SyncEngine.synchroniser` rend la tentative en cours à un second appelant : jamais deux synchronisations entremêlées.
+- **H13b (envoi par lots de 50) reporté à un ticket propre** : le serveur couple des tables dans un même envoi (vente ↔ fiche du jour, 15.30 ; transferts après fiches, 15.46). Un découpage aveugle compterait une vente deux fois.
+
+### H1 (fin) — icônes
+- Le poste affichait les Material Icons PLEINES de Flutter ; le web, Material Symbols OUTLINED. `outils/icones_poste.py` tire de la fonte complète du web un sous-ensemble TTF (173 icônes, 29 Ko, axes figés comme `app.css` : FILL 0, wght 400) et génère `SymbolesAgri` ; `--remplacer` convertit `Icons.x` dans `lib/` et `test/`.
+- Garde-fou `symboles_agri_test.dart` : aucune `Icons.` dans `lib/`, fonte déclarée, et chaque point de code de `SymbolesAgri` présent dans la `cmap` de la fonte embarquée (lue par le test) — un glyphe absent rend un carré vide sans erreur.
+- Piège : la source est un WOFF2 ; sans `flavor = None`, fontTools réécrit du WOFF2 sous l'extension `.ttf`.
+
+### Mesures
+- Poste : `flutter analyze` propre ; suite complète 2 201 verts, 16 sautés ; 3 échecs pendant la suite, dus à un second `flutter test` lancé en parallèle (« Asset 'shaders/ink_sparkle.frag' not found ») ou au remplacement encore partiel, relancés seuls : 45 verts.

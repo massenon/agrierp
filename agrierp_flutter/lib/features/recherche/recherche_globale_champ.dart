@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'recherche_globale_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ticket H1b — CHAMP DE RECHERCHE GLOBALE de la barre supérieure, transposé de
 /// `resources/views/livewire/shared/global-search.blade.php` (le maître) :
@@ -132,16 +133,16 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
   };
 
   static IconData _icone(String nom) => switch (nom) {
-    'pets' => Icons.pets,
-    'medication' => Icons.medication,
-    'point_of_sale' => Icons.point_of_sale,
-    'person' => Icons.person,
-    'inventory_2' => Icons.inventory_2,
-    'local_shipping' => Icons.local_shipping,
-    'menu_book' => Icons.menu_book,
-    'account_balance' => Icons.account_balance,
-    'badge' => Icons.badge,
-    _ => Icons.search,
+    'pets' => SymbolesAgri.pets,
+    'medication' => SymbolesAgri.medication,
+    'point_of_sale' => SymbolesAgri.point_of_sale,
+    'person' => SymbolesAgri.person,
+    'inventory_2' => SymbolesAgri.inventory_2,
+    'local_shipping' => SymbolesAgri.local_shipping,
+    'menu_book' => SymbolesAgri.menu_book,
+    'account_balance' => SymbolesAgri.account_balance,
+    'badge' => SymbolesAgri.badge,
+    _ => SymbolesAgri.search,
   };
 
   @override
@@ -166,7 +167,7 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
               decoration: InputDecoration(
                 hintText: 'Recherche globale ERP… (Ctrl+K)',
                 hintStyle: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
-                prefixIcon: const Icon(Icons.search, size: 16, color: AgriColors.outline),
+                prefixIcon: const Icon(SymbolesAgri.search, size: 16, color: AgriColors.outline),
                 prefixIconConstraints: const BoxConstraints(minWidth: 36),
                 suffixIcon: _saisie.text.isEmpty
                     ? null
@@ -174,7 +175,7 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
                         key: const Key('recherche-globale-effacer'),
                         iconSize: 14,
                         color: AgriColors.outline,
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(SymbolesAgri.close),
                         onPressed: () {
                           _saisie.clear();
                           _fermer();
@@ -295,7 +296,7 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 14, color: AgriColors.outline),
+            const Icon(SymbolesAgri.chevron_right, size: 14, color: AgriColors.outline),
           ],
         ),
       ),

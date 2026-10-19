@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Écran de synchronisation — ce qui attend, ce qui est parti, ce qui a été
 /// refusé.
@@ -209,7 +210,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
                               color: AgriColors.brandForest,
                             ),
                           )
-                        : const Icon(Icons.sync, size: 18),
+                        : const Icon(SymbolesAgri.sync, size: 18),
                     label: const Text('Synchroniser'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AgriColors.accentYellow,
@@ -265,7 +266,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
           child: Row(
             children: [
               Icon(
-                Icons.check_circle,
+                SymbolesAgri.check_circle,
                 color: AgriColors.brandEmerald,
                 size: 20,
               ),
@@ -291,7 +292,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
             Row(
               children: [
                 const Icon(
-                  Icons.error_outline,
+                  SymbolesAgri.error_outline,
                   color: AgriColors.errorDeep,
                   size: 20,
                 ),

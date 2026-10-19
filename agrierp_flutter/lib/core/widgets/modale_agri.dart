@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/agri_tokens.dart';
+import '../theme/symboles_agri.dart';
 
 /// Largeurs de modale du prototype — `max-w-sm`, `max-w-md`, `max-w-lg`.
 ///
@@ -151,7 +152,7 @@ class ModaleAgri extends StatelessWidget {
                       child: const Padding(
                         padding: EdgeInsets.all(AgriSpacing.xs),
                         child: Icon(
-                          Icons.close,
+                          SymbolesAgri.close,
                           size: 20,
                           color: AgriColors.outline,
                         ),

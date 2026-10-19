@@ -6,6 +6,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'sujets_repository.dart';
 import 'suivi_reproduction_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `livewire/elevage/suivi-reproduction.blade.php` → Suivi Reproduction.
 ///
@@ -50,10 +51,10 @@ class SuiviReproductionScreen extends StatefulWidget {
 class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   /// Les quatre onglets du Blade, dans son ordre, avec ses icônes.
   static const onglets = <(String, IconData)>[
-    ('Lapins', Icons.cruelty_free),
-    ('Volailles', Icons.egg),
-    ('Porcs', Icons.pets),
-    ('Escargots', Icons.bug_report),
+    ('Lapins', SymbolesAgri.cruelty_free),
+    ('Volailles', SymbolesAgri.egg),
+    ('Porcs', SymbolesAgri.pets),
+    ('Escargots', SymbolesAgri.bug_report),
   ];
 
   /// Colonnes du tableau : les neuf du Blade, dans son ordre, PUIS les ajouts du poste.
@@ -218,25 +219,25 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         _carteKpi(
           'Reproductrices Gestantes',
           '${d.gestantes}',
-          Icons.favorite,
+          SymbolesAgri.favorite,
           _CouleurKpi.bleu,
         ),
         _carteKpi(
           'Palpations / Échéances dues',
           '${d.palpationsDues}',
-          Icons.event,
+          SymbolesAgri.event,
           _CouleurKpi.mais,
         ),
         _carteKpi(
           'Mises bas / Éclosions (mois)',
           '${d.misesBasDuMois}',
-          Icons.child_care,
+          SymbolesAgri.child_care,
           _CouleurKpi.emeraude,
         ),
         _carteKpi(
           'Alertes Réforme / Pertes',
           '${d.echecs}',
-          Icons.warning,
+          SymbolesAgri.warning,
           _CouleurKpi.rouge,
         ),
       ],
@@ -376,7 +377,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       runSpacing: AgriSpacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.event_repeat, size: 20, color: AgriColors.infoBlue),
+        const Icon(SymbolesAgri.event_repeat, size: 20, color: AgriColors.infoBlue),
         const Text(
           'Rappel du cycle :',
           style: TextStyle(
@@ -393,7 +394,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             for (var i = 0; i < etapes.length; i++) ...[
               if (i > 0)
                 const Icon(
-                  Icons.arrow_forward,
+                  SymbolesAgri.arrow_forward,
                   size: 14,
                   color: AgriColors.outline,
                 ),
@@ -455,7 +456,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _titreOnglet(
-          lapins ? Icons.cruelty_free : Icons.pets,
+          lapins ? SymbolesAgri.cruelty_free : SymbolesAgri.pets,
           lapins
               ? 'Suivi Reproduction — Cuniculture (Lapins)'
               : 'Suivi Reproduction — Porciculture (Porcs)',
@@ -465,7 +466,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
           action: ElevatedButton.icon(
             key: Key('declarer-saillie-$cle'),
             onPressed: () => _ouvrirDeclaration(porcs: !lapins),
-            icon: const Icon(Icons.add_circle, size: 18),
+            icon: const Icon(SymbolesAgri.add_circle, size: 18),
             label: Text(
               lapins ? 'Déclarer une Saillie Lapin' : 'Déclarer une Saillie Porc',
               style: const TextStyle(
@@ -1016,7 +1017,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _titreOnglet(
-          volailles ? Icons.egg : Icons.bug_report,
+          volailles ? SymbolesAgri.egg : SymbolesAgri.bug_report,
           'Suivi Reproduction ${volailles ? 'Volailles' : 'Escargots'} — '
               'Couvoir & Éclosion',
           'La saisie quotidienne du couvoir se fait depuis la fiche journalière dédiée — '
@@ -1035,19 +1036,19 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             _carteKpi(
               'Œufs Couvés (mois)',
               '${resume.couves}',
-              Icons.egg,
+              SymbolesAgri.egg,
               _CouleurKpi.bleu,
             ),
             _carteKpi(
               'Naissains Nés (mois)',
               '${resume.nes}',
-              Icons.child_care,
+              SymbolesAgri.child_care,
               _CouleurKpi.emeraude,
             ),
             _carteKpi(
               "Taux d'Éclosion",
               resume.libelleTaux,
-              Icons.egg_alt,
+              SymbolesAgri.egg_alt,
               _CouleurKpi.mais,
             ),
             // ⚠️ AJOUT DU POSTE, GARDÉ (décision du 19/10/2026) : absent du Blade, après ses
@@ -1055,7 +1056,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             _carteKpi(
               'Bandes suivies',
               '${resume.lots}',
-              Icons.inventory_2,
+              SymbolesAgri.inventory_2,
               _CouleurKpi.foret,
             ),
           ],
@@ -1067,7 +1068,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             key: const Key('lien-couvoir'),
             onPressed: () =>
                 widget.onSaisirCouvoir?.call(volailles ? 'aviculture' : 'helico'),
-            icon: const Icon(Icons.edit_note, size: 18),
+            icon: const Icon(SymbolesAgri.edit_note, size: 18),
             label: const Text(
               'Saisir le Couvoir du Jour →',
               style: TextStyle(
@@ -1111,7 +1112,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(
@@ -1345,7 +1346,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.calculate, size: 14, color: AgriColors.brandForest),
+              Icon(SymbolesAgri.calculate, size: 14, color: AgriColors.brandForest),
               SizedBox(width: 4),
               // ⚠️ `Expanded` : le titre de l'aperçu se replie, comme le
               // `<p class="font-bold flex items-center gap-xs">` du navigateur.

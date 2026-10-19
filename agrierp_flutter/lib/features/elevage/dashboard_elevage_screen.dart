@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Dashboard Élevage — le maître est `Livewire\Elevage\DashboardElevage` et sa vue
 /// `dashboard-elevage.blade.php` (Doctrine, article 5 ; ticket H6).
@@ -37,12 +38,12 @@ class DashboardElevageScreen extends StatefulWidget {
   /// ⚠️ `monitoring` (Material Symbols) n'existe pas dans `Icons` : `ssid_chart`, axes et ligne
   /// brisée, est le glyphe le plus proche.
   static const onglets = <(String, IconData)>[
-    ('Synthèse Globale', Icons.dashboard),
-    ('GMQ & Croissance', Icons.ssid_chart),
+    ('Synthèse Globale', SymbolesAgri.dashboard),
+    ('GMQ & Croissance', SymbolesAgri.ssid_chart),
     // Libellé « Rentabilité » : décision client du 17/10/2026 (prototype : « Bilan Technico-Économique »).
-    ('Rentabilité', Icons.account_balance_wallet),
-    ('Analyse Sanitaire', Icons.coronavirus),
-    ('Prévision de Croissance', Icons.query_stats),
+    ('Rentabilité', SymbolesAgri.account_balance_wallet),
+    ('Analyse Sanitaire', SymbolesAgri.coronavirus),
+    ('Prévision de Croissance', SymbolesAgri.query_stats),
   ];
 
   /// Colonnes du tableau « GMQ & Croissance » du Blade (`<th>`), dans son ordre.
@@ -155,7 +156,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         Row(
           children: [
             const Icon(
-              Icons.dashboard,
+              SymbolesAgri.dashboard,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -261,7 +262,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                 d.effectifTotal.toDouble(),
               ),
               legende: 'Toutes espèces actives',
-              icone: Icons.pets,
+              icone: SymbolesAgri.pets,
               barre: AgriColors.brandEmerald,
             ),
             // ⚠️⚠️ NON CALCULABLE, ET DÉJÀ CONSTATÉ CÔTÉ WEB (carte marquée
@@ -273,7 +274,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Autonomie Aliment Min.',
               valeur: '—',
               legende: 'Conditionnement (kg/unité) absent du catalogue',
-              icone: Icons.inventory_2,
+              icone: SymbolesAgri.inventory_2,
               barre: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
@@ -286,7 +287,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               legende: d.gmqMoyen == null
                   ? 'Moins de 2 pesées enregistrées'
                   : 'Consolidé, toutes bandes',
-              icone: Icons.trending_up,
+              icone: SymbolesAgri.trending_up,
               barre: AgriColors.infoBlue,
               couleurIcone: AgriColors.infoBlue,
             ),
@@ -296,7 +297,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Mortalité Cumulée (7j)',
               valeur: DashboardElevageRepository.pourcent(d.mortalite7j),
               legende: 'Alerte si > 10%/semaine',
-              icone: Icons.health_and_safety,
+              icone: SymbolesAgri.health_and_safety,
               barre: AgriColors.errorRed,
               couleurIcone: AgriColors.errorRed,
             ),
@@ -314,10 +315,10 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
 
   /// Icônes du semis des espèces (`livestock_species.icon`), par code.
   static const _iconesEspeces = {
-    'cuniculture': Icons.cruelty_free,
-    'aviculture': Icons.egg,
-    'porciculture': Icons.pets,
-    'helico': Icons.bug_report,
+    'cuniculture': SymbolesAgri.cruelty_free,
+    'aviculture': SymbolesAgri.egg,
+    'porciculture': SymbolesAgri.pets,
+    'helico': SymbolesAgri.bug_report,
   };
 
   Widget _cartesEspeces(bool large) {
@@ -337,7 +338,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
             Row(
               children: [
                 Icon(
-                  _iconesEspeces[carte.code] ?? Icons.pets,
+                  _iconesEspeces[carte.code] ?? SymbolesAgri.pets,
                   size: 20,
                   color: AgriColors.brandEmerald,
                 ),
@@ -523,7 +524,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      r.enRetard ? Icons.warning : Icons.event,
+                      r.enRetard ? SymbolesAgri.warning : SymbolesAgri.event,
                       size: 18,
                       color: r.enRetard
                           ? AgriColors.errorDeep
@@ -674,7 +675,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _titrePanneau('GMQ & Croissance', Icons.ssid_chart),
+                  _titrePanneau('GMQ & Croissance', SymbolesAgri.ssid_chart),
                   const SizedBox(height: AgriSpacing.xs),
                   const Text(
                     'GMQ (g/j) = (Poids Final − Poids Initial) ÷ Nombre de '
@@ -725,7 +726,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Lots Suivis (Pesées ≥ 2)',
               valeur: '${d.lotsSuivis}',
               legende: '',
-              icone: Icons.checklist,
+              icone: SymbolesAgri.checklist,
               barre: AgriColors.infoBlue,
               couleurIcone: AgriColors.infoBlue,
             ),
@@ -797,7 +798,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
       libelle: libelle,
       valeur: valeur == null ? '—' : '${valeur.toStringAsFixed(0)} g/j',
       legende: valeur == null ? 'Moins de 2 pesées enregistrées' : legende,
-      icone: Icons.trending_up,
+      icone: SymbolesAgri.trending_up,
       barre: barre,
     );
   }
@@ -954,7 +955,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
       children: [
         _titrePanneau(
           'Analyse Sanitaire — Fréquence des Maladies',
-          Icons.coronavirus,
+          SymbolesAgri.coronavirus,
         ),
         const SizedBox(height: AgriSpacing.md),
         // Les trois cartes du Blade : soins du mois des bandes actives.
@@ -970,7 +971,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Traitements Administrés (mois)',
               valeur: '${d.traitementsDuMois}',
               legende: '',
-              icone: Icons.vaccines,
+              icone: SymbolesAgri.vaccines,
               barre: AgriColors.brandEmerald,
             ),
             _carteKpi(
@@ -978,7 +979,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               valeur:
                   '${DashboardElevageRepository.milliers(d.coutSanitaireDuMois)} FCFA',
               legende: '',
-              icone: Icons.payments,
+              icone: SymbolesAgri.payments,
               barre: AgriColors.errorRed,
               couleurIcone: AgriColors.errorRed,
             ),
@@ -986,7 +987,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Traitement le Plus Fréquent',
               valeur: d.traitementLePlusFrequent ?? '—',
               legende: '',
-              icone: Icons.star,
+              icone: SymbolesAgri.star,
               barre: AgriColors.infoBlue,
               couleurIcone: AgriColors.infoBlue,
             ),
@@ -1070,7 +1071,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Titre, méthode et tableau du Blade.
-        _titrePanneau('Prévision de Croissance', Icons.query_stats),
+        _titrePanneau('Prévision de Croissance', SymbolesAgri.query_stats),
         const SizedBox(height: AgriSpacing.xs),
         const Text(
           "Régression linéaire simple sur l'historique des pesées (minimum 3 "
@@ -1098,7 +1099,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         if (selection == null) ...[
           _bloc(
             titre: 'Paramètres de la projection',
-            icone: Icons.tune,
+            icone: SymbolesAgri.tune,
             enfant: const Padding(
               padding: EdgeInsets.all(AgriSpacing.lg),
               child: Text(
@@ -1116,7 +1117,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         ] else ...[
           _bloc(
             titre: 'Paramètres de la projection',
-            icone: Icons.tune,
+            icone: SymbolesAgri.tune,
             enfant: Wrap(
               spacing: AgriSpacing.md,
               runSpacing: AgriSpacing.md,
@@ -1183,7 +1184,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           const SizedBox(height: AgriSpacing.md),
           _bloc(
             titre: 'Courbe de Croissance — Historique et Projection',
-            icone: Icons.show_chart,
+            icone: SymbolesAgri.show_chart,
             enfant: _tableauProjection(selection),
           ),
         ],
@@ -1267,7 +1268,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         legende: p == null
             ? 'Trois pesées au minimum'
             : 'À $_horizon jours, ${p.nbPesees} pesées retenues',
-        icone: Icons.trending_up,
+        icone: SymbolesAgri.trending_up,
         barre: AgriColors.brandEmerald,
       ),
       // ⚠️⚠️ AUCUN POIDS CIBLE N'EXISTE hors de la maquette : ses 2 200 g,
@@ -1278,7 +1279,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         libelle: 'Poids Cible de Commercialisation',
         valeur: '—',
         legende: "Aucun poids cible n'est paramétré",
-        icone: Icons.flag,
+        icone: SymbolesAgri.flag,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.outline,
       ),
@@ -1286,7 +1287,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         libelle: "Date Estimée d'Atteinte de la Cible",
         valeur: '—',
         legende: 'Dépend du poids cible',
-        icone: Icons.event,
+        icone: SymbolesAgri.event,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.outline,
       ),

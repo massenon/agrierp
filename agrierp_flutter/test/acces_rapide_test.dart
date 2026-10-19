@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
 import 'coque_poste.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket H1 — BOUTON FLOTTANT ET PANNEAU « ACCÈS RAPIDE » (`layouts/app.blade.php:219-247`).
 ///
@@ -47,19 +48,19 @@ void main() {
     }
 
     String nomIcone(IconData i) => switch (i) {
-      Icons.cruelty_free => 'cruelty_free',
-      Icons.egg => 'egg',
-      Icons.egg_alt => 'egg_alt',
-      Icons.pets => 'pets',
-      Icons.bug_report => 'bug_report',
-      Icons.favorite => 'favorite',
-      Icons.vaccines => 'vaccines',
-      Icons.point_of_sale => 'point_of_sale',
-      Icons.inventory_2 => 'inventory_2',
-      Icons.dashboard => 'dashboard',
-      Icons.receipt => 'receipt',
-      Icons.account_balance => 'account_balance',
-      Icons.picture_as_pdf => 'picture_as_pdf',
+      SymbolesAgri.cruelty_free => 'cruelty_free',
+      SymbolesAgri.egg => 'egg',
+      SymbolesAgri.egg_alt => 'egg_alt',
+      SymbolesAgri.pets => 'pets',
+      SymbolesAgri.bug_report => 'bug_report',
+      SymbolesAgri.favorite => 'favorite',
+      SymbolesAgri.vaccines => 'vaccines',
+      SymbolesAgri.point_of_sale => 'point_of_sale',
+      SymbolesAgri.inventory_2 => 'inventory_2',
+      SymbolesAgri.dashboard => 'dashboard',
+      SymbolesAgri.receipt => 'receipt',
+      SymbolesAgri.account_balance => 'account_balance',
+      SymbolesAgri.picture_as_pdf => 'picture_as_pdf',
       _ => '?',
     };
     final groupesPoste = [

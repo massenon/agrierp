@@ -6,6 +6,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'transferts_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ticket 15.46 — ÉCRAN « TRANSFERTS ENTRE BANDES », portage de `transferts-bandes.blade.php`.
 ///
@@ -81,7 +82,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
       context: context,
       confirmation: true,
       constructeur: (ctx) => ModaleConfirmation(
-        icone: Icons.swap_horiz,
+        icone: SymbolesAgri.swap_horiz,
         couleurIcone: AgriColors.errorDeep,
         titre: 'Annuler ce transfert ?',
         message: 'Les deux bandes seront recalculées. Le transfert reste tracé.',
@@ -136,7 +137,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.swap_horiz, color: AgriColors.brandEmerald, size: 26),
+                const Icon(SymbolesAgri.swap_horiz, color: AgriColors.brandEmerald, size: 26),
                 const SizedBox(width: AgriSpacing.xs),
                 const Expanded(
                   child: Text(
@@ -152,7 +153,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                   key: const Key('transfert-nouveau'),
                   style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
                   onPressed: () => _ouvrirFormulaire(),
-                  icon: const Icon(Icons.add_circle, size: 18),
+                  icon: const Icon(SymbolesAgri.add_circle, size: 18),
                   label: const Text('Nouveau Transfert'),
                 ),
               ],
@@ -172,7 +173,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                     libelle: 'Transferts du Mois',
                     valeur: '${duMois.length}',
                     couleurLisere: AgriColors.brandEmerald,
-                    icone: Icons.swap_horiz,
+                    icone: SymbolesAgri.swap_horiz,
                     legende: 'Transferts actifs datés de ce mois',
                   ),
                 ),
@@ -182,7 +183,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                     libelle: 'Sujets Transférés',
                     valeur: '${duMois.fold(0, (s, t) => s + t.quantity)}',
                     couleurLisere: AgriColors.infoBlue,
-                    icone: Icons.pets,
+                    icone: SymbolesAgri.pets,
                     legende: 'Cumul des sujets transférés ce mois',
                   ),
                 ),
@@ -192,7 +193,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                     libelle: 'Bandes Rattachées',
                     valeur: '${bandes.where((b) => b.lotSourceId != null).length}',
                     couleurLisere: AgriColors.accentYellow,
-                    icone: Icons.link,
+                    icone: SymbolesAgri.link,
                     legende: "Bandes reliées à leur bande d'origine",
                   ),
                 ),
@@ -202,7 +203,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                     libelle: 'Bandes à Vérifier',
                     valeur: '${_aRattacher.length}',
                     couleurLisere: AgriColors.errorRed,
-                    icone: Icons.warning,
+                    icone: SymbolesAgri.warning,
                     legende: "Bandes peut-être issues d'une autre, sans origine renseignée",
                   ),
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'mon_profil_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/mon-profil.html` → Mon Profil.
 ///
@@ -206,7 +207,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.person, size: 26, color: AgriColors.brandEmerald),
+            const Icon(SymbolesAgri.person, size: 26, color: AgriColors.brandEmerald),
             const SizedBox(width: AgriSpacing.xs),
             Text(
               'Mon Profil',
@@ -422,7 +423,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.lock, size: 18, color: AgriColors.brandForest),
+            const Icon(SymbolesAgri.lock, size: 18, color: AgriColors.brandForest),
             const SizedBox(width: AgriSpacing.xs),
             Text(
               'Modifier le Mot de Passe'.toUpperCase(),
@@ -583,7 +584,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),

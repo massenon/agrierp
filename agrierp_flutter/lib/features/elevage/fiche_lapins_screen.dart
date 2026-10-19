@@ -8,6 +8,7 @@ import 'categorie_ration_lapin.dart';
 import 'effectif_par_categorie.dart';
 import 'fiche_journaliere_repository.dart';
 import 'soins_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fiche-lapins.html` → Saisie Journalière du Cheptel.
 ///
@@ -352,7 +353,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
             else
               _carte(
                 titre: 'Saisie Journalière du Cheptel — ${_libelleJour()}',
-                icone: Icons.edit_note,
+                icone: SymbolesAgri.edit_note,
                 enfant: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -360,7 +361,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Morts par catégorie',
-                      icone: Icons.dangerous_outlined,
+                      icone: SymbolesAgri.dangerous,
                       couleur: AgriColors.errorDeep,
                       fond: AgriColors.errorBg.withValues(alpha: 0.3),
                       valeurs: _morts,
@@ -368,7 +369,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Dons par catégorie',
-                      icone: Icons.card_giftcard,
+                      icone: SymbolesAgri.card_giftcard,
                       couleur: AgriColors.brandEmerald,
                       fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
                       valeurs: _dons,
@@ -397,7 +398,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _blocCategories(
                       titre: 'Sevrage du jour (Sous-mères → Jeune)',
-                      icone: Icons.trending_up,
+                      icone: SymbolesAgri.trending_up,
                       couleur: AgriColors.brandForest,
                       fond: AgriColors.surfaceZebra,
                       valeurs: _sevrage,
@@ -442,7 +443,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
         Row(
           children: [
             const Icon(
-              Icons.cruelty_free,
+              SymbolesAgri.cruelty_free,
               color: AgriColors.brandEmerald,
               size: 26,
             ),
@@ -476,7 +477,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
             OutlinedButton.icon(
               key: const Key('selecteur-date'),
               onPressed: _choisirDate,
-              icon: const Icon(Icons.calendar_month, size: 18),
+              icon: const Icon(SymbolesAgri.calendar_month, size: 18),
               label: Text(
                 '${_jour.day.toString().padLeft(2, '0')}/'
                 '${_jour.month.toString().padLeft(2, '0')}/${_jour.year}',
@@ -527,14 +528,14 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
               largeur: largeur,
               libelle: 'Effectif Total Vivant',
               valeur: i == null ? '—' : '${i.effectif}',
-              icone: Icons.pets,
+              icone: SymbolesAgri.pets,
               couleur: AgriColors.brandEmerald,
             ),
             _carteKpi(
               largeur: largeur,
               libelle: 'Géniteurs (M/F)',
               valeur: '—',
-              icone: Icons.favorite,
+              icone: SymbolesAgri.favorite,
               couleur: AgriColors.infoBlue,
               note: 'non synchronisé',
             ),
@@ -542,7 +543,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
               largeur: largeur,
               libelle: 'Naissances du Mois',
               valeur: i == null ? '—' : '${i.naissances}',
-              icone: Icons.child_care,
+              icone: SymbolesAgri.child_care,
               couleur: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
@@ -552,7 +553,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
               valeur: i?.tauxMortalite == null
                   ? '—'
                   : '${i!.tauxMortalite!.toStringAsFixed(1)}%',
-              icone: Icons.trending_down,
+              icone: SymbolesAgri.trending_down,
               couleur: AgriColors.errorRed,
             ),
           ],
@@ -727,7 +728,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
         padding: EdgeInsets.all(AgriSpacing.lg),
         child: Column(
           children: [
-            Icon(Icons.inbox, size: 44, color: AgriColors.outlineVariant),
+            Icon(SymbolesAgri.inbox, size: 44, color: AgriColors.outlineVariant),
             SizedBox(height: AgriSpacing.sm),
             Text(
               'Aucune bande sur ce poste.',
@@ -1099,7 +1100,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       children: [
         const Row(
           children: [
-            Icon(Icons.restaurant, size: 16, color: AgriColors.brandEmerald),
+            Icon(SymbolesAgri.restaurant, size: 16, color: AgriColors.brandEmerald),
             SizedBox(width: AgriSpacing.xs),
             Expanded(
               child: Text(
@@ -1474,7 +1475,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.vaccines, size: 18, color: AgriColors.infoBlue),
+              const Icon(SymbolesAgri.vaccines, size: 18, color: AgriColors.infoBlue),
               const SizedBox(width: AgriSpacing.xs),
               const Expanded(
                 child: Text(
@@ -1564,7 +1565,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.help_outline, size: 15, color: AgriColors.errorDeep),
+          const Icon(SymbolesAgri.help_outline, size: 15, color: AgriColors.errorDeep),
           const SizedBox(width: AgriSpacing.xs),
           Expanded(
             child: Text(
@@ -1709,7 +1710,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
           onPressed: _traitementsCoches.isEmpty || _validationEnCours
               ? null
               : _validerTraitements,
-          icon: const Icon(Icons.check_circle_outline, size: 16),
+          icon: const Icon(SymbolesAgri.check_circle_outline, size: 16),
           label: const Text(
             'Valider l\'Administration de tous ces Traitements Aujourd\'hui',
             textAlign: TextAlign.center,
@@ -1729,7 +1730,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
       child: Row(
         children: [
           Icon(
-            n > 0 ? Icons.error_outline : Icons.check_circle_outline,
+            n > 0 ? SymbolesAgri.error_outline : SymbolesAgri.check_circle_outline,
             size: 13,
             color: n > 0 ? AgriColors.errorDeep : AgriColors.brandEmerald,
           ),
@@ -1812,7 +1813,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
           Row(
             children: [
               const Icon(
-                Icons.grid_view,
+                SymbolesAgri.grid_view,
                 size: 18,
                 color: AgriColors.brandEmerald,
               ),
@@ -1881,7 +1882,7 @@ class _FicheLapinsScreenState extends State<FicheLapinsScreen> {
           FilledButton.icon(
             key: const Key('bouton-enregistrer'),
             onPressed: _bande == null ? null : _enregistrer,
-            icon: const Icon(Icons.save, size: 18),
+            icon: const Icon(SymbolesAgri.save, size: 18),
             label: const Text(
               'Enregistrer ce Jour',
               style: TextStyle(

@@ -5,6 +5,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'gestion_elevage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Une carte de navigation du hub (`components/nav-card.blade.php`) : icône, titre, description, écran ouvert.
 ///
@@ -45,21 +46,21 @@ class GestionElevageScreen extends StatefulWidget {
   /// « Registres par Espèce », dans l'ordre du Blade. La description de « Bandes & Sujets » est précédée du nombre de
   /// bandes actives (`$this->bandesActives.' bande(s) …'`).
   static const registres = <CarteHub>[
-    (Icons.layers, 'Bandes & Sujets', ' bande(s) active(s) — création, numérotation individuelle', null),
-    (Icons.cruelty_free, 'Fiches Lapins', 'Suivi mensuel du cheptel — Cuniculture', EcranPoste.ficheElevage),
-    (Icons.egg, 'Fiches Pondeuses', "Suivi quotidien de la ponte et récolte d'œufs", EcranPoste.fichePondeuses),
-    (Icons.pets, 'Fiches Volailles', 'Reproducteurs, poussins, Goliath/Chair', EcranPoste.ficheReproducteurs),
-    (Icons.pets, 'Fiches Porcs', 'Suivi journalier — Porciculture', EcranPoste.fichePorcs),
-    (Icons.bug_report, 'Fiches Escargots', 'Héliciculture — suivi mensuel du cheptel', EcranPoste.ficheEscargots),
+    (SymbolesAgri.layers, 'Bandes & Sujets', ' bande(s) active(s) — création, numérotation individuelle', null),
+    (SymbolesAgri.cruelty_free, 'Fiches Lapins', 'Suivi mensuel du cheptel — Cuniculture', EcranPoste.ficheElevage),
+    (SymbolesAgri.egg, 'Fiches Pondeuses', "Suivi quotidien de la ponte et récolte d'œufs", EcranPoste.fichePondeuses),
+    (SymbolesAgri.pets, 'Fiches Volailles', 'Reproducteurs, poussins, Goliath/Chair', EcranPoste.ficheReproducteurs),
+    (SymbolesAgri.pets, 'Fiches Porcs', 'Suivi journalier — Porciculture', EcranPoste.fichePorcs),
+    (SymbolesAgri.bug_report, 'Fiches Escargots', 'Héliciculture — suivi mensuel du cheptel', EcranPoste.ficheEscargots),
   ];
 
   /// « Accès Rapides — Élevage & Soins », dans l'ordre du Blade.
   static const accesRapides = <CarteHub>[
-    (Icons.favorite, 'Suivi Reproduction', 'Saillies, palpations, mises bas, sevrages', EcranPoste.suiviReproduction),
-    (Icons.vaccines, 'Soins et Vaccins', 'Registre vétérinaire, calendrier, rémanence', EcranPoste.soinsEtVaccins),
-    (Icons.dashboard, 'Dashboard Élevage', 'GMQ, rentabilité, alertes', EcranPoste.dashboardElevage),
+    (SymbolesAgri.favorite, 'Suivi Reproduction', 'Saillies, palpations, mises bas, sevrages', EcranPoste.suiviReproduction),
+    (SymbolesAgri.vaccines, 'Soins et Vaccins', 'Registre vétérinaire, calendrier, rémanence', EcranPoste.soinsEtVaccins),
+    (SymbolesAgri.dashboard, 'Dashboard Élevage', 'GMQ, rentabilité, alertes', EcranPoste.dashboardElevage),
     (
-      Icons.swap_horiz,
+      SymbolesAgri.swap_horiz,
       'Transferts entre Bandes',
       "Portées, sevrés, regroupements ; rattachement à la bande d'origine",
       EcranPoste.transfertsBandes,
@@ -160,7 +161,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
     children: [
       Row(
         children: [
-          const Icon(Icons.pets, color: AgriColors.brandEmerald),
+          const Icon(SymbolesAgri.pets, color: AgriColors.brandEmerald),
           const SizedBox(width: AgriSpacing.xs),
           Expanded(
             child: Text(
@@ -186,7 +187,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
   List<Widget> _kpis(IndicateursGestionElevage k) => [
     CarteKpi(
       libelle: 'Effectif Total Vivant',
-      icone: Icons.pets,
+      icone: SymbolesAgri.pets,
       couleurLisere: AgriColors.brandEmerald,
       couleurIcone: AgriColors.brandEmerald,
       valeur: GestionElevageRepository.formaterEntier(k.effectifTotal),
@@ -194,7 +195,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
     ),
     CarteKpi(
       libelle: 'Bandes Actives',
-      icone: Icons.layers,
+      icone: SymbolesAgri.layers,
       couleurLisere: AgriColors.accentYellow,
       couleurIcone: AgriColors.brandForest,
       valeur: '${k.bandesActives}',
@@ -203,7 +204,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
     // `:pending="true" pending-since="Sprint 6 (Stocks)"` : aucune table ne suit encore un stock d'aliment.
     CarteKpi(
       libelle: 'Alertes Stock Aliment',
-      icone: Icons.warning,
+      icone: SymbolesAgri.warning,
       couleurLisere: AgriColors.errorRed,
       couleurIcone: AgriColors.errorRed,
       valeur: '—',
@@ -212,7 +213,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
     ),
     CarteKpi(
       libelle: 'Taux Mortalité (mois)',
-      icone: Icons.monitor_heart,
+      icone: SymbolesAgri.monitor_heart,
       couleurLisere: AgriColors.infoBlue,
       couleurIcone: AgriColors.infoBlue,
       valeur: GestionElevageRepository.formaterTaux(k.tauxMortaliteMois),
@@ -315,7 +316,7 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AgriColors.outline),
+              const Icon(SymbolesAgri.chevron_right, color: AgriColors.outline),
             ],
           ),
         ),

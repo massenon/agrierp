@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/agri_tokens.dart';
 import 'permissions_poste.dart';
+import '../theme/symboles_agri.dart';
 
 /// Garde d'accès posée SUR l'écran lui-même.
 ///
@@ -38,7 +39,7 @@ class GardeEcran extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock, size: 64, color: AgriColors.accentYellow),
+              const Icon(SymbolesAgri.lock, size: 64, color: AgriColors.accentYellow),
               const SizedBox(height: AgriSpacing.md),
               const Text(
                 'Accès refusé',

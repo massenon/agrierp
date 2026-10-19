@@ -7,6 +7,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'rapports_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Signature de l'éditeur, injectable — un test ne lance pas d'imprimante.
 typedef Editeur =
@@ -62,12 +63,12 @@ class RapportsExportsScreen extends StatefulWidget {
 
   /// Les six onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Recettes et Dépenses', Icons.receipt_long),
-    ('État de Trésorerie', Icons.account_balance_wallet),
-    ('Créances Clients', Icons.request_quote),
-    ('Dettes Fournisseurs', Icons.local_shipping),
-    ('Rapport Élevage', Icons.pets),
-    ('Rapport de Stocks', Icons.inventory_2),
+    ('Recettes et Dépenses', SymbolesAgri.receipt_long),
+    ('État de Trésorerie', SymbolesAgri.account_balance_wallet),
+    ('Créances Clients', SymbolesAgri.request_quote),
+    ('Dettes Fournisseurs', SymbolesAgri.local_shipping),
+    ('Rapport Élevage', SymbolesAgri.pets),
+    ('Rapport de Stocks', SymbolesAgri.inventory_2),
   ];
 
   /// Les trois tableaux du rapport d'élevage, dans l'ordre de ses pilules.
@@ -165,7 +166,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     children: [
       Row(
         children: [
-          const Icon(Icons.summarize, size: 26, color: AgriColors.brandEmerald),
+          const Icon(SymbolesAgri.summarize, size: 26, color: AgriColors.brandEmerald),
           const SizedBox(width: AgriSpacing.xs),
           Expanded(
             child: Text(
@@ -203,7 +204,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       runSpacing: AgriSpacing.sm,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.calendar_month, size: 18, color: AgriColors.outline),
+        const Icon(SymbolesAgri.calendar_month, size: 18, color: AgriColors.outline),
         _champDate('hub-filter-du', _du, (v) {
           setState(() => _du = v);
           _charger();
@@ -222,14 +223,14 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         _boutonExport(
           cle: 'hub-export-pdf',
           libelle: 'Exporter PDF',
-          icone: Icons.picture_as_pdf,
+          icone: SymbolesAgri.picture_as_pdf,
           plein: true,
           surAppui: _exporterPdf,
         ),
         _boutonExport(
           cle: 'hub-export-excel',
           libelle: 'Excel',
-          icone: Icons.table_view,
+          icone: SymbolesAgri.table_view,
           plein: false,
           surAppui: _exporterTableur,
         ),
@@ -253,7 +254,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       );
       if (choix != null) quand(choix);
     },
-    icon: const Icon(Icons.event, size: 16),
+    icon: const Icon(SymbolesAgri.event, size: 16),
     label: Text(
       RapportsRepository.date(valeur),
       style: const TextStyle(fontSize: AgriTypography.xs),
@@ -383,16 +384,16 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         'État des Recettes et Dépenses',
         'Comparatif détaillé des entrées et sorties de trésorerie sur la '
             'période.',
-        Icons.receipt_long,
+        SymbolesAgri.receipt_long,
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
       _grilleKpi(
         large,
         const [
-          ('Total Recettes', Icons.trending_up, AgriColors.brandEmerald),
-          ('Total Dépenses', Icons.trending_down, AgriColors.errorRed),
-          ('Solde Net', Icons.account_balance_wallet, AgriColors.infoBlue),
+          ('Total Recettes', SymbolesAgri.trending_up, AgriColors.brandEmerald),
+          ('Total Dépenses', SymbolesAgri.trending_down, AgriColors.errorRed),
+          ('Solde Net', SymbolesAgri.account_balance_wallet, AgriColors.infoBlue),
         ],
         [
           RapportsRepository.montant(d.totalRecettes),
@@ -448,7 +449,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         _enteteRapport(
           'État de Trésorerie',
           'Position de trésorerie consolidée.',
-          Icons.account_balance_wallet,
+          SymbolesAgri.account_balance_wallet,
           large,
         ),
         const SizedBox(height: AgriSpacing.md),
@@ -504,7 +505,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       _enteteRapport(
         'État des Créances Clients',
         'Suivi des sommes dues par les clients.',
-        Icons.request_quote,
+        SymbolesAgri.request_quote,
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -537,7 +538,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       _enteteRapport(
         'État des Dettes Fournisseurs',
         'Suivi des sommes dues aux fournisseurs.',
-        Icons.local_shipping,
+        SymbolesAgri.local_shipping,
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -574,12 +575,12 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         'Restitution fidèle des registres manuscrits — recensement, mouvements '
             "et suivi de ponte, alimentée automatiquement depuis les fiches "
             "d'élevage.",
-        Icons.pets,
+        SymbolesAgri.pets,
         large,
         actionSupplementaire: OutlinedButton.icon(
           key: const Key('elevage-filtrer-periode'),
           onPressed: _ouvrirFiltrePeriode,
-          icon: const Icon(Icons.tune, size: 18),
+          icon: const Icon(SymbolesAgri.tune, size: 18),
           label: const Text(
             'Filtrer la Période',
             style: TextStyle(
@@ -764,7 +765,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       _enteteRapport(
         'Rapport de Stocks — Synthèse',
         'État consolidé des stocks et alertes.',
-        Icons.inventory_2,
+        SymbolesAgri.inventory_2,
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -1153,14 +1154,14 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           _boutonExport(
             cle: 'rapport-export-pdf',
             libelle: 'PDF',
-            icone: Icons.picture_as_pdf,
+            icone: SymbolesAgri.picture_as_pdf,
             plein: false,
             surAppui: _exporterPdf,
           ),
           _boutonExport(
             cle: 'rapport-export-excel',
             libelle: 'Excel',
-            icone: Icons.upload,
+            icone: SymbolesAgri.upload,
             plein: true,
             surAppui: _exporterTableur,
           ),
@@ -1213,7 +1214,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       key: Key('recherche-$cle'),
       decoration: InputDecoration(
         isDense: true,
-        prefixIcon: const Icon(Icons.search, size: 18),
+        prefixIcon: const Icon(SymbolesAgri.search, size: 18),
         hintText: invite,
         hintStyle: const TextStyle(fontSize: AgriTypography.xs),
         border: const OutlineInputBorder(),
@@ -1369,7 +1370,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

@@ -6,6 +6,7 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'soins_repository.dart';
 import 'soins_vaccins_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Soins et vaccins — maître : `resources/views/livewire/elevage/soins-vaccins-hub.blade.php` et
 /// `App\Livewire\Elevage\SoinsVaccinsHub` (doctrine, article 5 : la vue Blade fait foi).
@@ -42,9 +43,9 @@ class SoinsVaccinsScreen extends StatefulWidget {
 class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
   /// Les trois onglets du hub, dans son ordre (`:tabs` de `x-tab-page`).
   static const onglets = <(String, IconData)>[
-    ('Registre Vétérinaire', Icons.medical_information),
-    ('Calendrier Vétérinaire', Icons.event_repeat),
-    ('Suivi Sanitaire', Icons.monitor_heart),
+    ('Registre Vétérinaire', SymbolesAgri.medical_information),
+    ('Calendrier Vétérinaire', SymbolesAgri.event_repeat),
+    ('Suivi Sanitaire', SymbolesAgri.monitor_heart),
   ];
 
   /// Les six types d'action de la modale, dans l'ordre du Blade.
@@ -279,7 +280,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             child: Row(
               children: [
                 const Icon(
-                  Icons.bar_chart,
+                  SymbolesAgri.bar_chart,
                   size: 18,
                   color: AgriColors.brandForest,
                 ),
@@ -294,7 +295,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                     ),
                   ),
                 ),
-                Icon(ouvert ? Icons.expand_less : Icons.expand_more, size: 18),
+                Icon(ouvert ? SymbolesAgri.expand_less : SymbolesAgri.expand_more, size: 18),
               ],
             ),
           ),
@@ -308,7 +309,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       ElevatedButton.icon(
         key: Key(cle),
         onPressed: action,
-        icon: const Icon(Icons.add_circle, size: 18),
+        icon: const Icon(SymbolesAgri.add_circle, size: 18),
         label: Text(
           libelle,
           style: const TextStyle(
@@ -339,7 +340,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       children: [
         _entete(
           titre: 'Registre Vétérinaire',
-          icone: Icons.vaccines,
+          icone: SymbolesAgri.vaccines,
           sousTitre:
               'Carnet médical numérique : vaccinations, traitements et '
               'vermifuges du cheptel.',
@@ -354,13 +355,13 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           _carteKpi(
             'Interventions (mois)',
             '${d.interventionsDuMois}',
-            Icons.vaccines,
+            SymbolesAgri.vaccines,
             AgriColors.brandEmerald,
           ),
           _carteKpi(
             'Vaccinations planifiées',
             '${d.vaccinationsPlanifiees}',
-            Icons.event,
+            SymbolesAgri.event,
             AgriColors.infoBlue,
             couleurIcone: AgriColors.infoBlue,
           ),
@@ -368,14 +369,14 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           _carteKpi(
             'Animaux en quarantaine',
             '${d.enQuarantaine}',
-            Icons.coronavirus,
+            SymbolesAgri.coronavirus,
             AgriColors.accentYellow,
             couleurIcone: AgriColors.brandForest,
           ),
           _carteKpi(
             'Coût sanitaire (mois)',
             SoinsVaccinsRepository.fcfa(d.coutDuMois),
-            Icons.payments,
+            SymbolesAgri.payments,
             AgriColors.errorRed,
             couleurIcone: AgriColors.errorRed,
           ),
@@ -407,7 +408,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             key: const Key('vms-recherche'),
             decoration: const InputDecoration(
               isDense: true,
-              prefixIcon: Icon(Icons.search, size: 18),
+              prefixIcon: Icon(SymbolesAgri.search, size: 18),
               hintText: 'Rechercher un diagnostic, un lot...',
               hintStyle: TextStyle(fontSize: AgriTypography.xs),
               border: OutlineInputBorder(),
@@ -437,8 +438,8 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
         ),
         // ⚠️ IMPORT ET EXPORT PRÉSENTS ET INERTES (ajouts du poste gardés) : ni sélecteur de fichier ni chaîne
         // d'édition ne sont raccordés à cet écran.
-        _boutonInerte(Icons.upload_file, 'Importer'),
-        _boutonInerte(Icons.picture_as_pdf, 'Exporter PDF'),
+        _boutonInerte(SymbolesAgri.upload_file, 'Importer'),
+        _boutonInerte(SymbolesAgri.picture_as_pdf, 'Exporter PDF'),
       ],
     ),
   );
@@ -653,7 +654,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 child: Opacity(
                   opacity: 0.4,
                   child: Icon(
-                    Icons.delete,
+                    SymbolesAgri.delete,
                     size: 18,
                     color: AgriColors.outline,
                   ),
@@ -731,7 +732,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       children: [
         _entete(
           titre: 'Calendrier Vétérinaire',
-          icone: Icons.event,
+          icone: SymbolesAgri.event,
           sousTitre:
               "Planificateur de prophylaxie : lots d'élevage × échéances de "
               'soins (14 prochains jours).',
@@ -953,7 +954,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.vaccines,
+                    SymbolesAgri.vaccines,
                     size: 14,
                     color: Colors.white,
                   ),
@@ -978,7 +979,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.vaccines,
+                    SymbolesAgri.vaccines,
                     size: planifie == null ? 14 : 10,
                     color: _couleursEtat[calculee.etat],
                   ),
@@ -1007,7 +1008,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       children: [
         _entete(
           titre: 'Suivi Sanitaire',
-          icone: Icons.monitor_heart,
+          icone: SymbolesAgri.monitor_heart,
           sousTitre:
               "Infirmerie d'élevage : suivi clinique des animaux en isolement, "
               'quarantaine ou observation.',
@@ -1022,27 +1023,27 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           _carteKpi(
             'En Quarantaine',
             '${k.enQuarantaine}',
-            Icons.coronavirus,
+            SymbolesAgri.coronavirus,
             AgriColors.accentYellow,
             couleurIcone: AgriColors.brandForest,
           ),
           _carteKpi(
             'Guéris (mois)',
             '${k.guerisMois}',
-            Icons.task_alt,
+            SymbolesAgri.task_alt,
             AgriColors.brandEmerald,
           ),
           _carteKpi(
             'Sous Traitement',
             '${k.sousTraitement}',
-            Icons.medication,
+            SymbolesAgri.medication,
             AgriColors.infoBlue,
             couleurIcone: AgriColors.infoBlue,
           ),
           _carteKpi(
             'Décès (mois)',
             '${k.decesMois}',
-            Icons.heart_broken,
+            SymbolesAgri.heart_broken,
             AgriColors.errorRed,
             couleurIcone: AgriColors.errorRed,
           ),
@@ -1108,7 +1109,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           tooltip: 'Valider la guérison et réintégrer',
           visualDensity: VisualDensity.compact,
           icon: const Icon(
-            Icons.settings_backup_restore,
+            SymbolesAgri.settings_backup_restore,
             size: 18,
             color: AgriColors.brandEmerald,
           ),
@@ -1123,7 +1124,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           tooltip: 'Déclarer le décès',
           visualDensity: VisualDensity.compact,
           icon: const Icon(
-            Icons.heart_broken,
+            SymbolesAgri.heart_broken,
             size: 18,
             color: AgriColors.errorDeep,
           ),

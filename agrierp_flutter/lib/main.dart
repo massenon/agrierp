@@ -85,6 +85,7 @@ import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
+import 'core/theme/symboles_agri.dart';
 
 /// AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
 ///
@@ -1000,7 +1001,7 @@ class _BarreLaterale extends StatelessWidget {
   static const arborescence = <(String, List<(IconData, String, EcranPoste?)>)>[
     (
       'PILOTAGE',
-      [(Icons.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord)],
+      [(SymbolesAgri.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord)],
     ),
     (
       'PRODUCTION ÉLEVAGE & SOINS',
@@ -1008,52 +1009,52 @@ class _BarreLaterale extends StatelessWidget {
         // ⚠️ « Gestion Élevage » mène aux fiches, exactement comme dans la
         // maquette : celle-ci ne liste AUCUNE fiche dans sa barre, elles
         // s'ouvrent depuis cet écran.
-        (Icons.pets, 'Gestion Élevage', EcranPoste.gestionElevage),
-        (Icons.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
-        (Icons.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
-        (Icons.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
-        (Icons.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
+        (SymbolesAgri.pets, 'Gestion Élevage', EcranPoste.gestionElevage),
+        (SymbolesAgri.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
+        (SymbolesAgri.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
+        (SymbolesAgri.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
+        (SymbolesAgri.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
       ],
     ),
     (
       'VENTES FERME',
       [
-        (Icons.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
-        (Icons.payments, 'Clients et Créances', EcranPoste.clientsEtCreances),
+        (SymbolesAgri.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
+        (SymbolesAgri.payments, 'Clients et Créances', EcranPoste.clientsEtCreances),
       ],
     ),
     (
       'ACHATS & CHARGES',
       [
         (
-          Icons.local_shipping,
+          SymbolesAgri.local_shipping,
           'Achats & Commandes',
           EcranPoste.achatsEtCommandes,
         ),
-        (Icons.contact_page, 'Fournisseurs', EcranPoste.fournisseurs),
-        (Icons.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
+        (SymbolesAgri.contact_page, 'Fournisseurs', EcranPoste.fournisseurs),
+        (SymbolesAgri.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
       ],
     ),
     (
       'STOCKS & PRODUITS',
       [
-        (Icons.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
-        (Icons.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
+        (SymbolesAgri.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
+        (SymbolesAgri.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
       ],
     ),
     (
       'FACTURATION',
-      [(Icons.receipt_long, 'Facturation & MeCeF', EcranPoste.facturation)],
+      [(SymbolesAgri.receipt_long, 'Facturation & MeCeF', EcranPoste.facturation)],
     ),
     (
       'RESSOURCES HUMAINES',
-      [(Icons.badge, 'Personnel & Stages', EcranPoste.personnelEtStages)],
+      [(SymbolesAgri.badge, 'Personnel & Stages', EcranPoste.personnelEtStages)],
     ),
     (
       'ADMINISTRATION',
       [
         (
-          Icons.folder_shared,
+          SymbolesAgri.folder_shared,
           'Administration & Document',
           EcranPoste.administrationEtDocument,
         ),
@@ -1062,15 +1063,15 @@ class _BarreLaterale extends StatelessWidget {
     (
       'COMPTABILITÉ & ADMIN',
       [
-        (Icons.account_balance, 'Comptabilité', EcranPoste.comptabilite),
-        (Icons.settings, 'Paramètres Général', EcranPoste.parametresGeneraux),
+        (SymbolesAgri.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+        (SymbolesAgri.settings, 'Paramètres Général', EcranPoste.parametresGeneraux),
       ],
     ),
     (
       'EDITIONS',
       [
         (
-          Icons.picture_as_pdf,
+          SymbolesAgri.picture_as_pdf,
           'Rapports & Exports',
           EcranPoste.rapportsEtExports,
         ),
@@ -1083,9 +1084,9 @@ class _BarreLaterale extends StatelessWidget {
     (
       'POSTE',
       [
-        (Icons.sync, 'Synchronisation', EcranPoste.synchronisation),
+        (SymbolesAgri.sync, 'Synchronisation', EcranPoste.synchronisation),
         (
-          Icons.settings_applications,
+          SymbolesAgri.settings_applications,
           'Paramètres du poste',
           EcranPoste.parametres,
         ),
@@ -1182,7 +1183,7 @@ class _BarreLaterale extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.agriculture, color: AgriColors.accentYellow, size: 26),
+                    const Icon(SymbolesAgri.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
                     // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
                     RichText(
@@ -1243,7 +1244,7 @@ class _BarreLaterale extends StatelessWidget {
                   CircleAvatar(
                     radius: 16,
                     backgroundColor: Colors.white.withValues(alpha: 0.10),
-                    child: const Icon(Icons.account_circle, size: 18, color: Colors.white),
+                    child: const Icon(SymbolesAgri.account_circle, size: 18, color: Colors.white),
                   ),
                   const SizedBox(width: AgriSpacing.sm),
                   Expanded(
@@ -1292,12 +1293,12 @@ class _RubanReplie extends StatelessWidget {
 
   /// Les six liens du web, dans l'ordre, avec leur `title` exact.
   static const liens = <(IconData, String, EcranPoste)>[
-    (Icons.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
-    (Icons.point_of_sale, 'Caisse POS', EcranPoste.ventesEtDevis),
-    (Icons.pets, 'Élevage', EcranPoste.gestionElevage),
-    (Icons.inventory_2, 'Stocks', EcranPoste.gestionStocks),
-    (Icons.badge, 'Ressources Humaines', EcranPoste.personnelEtStages),
-    (Icons.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+    (SymbolesAgri.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
+    (SymbolesAgri.point_of_sale, 'Caisse POS', EcranPoste.ventesEtDevis),
+    (SymbolesAgri.pets, 'Élevage', EcranPoste.gestionElevage),
+    (SymbolesAgri.inventory_2, 'Stocks', EcranPoste.gestionStocks),
+    (SymbolesAgri.badge, 'Ressources Humaines', EcranPoste.personnelEtStages),
+    (SymbolesAgri.account_balance, 'Comptabilité', EcranPoste.comptabilite),
   ];
 
   @override
@@ -1324,7 +1325,7 @@ class _RubanReplie extends StatelessWidget {
           IconButton(
             key: const Key('ruban-reafficher'),
             tooltip: 'Réafficher le menu',
-            icon: const Icon(Icons.menu_open, color: AgriColors.accentYellow),
+            icon: const Icon(SymbolesAgri.menu_open, color: AgriColors.accentYellow),
             hoverColor: Colors.white.withValues(alpha: 0.10),
             onPressed: onReafficher,
           ),
