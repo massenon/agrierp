@@ -1,7 +1,9 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
 import 'package:agrierp/features/elevage/soins_vaccins_repository.dart';
 import 'package:agrierp/features/elevage/soins_vaccins_screen.dart';
@@ -18,10 +20,10 @@ import 'cartes_attendues.dart';
 /// charge `vms-registre`, `vms-calendrier` et `vms-suivi` dans des `<iframe>`
 /// d'un même hub, et la barre latérale ne porte qu'une entrée.
 ///
-/// ⚠️⚠️ **`infirmary_records` NE DESCEND PAS AU POSTE.** La table existe côté
-/// serveur mais ne figure pas dans la charge du tirage : tout l'onglet
-/// « Suivi Sanitaire » et le KPI « Animaux en quarantaine » en dépendent. Un
-/// zéro se lirait « aucun animal isolé » — c'est un tiret motivé.
+/// Tickets H8 / H8b (19/10/2026) : le Blade fait foi, et l'infirmerie comme le
+/// calendrier planifié descendent au poste et y sont saisis. Les tests adaptés le
+/// disent (« Ticket H8 : le Blade fait foi ») ; la confrontation au Blade lui-même
+/// vit dans `soins_infirmerie_calendrier_test.dart`.
 void main() {
   late AppDatabase db;
   late SoinsRepository soins;
@@ -51,6 +53,9 @@ void main() {
                 speciesId: 'esp-$espece',
                 speciesCode: Value(espece),
                 stage: const Value('engraissement'),
+                // Ticket H8 : le Blade fait foi — seules les bandes `status = actif` ET `is_active` sont
+                // proposées et ont leur ligne au calendrier (`getActiveLotsProperty`).
+                status: const Value('actif'),
                 createdDate: Value(debut),
                 currentQuantity: const Value(50),
               ),
@@ -160,12 +165,20 @@ void main() {
     );
   });
 
-  testWidgets('⚠️⚠️ les animaux en quarantaine affichent un tiret motivé', (
+  /// Ticket H8 : le Blade fait foi — l'infirmerie descend au poste (H8b) : « Animaux en quarantaine » est
+  /// une MESURE (`InfirmaryRecord::where('status', 'en_cours')->count()`), plus un tiret motivé.
+  testWidgets('Ticket H8 : « Animaux en quarantaine » compte l infirmerie', (
     tester,
   ) async {
     await afficher(tester);
 
-    expect(find.text('Infirmerie non synchronisée'), findsOneWidget);
+    expect(find.text('Infirmerie non synchronisée'), findsNothing);
+    final carte = tester.widget<CarteKpi>(
+      find.byWidgetPredicate(
+        (w) => w is CarteKpi && w.libelle == 'Animaux en quarantaine',
+      ),
+    );
+    expect(carte.valeur, '0');
   });
 
   testWidgets('le registre porte les six colonnes de la maquette', (
@@ -200,8 +213,10 @@ void main() {
 
     expect(find.text('Vaccin Myxomatose'), findsOneWidget);
     expect(find.text('1 dose/sujet'), findsOneWidget);
-    expect(find.text('LOT-LAP-2026-06'), findsWidgets);
-    expect(find.text('12000 F'), findsOneWidget);
+    // Ticket H8 : le Blade fait foi — cellule « CODE (Espèce) » (espèce inconnue du poste : « — ») et
+    // coût « 12 000 FCFA » (`number_format(…, 0, ',', ' ').' FCFA'`).
+    expect(find.text('LOT-LAP-2026-06 (—)'), findsOneWidget);
+    expect(find.text('12 000 FCFA'), findsOneWidget);
   });
 
   testWidgets('le filtre de filière restreint le registre', (tester) async {
@@ -253,8 +268,22 @@ void main() {
     expect(find.text('Levalap'), findsNothing);
   });
 
+  /// Ticket H8 : le Blade fait foi — registre vide : son message exact ; registre que les FILTRES (ajout du
+  /// poste) vident : le dire.
   testWidgets('sans soin correspondant, le registre le dit', (tester) async {
     await afficher(tester);
+
+    expect(find.text('Aucun soin enregistré pour le moment.'), findsOneWidget);
+
+    await soins.enregistrer(
+      lotId: bandeLapins,
+      typeAction: 'Vaccination',
+      produit: 'Myxomatose',
+    );
+    await tester.pumpWidget(const SizedBox());
+    await afficher(tester);
+    await tester.enterText(find.byKey(const Key('vms-recherche')), 'introuvable');
+    await tester.pumpAndSettle();
 
     expect(
       find.text('— Aucun soin au registre pour ces critères —'),
@@ -294,11 +323,25 @@ void main() {
     }
   });
 
+  /// Ticket H8 : le Blade fait foi — les deux listes s'ouvrent sur « -- Sélectionner -- » : la bande et le
+  /// type d'action se CHOISISSENT (`required` de `saveSoin()`).
+  Future<void> choisirBandeEtType(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('soin-bande')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LOT-LAP-2026-06 (—)').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('soin-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vermifuge').last);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('la modale enregistre un soin en file d envoi', (tester) async {
     await afficher(tester);
     await tester.tap(find.byKey(const Key('nouveau-soin')));
     await tester.pumpAndSettle();
 
+    await choisirBandeEtType(tester);
     await tester.enterText(find.byKey(const Key('soin-produit')), 'Levalap');
     await tester.enterText(find.byKey(const Key('soin-dose')), '1C / 5L eau');
     await tester.tap(find.byKey(const Key('soin-enregistrer')));
@@ -309,6 +352,9 @@ void main() {
     expect(enregistres, hasLength(1));
     expect(enregistres.single.productUsed, 'Levalap');
     expect(enregistres.single.syncStatus, SyncStatus.pending);
+    // Ticket H8 : le message du composant (`saveSoin()`), en toast unique.
+    expect(find.text('Soin enregistré avec succès.'), findsOneWidget);
+    ToastAgri.toutRetirer();
   });
 
   /// ⚠️⚠️ LE POINT SANITAIRE : un délai d'attente crée la période de rémanence
@@ -320,6 +366,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nouveau-soin')));
     await tester.pumpAndSettle();
 
+    await choisirBandeEtType(tester);
     await tester.enterText(find.byKey(const Key('soin-produit')), 'Alfamec');
     await tester.enterText(find.byKey(const Key('soin-remanence')), '7');
     await tester.tap(find.byKey(const Key('soin-enregistrer')));
@@ -329,6 +376,11 @@ void main() {
 
     expect(remanences, hasLength(1));
     expect(remanences.single.productUsed, 'Alfamec');
+    expect(
+      find.text('Soin enregistré — bande bloquée à la vente pendant 7 jour(s).'),
+      findsOneWidget,
+    );
+    ToastAgri.toutRetirer();
   });
 
   /// ⚠️⚠️ Un délai sans produit ne bloque rien — c'est la règle du serveur.
@@ -341,11 +393,13 @@ void main() {
     await tester.tap(find.byKey(const Key('nouveau-soin')));
     await tester.pumpAndSettle();
 
+    await choisirBandeEtType(tester);
     await tester.enterText(find.byKey(const Key('soin-remanence')), '7');
     await tester.tap(find.byKey(const Key('soin-enregistrer')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('soin-erreur')), findsOneWidget);
+    expect(find.textContaining('exige de nommer le produit'), findsOneWidget);
     expect(await db.select(db.veterinaryRecords).get(), isEmpty);
   });
 
@@ -367,33 +421,37 @@ void main() {
     }
   });
 
-  /// ⚠️⚠️ « EN RETARD » N'EST PAS « PLANIFIÉ ». La bande est née il y a
-  /// 10 jours ; un traitement dû au 5e jour de cycle n'a pas été administré.
-  testWidgets('⚠️⚠️ un traitement dû et non administré passe en retard', (
+  /// Ticket H8 : le Blade fait foi — la fenêtre commence AUJOURD'HUI (J → J+13) : un traitement du protocole
+  /// passé n'y figure plus. L'ajout du poste (protocole calculé, gardé par décision client) s'affiche en
+  /// ANNEAU jaune « calculé » sur son jour à venir. La bande est née il y a 10 jours (J11 aujourd'hui) : le
+  /// traitement du 13e jour tombe à J+2.
+  testWidgets('Ticket H8 : un traitement à venir du protocole s affiche en anneau calculé', (
     tester,
   ) async {
-    await protocole('cuniculture', 'Vaccination Myxomatose', 8);
+    await protocole('cuniculture', 'Vaccination Myxomatose', 13);
 
     await afficher(tester);
     await ouvrir(tester, 'Calendrier Vétérinaire');
 
     expect(find.byKey(const Key('gantt-LOT-LAP-2026-06')), findsOneWidget);
 
-    // Une pastille rouge : le traitement du 8e jour est passé, non administré.
-    final rouges = tester
+    final anneaux = tester
         .widgetList<Container>(
           find.descendant(
             of: find.byKey(const Key('gantt-LOT-LAP-2026-06')),
             matching: find.byType(Container),
           ),
         )
-        .where(
-          (c) =>
-              c.decoration is BoxDecoration &&
-              (c.decoration as BoxDecoration).shape == BoxShape.circle,
-        );
+        .where((c) {
+          final d = c.decoration;
+          return d is BoxDecoration &&
+              d.shape == BoxShape.circle &&
+              d.border is Border &&
+              (d.border! as Border).top.color == AgriColors.accentYellow;
+        });
 
-    expect(rouges, isNotEmpty);
+    expect(anneaux, hasLength(1));
+    expect(find.byTooltip('Vaccination Myxomatose (calculé)'), findsOneWidget);
   });
 
   testWidgets('la grille porte une colonne par jour de la fenêtre', (
@@ -402,7 +460,7 @@ void main() {
     await afficher(tester);
     await ouvrir(tester, 'Calendrier Vétérinaire');
 
-    // 3 jours en arrière + aujourd'hui + 10 en avant = 14 colonnes.
+    // Ticket H8 : le Blade fait foi — aujourd'hui + 13 jours = 14 colonnes (`range(0, 13)`).
     final debut = jourDe(-SoinsVaccinsRepository.joursAvant);
     final fin = jourDe(SoinsVaccinsRepository.joursApres);
 
@@ -412,12 +470,20 @@ void main() {
 
   // ── Onglet Suivi Sanitaire ────────────────────────────────────────────────
 
-  testWidgets('⚠️⚠️ le suivi sanitaire dit sa dépendance', (tester) async {
+  /// Ticket H8 : le Blade fait foi — l'infirmerie est embarquée (H8b) : l'onglet est COMPLET ; vide, il
+  /// porte le message exact du Blade (détail : `soins_infirmerie_calendrier_test.dart`).
+  testWidgets('Ticket H8 : le suivi sanitaire est complet, vide il le dit', (
+    tester,
+  ) async {
     await afficher(tester);
     await ouvrir(tester, 'Suivi Sanitaire');
 
-    expect(find.byKey(const Key('suivi-non-embarque')), findsOneWidget);
-    expect(find.text('— Module non embarqué au poste —'), findsOneWidget);
-    expect(find.textContaining("L'infirmerie"), findsOneWidget);
+    expect(find.text('— Module non embarqué au poste —'), findsNothing);
+    expect(find.byKey(const Key('nouvelle-entree-infirmerie')), findsOneWidget);
+    expect(find.byType(CarteKpi), findsNWidgets(4));
+    expect(
+      find.text("Aucune entrée d'infirmerie pour le moment."),
+      findsOneWidget,
+    );
   });
 }

@@ -75,6 +75,9 @@ class SoinsRepository {
   final String _deviceId;
   final Uuid _uuid;
 
+  /// Identifiant du poste — repris par `SoinsVaccinsRepository` pour l'infirmerie et le calendrier (H8b).
+  String get deviceId => _deviceId;
+
   /// Protocole prévu pour une espèce, tel que le serveur le sert.
   ///
   /// ⚠️ Jamais de traitement codé en dur : le protocole est éditable depuis

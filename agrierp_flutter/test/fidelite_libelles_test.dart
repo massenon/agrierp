@@ -346,7 +346,7 @@ void main() {
     // ── Accordéon des KPI : repli propre au mobile ; le poste est un écran de
     //    bureau, où le panneau est toujours déplié.
     'Indicateurs de performance': 'accordéon mobile sans objet au poste',
-    'Résumé sanitaire': 'accordéon mobile sans objet au poste',
+    // Ticket H8 : « Résumé sanitaire » est désormais rendu (accordéon `x-kpi-accordion`, sous md) — retiré.
 
     // ── Modules non embarqués, déjà annoncés à l'écran (tickets F0.33, F0.37).
     'Détail de la Vente': 'module non embarqué au poste',
@@ -355,8 +355,11 @@ void main() {
     'Relancer': 'module non embarqué au poste',
     'Détail des Coûts': 'bilan technico-économique non embarqué',
     'Détail des Revenus': 'bilan technico-économique non embarqué',
-    'Dossier Clinique': 'infirmerie non synchronisée',
-    'Alertes Sanitaires du Jour': 'infirmerie non synchronisée',
+    // Ticket H8 : l'infirmerie descend au poste depuis H8b (19/10/2026) ; ces deux libellés restent absents
+    // pour d'autres raisons, dites ici.
+    'Dossier Clinique': 'absent du Blade maître (H8 : le Blade fait foi)',
+    'Alertes Sanitaires du Jour':
+        "infirmerie pas encore raccordée au tableau de bord élevage",
     'Maladies les Plus Fréquentes — 2026 vs 2025':
         "historique de l'an dernier non synchronisé",
     'Cas 2025': "historique de l'an dernier non synchronisé",
@@ -377,11 +380,10 @@ void main() {
     //    l'onglet Calendrier rend déjà (ticket F0.36).
     'Rappel de Prophylaxie du Jour': 'rendu par le Calendrier Vétérinaire',
     "Détail de l'Intervention": 'rendu par le Calendrier Vétérinaire',
-    'Planifier une Intervention':
-        'calendrier calculé depuis le protocole, non saisi',
-    // ⚠️ Confirmer l'administration d'un soin, c'est l'écrire au registre —
-    //    ce que fait la modale « Nouveau Soin » de l'onglet précédent.
-    'Confirmer Administration': 'porté par la modale Nouveau Soin',
+    // Ticket H8b : « Planifier une Intervention » est porté (modale du Blade) — exemption retirée.
+    // ⚠️ Comme au Blade, un clic sur la case planifiée confirme l'administration
+    //    (`confirmAdministration`) : le libellé de la modale de la maquette n'existe pas au web.
+    'Confirmer Administration': 'clic sur la case, comme au Blade (H8b)',
 
     // ── Colonnes et libellés du détail d'une vente, non embarqué.
     'Qté': 'module non embarqué au poste',
@@ -1085,11 +1087,8 @@ void main() {
       'Mot de Passe': 'aucun secret ne descend au poste',
     },
 
-    'vms-calendrier.html': {
-      // « Le calendrier du poste est CALCULÉ depuis le protocole
-      // prophylactique servi par le serveur. »
-      'Planifier': 'calendrier calculé depuis le protocole, non saisi',
-    },
+    // Ticket H8b : « Planifier » est porté (bouton de la modale du Blade) — exemption de
+    // `vms-calendrier.html` retirée.
 
     'vms-registre.html': {
       'Imprimer': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
@@ -1120,7 +1119,8 @@ void main() {
   ///
   /// Ticket H7 : le Blade fait foi — 268 → 239. Les 29 couples masqués de
   /// `suivi-reproduction.html` sortent du compte avec la page (contrôlée contre le Blade).
-  const plafondManquesMasques = 239;
+  /// H8 / H8b (19/10/2026) : 239 → 237 (« Résumé sanitaire » et « Planifier une Intervention » portés).
+  const plafondManquesMasques = 237;
 
   for (final entree in portages.entries) {
     final page = entree.key;

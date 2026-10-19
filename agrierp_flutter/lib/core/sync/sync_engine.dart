@@ -360,6 +360,11 @@ class SyncEngine {
     );
     // Ticket 15.46 — APRÈS les bandes : un transfert d'une bande inconnue est refusé.
     recus += await _absorberTransferts(corps['livestock_transfers']);
+    // Ticket H8b — APRÈS les bandes : une entrée ou une intervention d'une bande inconnue est refusée.
+    recus += await _absorberInfirmerie(corps['infirmary_records']);
+    recus += await _absorberCalendrierVeterinaire(
+      corps['veterinary_calendar_events'],
+    );
     recus += await _absorberRations(corps['feed_ration_standards']);
     recus += await _absorberRemanences(corps['veterinary_withdrawal_periods']);
     recus += await _absorberProphylaxie(
@@ -630,6 +635,147 @@ class SyncEngine {
     });
 
     return transferts.length;
+  }
+
+  /// Ticket H8b (D-H8) — ENTRÉES D'INFIRMERIE du serveur, FUSIONNÉES par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberTransferts] : une entrée `pending` ou en `conflict` (créée, réintégrée
+  /// ou déclarée décédée sur ce poste, pas encore acquittée) n'est JAMAIS écrasée — un upsert aveugle
+  /// effacerait une réintégration saisie hors ligne. Un élément illisible (identifiant, bande, motif, date),
+  /// un statut hors de l'enum du serveur (`en_cours`, `reintegre`, `deces`) ou une bande inconnue du poste
+  /// refuse le lot entier ([FormatException], rien n'est écrit, le curseur n'avance pas).
+  Future<int> _absorberInfirmerie(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    const statuts = ['en_cours', 'reintegre', 'deces'];
+    final entrees = <InfirmaryRecordsCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final lot = l['lot_id'];
+      final motif = l['motif'];
+      final date = _date(l['entry_date']);
+      final statut = l['status'] ?? 'en_cours';
+      final sujet = l['sujet_ref'];
+      final isolement = l['isolation_level'];
+      if (id is! String ||
+          lot is! String ||
+          motif is! String ||
+          date == null ||
+          (sujet != null && sujet is! String) ||
+          (isolement != null && isolement is! String)) {
+        throw FormatException(
+          'Entrée d\'infirmerie $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!statuts.contains(statut)) {
+        throw FormatException(
+          'Entrée d\'infirmerie $id refusée : statut inconnu ($statut).',
+        );
+      }
+      entrees.add(
+        InfirmaryRecordsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          sujetRef: Value(sujet as String?),
+          motif: motif,
+          isolationLevel: Value(isolement as String?),
+          entryDate: DateTime(date.year, date.month, date.day),
+          status: Value(statut as String),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final e in entrees) {
+        if (!connues.contains(e.lotId.value)) {
+          throw FormatException(
+            'Entrée d\'infirmerie ${e.id.value} refusée : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.infirmaryRecords,
+        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.infirmaryRecords)
+            .insert(e, onConflict: DoUpdate((_) => e));
+      }
+    });
+
+    return entrees.length;
+  }
+
+  /// Ticket H8b (D-H8) — INTERVENTIONS PLANIFIÉES du calendrier vétérinaire, FUSIONNÉES par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT**, même règle que [_absorberInfirmerie] : une intervention planifiée ou confirmée sur ce
+  /// poste (`pending`, `conflict`) n'est jamais écrasée ; statut hors de l'enum du serveur (`planned`, `done`,
+  /// `late`, `inprogress`), élément illisible ou bande inconnue → [FormatException], rien n'est écrit.
+  Future<int> _absorberCalendrierVeterinaire(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    const statuts = ['planned', 'done', 'late', 'inprogress'];
+    final evenements = <VeterinaryCalendarEventsCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final lot = l['lot_id'];
+      final tache = l['task_type'];
+      final date = _date(l['scheduled_date']);
+      final statut = l['status'] ?? 'planned';
+      if (id is! String || lot is! String || tache is! String || date == null) {
+        throw FormatException(
+          'Intervention planifiée $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!statuts.contains(statut)) {
+        throw FormatException(
+          'Intervention planifiée $id refusée : statut inconnu ($statut).',
+        );
+      }
+      evenements.add(
+        VeterinaryCalendarEventsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          taskType: tache,
+          scheduledDate: DateTime(date.year, date.month, date.day),
+          status: Value(statut as String),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final e in evenements) {
+        if (!connues.contains(e.lotId.value)) {
+          throw FormatException(
+            'Intervention planifiée ${e.id.value} refusée : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.veterinaryCalendarEvents,
+        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.veterinaryCalendarEvents)
+            .insert(e, onConflict: DoUpdate((_) => e));
+      }
+    });
+
+    return evenements.length;
   }
 
   /// Fiches journalières du cheptel — FUSIONNÉES par identifiant (ticket F0.94).
@@ -2922,6 +3068,15 @@ class SyncEngine {
       _db.livestockTransfers,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket H8b — infirmerie et interventions planifiées saisies au poste.
+    final infirmerie = await (_db.select(
+      _db.infirmaryRecords,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final interventions = await (_db.select(
+      _db.veterinaryCalendarEvents,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     _financiersAcquittes = 0;
     _courriersAcquittes = 0;
     _archivesAcquittees = 0;
@@ -2929,6 +3084,8 @@ class SyncEngine {
 
     if (fiches.isEmpty &&
         transferts.isEmpty &&
+        infirmerie.isEmpty &&
+        interventions.isEmpty &&
         courriers.isEmpty &&
         archives.isEmpty &&
         documents.isEmpty &&
@@ -3013,6 +3170,11 @@ class SyncEngine {
         ],
         // Ticket 15.46 — traités par le serveur APRÈS les fiches du même envoi.
         'livestock_transfers': transferts.map(_transfertEnJson).toList(),
+        // Ticket H8b — `pushInfirmerie` / `pushCalendrierVeterinaire` (manage-elevage).
+        'infirmary_records': infirmerie.map(_infirmerieEnJson).toList(),
+        'veterinary_calendar_events': interventions
+            .map(_interventionEnJson)
+            .toList(),
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
@@ -3070,6 +3232,51 @@ class SyncEngine {
       (ids, statut) =>
           (_db.update(_db.livestockTransfers)..where((t) => t.id.isIn(ids)))
               .write(LivestockTransfersCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket H8b — n'acquitte que la VERSION partie (voir [_marquerParStatut]).
+    accepte += await _acquitter(
+      'infirmary_records',
+      corps['infirmary_records'],
+      (ids, statut) => _marquerParStatut(
+        [for (final e in infirmerie) (e.id, e.status)],
+        ids,
+        statut,
+        (id, statutMetier) =>
+            (_db.update(_db.infirmaryRecords)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.status.equals(statutMetier),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(InfirmaryRecordsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'veterinary_calendar_events',
+      corps['veterinary_calendar_events'],
+      (ids, statut) => _marquerParStatut(
+        [for (final e in interventions) (e.id, e.status)],
+        ids,
+        statut,
+        (id, statutMetier) =>
+            (_db.update(_db.veterinaryCalendarEvents)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.status.equals(statutMetier),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  VeterinaryCalendarEventsCompanion(syncStatus: Value(statut)),
+                ),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -3273,6 +3480,24 @@ class SyncEngine {
     await _db.noterEtatDeSynchronisation(envoye: DateTime.now());
 
     return (accepte, rejete, motifs);
+  }
+
+  /// Ticket H8b — acquitte ou refuse des lignes dont seul le STATUT MÉTIER change après création (infirmerie :
+  /// `en_cours` → `reintegre`/`deces` ; intervention : `planned` → `done`). [envoyes] = (id, statut métier) de
+  /// ce qui est PARTI.
+  ///
+  /// ⚠️⚠️ **LE STATUT DE SYNCHRONISATION NE CHANGE QUE SI LA LIGNE EST ENCORE CELLE QUI EST PARTIE** (même
+  /// règle que [_marquerCourriers]) : une entrée réintégrée PENDANT l'envoi de sa création serait sinon marquée
+  /// `synced` sur l'accusé de l'ancienne version, et la réintégration ne partirait jamais.
+  Future<void> _marquerParStatut(
+    List<(String, String)> envoyes,
+    List<String> ids,
+    SyncStatus statut,
+    Future<void> Function(String id, String statutMetier) marquer,
+  ) async {
+    for (final (id, statutMetier) in envoyes) {
+      if (ids.contains(id)) await marquer(id, statutMetier);
+    }
   }
 
   /// Acquitte ou refuse des courriers ([envoyes] = ce qui est PARTI, tel quel).
@@ -3606,6 +3831,26 @@ class SyncEngine {
               _db.livestockReproductionEvents,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const LivestockReproductionEventsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      // Ticket H8b — sans ces entrées, « Relancer » une entrée d'infirmerie ou une intervention refusée ne
+      // ferait rien (même défaut que celui des achats, F0.77).
+      'infirmary_records' =>
+        () =>
+            (_db.update(
+              _db.infirmaryRecords,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const InfirmaryRecordsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'veterinary_calendar_events' =>
+        () =>
+            (_db.update(
+              _db.veterinaryCalendarEvents,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const VeterinaryCalendarEventsCompanion(
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
@@ -3965,6 +4210,31 @@ class SyncEngine {
     'is_active': t.isActive,
     'device_id': t.deviceId,
     'updated_at': t.updatedAt.toUtc().toIso8601String(),
+  };
+
+  /// Ticket H8b — entrée d'infirmerie telle que `SyncController::pushInfirmerie` la valide (snake_case).
+  /// Pour une entrée déjà connue du serveur, seul `status` est relu (dernier écrivain gagne).
+  Map<String, dynamic> _infirmerieEnJson(InfirmaryRecord e) => {
+    'id': e.id,
+    'lot_id': e.lotId,
+    'sujet_ref': e.sujetRef,
+    'motif': e.motif,
+    'isolation_level': e.isolationLevel,
+    'entry_date': _jour(e.entryDate),
+    'status': e.status,
+    'device_id': e.deviceId,
+    'updated_at': e.updatedAt.toUtc().toIso8601String(),
+  };
+
+  /// Ticket H8b — intervention planifiée telle que `SyncController::pushCalendrierVeterinaire` la valide.
+  Map<String, dynamic> _interventionEnJson(VeterinaryCalendarEvent e) => {
+    'id': e.id,
+    'lot_id': e.lotId,
+    'task_type': e.taskType,
+    'scheduled_date': _jour(e.scheduledDate),
+    'status': e.status,
+    'device_id': e.deviceId,
+    'updated_at': e.updatedAt.toUtc().toIso8601String(),
   };
 
   Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {

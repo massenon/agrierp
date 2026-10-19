@@ -135,6 +135,17 @@ void main() {
     'Fichier': 'sauvegardes produites et gardées sur le serveur',
   };
 
+  /// ⚠️⚠️ **TICKET H8 — LE BLADE FAIT FOI** (doctrine, article 5). Pour ces pages, la vue Blade (maître)
+  /// diverge de la maquette et l'écran suit le Blade : la suite attendue est celle du BLADE (plus les ajouts du
+  /// poste gardés par décision client, à leur place), au lieu de celle de la maquette. Les colonnes du Blade
+  /// sont en outre LUES dans le Blade par `test/soins_infirmerie_calendrier_test.dart`.
+  const bladeFaitFoi = <String, List<List<String>>>{
+    // Blade : six colonnes, sans le « Statut » de la maquette ; « Statut » du poste gardé APRÈS elles.
+    'vms-registre.html': [
+      ['Date', 'Lot / Espèce', "Type d'action", 'Produit', 'Dose', 'Actions', 'Statut'],
+    ],
+  };
+
   /// Colonnes déclarées par un écran, sous ses DEUX formes.
   ///
   /// ⚠️⚠️ **LES ÉCRANS N'ONT PAS TOUS LE MÊME GABARIT DE TABLEAU**, et c'est
@@ -270,7 +281,8 @@ void main() {
 
   for (final entree in portages.entries) {
     final page = entree.key;
-    final attendus = tableauxMaquette[page];
+    // Ticket H8 : quand le Blade fait foi, c'est SA suite qui est attendue, pas celle de la maquette.
+    final attendus = bladeFaitFoi[page] ?? tableauxMaquette[page];
 
     if (attendus == null) continue;
 
@@ -312,6 +324,14 @@ void main() {
       );
     });
   }
+
+  /// Une page « le Blade fait foi » doit exister au portage, et son test de remplacement aussi.
+  test('⚠️ chaque page « le Blade fait foi » est portée et contrôlée ailleurs', () {
+    for (final page in bladeFaitFoi.keys) {
+      expect(portages.containsKey(page), isTrue, reason: page);
+    }
+    expect(File('test/soins_infirmerie_calendrier_test.dart').existsSync(), isTrue);
+  });
 
   /// ⚠️ Une exemption qui ne correspond plus à aucun tableau laisse croire
   /// qu'un écart est couvert alors qu'il a disparu — ou pire, qu'un tableau

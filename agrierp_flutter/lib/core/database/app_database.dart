@@ -1260,6 +1260,41 @@ class VeterinaryRecords extends Table with SyncColumns {
   IntColumn get withdrawalDays => integer().withDefault(const Constant(0))();
 }
 
+/// Ticket H8b (décision client D-H8 du 19/10/2026) — ENTRÉE D'INFIRMERIE (`infirmary_records` du serveur),
+/// saisie au poste comme au web (`SoinsVaccinsHub::saveInfirmaryEntry()`, `reintegrer()`, `declarerDeces()`).
+///
+/// ⚠️ Reçue ET envoyée. Le serveur (`SyncController::pushInfirmerie`) crée l'entrée inconnue, puis ne change
+/// plus que le `status` d'une entrée connue (dernier écrivain gagne) : bande, motif et date d'entrée sont figés.
+/// ⚠️ `entry_date` ne peut pas être postérieure à aujourd'hui (`before_or_equal:today` à l'envoi).
+class InfirmaryRecords extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+
+  /// Sujet isolé (« #A-204 ») — optionnel : l'entrée peut viser la bande entière.
+  TextColumn get sujetRef => text().nullable()();
+  TextColumn get motif => text()();
+
+  /// `Quarantaine stricte` | `Infirmerie` | `Simple surveillance` (nullable au serveur).
+  TextColumn get isolationLevel => text().nullable()();
+  DateTimeColumn get entryDate => dateTime()();
+
+  /// `en_cours` | `reintegre` | `deces` (enum du serveur).
+  TextColumn get status => text().withDefault(const Constant('en_cours'))();
+}
+
+/// Ticket H8b (D-H8) — INTERVENTION PLANIFIÉE du calendrier vétérinaire (`veterinary_calendar_events` du
+/// serveur) : `SoinsVaccinsHub::savePlan()` (statut `planned`) et `confirmAdministration()` (statut `done`).
+///
+/// ⚠️ « En retard » n'est JAMAIS stocké par le poste : c'est un affichage (`display_status` du modèle web,
+/// `planned` dont la date est passée). Le serveur refuse `late` à l'envoi.
+class VeterinaryCalendarEvents extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+  TextColumn get taskType => text()();
+  DateTimeColumn get scheduledDate => dateTime()();
+
+  /// `planned` | `done` | `late` | `inprogress` (enum du serveur ; le poste n'écrit que les deux premiers).
+  TextColumn get status => text().withDefault(const Constant('planned'))();
+}
+
 /// Ajustement de stock saisi hors ligne.
 ///
 /// ⚠️ LE SERVEUR NE L'APPLIQUE JAMAIS TEL QUEL : il le rejoue par son action
@@ -1438,6 +1473,8 @@ class SyncState extends Table {
     LivestockTransfers,
     ProphylaxisScheduleStandards,
     VeterinaryRecords,
+    InfirmaryRecords,
+    VeterinaryCalendarEvents,
     Sales,
     SaleLines,
     StockAdjustments,
@@ -1461,7 +1498,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 40;
+  int get schemaVersion => 41;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1845,6 +1882,16 @@ class AppDatabase extends _$AppDatabase {
       if (from < 40) {
         await _ajouterColonneSiAbsente(m, syncState, syncState.lastSucceededAt);
       }
+
+      // v41 — ticket H8b (D-H8) : infirmerie et calendrier vétérinaire planifié, saisis au poste.
+      if (from < 41) {
+        if (!await _tableExiste(m, infirmaryRecords)) {
+          await m.createTable(infirmaryRecords);
+        }
+        if (!await _tableExiste(m, veterinaryCalendarEvents)) {
+          await m.createTable(veterinaryCalendarEvents);
+        }
+      }
     },
   );
 
@@ -1942,6 +1989,9 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
+    'infirmary_records',
+    'veterinary_calendar_events',
   ];
 
   /// Nombre d'enregistrements en attente d'envoi, toutes tables confondues.
@@ -1982,6 +2032,7 @@ class AppDatabase extends _$AppDatabase {
   static const tablesDActivite = [
     'livestock_lots', 'livestock_daily_entries', 'livestock_transfers',
     'livestock_reproduction_events', 'veterinary_records', 'veterinary_withdrawal_periods',
+    'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
     'advance_imputations', 'sales', 'sale_lines',

@@ -26058,6 +26058,1184 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
   }
 }
 
+class $InfirmaryRecordsTable extends InfirmaryRecords
+    with TableInfo<$InfirmaryRecordsTable, InfirmaryRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InfirmaryRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($InfirmaryRecordsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lotIdMeta = const VerificationMeta('lotId');
+  @override
+  late final GeneratedColumn<String> lotId = GeneratedColumn<String>(
+    'lot_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sujetRefMeta = const VerificationMeta(
+    'sujetRef',
+  );
+  @override
+  late final GeneratedColumn<String> sujetRef = GeneratedColumn<String>(
+    'sujet_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _motifMeta = const VerificationMeta('motif');
+  @override
+  late final GeneratedColumn<String> motif = GeneratedColumn<String>(
+    'motif',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isolationLevelMeta = const VerificationMeta(
+    'isolationLevel',
+  );
+  @override
+  late final GeneratedColumn<String> isolationLevel = GeneratedColumn<String>(
+    'isolation_level',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _entryDateMeta = const VerificationMeta(
+    'entryDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> entryDate = GeneratedColumn<DateTime>(
+    'entry_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('en_cours'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    sujetRef,
+    motif,
+    isolationLevel,
+    entryDate,
+    status,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'infirmary_records';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InfirmaryRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('lot_id')) {
+      context.handle(
+        _lotIdMeta,
+        lotId.isAcceptableOrUnknown(data['lot_id']!, _lotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lotIdMeta);
+    }
+    if (data.containsKey('sujet_ref')) {
+      context.handle(
+        _sujetRefMeta,
+        sujetRef.isAcceptableOrUnknown(data['sujet_ref']!, _sujetRefMeta),
+      );
+    }
+    if (data.containsKey('motif')) {
+      context.handle(
+        _motifMeta,
+        motif.isAcceptableOrUnknown(data['motif']!, _motifMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_motifMeta);
+    }
+    if (data.containsKey('isolation_level')) {
+      context.handle(
+        _isolationLevelMeta,
+        isolationLevel.isAcceptableOrUnknown(
+          data['isolation_level']!,
+          _isolationLevelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('entry_date')) {
+      context.handle(
+        _entryDateMeta,
+        entryDate.isAcceptableOrUnknown(data['entry_date']!, _entryDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryDateMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InfirmaryRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InfirmaryRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $InfirmaryRecordsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      lotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lot_id'],
+      )!,
+      sujetRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sujet_ref'],
+      ),
+      motif: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}motif'],
+      )!,
+      isolationLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}isolation_level'],
+      ),
+      entryDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}entry_date'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+    );
+  }
+
+  @override
+  $InfirmaryRecordsTable createAlias(String alias) {
+    return $InfirmaryRecordsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class InfirmaryRecord extends DataClass implements Insertable<InfirmaryRecord> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String lotId;
+
+  /// Sujet isolé (« #A-204 ») — optionnel : l'entrée peut viser la bande entière.
+  final String? sujetRef;
+  final String motif;
+
+  /// `Quarantaine stricte` | `Infirmerie` | `Simple surveillance` (nullable au serveur).
+  final String? isolationLevel;
+  final DateTime entryDate;
+
+  /// `en_cours` | `reintegre` | `deces` (enum du serveur).
+  final String status;
+  const InfirmaryRecord({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.lotId,
+    this.sujetRef,
+    required this.motif,
+    this.isolationLevel,
+    required this.entryDate,
+    required this.status,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $InfirmaryRecordsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['lot_id'] = Variable<String>(lotId);
+    if (!nullToAbsent || sujetRef != null) {
+      map['sujet_ref'] = Variable<String>(sujetRef);
+    }
+    map['motif'] = Variable<String>(motif);
+    if (!nullToAbsent || isolationLevel != null) {
+      map['isolation_level'] = Variable<String>(isolationLevel);
+    }
+    map['entry_date'] = Variable<DateTime>(entryDate);
+    map['status'] = Variable<String>(status);
+    return map;
+  }
+
+  InfirmaryRecordsCompanion toCompanion(bool nullToAbsent) {
+    return InfirmaryRecordsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      lotId: Value(lotId),
+      sujetRef: sujetRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sujetRef),
+      motif: Value(motif),
+      isolationLevel: isolationLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(isolationLevel),
+      entryDate: Value(entryDate),
+      status: Value(status),
+    );
+  }
+
+  factory InfirmaryRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InfirmaryRecord(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $InfirmaryRecordsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      lotId: serializer.fromJson<String>(json['lotId']),
+      sujetRef: serializer.fromJson<String?>(json['sujetRef']),
+      motif: serializer.fromJson<String>(json['motif']),
+      isolationLevel: serializer.fromJson<String?>(json['isolationLevel']),
+      entryDate: serializer.fromJson<DateTime>(json['entryDate']),
+      status: serializer.fromJson<String>(json['status']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $InfirmaryRecordsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'lotId': serializer.toJson<String>(lotId),
+      'sujetRef': serializer.toJson<String?>(sujetRef),
+      'motif': serializer.toJson<String>(motif),
+      'isolationLevel': serializer.toJson<String?>(isolationLevel),
+      'entryDate': serializer.toJson<DateTime>(entryDate),
+      'status': serializer.toJson<String>(status),
+    };
+  }
+
+  InfirmaryRecord copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? lotId,
+    Value<String?> sujetRef = const Value.absent(),
+    String? motif,
+    Value<String?> isolationLevel = const Value.absent(),
+    DateTime? entryDate,
+    String? status,
+  }) => InfirmaryRecord(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    lotId: lotId ?? this.lotId,
+    sujetRef: sujetRef.present ? sujetRef.value : this.sujetRef,
+    motif: motif ?? this.motif,
+    isolationLevel: isolationLevel.present
+        ? isolationLevel.value
+        : this.isolationLevel,
+    entryDate: entryDate ?? this.entryDate,
+    status: status ?? this.status,
+  );
+  InfirmaryRecord copyWithCompanion(InfirmaryRecordsCompanion data) {
+    return InfirmaryRecord(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lotId: data.lotId.present ? data.lotId.value : this.lotId,
+      sujetRef: data.sujetRef.present ? data.sujetRef.value : this.sujetRef,
+      motif: data.motif.present ? data.motif.value : this.motif,
+      isolationLevel: data.isolationLevel.present
+          ? data.isolationLevel.value
+          : this.isolationLevel,
+      entryDate: data.entryDate.present ? data.entryDate.value : this.entryDate,
+      status: data.status.present ? data.status.value : this.status,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InfirmaryRecord(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('sujetRef: $sujetRef, ')
+          ..write('motif: $motif, ')
+          ..write('isolationLevel: $isolationLevel, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('status: $status')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    sujetRef,
+    motif,
+    isolationLevel,
+    entryDate,
+    status,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InfirmaryRecord &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.lotId == this.lotId &&
+          other.sujetRef == this.sujetRef &&
+          other.motif == this.motif &&
+          other.isolationLevel == this.isolationLevel &&
+          other.entryDate == this.entryDate &&
+          other.status == this.status);
+}
+
+class InfirmaryRecordsCompanion extends UpdateCompanion<InfirmaryRecord> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> lotId;
+  final Value<String?> sujetRef;
+  final Value<String> motif;
+  final Value<String?> isolationLevel;
+  final Value<DateTime> entryDate;
+  final Value<String> status;
+  final Value<int> rowid;
+  const InfirmaryRecordsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.lotId = const Value.absent(),
+    this.sujetRef = const Value.absent(),
+    this.motif = const Value.absent(),
+    this.isolationLevel = const Value.absent(),
+    this.entryDate = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InfirmaryRecordsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String lotId,
+    this.sujetRef = const Value.absent(),
+    required String motif,
+    this.isolationLevel = const Value.absent(),
+    required DateTime entryDate,
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       lotId = Value(lotId),
+       motif = Value(motif),
+       entryDate = Value(entryDate);
+  static Insertable<InfirmaryRecord> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? lotId,
+    Expression<String>? sujetRef,
+    Expression<String>? motif,
+    Expression<String>? isolationLevel,
+    Expression<DateTime>? entryDate,
+    Expression<String>? status,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (lotId != null) 'lot_id': lotId,
+      if (sujetRef != null) 'sujet_ref': sujetRef,
+      if (motif != null) 'motif': motif,
+      if (isolationLevel != null) 'isolation_level': isolationLevel,
+      if (entryDate != null) 'entry_date': entryDate,
+      if (status != null) 'status': status,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InfirmaryRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? lotId,
+    Value<String?>? sujetRef,
+    Value<String>? motif,
+    Value<String?>? isolationLevel,
+    Value<DateTime>? entryDate,
+    Value<String>? status,
+    Value<int>? rowid,
+  }) {
+    return InfirmaryRecordsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lotId: lotId ?? this.lotId,
+      sujetRef: sujetRef ?? this.sujetRef,
+      motif: motif ?? this.motif,
+      isolationLevel: isolationLevel ?? this.isolationLevel,
+      entryDate: entryDate ?? this.entryDate,
+      status: status ?? this.status,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $InfirmaryRecordsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (lotId.present) {
+      map['lot_id'] = Variable<String>(lotId.value);
+    }
+    if (sujetRef.present) {
+      map['sujet_ref'] = Variable<String>(sujetRef.value);
+    }
+    if (motif.present) {
+      map['motif'] = Variable<String>(motif.value);
+    }
+    if (isolationLevel.present) {
+      map['isolation_level'] = Variable<String>(isolationLevel.value);
+    }
+    if (entryDate.present) {
+      map['entry_date'] = Variable<DateTime>(entryDate.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InfirmaryRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('sujetRef: $sujetRef, ')
+          ..write('motif: $motif, ')
+          ..write('isolationLevel: $isolationLevel, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('status: $status, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $VeterinaryCalendarEventsTable extends VeterinaryCalendarEvents
+    with TableInfo<$VeterinaryCalendarEventsTable, VeterinaryCalendarEvent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VeterinaryCalendarEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $VeterinaryCalendarEventsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lotIdMeta = const VerificationMeta('lotId');
+  @override
+  late final GeneratedColumn<String> lotId = GeneratedColumn<String>(
+    'lot_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _taskTypeMeta = const VerificationMeta(
+    'taskType',
+  );
+  @override
+  late final GeneratedColumn<String> taskType = GeneratedColumn<String>(
+    'task_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledDateMeta = const VerificationMeta(
+    'scheduledDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> scheduledDate =
+      GeneratedColumn<DateTime>(
+        'scheduled_date',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('planned'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    taskType,
+    scheduledDate,
+    status,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'veterinary_calendar_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VeterinaryCalendarEvent> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('lot_id')) {
+      context.handle(
+        _lotIdMeta,
+        lotId.isAcceptableOrUnknown(data['lot_id']!, _lotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lotIdMeta);
+    }
+    if (data.containsKey('task_type')) {
+      context.handle(
+        _taskTypeMeta,
+        taskType.isAcceptableOrUnknown(data['task_type']!, _taskTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_taskTypeMeta);
+    }
+    if (data.containsKey('scheduled_date')) {
+      context.handle(
+        _scheduledDateMeta,
+        scheduledDate.isAcceptableOrUnknown(
+          data['scheduled_date']!,
+          _scheduledDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledDateMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VeterinaryCalendarEvent map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VeterinaryCalendarEvent(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $VeterinaryCalendarEventsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      lotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lot_id'],
+      )!,
+      taskType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_type'],
+      )!,
+      scheduledDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_date'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+    );
+  }
+
+  @override
+  $VeterinaryCalendarEventsTable createAlias(String alias) {
+    return $VeterinaryCalendarEventsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class VeterinaryCalendarEvent extends DataClass
+    implements Insertable<VeterinaryCalendarEvent> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String lotId;
+  final String taskType;
+  final DateTime scheduledDate;
+
+  /// `planned` | `done` | `late` | `inprogress` (enum du serveur ; le poste n'écrit que les deux premiers).
+  final String status;
+  const VeterinaryCalendarEvent({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.lotId,
+    required this.taskType,
+    required this.scheduledDate,
+    required this.status,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $VeterinaryCalendarEventsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['lot_id'] = Variable<String>(lotId);
+    map['task_type'] = Variable<String>(taskType);
+    map['scheduled_date'] = Variable<DateTime>(scheduledDate);
+    map['status'] = Variable<String>(status);
+    return map;
+  }
+
+  VeterinaryCalendarEventsCompanion toCompanion(bool nullToAbsent) {
+    return VeterinaryCalendarEventsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      lotId: Value(lotId),
+      taskType: Value(taskType),
+      scheduledDate: Value(scheduledDate),
+      status: Value(status),
+    );
+  }
+
+  factory VeterinaryCalendarEvent.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VeterinaryCalendarEvent(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $VeterinaryCalendarEventsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      lotId: serializer.fromJson<String>(json['lotId']),
+      taskType: serializer.fromJson<String>(json['taskType']),
+      scheduledDate: serializer.fromJson<DateTime>(json['scheduledDate']),
+      status: serializer.fromJson<String>(json['status']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $VeterinaryCalendarEventsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'lotId': serializer.toJson<String>(lotId),
+      'taskType': serializer.toJson<String>(taskType),
+      'scheduledDate': serializer.toJson<DateTime>(scheduledDate),
+      'status': serializer.toJson<String>(status),
+    };
+  }
+
+  VeterinaryCalendarEvent copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? lotId,
+    String? taskType,
+    DateTime? scheduledDate,
+    String? status,
+  }) => VeterinaryCalendarEvent(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    lotId: lotId ?? this.lotId,
+    taskType: taskType ?? this.taskType,
+    scheduledDate: scheduledDate ?? this.scheduledDate,
+    status: status ?? this.status,
+  );
+  VeterinaryCalendarEvent copyWithCompanion(
+    VeterinaryCalendarEventsCompanion data,
+  ) {
+    return VeterinaryCalendarEvent(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lotId: data.lotId.present ? data.lotId.value : this.lotId,
+      taskType: data.taskType.present ? data.taskType.value : this.taskType,
+      scheduledDate: data.scheduledDate.present
+          ? data.scheduledDate.value
+          : this.scheduledDate,
+      status: data.status.present ? data.status.value : this.status,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VeterinaryCalendarEvent(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('taskType: $taskType, ')
+          ..write('scheduledDate: $scheduledDate, ')
+          ..write('status: $status')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    taskType,
+    scheduledDate,
+    status,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VeterinaryCalendarEvent &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.lotId == this.lotId &&
+          other.taskType == this.taskType &&
+          other.scheduledDate == this.scheduledDate &&
+          other.status == this.status);
+}
+
+class VeterinaryCalendarEventsCompanion
+    extends UpdateCompanion<VeterinaryCalendarEvent> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> lotId;
+  final Value<String> taskType;
+  final Value<DateTime> scheduledDate;
+  final Value<String> status;
+  final Value<int> rowid;
+  const VeterinaryCalendarEventsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.lotId = const Value.absent(),
+    this.taskType = const Value.absent(),
+    this.scheduledDate = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VeterinaryCalendarEventsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String lotId,
+    required String taskType,
+    required DateTime scheduledDate,
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       lotId = Value(lotId),
+       taskType = Value(taskType),
+       scheduledDate = Value(scheduledDate);
+  static Insertable<VeterinaryCalendarEvent> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? lotId,
+    Expression<String>? taskType,
+    Expression<DateTime>? scheduledDate,
+    Expression<String>? status,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (lotId != null) 'lot_id': lotId,
+      if (taskType != null) 'task_type': taskType,
+      if (scheduledDate != null) 'scheduled_date': scheduledDate,
+      if (status != null) 'status': status,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VeterinaryCalendarEventsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? lotId,
+    Value<String>? taskType,
+    Value<DateTime>? scheduledDate,
+    Value<String>? status,
+    Value<int>? rowid,
+  }) {
+    return VeterinaryCalendarEventsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lotId: lotId ?? this.lotId,
+      taskType: taskType ?? this.taskType,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      status: status ?? this.status,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $VeterinaryCalendarEventsTable.$convertersyncStatus.toSql(
+          syncStatus.value,
+        ),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (lotId.present) {
+      map['lot_id'] = Variable<String>(lotId.value);
+    }
+    if (taskType.present) {
+      map['task_type'] = Variable<String>(taskType.value);
+    }
+    if (scheduledDate.present) {
+      map['scheduled_date'] = Variable<DateTime>(scheduledDate.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VeterinaryCalendarEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('taskType: $taskType, ')
+          ..write('scheduledDate: $scheduledDate, ')
+          ..write('status: $status, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -30223,6 +31401,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ProphylaxisScheduleStandardsTable(this);
   late final $VeterinaryRecordsTable veterinaryRecords =
       $VeterinaryRecordsTable(this);
+  late final $InfirmaryRecordsTable infirmaryRecords = $InfirmaryRecordsTable(
+    this,
+  );
+  late final $VeterinaryCalendarEventsTable veterinaryCalendarEvents =
+      $VeterinaryCalendarEventsTable(this);
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $StockAdjustmentsTable stockAdjustments = $StockAdjustmentsTable(
@@ -30288,6 +31471,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     livestockTransfers,
     prophylaxisScheduleStandards,
     veterinaryRecords,
+    infirmaryRecords,
+    veterinaryCalendarEvents,
     sales,
     saleLines,
     stockAdjustments,
@@ -43265,6 +44450,595 @@ typedef $$VeterinaryRecordsTableProcessedTableManager =
       VeterinaryRecord,
       PrefetchHooks Function()
     >;
+typedef $$InfirmaryRecordsTableCreateCompanionBuilder =
+    InfirmaryRecordsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String lotId,
+      Value<String?> sujetRef,
+      required String motif,
+      Value<String?> isolationLevel,
+      required DateTime entryDate,
+      Value<String> status,
+      Value<int> rowid,
+    });
+typedef $$InfirmaryRecordsTableUpdateCompanionBuilder =
+    InfirmaryRecordsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> lotId,
+      Value<String?> sujetRef,
+      Value<String> motif,
+      Value<String?> isolationLevel,
+      Value<DateTime> entryDate,
+      Value<String> status,
+      Value<int> rowid,
+    });
+
+class $$InfirmaryRecordsTableFilterComposer
+    extends Composer<_$AppDatabase, $InfirmaryRecordsTable> {
+  $$InfirmaryRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sujetRef => $composableBuilder(
+    column: $table.sujetRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get motif => $composableBuilder(
+    column: $table.motif,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get isolationLevel => $composableBuilder(
+    column: $table.isolationLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InfirmaryRecordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $InfirmaryRecordsTable> {
+  $$InfirmaryRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sujetRef => $composableBuilder(
+    column: $table.sujetRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get motif => $composableBuilder(
+    column: $table.motif,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get isolationLevel => $composableBuilder(
+    column: $table.isolationLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InfirmaryRecordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InfirmaryRecordsTable> {
+  $$InfirmaryRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get lotId =>
+      $composableBuilder(column: $table.lotId, builder: (column) => column);
+
+  GeneratedColumn<String> get sujetRef =>
+      $composableBuilder(column: $table.sujetRef, builder: (column) => column);
+
+  GeneratedColumn<String> get motif =>
+      $composableBuilder(column: $table.motif, builder: (column) => column);
+
+  GeneratedColumn<String> get isolationLevel => $composableBuilder(
+    column: $table.isolationLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get entryDate =>
+      $composableBuilder(column: $table.entryDate, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+}
+
+class $$InfirmaryRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InfirmaryRecordsTable,
+          InfirmaryRecord,
+          $$InfirmaryRecordsTableFilterComposer,
+          $$InfirmaryRecordsTableOrderingComposer,
+          $$InfirmaryRecordsTableAnnotationComposer,
+          $$InfirmaryRecordsTableCreateCompanionBuilder,
+          $$InfirmaryRecordsTableUpdateCompanionBuilder,
+          (
+            InfirmaryRecord,
+            BaseReferences<
+              _$AppDatabase,
+              $InfirmaryRecordsTable,
+              InfirmaryRecord
+            >,
+          ),
+          InfirmaryRecord,
+          PrefetchHooks Function()
+        > {
+  $$InfirmaryRecordsTableTableManager(
+    _$AppDatabase db,
+    $InfirmaryRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InfirmaryRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InfirmaryRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InfirmaryRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> lotId = const Value.absent(),
+                Value<String?> sujetRef = const Value.absent(),
+                Value<String> motif = const Value.absent(),
+                Value<String?> isolationLevel = const Value.absent(),
+                Value<DateTime> entryDate = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InfirmaryRecordsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                sujetRef: sujetRef,
+                motif: motif,
+                isolationLevel: isolationLevel,
+                entryDate: entryDate,
+                status: status,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String lotId,
+                Value<String?> sujetRef = const Value.absent(),
+                required String motif,
+                Value<String?> isolationLevel = const Value.absent(),
+                required DateTime entryDate,
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InfirmaryRecordsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                sujetRef: sujetRef,
+                motif: motif,
+                isolationLevel: isolationLevel,
+                entryDate: entryDate,
+                status: status,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InfirmaryRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InfirmaryRecordsTable,
+      InfirmaryRecord,
+      $$InfirmaryRecordsTableFilterComposer,
+      $$InfirmaryRecordsTableOrderingComposer,
+      $$InfirmaryRecordsTableAnnotationComposer,
+      $$InfirmaryRecordsTableCreateCompanionBuilder,
+      $$InfirmaryRecordsTableUpdateCompanionBuilder,
+      (
+        InfirmaryRecord,
+        BaseReferences<_$AppDatabase, $InfirmaryRecordsTable, InfirmaryRecord>,
+      ),
+      InfirmaryRecord,
+      PrefetchHooks Function()
+    >;
+typedef $$VeterinaryCalendarEventsTableCreateCompanionBuilder =
+    VeterinaryCalendarEventsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String lotId,
+      required String taskType,
+      required DateTime scheduledDate,
+      Value<String> status,
+      Value<int> rowid,
+    });
+typedef $$VeterinaryCalendarEventsTableUpdateCompanionBuilder =
+    VeterinaryCalendarEventsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> lotId,
+      Value<String> taskType,
+      Value<DateTime> scheduledDate,
+      Value<String> status,
+      Value<int> rowid,
+    });
+
+class $$VeterinaryCalendarEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $VeterinaryCalendarEventsTable> {
+  $$VeterinaryCalendarEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskType => $composableBuilder(
+    column: $table.taskType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$VeterinaryCalendarEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $VeterinaryCalendarEventsTable> {
+  $$VeterinaryCalendarEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taskType => $composableBuilder(
+    column: $table.taskType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$VeterinaryCalendarEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VeterinaryCalendarEventsTable> {
+  $$VeterinaryCalendarEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get lotId =>
+      $composableBuilder(column: $table.lotId, builder: (column) => column);
+
+  GeneratedColumn<String> get taskType =>
+      $composableBuilder(column: $table.taskType, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+}
+
+class $$VeterinaryCalendarEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VeterinaryCalendarEventsTable,
+          VeterinaryCalendarEvent,
+          $$VeterinaryCalendarEventsTableFilterComposer,
+          $$VeterinaryCalendarEventsTableOrderingComposer,
+          $$VeterinaryCalendarEventsTableAnnotationComposer,
+          $$VeterinaryCalendarEventsTableCreateCompanionBuilder,
+          $$VeterinaryCalendarEventsTableUpdateCompanionBuilder,
+          (
+            VeterinaryCalendarEvent,
+            BaseReferences<
+              _$AppDatabase,
+              $VeterinaryCalendarEventsTable,
+              VeterinaryCalendarEvent
+            >,
+          ),
+          VeterinaryCalendarEvent,
+          PrefetchHooks Function()
+        > {
+  $$VeterinaryCalendarEventsTableTableManager(
+    _$AppDatabase db,
+    $VeterinaryCalendarEventsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VeterinaryCalendarEventsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$VeterinaryCalendarEventsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$VeterinaryCalendarEventsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> lotId = const Value.absent(),
+                Value<String> taskType = const Value.absent(),
+                Value<DateTime> scheduledDate = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VeterinaryCalendarEventsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                taskType: taskType,
+                scheduledDate: scheduledDate,
+                status: status,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String lotId,
+                required String taskType,
+                required DateTime scheduledDate,
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VeterinaryCalendarEventsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                taskType: taskType,
+                scheduledDate: scheduledDate,
+                status: status,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$VeterinaryCalendarEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VeterinaryCalendarEventsTable,
+      VeterinaryCalendarEvent,
+      $$VeterinaryCalendarEventsTableFilterComposer,
+      $$VeterinaryCalendarEventsTableOrderingComposer,
+      $$VeterinaryCalendarEventsTableAnnotationComposer,
+      $$VeterinaryCalendarEventsTableCreateCompanionBuilder,
+      $$VeterinaryCalendarEventsTableUpdateCompanionBuilder,
+      (
+        VeterinaryCalendarEvent,
+        BaseReferences<
+          _$AppDatabase,
+          $VeterinaryCalendarEventsTable,
+          VeterinaryCalendarEvent
+        >,
+      ),
+      VeterinaryCalendarEvent,
+      PrefetchHooks Function()
+    >;
 typedef $$SalesTableCreateCompanionBuilder =
     SalesCompanion Function({
       required String id,
@@ -45478,6 +47252,13 @@ class $AppDatabaseManager {
       );
   $$VeterinaryRecordsTableTableManager get veterinaryRecords =>
       $$VeterinaryRecordsTableTableManager(_db, _db.veterinaryRecords);
+  $$InfirmaryRecordsTableTableManager get infirmaryRecords =>
+      $$InfirmaryRecordsTableTableManager(_db, _db.infirmaryRecords);
+  $$VeterinaryCalendarEventsTableTableManager get veterinaryCalendarEvents =>
+      $$VeterinaryCalendarEventsTableTableManager(
+        _db,
+        _db.veterinaryCalendarEvents,
+      );
   $$SalesTableTableManager get sales =>
       $$SalesTableTableManager(_db, _db.sales);
   $$SaleLinesTableTableManager get saleLines =>

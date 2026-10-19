@@ -140,10 +140,6 @@ void main() {
     'data_reset_at':
         'marque de réinitialisation (15.50), lue en tête de _tirer pour purger le poste : '
         'ce n est pas une table',
-    // ⚠️ PROVISOIRE, DATÉ : servies par le serveur depuis le ticket H8b (19/10/2026) ; leurs tables Drift et
-    // leurs absorbeurs arrivent avec la partie poste du même ticket, qui retire ces deux lignes.
-    'infirmary_records': 'H8b (19/10/2026) : partie poste en cours — table Drift et absorbeur à venir',
-    'veterinary_calendar_events': 'H8b (19/10/2026) : partie poste en cours — table Drift et absorbeur à venir',
   };
 
   Set<String> clesAbsorbees() {

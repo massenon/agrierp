@@ -59,6 +59,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   32: [d.purchaseReturns, d.supplierRefunds, d.supplierCredits],
   // Ticket 15.46 — transferts entre bandes.
   39: [d.livestockTransfers],
+  // Ticket H8b (D-H8) — infirmerie et calendrier vétérinaire planifié.
+  41: [d.infirmaryRecords, d.veterinaryCalendarEvents],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier

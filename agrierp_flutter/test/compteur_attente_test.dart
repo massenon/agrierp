@@ -28,7 +28,8 @@ void main() {
         .map((camel) => camel.replaceAllMapped(RegExp('[A-Z]'), (l) => '_${l.group(0)!.toLowerCase()}'))
         .toSet();
 
-    expect(lues, hasLength(20), reason: 'vingt tables envoyées le 19/10/2026 : $lues');
+    // Ticket H8b (19/10/2026) : + `infirmary_records` et `veterinary_calendar_events`, saisies au poste (D-H8).
+    expect(lues, hasLength(22), reason: 'vingt-deux tables envoyées depuis H8b : $lues');
     expect(AppDatabase.tablesEnvoyees.toSet(), lues);
   });
 }
