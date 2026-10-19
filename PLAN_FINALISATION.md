@@ -260,6 +260,22 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | D-U7 | Prix moyen de la provende (bilan) : **même règle au web et au poste** — types ACTIFS seulement (un type archivé n'est plus acheté) | U7 |
 | D-U8 | Mobile money dans la répartition Caisse / Banque : **oui, troisième ligne au web et au poste** | ✅ 19/10/2026 |
 
+### Décision du client du 19/10/2026 (nuit) — méthode TATACORA
+
+**D-SYNC-1 confirmée** : le protocole actuel (`/api/sync/pull` + `/api/sync/push`, état de synchronisation porté par chaque ligne) est gardé ; les principes de la méthode TATACORA sont transposés par les tickets S-T1 à S-T9 (`docs/COMPARAISON_METHODE_TATACORA.md`).
+
+| # | Ticket | Statut |
+|---|---|---|
+| S-T1 | Renvoi d'une 5xx comme un échec réseau ; 401/403 : la synchronisation automatique s'arrête jusqu'à la reconnexion ; 422 / 413 : lot coupé en deux | 🔧 |
+| S-T2 | `device_id` envoyé comparé au nom du jeton Sanctum (refus 403 sinon) | 🔧 |
+| S-T3 | Déclencheurs : au démarrage de la session, après un geste important, intervalle par défaut 5 min | 🔧 |
+| S-T4 | Tirage paginé (curseur `updated_at` + `id`) et limité aux tables que le rôle lit | 🔧 |
+| S-T5 | Fusion par clé naturelle des référentiels saisis au poste (clients, fournisseurs, produits) + table de correspondances | 🔧 |
+| S-T6 | Bouton « Synchroniser les postes » au web (demande lue par les postes toutes les 30 s) ; contrôle de cohérence (nombre et total par table et par jour) au web et au poste | 🔧 |
+| S-T7 | Garde-fou « un seul écrivain par table » au poste ; `roles` daté quand ses droits changent | 🔧 |
+| S-T8 | Installateur : refus de la version démo, adresses par environnement | 🔧 |
+| S-T9 | Essai à plusieurs postes contre le vrai serveur, avec coupures au hasard | 🔧 |
+
 | # | Ticket | Statut |
 |---|---|---|
 | U2 | `growth_standards` tirée au poste (table Drift, absorbeur strict) ; Dashboard Élevage web et poste lisent les objectifs dans cette table, même agrégation par espèce | ✅ 19/10/2026 (barème du stade de chaque bande moyennée, enveloppe min/max ; aucun barème → « — ») |
