@@ -134,6 +134,8 @@ void main() {
     // Ticket U4 (D-U4) — lignes des ventes et des achats servis, avec leur pièce.
     'sale_lines',
     'purchase_lines',
+    // Ticket U8 — lignes de retour des achats servis, avec leur achat.
+    'purchase_returns',
     'treasury_accounts',
     'expense_categories',
   };

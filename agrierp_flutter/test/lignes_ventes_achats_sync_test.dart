@@ -452,6 +452,9 @@ void main() {
           'sale_lines': [ligneVenteJson(uuid('lv1'), venteWeb, 1, 30000)],
           'purchases': [achatJson(achatWeb, 82000)],
           'purchase_lines': [ligneAchatJson(uuid('la1'), achatWeb, 4, 20500)],
+          // Ticket U8 — un serveur à jour sert aussi les retours des achats servis (sinon la resynchronisation
+          // `retours_resync_u8` maintient le tirage complet).
+          'purchase_returns': <Object>[],
         };
 
         await moteur.synchroniser();

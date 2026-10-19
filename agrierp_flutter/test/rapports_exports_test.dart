@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/core/export/export_tableur.dart';
@@ -515,6 +516,95 @@ void main() {
 
       // Taux de ponte : 432 × 100 ÷ 461 = 93,7 %
       expect(jour[3], '93.7 %');
+    });
+
+    /// 🔴→✅ TICKET U8 — OS (« Sorties Vente ») EST CELLE DU JOUR DE LA FICHE. Le web
+    /// (`EggStockLedgerService::ventesDu($date)`) ne compte que les ventes de ce jour-là ; le
+    /// poste additionnait toutes les ventes d'œufs de la bande à CHAQUE journée. Le jour d'une
+    /// vente est sa date effective (`sold_at`) ; une vente refusée par le serveur (`conflict`)
+    /// n'a rien fait sortir ; chaque vente antérieure est retranchée UNE fois du SRH, qu'il y ait
+    /// une fiche ce jour-là ou non.
+    test('⚠️⚠️ U8 — les sorties de vente d une journée sont celles de CE jour', () async {
+      await bande('b1', creee: DateTime(2026, 1, 5));
+      await bande('b2', code: 'Pondeuses Lot P2');
+      await produit('oeufs', nom: 'Œufs de table (plateau)');
+      await journee(
+        'j1',
+        lot: 'b1',
+        date: DateTime(2026, 7, 6),
+        effectifFinal: 443,
+        ponteTotal: 398,
+        ponteCasses: 6,
+      );
+      await journee(
+        'j2',
+        lot: 'b1',
+        date: DateTime(2026, 7, 13),
+        effectifFinal: 461,
+        ponteTotal: 432,
+        ponteCasses: 4,
+      );
+      Future<void> venteOeufs(
+        String cle,
+        DateTime quand,
+        double plateaux, {
+        String lot = 'b1',
+        SyncStatus statut = SyncStatus.synced,
+      }) async {
+        await db.into(db.sales).insert(
+          SalesCompanion.insert(
+            id: uuid(cle),
+            deviceId: 'poste-test',
+            updatedAt: quand,
+            syncStatus: Value(statut),
+            paymentMode: 'especes',
+            total: plateaux * 2500,
+            soldAt: quand,
+          ),
+        );
+        await db.into(db.saleLines).insert(
+          SaleLinesCompanion.insert(
+            id: uuid('l$cle'),
+            saleId: uuid(cle),
+            productId: uuid('oeufs'),
+            lotId: Value(uuid(lot)),
+            qty: plateaux,
+            unitPrice: 2500,
+            manualTotalAmount: plateaux * 2500,
+          ),
+        );
+      }
+
+      await venteOeufs('v1', DateTime(2026, 7, 6, 15), 2); // 60 œufs le 06/07
+      await venteOeufs('v2', DateTime(2026, 7, 10, 9), 3); // 90 œufs le 10/07 (aucune fiche ce jour)
+      await venteOeufs('v3', DateTime(2026, 7, 13, 16), 1); // 30 œufs le 13/07
+      await venteOeufs(
+        'v4',
+        DateTime(2026, 7, 13, 17),
+        5,
+        statut: SyncStatus.conflict,
+      ); // refusée : rien n'est sorti
+      await venteOeufs('v5', DateTime(2026, 7, 13, 10), 4, lot: 'b2'); // autre bande
+
+      final d = await depot.charger(du: du, au: au);
+      final veille = d.elevageT3[0].cellules;
+      final jour = d.elevageT3[1].cellules;
+
+      // 06/07 : 398 − 6 = 392 ; SRH 0 ; TS 392 ; OS = 60 (v1 seule) ; final 332 = 11 × 30 + 2.
+      expect([veille[6], veille[7], veille[8], veille[9]], [
+        '0',
+        '392',
+        '2 (60 œufs)',
+        '11 plateaux + 2 vrac',
+      ]);
+      // 13/07 : 432 − 4 = 428 ; SRH = 392 − (60 + 90) = 242 ; TS 670 ; OS = 30 (v3 seule) ;
+      // final 640 = 21 × 30 + 10.
+      expect([jour[6], jour[7], jour[8], jour[9]], [
+        '242',
+        '670',
+        '1 (30 œufs)',
+        '21 plateaux + 10 vrac',
+      ]);
     });
 
     test('⚠️ sans date de création de bande, l âge est un tiret', () async {

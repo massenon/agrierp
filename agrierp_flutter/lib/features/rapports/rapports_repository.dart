@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show OrderingTerm, OrderingMode;
 
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
 import '../elevage/production_oeufs_service.dart';
 
 /// Une ligne de rapport : ses cellules, dans l'ordre des colonnes de la
@@ -197,6 +198,7 @@ class RapportsRepository {
         bandes,
         lignesDeVente,
         produits,
+        ventes,
       ),
       indicateurs: _indicateurs(dansLaPeriode),
       stocks: _stocks(produits, categories),
@@ -429,8 +431,18 @@ class RapportsRepository {
     List<LivestockLot> bandes,
     List<SaleLine> lignesDeVente,
     List<Product> produits,
+    List<Sale> ventes,
   ) {
     final bandeDe = {for (final b in bandes) b.id: b};
+
+    // Ticket U8 — JOUR DE VENTE de chaque vente : sa date effective (`sold_at ?? created_at` au web ; le serveur la
+    // sert dans `sold_at`, et une vente du poste porte l'instant de la saisie), ramenée au jour. Une vente REFUSÉE
+    // par le serveur (`conflict`) n'a rien fait sortir du stock de la ferme : elle n'a pas de jour de sortie.
+    final jourDeVente = <String, DateTime>{
+      for (final v in ventes)
+        if (v.syncStatus != SyncStatus.conflict)
+          v.id: DateTime(v.soldAt.year, v.soldAt.month, v.soldAt.day),
+    };
 
     // ⚠️ LE STOCK RESTANT HIER SE LIT SUR LA VEILLE, PAS SUR LA PREMIÈRE LIGNE
     // AFFICHÉE. Filtrer d'abord la période puis chercher la veille ferait
@@ -464,9 +476,10 @@ class RapportsRepository {
         f.entryDate,
         lignesDeVente,
         oeufs,
+        jourDeVente,
       );
       final ts = commercialisables + srh;
-      final osOeufs = _sortiesVente(f, lignesDeVente, oeufs);
+      final osOeufs = _sortiesVente(f, lignesDeVente, oeufs, jourDeVente);
       final finalOeufs = ts - osOeufs < 0 ? 0 : ts - osOeufs;
 
       final taux = ProductionOeufsService.tauxDePonte(
@@ -499,15 +512,53 @@ class RapportsRepository {
   /// `SaleLines.lotId` porte la bande d'origine, précisément pour éviter une
   /// répartition inventée. Une vente d'œufs prise sur le stock sans bande
   /// d'origine ne peut donc pas être imputée — et n'est pas devinée.
+  ///
+  /// 🔴→✅ **TICKET U8 — LES SORTIES DU JOUR DE LA FICHE, PAS DE TOUTE LA VIE DE
+  /// LA BANDE.** OS est la colonne « Sorties Vente » d'UNE journée : le web
+  /// (`EggStockLedgerService::ventesDu($date)`) ne compte que les ventes de ce
+  /// jour-là. Le poste additionnait toutes les lignes d'œufs de la bande à
+  /// chaque journée — une vente du 3 sortait aussi le 4, le 5… et le stock
+  /// final s'effondrait à tort. Le jour d'une vente est sa date effective
+  /// ([jourDeVente]) ; une ligne dont la vente est inconnue du poste n'a pas de
+  /// jour et ne sort nulle part.
   int _sortiesVente(
     LivestockDailyEntry fiche,
     List<SaleLine> lignes,
     Product? oeufs,
+    Map<String, DateTime> jourDeVente,
+  ) {
+    final jour = DateTime(
+      fiche.entryDate.year,
+      fiche.entryDate.month,
+      fiche.entryDate.day,
+    );
+    return _sorties(
+      fiche.lotId,
+      lignes,
+      oeufs,
+      jourDeVente,
+      (jourVente) => jourVente == jour,
+    );
+  }
+
+  /// Œufs sortis par les ventes de la bande [lotId] dont le jour de vente satisfait [retenu].
+  int _sorties(
+    String lotId,
+    List<SaleLine> lignes,
+    Product? oeufs,
+    Map<String, DateTime> jourDeVente,
+    bool Function(DateTime jourVente) retenu,
   ) {
     if (oeufs == null) return 0;
 
     return lignes
-        .where((l) => l.productId == oeufs.id && l.lotId == fiche.lotId)
+        .where((l) {
+          final jourVente = jourDeVente[l.saleId];
+          return l.productId == oeufs.id &&
+              l.lotId == lotId &&
+              jourVente != null &&
+              retenu(jourVente);
+        })
         .fold<int>(
           0,
           (t, l) =>
@@ -520,21 +571,31 @@ class RapportsRepository {
     DateTime jour,
     List<SaleLine> lignes,
     Product? oeufs,
+    Map<String, DateTime> jourDeVente,
   ) {
+    final debutDuJour = DateTime(jour.year, jour.month, jour.day);
     var stock = 0;
 
     for (final f in journees) {
-      if (!f.entryDate.isBefore(DateTime(jour.year, jour.month, jour.day))) {
-        break;
-      }
+      if (!f.entryDate.isBefore(debutDuJour)) break;
       if (f.ponteTotal == null) continue;
 
-      stock +=
-          ProductionOeufsService.commercialisables(
-            recoltes: f.ponteTotal ?? 0,
-            casses: f.ponteCasses ?? 0,
-          ) -
-          _sortiesVente(f, lignes, oeufs);
+      stock += ProductionOeufsService.commercialisables(
+        recoltes: f.ponteTotal ?? 0,
+        casses: f.ponteCasses ?? 0,
+      );
+    }
+
+    // Ticket U8 — les ventes de la bande AVANT ce jour, chacune UNE fois, à son jour de vente (jour avec ou sans
+    // fiche) : sans le filtre par jour, chaque vente était retranchée autant de fois qu'il y avait de journées.
+    if (journees.isNotEmpty) {
+      stock -= _sorties(
+        journees.first.lotId,
+        lignes,
+        oeufs,
+        jourDeVente,
+        (jourVente) => jourVente.isBefore(debutDuJour),
+      );
     }
 
     return stock < 0 ? 0 : stock;

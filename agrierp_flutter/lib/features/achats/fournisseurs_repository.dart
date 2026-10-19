@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
-import 'achats_repository.dart' show LigneAchat;
+import 'achats_repository.dart' show AchatsRepository, LigneAchat;
 
 /// Une ligne de « Fiches Fournisseurs » et de « Ajouter Fournisseur ».
 class LigneFournisseur {
@@ -431,25 +431,11 @@ class FournisseursRepository {
               ..limit(20))
             .get();
 
-    final categorieParAchat = <String, String>{};
-    for (final a in achats) {
-      final lignes =
-          await (database.select(database.purchaseLines)
-                ..where((l) => l.purchaseId.equals(a.id))
-                ..limit(1))
-              .get();
-      if (lignes.isEmpty) continue;
-
-      final produit = await (database.select(
-        database.products,
-      )..where((p) => p.id.equals(lignes.first.productId))).getSingleOrNull();
-      final categorie = produit?.categoryId == null
-          ? null
-          : await (database.select(database.productCategories)
-                  ..where((c) => c.id.equals(produit!.categoryId!)))
-                .getSingleOrNull();
-      if (categorie != null) categorieParAchat[a.id] = categorie.label;
-    }
+    // Ticket U8 — un seul calcul de la « première ligne » pour la liste des achats et ce profil.
+    final toutes = await AchatsRepository.categoriesDesAchats(database);
+    final categorieParAchat = {
+      for (final a in achats) a.id: ?toutes[a.id],
+    };
 
     return ProfilFournisseur(
       categorieParAchat: categorieParAchat,

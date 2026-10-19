@@ -381,9 +381,11 @@ class SyncController extends Controller
             ->flip();
 
         // Ticket U4 (D-U4) — un achat dont une LIGNE a changé depuis `since` redescend aussi : ses lignes
-        // ne voyagent qu'avec lui (voir `$lignesAchat` plus bas).
+        // ne voyagent qu'avec lui (voir `$lignesAchat` plus bas). Ticket U8 : de même pour une ligne de RETOUR
+        // (voir `$retoursAchat`).
         $achats = Purchase::with('supplier')
-            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)))
+            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)
+                ->orWhereHas('returns', fn ($r) => $r->where('updated_at', '>', $since))))
             ->orderByDesc('purchase_date')
             ->get()
             ->map(fn (Purchase $achat) => [
@@ -420,6 +422,30 @@ class SyncController extends Controller
                 'product_name' => $ligne->product?->name,
                 'qty' => (float) $ligne->qty,
                 'unit_price' => (float) $ligne->unit_price,
+            ],
+        );
+
+        // 🔴→✅ TICKET U8 — LES LIGNES DE RETOUR DES ACHATS SERVIS DESCENDENT AVEC EUX.
+        //
+        // La carte « Écarts / Retours » de la liste des achats compte des LIGNES de retour (`PurchaseReturn::count()` :
+        // une ligne par ligne d'achat retournée, `PurchaseReturnService`) ; le poste, qui ne les recevait pas,
+        // comptait des achats retournés. Même règle que `$lignesAchat` : TOUTES les lignes de retour de chaque achat
+        // servi, au même curseur, JAMAIS une d'un achat non servi. `return_batch_id` est l'identifiant du RETOUR
+        // (celui que le poste a fourni s'il l'a saisi) ; `return_date` manque aux retours d'avant le ticket 15.20 :
+        // la date d'enregistrement en tient lieu, jamais une date inventée.
+        $retoursAchat = $this->lignesDesPieces(
+            \App\Models\PurchaseReturn::class,
+            'purchase_id',
+            $achats->pluck('id'),
+            fn ($retour) => [
+                'id' => $retour->id,
+                'purchase_id' => $retour->purchase_id,
+                'return_batch_id' => $retour->return_batch_id,
+                'purchase_line_id' => $retour->purchase_line_id,
+                'product_id' => $retour->product_id,
+                'qty' => (float) $retour->qty,
+                'reason' => $retour->reason,
+                'return_date' => ($retour->return_date ?? $retour->created_at)?->format('Y-m-d'),
             ],
         );
 
@@ -1012,6 +1038,8 @@ class SyncController extends Controller
             'purchases' => $achats,
             // Ticket U4 (D-U4) — lignes des achats servis ci-dessus, et d'eux seuls.
             'purchase_lines' => $lignesAchat,
+            // Ticket U8 — lignes de retour des achats servis ci-dessus, et d'eux seuls.
+            'purchase_returns' => $retoursAchat,
             'supplier_credits' => $creancesFournisseurs,
             'purchase_orders' => $bonsCommande,
             'payables' => $dettes,

@@ -115,7 +115,10 @@ class SupplierPayments extends Table with SyncColumns {
 ///
 /// ⚠️ **JAMAIS d'ajustement de stock pour un retour** : le serveur rejette toute sortie qui
 /// le désigne, et décrémenter ici ferait un double décrément silencieux.
-/// Cette table ne descend pas du serveur : `purchases.returned_at` en est l'écho.
+/// Ticket U8 — la table reçoit AUSSI les LIGNES de retour servies par le serveur (`purchase_returns`, une
+/// ligne par ligne d'achat retournée, `device_id` = `serveur`, `synced`) : la carte « Écarts / Retours »
+/// les compte comme le web. Une demande `pending`/`conflict` du poste n'est jamais touchée par le tirage ;
+/// une demande acquittée est remplacée par les lignes que le serveur a créées. Aucune colonne ajoutée.
 @DataClassName('RetourFournisseur')
 class PurchaseReturns extends Table with SyncColumns {
   TextColumn get purchaseId => text().withLength(min: 36, max: 36)();

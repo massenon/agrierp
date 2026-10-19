@@ -256,6 +256,13 @@ class SyncEngine {
   /// [cleFichesResyncCategories].
   static const cleLignesResync = 'lignes_resync_u4';
 
+  /// Ticket U8 — resynchronisation UNIQUE des lignes de retour fournisseur (`purchase_returns`). Avant U8 le
+  /// serveur ne les servait pas ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait
+  /// JAMAIS les achats retournés avant lui (« Écarts / Retours » compterait faux pour tout l'historique). Même
+  /// règle que [cleLignesResync] : écrite après tous les absorbeurs, et seulement si le serveur sert les retours
+  /// des achats qu'il sert.
+  static const cleRetoursResync = 'retours_resync_u8';
+
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
     'mort_repro',
@@ -325,6 +332,7 @@ class SyncEngine {
     final resyncCategoriesFaite =
         await _lireReglage(cleFichesResyncCategories) != null;
     final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
+    final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -332,7 +340,8 @@ class SyncEngine {
         etaitIncomplet ||
         !resyncFichesFaite ||
         !resyncCategoriesFaite ||
-        !resyncLignesFaite;
+        !resyncLignesFaite ||
+        !resyncRetoursFaite;
 
     final reponse = await _client.get<Map<String, dynamic>>(
       '/api/sync/pull',
@@ -412,6 +421,11 @@ class SyncEngine {
       corps['purchases'],
       corps['purchase_lines'],
     );
+    // Ticket U8 — APRÈS les achats : une ligne de retour d'un achat non servi est refusée.
+    recus += await _absorberRetoursDAchat(
+      corps['purchases'],
+      corps['purchase_returns'],
+    );
     recus += await _absorberCreancesFournisseurs(corps['supplier_credits']);
     recus += await _absorberDettes(corps['payables']);
     recus += await _absorberVentes(corps['sales']);
@@ -486,6 +500,12 @@ class SyncEngine {
             !corps.containsKey('purchase_lines'));
     if (!resyncLignesFaite && !lignesNonServies) {
       await _ecrireReglage(cleLignesResync, '1');
+    }
+    // U8 : même place, et seulement si les achats servis l'ont été avec leurs retours.
+    if (!resyncRetoursFaite &&
+        !(corps.containsKey('purchases') &&
+            !corps.containsKey('purchase_returns'))) {
+      await _ecrireReglage(cleRetoursResync, '1');
     }
 
     // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
@@ -3139,6 +3159,120 @@ class SyncEngine {
           await _db.batch((b) => b.insertAll(_db.purchaseLines, lignes));
         },
       );
+
+  /// Ticket U8 — LIGNES DE RETOUR FOURNISSEUR servies par le tirage (`purchase_returns`).
+  ///
+  /// Le web compte, à la carte « Écarts / Retours », les LIGNES de retour (`PurchaseReturn::count()` : une ligne
+  /// par ligne d'achat retournée) ; le poste comptait des achats. Le serveur sert TOUTES les lignes de retour de
+  /// chaque achat servi, au même curseur que lui, et aucune d'un achat non servi.
+  ///
+  /// ⚠️⚠️ **LA TABLE DU POSTE MÊLE DEUX CHOSES, DISTINGUÉES PAR `device_id`.** Une DEMANDE saisie ici (F0.74 : une
+  /// ligne par retour, `id` = identifiant du retour, `device_id` = le poste) et les LIGNES servies par le serveur
+  /// (`id` = celui de la ligne serveur, `device_id` = `serveur`, `synced`). Règles :
+  ///  - ⚠️⚠️ une demande `pending` ou en `conflict` n'est JAMAIS touchée : ni effacée, ni écrasée (elle repartira,
+  ///    ou attend sa relance) ;
+  ///  - pour chaque achat servi, les lignes `synced` du poste (lignes serveur précédentes, demande ACQUITTÉE) sont
+  ///    REMPLACÉES par celles du serveur : la demande acquittée devient les lignes que le serveur a créées ;
+  ///  - un achat `pending` ou en `conflict` sur ce poste n'a rien de touché (le serveur ne le connaît pas) ;
+  ///  - STRICT : élément illisible, ligne servie deux fois, ligne d'un achat non servi par ce tirage, identifiant
+  ///    d'une demande locale `pending`/`conflict`, date illisible → [FormatException], rien n'est écrit, le
+  ///    curseur n'avance pas.
+  /// Clé absente (serveur antérieur à U8) : rien n'est touché.
+  Future<int> _absorberRetoursDAchat(Object? brutPieces, Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    final servis = {
+      for (final p in _lignes(brutPieces))
+        if (p['id'] is String) p['id'] as String,
+    };
+    if (servis.isEmpty && lignes.isEmpty) return 0;
+
+    final locales = await _db.select(_db.purchaseReturns).get();
+    final demandesEnCours = {
+      for (final r in locales)
+        if (r.syncStatus != SyncStatus.synced) r.id,
+    };
+
+    final parAchat = <String, List<PurchaseReturnsCompanion>>{
+      for (final a in servis) a: [],
+    };
+    final vues = <String>{};
+    for (final l in lignes) {
+      final id = l['id'];
+      final achat = l['purchase_id'];
+      final motif = l['reason'];
+      final date = _date(l['return_date']);
+      if (id is! String ||
+          id.length != 36 ||
+          achat is! String ||
+          (motif != null && motif is! String)) {
+        throw FormatException(
+          'Ligne de retour $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!vues.add(id)) {
+        throw FormatException('Ligne de retour $id refusée : servie deux fois.');
+      }
+      if (!servis.contains(achat)) {
+        throw FormatException(
+          "Ligne de retour $id refusée : son achat ($achat) n'est pas servi par ce tirage.",
+        );
+      }
+      if (demandesEnCours.contains(id)) {
+        throw FormatException(
+          "Ligne de retour $id refusée : elle porte l'identifiant d'une demande de retour "
+          'du poste encore en attente ou refusée.',
+        );
+      }
+      if (date == null) {
+        throw FormatException(
+          'Ligne de retour $id refusée : date du retour illisible.',
+        );
+      }
+      parAchat[achat]!.add(
+        PurchaseReturnsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: date,
+          purchaseId: achat,
+          reason: (motif as String?) ?? '',
+          returnDate: date,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      // ⚠️ Un achat que le poste tient `pending` ou en `conflict` n'est pas celui du serveur : rien n'y est touché.
+      final achatsLocaux = {
+        for (final a in await (_db.select(
+          _db.purchases,
+        )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+          a.id,
+      };
+      final remplaces = [
+        for (final a in parAchat.keys)
+          if (!achatsLocaux.contains(a)) a,
+      ];
+      if (remplaces.isEmpty) return;
+      // ⚠️⚠️ Seules les lignes `synced` sont remplacées : une demande `pending` ou en `conflict` reste.
+      await (_db.delete(_db.purchaseReturns)..where(
+            (t) =>
+                t.purchaseId.isIn(remplaces) &
+                t.syncStatus.equalsValue(SyncStatus.synced),
+          ))
+          .go();
+      await _db.batch(
+        (b) => b.insertAll(
+          _db.purchaseReturns,
+          [for (final a in remplaces) ...parAchat[a]!],
+          mode: InsertMode.insertOrReplace,
+        ),
+      );
+    });
+
+    return lignes.length;
+  }
 
   /// Corps commun de [_absorberLignesDeVente] et [_absorberLignesDAchat] : valide TOUT avant d'écrire, puis
   /// remplace, dans une transaction, les lignes des pièces servies que le poste tient `synced`.

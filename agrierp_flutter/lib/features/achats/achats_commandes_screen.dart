@@ -934,14 +934,13 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         CarteKpi(
           key: const Key('kpi-achats-ecarts'),
           libelle: 'Écarts / Retours',
-          // ⚠️ CALCULABLE DEPUIS F0.74 (`returned_at` descend, les retours du poste sont
-          // acquittés) : plus de tiret. Des ACHATS retournés, pas des lignes de retour
-          // comme sur la page web — `purchase_returns` ne descend pas.
+          // Ticket U8 — des LIGNES de retour, comme la page web
+          // (`PurchaseReturn::count()`) : `purchase_returns` descend au tirage.
           valeur: '${d.ecartsEtRetours}',
           legende: d.retoursEnAttente > 0
-              ? 'achats retournés · ${d.retoursEnAttente} demande(s) en attente '
+              ? '${d.retoursEnAttente} demande(s) en attente '
                     "d'envoi, non comptée(s)"
-              : 'achats retournés',
+              : null,
           couleurLisere: AgriColors.accentYellow,
           icone: SymbolesAgri.assignment_return,
           couleurIcone: AgriColors.outline,
@@ -973,9 +972,12 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
                 4,
               ),
+              // Ticket U8 — catégorie de PRODUIT de la première ligne, comme le
+              // web (`ListeAchats`), et non celle du fournisseur.
               (
                 Text(
-                  d.achats[i].achat.supplierCategory ?? '—',
+                  d.achats[i].categorie ?? '—',
+                  key: Key('categorie-achat-$i'),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),

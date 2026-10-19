@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_repository.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -704,6 +705,106 @@ void main() {
       expect(TableauDeBordRepository.margePct(null, 2, 1500), isNull);
       expect(TableauDeBordRepository.margePct(1000, 0, 1500), isNull);
       expect(TableauDeBordRepository.margePct(1000, 2, 0), isNull);
+    });
+
+    /// Ticket U8 — RÈGLE UNIQUE DU TABLEAU DE BORD : ce que le web compte (pièces `synced`) plus ce qui part vers
+    /// lui (`pending` : toutes les pièces du jeu ci-dessus sont en attente d'envoi, et comptent). Une pièce REFUSÉE
+    /// par le serveur (`conflict`) n'entrera jamais au web : elle ne compte NULLE PART.
+    test('U8 — une vente, un achat ou une charge REFUSÉS (conflict) ne comptent à aucun indicateur', () async {
+      await jeuALaMain();
+      // Lignes d'achat du porc (achats en attente, donc comptés) : PMP 9 600 → marge 52 (voir le test U4).
+      for (final (id, achat, qte, prix) in [
+        (uuid('pl1'), achatP1, 2.0, 9000.0),
+        (uuid('pl2'), achatP2, 3.0, 10000.0),
+      ]) {
+        await db.into(db.purchaseLines).insert(
+          PurchaseLinesCompanion.insert(
+            id: id,
+            purchaseId: achat,
+            productId: porcCharcutier,
+            qty: qte,
+            unitPrice: prix,
+          ),
+        );
+      }
+      // Pièces REFUSÉES, toutes en octobre : une vente de porc transmise au MeCeF, un achat de porc à 1 F (qui
+      // ferait tomber le PMP à 100 × 1 + 48 000 → 470,59, marge 98 %), une charge.
+      final refusee = uuid('vente-refusee');
+      await db.into(db.sales).insert(
+        SalesCompanion.insert(
+          id: refusee,
+          deviceId: 'poste-test',
+          updatedAt: DateTime(2026, 10, 18, 9),
+          syncStatus: const Value(SyncStatus.conflict),
+          paymentMode: 'especes',
+          total: 500000,
+          soldAt: DateTime(2026, 10, 18, 9),
+          mecefStatus: const Value('transmise'),
+        ),
+      );
+      await ligne(uuid('lr1'), refusee, porcCharcutier, 10, 500000);
+      await db.into(db.purchases).insert(
+        PurchasesCompanion.insert(
+          id: uuid('achat-refuse'),
+          deviceId: 'poste-test',
+          updatedAt: DateTime(2026, 10, 18),
+          syncStatus: const Value(SyncStatus.conflict),
+          supplierId: uuid('fournisseur'),
+          supplierName: const Value('Fournisseur refusé'),
+          paymentMode: 'comptant',
+          total: 300000,
+          purchaseDate: DateTime(2026, 10, 18),
+        ),
+      );
+      await db.into(db.purchaseLines).insert(
+        PurchaseLinesCompanion.insert(
+          id: uuid('pl-refusee'),
+          purchaseId: uuid('achat-refuse'),
+          productId: porcCharcutier,
+          qty: 100,
+          unitPrice: 1,
+        ),
+      );
+      await db.into(db.expenses).insert(
+        ExpensesCompanion.insert(
+          id: uuid('e-refusee'),
+          deviceId: 'poste-test',
+          updatedAt: DateTime(2026, 10, 18),
+          syncStatus: const Value(SyncStatus.conflict),
+          expenseDate: DateTime(2026, 10, 18),
+          label: 'Charge refusée',
+          category: 'Carburant',
+          amount: 1234,
+          treasuryAccountId: uuid('caisse'),
+        ),
+      );
+
+      final d = await depot.charger();
+
+      // Mêmes chiffres que sans les pièces refusées (test « KPI » et « courbe » ci-dessus).
+      expect(d.chiffreAffaires.valeur, 150000);
+      expect(d.depenses.valeur, 60000);
+      expect(d.resultatNet.valeur, 90000);
+      expect((d.serie[5].chiffreAffaires, d.serie[5].depenses), (150000.0, 60000.0));
+      expect(d.especes[2].mesures.last, ('Ventes (mois)', '2'));
+      expect(
+        d.topProduits.map((t) => (t.produit, t.chiffreAffaires, t.margePct)),
+        [('Œufs de table', 80000.0, null), ('Porc charcutier', 70000.0, 52)],
+      );
+      expect(d.ventesRecentes.map((l) => l.libelle), isNot(contains(startsWith('VENTE-RE'))));
+      expect(d.ventesRecentes, hasLength(3));
+      expect(d.achatsRecents.map((l) => l.libelle), isNot(contains(contains('Fournisseur refusé'))));
+      expect(d.depensesRecentes.map((l) => l.libelle), ['Carburant groupe électrogène']);
+      expect(d.facturesRecentes.map((l) => l.libelle), ['A1B2C3D4 · AMOUSSOU Régis']);
+
+      // Contre-épreuve : la même vente ACQUITTÉE par le serveur (`synced`) compte partout.
+      await (db.update(db.sales)..where((v) => v.id.equals(refusee))).write(
+        const SalesCompanion(syncStatus: Value(SyncStatus.synced)),
+      );
+      final apres = await depot.charger();
+      expect(apres.chiffreAffaires.valeur, 650000);
+      expect(apres.especes[2].mesures.last, ('Ventes (mois)', '3'));
+      expect(apres.topProduits.first.produit, 'Porc charcutier');
     });
 
     test('courbe et statistiques : six mois, achats en dépenses', () async {

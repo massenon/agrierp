@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import 'pmp_service.dart';
 import 'stocks_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -11,12 +12,17 @@ import '../../core/theme/symboles_agri.dart';
 /// puis les **trois onglets** dans SON ordre : Tableau & Valorisation ·
 /// Journal des Mouvements · Ajustement / Correction.
 ///
-/// ⚠️⚠️ **LA VALORISATION N'EST PAS ENCORE PORTÉE.** Le PMP se calcule côté
-/// serveur par moyenne pondérée des **lignes d'achat**, qui descendent au poste
-/// depuis U4 (D-U4) ; le portage de la valorisation reste à faire. PMP
-/// unitaire, valeur de ligne, valorisation totale et écarts en FCFA affichent
-/// donc un tiret motivé. Les estimer depuis le prix de VENTE donnerait une
-/// valorisation supérieure au coût — un actif gonflé au bilan.
+/// 🔴→✅ **TICKET U8 — LA VALORISATION EST CELLE DU WEB.** Le PMP se calcule
+/// par moyenne pondérée des **lignes d'achat**, qui descendent au poste depuis
+/// U4 (D-U4) : PMP unitaire, valeur de ligne, valorisation totale, écarts en
+/// FCFA et valeur du journal reprennent EXACTEMENT `GestionStocks` (Livewire)
+/// et son Blade, via [PmpService] (`Product::computePmp()`). « — » seulement
+/// là où le web en met un : produit sans PMP (jamais acheté). Jamais une
+/// estimation depuis le prix de VENTE — un actif gonflé au bilan.
+///
+/// ⚠️ Restent hors de portée : la « Rotation du Stock » et la part des écarts
+/// saisie AILLEURS que sur ce poste — toutes deux lisent le grand livre
+/// `stock_movements`, qui ne descend pas.
 class GestionStocksScreen extends StatefulWidget {
   const GestionStocksScreen({super.key, required this.depot});
 
@@ -147,13 +153,14 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     crossAxisSpacing: AgriSpacing.md,
     childAspectRatio: large ? 2.6 : 1.6,
     children: [
-      // ⚠️⚠️ Sans PMP, aucune valorisation. Le bouton « Recalculer PMP » de
-      // la maquette n'est pas repris : il n'y a rien à recalculer au poste.
+      // Ticket U8 — `number_format($kpis['valorisation'], 0, ',', ' ').' FCFA'`
+      // et la légende du Blade. Le bouton « Recalculer PMP » de la maquette
+      // n'est pas repris : le web ne l'a pas (le PMP se lit à chaque affichage).
       _carteKpi(
         'Valorisation Stocks',
-        '—',
+        '${PmpService.francs(d.valorisation)} FCFA',
         AgriColors.brandEmerald,
-        legende: "Prix de revient absent du catalogue",
+        legende: 'Basée sur le PMP réel (achats)',
       ),
       _carteKpi('Alertes de Seuil', '${d.alertesDeSeuil}', AgriColors.errorRed),
       // ⚠️ Rotation = COGS du mois ÷ stock moyen. Les deux termes viennent
@@ -164,12 +171,14 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         AgriColors.infoBlue,
         legende: 'Journal des mouvements non synchronisé',
       ),
-      // ⚠️ EN NOMBRE, PAS EN FRANCS : un écart se valorise au PMP.
+      // Ticket U8 — en FCFA, formule du web (ajustements du mois × PMP).
+      // ⚠️ Périmètre : les ajustements saisis sur CE poste (`stock_movements`
+      // ne descend pas) — la légende le dit.
       _carteKpi(
         "Écarts d'Inventaire",
-        '${d.ecartsDInventaire}',
+        '${PmpService.francs(d.ecartsDuMois)} FCFA',
         AgriColors.accentYellow,
-        legende: 'Saisis sur ce poste',
+        legende: 'Ajustements du mois saisis sur ce poste',
       ),
     ],
   );
@@ -449,14 +458,26 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             ),
           ),
         ),
-        // ⚠️⚠️ PMP et VALEUR : voir le docblock de l'écran.
-        const Expanded(
+        // Ticket U8 — `number_format($row['pmp'], 0, ',', ' ')` et
+        // `number_format($row['valeur'], 0, ',', ' ')`, « — » sans PMP.
+        Expanded(
           flex: 2,
-          child: Text('—', style: TextStyle(fontSize: AgriTypography.xs)),
+          child: Text(
+            l.pmp == null ? '—' : PmpService.francs(l.pmp!),
+            key: Key('pmp-$index'),
+            style: const TextStyle(fontSize: AgriTypography.xs),
+          ),
         ),
-        const Expanded(
+        Expanded(
           flex: 2,
-          child: Text('—', style: TextStyle(fontSize: AgriTypography.xs)),
+          child: Text(
+            l.valeur == null ? '—' : PmpService.francs(l.valeur!),
+            key: Key('valeur-$index'),
+            style: const TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
         Expanded(flex: 2, child: _pastilleUrgence(l)),
         const Expanded(
@@ -654,10 +675,15 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             style: const TextStyle(fontSize: AgriTypography.xs),
           ),
         ),
-        // ⚠️ Sans PMP, un mouvement ne se valorise pas.
-        const Expanded(
+        // Ticket U8 — `number_format(abs(quantité) × PMP, 0, ',', ' ').' FCFA'`
+        // du Blade ; « — » sans PMP.
+        Expanded(
           flex: 2,
-          child: Text('—', style: TextStyle(fontSize: AgriTypography.xs)),
+          child: Text(
+            m.valeur == null ? '—' : '${PmpService.francs(m.valeur!)} FCFA',
+            key: Key('valeur-mouvement-$index'),
+            style: const TextStyle(fontSize: AgriTypography.xs),
+          ),
         ),
       ],
     ),

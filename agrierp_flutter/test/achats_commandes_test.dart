@@ -421,19 +421,32 @@ void main() {
     );
 
     /// ⚠️ F0.74 : `returned_at` descend et le poste acquitte ses retours — la carte est
-    /// CALCULABLE. Elle compte des achats retournés (voir `retour_fournisseur_poste_test`
-    /// pour le recalcul SQL indépendant) ; sans aucun retour, c'est un vrai zéro.
+    /// CALCULABLE ; sans aucun retour, c'est un vrai zéro. Ticket U8 : elle compte des LIGNES
+    /// de retour comme le web (voir `retour_fournisseur_poste_test` pour le recalcul SQL
+    /// indépendant, `retours_achats_sync_test` pour les lignes servies) — ici, un achat retourné
+    /// dont aucune ligne de retour n'est encore servie compte ses lignes d'achat.
     test('⚠️⚠️ « Écarts / Retours » est calculé : zéro sans retour, le compte '
         'sinon', () async {
       await fournisseur('f1', 'Provenderie du Plateau');
       await achatServeur('a1', cleFournisseur: 'f1', total: 100000);
+      for (var i = 0; i < 2; i++) {
+        await db.into(db.purchaseLines).insert(
+          PurchaseLinesCompanion.insert(
+            id: uuid('la1-$i'),
+            purchaseId: uuid('a1'),
+            productId: uuid('p1'),
+            qty: 1,
+            unitPrice: 50000,
+          ),
+        );
+      }
 
       expect((await depot.charger()).ecartsEtRetours, 0);
 
       await (db.update(db.purchases)..where((t) => t.id.equals(uuid('a1'))))
           .write(PurchasesCompanion(returnedAt: Value(DateTime(2026, 10, 5))));
 
-      expect((await depot.charger()).ecartsEtRetours, 1);
+      expect((await depot.charger()).ecartsEtRetours, 2);
     });
 
     testWidgets('la liste d achats porte ses quatre cartes', (tester) async {
@@ -669,7 +682,13 @@ void main() {
       await ouvrir(tester, "Liste d'Achats");
 
       expect(find.text('Véto-Santé Bénin'), findsOneWidget);
-      expect(find.text('Vétérinaire'), findsOneWidget);
+      // Ticket U8 — la colonne « Catégorie » est celle du PRODUIT de la première ligne (comme le web),
+      // jamais celle du fournisseur : sans ligne, un tiret.
+      expect(find.text('Vétérinaire'), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('categorie-achat-0'))).data,
+        '—',
+      );
       expect(find.text('Dette fournisseur'), findsOneWidget);
     });
 

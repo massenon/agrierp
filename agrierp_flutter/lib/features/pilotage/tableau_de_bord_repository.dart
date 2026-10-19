@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import '../../core/audit/libelles_audit.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
+import '../stocks/pmp_service.dart';
 
 /// Une mesure du tableau de bord : un chiffre, ou une absence assumée.
 ///
@@ -229,17 +231,38 @@ class TableauDeBordRepository {
     final debutPrecedent = DateTime(maintenant.year, maintenant.month - 1);
     final finPrecedent = debutMois.subtract(const Duration(microseconds: 1));
 
-    final ventes = await database.select(database.sales).get();
+    // 🔴→✅ TICKET U8 — RÈGLE UNIQUE DU TABLEAU DE BORD : CE QUE LE WEB COMPTE, PLUS CE QUI PART VERS LUI.
+    // Toute pièce du poste entre aux calculs ET aux listes si elle est connue du serveur (`synced`) ou saisie ici
+    // et en attente d'envoi (`pending` : un fait de la ferme que le web aura à la synchronisation — le poste
+    // travaille hors ligne, l'en exclure ferait mentir le tableau précisément quand il sert). Une pièce REFUSÉE
+    // par le serveur (`conflict`) n'existe que sur ce poste et n'entrera jamais au web : elle ne compte NULLE PART
+    // — ni au CA, ni aux Dépenses, ni au Résultat Net, ni à la courbe, ni aux ventes porcines, ni au Top 5 (ses
+    // lignes de vente, et les lignes d'achat d'un achat refusé au PMP de la marge), ni aux transactions récentes.
+    // Elle reste visible là où elle se corrige : l'écran Synchronisation et la liste de son module.
+    // ⚠️ La règle vise les PIÈCES, jamais modifiées après leur création : leur refus veut dire « absente du web ».
+    // Une fiche journalière, un cycle de reproduction ou un produit refusés peuvent être la MODIFICATION d'un
+    // enregistrement que le web garde dans sa version précédente, que le poste n'a pas : les exclure ne
+    // reproduirait pas davantage le web — ils restent comptés dans leur version locale.
+    final ventes = (await database.select(database.sales).get())
+        .where((v) => compteAuWeb(v.syncStatus))
+        .toList();
     // Ticket H5 — `Sale::nonAnnulees()` du web (corrigé au web d'abord) : une vente annulée ne compte ni au CA, ni à
     // la courbe, ni aux ventes du mois, ni au Top 5. Les LISTES (transactions récentes, factures) la montrent encore.
     final ventesValides = ventes.where((v) => v.status != 'annulee').toList();
     final lignes = await database.select(database.saleLines).get();
-    // Ticket U4 — lignes d'achat de la ferme (descendues avec leurs achats) : PMP de la marge du Top 5.
-    final lignesAchat = await database.select(database.purchaseLines).get();
     final produits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
-    final achats = await database.select(database.purchases).get();
-    final depenses = await database.select(database.expenses).get();
+    final tousAchats = await database.select(database.purchases).get();
+    final achats = tousAchats.where((a) => compteAuWeb(a.syncStatus)).toList();
+    // Ticket U4 — lignes d'achat de la ferme (descendues avec leurs achats) : PMP de la marge du Top 5. U8 : même
+    // règle que la Gestion des Stocks ([PmpService.lignesRetenues]) — sans les lignes d'un achat refusé.
+    final lignesAchat = PmpService.lignesRetenues(
+      tousAchats,
+      await database.select(database.purchaseLines).get(),
+    );
+    final depenses = (await database.select(database.expenses).get())
+        .where((d) => compteAuWeb(d.syncStatus))
+        .toList();
     final comptes = await database.select(database.treasuryAccounts).get();
     final creances = await database.select(database.receivables).get();
     final dettes = await database.select(database.payables).get();
@@ -362,6 +385,10 @@ class TableauDeBordRepository {
       ),
     );
   }
+
+  /// Ticket U8 — une pièce synchronisable compte au Tableau de bord si le web la connaît ou la connaîtra : tout
+  /// sauf `conflict` (voir la règle en tête de [charger]).
+  static bool compteAuWeb(SyncStatus statut) => statut != SyncStatus.conflict;
 
   /// `is_active = true` ET `status = 'actif'` — le scope `vivantes()` et les filtres du tableau de bord.
   static bool _vivante(LivestockLot b) => b.isActive && b.status == 'actif';
@@ -824,14 +851,10 @@ class TableauDeBordRepository {
   }
 
   /// `Product::computePmp()` : Σ (qté × prix unitaire) ÷ Σ qté sur TOUTES les lignes d'achat du produit, arrondi
-  /// à 2 décimales ; `null` si la quantité achetée totale n'est pas strictement positive.
-  static double? pmp(String produitId, List<PurchaseLine> lignesAchat) {
-    final du = lignesAchat.where((l) => l.productId == produitId);
-    final quantite = du.fold<double>(0, (t, l) => t + l.qty);
-    if (quantite <= 0) return null;
-    final cout = du.fold<double>(0, (t, l) => t + l.qty * l.unitPrice);
-    return _arrondi(cout / quantite, 2);
-  }
+  /// à 2 décimales ; `null` si la quantité achetée totale n'est pas strictement positive. Ticket U8 : un seul
+  /// calcul au poste, celui de [PmpService] (partagé avec la Gestion des Stocks).
+  static double? pmp(String produitId, List<PurchaseLine> lignesAchat) =>
+      PmpService.pmp(produitId, lignesAchat);
 
   /// Marge du Top 5 (`getTopProduitsProperty`) : `round((CA − PMP × qté) ÷ CA × 100)` (arrondi PHP) quand le PMP
   /// existe, que la quantité et le CA sont strictement positifs ; `null` (« — ») sinon.

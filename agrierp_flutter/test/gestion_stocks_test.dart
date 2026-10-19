@@ -18,10 +18,9 @@ import 'cartes_attendues.dart';
 /// existait sans producteur : un inventaire physique constaté au magasin
 /// n'avait aucun moyen d'être saisi hors ligne.
 ///
-/// ⚠️⚠️ **TOUTE LA VALORISATION EST HORS DE PORTÉE.** Le PMP se calcule côté
-/// serveur par moyenne pondérée des lignes d'achat ; `purchase_lines` ne
-/// descend pas et `products` ne porte aucune colonne de coût. L'estimer depuis
-/// le prix de VENTE gonflerait l'actif.
+/// Ticket U8 — la valorisation (PMP, valeurs, écarts en FCFA) est désormais celle
+/// du web, sur les lignes d'achat descendues depuis U4 : voir
+/// `valorisation_stocks_test.dart` (jeu fait à la main et parité exécutée PHP).
 void main() {
   late AppDatabase db;
   late StocksRepository depot;
@@ -224,7 +223,10 @@ void main() {
       );
     });
 
-    testWidgets('⚠️⚠️ la valorisation dit pourquoi elle est absente', (
+    /// Ticket U8 — la valorisation est celle du web (voir `valorisation_stocks_test`) : sans aucune
+    /// ligne d'achat, aucun produit n'a de PMP, et le web affiche « 0 FCFA » (un produit sans PMP est
+    /// exclu de la somme), PMP et valeur « — » sur chaque ligne.
+    testWidgets('⚠️⚠️ sans achat, la valorisation vaut 0 FCFA et chaque PMP est un tiret', (
       tester,
     ) async {
       await afficher(tester);
@@ -232,11 +234,15 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('kpi-Valorisation Stocks')),
-          matching: find.text('—'),
+          matching: find.text('0 FCFA'),
         ),
         findsOneWidget,
       );
-      expect(find.text('Prix de revient absent du catalogue'), findsOneWidget);
+      expect(find.text('Basée sur le PMP réel (achats)'), findsOneWidget);
+      for (var i = 0; i < 2; i++) {
+        expect(tester.widget<Text>(find.byKey(Key('pmp-$i'))).data, '—');
+        expect(tester.widget<Text>(find.byKey(Key('valeur-$i'))).data, '—');
+      }
     });
 
     testWidgets('les alertes de seuil comptent les produits sous leur seuil', (
