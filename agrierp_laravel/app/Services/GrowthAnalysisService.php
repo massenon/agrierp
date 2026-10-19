@@ -35,19 +35,25 @@ use App\Models\LivestockLot;
  */
 class GrowthAnalysisService
 {
-    /** Pesées réelles d'un lot, chronologiques. */
-    private function weighIns(string $lotId)
+    /** Pesées réelles d'un lot, chronologiques — jusqu'à `$jusquau` inclus (Y-m-d) s'il est donné. */
+    private function weighIns(string $lotId, ?string $jusquau = null)
     {
         return LivestockDailyEntry::where('lot_id', $lotId)
             ->whereNotNull('weight_sample_avg_g')
+            ->when($jusquau, fn ($q) => $q->whereDate('entry_date', '<=', $jusquau))
             ->orderBy('entry_date')
             ->get(['entry_date', 'weight_sample_avg_g']);
     }
 
-    /** GMQ depuis la première pesée du lot — formule de `DashboardElevage`. */
-    public function gmqCumule(string $lotId): ?float
+    /**
+     * GMQ depuis la première pesée du lot — formule de `DashboardElevage`.
+     *
+     * Ticket H11 — `$jusquau` (Y-m-d) donne le GMQ cumulé TEL QU'IL ÉTAIT CONNU à cette date : les courbes
+     * hebdomadaires du poste (`_serieHebdomadaire`, pesées `entry_date <= borne`) en sont faites, sur la même formule.
+     */
+    public function gmqCumule(string $lotId, ?string $jusquau = null): ?float
     {
-        $pesees = $this->weighIns($lotId);
+        $pesees = $this->weighIns($lotId, $jusquau);
 
         if ($pesees->count() < 2) {
             return null;

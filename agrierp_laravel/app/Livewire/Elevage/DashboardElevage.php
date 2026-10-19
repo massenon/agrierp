@@ -7,6 +7,10 @@ use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
 use App\Models\VeterinaryRecord;
+use App\Models\VeterinaryWithdrawalPeriod;
+use App\Services\GrowthAnalysisService;
+use App\Services\ProtocoleDuJourService;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -39,12 +43,47 @@ use Livewire\Component;
  *   fictif avec des points inventés).
  * - "Rappels VMS à venir" renvoie vers le calendrier réel déjà construit
  *   (ticket 3.11), jamais une liste dupliquée localement.
+ *
+ * ⚠️ TICKET H11 (décision client D-H-maquette du 19/10/2026) — LES AJOUTS DU POSTE SONT CONSTRUITS ICI, pour que les
+ * deux surfaces soient identiques. Référence : `agrierp_flutter/lib/features/elevage/dashboard_elevage_repository.dart`
+ * et `dashboard_elevage_screen.dart`, formules et libellés repris tels quels :
+ * - courbe SVG « Croissance (GMQ) par Espèce » (GMQ cumulé connu à 5 bornes hebdomadaires) ;
+ * - 4ᵉ ligne propre à chaque carte de filière (Mères / Géniteurs, Taux de ponte, Truies reproductrices, Taux d'éclosion) ;
+ * - liste CALCULÉE des rappels VMS (moteur unique `ProtocoleDuJourService`, 7 jours, + rémanences en cours), AU-DESSUS du
+ *   texte et du lien d'origine, qui restent ;
+ * - onglet GMQ : filtre d'espèce (tableau seulement, comme au poste), 4 cartes, courbe 8 semaines de la bande suivie ;
+ * - onglet Prévision : sélecteur de bande, horizons 7/14/30/60, 3 cartes, tableau Échéance / Poids — même régression
+ *   que le tableau du Blade.
+ * La note « 2026 vs 2025 » de l'onglet sanitaire du poste n'est PAS reprise : elle explique une limite du TIRAGE du
+ * poste (l'historique de l'an dernier ne descend pas), qui n'existe pas au web — la recopier y serait faux.
  */
 #[Layout('layouts.app')]
 class DashboardElevage extends Component
 {
     #[Url]
     public string $tab = 'synthese';
+
+    /** Ticket H11 — filtre d'espèce de l'onglet GMQ (« all » au poste). */
+    public string $espece = 'all';
+
+    /** Ticket H11 — bande retenue par le sélecteur de l'onglet Prévision (`null` : la première projetable). */
+    public ?string $bandePrevision = null;
+
+    /** Ticket H11 — horizon de projection, en jours (14 par défaut au poste). */
+    public int $horizon = 14;
+
+    /** Horizons proposés par le poste (`horizons`), en jours. */
+    public const HORIZONS = [7, 14, 30, 60];
+
+    /** Objectifs de GMQ des cartes de l'onglet GMQ, en g/jour — constantes du poste (`DashboardElevageRepository.objectifs`). */
+    public const OBJECTIFS_GMQ = [
+        'cuniculture' => [15, 20],
+        'aviculture' => [20, 55],
+        'porciculture' => [400, 650],
+    ];
+
+    /** Horizon des rappels VMS, en jours (`horizonRappels` du poste). */
+    public const HORIZON_RAPPELS = 7;
 
     public function getActiveLotsProperty()
     {
@@ -88,8 +127,126 @@ class DashboardElevage extends Component
                 'species' => $species,
                 'effectif' => (int) $lots->sum('current_quantity'),
                 'taux_mortalite' => $totalEffectifDepart > 0 ? round(($totalMorts / $totalEffectifDepart) * 100, 1) : 0.0,
+                'ligne_poste' => $this->ligneDuPoste($species->code, $lots),
             ];
         });
+    }
+
+    /**
+     * Ticket H11 — la 4ᵉ ligne propre à chaque filière (`_ligneDuPoste` du poste), formules reprises telles quelles.
+     *
+     * ⚠️ Mères / Géniteurs, Truies reproductrices et Taux d'éclosion valent « — » au poste (aucun décompte stocké, la
+     * fiche Escargots n'a pas de colonne d'éclosion) : « — » ici aussi, jamais un chiffre que le poste n'affiche pas.
+     * Taux de ponte : moyenne, sur les fiches DU MOIS des bandes au stade `ponte`, de (œufs ÷ effectif final × 100) —
+     * œufs absents comptés 0, fiche à effectif nul écartée (`ProductionOeufsService.tauxDePonte`) ; écrit « 56.7% ».
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function ligneDuPoste(string $code, Collection $lots): ?array
+    {
+        return match ($code) {
+            'cuniculture' => ['Mères / Géniteurs', '—'],
+            'porciculture' => ['Truies reproductrices', '—'],
+            'helico' => ["Taux d'éclosion", '—'],
+            'aviculture' => ['Taux de ponte', $this->tauxDePonteDuMois($lots)],
+            default => null,
+        };
+    }
+
+    private function tauxDePonteDuMois(Collection $lots): string
+    {
+        $enPonte = $lots->filter(fn ($lot) => ($lot->stage ?? '') === 'ponte')->pluck('id');
+
+        $taux = LivestockDailyEntry::whereIn('lot_id', $enPonte)
+            ->whereBetween('entry_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+            ->get()
+            ->filter(fn ($e) => (int) $e->effectif_final > 0)
+            ->map(fn ($e) => ((int) ($e->ponte_total ?? 0)) / (int) $e->effectif_final * 100);
+
+        return $taux->isEmpty() ? '—' : number_format($taux->avg(), 1, '.', '').'%';
+    }
+
+    /**
+     * Ticket H11 — série hebdomadaire du GMQ cumulé tel qu'il était connu à la fin de chaque semaine
+     * (`_serieHebdomadaire` du poste) : moyenne NON arrondie des bandes qui avaient deux pesées, `null` sinon.
+     *
+     * @return array<int, ?float>
+     */
+    private function serieHebdomadaire(Collection $lots, int $semaines): array
+    {
+        $service = app(GrowthAnalysisService::class);
+        $serie = [];
+
+        for ($i = $semaines - 1; $i >= 0; $i--) {
+            $borne = now()->startOfDay()->subDays(7 * $i)->toDateString();
+            $valeurs = $lots->map(fn ($lot) => $service->gmqCumule($lot->id, $borne))->filter(fn ($v) => $v !== null);
+            $serie[] = $valeurs->isEmpty() ? null : (float) $valeurs->avg();
+        }
+
+        return $serie;
+    }
+
+    private function lotsDeLEspece(string $code): Collection
+    {
+        return $this->activeLots->filter(fn ($lot) => $lot->species?->code === $code)->values();
+    }
+
+    /** Ticket H11 — courbe « Croissance (GMQ) par Espèce » de la Synthèse : 5 points (S1..S5) par espèce. */
+    public function getGmqParEspeceParSemaineProperty(): array
+    {
+        $series = [];
+        foreach (['cuniculture', 'aviculture', 'porciculture'] as $code) {
+            $series[$code] = $this->serieHebdomadaire($this->lotsDeLEspece($code), 5);
+        }
+
+        return $series;
+    }
+
+    /**
+     * Ticket H11 — rappels des 7 prochains jours (`_rappels` du poste) : traitements du barème DUS et NON ADMINISTRÉS,
+     * bande par bande (le cycle vient du moteur UNIQUE `ProtocoleDuJourService` — une seconde copie de la règle
+     * finirait par faire administrer un traitement au mauvais jour), puis les rémanences en cours ; tri par échéance.
+     *
+     * @return array<int, array{libelle: string, echeance: string, jours: int}>
+     */
+    public function getRappelsVmsProperty(): array
+    {
+        $moteur = app(ProtocoleDuJourService::class);
+        $jour = now()->startOfDay();
+        $rappels = [];
+
+        foreach ($this->activeLots->sortBy('code')->values() as $bande) {
+            if (! $bande->species) {
+                continue;
+            }
+
+            for ($d = 0; $d <= self::HORIZON_RAPPELS; $d++) {
+                foreach ($moteur->pourBande($bande, $jour->copy()->addDays($d))->traitements as $t) {
+                    if ($t['deja_administre']) {
+                        continue;   // un traitement déjà administré n'est plus un rappel : l'afficher ferait redoser
+                    }
+                    $rappels[] = [
+                        'libelle' => $t['standard']->treatment.' — '.$bande->code,
+                        'echeance' => $d === 0 ? "Aujourd'hui" : 'Dans '.$d.' jour'.($d > 1 ? 's' : ''),
+                        'jours' => $d,
+                    ];
+                }
+            }
+        }
+
+        // Rémanences en cours : des interdictions de vente en vigueur, que le poste mêle au bloc.
+        foreach (VeterinaryWithdrawalPeriod::whereDate('end_date', '>=', $jour->toDateString())->get() as $r) {
+            $restants = (int) round($jour->diffInDays($r->end_date->copy()->startOfDay()));
+            $rappels[] = [
+                'libelle' => 'Rémanence en cours — '.($r->product_used ?: 'traitement'),
+                'echeance' => 'Fin dans '.$restants.' jour'.($restants > 1 ? 's' : ''),
+                'jours' => $restants,
+            ];
+        }
+
+        usort($rappels, fn ($a, $b) => $a['jours'] <=> $b['jours']);   // tri stable (PHP 8)
+
+        return $rappels;
     }
 
     private function consolidatedGmq(): ?float
@@ -129,6 +286,7 @@ class DashboardElevage extends Component
                     'poids_actuel' => $weighIns->last()?->weight_sample_avg_g,
                     'jours' => null,
                     'gmq' => null,
+                    'derniere_date' => $weighIns->last()?->entry_date?->toDateString(),
                 ];
             }
 
@@ -142,8 +300,52 @@ class DashboardElevage extends Component
                 'poids_actuel' => $last->weight_sample_avg_g,
                 'jours' => $days,
                 'gmq' => $days > 0 ? round(($last->weight_sample_avg_g - $first->weight_sample_avg_g) / $days, 1) : null,
+                'derniere_date' => $last->entry_date->toDateString(),
             ];
         });
+    }
+
+    /** Ticket H11 — le tableau GMQ du Blade, filtré par espèce (seul le tableau suit le filtre, comme au poste). */
+    public function getGmqTableFiltreeProperty()
+    {
+        return $this->espece === 'all'
+            ? $this->gmqTable
+            : $this->gmqTable->filter(fn ($row) => $row['lot']->species?->code === $this->espece)->values();
+    }
+
+    /**
+     * Ticket H11 — cartes de l'onglet GMQ : moyenne NON arrondie des GMQ cumulés des bandes de l'espèce (affichée sans
+     * décimale), `null` si aucune n'a deux pesées ; et « Lots Suivis (Pesées ≥ 2) ».
+     */
+    public function getGmqCartesProperty(): array
+    {
+        $avecGmq = $this->gmqTable->filter(fn ($row) => $row['gmq'] !== null);
+        $parEspece = [];
+
+        foreach (array_keys(self::OBJECTIFS_GMQ) as $code) {
+            $valeurs = $avecGmq->filter(fn ($row) => $row['lot']->species?->code === $code)->pluck('gmq');
+            $parEspece[$code] = $valeurs->isEmpty() ? null : (float) $valeurs->avg();
+        }
+
+        return ['par_espece' => $parEspece, 'lots_suivis' => $avecGmq->count()];
+    }
+
+    /** Ticket H11 — bande de la courbe « Évolution du GMQ » : la dernière pesée la plus récente (à égalité, le code). */
+    public function getBandeSuivieProperty(): ?LivestockLot
+    {
+        $suivie = $this->gmqTable->filter(fn ($row) => $row['gmq'] !== null)
+            ->sort(fn ($a, $b) => [$b['derniere_date'], $a['lot']->code] <=> [$a['derniere_date'], $b['lot']->code])
+            ->first();
+
+        return $suivie['lot'] ?? null;
+    }
+
+    /** Ticket H11 — courbe 8 semaines de la bande suivie. */
+    public function getEvolutionGmqProperty(): array
+    {
+        $suivie = $this->bandeSuivie;
+
+        return $suivie === null ? [] : $this->serieHebdomadaire(collect([$suivie]), 8);
     }
 
     public function getSanitaireBySpeciesProperty()
@@ -228,12 +430,43 @@ class DashboardElevage extends Component
                 'poids_actuel' => (int) $weighIns->last()->weight_sample_avg_g,
                 'tendance_g_par_jour' => round($slope, 1),
                 'projection_30j' => $projection30j,
+                // Ticket H11 — la droite elle-même, pour les ajouts du poste (sélecteur, horizons, cartes).
+                'pente' => $slope,
+                'ordonnee' => $intercept,
+                'dernier_jour' => (int) $lastX,
+                'nb_pesees' => $n,
+                'poids_actuel_g' => (float) $weighIns->last()->weight_sample_avg_g,
             ];
         });
     }
 
+    /** Ticket H11 — bandes projetables (3 pesées au moins), triées par code comme au poste. */
+    public function getPrevisionsProjetablesProperty()
+    {
+        return $this->previsions->where('insufficient', false)->sortBy(fn ($row) => $row['lot']->code)->values();
+    }
+
+    /** Ticket H11 — bande retenue : celle du sélecteur, sinon la première (une sélection disparue retombe sur elle). */
+    public function getPrevisionChoisieProperty(): ?array
+    {
+        $projetables = $this->previsionsProjetables;
+
+        return $projetables->first(fn ($row) => $row['lot']->id === $this->bandePrevision) ?? $projetables->first();
+    }
+
+    /** Poids projeté `$jours` après la dernière pesée, arrondi à l'entier (`Prevision.projeter` du poste). */
+    public static function projeter(array $prevision, int $jours): float
+    {
+        return round($prevision['ordonnee'] + $prevision['pente'] * ($prevision['dernier_jour'] + $jours));
+    }
+
     public function render()
     {
+        // Ticket H11 — le sélecteur du navigateur montre la bande réellement projetée (la première, faute de choix).
+        if ($this->tab === 'prevision' && $this->bandePrevision === null) {
+            $this->bandePrevision = $this->previsionChoisie['lot']->id ?? null;
+        }
+
         return view('livewire.elevage.dashboard-elevage', ['title' => 'Élevage > Dashboard Élevage']);
     }
 }

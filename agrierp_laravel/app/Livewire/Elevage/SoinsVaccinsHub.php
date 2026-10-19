@@ -38,12 +38,34 @@ use Livewire\Component;
  * "Tester Rémanence" (vms-registre.html). Import CSV/Excel du registre
  * différé (fonctionnalité indépendante substantielle, hors périmètre de
  * ce ticket déjà dense — à trancher comme ticket séparé si prioritaire).
+ *
+ * ⚠️ TICKET H11 (décision client D-H-maquette du 19/10/2026) — ajouts du poste au registre
+ * (`agrierp_flutter/lib/features/elevage/soins_vaccins_screen.dart`) : recherche « Rechercher un diagnostic, un lot... »
+ * (code de bande, type d'action, produit, symptômes) et filtres « Toutes catégories » / « Toutes espèces », appliqués
+ * PAR LA REQUÊTE ; colonne « Statut » après les six du Blade (« Effectué » : le registre ne contient que des soins
+ * administrés — un soin planifié vit au calendrier). Les boutons « Importer » et « Exporter PDF » du poste sont INERTES
+ * (désactivés, sans action) : ils ne sont PAS construits ici, un bouton mort n'apporterait rien.
  */
 #[Layout('layouts.app')]
 class SoinsVaccinsHub extends Component
 {
     #[Url]
     public string $tab = 'registre';
+
+    // --- Ticket H11 : recherche et filtres du registre (ajouts du poste) ---
+    public string $recherche = '';
+
+    /** Type d'action exact (« Toutes catégories » = vide). */
+    public string $categorie = '';
+
+    /** Libellé du filtre du poste (« Toutes espèces » = vide). */
+    public string $espece = '';
+
+    /** Catégories proposées par le filtre du poste (`_filtres`), dans son ordre. */
+    public const CATEGORIES_FILTRE = ['Vaccination', 'Traitement curatif', 'Vermifuge', 'Vitamines'];
+
+    /** Espèces du filtre du poste → code d'espèce (`_filieres`). */
+    public const ESPECES_FILTRE = ['Lapins' => 'cuniculture', 'Volailles' => 'aviculture', 'Porcs' => 'porciculture'];
 
     // --- Nouveau Soin ---
     public string $soinLotId = '';
@@ -110,7 +132,28 @@ class SoinsVaccinsHub extends Component
 
     public function getVeterinaryRecordsProperty()
     {
-        return VeterinaryRecord::with('lot.species')->where('is_active', true)->orderByDesc('record_date')->limit(50)->get();
+        $terme = trim($this->recherche);
+        $codeEspece = self::ESPECES_FILTRE[$this->espece] ?? null;
+
+        return VeterinaryRecord::with('lot.species')->where('is_active', true)
+            // Ticket H11 — recherche et filtres du poste (`_lignesFiltrees`), appliqués PAR LA REQUÊTE, avant la limite.
+            ->when($this->categorie !== '', fn ($q) => $q->where('action_type', $this->categorie))
+            ->when($codeEspece, fn ($q) => $q->whereHas('lot.species', fn ($s) => $s->where('code', $codeEspece)))
+            ->when($terme !== '', function ($q) use ($terme) {
+                $motif = '%'.mb_strtolower($terme).'%';
+                // « Un diagnostic, un lot » : code de bande, type d'action, produit ET symptômes, sans casse.
+                $q->where(fn ($w) => $w->whereRaw('LOWER(action_type) LIKE ?', [$motif])
+                    ->orWhereRaw('LOWER(product_used) LIKE ?', [$motif])
+                    ->orWhereRaw('LOWER(symptomes) LIKE ?', [$motif])
+                    ->orWhereHas('lot', fn ($l) => $l->whereRaw('LOWER(code) LIKE ?', [$motif])));
+            })
+            ->orderByDesc('record_date')->limit(50)->get();
+    }
+
+    /** Ticket H11 — le registre est-il filtré ? (message vide du poste : « … pour ces critères »). */
+    public function getRegistreFiltreProperty(): bool
+    {
+        return trim($this->recherche) !== '' || $this->categorie !== '' || $this->espece !== '';
     }
 
     public function newSoin(): void

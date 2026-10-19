@@ -32,7 +32,9 @@
 // servi cache d'abord : ils continueraient à la lire depuis leur disque, sans
 // jamais redemander les 37 Ko. `activate` purge les caches des versions
 // précédentes.
-const VERSION = 'agrierp-v2';
+// v3 (ticket H11) — la fonte d'icônes embarque `flag` et `show_chart` (ajouts du poste au Dashboard Élevage) : sans
+// nouveau numéro, un poste déjà venu lirait l'ancienne fonte en cache et afficherait ces noms en toutes lettres.
+const VERSION = 'agrierp-v3';
 const CACHE_STATIQUE = `${VERSION}-statique`;
 
 /** Le strict minimum pour afficher une page d'attente présentable. */

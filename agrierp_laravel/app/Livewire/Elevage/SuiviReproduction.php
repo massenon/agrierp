@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Models\Animal;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -42,6 +43,19 @@ use Livewire\Component;
  * "Cages Occupées" du prototype non repris — aucune table ne modélise de
  * sous-division "cage" (même constat qu'au ticket 3.5, non tranché avec
  * vous à ce stade).
+ *
+ * ⚠️ TICKET H11 (décision client D-H-maquette du 19/10/2026) — les ajouts du poste
+ * (`agrierp_flutter/lib/features/elevage/suivi_reproduction_screen.dart`) sont construits ici, APRÈS ce que le
+ * Blade affichait, avec les mêmes calculs et libellés :
+ * - ligne annexe « Boîte à nid J+28 » sous le rappel du cycle lapin ;
+ * - colonnes après les neuf du Blade — Lapins : Sevrés (M/F) « — », Morts S/Mère (`nes_morts`), Poids Moyen (g) « — »,
+ *   Cages « — » (le cycle ne porte ni sevrés, ni ventilation M/F, ni pesée, ni cage) ; Porcs : Sevrage (J+42) =
+ *   date stockée, sinon mise bas réelle + 42 j ;
+ * - carte « Bandes suivies » et bandeau « Rappel du cycle » Volailles / Escargots ;
+ * - modale lapin : champ « Cages Occupées » DÉSACTIVÉ (toujours aucun référentiel de cage pour le porter) et aperçu
+ *   « Ligne du temps automatique calculée » ;
+ * - N° de femelle / de mâle : lien vers la fiche du sujet (`elevage.animal-details`) quand un sujet porte ce nom.
+ * Le bandeau « lecture seule » du poste n'est pas repris : il dit ce qui reste réservé au web.
  */
 #[Layout('layouts.app')]
 class SuiviReproduction extends Component
@@ -145,7 +159,42 @@ class SuiviReproduction extends Component
             'couves' => (int) $couves,
             'nes' => (int) $nes,
             'taux_eclosion' => $couves > 0 ? round(($nes / $couves) * 100, 1) : 0.0,
+            // Ticket H11 — carte « Bandes suivies » du poste : les bandes NON ARCHIVÉES de l'espèce (`ResumeCouvoir.lots`).
+            'lots' => $lots->count(),
         ];
+    }
+
+    /**
+     * Ticket H11 — cellules des colonnes ajoutées du poste, par cycle de l'onglet, dans l'ordre des en-têtes.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function getColonnesPosteProperty(): array
+    {
+        $cellules = [];
+
+        foreach ($this->eventsForTab as $event) {
+            $cellules[$event->id] = $this->tab === 'porcs'
+                // Sevrage : stocké, sinon déduit de la mise bas réelle (J+42), sinon inconnu.
+                ? [$event->sevrage_date_expected?->format('d/m/Y')
+                    ?? $event->mise_bas_date_actual?->copy()->addDays(42)->format('d/m/Y')
+                    ?? '—']
+                : ['—', $event->nes_morts === null ? '—' : (string) $event->nes_morts, '—', '—'];
+        }
+
+        return $cellules;
+    }
+
+    /**
+     * Ticket H11 — sujets enregistrés (`identifier → id`) : une référence de femelle ou de mâle n'est un LIEN que si un
+     * sujet porte ce nom (« R1 » peut aussi être une lapine jamais enregistrée ; un lien vers une fiche inexistante
+     * serait pire que du texte).
+     *
+     * @return array<string, string>
+     */
+    public function getSujetsConnusProperty(): array
+    {
+        return Animal::pluck('id', 'identifier')->all();
     }
 
     public function newDeclaration(): void
