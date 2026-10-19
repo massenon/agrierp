@@ -16,7 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 ///    terrain, des jours plus tard.
 /// 2. **Le poste ne prétend rien décaisser** : il n'a ni comptabilité ni solde
 ///    faisant foi.
-/// 3. **La liste n'est pas celle de l'exploitation** — et l'écran le dit.
+/// 3. Ticket U13 — **la liste et « Dépenses du mois » sont celles de l'exploitation**, comme au web (les dépenses du
+///    serveur descendent) : archivées exclues, saisie refusée listée mais non comptée.
 void main() {
   late AppDatabase db;
   late DepensesRepository depot;
@@ -191,7 +192,7 @@ void main() {
       y(tester, 'MONTANT DÉCAISSÉ (FCFA) *'),
       y(tester, 'COMPTE DE TRÉSORERIE DÉBITÉ *'),
       y(tester, 'REÇU / FACTURE (PHOTO)'),
-      y(tester, 'Dépenses saisies sur ce poste'),
+      y(tester, "Dépenses de l'exploitation"),
     ];
 
     expect(positions, equals([...positions]..sort()));
@@ -213,16 +214,86 @@ void main() {
     },
   );
 
-  testWidgets("⚠️ l'écran dit que la liste ne couvre que ce poste", (
+  testWidgets("U13 — l'écran dit que la liste est celle de l'exploitation, au dernier tirage", (
     tester,
   ) async {
     await afficher(tester);
 
     expect(
-      find.textContaining("sur le web ou sur un autre poste n'y figurent pas"),
+      find.textContaining('Dépenses du web et de tous les postes au dernier tirage'),
       findsOneWidget,
-      reason: 'sinon la liste se lit comme l etat complet de l exploitation',
     );
+    expect(find.text('Aucune dépense pour le moment.'), findsOneWidget, reason: 'état vide du Blade');
+    expect(find.textContaining('saisies sur ce poste'), findsNothing);
+  });
+
+  /// Une dépense telle que le tirage la dépose (U13) : `synced`, `device_id` d'origine.
+  Future<void> depenseDuServeur(
+    String id,
+    DateTime date,
+    double montant, {
+    bool actif = true,
+    SyncStatus statut = SyncStatus.synced,
+  }) => db
+      .into(db.expenses)
+      .insert(
+        ExpensesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: Value(statut),
+          updatedAt: DateTime(2026, 8, 20),
+          expenseDate: date,
+          label: 'Dépense $id',
+          category: '601 - Aliments',
+          amount: montant,
+          treasuryAccountId: compteId,
+          isActive: Value(actif),
+        ),
+      );
+
+  test(
+    "⚠️ U13 — liste et « Dépenses du mois » : celles du web, archivées exclues, refusée listée mais non comptée",
+    () async {
+      const web = 'aaaaaaaa-0000-4000-8000-000000000001';
+      const archivee = 'aaaaaaaa-0000-4000-8000-000000000002';
+      const refusee = 'aaaaaaaa-0000-4000-8000-000000000003';
+      await depenseDuServeur(web, DateTime(2026, 8, 3), 12000);
+      await depenseDuServeur(archivee, DateTime(2026, 8, 4), 70000, actif: false);
+      await depenseDuServeur(refusee, DateTime(2026, 8, 5), 9000, statut: SyncStatus.conflict);
+      await depot.enregistrer(
+        date: DateTime(2026, 8, 19),
+        libelle: 'Saisie du poste',
+        categorie: '601 - Aliments',
+        montant: 25000,
+        compteTresorerieId: compteId,
+      );
+
+      final liste = await depot.mesDepenses();
+      expect(
+        [for (final d in liste) d.label],
+        ['Saisie du poste', 'Dépense $refusee', 'Dépense $web'],
+        reason: 'la plus récente d abord ; l archivée n est plus une dépense',
+      );
+      // 12 000 (web) + 25 000 (en attente) ; ni l'archivée (70 000), ni la refusée (9 000).
+      expect(await depot.totalDuMois(DateTime(2026, 8, 19)), 37000);
+    },
+  );
+
+  testWidgets('U13 — une dépense connue du serveur est « Payée » (badge du Blade), une refusée « Refusée »', (
+    tester,
+  ) async {
+    await depenseDuServeur('aaaaaaaa-0000-4000-8000-000000000011', DateTime(2026, 8, 3), 12000);
+    await depenseDuServeur(
+      'aaaaaaaa-0000-4000-8000-000000000012',
+      DateTime(2026, 8, 4),
+      8000,
+      statut: SyncStatus.conflict,
+    );
+    await afficher(tester);
+
+    expect(find.text('Payée'), findsOneWidget);
+    expect(find.text('Refusée'), findsOneWidget);
+    expect(find.text('Envoyée'), findsNothing);
   });
 
   testWidgets('⚠️ le champ justificatif annonce sa limite au lieu de mentir', (

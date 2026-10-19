@@ -102,7 +102,12 @@ class SuiviReproduction extends Component
         $gestantes = $activeEvents->whereNull('mise_bas_date_actual')->count();
         $palpationsDues = $activeEvents->filter(fn ($e) => $e->palpation_date === null && $e->saillie_date && now()->gte($e->saillie_date->copy()->addDays(14)))->count();
         $misesBasMois = LivestockReproductionEvent::whereBetween('mise_bas_date_actual', [now()->startOfMonth(), now()->endOfMonth()])->count();
-        $echecs = LivestockReproductionEvent::where('status', 'echec')->whereMonth('updated_at', now()->month)->count();
+        // 🔴→✅ Ticket U13 — « Échecs (mois) » : le mois de l'ANNÉE courante. `whereMonth` seul comptait aussi les échecs
+        // d'octobre 2025, 2024… dans « octobre » (le poste, lui, vérifiait déjà l'année).
+        $echecs = LivestockReproductionEvent::where('status', 'echec')
+            ->whereYear('updated_at', now()->year)
+            ->whereMonth('updated_at', now()->month)
+            ->count();
 
         return [
             'gestantes' => $gestantes,

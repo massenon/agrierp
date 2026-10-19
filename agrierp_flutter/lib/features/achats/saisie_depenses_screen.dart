@@ -164,7 +164,6 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   valeur: '${_montantFormate(_totalDuMois)} F',
                   icone: SymbolesAgri.payments,
                   couleur: AgriColors.brandEmerald,
-                  note: 'saisies sur ce poste',
                 ),
                 // ⚠️ « — » ET NON UN MONTANT : le classement fixe/variable
                 // n'est défini nulle part. Répartir au jugé donnerait une
@@ -503,17 +502,17 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Dépenses saisies sur ce poste',
+              "Dépenses de l'exploitation",
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AgriColors.brandForest,
               ),
             ),
-            // ⚠️ DIT AVANT LE TABLEAU, pas après : sans cela la liste se lit
-            // comme l'état complet de l'exploitation.
+            // Ticket U13 — les dépenses du web et des autres postes descendent au poste (archivées exclues) : la liste
+            // est celle de l'exploitation au dernier tirage, plus les saisies d'ici pas encore envoyées.
             const Text(
-              "Les dépenses enregistrées sur le web ou sur un autre poste n'y "
-              'figurent pas — la synchronisation ne les redescend pas.',
+              'Dépenses du web et de tous les postes au dernier tirage, plus celles saisies ici en attente '
+              "d'envoi.",
               style: TextStyle(fontSize: 10, color: AgriColors.outline),
             ),
             const SizedBox(height: AgriSpacing.sm),
@@ -521,7 +520,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: AgriSpacing.md),
                 child: Text(
-                  '— Aucune dépense saisie sur ce poste —',
+                  'Aucune dépense pour le moment.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
@@ -573,14 +572,14 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     );
   }
 
-  /// ⚠️ LE STATUT DIT L'ÉTAT D'ENVOI, PAS CELUI DU PAIEMENT. Sur le serveur une
-  /// dépense reçue est « Payée » ; au poste, tant qu'elle n'est pas partie,
-  /// elle n'engage encore rien. Afficher « Payée » ici laisserait croire le
-  /// décaissement fait.
+  /// ⚠️ TANT QU'ELLE N'EST PAS PARTIE, LE STATUT DIT L'ÉTAT D'ENVOI : au poste, une dépense en attente n'engage
+  /// encore rien ; afficher « Payée » laisserait croire le décaissement fait. Ticket U13 — une dépense CONNUE du
+  /// serveur (descendue du web, d'un autre poste, ou acquittée) y est « Payée » : le serveur décaisse toute dépense
+  /// reçue (`status = 'payee'`), c'est le badge du Blade.
   String _statut(Expense d) {
     return switch (d.syncStatus) {
       SyncStatus.pending => 'À envoyer',
-      SyncStatus.synced => 'Envoyée',
+      SyncStatus.synced => 'Payée',
       SyncStatus.conflict => 'Refusée',
     };
   }

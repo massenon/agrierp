@@ -1554,12 +1554,42 @@ class ExpenseCategories extends Table {
 /// C'est une difference assumee avec les ventes et la ponte, ou l'effet local
 /// existe parce que le poste EN A BESOIN tout de suite (vendre, servir la
 /// provende). Ici, personne au poste ne decide sur la foi du solde.
+///
+/// Ticket U13 — TABLE MIXTE, comme les clients ou les achats : les dépenses du serveur (web, autres postes) y
+/// DESCENDENT, au curseur, avec leur archivage (`is_active`) ; une saisie locale `pending` ou `conflict` n'est jamais
+/// écrasée par le tirage (`SyncEngine._absorberDepenses`).
 class Expenses extends Table with SyncColumns {
   DateTimeColumn get expenseDate => dateTime()();
   TextColumn get label => text()();
   TextColumn get category => text()();
   RealColumn get amount => real()();
   TextColumn get treasuryAccountId => text()();
+
+  /// Ticket U13 — archivage logique du web (`SaisieDepenses::archiveExpense()` : montant réintégré, charge
+  /// contre-passée). Une dépense archivée n'est plus une dépense : aucun écran ni rapport ne la compte. Défaut `true` :
+  /// toute dépense saisie ici, ou déjà présente avant U13, est active (comme au serveur à sa création).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
+/// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
+/// et Dépenses » du web lit (`RecettesDepenses::depensesRows()`) descendent — l'instant du règlement, le nom de
+/// l'employé et le net versé. ⚠️ RIEN D'AUTRE SUR LA PAIE (protections S3 sur les salaires) : ni brut, ni retenues,
+/// ni charges patronales, ni période. Servie aux comptes qui lisent les rapports (`view-rapports`), qui voient ces
+/// mêmes lignes au web. Jamais écrite ici, jamais envoyée.
+class Payslips extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `last_name.' '.first_name` de l'employé ; `null` : employé introuvable (« Employé » au rapport).
+  TextColumn get employeeName => text().nullable()();
+
+  /// Net versé (`net_salary`).
+  RealColumn get netSalary => real()();
+
+  /// Instant du règlement (`created_at`), en HEURE MURALE du serveur (Bénin) : le jour du rapport est son jour.
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 class AppSettings extends Table {
@@ -1648,6 +1678,7 @@ class SyncState extends Table {
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    Payslips,
     AppSettings,
     SyncState,
   ],
@@ -1664,7 +1695,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 46;
+  int get schemaVersion => 47;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2145,6 +2176,15 @@ class AppDatabase extends _$AppDatabase {
       if (from < 46) {
         await _ajouterColonneSiAbsente(m, stockAdjustments, stockAdjustments.countedQuantity);
       }
+
+      // v47 — ticket U13 : les dépenses du serveur descendent avec leur archivage (défaut `true` : toute dépense déjà
+      // présente est active) ; la paie réglée (`payslips`) descend en lecture seule pour « Recettes et Dépenses ».
+      if (from < 47) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.isActive);
+        if (!await _tableExiste(m, payslips)) {
+          await m.createTable(payslips);
+        }
+      }
     },
   );
 
@@ -2299,6 +2339,7 @@ class AppDatabase extends _$AppDatabase {
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'payslips', // U13
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',

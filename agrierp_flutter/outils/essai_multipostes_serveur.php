@@ -21,6 +21,12 @@
  *   reinitialiser             « Réinitialisation des données » (15.50) : mode démonstration, mot de confirmation
  *   etat-reinitialise         lignes restantes dans chaque table d'activité, et la marque `data_reset_at`
  *
+ * Ticket U13 — paie, archivage d'une dépense et rapport « Recettes et Dépenses » (toujours par les vrais composants) :
+ *
+ *   paie-web                  « Valider le règlement » d'un employé (GestionPaie) : un bulletin daté de maintenant
+ *   archiver-depense <json>   « Archiver » (SaisieDepenses) la première dépense des postes déjà reçue et active
+ *   recettes-depenses <du> <au>   totaux et lignes de « Recettes et Dépenses » (RecettesDepenses) sur la période
+ *
  * ⚠️⚠️ LES ÉCRITURES « AU WEB » PASSENT PAR LES VRAIS COMPOSANTS LIVEWIRE (`Livewire::test`, compte admin) : la vente
  * par `PosInterface` (panier, puis « Valider la Vente »), la ration par `ParametresElevage`, les bandes de l'essai par
  * `GestionBandes`. C'est le code que le navigateur exécute, contrôles d'autorisation compris — pas une insertion
@@ -168,9 +174,9 @@ function instantane(array $lots): array
 }
 
 /** Ticket S-T12 — un composant Livewire du web, au nom de l'administrateur. */
-function web(string $composant)
+function web(string $composant, array $parametres = [])
 {
-    return Livewire::actingAs(administrateur())->test($composant);
+    return Livewire::actingAs(administrateur())->test($composant, $parametres);
 }
 
 switch ($commande) {
@@ -332,6 +338,59 @@ switch ($commande) {
         }
 
         sortie(['stock' => $stock, 'le' => now()->toIso8601String()]);
+
+    // ── Ticket U13 : la paie réglée au web (Gestion de la Paie, « Valider le règlement ») ─────────────────────────────
+    case 'paie-web':
+        // Le premier employé actif sans bulletin ce mois-ci (le jeu de démonstration en porte) : son règlement crée un
+        // bulletin daté de maintenant, décaisse la trésorerie et passe l'écriture de paie.
+        $mois = now()->format('Y-m');
+        $deja = App\Models\Payslip::whereDate('period_month', $mois.'-01')->pluck('employee_id')->all();
+        $employe = App\Models\Employee::where('is_active', true)->whereNotNull('base_salary')->where('base_salary', '>', 0)
+            ->whereNotIn('id', $deja)->orderBy('last_name')->first();
+        if ($employe === null) {
+            echec('Aucun employé actif sans bulletin ce mois-ci.');
+        }
+        $avant = App\Models\Payslip::pluck('id')->all();
+        $composant = web(App\Livewire\RH\GestionPaie::class)->call('validerReglement', $employe->id);
+        $bulletin = App\Models\Payslip::whereNotIn('id', $avant)->first();
+        if ($bulletin === null) {
+            echec('Règlement de paie non validé au web : '.diagnostic($composant));
+        }
+
+        sortie(['bulletin' => $bulletin->id, 'net' => (float) $bulletin->net_salary, 'employe' => $employe->last_name.' '.$employe->first_name]);
+
+    // ── Ticket U13 : une dépense saisie au poste, ARCHIVÉE au web (Saisie des Dépenses, « Archiver ») ─────────────────
+    case 'archiver-depense':
+        // Candidats : les dépenses saisies aux postes ; la première déjà reçue et active au serveur est archivée.
+        $candidats = json_decode($arguments[0] ?? '[]', true) ?: [];
+        $depense = App\Models\Expense::whereIn('id', $candidats)->where('is_active', true)->orderBy('id')->first();
+        if ($depense === null) {
+            sortie(['depense' => null]);
+        }
+        $composant = web(App\Livewire\Achats\SaisieDepenses::class)->call('archiveExpense', $depense->id);
+        if ($depense->fresh()->is_active) {
+            echec('Dépense non archivée au web : '.diagnostic($composant));
+        }
+
+        sortie(['depense' => $depense->id, 'montant' => (float) $depense->amount]);
+
+    // ── Ticket U13 : « Recettes et Dépenses » du web, sur une période ─────────────────────────────────────────────────
+    case 'recettes-depenses':
+        [$du, $au] = $arguments + [now()->startOfMonth()->toDateString(), now()->toDateString()];
+        $composant = web(App\Livewire\Rapports\RecettesDepenses::class, ['startDate' => $du, 'endDate' => $au]);
+        $rapport = $composant->instance();
+        $ligne = fn (array $m) => [
+            'date' => Carbon\Carbon::parse($m['date'])->format('d/m/Y'), 'libelle' => $m['label'], 'montant' => round((float) $m['amount'], 2),
+        ];
+
+        sortie([
+            'du' => $du, 'au' => $au,
+            'recettes' => round((float) $rapport->kpis['recettes'], 2),
+            'depenses' => round((float) $rapport->kpis['depenses'], 2),
+            'solde' => round((float) $rapport->kpis['solde'], 2),
+            'lignes_recettes' => $rapport->recettes->map($ligne)->values()->all(),
+            'lignes_depenses' => $rapport->depenses->map($ligne)->values()->all(),
+        ]);
 
     // ── Ticket S-T12 : session refusée (CFG-1, S3) ────────────────────────────────────────────────────────────────
     case 'revoquer':

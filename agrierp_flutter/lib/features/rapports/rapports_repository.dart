@@ -187,9 +187,9 @@ class DonneesRapports {
 /// Ils suivent désormais leur composant, règle pour règle, prouvé par `test/rapports_parite_test.dart` (parité
 /// exécutée : le VRAI composant rend ses tableaux et son CSV sur le même jeu).
 ///
-/// ⚠️ **ÉCART RESTANT, DIT À L'ÉCRAN** : les dépenses du web portent aussi la PAIE (`payslips`, absente du poste) et
-/// les dépenses saisies sur le web ou un autre poste (`expenses` est au poste une table de saisie, jamais tirée).
-/// Le calcul est celui du web ; sa matière, au poste, n'est que celle qu'il détient.
+/// 🔴→✅ **Ticket U13** — les dépenses du web portent aussi la PAIE (`payslips`) et les dépenses saisies sur le web ou
+/// un autre poste : les deux descendent désormais au poste (tirage, `SyncEngine._absorberDepenses` / `_absorberPaie`),
+/// archivage compris. « Recettes et Dépenses » a la même matière qu'au web, et donne le même total (parité exécutée).
 class RapportsRepository {
   RapportsRepository({required this.database});
 
@@ -211,6 +211,8 @@ class RapportsRepository {
     final achats = await database.select(database.purchases).get();
     final lignesAchat = await database.select(database.purchaseLines).get();
     final depenses = await database.select(database.expenses).get();
+    // Ticket U13 — la paie réglée, descendue du serveur (comptes `view-rapports`).
+    final paie = await database.select(database.payslips).get();
     final clients = await database.select(database.customers).get();
     final creances = await database.select(database.receivables).get();
     final dettes = await database.select(database.payables).get();
@@ -256,6 +258,7 @@ class RapportsRepository {
       achats: achats,
       nomFournisseur: nomFournisseur,
       depenses: depenses,
+      paie: paie,
       du: debut,
       au: fin,
     );
@@ -364,12 +367,16 @@ class RapportsRepository {
   ///
   /// Le poste ne comptait que ses dépenses, libellées « {libellé} ({catégorie}) » : ni achats ni paie.
   ///
-  /// ⚠️ ÉCART RESTANT (dit à l'écran) : la PAIE (`payslips`) n'existe pas au poste, et les dépenses saisies sur le web
-  /// ou un autre poste n'y descendent pas (`expenses` n'est pas tirée). Achat ou dépense REFUSÉ (`conflict`) : exclu.
+  /// 🔴→✅ Ticket U13 — les dépenses du web et des autres postes et la PAIE (`payslips`) descendent au poste : les
+  /// dépenses ARCHIVÉES sont écartées (`where('is_active', true)`, U12b au web), la paie entre datée du JOUR de son
+  /// règlement (`created_at->toDateString()`, heure murale du serveur), libellée « Paie — {Nom Prénom} » (« Employé »
+  /// sans employé, libellé corrigé au web par U13), montant `net_salary`. Achat ou dépense REFUSÉ (`conflict`) :
+  /// exclu (absent du web) ; en attente d'envoi : compté (il part vers lui).
   static List<MouvementRapport> depensesDe({
     required List<Purchase> achats,
     required Map<String, String> nomFournisseur,
     required List<Expense> depenses,
+    List<Payslip> paie = const [],
     required DateTime du,
     required DateTime au,
   }) {
@@ -386,15 +393,27 @@ class RapportsRepository {
           ),
       for (final e in [...depenses]..sort((x, y) => x.id.compareTo(y.id)))
         if (e.syncStatus != SyncStatus.conflict &&
+            e.isActive &&
             _dansLaPeriode(e.expenseDate, du, au))
           MouvementRapport(
             date: _jour(e.expenseDate),
             libelle: e.label,
             montant: e.amount,
           ),
+      for (final p in [...paie]..sort((x, y) => x.id.compareTo(y.id)))
+        if (_dansLaPeriode(p.createdAt, du, au))
+          MouvementRapport(
+            date: _jour(p.createdAt),
+            libelle: libellePaie(p.employeeName),
+            montant: p.netSalary,
+          ),
     ];
     return _trierStable(lignes, (a, b) => b.date.compareTo(a.date));
   }
+
+  /// Ticket U13 — « Paie — {Nom Prénom} », « Paie — Employé » sans employé (`RecettesDepenses::depensesRows()`, libellé
+  /// corrigé au web par U13 : la priorité de `??` en PHP rendait « Employé » inatteignable).
+  static String libellePaie(String? employe) => 'Paie — ${employe ?? 'Employé'}';
 
   /// Cellules d'une recette à l'écran et au PDF : « dd/mm/AAAA », libellé, « +N FCFA ».
   static List<String> celluleRecette(MouvementRapport m) => [

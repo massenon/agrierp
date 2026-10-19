@@ -78,7 +78,7 @@ void main() {
       ];
 
       expect(coteDart, cotePhp);
-      expect(cotePhp, hasLength(7));
+      expect(cotePhp, hasLength(8), reason: "ticket U13 : les dépenses y entrent");
     });
 
     test('chaque table et chaque colonne de la correspondance existe au poste', () {
@@ -370,7 +370,7 @@ void main() {
       expect(find.byKey(const Key('coherence-sales-2026-10-18')), findsOneWidget);
 
       // Les autres tables, sans aucune ligne d'aucun côté, le disent.
-      expect(find.text('Aucune ligne sur la période, ni au poste ni au serveur.'), findsNWidgets(6));
+      expect(find.text('Aucune ligne sur la période, ni au poste ni au serveur.'), findsNWidgets(7));
       await t.pump(const Duration(seconds: 4)); // toast retiré
     });
 

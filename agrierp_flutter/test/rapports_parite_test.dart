@@ -4,7 +4,10 @@ import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/rapports/rapports_exports_screen.dart';
 import 'package:agrierp/features/rapports/rapports_repository.dart';
+import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/stocks/pmp_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +27,11 @@ import 'php_laravel.dart';
 ///    écritures actives et inactives, comptes 531… et autres comptes de classe 5 ; créances et dettes soldées,
 ///    partielles, sans échéance, hors période, à échéance égale ; catégories inactives ou sans produit, stocks
 ///    négatifs, produits jamais achetés, seuils nuls ; recherches.
+/// 3. 🔴→✅ **Ticket U13 — paie comprise, et la matière vient du VRAI tirage** : les dépenses et la paie que le poste
+///    compte lui sont servies par le vrai `SyncController::pull` (pages S-T4, compte qui lit les rapports) et absorbées
+///    par le vrai [SyncEngine] : dépenses du web, dépense saisie au poste puis ARCHIVÉE au web (le poste la croyait
+///    active), dépense refusée restée au poste, bulletins de paie à la frontière des jours (23 h 30, minuit), bulletin
+///    sans employé (« Paie — Employé »), paie le même jour qu'un achat et qu'une dépense (ordre du tri du web).
 void main() {
   String vue(String nom) =>
       '$dossierLaravel/resources/views/livewire/rapports/$nom.blade.php';
@@ -298,6 +306,30 @@ void main() {
           },
       ];
 
+      // Ticket U13 — la paie réglée : nom accentué, bulletins à la frontière des jours (heure murale du serveur), le
+      // même jour qu'un achat et qu'une dépense, et un bulletin dont l'employé n'existe plus.
+      final employes = [
+        {'id': identifiant(), 'nom': 'HOUNKPÈ', 'prenom': 'Codjo'},
+        {'id': identifiant(), 'nom': 'ADJOVI', 'prenom': 'Élise'},
+      ];
+      final paie = <Map<String, Object?>>[
+        for (final (k, quand) in [
+          '2026-06-30 23:59:59',
+          '2026-07-01 00:00:00',
+          '2026-07-06 10:15:00',
+          '2026-07-06 18:40:00',
+          '2026-07-16 09:00:00',
+          '2026-07-31 23:30:00',
+          '2026-08-01 00:15:00',
+        ].indexed)
+          {
+            'id': identifiant(),
+            'employe': k == 4 ? null : k % 2,
+            'net': montant() + 1000,
+            'created_at': quand,
+          },
+      ];
+
       final comptes = [
         {'id': identifiant(), 'code': '531', 'classe': 5},
         {'id': identifiant(), 'code': '5312', 'classe': 5},
@@ -463,6 +495,8 @@ void main() {
           'ventes': ventes,
           'achats': achats,
           'depenses': depenses,
+          'employes': employes,
+          'paie': paie,
           'comptes': comptes,
           'ecritures': ecritures,
           'creances': creances,
@@ -550,23 +584,45 @@ void main() {
               ),
             );
       }
-      for (final e in depenses) {
-        if (e['actif'] != true) continue;
+      // Ticket U13 — dépenses et paie : par le VRAI tirage du serveur, absorbé par le VRAI moteur. Avant lui, le poste
+      // détient la dépense archivée au web comme il l'avait saisie (active, acquittée), et une dépense REFUSÉE par le
+      // serveur (absente du web) : la première doit sortir du rapport, la seconde ne jamais y entrer.
+      final archivee = depenses.firstWhere((e) => e['actif'] != true);
+      for (final (id, statut, montantLocal) in [
+        (archivee['id']! as String, SyncStatus.synced, archivee['montant']! as double),
+        ('ffffffff-0000-4000-8000-0000000000e1', SyncStatus.conflict, 777777.0),
+      ]) {
         await db
             .into(db.expenses)
             .insert(
               ExpensesCompanion.insert(
-                id: e['id']! as String,
+                id: id,
                 deviceId: 'poste',
+                syncStatus: Value(statut),
                 updatedAt: instant,
-                expenseDate: lire(e['date']! as String),
-                label: e['libelle']! as String,
+                expenseDate: DateTime(2026, 7, 11),
+                label: 'Saisie du poste',
                 category: '628 - Autres charges',
-                amount: e['montant']! as double,
+                amount: montantLocal,
                 treasuryAccountId: 'caisse-0000000000000000000000000000',
               ),
             );
       }
+      final tirage = (sortie['tirage'] as Map).cast<String, dynamic>();
+      final moteur = SyncEngine(
+        database: db,
+        client: Dio()..interceptors.add(_TirageFeint({'server_time': '2026-08-25T13:30:00Z', ...tirage})),
+        deviceId: 'poste-parite',
+        connectivity: _Connectivite(),
+      );
+      // Un absorbeur strict qui refuserait le tirage lèverait ici (`FormatException`).
+      await moteur.synchroniser();
+      expect(
+        (await db.select(db.expenses).get()).length,
+        depenses.length + 1,
+        reason: 'toutes les dépenses du serveur (archivée comprise) + la refusée du poste',
+      );
+      expect(await db.select(db.payslips).get(), hasLength(paie.length));
       for (final c in comptes) {
         await db
             .into(db.chartOfAccounts)
@@ -796,6 +852,20 @@ void main() {
         lignes(rd['recettes']).where((l) => l[1] == 'Vente — Client comptant'),
         isNotEmpty,
       );
+      // Ticket U13 — la paie est dans le total, au jour de son règlement, libellée comme au web.
+      final paieWeb = [
+        for (final l in lignes(rd['depenses']))
+          if (l[1].startsWith('Paie — ')) l,
+      ];
+      expect(paieWeb, hasLength(5), reason: '30/06 23:59:59 et 01/08 00:15 hors période');
+      expect(paieWeb.map((l) => l[1]), contains('Paie — Employé'));
+      expect(paieWeb.map((l) => l[1]), contains('Paie — HOUNKPÈ Codjo'));
+      expect(paieWeb.map((l) => l[0]), contains('31/07/2026'));
+      expect(
+        lignes(rd['depenses']).where((l) => l[1] == 'Saisie du poste'),
+        isEmpty,
+        reason: 'archivée au web, refusée au poste : aucune des deux',
+      );
       final jours = [for (final l in lignes(rd['depenses'])) l[0]];
       expect(
         jours.length - jours.toSet().length,
@@ -879,6 +949,19 @@ foreach ($e['depenses'] as $d) {
         'amount' => $d['montant'], 'treasury_account_id' => $caisse, 'is_active' => $d['actif'], 'created_at' => $t, 'updated_at' => $t,
     ]);
 }
+foreach ($e['employes'] as $x) {
+    app('db')->table('employees')->insert(['id' => $x['id'], 'first_name' => $x['prenom'], 'last_name' => $x['nom'], 'is_active' => true, 'created_at' => $t, 'updated_at' => $t]);
+}
+// Ticket U13 — un bulletin dont l'employé n'existe plus : clé étrangère suspendue le temps de l'écrire.
+app('db')->statement('PRAGMA foreign_keys = OFF');
+foreach ($e['paie'] as $p) {
+    app('db')->table('payslips')->insert([
+        'id' => $p['id'], 'employee_id' => $p['employe'] === null ? '99999999-9999-4999-8999-999999999999' : $e['employes'][$p['employe']]['id'],
+        'period_month' => '2026-07-01', 'gross_salary' => $p['net'] + 3600, 'cnss_deduction' => 3600, 'net_salary' => $p['net'],
+        'created_at' => $p['created_at'], 'updated_at' => $t,
+    ]);
+}
+app('db')->statement('PRAGMA foreign_keys = ON');
 $exercice = (string) Illuminate\Support\Str::uuid();
 app('db')->table('fiscal_years')->insert(['id' => $exercice, 'year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert', 'created_at' => $t, 'updated_at' => $t]);
 foreach ($e['comptes'] as $c) {
@@ -975,6 +1058,24 @@ $au = '2026-07-31';
 $params = ['startDate' => $du, 'endDate' => $au];
 $sortie = [];
 
+// Ticket U13 — le VRAI tirage paginé (S-T4) d'un compte qui lit les rapports : les dépenses et la paie que le poste
+// absorbera, page par page (taille 7 : plusieurs pages).
+$compte = App\Models\User::create(['name' => 'Comptable', 'username' => 'compta-parite', 'email' => 'compta-parite@olouwachegoun.bj', 'password' => 'AgriERP@2026', 'is_active' => true]);
+$tirage = ['expenses' => [], 'payslips' => []];
+$jeton = null;
+$pagesLues = 0;
+do {
+    $requete = Illuminate\Http\Request::create('/api/sync/pull', 'GET', array_filter(['page' => $pagesLues + 1, 'taille' => 7, 'curseur_page' => $jeton]));
+    $requete->setUserResolver(fn () => $compte);
+    $page = app(App\Http\Controllers\Api\SyncController::class)->pull($requete)->getData(true);
+    foreach (['expenses', 'payslips'] as $cle) {
+        $tirage[$cle] = array_merge($tirage[$cle], $page[$cle] ?? []);
+    }
+    $jeton = $page['page_suivante'] ?? null;
+    $pagesLues++;
+} while ($jeton !== null && $pagesLues < 200);
+$sortie['tirage'] = $tirage;
+
 $html = Livewire\Livewire::test(App\Livewire\Rapports\RecettesDepenses::class, $params)->html();
 $t = tableaux($html, 3);
 $sortie['rd'] = ['kpis' => cartes($html), 'recettes' => $t[0], 'depenses' => $t[1], 'csv' => csv(instance(App\Livewire\Rapports\RecettesDepenses::class), $du, $au)];
@@ -995,3 +1096,29 @@ foreach ($e['recherches']['stocks'] as $terme) {
 }
 echo json_encode($sortie, JSON_UNESCAPED_UNICODE);
 ''';
+
+/// Ticket U13 — serveur feint du tirage : rend, en une page, ce que le VRAI tirage du serveur a servi.
+class _TirageFeint extends Interceptor {
+  _TirageFeint(this.corps);
+
+  final Map<String, dynamic> corps;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: options.path.contains('pull') ? corps : const <String, dynamic>{},
+      ),
+    );
+  }
+}
+
+class _Connectivite implements Connectivity {
+  @override
+  Future<List<ConnectivityResult>> checkConnectivity() async => [ConnectivityResult.wifi];
+
+  @override
+  Stream<List<ConnectivityResult>> get onConnectivityChanged => const Stream.empty();
+}

@@ -60,18 +60,23 @@ class DepensesRepository {
     )..orderBy([(t) => OrderingTerm(expression: t.label)])).get();
   }
 
-  /// Dépenses saisies **sur ce poste**, la plus récente d'abord.
+  /// Dépenses de l'exploitation, la plus récente d'abord (`SaisieDepenses::getExpensesProperty()` du web :
+  /// `where('is_active', true)->orderByDesc('expense_date')`).
   ///
-  /// ⚠️ CE N'EST PAS LA LISTE DE L'EXPLOITATION. Le contrat de synchronisation
-  /// ne redescend pas les dépenses du serveur : le poste ne connaît que les
-  /// siennes. L'écran doit le dire, sinon la liste se lit comme un état
-  /// complet et une dépense saisie ailleurs paraîtra manquante.
+  /// 🔴→✅ Ticket U13 — les dépenses du serveur DESCENDENT au poste (web et autres postes, archivage compris) : la
+  /// liste est celle de l'exploitation, comme au web, plus les saisies de ce poste pas encore acquittées. Une dépense
+  /// ARCHIVÉE au web n'y figure plus. Une saisie REFUSÉE (`conflict`) reste listée : c'est ici qu'elle se voit.
   Future<List<Expense>> mesDepenses() {
-    return (_db.select(_db.expenses)..orderBy([
-          (t) =>
-              OrderingTerm(expression: t.expenseDate, mode: OrderingMode.desc),
-          (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-        ]))
+    return (_db.select(_db.expenses)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.expenseDate,
+              mode: OrderingMode.desc,
+            ),
+            (t) =>
+                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
+          ]))
         .get();
   }
 
@@ -141,11 +146,11 @@ class DepensesRepository {
     )..where((t) => t.id.equals(id))).getSingle();
   }
 
-  /// Total des dépenses saisies sur ce poste pour le mois d'une date donnée.
+  /// « Dépenses du mois » du web (`SaisieDepenses::getKpisProperty()` : dépenses ACTIVES dont `expense_date` tombe
+  /// dans le mois et l'année de [quand]).
   ///
-  /// ⚠️ « DU POSTE », PAS « DU MOIS DE L'EXPLOITATION » — même raison que
-  /// [mesDepenses] : les dépenses saisies sur le web ou sur un autre poste n'y
-  /// figurent pas.
+  /// 🔴→✅ Ticket U13 — l'exploitation entière (les dépenses du serveur descendent), archivées exclues. Règle U8 : une
+  /// saisie en attente d'envoi compte (elle part vers le web), une saisie REFUSÉE (`conflict`) n'existe pas au web.
   Future<double> totalDuMois(DateTime quand) async {
     final debut = DateTime(quand.year, quand.month, 1);
     final finExclue = DateTime(quand.year, quand.month + 1, 1);
@@ -154,7 +159,9 @@ class DepensesRepository {
         await (_db.select(_db.expenses)..where(
               (t) =>
                   t.expenseDate.isBiggerOrEqualValue(debut) &
-                  t.expenseDate.isSmallerThanValue(finExclue),
+                  t.expenseDate.isSmallerThanValue(finExclue) &
+                  t.isActive.equals(true) &
+                  t.syncStatus.equalsValue(SyncStatus.conflict).not(),
             ))
             .get();
 

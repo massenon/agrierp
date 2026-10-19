@@ -735,7 +735,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
                       ))
                         ApercuNotification(
                           message: n.message,
-                          dateTexte: n.dateTexte,
+                          // Ticket U13 — « il y a … » comme la cloche du web (`diffForHumans`), à l'heure du Bénin.
+                          dateTexte: n.dateRelative(instantane.data!.$2.maintenant),
                           lue: n.lue,
                           critique: n.gravite == 'critique',
                         ),

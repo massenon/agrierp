@@ -130,6 +130,8 @@ class SyncController extends Controller
         'growth_standards',
         // Ticket U9 — grand livre des stocks : lecture seule au poste.
         'stock_movements',
+        // Ticket U13 — paie réglée : lecture seule au poste (Recettes et Dépenses).
+        'payslips',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -232,6 +234,17 @@ class SyncController extends Controller
         'stock_movements' => ['view-elevage', 'view-stocks', 'view-rapports'],
         'treasury_accounts' => null,
         'expense_categories' => ['view-achats'],
+        // Ticket U13 — DÉPENSES : de BASE, comme les achats. Le Tableau de bord (ouvert aux quatre rôles) les liste au
+        // web (« Dépenses récentes » : `Expense::where('is_active', true)->latest('expense_date')`) ; le rapport
+        // « Recettes et Dépenses » les compte. Libellé, compte de charge, montant, date, compte payeur, archivage :
+        // rien qu'un compte connecté ne voie déjà au web.
+        'expenses' => null,
+        // Ticket U13 — PAIE RÉGLÉE : aux seuls comptes qui lisent les RAPPORTS (`view-rapports`, la permission de la
+        // route du hub où « Recettes et Dépenses » l'affiche). ⚠️ Protection S3 des salaires : ni `view-rh` (le poste
+        // n'affiche aucun bulletin : les cartes de la paie y sont des « — »), ni base ; et seulement ce que le rapport
+        // affiche au web à ces mêmes comptes (instant du règlement, nom de l'employé, NET versé) — jamais le brut, les
+        // retenues, les charges patronales ni la période (voir [famillesPaginees]).
+        'payslips' => ['view-rapports'],
     ];
 
     /**
@@ -265,7 +278,8 @@ class SyncController extends Controller
      *  - la PAGE 1 porte toutes les tables NON paginées (référentiels, tables servies en entier : leur sémantique de
      *    remplacement complet est gardée, elles ne se découpent jamais), `data_reset_at` et `tables_servies` ;
      *  - les tables d'HISTORIQUE ([famillesPaginees] : fiches, transferts, soins, infirmerie, calendrier, cycles,
-     *    achats + lignes + retours, ventes + lignes, grand livre des stocks, journal comptable + lignes) se découpent
+     *    achats + lignes + retours, ventes + lignes, dépenses et paie (U13), grand livre des stocks, journal
+     *    comptable + lignes) se découpent
      *    PAR PIÈCE, au curseur composite (`updated_at`, `id`) : une pièce descend avec TOUTES ses lignes (U4, U8 :
      *    l'absorbeur strict du poste refuserait une ligne d'une pièce non servie) ;
      *  - `server_time` (instant du DÉBUT de la page 1, reculé de l'horizon) et `accounting_entry_ids` ne viennent
@@ -1521,6 +1535,68 @@ class SyncController extends Controller
                 ],
             ],
             [
+                // 🔴→✅ TICKET U13 — LES DÉPENSES DESCENDENT AU POSTE, AVEC LEUR ARCHIVAGE.
+                //
+                // `expenses` n'était au poste qu'une table de SAISIE (envoyée, jamais tirée) : son « Recettes et
+                // Dépenses » ignorait les dépenses saisies au web ou sur un autre poste, et comptait encore une dépense
+                // de ce poste archivée ensuite au web (`SaisieDepenses::archiveExpense()` : montant réintégré, charge
+                // contre-passée). Table d'HISTORIQUE (une ligne par dépense, sans lignes) : paginée par pièce au
+                // curseur (`updated_at`, `id`), comme les soins.
+                //
+                // ⚠️ TIRAGE COMPLET : TOUTES LES DÉPENSES, ARCHIVÉES COMPRISES (contrairement aux soins, actifs seuls).
+                // Un poste DÉJÀ EN SERVICE repart d'un tirage complet (règle du périmètre S-T4, ou resynchronisation
+                // unique `depenses_resync_u13`) avec, en base, des dépenses qu'il a lui-même saisies et fait acquitter :
+                // si l'une a été archivée au web depuis, seul ce tirage complet peut le lui dire. Volume : une ligne
+                // par dépense, de quelques champs. Tirage incrémental : toute dépense créée, modifiée ou archivée
+                // depuis `since`.
+                //
+                // ⚠️ `expense_date` en 'Y-m-d' (une DATE : jamais un instant, piège de l'échéance 14.75) ; `amount` tel
+                // que stocké ; `is_active` ; `updated_at` (instant ISO) pour le poste. Le justificatif ne descend pas
+                // (aucun fichier ne voyage). Le poste ne remplace jamais une dépense qu'il a en attente ou en conflit.
+                'cle' => 'expenses',
+                'requete' => fn () => \App\Models\Expense::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active',
+                        'updated_at']),
+                'historique' => fn ($q) => $q->orderBy('expense_date')->orderBy('id'),
+                'enJson' => fn (\App\Models\Expense $d) => [
+                    'id' => $d->id,
+                    'expense_date' => $d->expense_date?->format('Y-m-d'),
+                    'label' => $d->label,
+                    'category' => $d->category,
+                    'amount' => (float) $d->amount,
+                    'treasury_account_id' => $d->treasury_account_id,
+                    'is_active' => (bool) $d->is_active,
+                    'updated_at' => $d->updated_at?->toIso8601String(),
+                ],
+            ],
+            [
+                // 🔴→✅ TICKET U13 — LA PAIE RÉGLÉE DESCEND AU POSTE, RÉDUITE À CE QUE LE RAPPORT LIT.
+                //
+                // `RecettesDepenses::depensesRows()` compte la paie (`payslips`) dans les sorties : le poste, qui ne
+                // l'avait pas, donnait un total des dépenses faux. ⚠️⚠️ SALAIRES (ticket S3) : seules les colonnes du
+                // calcul du web descendent — l'instant du règlement (`created_at`, en HEURE MURALE du serveur
+                // 'Y-m-d H:i:s' : le rapport prend son JOUR, `toDateString()`), le NOM de l'employé (« Nom Prénom »,
+                // `null` sans employé) et le NET versé. Jamais le brut, les retenues (CNSS, ITS, absences), les charges
+                // patronales, la période ni l'identifiant de l'employé ; servie aux seuls comptes `view-rapports` (voir
+                // [PERMISSIONS_DE_TIRAGE]). Table d'historique (un bulletin par employé et par mois, jamais modifié) :
+                // paginée par pièce au curseur. ⚠️ Le NOM est celui de l'employé AUJOURD'HUI (le web le lit par la
+                // relation) : un bulletin dont l'employé a été modifié depuis `since` redescend aussi.
+                'cle' => 'payslips',
+                'requete' => fn () => \App\Models\Payslip::query()
+                    ->with('employee:id,first_name,last_name')
+                    ->when($since, fn ($q) => $q->where(fn ($w) => $w->where('updated_at', '>', $since)
+                        ->orWhereHas('employee', fn ($e) => $e->where('updated_at', '>', $since))))
+                    ->select(['id', 'employee_id', 'net_salary', 'created_at', 'updated_at']),
+                'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
+                'enJson' => fn (\App\Models\Payslip $p) => [
+                    'id' => $p->id,
+                    'employee_name' => $p->employee === null ? null : $p->employee->last_name.' '.$p->employee->first_name,
+                    'net_salary' => (float) $p->net_salary,
+                    'created_at' => $p->created_at?->format('Y-m-d H:i:s'),
+                ],
+            ],
+            [
                 // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
                 //
                 // Trois écrans du web le lisent et le poste ne pouvait pas les reproduire : « Rotation du Stock »
@@ -1723,6 +1799,18 @@ class SyncController extends Controller
             app(FacturationMecefService::class)->facturer($venteRecue);
         }
 
+        // 🔴→✅ Ticket U13 — ALERTE D'AUTONOMIE ALIMENTAIRE des fiches saisies au poste, comme `saveDay()` au web : APRÈS
+        // la validation de l'envoi (comme le web après sa transaction ; un envoi rejoué sur interblocage ne la lève donc
+        // qu'une fois), avec les mêmes règles et le même dédoublonnage (`AlerteAutonomieFicheService`). Un échec de la
+        // cloche ne fait pas échouer un envoi déjà enregistré : il est signalé au journal des erreurs.
+        foreach (array_unique($this->fichesSaisiesAuPoste) as $ficheId) {
+            try {
+                app(\App\Services\AlerteAutonomieFicheService::class)->apresFicheDuPoste($ficheId);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         foreach ($refusParRole as $table => $refus) {
             $result[$table]['rejected'] = array_merge($result[$table]['rejected'], $refus);
         }
@@ -1745,6 +1833,7 @@ class SyncController extends Controller
     {
         $this->fichesPortantLesVentes = [];
         $this->ventesAFacturer = [];
+        $this->fichesSaisiesAuPoste = [];
 
         $result = [
             'cles_invalides' => $clesInvalides,
@@ -1811,6 +1900,8 @@ class SyncController extends Controller
             // Ticket U9 — le grand livre des stocks est écrit par le serveur seul (`AdjustStockAction`) : un poste
             // envoie ses ajustements dans `stock_adjustments`, jamais un mouvement.
             'stock_movements',
+            // Ticket U13 — la paie se règle au web seul (`GestionPaie::validerReglement`) : servie en lecture seule.
+            'payslips',
         ] as $referentialTable) {
             if ($request->has($referentialTable)) {
                 $result['referentiels_ignored'] += count($request->input($referentialTable));
@@ -2357,6 +2448,7 @@ class SyncController extends Controller
         $entries = array_values($entries);
         $issues = [];
         $cascades = [];
+        $saisieDeLEleveur = [];
 
         // Ordre de traitement : (bande, jour, rang d'envoi). Les éléments illisibles passent en tête et échoueront
         // à la validation, comme avant.
@@ -2430,6 +2522,10 @@ class SyncController extends Controller
                     'vente_sexe' => ['nullable', 'in:M,F,Mixte'],
                     'vente_montant' => ['nullable', 'numeric', 'min:0'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                // Ticket U13 — une SAISIE de l'éleveur (voir [fichesSaisiesAuPoste]) ?
+                $saisieDeLEleveur[$rang] = ! $venteSeulement
+                    && (($validated['feed_qty_kg'] ?? null) !== null || $this->modifieAutreChoseQueLaVente($validated, null));
 
                 // ⚠️ 'id' n'est PAS dans $fillable de LivestockDailyEntry
                 // (comme la quasi-totalité des modèles de ce projet — id
@@ -2637,11 +2733,14 @@ class SyncController extends Controller
         $accepted = [];
         $rejected = [];
         $merged = [];
-        foreach ($issues as $issue) {
+        foreach ($issues as $rang => $issue) {
             if (isset($issue['ok'])) {
                 $accepted[] = $issue['ok'];
                 if (isset($issue['fusion'])) {
                     $merged[] = ['id' => $issue['ok'], 'id_serveur' => $issue['fusion'], 'motif' => MotifsRefusPush::ficheFusionnee()];
+                }
+                if ($saisieDeLEleveur[$rang] ?? false) {
+                    $this->fichesSaisiesAuPoste[] = $issue['fusion'] ?? $issue['ok'];
                 }
             } else {
                 $rejected[] = $issue['ko'];
@@ -2667,6 +2766,17 @@ class SyncController extends Controller
      * @var array<int, string>
      */
     private array $ventesAFacturer = [];
+
+    /**
+     * Ticket U13 — identifiants (au SERVEUR : celui de la fiche occupante après une fusion S-T9) des fiches ACCEPTÉES
+     * de cet envoi qui sont une SAISIE de l'éleveur — l'équivalent d'un `saveDay()` du web : compte `manage-elevage`
+     * (la permission de `saveDay`) et fiche qui porte une provende (`feed_qty_kg`, que la fiche du poste écrit comme
+     * celle du web) ou un mouvement d'élevage. Une fiche née d'une vente au comptoir n'en est pas (la caisse du web ne
+     * lève pas l'alerte), ni une fiche réduite à son identité (F0.90).
+     *
+     * @var list<string>
+     */
+    private array $fichesSaisiesAuPoste = [];
 
     /**
      * Ticket S-T9 — FUSION de la fiche d'un poste dans [occupante], la fiche que le serveur tient déjà pour la même

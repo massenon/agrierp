@@ -65,6 +65,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   43: [d.growthStandards],
   // Ticket U9 — grand livre des stocks du serveur, en lecture seule.
   44: [d.stockMovements],
+  // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
+  47: [d.payslips],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -198,6 +200,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket S-T10 — quantité comptée d'un inventaire.
   46: [(d.stockAdjustments, d.stockAdjustments.countedQuantity)],
+  // Ticket U13 — archivage des dépenses, descendu du serveur.
+  47: [(d.expenses, d.expenses.isActive)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

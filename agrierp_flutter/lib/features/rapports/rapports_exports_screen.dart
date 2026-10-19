@@ -485,14 +485,8 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           const SizedBox(height: AgriSpacing.md),
           depenses,
         ],
-        const SizedBox(height: AgriSpacing.md),
-        // ⚠️ ÉCART (plateforme) — la paie et les dépenses saisies ailleurs ne descendent pas au poste : le calcul est
-        // celui du web, sa matière celle que le poste détient ; le dire vaut mieux qu'un total muet.
-        _mentionPoste(
-          'Dépenses : ce poste détient les achats de la ferme et les dépenses saisies sur CE poste. La paie et les '
-          'dépenses saisies sur le web ou sur un autre poste ne descendent pas encore : le total complet se lit sur '
-          'le web.',
-        ),
+        // Ticket U13 — plus de mention « ⚠️ ÉCART » : la paie et les dépenses saisies au web ou sur un autre poste
+        // descendent au poste, le total est celui du web (parité exécutée, `rapports_parite_test.dart`).
       ],
     );
   }
@@ -1557,35 +1551,6 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           ],
         ),
       ),
-    ),
-  );
-
-  /// ⚠️ ÉCART — mention propre au poste (absente du web) : dit ce que le poste ne détient pas.
-  Widget _mentionPoste(String texte) => Container(
-    key: const Key('mention-poste'),
-    padding: const EdgeInsets.all(AgriSpacing.sm),
-    decoration: BoxDecoration(
-      color: AgriColors.accentYellow.withValues(alpha: 0.10),
-      border: Border.all(
-        color: AgriColors.accentYellow.withValues(alpha: 0.30),
-      ),
-      borderRadius: BorderRadius.circular(AgriRadius.lg),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
-        const SizedBox(width: AgriSpacing.sm),
-        Expanded(
-          child: Text(
-            texte,
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.brandForest,
-            ),
-          ),
-        ),
-      ],
     ),
   );
 }

@@ -24,6 +24,7 @@ import 'package:agrierp/features/elevage/soins_repository.dart';
 import 'package:agrierp/features/elevage/soins_vaccins_repository.dart';
 import 'package:agrierp/features/elevage/suivi_reproduction_repository.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
+import 'package:agrierp/features/rapports/rapports_repository.dart';
 import 'package:agrierp/features/stocks/produits_repository.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
 import 'package:agrierp/features/sync/coherence_repository.dart';
@@ -66,6 +67,11 @@ import 'coffre_memoire.dart';
 /// réinitialisation des données au web en fin d'essai (15.50). Invariants ajoutés : dettes, créances, avances et
 /// créances sur fournisseurs justes au centime (métier = grand livre), trésorerie concordante dans les DEUX livres,
 /// dépenses comptabilisées une fois, aucun refus inattendu.
+///
+/// Ticket U13 — LA PAIE ET LES DÉPENSES DESCENDENT : le web règle une paie (Gestion de la Paie) et archive une dépense
+/// saisie à un poste (Saisie des Dépenses) ; à la fin, le « Recettes et Dépenses » de CHAQUE poste qui ouvre les
+/// rapports (bureau, comptabilité) doit être celui du web sur la même période — totaux ET lignes (date, libellé,
+/// montant), paie comprise — et la dépense archivée doit l'être sur chaque poste qui la détient.
 ///
 /// Rejouer : `outils/essai_multipostes.sh <graine>`. ⚠️ Le rejeu est fidèle pour les décisions de coupure de CHAQUE
 /// poste (une suite aléatoire par poste, tirée dans l'ordre de ses propres requêtes) ; l'entrelacement des cinq postes
@@ -492,6 +498,13 @@ class _Essai {
   final enAttenteFin = <String, Map<String, int>>{};
   final webRecu = <String, List<String>>{};
 
+  /// Ticket U13 — la paie réglée au web, la dépense d'un poste archivée au web, et pour chaque poste qui ouvre les
+  /// rapports, ce que son « Recettes et Dépenses » diffère de celui du web (vide : identique).
+  String? paieWeb;
+  String? depenseArchiveeWeb;
+  final recettesDepenses = <String, List<String>>{};
+  Map<String, dynamic> recettesDepensesWeb = {};
+
   void journaliser(String ligne) {
     final t = DateTime.now().difference(debut);
     _journal.add('[${(t.inMilliseconds / 1000).toStringAsFixed(1).padLeft(6)} s] $ligne');
@@ -629,6 +642,9 @@ class _Essai {
     for (final p in postes) {
       await _jusquAAboutir(p, 'tirage final, après la demande du web');
     }
+
+    // ── Ticket U13 : « Recettes et Dépenses » de chaque poste = celui du web, sur la fenêtre de l'essai ────────────
+    await _comparerRecettesDepenses(HeureBenin.plusJours(aujourdHui, -(jours + 2)), aujourdHui);
 
     // ── Relevés ──────────────────────────────────────────────────────────────────────────────────────────────
     final depuis = HeureBenin.plusJours(aujourdHui, -(jours + 2));
@@ -1319,6 +1335,73 @@ class _Essai {
       grammesWeb = r['grammes'] as int;
       evenement('Web : ration aviculture portée à 777 g/jour (Paramètres Élevage)');
     }
+    if (d == 3) {
+      // Ticket U13 — la paie réglée au web descend aux postes qui lisent les rapports.
+      final r = await _serveur(['paie-web']);
+      paieWeb = r['bulletin'] as String;
+      evenement('Web : paie de ${r['employe']} réglée (${r['net']} F net) — ${r['bulletin']}');
+    }
+    if (d == 4) {
+      // Ticket U13 — une dépense saisie à un poste et déjà reçue est ARCHIVÉE au web : elle doit sortir du rapport de
+      // chaque poste (le poste qui l'a saisie la croit active jusqu'au tirage suivant).
+      final candidates = [for (final p in postes) ...?p.saisies['expenses']];
+      final r = await _serveur(['archiver-depense', jsonEncode(candidates)]);
+      depenseArchiveeWeb = r['depense'] as String?;
+      evenement(depenseArchiveeWeb == null
+          ? 'Web : aucune dépense des postes encore reçue à archiver'
+          : 'Web : dépense ${r['depense']} (${r['montant']} F) archivée (Saisie des Dépenses)');
+    }
+  }
+
+  /// Ticket U13 — « Recettes et Dépenses » de chaque poste qui ouvre les rapports (son périmètre de tirage porte la
+  /// paie : `view-rapports`) = celui du web, sur la fenêtre de l'essai : totaux et lignes de dépenses (date, libellé,
+  /// montant, dans l'ordre), lignes de recettes ; et la dépense archivée au web l'est sur chaque poste qui la détient.
+  Future<void> _comparerRecettesDepenses(DateTime du, DateTime au) async {
+    recettesDepensesWeb = await _serveur(['recettes-depenses', _jourIso(du), _jourIso(au)]);
+    final web = recettesDepensesWeb;
+    String m(num v) => v.toDouble().toStringAsFixed(2);
+    List<String> lignesWeb(String cle) => [
+      for (final l in (web[cle] as List).cast<Map<String, dynamic>>())
+        '${l['date']} | ${l['libelle']} | ${m(l['montant'] as num)}',
+    ];
+    for (final p in postes) {
+      final ecarts = <String>[];
+      final archivee = depenseArchiveeWeb;
+      if (archivee != null) {
+        final locale = await (p.db.select(p.db.expenses)..where((t) => t.id.equals(archivee))).getSingleOrNull();
+        if (locale != null && locale.isActive) ecarts.add('dépense $archivee archivée au web, encore active au poste');
+      }
+      final perimetre = await PerimetreTirage.lire(p.db) ?? const <String>{};
+      if (!perimetre.contains('payslips')) {
+        if (ecarts.isNotEmpty) recettesDepenses[p.nom] = ecarts;
+        continue;
+      }
+      final d = await RapportsRepository(database: p.db).charger(du: du, au: au);
+      for (final (quoi, poste, serveur) in [
+        ('recettes', d.totalRecettes, web['recettes'] as num),
+        ('dépenses', d.totalDepenses, web['depenses'] as num),
+        ('solde', d.soldeNet, web['solde'] as num),
+      ]) {
+        if (m(poste) != m(serveur)) ecarts.add('total des $quoi : poste ${m(poste)}, web ${m(serveur)}');
+      }
+      String ligne(MouvementRapport x) => '${RapportsRepository.date(x.date)} | ${x.libelle} | ${m(x.montant)}';
+      for (final (quoi, poste, serveur) in [
+        ('dépenses', [for (final x in d.depenses) ligne(x)], lignesWeb('lignes_depenses')),
+        ('recettes', [for (final x in d.recettes) ligne(x)], lignesWeb('lignes_recettes')),
+      ]) {
+        if (poste.join('\n') != serveur.join('\n')) {
+          ecarts.add('lignes de $quoi : poste ${poste.length}, web ${serveur.length} — '
+              'poste seul ${poste.where((l) => !serveur.contains(l)).toList()}, '
+              'web seul ${serveur.where((l) => !poste.contains(l)).toList()}');
+        }
+      }
+      if (paieWeb != null && !lignesWeb('lignes_depenses').any((l) => l.contains('Paie — '))) {
+        ecarts.add('la paie réglée au web ($paieWeb) n\'est pas dans le rapport du web : période mal choisie');
+      }
+      recettesDepenses[p.nom] = ecarts;
+      journaliser('${p.nom} : Recettes et Dépenses — poste ${m(d.totalRecettes)} / ${m(d.totalDepenses)}, '
+          'web ${m(web['recettes'] as num)} / ${m(web['depenses'] as num)}${ecarts.isEmpty ? '' : ' — ÉCARTS $ecarts'}');
+    }
   }
 
   /// Ticket S-T6 — le web demande au poste-bureau de se synchroniser ; sa session ne fait rien d'autre qu'interroger le
@@ -1528,6 +1611,21 @@ class _Essai {
       expect(ecartsInexpliques[p.nom] ?? const [], isEmpty,
           reason: '${p.nom} : le contrôle de cohérence S-T6 montre des écarts : ${ecartsInexpliques[p.nom]}');
       expect(webRecu[p.nom], isEmpty, reason: '${p.nom} : écritures du web non reçues : ${webRecu[p.nom]}');
+    }
+
+    // Ticket U13 — « Recettes et Dépenses » : chaque poste qui ouvre les rapports a le total et les lignes du web.
+    expect(paieWeb, isNotNull, reason: 'la paie du web n\'a pas été réglée');
+    expect(depenseArchiveeWeb, isNotNull, reason: 'aucune dépense des postes n\'a pu être archivée au web');
+    expect(
+      [for (final p in postes) if ((recettesDepenses[p.nom] ?? const []).isEmpty && recettesDepenses.containsKey(p.nom)) p.nom],
+      containsAll([bureau.nom, compta.nom]),
+      reason: 'Recettes et Dépenses comparé au web pour le bureau et la comptabilité : ${{
+        for (final e in recettesDepenses.entries) e.key: e.value,
+      }}',
+    );
+    for (final p in postes) {
+      expect(recettesDepenses[p.nom] ?? const [], isEmpty,
+          reason: '${p.nom} : « Recettes et Dépenses » différent du web : ${recettesDepenses[p.nom]}');
     }
 
     // Aucune saisie perdue, aucune en double : chaque identifiant saisi sur un poste existe UNE fois au serveur —
@@ -1756,8 +1854,19 @@ class _Essai {
       for (final e in p.erreursInattendues) {
         b.writeln('    ERREUR INATTENDUE : $e');
       }
+      if (recettesDepenses.containsKey(p.nom)) {
+        final e = recettesDepenses[p.nom]!;
+        b.writeln('    Recettes et Dépenses (U13) : ${e.isEmpty ? 'identique au web' : 'ÉCARTS $e'}');
+      }
     }
     b.writeln();
+    if (recettesDepensesWeb.isNotEmpty) {
+      final w = recettesDepensesWeb;
+      b.writeln('RECETTES ET DÉPENSES DU WEB (U13), du ${w['du']} au ${w['au']} : recettes ${w['recettes']}, '
+          'dépenses ${w['depenses']} (dont ${(w['lignes_depenses'] as List).where((l) => '${(l as Map)['libelle']}'.startsWith('Paie — ')).length} '
+          'ligne(s) de paie), solde ${w['solde']} ; paie réglée au web : $paieWeb ; dépense archivée au web : $depenseArchiveeWeb');
+      b.writeln();
+    }
     final compte = inventaireCompte;
     if (compte != null) {
       b.writeln('INVENTAIRE COMPTÉ (S-T10, S-T12) : ${compte.nom}, attendu ${compte.attendu} '

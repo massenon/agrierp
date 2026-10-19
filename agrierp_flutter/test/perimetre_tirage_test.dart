@@ -22,7 +22,8 @@ import 'chemins_depot.dart';
 /// ⚠️ L'analyse par imports SUR-APPROXIME (un dépôt importé est compté en entier) : elle peut exiger une table de
 /// trop, jamais en oublier une — c'est le sens prudent.
 ///
-/// Les tables propres au poste (saisies jamais tirées : dépenses, ajustements, imputations…) sont listées ici ; toute
+/// Les tables propres au poste (saisies jamais tirées : ajustements, imputations… ; les dépenses sont tirées depuis
+/// U13) sont listées ici ; toute
 /// table Drift doit être soit tirée, soit dans cette liste : une table ajoutée au schéma impose une décision.
 void main() {
   final php = File(
@@ -87,12 +88,14 @@ void main() {
     'stock_movements': 'stock_movements',
     'treasury_accounts': 'treasury_accounts',
     'expense_categories': 'expense_categories',
+    // Ticket U13 — dépenses (table mixte : saisies au poste ET tirées) et paie réglée (lecture seule).
+    'expenses': 'expenses',
+    'payslips': 'payslips',
   };
 
   /// Tables Drift propres au poste : saisies envoyées mais jamais tirées, file, réglages.
   const tablesLocales = {
     'stock_adjustments',
-    'expenses',
     'advance_imputations',
     'supplier_payments',
     'supplier_refunds',

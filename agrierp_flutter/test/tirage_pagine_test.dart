@@ -193,6 +193,7 @@ void main() {
       SyncEngine.cleLignesResync,
       SyncEngine.cleRetoursResync,
       SyncEngine.cleMouvementsResync,
+      SyncEngine.cleDepensesResync,
     ]) {
       await db
           .into(db.appSettings)
@@ -514,7 +515,7 @@ void main() {
 
       // Périmètre inconnu : toutes les tables sont contrôlées, comme avant S-T4.
       await PerimetreTirage.effacer(db);
-      expect((await controle.verifier()).tables, hasLength(7));
+      expect((await controle.verifier()).tables, hasLength(8)); // U13 : les dépenses y entrent
     },
   );
 

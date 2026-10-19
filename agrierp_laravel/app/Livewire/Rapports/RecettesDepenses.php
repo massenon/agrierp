@@ -89,15 +89,26 @@ class RecettesDepenses extends Component
             ->get()
             ->map(fn ($e) => ['date' => $e->expense_date, 'label' => $e->label, 'amount' => (float) $e->amount]);
 
+        // 🔴→✅ Ticket U13 — LIBELLÉ « Paie — Employé » ENFIN ATTEIGNABLE. En PHP, `.` lie plus fort que `??` :
+        // `'Paie — '.($nom.' '.$prenom ?? 'Employé')` concaténait d'abord (une chaîne, jamais `null`), et un bulletin
+        // sans employé sortait « Paie —   » (deux espaces). Le repli s'applique désormais quand l'employé manque.
         $payslips = Payslip::with('employee')
             ->whereDate('created_at', '>=', $this->startDate)
             ->whereDate('created_at', '<=', $this->endDate)
             ->orderBy('id')
             ->get()
-            ->map(fn ($p) => ['date' => $p->created_at->toDateString(), 'label' => 'Paie — '.($p->employee?->last_name.' '.$p->employee?->first_name ?? 'Employé'), 'amount' => (float) $p->net_salary]);
+            ->map(fn ($p) => ['date' => $p->created_at->toDateString(), 'label' => self::libellePaie($p), 'amount' => (float) $p->net_salary]);
 
         return $purchases->concat($expenses)->concat($payslips)
             ->sortByDesc('date')->values()->all();
+    }
+
+    /** Ticket U13 — « Paie — {Nom Prénom} », « Paie — Employé » sans employé (même règle au poste). */
+    public static function libellePaie(Payslip $bulletin): string
+    {
+        $employe = $bulletin->employee;
+
+        return 'Paie — '.($employe === null ? 'Employé' : $employe->last_name.' '.$employe->first_name);
     }
 
     public function getRecettesProperty()

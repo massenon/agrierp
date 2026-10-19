@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
+import '../../core/temps/duree_relative.dart';
 import '../../core/temps/heure_benin.dart';
 
 /// Échec d'une action sur une notification, porteur d'une phrase lisible.
@@ -123,6 +124,15 @@ class LigneNotification {
         '${deux(d.hour)}:${deux(d.minute)}';
   }
 
+  /// Ticket U13 — « il y a 5 minutes » : le rendu de la CLOCHE du web (`$notif->created_at->diffForHumans()`, Carbon
+  /// en français, à l'heure du Bénin), vu depuis [maintenant] (un instant) ; « — » sans date. Le Centre de
+  /// notifications garde, comme au web, la date « jj/mm/AAAA - HH:mm » ([dateTexte]).
+  String dateRelative(DateTime maintenant) {
+    final instant = date;
+    if (instant == null) return '—';
+    return DureeRelative.depuis(instant, maintenant: maintenant);
+  }
+
   String get graviteLibelle => switch (gravite) {
     'critique' => 'Critique',
     'moyen' => 'Moyen',
@@ -185,7 +195,7 @@ class NotificationsRepository {
             .get();
 
     return DonneesNotifications(
-      maintenant: maintenant ?? DateTime.now(),
+      maintenant: maintenant ?? HeureBenin.horloge(),
       lignes: [
         for (final n in brutes)
           LigneNotification(

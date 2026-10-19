@@ -22,11 +22,10 @@ use Illuminate\Support\Facades\DB;
  *  - `montant` : colonne sommée ; `filtre` : condition `[colonne, opérateur, valeur]` ou `null`.
  *
  * ⚠️ SEULES LES TABLES DONT LE POSTE TIENT UN MIROIR COMPLET y figurent : envoyées ET tirées en entier (ventes, achats,
- * fiches, soins, avances, transferts), ou tirées en lecture seule (le grand livre des stocks, qui porte les
+ * fiches, soins, avances, transferts, dépenses), ou tirées en lecture seule (le grand livre des stocks, qui porte les
  * ajustements d'inventaire rejoués des postes). Pour elles, poste et serveur doivent avoir les mêmes lignes.
- * **Les dépenses n'y sont pas** : elles ne descendent pas au poste, qui n'a donc que les siennes quand le serveur a
- * celles du web et des autres postes — l'écart serait permanent et ne dirait rien. Les y faire entrer suppose de les
- * servir au tirage, ou de dater leur origine (`device_id`) au serveur : ticket à part.
+ * Ticket U13 — **les dépenses y entrent** : elles descendent désormais au poste (web et autres postes, archivage
+ * compris) ; seules les ACTIVES sont comptées (une dépense archivée n'est plus une dépense).
  */
 class CoherenceSynchronisationService
 {
@@ -41,6 +40,7 @@ class CoherenceSynchronisationService
         'customer_advances' => ['libelle' => 'Avances clients', 'jour' => ['advance_date'], 'montant' => 'amount', 'filtre' => ['is_active', '=', 1]],
         'livestock_transfers' => ['libelle' => 'Transferts entre bandes (sujets)', 'jour' => ['transfer_date'], 'montant' => 'quantity', 'filtre' => ['is_active', '=', 1]],
         'stock_movements' => ['libelle' => 'Mouvements de stock, ajustements compris (quantités)', 'jour' => ['movement_date'], 'montant' => 'quantity', 'filtre' => null],
+        'expenses' => ['libelle' => 'Dépenses', 'jour' => ['expense_date'], 'montant' => 'amount', 'filtre' => ['is_active', '=', 1]],
     ];
 
     /** Fenêtre maximale d'un contrôle : au-delà, la réponse grossit sans servir (un contrôle regarde le récent). */

@@ -228,6 +228,7 @@ void main() {
       SyncEngine.cleRetoursResync,
       SyncEngine.cleMouvementsResync,
       SyncEngine.cleFichesResyncU10,
+      SyncEngine.cleDepensesResync,
     ]) {
       await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: cle, value: '1'));
     }

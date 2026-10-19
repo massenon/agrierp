@@ -6,8 +6,8 @@
 /// entrée par entrée : table, libellé, colonnes du jour, colonne du montant, filtre. Une définition qui ne serait
 /// changée que d'un côté ferait apparaître des écarts qui n'existent pas — ou en cacherait de vrais.
 ///
-/// Seules les tables dont le poste tient un MIROIR COMPLET y figurent (voir le PHP) : les dépenses, qui ne
-/// descendent pas au poste, n'y sont pas.
+/// Seules les tables dont le poste tient un MIROIR COMPLET y figurent (voir le PHP). Ticket U13 : les dépenses y
+/// entrent, elles descendent désormais au poste (actives seules).
 class AgregatCoherence {
   const AgregatCoherence({
     required this.table,
@@ -83,6 +83,13 @@ class AgregatsCoherence {
       libelle: 'Mouvements de stock, ajustements compris (quantités)',
       jour: ['movement_date'],
       montant: 'quantity',
+    ),
+    AgregatCoherence(
+      table: 'expenses',
+      libelle: 'Dépenses',
+      jour: ['expense_date'],
+      montant: 'amount',
+      filtre: ('is_active', '=', 1),
     ),
   ];
 }

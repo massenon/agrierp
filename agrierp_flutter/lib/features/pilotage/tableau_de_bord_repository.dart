@@ -211,7 +211,7 @@ class DonneesTableauDeBord {
 /// `livestock_reproduction_events` descendent au poste : les mentions « Ce poste uniquement » et « Table non
 /// synchronisée » étaient fausses. Depuis U4 (D-U4), `sale_lines` et `purchase_lines` descendent aussi, avec leur
 /// pièce : le Top 5 (marge comprise) et « Ventes (mois) » portent sur TOUTES les ventes de la ferme, comme au web.
-/// Reste propre au poste (non servie par le tirage) : `expenses` — voir l'onglet Dépenses.
+/// Depuis U13, `expenses` descend aussi (dépenses du web et des autres postes, archivage compris).
 class TableauDeBordRepository {
   TableauDeBordRepository({required this.database, DateTime Function()? horloge})
     : _horloge = horloge ?? HeureBenin.maintenant;
@@ -739,11 +739,13 @@ class TableauDeBordRepository {
   }
 
   /// `Expense::where('is_active', true)->latest('expense_date')->limit(5)`.
-  /// ⚠️ `expenses` ne descend pas au poste et n'y a pas de colonne d'archivage : ce sont les charges saisies
-  /// ici, en attente ou acquittées.
+  /// Ticket U13 — `expenses` descend au poste (web, autres postes) avec son archivage : une dépense ARCHIVÉE au web
+  /// n'est plus listée, comme au web ; celles saisies ici comptent en attente ou acquittées (règle U8).
   List<LigneTransaction> _depenses(List<Expense> depenses) {
-    final triees = [...depenses]
-      ..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+    final triees = [
+      for (final d in depenses)
+        if (d.isActive) d,
+    ]..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
     return triees
         .take(5)
         .map(

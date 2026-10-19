@@ -375,6 +375,16 @@ class SyncEngine {
   /// leur grand livre (un serveur qui sert `products` sans `stock_movements` est antérieur à U9).
   static const cleMouvementsResync = 'mouvements_resync_u9';
 
+  /// Ticket U13 — resynchronisation UNIQUE des dépenses et de la paie. Avant U13 le serveur ne servait ni `expenses`
+  /// ni `payslips` ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait JAMAIS les
+  /// dépenses saisies au web ou sur un autre poste avant lui, ni la paie déjà réglée, ni l'archivage, fait au web, des
+  /// dépenses que CE poste a déjà acquittées (« Recettes et Dépenses » resterait faux pour tout l'historique). Même
+  /// règle que [cleMouvementsResync] : écrite après tous les absorbeurs, et seulement si le serveur sert les dépenses
+  /// (un serveur qui sert `products` sans `expenses`, sans paginer, est antérieur à U13). ⚠️ Un poste déjà paginé dont
+  /// le compte reçoit désormais ces tables repart aussi d'un tirage complet par la règle du périmètre (S-T4) ; cette
+  /// clé couvre le poste dont le périmètre est inconnu (dernier tirage non paginé).
+  static const cleDepensesResync = 'depenses_resync_u13';
+
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
     'mort_repro',
@@ -484,6 +494,8 @@ class SyncEngine {
         await _lireReglage(cleMouvementsResync) != null;
     final resyncFichesU10Faite =
         await _lireReglage(cleFichesResyncU10) != null;
+    final resyncDepensesFaite =
+        await _lireReglage(cleDepensesResync) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -494,7 +506,8 @@ class SyncEngine {
         !resyncLignesFaite ||
         !resyncRetoursFaite ||
         !resyncMouvementsFaite ||
-        !resyncFichesU10Faite;
+        !resyncFichesU10Faite ||
+        !resyncDepensesFaite;
     final since = !toutRedemander && etat?.lastPulledAt != null
         ? etat!.lastPulledAt!.toUtc().toIso8601String()
         : null;
@@ -647,6 +660,15 @@ class SyncEngine {
       await _ecrireReglage(cleMouvementsResync, '1');
     }
 
+    // U13 : même place, et seulement si le serveur sert les dépenses. Un serveur qui sert les produits SANS les
+    // dépenses (réponse non paginée) est antérieur à U13 : le tirage reste complet tant que cela dure.
+    if (!resyncDepensesFaite &&
+        !(!pagine &&
+            cles.contains('products') &&
+            !cles.contains('expenses'))) {
+      await _ecrireReglage(cleDepensesResync, '1');
+    }
+
     // Ticket S-T4 — le périmètre de CE tirage, gardé pour le suivant. Une réponse non paginée (serveur antérieur)
     // a servi toutes les tables : périmètre inconnu, rien à resynchroniser au prochain élargissement.
     if (pagine && perimetre != null) {
@@ -756,6 +778,9 @@ class SyncEngine {
     recus += await _absorberCompteursAttestation(corps['attestation_counts']);
     recus += await _absorberComptesTresorerie(corps['treasury_accounts']);
     recus += await _absorberCategoriesDepense(corps['expense_categories']);
+    // Ticket U13 — dépenses du serveur (table mixte) et paie réglée (lecture seule).
+    recus += await _absorberDepenses(corps['expenses']);
+    recus += await _absorberPaie(corps['payslips']);
 
     return recus;
   }
@@ -3968,6 +3993,155 @@ class SyncEngine {
     });
 
     return libelles.length;
+  }
+
+  /// 🔴→✅ Ticket U13 — LES DÉPENSES DU SERVEUR DESCENDENT AU POSTE, avec leur archivage.
+  ///
+  /// `expenses` n'était au poste qu'une table de SAISIE, jamais tirée : le rapport « Recettes et Dépenses » ne voyait
+  /// ni les dépenses saisies au web ou sur un autre poste, et une dépense de CE poste archivée ensuite au web y comptait
+  /// encore. Le serveur sert désormais, au curseur (`updated_at`), toute dépense créée, modifiée ou archivée — tout
+  /// l'historique, archivées comprises, au tirage complet (un poste en service doit apprendre l'archivage de ses
+  /// propres dépenses déjà acquittées).
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberInfirmerie] : élément illisible, identifiant invalide ou servi deux fois, date,
+  /// libellé, compte de charge, montant (absent, illisible ou négatif), compte payeur ou `is_active` illisibles →
+  /// [FormatException] : rien n'est écrit, la page est annulée, le curseur n'avance pas. Lisser — un montant illisible
+  /// devenu 0 — fausserait le total du rapport sans que rien ne le dise.
+  ///
+  /// ⚠️⚠️ **UNE DÉPENSE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (saisie ici, pas encore acquittée, ou
+  /// refusée et en attente de correction) : le tirage précède toujours l'envoi. Une dépense acquittée (`synced`) prend
+  /// la dernière version du serveur (modification ou archivage au web) et garde son `device_id` d'origine.
+  /// Clé absente (serveur antérieur à U13, ou table non servie) : rien n'est touché.
+  Future<int> _absorberDepenses(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Dépense';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recues = <ExpensesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final date = l['expense_date'] is String
+          ? HeureBenin.lire(l['expense_date'])
+          : null;
+      final libelle = _texteStrict(l['label'], '$quoi $id : libellé');
+      final categorie = _texteStrict(l['category'], '$quoi $id : compte de charge');
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final compte = _texteStrict(
+        l['treasury_account_id'],
+        '$quoi $id : compte de trésorerie',
+      );
+      final actif = _actifStrict(l, '$quoi $id');
+      if (date == null) {
+        throw FormatException(
+          '$quoi $id refusée : date illisible (${l['expense_date']}).',
+        );
+      }
+      if (libelle == null || categorie == null || compte == null || compte.isEmpty) {
+        throw FormatException(
+          '$quoi $id refusée : libellé, compte de charge ou compte de trésorerie absent.',
+        );
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException(
+          '$quoi $id refusée : montant absent ou négatif ($montant).',
+        );
+      }
+      recues.add(
+        ExpensesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          // Une DATE pure, au jour du Bénin (minuit, heure murale) : celle que le web compare (`whereDate`).
+          expenseDate: DateTime(date.year, date.month, date.day),
+          label: libelle,
+          category: categorie,
+          amount: montant,
+          treasuryAccountId: compte,
+          isActive: Value(actif),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final d in await (_db.select(
+          _db.expenses,
+        )..where((t) => t.id.isIn(vus))).get())
+          d.id: d.syncStatus,
+      };
+      for (final d in recues) {
+        final statut = locales[d.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Une dépense acquittée de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.expenses)
+            .insert(
+              d,
+              onConflict: DoUpdate(
+                (_) => d.copyWith(deviceId: const Value.absent()),
+              ),
+            );
+      }
+    });
+
+    return recues.length;
+  }
+
+  /// 🔴→✅ Ticket U13 — LA PAIE RÉGLÉE DESCEND AU POSTE (lecture seule), pour le rapport « Recettes et Dépenses ».
+  ///
+  /// Le serveur ne sert que ce que `RecettesDepenses::depensesRows()` lit : l'instant du règlement (`created_at`, heure
+  /// murale du serveur), le nom de l'employé et le net versé — rien d'autre sur la paie (S3). Servie au curseur ; un
+  /// bulletin ne se modifie ni ne s'archive au web (il disparaît seulement à la réinitialisation, purgée ici à part).
+  ///
+  /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, net absent, illisible ou négatif, instant illisible,
+  /// nom qui n'est pas un texte → [FormatException], rien n'est écrit. Aucune écriture locale à protéger : la table ne
+  /// s'écrit jamais au poste.
+  Future<int> _absorberPaie(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Bulletin de paie';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <PayslipsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final net = _nombreStrict(l['net_salary'], '$quoi $id : net versé');
+      final nom = _texteStrict(l['employee_name'], '$quoi $id : employé');
+      final instant = l['created_at'] is String
+          ? HeureBenin.lire(l['created_at'])
+          : null;
+      if (net == null || net < 0) {
+        throw FormatException(
+          '$quoi $id refusé : net versé absent ou négatif ($net).',
+        );
+      }
+      if (instant == null) {
+        throw FormatException(
+          '$quoi $id refusé : date de règlement illisible (${l['created_at']}).',
+        );
+      }
+      recus.add(
+        PayslipsCompanion.insert(
+          id: id,
+          employeeName: Value(nom),
+          netSalary: net,
+          // ⚠️ Heure MURALE du serveur, lue telle quelle : le jour du web (`toDateString()`) doit rester le jour.
+          createdAt: instant,
+        ),
+      );
+    }
+
+    await _db.batch(
+      (b) => b.insertAll(_db.payslips, recus, mode: InsertMode.insertOrReplace),
+    );
+
+    return recus.length;
   }
 
   /// Registre des soins déjà administrés.

@@ -140,6 +140,9 @@ void main() {
     'stock_movements',
     'treasury_accounts',
     'expense_categories',
+    // Ticket U13 — dépenses (table mixte) et paie réglée (lecture seule), pour « Recettes et Dépenses ».
+    'expenses',
+    'payslips',
   };
 
   const ignorees = {
