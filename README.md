@@ -70,3 +70,5 @@ cd agrierp_laravel && php artisan migrate:fresh --seed
 - Toute la prose, les libellés d'interface, les commentaires et la documentation sont **en français**.
 - Le prototype HTML reste la source de vérité visuelle et comportementale des deux clients (voir les `CLAUDE.md` des projets).
 - Les fins de ligne sont normalisées en LF dans le dépôt (voir `.gitattributes`).
+
+**Cloner, tester, déployer sur cPanel, tâches planifiées :** [`GUIDE_DEPLOIEMENT.md`](GUIDE_DEPLOIEMENT.md).
