@@ -167,7 +167,12 @@ class SyncParametresElevageTest extends TestCase
      * référentiels, un envoi la concernant tombe dans le vide sans trace — le
      * rejet muet que ce mécanisme existe pour empêcher.
      */
-    public function test_the_device_cannot_write_back_on_these_referentials(): void
+    /**
+     * Ticket H9b (décision D-H9 du 19/10/2026) — ces barèmes NE SONT PLUS en lecture seule : le poste les modifie
+     * comme le web (`SyncParametresElevageModifiablesTest`). Un envoi INCOMPLET reste sans effet, mais il est désormais
+     * REFUSÉ avec son motif au lieu d'être compté parmi les référentiels ignorés.
+     */
+    public function test_an_incomplete_write_back_is_refused_with_its_reason(): void
     {
         FeedRationStandard::create([
             'species_code' => 'aviculture', 'stage_label' => 'Ponte',
@@ -179,8 +184,9 @@ class SyncParametresElevageTest extends TestCase
             'elevage_numbering' => [['lapine_prefix' => 'ZZZ']],
         ]);
 
-        $reponse->assertOk();
-        $this->assertGreaterThanOrEqual(2, $reponse->json('referentiels_ignored'));
+        $reponse->assertOk()
+            ->assertJsonCount(1, 'feed_types.rejected')
+            ->assertJsonCount(1, 'elevage_numbering.rejected');
         $this->assertSame(0, FeedType::count());
         $this->assertSame('R', ElevageNumberingSetting::current()->lapine_prefix);
     }

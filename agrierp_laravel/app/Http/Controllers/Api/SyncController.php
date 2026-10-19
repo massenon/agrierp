@@ -115,6 +115,8 @@ class SyncController extends Controller
         'attestation_templates', 'attestation_counts', 'livestock_transfers',
         // Ticket H8b — infirmerie et calendrier vétérinaire saisis au poste.
         'infirmary_records', 'veterinary_calendar_events',
+        // Ticket H9b — barèmes d'élevage modifiables au poste.
+        'feed_ration_standards', 'prophylaxis_schedule_standards',
     ];
 
     /**
@@ -434,6 +436,8 @@ class SyncController extends Controller
             'rccm' => $entreprise->rccm,
             'tva_enabled' => $entreprise->tva_enabled,
             'tva_default_rate' => $entreprise->tva_default_rate,
+            // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
+            'rappel_soins_jours' => $entreprise->rappel_soins_jours,
         ];
 
         // ⚠️⚠️ UN MODULE DESACTIVE DOIT DISPARAITRE DE L'ECRAN, PAS SEULEMENT
@@ -1066,8 +1070,6 @@ class SyncController extends Controller
             'product_categories',
             'receivables',
             'customer_reminders',
-            'feed_types',
-            'elevage_numbering',
             'purchase_orders',
             'payables',
             'employees',
@@ -1076,7 +1078,6 @@ class SyncController extends Controller
             'fiscal_years',
             'accounting_entries',
             'accounting_entry_lines',
-            'company_settings',
             'modules_config',
             'roles',
             'users',
@@ -1091,6 +1092,26 @@ class SyncController extends Controller
             if ($request->has($referentialTable)) {
                 $result['referentiels_ignored'] += count($request->input($referentialTable));
             }
+        }
+
+        // Ticket H9b (décision D-H9 du 19/10/2026) — PARAMÈTRES ÉLEVAGE MODIFIABLES AU POSTE. Les barèmes cessent d'être
+        // des référentiels en lecture seule : rations, prophylaxie, provendes, numérotation et délai de rappel des
+        // soins s'envoient avec le droit `manage-elevage` (celui de l'écran web), mêmes validations que
+        // `ParametresElevage`, archivage logique, dernier écrivain gagne.
+        $parametresElevage = app(\App\Actions\RecordParametresElevageFromDeviceAction::class);
+        foreach (\App\Actions\RecordParametresElevageFromDeviceAction::TABLES as $table) {
+            if (! $request->has($table)) {
+                continue;
+            }
+            if (! $request->user()?->can('manage-elevage')) {
+                $result[$table] = ['accepted' => [], 'rejected' => array_map(
+                    fn ($e) => ['id' => is_array($e) ? ($e['id'] ?? null) : null, 'reason' => MotifsRefusPush::roleInsuffisant($table)],
+                    $request->input($table),
+                )];
+
+                continue;
+            }
+            $result[$table] = $parametresElevage->execute($table, $request->input($table));
         }
 
         // ⚠️ LES FOURNISSEURS ET LES PRODUITS D'ABORD (15.15, 15.17) : un achat ou un
