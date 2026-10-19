@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Actions\AdjustStockAction;
+use App\Actions\RecordStockAdjustmentEntryAction;
 use App\Livewire\Stocks\GestionStocks;
+use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\StockMovement;
 use Carbon\Carbon;
@@ -34,8 +37,13 @@ use Carbon\CarbonInterface;
  * ⚠️ Un mouvement daté du seul JOUR du comptage (minuit pile) est placé par son heure d'enregistrement (voir
  * `apresLeComptage`).
  *
- * Limite connue, dite : un mouvement fait AVANT T mais arrivé au serveur APRÈS ce comptage (vente d'une caisse restée
- * hors ligne plus longtemps que le poste qui compte) est encore compté en plus du comptage, qui le reflétait déjà.
+ * 🔴→✅ TICKET S-T12 — LE MOUVEMENT ANTÉRIEUR AU COMPTAGE QUI ARRIVE APRÈS LUI (`compenserMouvementAnterieur`). Une
+ * vente faite AVANT T sur une caisse restée hors ligne plus longtemps que le poste qui compte (ou un achat, ou une
+ * vente antidatée saisie au web après un inventaire — 15.30) était décomptée EN PLUS du comptage, qui la reflétait
+ * déjà : les rayons comptés à T ne contenaient plus la marchandise vendue avant T. Le stock finissait trop bas (ou
+ * trop haut pour un achat), sans erreur. Règle : le mouvement est enregistré à SA date métier (grand livre, rotation,
+ * fiche), puis une RÉGULARISATION d'inventaire de sens opposé est écrite à l'instant du premier comptage qui le suit —
+ * c'est l'écart de ce comptage, recalculé avec ce que l'on sait maintenant. Effet net après T : nul. Voir la méthode.
  */
 class InventaireAuComptageService
 {
@@ -87,6 +95,104 @@ class InventaireAuComptageService
             'posterieurs' => $posterieurs->count(),
         ];
     }
+
+    /**
+     * Ticket S-T12 — LE MOUVEMENT [$mouvement], DATÉ AVANT UN COMPTAGE DÉJÀ ENREGISTRÉ, NE CHANGE PLUS LE STOCK D'APRÈS
+     * CE COMPTAGE. Appelé par `AdjustStockAction` (point de passage unique) pour tout mouvement daté qu'il écrit.
+     *
+     * Le comptage d'un instant T est la vérité physique à T : les rayons comptés reflétaient déjà tout ce qui s'était
+     * passé avant. Un mouvement daté avant T (une vente d'une caisse restée hors ligne, `sold_at` ; un achat du poste,
+     * `purchased_at` ; une vente antidatée au web, 15.30 ; un ajout de stock d'un jour passé) qui n'arrive qu'APRÈS
+     * l'enregistrement du comptage a donc déjà été « vu » par lui. Il est gardé à sa date — le grand livre, la rotation
+     * et la fiche le voient au bon jour —, et l'écart du comptage est RECALCULÉ : une régularisation d'inventaire de
+     * sens opposé (`inventaire`, `reference_id` = ce mouvement), datée de T, ramène le stock à T sur la quantité
+     * comptée. Les mouvements postérieurs à T restent comptés une fois par-dessus, comme `evaluer()` le veut.
+     *
+     * - Le comptage retenu est le PREMIER qui suit le mouvement : c'est lui qui l'a vu ; les suivants partent de lui.
+     * - Un mouvement daté du seul JOUR (minuit) le jour même d'un comptage le SUIT (son heure n'est pas connue, et il
+     *   est enregistré après lui) — la règle de `apresLeComptage`. Un mouvement à la seconde exacte du comptage le
+     *   suit aussi (enregistré après lui).
+     * - La PERTE passée au journal par ce comptage (14.41, D 657 / C 601 au PMP) suit son écart recalculé : une vente
+     *   qui explique un « manquant » le reclasse en achats consommés (`annulerPerte`), un achat antérieur qui creuse
+     *   le manquant ajoute la perte correspondante. Valorisée au PMP courant.
+     *
+     * ⚠️ Limite dite : un comptage SANS écart ne laisse aucun mouvement (le web répond « Aucun écart détecté », S-T10
+     * l'acquitte sans mouvement) — il n'est donc pas retrouvé ici, et un mouvement antérieur qui arrive après lui
+     * reste compté en plus.
+     */
+    public function compenserMouvementAnterieur(Product $produit, StockMovement $mouvement): ?StockMovement
+    {
+        if (in_array($mouvement->reference_type, GestionStocks::TYPES_ECART_INVENTAIRE, true)) {
+            return null;   // un comptage ne se compense pas lui-même (et la régularisation n'en appelle pas une autre)
+        }
+
+        $delta = match ($mouvement->type) {
+            'entree' => (float) $mouvement->quantity,
+            'sortie' => -(float) $mouvement->quantity,
+            default => 0.0,
+        };
+        $date = $mouvement->movement_date?->copy()->setTimezone(config('app.timezone'));
+        if ($delta == 0.0 || $date === null) {
+            return null;
+        }
+        $jourSeul = $date->format('H:i:s') === '00:00:00';
+
+        $comptage = StockMovement::query()
+            ->where('product_id', $produit->id)
+            ->whereIn('reference_type', GestionStocks::TYPES_ECART_INVENTAIRE)
+            ->where('movement_date', '>', $date->format('Y-m-d H:i:s'))
+            ->orderBy('movement_date')
+            ->get(['movement_date'])
+            ->first(fn (StockMovement $c) => ! ($jourSeul && $c->movement_date->isSameDay($date)));
+        if ($comptage === null) {
+            return null;
+        }
+        $instant = $comptage->movement_date;
+
+        // Écart de ce comptage tel qu'il est au grand livre (le mouvement d'origine et ses régularisations, tous datés
+        // de T), avant celle-ci.
+        $ecartAvant = (float) StockMovement::query()
+            ->where('product_id', $produit->id)
+            ->whereIn('reference_type', GestionStocks::TYPES_ECART_INVENTAIRE)
+            ->where('movement_date', $instant->format('Y-m-d H:i:s'))
+            ->get(['type', 'quantity'])
+            ->sum(fn (StockMovement $m) => $m->type === 'entree' ? (float) $m->quantity : -(float) $m->quantity);
+
+        $motif = mb_substr(sprintf(
+            'Régularisation d\'inventaire : %s du %s, antérieur(e) au comptage du %s, enregistré(e) après lui',
+            self::LIBELLES[$mouvement->reference_type] ?? $mouvement->reference_type,
+            $date->format('d/m/Y H:i'),
+            $instant->format('d/m/Y H:i'),
+        ), 0, 255);
+
+        $regularisation = app(AdjustStockAction::class)->execute($produit, -$delta, 'inventaire', $mouvement->id, $instant, $motif);
+
+        $perteAvant = max(0.0, -$ecartAvant);
+        $perteApres = max(0.0, -($ecartAvant - $delta));
+        $variation = round($perteApres - $perteAvant, 2);
+        $ecritures = app(RecordStockAdjustmentEntryAction::class);
+        if ($variation > 0) {
+            $ecritures->execute($produit->fresh(), -$variation, 'régularisation d\'inventaire');
+        } elseif ($variation < 0) {
+            $ecritures->annulerPerte($produit->fresh(), -$variation, 'régularisation d\'inventaire');
+        }
+
+        AuditLog::record('stock.inventaire_regularise', 'stocks');
+
+        return $regularisation;
+    }
+
+    /** Ce que le motif de la régularisation dit du mouvement compensé. */
+    private const LIBELLES = [
+        'sale' => 'vente',
+        'purchase' => 'achat',
+        'purchase_return' => 'retour fournisseur',
+        'credit_note' => 'retour client',
+        'manual_addition' => 'ajout de stock',
+        'transformation' => 'transformation',
+        'elevage' => 'production d\'élevage',
+        'daily_entry' => 'production',
+    ];
 
     /**
      * Le mouvement [$m] a-t-il eu lieu APRÈS le comptage ?

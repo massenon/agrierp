@@ -257,6 +257,76 @@ class SyncEssaiMultipostesTest extends TestCase
     // ═══ 3. L'envoi est atomique ═══
 
     /** 🔴 Un échec au milieu de l'envoi (après la fiche, pendant la vente) n'écrit rien ; le renvoi compte UNE fois. */
+    /**
+     * 🔴→✅ Ticket S-T12 (essai à plusieurs postes, graine 7, MariaDB) — DEUX ENVOIS SIMULTANÉS SUR LA MÊME FICHE CONNUE.
+     * Deux caisses vendent chacune un lapin de la même bande le même jour ; leurs envois arrivent ensemble. Chaque
+     * transaction lisait `vente` = 5 sans verrou et écrivait 6 : une vente comptée zéro fois (5 → 6 au lieu de 7). SQLite
+     * (cette suite) sérialise les transactions et ne peut pas le montrer : ce garde-fou lit le code — la fiche doit être
+     * relue SOUS VERROU (`lockForUpdate`) avant l'incrément ; l'essai sur MariaDB en est la preuve exécutée.
+     */
+    public function test_l_increment_de_la_vente_d_une_fiche_relit_la_fiche_sous_verrou(): void
+    {
+        $source = (string) file_get_contents(app_path('Actions/RecordSaleOnFicheElevageAction.php'));
+        $increment = strpos($source, '$entry->vente = (int) $entry->vente + $qty;');
+        $this->assertNotFalse($increment, 'incrément de la vente introuvable');
+        $avant = substr($source, 0, $increment);
+        $verrou = strrpos($avant, '->lockForUpdate()');
+        $this->assertNotFalse($verrou, 'la fiche n\'est pas relue sous verrou avant l\'incrément de sa vente');
+        $recherche = strrpos($avant, '$this->ficheDuJour(');
+        $this->assertNotFalse($recherche, 'la fiche du jour n\'est plus cherchée par `ficheDuJour`');
+        $this->assertGreaterThan($recherche, $verrou,
+            'le verrou doit porter sur la relecture APRÈS la recherche de la fiche (lecture à jour), pas avant');
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T12 (essai à plusieurs postes, graine 5, MariaDB) — DEUX COMPTOIRS CRÉENT LA MÊME FICHE AU MÊME
+     * INSTANT. Le second envoi bute sur l'unicité (bande, jour) et relit la fiche du premier pour la fusion prudente
+     * (S-T9) ; une lecture ordinaire lisait l'instantané de SA transaction, où la fiche validée entre-temps n'existe pas
+     * encore : « aucune », et la fiche de la caisse (sa vente seulement) était refusée « en double ». SQLite n'a pas cet
+     * isolement : ce garde-fou lit le code — la relecture qui suit la violation d'unicité est VERROUILLANTE.
+     */
+    public function test_la_relecture_apres_une_creation_simultanee_de_fiche_est_verrouillante(): void
+    {
+        $source = (string) file_get_contents(app_path('Http/Controllers/Api/SyncController.php'));
+        $debut = strpos($source, 'catch (\\Illuminate\\Database\\UniqueConstraintViolationException $e) {');
+        $this->assertNotFalse($debut, 'le rattrapage de la violation d\'unicité des fiches a disparu');
+        $bloc = substr($source, $debut, (int) strpos($source, '$this->ficheFusionnable($validated, $occupante)', $debut) - $debut);
+        $this->assertStringContainsString('->lockForUpdate()->first()', $bloc,
+            'la fiche concurrente doit être relue sous verrou : une lecture ordinaire ne la voit pas (instantané de la transaction)');
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T12 (essai à plusieurs postes, graine 314, MariaDB) — LA FICHE DU JOUR CRÉÉE PAR UN AUTRE ENVOI
+     * ENTRE LA LECTURE ET L'INSERTION. La vente (web ou poste) cherche la fiche (bande, jour), n'en trouve pas, et
+     * l'insère ; un poste vient de créer la même au même instant : l'unicité (bande, jour) refusait la seconde insertion
+     * (`SQLSTATE 1062`) — la caisse du web affichait l'erreur, la vente était perdue. Simulé ici : la fiche concurrente
+     * (1 sujet vendu) est écrite JUSTE AVANT l'insertion de celle de la vente. Attendu : la vente de 2 sujets s'ajoute à
+     * elle (3 vendus, effectif 297), aucune erreur, une seule fiche.
+     */
+    public function test_une_fiche_creee_au_meme_instant_par_un_autre_envoi_recoit_la_vente(): void
+    {
+        $caissier = $this->compte('caissier');
+        $concurrente = null;
+        LivestockDailyEntry::creating(function (LivestockDailyEntry $f) use (&$concurrente) {
+            if ($concurrente === null && $f->lot_id === $this->bande->id) {
+                $concurrente = (string) \Illuminate\Support\Str::uuid();
+                \Illuminate\Support\Facades\DB::table('livestock_daily_entries')->insert([
+                    'id' => $concurrente, 'lot_id' => $this->bande->id, 'entry_date' => self::JOUR,
+                    'achat' => 0, 'ne' => 0, 'mort' => 0, 'vente' => 1, 'don' => 0, 'effectif_final' => 299,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        });
+
+        $this->pousser($caissier, [], [$this->vente('a3333333-3333-4333-8333-333333333333', 2)])
+            ->assertJsonPath('sales.accepted.0', 'a3333333-3333-4333-8333-333333333333');
+
+        $this->assertNotNull($concurrente, 'la création concurrente n\'a pas été simulée');
+        $this->assertSame(1, LivestockDailyEntry::where('lot_id', $this->bande->id)->count());
+        $this->assertSame(3, (int) $this->ficheDuJour()->vente, '1 vendu par l\'autre envoi + 2 par celui-ci');
+        $this->assertSame(297, (int) $this->ficheDuJour()->effectif_final);
+    }
+
     public function test_un_envoi_en_echec_n_ecrit_rien_et_son_renvoi_ne_double_pas_la_vente(): void
     {
         $caissier = $this->compte('caissier');

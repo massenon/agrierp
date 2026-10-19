@@ -93,4 +93,46 @@ class RecordStockAdjustmentEntryAction
             sourceId: $produit->id,
         );
     }
+
+    /**
+     * Ticket S-T12 — UNE PERTE D'INVENTAIRE QUI N'EN ÉTAIT PAS UNE, RECLASSÉE. Un comptage avait constaté un manquant
+     * (D 657 / C 601) ; une vente datée d'avant ce comptage arrive ensuite au serveur (caisse restée hors ligne) : les
+     * [$quantite] unités « manquantes » avaient en fait été vendues. `InventaireAuComptageService` recalcule l'écart du
+     * comptage ; cette écriture défait la part de perte qu'il n'y a plus — exactement l'inverse de `execute` :
+     *
+     *     Débit  601 Achats de marchandises ...... valeur au PMP
+     *     Crédit 657 Charges exceptionnelles ..... même montant
+     *
+     * ⚠️ Mêmes garde-fous que `execute` : produit sans PMP (aucun coût connu) ou plan comptable incomplet → aucune
+     * écriture, jamais une valeur devinée.
+     */
+    public function annulerPerte(Product $produit, float $quantite, ?string $motif = null): ?AccountingEntry
+    {
+        $pmp = $produit->computePmp();
+        if ($quantite <= 0 || $pmp === null || $pmp <= 0) {
+            return null;
+        }
+
+        $valeur = round($quantite * $pmp, 2);
+        $chargesExceptionnelles = ChartOfAccount::where('code', '657')->first();
+        $achats = ChartOfAccount::where('code', '601')->first();
+        if ($valeur < 0.01 || ! $chargesExceptionnelles || ! $achats) {
+            return null;
+        }
+
+        return app(AccountingEntryService::class)->record(
+            lines: [
+                ['account_id' => $achats->id, 'debit' => $valeur, 'credit' => 0],
+                ['account_id' => $chargesExceptionnelles->id, 'debit' => 0, 'credit' => $valeur],
+            ],
+            entryDate: now()->format('Y-m-d'),
+            reference: mb_substr(
+                AccountingEntry::generateReference().' — Écart inventaire annulé '.$produit->sku
+                    .($motif ? ' ('.$motif.')' : ''),
+                0, 100
+            ),
+            sourceType: 'stock_adjustment',
+            sourceId: $produit->id,
+        );
+    }
 }

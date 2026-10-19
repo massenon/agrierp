@@ -11,6 +11,16 @@
  *   php essai_multipostes_serveur.php <dossier Laravel> ration-web <json>
  *   php essai_multipostes_serveur.php <dossier Laravel> etat <fichier instantané> <fichier des saisies des postes>
  *
+ * Ticket S-T12 — l'essai couvre tout ce qui se synchronise ; commandes ajoutées (toujours par les vrais composants) :
+ *
+ *   produit-web <json>        « Ajouter un Produit » (AjouterProduit) — le même produit qu'un poste crée (fusion S-T5)
+ *   inventaire-web <json>     inventaire de Gestion des Stocks (validateAdjustment) : `ecart` = rayons − stock du serveur
+ *   revoquer <poste>          « Révoquer l'appairage » (Paramètres → Postes & Appairage, CFG-1)
+ *   desactiver|reactiver <identifiant>   archiver / réactiver un compte (Gestion des utilisateurs)
+ *   demander <poste>          « Demander la synchronisation » d'un poste (S-T6) ; `demande <id>` : servie ?
+ *   reinitialiser             « Réinitialisation des données » (15.50) : mode démonstration, mot de confirmation
+ *   etat-reinitialise         lignes restantes dans chaque table d'activité, et la marque `data_reset_at`
+ *
  * ⚠️⚠️ LES ÉCRITURES « AU WEB » PASSENT PAR LES VRAIS COMPOSANTS LIVEWIRE (`Livewire::test`, compte admin) : la vente
  * par `PosInterface` (panier, puis « Valider la Vente »), la ration par `ParametresElevage`, les bandes de l'essai par
  * `GestionBandes`. C'est le code que le navigateur exécute, contrôles d'autorisation compris — pas une insertion
@@ -45,6 +55,8 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\FusionReferentielsService;
+use App\Services\ReinitialisationDonneesService;
+use App\Services\SupplierRefundService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -86,6 +98,39 @@ function fenetre(int $jours): array
     return $liste;
 }
 
+/**
+ * Ticket S-T12 — les soldes que l'essai compare entre les DEUX côtés de chaque flux : le grand livre (par code de
+ * compte, écritures actives) et les tables métier (soldes des comptes de trésorerie par code, dettes fournisseurs,
+ * créances clients, avances, créances sur fournisseurs). Une opération synchronisée doit les déplacer d'autant.
+ */
+function soldes(): array
+{
+    $livre = [];
+    foreach (DB::table('accounting_entry_lines as l')
+        ->join('accounting_entries as e', 'e.id', '=', 'l.entry_id')
+        ->join('chart_of_accounts as c', 'c.id', '=', 'l.account_id')
+        ->where('e.is_active', true)
+        ->selectRaw('c.code AS code, ROUND(SUM(l.debit), 2) AS d, ROUND(SUM(l.credit), 2) AS c')
+        ->groupBy('c.code')->get() as $l) {
+        $livre[(string) $l->code] = round((float) $l->d - (float) $l->c, 2);
+    }
+    $tresorerie = [];
+    foreach (DB::table('treasury_accounts')->selectRaw('account_code, ROUND(SUM(balance), 2) AS solde')->groupBy('account_code')->get() as $t) {
+        $tresorerie[(string) $t->account_code] = round((float) $t->solde, 2);
+    }
+    $creancesFournisseurs = (float) DB::table('purchases')->whereNotNull('returned_at')->sum('supplier_credit')
+        - (float) DB::table('supplier_refunds')->sum('applied_amount');
+
+    return [
+        'livre' => $livre,
+        'tresorerie' => $tresorerie,
+        'dettes_fournisseurs' => round((float) DB::table('payables')->selectRaw('SUM(amount - amount_paid) AS s')->value('s'), 2),
+        'creances_clients' => round((float) DB::table('receivables')->selectRaw('SUM(amount - amount_paid) AS s')->value('s'), 2),
+        'avances' => round((float) DB::table('customer_advances')->where('is_active', true)->selectRaw('SUM(amount - amount_used) AS s')->value('s'), 2),
+        'creances_fournisseurs' => round($creancesFournisseurs, 2),
+    ];
+}
+
 /** Stock par produit, grand livre par produit (entrées − sorties), fiches de la fenêtre, ventes connues. */
 function instantane(array $lots): array
 {
@@ -118,7 +163,14 @@ function instantane(array $lots): array
         'fiches' => $fiches,
         'ventes' => Sale::pluck('id')->all(),
         'lots' => $lots,
+        'soldes' => soldes(),
     ];
+}
+
+/** Ticket S-T12 — un composant Livewire du web, au nom de l'administrateur. */
+function web(string $composant)
+{
+    return Livewire::actingAs(administrateur())->test($composant);
 }
 
 switch ($commande) {
@@ -183,27 +235,53 @@ switch ($commande) {
         $p = json_decode($arguments[0] ?? '{}', true);
         $avant = Sale::pluck('id')->all();
 
-        $caisse = Livewire::actingAs(administrateur())->test(App\Livewire\Ventes\PosInterface::class);
-        if (! empty($p['jour'])) {
-            $caisse->set('dateVente', $p['jour']);
+        // ⚠️ Ticket S-T12 — DÉFAUT DÉCRIT, NON CORRIGÉ ICI : la caisse du web (`PosInterface::validateSale`) n'est pas
+        // rejouée sur un interblocage MariaDB, contrairement à l'envoi des postes (S-T9, `DB::transaction(…, 3)`) — elle
+        // verrouille le stock du produit puis la fiche, un envoi la fiche puis le stock. Sous les envois simultanés de
+        // l'essai, la vente web a échoué deux fois (graine 314, `QueryException` venue de `Connection.php`). La rejouer
+        // au serveur exige d'abord de sortir l'appel MeCeF de la transaction (il serait transmis deux fois). La
+        // caissière revaliderait : l'aide fait de même pour un interblocage ou un délai de verrou (jamais pour une autre
+        // erreur, rendue entière), au plus trois fois, et le dit (`interblocages`) — la transaction annulée n'a rien laissé.
+        $interblocages = [];
+        for ($essai = 1; ; $essai++) {
+            try {
+                $caisse = Livewire::actingAs(administrateur())->test(App\Livewire\Ventes\PosInterface::class);
+                if (! empty($p['jour'])) {
+                    $caisse->set('dateVente', $p['jour']);
+                }
+                $caisse->call('selectProduct', $p['produit'])
+                    ->set('weightQty', (int) $p['quantite'])
+                    ->set('weightPrice', (float) $p['montant'])
+                    ->set('weightLotId', $p['lot'] ?? '')
+                    ->call('confirmWeightAdd')
+                    ->set('paymentMode', 'especes')
+                    ->set('cashReceived', (float) $p['montant'])
+                    ->call('validateSale');
+                break;
+            } catch (Illuminate\Database\QueryException $e) {
+                $interblocages[] = mb_substr($e->getMessage(), 0, 200);
+                if ($essai >= 3 || ! preg_match('/1213|40001|Deadlock|1205/i', $e->getMessage())) {
+                    echec('Vente web en échec : '.$e->getMessage());
+                }
+            }
         }
-        $caisse->call('selectProduct', $p['produit'])
-            ->set('weightQty', (int) $p['quantite'])
-            ->set('weightPrice', (float) $p['montant'])
-            ->set('weightLotId', $p['lot'] ?? '')
-            ->call('confirmWeightAdd')
-            ->set('paymentMode', 'especes')
-            ->set('cashReceived', (float) $p['montant'])
-            ->call('validateSale');
 
-        $nouvelles = Sale::whereNotIn('id', $avant)->pluck('id')->all();
+        // Ticket S-T12 — les postes envoient PENDANT la vente du web : une vente nouvelle n'est pas forcément la sienne.
+        // Celle du web porte un identifiant du serveur (UUID ordonné, `HasUuids`), jamais un UUID v4 de poste, et une
+        // ligne du produit vendu.
+        $nouvelles = Sale::whereNotIn('id', $avant)
+            ->whereHas('lines', fn ($l) => $l->where('product_id', $p['produit'])->where('qty', (int) $p['quantite']))
+            ->pluck('id')
+            ->filter(fn ($id) => substr((string) $id, 14, 1) !== '4')
+            ->values()->all();
         if (count($nouvelles) !== 1) {
-            echec('Vente web non enregistrée ('.count($nouvelles).' vente(s) nouvelle(s)) : '.diagnostic($caisse));
+            echec('Vente web non enregistrée ('.count($nouvelles).' vente(s) nouvelle(s) du web) : '.diagnostic($caisse));
         }
 
         // Ticket S-T10 — le stock du produit au serveur JUSTE APRÈS la vente : ce que les rayons contiennent (l'essai
         // en déduit la quantité que le bureau compte, alors que son stock local ignore encore cette vente).
-        sortie(['vente' => $nouvelles[0], 'stock_apres' => round((float) Product::findOrFail($p['produit'])->stock_qty, 2)]);
+        sortie(['vente' => $nouvelles[0], 'stock_apres' => round((float) Product::findOrFail($p['produit'])->stock_qty, 2),
+            'interblocages' => $interblocages]);
 
     // ── Une ration modifiée AU WEB (Paramètres Élevage) ───────────────────────────────────────────────────────────
     case 'ration-web':
@@ -224,6 +302,117 @@ switch ($commande) {
 
         sortie(['ration' => $ration->id, 'grammes' => (int) $p['grammes']]);
 
+    // ── Ticket S-T12 : le même produit créé au web qu'au poste (fusion S-T5), par « Ajouter un Produit » ─────────────
+    case 'produit-web':
+        $p = json_decode($arguments[0] ?? '{}', true);
+        $avant = Product::pluck('id')->all();
+        $composant = web(App\Livewire\Stocks\AjouterProduit::class)
+            ->set('name', $p['nom'])
+            ->set('category_id', $p['categorie'])
+            ->set('species_id', $p['espece'] ?? '')
+            ->set('unit', $p['unite'])
+            ->set('pricing_mode', 'fourchette')
+            ->set('price_min', (float) $p['prix_min'])
+            ->set('price_max', (float) $p['prix_max'])
+            ->set('stock_qty', (float) ($p['stock'] ?? 0))
+            ->call('save');
+        $nouveaux = Product::whereNotIn('id', $avant)->pluck('id')->all();
+        if (count($nouveaux) !== 1) {
+            echec('Produit non créé au web : '.diagnostic($composant));
+        }
+
+        sortie(['produit' => $nouveaux[0]]);
+
+    // ── Ticket S-T12 : inventaire au web (Gestion des Stocks, onglet Ajustement) ──────────────────────────────────────
+    case 'inventaire-web':
+        // `ecart` : ce que les rayons contiennent de plus (ou de moins) que le stock du serveur à cet instant.
+        $p = json_decode($arguments[0] ?? '{}', true);
+        $p['compte'] = round((float) Product::findOrFail($p['produit'])->stock_qty + (float) $p['ecart'], 2);
+        $composant = web(App\Livewire\Stocks\GestionStocks::class)
+            ->set('adjProductId', $p['produit'])
+            ->set('adjPhysical', (float) $p['compte'])
+            ->set('adjReason', $p['motif'] ?? 'Casse')
+            ->call('validateAdjustment');
+        $stock = round((float) Product::findOrFail($p['produit'])->stock_qty, 2);
+        if ($stock !== round((float) $p['compte'], 2)) {
+            echec("Inventaire web non appliqué (stock {$stock}) : ".diagnostic($composant));
+        }
+
+        sortie(['stock' => $stock, 'le' => now()->toIso8601String()]);
+
+    // ── Ticket S-T12 : session refusée (CFG-1, S3) ────────────────────────────────────────────────────────────────
+    case 'revoquer':
+        $poste = $arguments[0] ?? '';
+        web(App\Livewire\Parametres\PostesAppairage::class)->call('revoquer', $poste);
+        $restants = DB::table('personal_access_tokens')->where('name', $poste)->count();
+        if ($restants !== 0) {
+            echec("Appairage du poste {$poste} non révoqué ({$restants} jeton(s)).");
+        }
+
+        sortie(['revoque' => $poste]);
+
+    case 'desactiver':
+    case 'reactiver':
+        $compte = User::where('username', $arguments[0] ?? '')->firstOrFail();
+        web(App\Livewire\Parametres\GestionUtilisateurs::class)
+            ->call($commande === 'desactiver' ? 'archiveUser' : 'reactivateUser', $compte->id);
+        $actif = (bool) $compte->fresh()->is_active;
+        if ($actif !== ($commande === 'reactiver')) {
+            echec("Compte {$compte->username} : {$commande} sans effet.");
+        }
+
+        sortie(['compte' => $compte->username, 'actif' => $actif, 'jetons' => $compte->tokens()->count()]);
+
+    // ── Ticket S-T6 : demande de synchronisation d'un poste, et sa lecture par le poste ──────────────────────────────
+    case 'demander':
+        $poste = $arguments[0] ?? '';
+        web(App\Livewire\Parametres\PostesAppairage::class)->call('demander', $poste);
+        $demande = App\Models\DemandeSynchronisation::where('poste', $poste)->latest('demandee_le')->first();
+        if ($demande === null) {
+            echec("Demande de synchronisation du poste {$poste} non déposée.");
+        }
+
+        sortie(['demande' => $demande->id, 'le' => $demande->demandee_le->toIso8601String()]);
+
+    case 'demande':
+        $servie = App\Models\DemandeSynchronisationServie::where('demande_id', $arguments[0] ?? '')->first();
+
+        sortie(['servie' => $servie !== null, 'le' => $servie?->servie_le]);
+
+    // ── Ticket S-T12 : réinitialisation des données (15.50), par l'écran de Paramètres ──────────────────────────────
+    case 'reinitialiser':
+        $composant = web(App\Livewire\Parametres\ReinitialisationDonnees::class);
+        if (! (bool) (App\Models\CompanySetting::first()?->demo_mode_enabled)) {
+            $composant->call('basculerModeDemo');
+        }
+        $composant->set('confirmation', App\Livewire\Parametres\ReinitialisationDonnees::MOT_DE_CONFIRMATION)->call('reinitialiser');
+        $marque = App\Models\CompanySetting::query()->value('data_reset_at');
+        if ($marque === null) {
+            echec('Réinitialisation non faite : '.diagnostic($composant));
+        }
+
+        sortie(['data_reset_at' => (string) $marque]);
+
+    case 'etat-reinitialise':
+        $restantes = [];
+        $marque = App\Models\CompanySetting::query()->value('data_reset_at');
+        foreach (ReinitialisationDonneesService::tablesTransactionnelles() as $table) {
+            if (! Illuminate\Support\Facades\Schema::hasTable($table)) {
+                continue;
+            }
+            $requete = DB::table($table);
+            // Le journal de synchronisation (H3) consigne les synchronisations des postes APRÈS la réinitialisation :
+            // ces lignes-là sont la trace de l'essai, pas une donnée ressuscitée. Celles d'avant doivent avoir disparu.
+            if ($table === 'journal_synchronisation' && $marque !== null) {
+                $requete->where('created_at', '<', $marque);
+            }
+            if (($n = $requete->count()) > 0) {
+                $restantes[$table] = $n;
+            }
+        }
+
+        sortie(['restantes' => $restantes, 'data_reset_at' => (string) App\Models\CompanySetting::query()->value('data_reset_at')]);
+
     // ── Après l'essai : ce que le serveur détient, et ses invariants propres ──────────────────────────────────────
     case 'etat':
         [$fichierInstantane, $fichierSaisies] = $arguments + [null, null];
@@ -238,13 +427,67 @@ switch ($commande) {
             'veterinary_records' => 'veterinary_records', 'customers' => 'customers', 'suppliers' => 'suppliers',
             'purchases' => 'purchases', 'customer_advances' => 'customer_advances',
             'livestock_transfers' => 'livestock_transfers',
+            // Ticket S-T12 — tout ce qui se synchronise.
+            'products' => 'products', 'expenses' => 'expenses', 'supplier_payments' => 'supplier_payments',
+            'supplier_refunds' => 'supplier_refunds', 'advance_imputations' => 'advance_imputations',
+            'infirmary_records' => 'infirmary_records', 'veterinary_calendar_events' => 'veterinary_calendar_events',
+            'livestock_reproduction_events' => 'livestock_reproduction_events', 'feed_types' => 'feed_types',
+            'feed_ration_standards' => 'feed_ration_standards',
         ];
         $presence = [];
         foreach ($tables as $cle => $table) {
             foreach ($saisies[$cle] ?? [] as $id) {
-                $idServeur = in_array($table, ['customers', 'suppliers'], true) ? ($fusion->idServeur($table, $id) ?? $id) : $id;
+                $idServeur = in_array($table, ['customers', 'suppliers', 'products'], true) ? ($fusion->idServeur($table, $id) ?? $id) : $id;
                 $presence[$cle][$id] = DB::table($table)->where('id', $idServeur)->count();
             }
+        }
+        // Retours fournisseurs : une ligne par ligne d'achat, rattachées au lot du poste (`return_batch_id`) ; « présent
+        // une fois » = le lot existe (ses lignes sont comptées à part, dans `retours`).
+        $retours = [];
+        foreach ($saisies['purchase_returns'] ?? [] as $id) {
+            $n = DB::table('purchase_returns')->where('return_batch_id', $id)->count();
+            $presence['purchase_returns'][$id] = $n > 0 ? 1 : 0;
+            $retours[$id] = $n;
+        }
+
+        // Ticket S-T12 — l'état au serveur des lignes saisies aux postes dont l'essai compare les champs avec le poste
+        // qui les a saisies (cycle de reproduction, infirmerie, calendrier, archivage d'un soin, barèmes d'élevage).
+        $colonnes = [
+            'livestock_reproduction_events' => ['status', 'palpation_date', 'mise_bas_date_actual', 'nes_vivants', 'nes_morts'],
+            'infirmary_records' => ['status'],
+            'veterinary_calendar_events' => ['status'],
+            'veterinary_records' => ['is_active'],
+            'feed_ration_standards' => ['ration_g_per_day', 'is_active'],
+            'feed_types' => ['name', 'price_per_kg', 'is_active'],
+        ];
+        $lignes = [];
+        foreach ($colonnes as $table => $cols) {
+            foreach ($saisies[$table] ?? [] as $id) {
+                $ligne = DB::table($table)->where('id', $id)->first($cols);
+                $lignes[$table][$id] = $ligne === null ? null : array_map(
+                    fn ($v) => is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}/', $v) ? substr($v, 0, 10) : $v,
+                    (array) $ligne,
+                );
+            }
+        }
+        $lignes['company_settings'] = ['rappel_soins_jours' => App\Models\CompanySetting::query()->value('rappel_soins_jours')];
+
+        // Dépenses : chacune comptabilisée UNE fois (une écriture `expense` active qui la désigne).
+        $depenses = [];
+        foreach ($saisies['expenses'] ?? [] as $id) {
+            $depenses[$id] = DB::table('accounting_entries')->where('source_type', 'expense')->where('source_id', $id)
+                ->where('is_active', true)->count();
+        }
+
+        // Avances saisies aux postes : `amount_used` = somme des imputations reçues (ni perdue, ni comptée deux fois).
+        $avances = [];
+        foreach ($saisies['customer_advances'] ?? [] as $id) {
+            $a = DB::table('customer_advances')->where('id', $id)->first(['amount', 'amount_used']);
+            $avances[$id] = $a === null ? null : [
+                'montant' => round((float) $a->amount, 2),
+                'utilise' => round((float) $a->amount_used, 2),
+                'imputations' => round((float) DB::table('advance_imputations')->where('customer_advance_id', $id)->sum('amount'), 2),
+            ];
         }
         // Fiches : par leur clé naturelle (bande, jour) — une fiche fusionnée (S-T9) a pris l'identifiant du serveur.
         foreach ($saisies['fiches'] ?? [] as $cle) {
@@ -288,6 +531,16 @@ switch ($commande) {
         }
         $doublons['clients_meme_cle'] = $cles['customers'];
         $doublons['fournisseurs_meme_cle'] = $cles['suppliers'];
+        // Ticket S-T12 — produits : même clé naturelle (S-T5) parmi les fiches actives, dont une créée pendant l'essai.
+        $produits = [];
+        foreach (Product::where('is_active', true)->get(['id', 'name', 'category_id', 'unit', 'species_id']) as $produit) {
+            $cle = $fusion->cleNaturelle('products', $produit->toArray());
+            if ($cle !== null) {
+                $produits[$cle][] = $produit->id;
+            }
+        }
+        $doublons['produits_meme_cle'] = array_filter($produits, fn ($ids) => count($ids) > 1
+            && array_diff($ids, array_keys($avant['stocks'])) !== []);
 
         // 3. Ventes sur les fiches (15.30) : pour chaque (bande, jour) suivi, la vente AJOUTÉE à la fiche depuis
         // l'instantané doit être la somme des quantités des NOUVELLES ventes (postes et web) — ni deux fois, ni zéro.
@@ -335,7 +588,33 @@ switch ($commande) {
         $ventesSansEcriture = Sale::whereNotIn('id', $avant['ventes'])
             ->where('status', 'validee')->whereNull('accounting_entry_id')->pluck('id')->all();
 
+        // 6. Ticket S-T12 — les deux côtés de chaque flux ont bougé d'autant depuis l'instantané (au centime).
+        $s0 = $avant['soldes'];
+        $s1 = $apres['soldes'];
+        $d = fn (array $a, array $b, string $k) => round(($b[$k] ?? 0) - ($a[$k] ?? 0), 2);
+        $codes = array_unique(array_merge(array_keys($s0['tresorerie']), array_keys($s1['tresorerie'])));
+        $tresorerie = [];
+        foreach ($codes as $code) {
+            $tresorerie[$code] = [
+                'comptes' => $d($s0['tresorerie'], $s1['tresorerie'], $code),
+                'classe5' => $d($s0['livre'], $s1['livre'], $code),
+            ];
+        }
+        $concordance = [
+            'tresorerie' => $tresorerie,
+            // Solde débiteur du 411 = créances ; créditeur du 401 = dettes ; créditeur du 419 = avances ; débiteur du 409.
+            'creances_clients' => ['metier' => round($s1['creances_clients'] - $s0['creances_clients'], 2), 'livre' => $d($s0['livre'], $s1['livre'], '411')],
+            'dettes_fournisseurs' => ['metier' => round($s1['dettes_fournisseurs'] - $s0['dettes_fournisseurs'], 2), 'livre' => -$d($s0['livre'], $s1['livre'], '401')],
+            'avances' => ['metier' => round($s1['avances'] - $s0['avances'], 2), 'livre' => -$d($s0['livre'], $s1['livre'], '419')],
+            'creances_fournisseurs' => ['metier' => round($s1['creances_fournisseurs'] - $s0['creances_fournisseurs'], 2), 'livre' => $d($s0['livre'], $s1['livre'], '409')],
+        ];
+
         sortie([
+            'concordance' => $concordance,
+            'depenses' => $depenses,
+            'avances' => $avances,
+            'retours' => $retours,
+            'lignes' => $lignes,
             'presence' => $presence,
             'doublons' => $doublons,
             'fiches_vente' => $fichesVente,

@@ -84,7 +84,11 @@ cd agrierp_flutter && flutter test --tags integration test/sync_reel_test.dart
 # 2) L'essai à cinq postes avec coupures au hasard (Linux / WSL : MariaDB privé, serveur, postes, arrêt propre)
 cd agrierp_flutter && ./outils/essai_multipostes.sh                 # une graine tirée au hasard
 ./outils/essai_multipostes.sh 42 7 2026                               # trois essais rejouables (graines 42, 7, 2026)
+ESSAI_FUSEAUX="Africa/Porto-Novo America/New_York" ./outils/essai_multipostes.sh 42   # postes dans deux fuseaux
 ```
+
+L'essai (S-T9 à S-T12) joue cinq journées par graine (~3 min) et couvre tout ce qui se synchronise, jusqu'à la
+réinitialisation des données au web en fin d'essai ; il échoue au premier invariant faux et laisse un rapport lisible.
 
 ### Construire l'installateur
 

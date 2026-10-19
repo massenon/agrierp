@@ -155,7 +155,7 @@ class SyncLignesVentesAchatsTest extends TestCase
         Carbon::setTestNow('2026-10-19 08:00:00');
         $ancienneVente = $this->vente([[1, 30000]]);
         $ancienAchat = $this->achat([[4, 8000]]);
-        $depuis = '2026-10-19T09:00:00+00:00';
+        $depuis = '2026-10-19T09:00:00';
 
         Carbon::setTestNow('2026-10-19 10:00:00');
         $nouvelleVente = $this->vente([[3, 90000]]);
@@ -177,7 +177,7 @@ class SyncLignesVentesAchatsTest extends TestCase
         Carbon::setTestNow('2026-10-19 08:00:00');
         $vente = $this->vente([[1, 30000], [2, 50000]]);
         $achat = $this->achat([[4, 8000], [6, 7900]]);
-        $depuis = '2026-10-19T09:00:00+00:00';
+        $depuis = '2026-10-19T09:00:00';
 
         // La pièce change APRÈS le curseur (ex. statut MeCeF d'une vente, retour d'un achat), pas ses lignes.
         Carbon::setTestNow('2026-10-19 10:00:00');
@@ -196,7 +196,7 @@ class SyncLignesVentesAchatsTest extends TestCase
         Carbon::setTestNow('2026-10-19 08:00:00');
         $vente = $this->vente([[1, 30000], [2, 50000]]);
         $achat = $this->achat([[4, 8000], [6, 7900]]);
-        $depuis = '2026-10-19T09:00:00+00:00';
+        $depuis = '2026-10-19T09:00:00';
 
         Carbon::setTestNow('2026-10-19 10:00:00');
         SaleLine::where('sale_id', $vente->id)->first()->touch();
@@ -217,7 +217,7 @@ class SyncLignesVentesAchatsTest extends TestCase
         $this->vente([[1, 30000]]);
         $this->achat([[4, 8000]]);
 
-        $reponse = $this->tirer('2026-10-19T09:00:00+00:00');
+        $reponse = $this->tirer('2026-10-19T09:00:00');
 
         $this->assertSame([], $reponse->json('sale_lines'));
         $this->assertSame([], $reponse->json('purchase_lines'));

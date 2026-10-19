@@ -137,7 +137,7 @@ class SyncRetoursAchatsTest extends TestCase
     {
         Carbon::setTestNow('2026-10-19 08:00:00');
         $ancien = $this->achat([[4, 8000]], retourne: true);
-        $depuis = '2026-10-19T09:00:00+00:00';
+        $depuis = '2026-10-19T09:00:00';
 
         Carbon::setTestNow('2026-10-19 10:00:00');
         $nouveau = $this->achat([[2, 8100], [1, 8000]], retourne: true);
@@ -157,7 +157,7 @@ class SyncRetoursAchatsTest extends TestCase
     {
         Carbon::setTestNow('2026-10-19 08:00:00');
         $achat = $this->achat([[4, 8000], [6, 7900]], retourne: true);
-        $depuis = '2026-10-19T09:00:00+00:00';
+        $depuis = '2026-10-19T09:00:00';
 
         Carbon::setTestNow('2026-10-19 10:00:00');
         PurchaseReturn::where('purchase_id', $achat->id)->first()->touch();
@@ -190,6 +190,6 @@ class SyncRetoursAchatsTest extends TestCase
         Carbon::setTestNow('2026-10-19 08:00:00');
         $this->achat([[4, 8000]], retourne: true);
 
-        $this->assertSame([], $this->tirer('2026-10-19T09:00:00+00:00')->json('purchase_returns'));
+        $this->assertSame([], $this->tirer('2026-10-19T09:00:00')->json('purchase_returns'));
     }
 }

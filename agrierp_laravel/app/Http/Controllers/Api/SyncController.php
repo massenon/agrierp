@@ -298,7 +298,7 @@ class SyncController extends Controller
             return $this->tiragePagine($request);
         }
 
-        $since = $request->filled('since') ? $request->date('since') : null;
+        $since = $request->filled('since') ? $this->curseurDuPoste((string) $request->input('since')) : null;
 
         // 🔴→✅ CURSEUR PRIS AVANT LES REQUÊTES, AVEC UN RECOUVREMENT. `server_time` était calculé APRÈS les quelque
         // 900 lignes de requêtes ci-dessous : une ligne écrite au web PENDANT le tirage (après la lecture de sa table)
@@ -335,6 +335,22 @@ class SyncController extends Controller
     }
 
     /**
+     * 🔴→✅ Ticket S-T12 (trouvé par l'essai à plusieurs postes) — LE CURSEUR DU POSTE EST RAMENÉ À L'HEURE DU SERVEUR.
+     *
+     * Le poste renvoie `since` en UTC (`2026-10-19T17:39:25.000Z`, l'instant que `server_time` lui a donné). Laissé tel
+     * quel, Eloquent le comparait à `updated_at` — enregistré à l'heure MURALE du serveur (Africa/Porto-Novo, UTC+1) —
+     * comme une heure murale : le curseur reculait d'une heure, et chaque tirage « incrémental » resservait toute la
+     * dernière heure d'activité. Mesuré sur le jeu de démonstration (saisi dans l'heure) : 6 pages de 1 000 lignes
+     * pour un tirage censé n'apporter que la minute écoulée, chaque page à refaire depuis la première à la moindre
+     * coupure. Un curseur envoyé avec un décalage À L'EST du serveur aurait, lui, fait sauter des lignes. L'instant est
+     * donc converti dans le fuseau de l'application avant toute comparaison (même règle que `counted_at`, S-T10).
+     */
+    private function curseurDuPoste(string $brut): Carbon
+    {
+        return Date::parse($brut)->setTimezone(config('app.timezone'));
+    }
+
+    /**
      * Ticket S-T4 — une page du tirage paginé (voir `pull`).
      */
     private function tiragePagine(Request $request): JsonResponse
@@ -361,7 +377,7 @@ class SyncController extends Controller
         }
 
         // `since` est celui de la PAGE 1, porté par le jeton : toutes les pages d'un tirage lisent le même.
-        $since = $etat['since'] !== null ? Date::parse($etat['since']) : null;
+        $since = $etat['since'] !== null ? $this->curseurDuPoste($etat['since']) : null;
         $servies = self::tablesServies($request->user());
 
         $reponse = ['page' => (int) $request->input('page', 1), 'tables_servies' => $servies];
@@ -2576,8 +2592,14 @@ class SyncController extends Controller
                 // postes : deux comptoirs qui vendent dans la même bande et envoient à la même seconde) : le second ne
                 // voyait pas encore la fiche du premier à sa lecture et butait sur la contrainte. La fiche est relue,
                 // et la fusion prudente s'applique comme si elle avait été vue ; sinon, refus motivé.
+                //
+                // 🔴→✅ Ticket S-T12 (essai à plusieurs postes, graine 5, MariaDB) — RELUE SOUS VERROU. Une lecture
+                // ordinaire, dans cette transaction, lit l'instantané pris à sa première lecture (REPEATABLE READ) : la
+                // fiche que l'autre envoi vient de valider y est INVISIBLE, la relecture rendait « aucune », et la fiche
+                // de la caisse — qui ne portait que sa vente — était refusée « en double ». La lecture verrouillante lit
+                // la dernière version validée.
                 $occupante = isset($validated)
-                    ? LivestockDailyEntry::where('lot_id', $validated['lot_id'])->whereDate('entry_date', $validated['entry_date'])->first()
+                    ? LivestockDailyEntry::where('lot_id', $validated['lot_id'])->whereDate('entry_date', $validated['entry_date'])->lockForUpdate()->first()
                     : null;
                 try {
                     $issues[$rang] = $occupante !== null && $this->ficheFusionnable($validated, $occupante)
@@ -2892,18 +2914,20 @@ class SyncController extends Controller
                 // poste (palpation, mise bas, cloture), avec les memes valeurs que les actions de l'ecran web
                 // (`SuiviReproduction::recordPalpation`, `saveMiseBas`, `closeCycle`). 🔴 Avant, elles etaient
                 // ignorees en silence : le poste croyait sa palpation envoyee, le serveur n'en savait rien.
+                // Ticket H7 — étapes du cycle saisies au poste. 🔴→✅ Ticket S-T12 : validées AVANT la création aussi
+                // (voir plus bas) — une saillie et sa palpation saisies hors ligne partent dans le même envoi.
+                $etapes = validator($data, [
+                    'palpation_date' => ['nullable', 'date', 'before_or_equal:today'],
+                    'mise_bas_date_actual' => ['nullable', 'date', 'before_or_equal:today'],
+                    'nes_vivants' => ['nullable', 'integer', 'min:0'],
+                    'nes_morts' => ['nullable', 'integer', 'min:0'],
+                    'status' => ['nullable', 'in:en_cours,echec,termine'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                // Seules les valeurs RENSEIGNEES s'appliquent : un poste qui ne connait pas une etape ne l'efface pas.
+                $maj = array_filter($etapes, fn ($v) => $v !== null);
+
                 $existant = LivestockReproductionEvent::find($validated['id']);
                 if ($existant !== null) {
-                    $etapes = validator($data, [
-                        'palpation_date' => ['nullable', 'date', 'before_or_equal:today'],
-                        'mise_bas_date_actual' => ['nullable', 'date', 'before_or_equal:today'],
-                        'nes_vivants' => ['nullable', 'integer', 'min:0'],
-                        'nes_morts' => ['nullable', 'integer', 'min:0'],
-                        'status' => ['nullable', 'in:en_cours,echec,termine'],
-                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
-
-                    // Seules les valeurs RENSEIGNEES s'appliquent : un poste qui ne connait pas une etape ne l'efface pas.
-                    $maj = array_filter($etapes, fn ($v) => $v !== null);
                     if ($maj !== []) {
                         $existant->update($maj);
                         AuditLog::record('reproduction_event.updated_from_device', 'elevage');
@@ -2954,7 +2978,16 @@ class SyncController extends Controller
                     // Meme etat initial que `SuiviReproduction::saveDeclaration()`.
                     'status' => 'en_cours',
                 ]);
+                // 🔴→✅ TICKET S-T12 (trouvé par l'essai à plusieurs postes) — LES ÉTAPES SAISIES AVANT LE PREMIER ENVOI.
+                // Une saillie déclarée hors ligne, puis palpée (ou mise bas, ou cycle clôturé) avant tout envoi, part en UNE
+                // ligne : la création n'en gardait que la saillie, le poste était acquitté, et le tirage suivant écrasait
+                // sa palpation par la ligne du serveur — l'étape perdue sans un mot. Elles s'appliquent comme sur un cycle
+                // connu (mêmes règles que les actions de l'écran web), dans la même écriture.
+                $evenement->fill($maj);
                 $evenement->save();
+                if (array_diff_key($maj, ['status' => true]) !== [] || ($maj['status'] ?? 'en_cours') !== 'en_cours') {
+                    AuditLog::record('reproduction_event.updated_from_device', 'elevage');
+                }
 
                 $accepted[] = $validated['id'];
             } catch (ValidationException $e) {
@@ -3008,6 +3041,8 @@ class SyncController extends Controller
                     // ⚠️ La date de l'achat vient du POSTE : une livraison recue
                     // mardi et synchronisee jeudi appartient a mardi.
                     'purchase_date' => ['nullable', 'date', 'before_or_equal:today'],
+                    // Ticket S-T12 — l'INSTANT de l'achat au poste (ISO 8601 avec fuseau) : il date l'entrée en stock.
+                    'purchased_at' => ['nullable', 'date'],
                     'lines' => ['required', 'array', 'min:1'],
                     'lines.*.product_id' => ['required', 'uuid', 'exists:products,id'],
                     'lines.*.qty' => ['required', 'numeric', 'min:0.01'],
@@ -3028,6 +3063,7 @@ class SyncController extends Controller
                     montantRegle: (float) ($validated['amount_paid'] ?? 0),
                     purchaseId: $validated['id'],
                     purchaseDate: $validated['purchase_date'] ?? null,
+                    instantDuMouvement: $this->instantDeLAchat($validated),
                 );
 
                 $accepted[] = $validated['id'];
@@ -3043,6 +3079,41 @@ class SyncController extends Controller
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T12 — L'ENTRÉE EN STOCK D'UN ACHAT DU POSTE EST DATÉE DE L'ACHAT, plus de sa réception au serveur.
+     *
+     * Un achat fait mardi matin sur un poste hors ligne, puis un comptage de ces rayons mardi midi au bureau, puis la
+     * réception de l'achat jeudi : daté de jeudi, l'achat passait pour POSTÉRIEUR au comptage et la marchandise, déjà
+     * comptée, entrait une seconde fois (`InventaireAuComptageService`). Comme une vente (`sold_at`, 15.30), le
+     * mouvement porte désormais sa date métier :
+     *  - `purchased_at` (instant de la saisie au poste, avec son fuseau) quand il tombe le jour de `purchase_date` —
+     *    ramené à l'heure du serveur, jamais dans le futur ;
+     *  - sinon, un `purchase_date` passé sans heure connue : le seul JOUR (minuit), placé comme les autres dates seules
+     *    (le jour même d'un comptage, il le suit) ;
+     *  - sinon (achat du jour d'un poste ancien) : `null`, l'instant de réception, comme avant.
+     */
+    private function instantDeLAchat(array $valides): ?Carbon
+    {
+        $jour = $valides['purchase_date'] ?? null;
+        $jour = $jour === null ? null : Carbon::parse($jour, config('app.timezone'))->format('Y-m-d');
+
+        if (! empty($valides['purchased_at'])) {
+            $instant = Carbon::parse($valides['purchased_at'])->setTimezone(config('app.timezone'));
+            if ($instant->greaterThan(now())) {
+                $instant = now();
+            }
+            if ($jour === null || $instant->format('Y-m-d') === $jour) {
+                return $instant;
+            }
+        }
+
+        if ($jour !== null && $jour < now()->format('Y-m-d')) {
+            return Carbon::parse($jour, config('app.timezone'))->startOfDay();
+        }
+
+        return null;
     }
 
     /**

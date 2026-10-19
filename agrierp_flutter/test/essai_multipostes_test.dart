@@ -15,16 +15,22 @@ import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/sync/synchronisation_automatique.dart';
 import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/achats/achats_repository.dart';
+import 'package:agrierp/features/achats/depenses_repository.dart';
 import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
+import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
+import 'package:agrierp/features/elevage/soins_vaccins_repository.dart';
+import 'package:agrierp/features/elevage/suivi_reproduction_repository.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
+import 'package:agrierp/features/stocks/produits_repository.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
 import 'package:agrierp/features/sync/coherence_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -50,6 +56,17 @@ import 'coffre_memoire.dart';
 /// par `outils/essai_multipostes.sh`, qui crée une base jetable — et se marque SAUTÉ sinon, avec sa raison. Jamais
 /// contre le serveur de développement (`:8002`) par accident.
 ///
+/// Ticket S-T12 — L'ESSAI COUVRE TOUT CE QUI SE SYNCHRONISE (cinq journées au moins) : retours, remboursements et
+/// règlements fournisseurs, achats à crédit, imputations d'avances (dont une sur la créance d'une vente à crédit du même
+/// envoi), produits créés au poste (et le même produit créé au web : fusion S-T5), dépenses, Paramètres Élevage modifiés
+/// au poste, infirmerie, calendrier vétérinaire, archivage d'un soin, étapes d'un cycle de reproduction ; une session
+/// refusée au web (appairage révoqué, compte désactivé) puis la reconnexion ; trois journées hors ligne pour la
+/// deuxième caisse (envoi par lots H13b, tirage en plusieurs pages S-T4) ; un inventaire compté pendant qu'un mouvement
+/// ANTÉRIEUR attend sur un poste hors ligne (S-T12, reste de S-T10) ; la demande de synchronisation du web (S-T6) ; la
+/// réinitialisation des données au web en fin d'essai (15.50). Invariants ajoutés : dettes, créances, avances et
+/// créances sur fournisseurs justes au centime (métier = grand livre), trésorerie concordante dans les DEUX livres,
+/// dépenses comptabilisées une fois, aucun refus inattendu.
+///
 /// Rejouer : `outils/essai_multipostes.sh <graine>`. ⚠️ Le rejeu est fidèle pour les décisions de coupure de CHAQUE
 /// poste (une suite aléatoire par poste, tirée dans l'ordre de ses propres requêtes) ; l'entrelacement des cinq postes
 /// au serveur, lui, dépend de l'horloge — comme à la ferme.
@@ -57,7 +74,8 @@ void main() {
   final env = Platform.environment;
   final adresse = env['AGRIERP_ESSAI_URL'];
   final graine = int.tryParse(env['AGRIERP_ESSAI_GRAINE'] ?? '') ?? 20261019;
-  final nombreDeJours = int.tryParse(env['AGRIERP_ESSAI_JOURS'] ?? '') ?? 4;
+  // Ticket S-T12 — cinq journées au moins : la deuxième caisse reste hors ligne trois journées pleines, puis revient.
+  final nombreDeJours = int.tryParse(env['AGRIERP_ESSAI_JOURS'] ?? '') ?? 5;
   final fichierRapport =
       env['AGRIERP_ESSAI_RAPPORT'] ??
       '${Directory.systemTemp.path}/agrierp-essai-multipostes-$graine.txt';
@@ -77,6 +95,10 @@ void main() {
         return;
       }
 
+      if (nombreDeJours < 5) {
+        fail('Ticket S-T12 : l\'essai demande au moins 5 journées (AGRIERP_ESSAI_JOURS=$nombreDeJours) — trois journées '
+            'hors ligne pour la deuxième caisse, puis son retour.');
+      }
       final essai = _Essai(
         adresse: adresse,
         graine: graine,
@@ -94,7 +116,7 @@ void main() {
       }
       essai.verifier();
     },
-    timeout: const Timeout(Duration(minutes: 20)),
+    timeout: const Timeout(Duration(minutes: 30)),
   );
 }
 
@@ -139,10 +161,25 @@ class _Perturbateur extends Interceptor {
 
   /// Un mandataire (proxy) qui refuse les corps de plus de [limiteCorps] octets : 413, la requête n'arrive pas.
   /// Le poste doit couper son lot en deux (S-T1) sans jamais séparer une journée couplée (H13b).
-  int limiteCorps = 6000;
+  ///
+  /// ⚠️ Ticket S-T12 — 14 000 octets (6 000 avant) : au-dessus de la plus grosse JOURNÉE COUPLÉE de l'essai (fiches et
+  /// ventes d'un jour de la caisse restée hors ligne, ≈ 12 Ko), au-dessous d'un lot de 50 (≈ 20 Ko). Une journée couplée
+  /// est INDIVISIBLE (H13b) : plus grosse que la limite, elle est refusée (« envoi trop volumineux (413) », S-T1) et ses
+  /// ventes ne partent pas — ce que 6 000 octets provoquaient dès 20 ventes d'un comptoir dans la journée. En
+  /// production la limite est celle de l'hébergement (PHP `post_max_size`, un éventuel ModSecurity) : à vérifier.
+  int limiteCorps = 14000;
 
   int requetes = 0;
   final compteurs = <String, int>{};
+
+  /// Ticket S-T12 — taille de page imposée aux tirages (`taille`, S-T4) : le poste qui revient de trois journées hors
+  /// ligne tire en plusieurs pages, comme à la ferme après une semaine (l'essai n'a pas une semaine de saisies).
+  int? taillePage;
+
+  /// Ticket S-T12 — pages et envois observés à partir du retour du poste ([observer]).
+  bool observer = false;
+  int pagesMax = 0;
+  final lignesParEnvoi = <int>[];
 
   void _compter(String cas, RequestOptions o, [String detail = '']) {
     compteurs[cas] = (compteurs[cas] ?? 0) + 1;
@@ -155,6 +192,12 @@ class _Perturbateur extends Interceptor {
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     if (options.path.startsWith('/api/sync/push') && options.data is Map) {
       journal('$poste  POST /api/sync/push  ← ${resumeCorps(options.data as Map)}');
+      if (observer) {
+        lignesParEnvoi.add((options.data as Map).values.whereType<List>().fold<int>(0, (n, l) => n + l.length));
+      }
+    }
+    if (options.path.startsWith('/api/sync/pull') && taillePage != null) {
+      options.queryParameters = {...options.queryParameters, 'taille': taillePage};
     }
     if (!actif || !_concerne(options)) return handler.next(options);
     requetes++;
@@ -220,6 +263,11 @@ class _Perturbateur extends Interceptor {
     }
     if (response.requestOptions.path.startsWith('/api/sync/push') && response.data is Map) {
       journal('$poste  POST /api/sync/push  → ${resumeEnvoi(response.data as Map)}');
+    }
+    final page = response.requestOptions.queryParameters['page'];
+    if (observer && response.requestOptions.path.startsWith('/api/sync/pull') && page is int && page > pagesMax) {
+      pagesMax = page;
+      journal('$poste  GET /api/sync/pull  → page $page reçue (taille $taillePage)');
     }
     handler.next(response);
   }
@@ -305,8 +353,14 @@ class _Poste {
   final gestes = GestesImportants();
   late final _Perturbateur perturbateur;
   late final Random alea;
-  late final SyncEngine moteur;
-  late final SynchronisationAutomatique auto;
+  SyncEngine? _moteur;
+  SyncEngine get moteur => _moteur!;
+
+  /// La synchronisation automatique de la SESSION en cours : une reconnexion en crée une neuve (S-T1, S-T3).
+  late SynchronisationAutomatique auto;
+
+  /// Ticket S-T12 — tentatives faites par la synchronisation AUTOMATIQUE (pas le bouton).
+  int tentativesAuto = 0;
 
   /// Jour simulé du poste (minuit) et horloge qui en découle (l'heure réelle, ce jour-là) — à l'heure du BÉNIN
   /// (S-T11), quel que soit le fuseau du processus (`TZ`, paramètre `ESSAI_FUSEAUX` du script).
@@ -322,18 +376,27 @@ class _Poste {
   final resultats = <String, int>{};
   final erreursInattendues = <String>[];
 
+  /// Connexion réelle (`POST /api/auth/login`, jeton nommé d'après le poste). Une REconnexion (après un 401) garde la
+  /// base et le moteur du poste, et ouvre une nouvelle session de synchronisation automatique (comme `SocleAccueil`).
   Future<void> connecter(String motDePasse) async {
     final auth = AuthService(client: client, deviceName: nom, coffre: CoffreMemoire());
     await auth.connecter(identifiant: compte, motDePasse: motDePasse);
-    moteur = SyncEngine(database: db, client: client, deviceId: nom, connectivity: connectivite);
-    auto = SynchronisationAutomatique(
-      synchroniser: moteur.synchroniser,
-      changementsReseau: const Stream.empty(),
-      intervalle: Duration(seconds: 6 + rang),
-      gestes: gestes,
-      delaiAgregation: const Duration(milliseconds: 300),
-    );
+    _moteur ??= SyncEngine(database: db, client: client, deviceId: nom, connectivity: connectivite);
+    auto = nouvelleAuto();
   }
+
+  /// [demande] (ticket S-T6) : la session interroge le serveur toutes les 30 s, sans autre déclencheur que l'intervalle.
+  SynchronisationAutomatique nouvelleAuto({Duration? intervalle, bool demande = false}) => SynchronisationAutomatique(
+    synchroniser: () {
+      tentativesAuto++;
+      return moteur.synchroniser();
+    },
+    changementsReseau: const Stream.empty(),
+    intervalle: intervalle ?? Duration(seconds: 6 + rang),
+    gestes: demande ? null : gestes,
+    delaiAgregation: const Duration(milliseconds: 300),
+    demandeDuServeur: demande ? moteur.demandeDuServeur : null,
+  );
 
   /// Une synchronisation « manuelle » (bouton) : son issue est comptée, jamais propagée — sauf une erreur qui
   /// n'est ni un refus du serveur ni un échec de liaison, notée comme INATTENDUE (elle fait échouer l'essai).
@@ -367,6 +430,11 @@ class _Poste {
   AchatsRepository get achats => AchatsRepository(database: db, identifiantPoste: nom, horloge: maintenant);
   StocksRepository get stocks => StocksRepository(database: db, deviceId: nom, horloge: maintenant);
   TransfertsRepository get transferts => TransfertsRepository(database: db, deviceId: nom);
+  DepensesRepository get depenses => DepensesRepository(database: db, deviceId: nom);
+  ProduitsRepository get produits => ProduitsRepository(database: db);
+  ParametresElevageRepository get parametresElevage => ParametresElevageRepository(database: db, maintenant: maintenant);
+  SoinsVaccinsRepository get soinsVaccins => SoinsVaccinsRepository(database: db, soins: soins);
+  SuiviReproductionRepository get reproduction => SuiviReproductionRepository(database: db, deviceId: nom);
 
   Future<Product> produit(String debutDuNom) async =>
       (await db.select(db.products).get()).firstWhere((p) => p.name.startsWith(debutDuNom));
@@ -388,7 +456,7 @@ class _Poste {
   }
 
   Future<void> fermer() async {
-    auto.arreter();
+    if (_moteur != null) auto.arreter();
     await db.close();
   }
 }
@@ -435,6 +503,9 @@ class _Essai {
   }
 
   // ── Côté serveur (le « web » et l'état final) ─────────────────────────────────────────────────────────────────
+  /// Ticket S-T12 — interblocages subis par la caisse du web (défaut décrit dans `essai_multipostes_serveur.php`).
+  final interblocagesWeb = <String>[];
+
   Future<Map<String, dynamic>> _serveur(List<String> arguments) async {
     final r = await Process.run('php', [
       '${Directory.current.path}/outils/essai_multipostes_serveur.php',
@@ -444,7 +515,17 @@ class _Essai {
     if (r.exitCode != 0) {
       throw StateError('Commande serveur « ${arguments.first} » en échec (${r.exitCode}) : ${r.stdout}\n${r.stderr}');
     }
-    return jsonDecode(r.stdout as String) as Map<String, dynamic>;
+    try {
+      final corps = jsonDecode(r.stdout as String) as Map<String, dynamic>;
+      for (final i in (corps['interblocages'] as List?) ?? const []) {
+        interblocagesWeb.add('$i');
+        evenement('Web : vente rejouée après un interblocage MariaDB (défaut connu de la caisse web) — $i');
+      }
+      return corps;
+    } on FormatException {
+      // Une exception rendue par la console de Laravel (code de sortie 0) : le message entier, pas « caractère inattendu ».
+      throw StateError('Commande serveur « ${arguments.first} » : réponse illisible : ${r.stdout}\n${r.stderr}');
+    }
   }
 
   Future<void> derouler() async {
@@ -469,7 +550,7 @@ class _Essai {
     // Connexion réelle (5 connexions : le limiteur du serveur en accepte 5 par minute et par adresse), puis le
     // premier tirage complet, réseau parfait — l'installation du poste.
     for (final p in postes) {
-      await p.connecter('AgriERP@2026');
+      await _connecter(p);
     }
     await Future.wait([for (final p in postes) p.synchroniser('premier tirage')]);
     for (final p in postes) {
@@ -490,9 +571,23 @@ class _Essai {
       for (final p in postes) {
         p.jour = jour;
       }
-      // Une journée sans réseau pour la deuxième caisse (le câble du comptoir) : elle saisit, elle n'envoie rien.
-      caisse2.connectivite.enLigne = d != 1;
-      evenement('Journée ${d + 1}/$jours (${_jourFr(jour)})${d == 1 ? ' — poste-caisse-2 hors ligne toute la journée' : ''}');
+      // Ticket S-T12 — la deuxième caisse (le câble du comptoir) reste hors ligne TROIS journées pleines, puis revient :
+      // elle saisit, elle n'envoie rien ; à son retour, envoi par lots (H13b) et tirage en plusieurs pages (S-T4).
+      caisse2.connectivite.enLigne = !_caisse2HorsLigne(d);
+      // Le bureau est hors ligne la première journée (le même produit est créé au web : fusion S-T5) ; l'élevage la
+      // troisième (une saillie et sa palpation partent dans le même envoi).
+      bureau.connectivite.enLigne = d != 0;
+      elevage.connectivite.enLigne = d != 2;
+      if (d == 4) {
+        caisse2.perturbateur
+          ..taillePage = 40
+          ..observer = true;
+      }
+      await _avantLaJournee(d);
+      evenement('Journée ${d + 1}/$jours (${_jourFr(jour)})'
+          '${_caisse2HorsLigne(d) ? ' — poste-caisse-2 hors ligne toute la journée' : ''}'
+          '${d == 0 ? ' — poste-bureau hors ligne' : ''}${d == 2 ? ' — poste-elevage hors ligne' : ''}'
+          '${d == 4 ? ' — poste-caisse-2 de retour' : ''}');
 
       await Future.wait([
         _journeeBureau(d),
@@ -505,6 +600,7 @@ class _Essai {
 
       // Fin de journée : chacun tente sa synchronisation (le réseau reste perturbé).
       await Future.wait([for (final p in postes) p.synchroniser('fin de journée ${d + 1}')]);
+      await _apresLaJournee(d);
     }
 
     // ── Rétablissement : réseau parfait, synchronisations jusqu'à ce que plus rien ne soit en attente ────────────
@@ -514,7 +610,7 @@ class _Essai {
       p.connectivite.enLigne = true;
     }
     evenement('Rétablissement : réseau parfait');
-    for (var tour = 1; tour <= 8; tour++) {
+    for (var tour = 1; tour <= 12; tour++) {
       for (final p in postes) {
         final r = await p.synchroniser('rétablissement $tour');
         if (r == null) await Future<void>.delayed(const Duration(seconds: 2));
@@ -525,7 +621,13 @@ class _Essai {
     }
     // Un dernier tirage pour tous : chacun reçoit ce que les autres ont envoyé au dernier tour.
     for (final p in postes) {
-      await p.synchroniser('tirage final');
+      await _jusquAAboutir(p, 'tirage final');
+    }
+
+    // ── Ticket S-T6 : la demande de synchronisation du web, servie dans les 30 s ──────────────────────────────────
+    await _demandeDuWeb();
+    for (final p in postes) {
+      await _jusquAAboutir(p, 'tirage final, après la demande du web');
     }
 
     // ── Relevés ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -546,6 +648,11 @@ class _Essai {
       if (compte != null) {
         final local = await (p.db.select(p.db.products)..where((t) => t.id.equals(compte.produit))).getSingleOrNull();
         if (local != null) stocksComptesAuPoste[p.nom] = local.stockQty;
+      }
+      final web = inventaireWeb;
+      if (web != null) {
+        final local = await (p.db.select(p.db.products)..where((t) => t.id.equals(web.produit))).getSingleOrNull();
+        if (local != null) stocksInventaireWebAuPoste[p.nom] = local.stockQty;
       }
       final ventesLocales = {for (final v in await p.db.select(p.db.sales).get()) v.id};
       webRecu[p.nom] = [
@@ -575,6 +682,10 @@ class _Essai {
     final fichierSaisies = '${_travail.path}/saisies.json';
     await File(fichierSaisies).writeAsString(jsonEncode(toutes));
     etatServeur = await _serveur(['etat', _instantane, fichierSaisies]);
+    await _releverLignesLocales();
+
+    // ── Ticket S-T12 : la réinitialisation des données au web, en fin d'essai (15.50) ─────────────────────────────
+    await _reinitialisation();
   }
 
   // ── Gestes de chaque rôle ───────────────────────────────────────────────────────────────────────────────────
@@ -601,7 +712,7 @@ class _Essai {
     return comptes.firstWhere((c) => c.label.toLowerCase().contains('caisse'), orElse: () => comptes.first).id;
   }
 
-  Future<void> _vente(_Poste p, String produit, int quantite, double prixUnitaire, {String? bande, String mode = 'especes', String? clientId}) async {
+  Future<String> _vente(_Poste p, String produit, int quantite, double prixUnitaire, {String? bande, String mode = 'especes', String? clientId}) async {
     final pr = await p.produit(produit);
     final lot = bande == null ? null : await p.bande(bande);
     final v = await p.caisse.enregistrerVente(
@@ -612,12 +723,145 @@ class _Essai {
     );
     p.noter('sales', v.id);
     journaliser('${p.nom}  · vente ${v.id.substring(0, 8)} : $quantite × $produit${bande == null ? '' : ' de $bande'} le ${_jourIso(p.jour)}');
+    return v.id;
   }
+
+  /// Un achat du bureau par le VRAI dépôt, à l'instant simulé (comme l'écran, qui ne passe pas de date : l'achat est
+  /// daté de l'instant de sa saisie).
+  Future<String> _achat(_Poste p, String produit, double quantite, double prix, double paye) async {
+    final f = (await p.db.select(p.db.suppliers).get()).firstWhere((s) => s.name == 'Provenderie ESSAI',
+        orElse: () => throw StateError('fournisseur pas encore reçu'));
+    final id = await p.achats.enregistrer(
+      fournisseurId: f.id,
+      lignes: [LigneSaisieAchat(produit: await p.produit(produit), quantite: quantite, prixUnitaire: prix)],
+      modePaiement: 'especes',
+      compteId: await _compteCaisse(p),
+      montantPaye: paye,
+      date: p.maintenant(),
+    );
+    p.noter('purchases', id);
+    return id;
+  }
+
+  Future<String> _fournisseurEssai(_Poste p) async =>
+      (await p.db.select(p.db.suppliers).get()).firstWhere((s) => s.name == 'Provenderie ESSAI').id;
+
+  Future<String> _depense(_Poste p, String libelle, double montant) async {
+    final categorie = (await p.depenses.categories()).first.label;
+    final e = await p.depenses.enregistrer(
+      date: p.jour,
+      libelle: libelle,
+      categorie: categorie,
+      montant: montant,
+      compteTresorerieId: await _compteCaisse(p),
+    );
+    p.noter('expenses', e.id);
+    return e.id;
+  }
+
+  /// Synchronise [p] jusqu'à ce que [condition] tienne (au plus [essais] fois, réseau perturbé) — l'utilisateur qui
+  /// appuie sur « Synchroniser » jusqu'à voir arriver ce qu'il attend du serveur (une dette, une créance).
+  Future<bool> _jusqua(_Poste p, String quoi, Future<bool> Function() condition, {int essais = 30}) async {
+    for (var i = 0; i < essais; i++) {
+      if (await condition()) return true;
+      final r = await p.synchroniser('attente : $quoi');
+      if (r == null) await Future<void>.delayed(const Duration(milliseconds: 800));
+    }
+    final ok = await condition();
+    if (!ok) journaliser('${p.nom} : $quoi — toujours absent après $essais synchronisations');
+    return ok;
+  }
+
+  /// Une synchronisation (réseau rétabli) réessayée jusqu'à ce qu'elle aboutisse : un refus de débit (429 — les deux
+  /// caisses partagent le compte « caisse », donc son crédit de requêtes par minute) passe en attendant, comme la
+  /// synchronisation automatique le ferait (S-T1). Au plus [essais] fois.
+  Future<void> _jusquAAboutir(_Poste p, String quoi, {int essais = 10}) async {
+    for (var i = 0; i < essais; i++) {
+      if (await p.synchroniser(quoi) != null) return;
+      await Future<void>.delayed(const Duration(seconds: 7));
+    }
+    journaliser('${p.nom} : $quoi — toujours en échec après $essais tentatives');
+  }
+
+  /// Ticket S-T12 — la deuxième caisse est hors ligne les journées 2, 3 et 4 (index 1 à 3).
+  bool _caisse2HorsLigne(int d) => d >= 1 && d <= 3;
+
+  /// Gestes du web qui ouvrent une journée (avant ceux des postes).
+  Future<void> _avantLaJournee(int d) async {
+    switch (d) {
+      case 2:
+        // CFG-1 : l'administrateur révoque l'appairage de la caisse 1, qui continue de vendre.
+        await _serveur(['revoquer', caisse1.nom]);
+        evenement('Web : appairage de poste-caisse-1 révoqué (Paramètres → Postes & Appairage)');
+      case 3:
+        // La caisse 1 se reconnecte (mot de passe) : nouvelle session, synchronisation automatique neuve (S-T3).
+        await _reconnecter(caisse1);
+        // Le compte de la comptabilité est désactivé au web (ses jetons sont révoqués avec lui, S3).
+        await _serveur(['desactiver', compta.compte]);
+        evenement('Web : compte « ${compta.compte} » désactivé (Gestion des utilisateurs)');
+      case 4:
+        await _serveur(['reactiver', compta.compte]);
+        evenement('Web : compte « ${compta.compte} » réactivé');
+        await _reconnecter(compta);
+    }
+  }
+
+  /// Ce qui se constate en fin de journée.
+  Future<void> _apresLaJournee(int d) async {
+    if (d == 2) sessionsRefusees[caisse1.nom] = await _suspendue(caisse1);
+    if (d == 3) sessionsRefusees[compta.nom] = await _suspendue(compta);
+  }
+
+  /// Ticket S-T1 — la synchronisation AUTOMATIQUE d'un poste dont la session est refusée (401) s'arrête. Le
+  /// déclencheur automatique est appelé (comme son intervalle le ferait), au plus cinq fois le temps qu'une tentative
+  /// en cours finisse ; rend l'état constaté.
+  Future<({bool suspendue, int tentatives})> _suspendue(_Poste p) async {
+    for (var i = 0; i < 5 && !p.auto.suspendue; i++) {
+      await p.auto.declencher();
+      if (!p.auto.suspendue) await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    final avant = p.tentativesAuto;
+    // Suspendue : un geste, l'intervalle, plus rien ne part tout seul.
+    p.gestes.signaler();
+    await p.auto.declencher();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    final r = (suspendue: p.auto.suspendue, tentatives: p.tentativesAuto - avant);
+    evenement('${p.nom} : session refusée — synchronisation automatique ${r.suspendue ? 'SUSPENDUE' : 'NON suspendue'}'
+        ', ${r.tentatives} tentative(s) automatique(s) ensuite ; en attente : ${await p.enAttente()}');
+    return r;
+  }
+
+  /// Connexions au serveur, pour respecter son limiteur (5 par minute et par adresse : les cinq postes partagent
+  /// 127.0.0.1).
+  final _connexions = <DateTime>[];
+
+  Future<void> _connecter(_Poste p) async {
+    final recentes = _connexions.where((t) => DateTime.now().difference(t) < const Duration(seconds: 61)).toList()..sort();
+    if (recentes.length >= 5) {
+      final attente = recentes.first.add(const Duration(seconds: 62)).difference(DateTime.now());
+      journaliser('${p.nom} : ${attente.inSeconds} s d\'attente avant la connexion (limiteur du serveur, 5 par minute)');
+      await Future<void>.delayed(attente);
+    }
+    _connexions.add(DateTime.now());
+    await p.connecter('AgriERP@2026');
+  }
+
+  /// Reconnexion après un refus de session : nouvelle connexion, nouvelle session (synchronisation à l'ouverture).
+  Future<void> _reconnecter(_Poste p) async {
+    p.auto.arreter();
+    await _connecter(p);
+    p.auto.demarrer(aussitot: true);
+    evenement('${p.nom} : reconnecté (nouvelle session, synchronisation automatique reprise)');
+  }
+
+  /// Ticket S-T1 — état de la synchronisation automatique constaté après le refus de session, par poste.
+  final sessionsRefusees = <String, ({bool suspendue, int tentatives})>{};
 
   Future<void> _journeeBureau(int d) async {
     final p = bureau;
     switch (d) {
       case 0:
+        // Hors ligne toute la journée : tout part au premier envoi de la journée suivante.
         await _geste(p, 'client « ESSAI Client Commun » (même client qu\'au comptoir 1)', () async {
           final c = await p.clients.creerClient(const FormulaireClient(nom: 'ESSAI Client Commun', telephone: '+229 97 11 22 33', ville: 'Ikpinlè'));
           p.noter('customers', c.id);
@@ -631,18 +875,29 @@ class _Essai {
           final a = await p.stocks.ajouterStock(date: p.jour, productId: pr.id, quantite: '60');
           p.noter('stock_adjustments', a.id);
         });
-        await _geste(p, 'achat de 3 sacs d\'aliment croissance', () async {
-          final f = (await p.db.select(p.db.suppliers).get()).firstWhere((s) => s.name == 'Provenderie ESSAI');
-          final id = await p.achats.enregistrer(
-            fournisseurId: f.id,
-            lignes: [LigneSaisieAchat(produit: await p.produit('Aliment croissance'), quantite: 3, prixUnitaire: 15000)],
-            modePaiement: 'especes',
-            compteId: await _compteCaisse(p),
-            montantPaye: 45000,
-            date: p.jour,
-          );
-          p.noter('purchases', id);
+        await _geste(p, 'achat de 3 sacs d\'aliment croissance (payé)', () => _achat(p, 'Aliment croissance', 3, 15000, 45000));
+        await _geste(p, 'achat de 2 flacons d\'anti-coccidien (payé ; il sera retourné)', () async {
+          achatARetourner = await _achat(p, 'Anti-coccidien', 2, 6000, 12000);
         });
+        await _geste(p, 'achat de 4 sacs d\'aliment ponte, 24 000 F payés sur 64 000 (dette de 40 000 F)',
+            () => _achat(p, 'Aliment ponte', 4, 16000, 24000));
+        // Ticket S-T12 — produits créés au poste (15.15). Le premier, le web le crée aussi aujourd'hui (fusion S-T5) ;
+        // un achat le désigne avant toute synchronisation (référence traduite au serveur, remplacée au poste).
+        await _geste(p, 'produit « $produitFusionNom » (12 en stock) — le web crée le même', () async {
+          final categorie = (await p.produit('Fumier compost')).categoryId!;
+          final pr = await p.produits.creer(FormulaireProduit(nom: produitFusionNom, categorieId: categorie, unite: 'pain', mode: 'fourchette', prixMin: 500, prixMax: 700, stock: 12));
+          p.noter('products', pr.id);
+          produitFusionPoste = pr.id;
+        });
+        await _geste(p, 'achat de 6 « $produitFusionNom » (produit pas encore envoyé)', () async {
+          produitFusionAchat = await _achat(p, produitFusionNom, 6, 400, 2400);
+        });
+        await _geste(p, 'produit « ESSAI Miel de la ferme (pot) » (20 en stock)', () async {
+          final categorie = (await p.produit('Fumier compost')).categoryId!;
+          final pr = await p.produits.creer(FormulaireProduit(nom: 'ESSAI Miel de la ferme (pot)', categorieId: categorie, unite: 'pot', mode: 'fourchette', prixMin: 2500, prixMax: 3000, stock: 20));
+          p.noter('products', pr.id);
+        });
+        await _geste(p, 'dépense : carburant du groupe (15 000 F)', () => _depense(p, 'Carburant du groupe (essai)', 15000));
       case 1:
         await _geste(p, 'inventaire : fumier composté, 2 sacs manquants', () async {
           final pr = await p.produit('Fumier compost');
@@ -650,33 +905,66 @@ class _Essai {
           p.noter('stock_adjustments', a.id);
         });
         await _geste(p, 'vente au bureau : 2 Poulet goliath de ESSAI-B', () => _vente(p, 'Poulet goliath', 2, 3500, bande: 'ESSAI-B'));
-      case 2:
-        await _geste(p, 'achat de 2 flacons d\'antibiotique', () async {
-          final f = (await p.db.select(p.db.suppliers).get()).firstWhere((s) => s.name == 'Provenderie ESSAI', orElse: () => throw StateError('fournisseur pas encore reçu'));
-          final id = await p.achats.enregistrer(
-            fournisseurId: f.id,
-            lignes: [LigneSaisieAchat(produit: await p.produit('Antibiotique'), quantite: 2, prixUnitaire: 4500)],
-            modePaiement: 'especes',
-            compteId: await _compteCaisse(p),
-            montantPaye: 9000,
-            date: p.jour,
-          );
-          p.noter('purchases', id);
+        // F0.74 / 15.20 — retour de l'achat d'anti-coccidien (payé : il ouvre une créance sur le fournisseur).
+        await _geste(p, 'retour fournisseur de l\'achat d\'anti-coccidien', () async {
+          final r = await p.achats.enregistrerRetour(achatId: achatARetourner!, motif: 'Flacons abîmés à la livraison (essai)', date: p.maintenant());
+          p.noter('purchase_returns', r.id);
+          retourFait = true;
         });
+        await _geste(p, 'dépense : réparation des abreuvoirs (8 000 F)', () => _depense(p, 'Réparation des abreuvoirs (essai)', 8000));
+      case 2:
+        await _geste(p, 'achat de 2 flacons d\'antibiotique', () => _achat(p, 'Antibiotique', 2, 4500, 9000));
         await _geste(p, 'ajout de stock : 5 Lapin vivant', () async {
           final a = await p.stocks.ajouterStock(date: p.jour, productId: (await p.produit('Lapin vivant')).id, quantite: '5');
           p.noter('stock_adjustments', a.id);
         });
         await _inventairePendantUneVente();
-      default:
+        // 15.16 — règlement d'une partie de la dette de l'achat à crédit (la dette doit être descendue au poste).
+        final fournisseur = await _fournisseurEssai(p);
+        await _jusqua(p, 'dette de Provenderie ESSAI', () async => await p.fournisseurs.du(fournisseur) > 0);
+        await _geste(p, 'règlement fournisseur de 25 000 F', () async {
+          final r = await p.fournisseurs.enregistrerReglement(fournisseurId: fournisseur, montant: 25000, compteId: await _compteCaisse(p), date: p.jour);
+          p.noter('supplier_payments', r.id);
+          reglements++;
+        });
+      case 3:
         await _geste(p, 'inventaire : vitamines, 1 sachet en trop', () async {
           final pr = await p.produit('Vitamines');
           final a = await p.stocks.enregistrerEcart(productId: pr.id, stockPhysique: pr.stockQty + 1, motif: StocksRepository.motifs[5], quand: p.maintenant());
           p.noter('stock_adjustments', a.id);
         });
+        // 15.20 — remboursement de la créance ouverte par le retour (elle doit être descendue au poste).
+        final fournisseur = await _fournisseurEssai(p);
+        await _jusqua(p, 'créance sur Provenderie ESSAI', () async => await p.achats.creanceNette(fournisseur) > 0);
+        await _geste(p, 'remboursement fournisseur de 12 000 F', () async {
+          final r = await p.achats.enregistrerRemboursement(fournisseurId: fournisseur, montant: 12000, date: p.jour, compteId: await _compteCaisse(p));
+          p.noter('supplier_refunds', r.id);
+          remboursementFait = true;
+        });
+        await _achatAvantInventaireWeb();
+      default:
+        await _geste(p, 'dépense : électricité (6 000 F)', () => _depense(p, 'Électricité (essai)', 6000));
+        final fournisseur = await _fournisseurEssai(p);
+        await _geste(p, 'règlement du reste de la dette fournisseur', () async {
+          final reste = await p.fournisseurs.du(fournisseur);
+          if (reste <= 0) throw StateError('aucune dette restante au poste');
+          final r = await p.fournisseurs.enregistrerReglement(fournisseurId: fournisseur, montant: reste, compteId: await _compteCaisse(p), date: p.jour);
+          p.noter('supplier_payments', r.id);
+          reglements++;
+        });
     }
     if (p.alea.nextBool()) await p.synchroniser('bureau, en cours de journée ${d + 1}');
   }
+
+  /// Ticket S-T12 — scénarios dont l'essai vérifie qu'ils ont bien eu lieu (un geste refusé au poste les ferait taire).
+  String? achatARetourner;
+  bool retourFait = false;
+  bool remboursementFait = false;
+  int reglements = 0;
+  static const produitFusionNom = 'ESSAI Savon de karité (pain)';
+  String? produitFusionPoste;
+  String? produitFusionWeb;
+  String? produitFusionAchat;
 
   /// Ticket S-T10 — INVENTAIRE SUR UN POSTE PENDANT QUE LE WEB ET UNE CAISSE VENDENT LE MÊME PRODUIT.
   ///
@@ -685,6 +973,10 @@ class _Essai {
   /// caisse 1 vend 1 sac. Puis le bureau revient en ligne et envoie son inventaire — APRÈS la vente de la caisse, au
   /// gré des coupures. Stock final attendu (à la main) : quantité comptée − 1. Avant S-T10, le poste envoyait son
   /// écart LOCAL (−5) et le serveur décomptait la vente du web une seconde fois : 3 sacs de moins, sans erreur.
+  ///
+  /// 🔴→✅ Ticket S-T12 — la caisse 2, hors ligne depuis la veille, a vendu du piment AVANT ce comptage : les rayons ne
+  /// le contiennent plus (le comptage en tient compte), mais la vente n'arrive au serveur que deux jours plus tard. Avant
+  /// S-T12, elle était décomptée EN PLUS du comptage : [pimentVenduHorsLigne] sacs de moins, sans erreur.
   Future<void> _inventairePendantUneVente() async {
     final p = bureau;
     p.connectivite.enLigne = false;
@@ -701,7 +993,9 @@ class _Essai {
       final rayon = (r['stock_apres'] as num).toDouble();
       evenement('Web : vente de 3 sacs de piment (${r['vente']}) — serveur : $rayon, poste-bureau : ${piment.stockQty}');
 
-      final compte = rayon - 2;
+      // Les rayons : le stock du serveur, moins ce que la caisse 2 a vendu hors ligne (le serveur ne le sait pas
+      // encore), moins 2 sacs réellement disparus.
+      final compte = rayon - pimentVenduHorsLigne - 2;
       final a = await p.stocks.enregistrerEcart(
         productId: piment.id,
         stockPhysique: compte,
@@ -710,7 +1004,8 @@ class _Essai {
       );
       p.noter('stock_adjustments', a.id);
       evenement('poste-bureau : inventaire du piment, $compte comptés (écart LOCAL ${a.type} ${a.quantity}, '
-          'écart attendu au serveur : −2) à ${a.movementDate}');
+          'écart attendu au serveur : −2, puis −$pimentVenduHorsLigne régularisés à l\'arrivée de la vente de la caisse 2) '
+          'à ${a.movementDate}');
 
       // Une seconde plus tard (le grand livre est daté à la seconde) : la caisse 1 vend un sac.
       await Future<void>.delayed(const Duration(milliseconds: 1500));
@@ -724,8 +1019,38 @@ class _Essai {
   /// Ticket S-T10 — produit compté par le bureau et son stock final attendu (comptage − ventes postérieures).
   ({String produit, String nom, double attendu})? inventaireCompte;
 
+  /// Ticket S-T12 — piment vendu par la caisse 2 hors ligne, AVANT le comptage du bureau.
+  int pimentVenduHorsLigne = 0;
+
   /// Ticket S-T10 — stock du produit compté sur chaque poste après le tirage final (il se recale sur le serveur).
   final stocksComptesAuPoste = <String, double>{};
+
+  /// 🔴→✅ Ticket S-T12 — UN ACHAT FAIT AVANT UN INVENTAIRE ET ARRIVÉ APRÈS LUI. Le bureau, hors ligne, reçoit 5 sacs
+  /// d'aliment ponte et les range ; une seconde plus tard, le web fait l'inventaire de l'aliment ponte (Gestion des
+  /// Stocks) : les rayons ont ces 5 sacs de plus que le serveur, moins 1 sac abîmé (écart web +4). Puis le bureau revient
+  /// et envoie l'achat. Attendu (à la main) : le comptage du web, sans les 5 sacs une seconde fois. Avant S-T12 :
+  /// l'achat daté de sa réception, compté en plus — 5 sacs de trop.
+  Future<void> _achatAvantInventaireWeb() async {
+    final p = bureau;
+    await _jusqua(p, 'achats du bureau envoyés', () async => !(await p.enAttente()).containsKey('purchases'));
+    p.connectivite.enLigne = false;
+    evenement('poste-bureau hors ligne : achat d\'aliment ponte, puis inventaire de l\'aliment ponte au web (S-T12)');
+    try {
+      final pr = await p.produit('Aliment ponte');
+      final achat = await _achat(p, 'Aliment ponte', 5, 16000, 80000);
+      evenement('poste-bureau : achat ${achat.substring(0, 8)} de 5 sacs d\'aliment ponte à ${p.maintenant()}');
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      final r = await _serveur(['inventaire-web', jsonEncode({'produit': pr.id, 'ecart': 4, 'motif': 'Casse'})]);
+      inventaireWeb = (produit: pr.id, nom: pr.name, attendu: (r['stock'] as num).toDouble());
+      evenement('Web : inventaire de l\'aliment ponte, ${r['stock']} comptés (5 sacs du bureau dans les rayons, 1 abîmé)');
+    } finally {
+      p.connectivite.enLigne = true;
+    }
+  }
+
+  /// Ticket S-T12 — produit inventorié au web pendant qu'un achat antérieur attendait au bureau, et son stock attendu.
+  ({String produit, String nom, double attendu})? inventaireWeb;
+  final stocksInventaireWebAuPoste = <String, double>{};
 
   Future<void> _journeeCaisse(_Poste p, int d) async {
     final bandeDuJour = p.alea.nextBool() ? 'ESSAI-A' : 'ESSAI-B';
@@ -752,18 +1077,90 @@ class _Essai {
       });
     }
     if (d == 1 && p == caisse1) {
-      await _geste(p, 'avance de 5 000 FCFA d\'un client connu', () async {
+      await _geste(p, 'avance de 5 000 F d\'un client connu', () async {
         final client = (await p.db.select(p.db.customers).get()).firstWhere((c) => c.isActive && c.syncStatus == SyncStatus.synced);
         final a = await p.clients.enregistrerAvance(clientId: client.id, montant: 5000, compteId: await _compteCaisse(p), motif: 'Commande de poulets (essai)', date: p.jour);
         p.noter('customer_advances', a.id);
+        avanceCaisse1 = a.id;
       });
     }
     if (d >= 1) {
       await _geste(p, 'vente à crédit à un client connu', () async {
         final client = (await p.db.select(p.db.customers).get()).firstWhere((c) => c.isActive && c.syncStatus == SyncStatus.synced);
-        await _vente(p, 'Fumier compost', 1, 1500, mode: 'credit', clientId: client.id);
+        final id = await _vente(p, 'Fumier compost', 1, 1500, mode: 'credit', clientId: client.id);
+        if (d == 1 && p == caisse1) venteCreditCaisse1 = id;
       });
     }
+    // 15.19 — imputation de l'avance de la veille sur la créance de la vente à crédit, une fois la créance descendue
+    // au poste (le poste n'impute que sur une créance qu'il connaît, F0.73). La caisse 1 vient de se reconnecter.
+    if (d == 3 && p == caisse1) {
+      Future<Receivable?> creance() async => (await p.db.select(p.db.receivables).get())
+          .where((c) => c.saleId == venteCreditCaisse1 && c.amount - c.amountPaid > 0).firstOrNull;
+      await _jusqua(p, 'créance de la vente à crédit de la veille', () async => await creance() != null);
+      await _geste(p, 'imputation de l\'avance sur la créance de la vente à crédit', () async {
+        final c = (await creance())!;
+        final avance = await (p.db.select(p.db.customerAdvances)..where((a) => a.id.equals(avanceCaisse1!))).getSingle();
+        final montant = [await p.clients.resteAvance(avance), await p.clients.soldeCreance(c)].reduce(min);
+        final i = await p.clients.imputerAvance(avanceId: avanceCaisse1!, creanceId: c.id, montant: montant, date: p.jour);
+        p.noter('advance_imputations', i.id);
+        imputationCreance = (avance: avanceCaisse1!, montant: montant);
+      });
+    }
+    if (p == caisse2 && _caisse2HorsLigne(d)) await _journeeHorsLigneCaisse2(d);
+  }
+
+  /// Ticket S-T12 — la caisse 1 : son avance, sa vente à crédit, l'imputation faite après sa reconnexion.
+  String? avanceCaisse1;
+  String? venteCreditCaisse1;
+  ({String avance, double montant})? imputationCreance;
+
+  /// Ticket S-T12 — la caisse 2 hors ligne : l'avance et la vente à crédit d'un client, imputée par la vente du MÊME
+  /// envoi (`sale_id`, 15.19).
+  ({String avance, double montant})? imputationMemeEnvoi;
+
+  /// Ticket S-T12 — la deuxième caisse, hors ligne trois journées : le comptoir continue (15 ventes de plus par jour, de
+  /// quoi dépasser un lot de 50 au retour), du piment vendu AVANT le comptage du bureau, et une avance imputée sur la
+  /// vente à crédit du même envoi.
+  Future<void> _journeeHorsLigneCaisse2(int d) async {
+    final p = caisse2;
+    for (var i = 0; i < 15; i++) {
+      try {
+        await _vente(p, 'Fumier compost', 1, 1500);
+      } catch (e) {
+        journaliser('${p.nom}  ✎ vente de comptoir — REFUSÉ AU POSTE : $e');
+        p._compter('geste refusé au poste');
+      }
+    }
+    if (d != 1) return;
+    await _geste(p, 'vente de 2 sacs de piment, hors ligne, AVANT le comptage du bureau', () async {
+      await _vente(p, 'Piment frais', 2, 1200);
+      pimentVenduHorsLigne += 2;
+    });
+    await _geste(p, 'avance de 3 000 F, vente à crédit de 3 000 F et imputation de l\'une sur l\'autre (même envoi)', () async {
+      final clients = (await p.db.select(p.db.customers).get()).where((c) => c.isActive && c.syncStatus == SyncStatus.synced).toList();
+      final client = clients.length > 1 ? clients[1] : clients.first;
+      final a = await p.clients.enregistrerAvance(clientId: client.id, montant: 3000, compteId: await _compteCaisse(p), motif: 'Acompte sur fumier (essai)', date: p.jour);
+      p.noter('customer_advances', a.id);
+      final vente = await _vente(p, 'Fumier compost', 2, 1500, mode: 'credit', clientId: client.id);
+      // ⚠️ AUCUN DÉPÔT DU POSTE N'ÉCRIT CETTE IMPUTATION (F0.73 : l'écran n'offre que les créances DÉJÀ descendues ;
+      // celle d'une vente à crédit pas encore envoyée n'existe pas au poste). La colonne `sale_id` et l'envoi sont
+      // prêts : l'essai l'écrit donc directement, pour éprouver le contrat 15.19 du serveur au milieu des coupures.
+      final id = 'e5512000-0000-4000-8000-${(DateTime.now().microsecondsSinceEpoch % 1000000000000).toString().padLeft(12, '0')}';
+      await p.db.into(p.db.advanceImputations).insert(
+        AdvanceImputationsCompanion.insert(
+          id: id,
+          deviceId: p.nom,
+          syncStatus: const Value(SyncStatus.pending),
+          updatedAt: DateTime.now(),
+          customerAdvanceId: a.id,
+          saleId: Value(vente),
+          amount: 3000,
+          imputationDate: p.jour,
+        ),
+      );
+      p.noter('advance_imputations', id);
+      imputationMemeEnvoi = (avance: a.id, montant: 3000);
+    });
   }
 
   Future<void> _journeeElevage(int d) async {
@@ -777,17 +1174,89 @@ class _Essai {
         journaliser('${p.nom}  · fiche ${f.id} ($code, ${_jourIso(p.jour)}) : ${f.mort} mort(s)');
       });
     }
-    if (d == 1) {
-      await _geste(p, 'soin : vitamines sur ESSAI-B (sans délai d\'attente)', () async {
-        final s = await p.soins.enregistrer(lotId: (await p.bande('ESSAI-B')).id, typeAction: 'Traitement', produit: 'Vitamines AD3E', dose: '1 g/L', cout: 2500, quand: p.maintenant());
-        p.noter('veterinary_records', s.id);
-      });
-    }
-    if (d == 2) {
-      await _geste(p, 'transfert de 10 sujets ESSAI-A → ESSAI-B', () async {
-        final t = await p.transferts.creer(sourceLotId: (await p.bande('ESSAI-A')).id, targetLotId: (await p.bande('ESSAI-B')).id, jour: p.jour, quantite: 10, motif: 'Essai S-T9');
-        p.noter('livestock_transfers', t.id);
-      });
+    switch (d) {
+      case 0:
+        // H8b — infirmerie et calendrier vétérinaire saisis au poste ; H7 — une saillie.
+        await _geste(p, 'entrée à l\'infirmerie (ESSAI-B)', () async {
+          infirmerie = await p.soinsVaccins.enregistrerEntreeInfirmerie(lotId: (await p.bande('ESSAI-B')).id, sujetRef: 'P-17', motif: 'Boiterie (essai)', niveauIsolement: 'Infirmerie', dateEntree: p.jour, quand: HeureBenin.versInstant(p.maintenant()));
+          p.noter('infirmary_records', infirmerie!);
+          _saisi('infirmary_records', infirmerie!, {'status': 'en_cours'});
+        });
+        await _geste(p, 'intervention planifiée (ESSAI-A, dans 3 jours)', () async {
+          intervention = await p.soinsVaccins.planifierIntervention(lotId: (await p.bande('ESSAI-A')).id, intervention: 'Vaccin Newcastle (essai)', datePrevue: HeureBenin.plusJours(p.jour, 3), quand: HeureBenin.versInstant(p.maintenant()));
+          p.noter('veterinary_calendar_events', intervention!);
+          _saisi('veterinary_calendar_events', intervention!, {'status': 'planned'});
+        });
+        await _geste(p, 'saillie de L-ESSAI-1 (CUN-2026-01)', () async {
+          cycle1 = await p.reproduction.declarerSaillie(lotId: (await p.bande('CUN-2026-01')).id, numeroFemelle: 'L-ESSAI-1', numeroMale: 'M-ESSAI', dateSaillie: p.jour, maintenant: p.maintenant());
+          p.noter('livestock_reproduction_events', cycle1!);
+          _saisi('livestock_reproduction_events', cycle1!, {'status': 'en_cours'});
+        });
+      case 1:
+        await _geste(p, 'soin : vitamines sur ESSAI-B (sans délai d\'attente)', () async {
+          final s = await p.soins.enregistrer(lotId: (await p.bande('ESSAI-B')).id, typeAction: 'Traitement', produit: 'Vitamines AD3E', dose: '1 g/L', cout: 2500, quand: p.maintenant());
+          p.noter('veterinary_records', s.id);
+          soinAArchiver = s.id;
+          _saisi('veterinary_records', s.id, {'is_active': true});
+        });
+        await _geste(p, 'palpation positive de L-ESSAI-1', () async {
+          await p.reproduction.enregistrerPalpation(cycle1!, positive: true, maintenant: p.maintenant());
+          _saisi('livestock_reproduction_events', cycle1!, {'palpation_date': _jourIso(p.jour), 'status': 'en_cours'});
+        });
+        // H9b — Paramètres Élevage modifiés au poste (le web, lui, modifie l'aviculture demain).
+        await _geste(p, 'ration cuniculture : +5 g/jour (Paramètres Élevage)', () async {
+          final ration = (await p.db.select(p.db.feedRationStandards).get()).firstWhere((r) => r.isActive && r.speciesCode == 'cuniculture');
+          await p.parametresElevage.enregistrerRation(id: ration.id, espece: 'cuniculture', stade: ration.stageLabel, grammes: ration.rationGPerDay.round() + 5);
+          p.noter('feed_ration_standards', ration.id);
+          rationPoste = ration.id;
+          _saisi('feed_ration_standards', ration.id, {'ration_g_per_day': ration.rationGPerDay.round() + 5, 'is_active': true});
+        });
+        await _geste(p, 'provende « ESSAI Provende lapin » (Paramètres Élevage)', () async {
+          final especes = (await p.parametresElevage.charger()).especesProvende;
+          final lapin = especes.firstWhere((e) => e.code == 'cuniculture', orElse: () => especes.first);
+          provende = await p.parametresElevage.enregistrerProvende(nom: 'ESSAI Provende lapin', espece: lapin, sacKg: 25, prixKg: 310);
+          p.noter('feed_types', provende!);
+          _saisi('feed_types', provende!, {'name': 'ESSAI Provende lapin', 'price_per_kg': 310, 'is_active': true});
+        });
+      case 2:
+        // Hors ligne toute la journée : la saillie et sa palpation (négative) partent dans le MÊME envoi.
+        await _geste(p, 'saillie de L-ESSAI-2 puis palpation négative, hors ligne', () async {
+          cycle2 = await p.reproduction.declarerSaillie(lotId: (await p.bande('CUN-2026-01')).id, numeroFemelle: 'L-ESSAI-2', dateSaillie: p.jour, maintenant: p.maintenant());
+          p.noter('livestock_reproduction_events', cycle2!);
+          await p.reproduction.enregistrerPalpation(cycle2!, positive: false, maintenant: p.maintenant());
+          _saisi('livestock_reproduction_events', cycle2!, {'status': 'echec', 'palpation_date': _jourIso(p.jour)});
+        });
+        await _geste(p, 'rappel des soins planifiés : 4 jours (Paramètres Élevage)', () async {
+          await p.parametresElevage.enregistrerRappelSoins(4);
+          rappelSoins = 4;
+        });
+        await _geste(p, 'réintégration de l\'animal de l\'infirmerie', () async {
+          await p.soinsVaccins.reintegrer(infirmerie!, quand: HeureBenin.versInstant(p.maintenant()));
+          _saisi('infirmary_records', infirmerie!, {'status': 'reintegre'});
+        });
+        await _geste(p, 'transfert de 10 sujets ESSAI-A → ESSAI-B', () async {
+          final t = await p.transferts.creer(sourceLotId: (await p.bande('ESSAI-A')).id, targetLotId: (await p.bande('ESSAI-B')).id, jour: p.jour, quantite: 10, motif: 'Essai S-T9');
+          p.noter('livestock_transfers', t.id);
+        });
+      case 3:
+        await _geste(p, 'mise bas de L-ESSAI-1 : 7 vivants, 1 mort', () async {
+          await p.reproduction.enregistrerMiseBas(cycle1!, nesVivants: 7, nesMorts: 1, maintenant: p.maintenant());
+          _saisi('livestock_reproduction_events', cycle1!, {'mise_bas_date_actual': _jourIso(p.jour), 'nes_vivants': 7, 'nes_morts': 1});
+        });
+        await _geste(p, 'administration confirmée (calendrier)', () async {
+          await p.soinsVaccins.confirmerAdministration(intervention!, quand: HeureBenin.versInstant(p.maintenant()));
+          _saisi('veterinary_calendar_events', intervention!, {'status': 'done'});
+        });
+        // U3 — archivage d'un soin au poste.
+        await _geste(p, 'archivage du soin de la journée 2', () async {
+          await p.soinsVaccins.archiverSoin(soinAArchiver!, quand: HeureBenin.versInstant(p.maintenant()));
+          _saisi('veterinary_records', soinAArchiver!, {'is_active': false});
+        });
+      case 4:
+        await _geste(p, 'clôture du cycle de L-ESSAI-1 (sevrage)', () async {
+          await p.reproduction.cloturerCycle(cycle1!, maintenant: p.maintenant());
+          _saisi('livestock_reproduction_events', cycle1!, {'status': 'termine'});
+        });
     }
     // L'animalier corrige sa fiche en fin de journée (un mort de plus), parfois pendant un envoi.
     final envoi = p.alea.nextBool() ? p.synchroniser('élevage, envoi en arrière-plan, journée ${d + 1}') : Future<SyncOutcome?>.value();
@@ -802,6 +1271,16 @@ class _Essai {
     await envoi;
   }
 
+  /// Ticket S-T12 — lignes saisies à l'élevage dont le serveur doit détenir l'état FINAL du poste.
+  String? infirmerie, intervention, cycle1, cycle2, soinAArchiver, rationPoste, provende;
+  int? rappelSoins;
+
+  /// Ticket S-T12 — ce que l'animalier a SAISI (dernière valeur de chaque champ), par `table|id` : c'est l'attendu, au
+  /// serveur comme sur le poste. ⚠️ Comparer le serveur à l'état FINAL du poste ne suffit pas : une étape acquittée sans
+  /// être appliquée est ensuite ÉCRASÉE au poste par le tirage, et les deux côtés concordent… sur la perte.
+  final saisiElevage = <String, Map<String, Object?>>{};
+  void _saisi(String table, String id, Map<String, Object?> champs) => (saisiElevage['$table|$id'] ??= {}).addAll(champs);
+
   Future<void> _journeeCompta(int d) async {
     await _pause(compta);
     await compta.synchroniser('comptabilité, journée ${d + 1}');
@@ -810,6 +1289,19 @@ class _Essai {
   /// Écritures faites AU WEB pendant que les postes travaillent : le tirage doit les ramener (curseur S-T4).
   Future<void> _journeeWeb(int d, DateTime jour) async {
     await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (d == 0) {
+      // Ticket S-T12 — le même produit que celui que le bureau, hors ligne, crée aujourd'hui (fusion S-T5).
+      final r = await _serveur(['produit-web', jsonEncode({
+        'nom': produitFusionNom,
+        'categorie': (await bureau.produit('Fumier compost')).categoryId,
+        'unite': 'pain',
+        'prix_min': 500,
+        'prix_max': 700,
+        'stock': 12,
+      })]);
+      produitFusionWeb = r['produit'] as String;
+      evenement('Web : produit « $produitFusionNom » créé (Ajouter un Produit) — ${r['produit']}');
+    }
     if (d == 1) {
       final r = await _serveur(['vente-web', jsonEncode({
         'produit': (await bureau.produit('Poulet goliath')).id,
@@ -827,6 +1319,150 @@ class _Essai {
       grammesWeb = r['grammes'] as int;
       evenement('Web : ration aviculture portée à 777 g/jour (Paramètres Élevage)');
     }
+  }
+
+  /// Ticket S-T6 — le web demande au poste-bureau de se synchroniser ; sa session ne fait rien d'autre qu'interroger le
+  /// serveur toutes les 30 s (intervalle d'une heure, aucun geste). Une vente faite au web juste avant doit arriver sur
+  /// le poste dans les 30 s (plus le temps du tirage).
+  Future<void> _demandeDuWeb() async {
+    final p = bureau;
+    p.auto.arreter();
+    p.auto = p.nouvelleAuto(intervalle: const Duration(hours: 1), demande: true)..demarrer();
+    final avant = p.tentativesAuto;
+    final vente = await _serveur(['vente-web', jsonEncode({
+      'produit': (await p.produit('Fumier compost')).id,
+      'quantite': 1,
+      'montant': 1500,
+    })]);
+    webVentes.add(vente['vente'] as String);
+    final demande = await _serveur(['demander', p.nom]);
+    evenement('Web : vente ${vente['vente']} puis « Demander la synchronisation » de ${p.nom} (S-T6)');
+    final debut = DateTime.now();
+    while (DateTime.now().difference(debut) < const Duration(seconds: 50)) {
+      final recue = await (p.db.select(p.db.sales)..where((v) => v.id.equals(vente['vente'] as String))).getSingleOrNull();
+      if (recue != null) {
+        delaiDemande = DateTime.now().difference(debut);
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    p.auto.arreter();
+    demandeServie = (await _serveur(['demande', demande['demande'] as String]))['servie'] == true;
+    tentativesDemande = p.tentativesAuto - avant;
+    evenement('${p.nom} : vente du web reçue ${delaiDemande == null ? 'JAMAIS (50 s)' : 'après ${delaiDemande!.inMilliseconds / 1000} s'}'
+        ', demande servie : $demandeServie, $tentativesDemande synchronisation(s) automatique(s)');
+  }
+
+  Duration? delaiDemande;
+  bool demandeServie = false;
+  int tentativesDemande = 0;
+
+  /// Ticket S-T12 — l'état final, au poste qui les a saisies, des lignes que le serveur doit détenir à l'identique.
+  final lignesLocales = <String, Map<String, Object?>>{};
+
+  Future<void> _releverLignesLocales() async {
+    final p = elevage;
+    String? jour(DateTime? d) => d == null ? null : _jourIso(d);
+    for (final id in [?cycle1, ?cycle2]) {
+      final c = await (p.db.select(p.db.livestockReproductionEvents)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['livestock_reproduction_events|$id'] = {
+        'status': c?.status,
+        'palpation_date': jour(c?.palpationDate),
+        'mise_bas_date_actual': jour(c?.miseBasDateActual),
+        'nes_vivants': c?.nesVivants,
+        'nes_morts': c?.nesMorts,
+      };
+    }
+    if (infirmerie != null) {
+      final i = await (p.db.select(p.db.infirmaryRecords)..where((t) => t.id.equals(infirmerie!))).getSingleOrNull();
+      lignesLocales['infirmary_records|$infirmerie'] = {'status': i?.status};
+    }
+    if (intervention != null) {
+      final i = await (p.db.select(p.db.veterinaryCalendarEvents)..where((t) => t.id.equals(intervention!))).getSingleOrNull();
+      lignesLocales['veterinary_calendar_events|$intervention'] = {'status': i?.status};
+    }
+    if (soinAArchiver != null) {
+      final s = await (p.db.select(p.db.veterinaryRecords)..where((t) => t.id.equals(soinAArchiver!))).getSingleOrNull();
+      lignesLocales['veterinary_records|$soinAArchiver'] = {'is_active': s?.isActive};
+    }
+    if (rationPoste != null) {
+      final r = await (p.db.select(p.db.feedRationStandards)..where((t) => t.id.equals(rationPoste!))).getSingleOrNull();
+      lignesLocales['feed_ration_standards|$rationPoste'] = {'ration_g_per_day': r?.rationGPerDay.round(), 'is_active': r?.isActive};
+    }
+    if (provende != null) {
+      final f = await (p.db.select(p.db.feedTypes)..where((t) => t.id.equals(provende!))).getSingleOrNull();
+      lignesLocales['feed_types|$provende'] = {'name': f?.name, 'price_per_kg': f?.pricePerKg, 'is_active': f?.isActive};
+    }
+  }
+
+  /// Ticket S-T12 — ce que la réinitialisation du web a laissé : sur chaque poste (lignes d'activité, saisies en
+  /// attente, avertissement), au serveur (lignes d'activité), et le refus de l'envoi d'un poste sans la marque.
+  final apresReinitialisation = <String, ({int activite, Map<String, int> enAttente, List<String> avertissements})>{};
+  Map<String, dynamic> serveurReinitialise = {};
+  int? statutEnvoiSansMarque;
+  String? venteAvantReinitialisation;
+
+  /// Statut de la première synchronisation de chaque poste après la réinitialisation (ses jetons sont révoqués avec
+  /// elle, 15.54 : 401 attendu, puis reconnexion).
+  final statutsApresReinitialisation = <String, int?>{};
+
+  /// Ticket 15.50 (avec 15.54) — la réinitialisation vide les données d'activité ET révoque les jetons des postes :
+  /// chacun se voit refuser sa session (401), se reconnecte, et son premier tirage applique la marque (purge locale)
+  /// avant tout envoi. Un envoi qui ne porte pas la marque est refusé (409) : il ressusciterait des données effacées.
+  Future<void> _reinitialisation() async {
+    // Une vente de la caisse 1 que personne n'a encore envoyée au moment de la réinitialisation.
+    caisse1.connectivite.enLigne = false;
+    venteAvantReinitialisation = await _vente(caisse1, 'Fumier compost', 1, 1500);
+    caisse1.connectivite.enLigne = true;
+
+    final r = await _serveur(['reinitialiser']);
+    evenement('Web : réinitialisation des données (Paramètres, 15.50) — marque ${r['data_reset_at']}');
+
+    for (final p in postes) {
+      try {
+        await p.moteur.synchroniser();
+        statutsApresReinitialisation[p.nom] = 200;
+      } on EchecSynchronisation catch (e) {
+        statutsApresReinitialisation[p.nom] = e.statut;
+      }
+    }
+    evenement('Après la réinitialisation, première synchronisation : $statutsApresReinitialisation (jetons révoqués, 15.54)');
+
+    for (final p in postes) {
+      // Nouvelle session, sans synchronisation automatique : la première synchronisation est celle de l'essai.
+      await _connecter(p);
+      if (p == caisse1) {
+        // Un envoi qui ne porte pas la marque (poste qui ne l'a pas tirée) : refusé, rien n'est écrit.
+        try {
+          await caisse1.client.post<dynamic>('/api/sync/push', data: {
+            'device_id': caisse1.nom,
+            'sales': [{'id': venteAvantReinitialisation}],
+          });
+          statutEnvoiSansMarque = 200;
+        } on DioException catch (e) {
+          statutEnvoiSansMarque = e.response?.statusCode;
+        }
+        evenement('poste-caisse-1 : envoi sans la marque de réinitialisation → $statutEnvoiSansMarque');
+      }
+      SyncOutcome? issue;
+      for (var i = 0; i < 10 && issue == null; i++) {
+        if (i > 0) await Future<void>.delayed(const Duration(seconds: 7));
+        issue = await p.synchroniser('après la réinitialisation');
+      }
+      var activite = 0;
+      for (final t in p.db.allTables) {
+        if (!AppDatabase.tablesDActivite.contains(t.actualTableName)) continue;
+        activite += (await p.db.customSelect('SELECT COUNT(*) AS n FROM ${t.actualTableName}').getSingle()).read<int>('n');
+      }
+      apresReinitialisation[p.nom] = (activite: activite, enAttente: await p.enAttente(), avertissements: issue?.avertissements ?? const []);
+      journaliser('${p.nom} après la réinitialisation : $activite ligne(s) d\'activité, en attente ${await p.enAttente()}, '
+          'avertissements ${issue?.avertissements}');
+    }
+    // Un second tour : rien de ce que les postes renverraient ne doit ressusciter au serveur.
+    for (final p in postes) {
+      await _jusquAAboutir(p, 'après la réinitialisation, second tour');
+    }
+    serveurReinitialise = await _serveur(['etat-reinitialise']);
   }
 
   // ── Invariants ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -946,6 +1582,9 @@ class _Essai {
     };
     expect(postesFaux, isEmpty, reason: 'S-T10 : ${compte.nom} — postes non recalés sur le serveur : $postesFaux');
 
+    // ── Ticket S-T12 ────────────────────────────────────────────────────────────────────────────────────────────
+    _verifierS12(stocks);
+
     // La saisie de l'animalier (morts) est arrivée au serveur, quelle que soit la fiche qui tient la (bande, jour) —
     // sauf refus attendu et motivé, qui reste au poste pour que l'éleveur tranche.
     final fichesApres = (etatServeur['fiches_apres'] as Map).cast<String, dynamic>();
@@ -961,6 +1600,124 @@ class _Essai {
     final journal = (etatServeur['journal'] as Map).cast<String, dynamic>();
     expect(journal['debit'], journal['credit'], reason: 'journal comptable déséquilibré (débit ≠ crédit)');
     expect(journal['desequilibrees'], isEmpty, reason: 'écritures déséquilibrées : ${journal['desequilibrees']}');
+  }
+
+  /// Ticket S-T12 — les invariants ajoutés : chaque scénario a eu lieu, et le serveur tient ce que les postes ont saisi.
+  void _verifierS12(Map<String, dynamic> stocks) {
+    // Chaque scénario a eu lieu (un geste refusé au poste le ferait taire sans faire échouer le reste).
+    final manquants = [
+      if (!retourFait) 'retour fournisseur',
+      if (!remboursementFait) 'remboursement fournisseur',
+      if (reglements < 2) 'deux règlements fournisseurs ($reglements)',
+      if (produitFusionPoste == null || produitFusionWeb == null || produitFusionAchat == null) 'produit créé au poste et au web',
+      if (imputationCreance == null) 'imputation sur une créance descendue',
+      if (imputationMemeEnvoi == null) 'imputation sur la vente à crédit du même envoi',
+      if (pimentVenduHorsLigne == 0) 'vente de piment hors ligne avant le comptage',
+      if (inventaireWeb == null) 'achat avant l\'inventaire du web',
+      if (cycle1 == null || cycle2 == null) 'cycles de reproduction',
+      if (infirmerie == null || intervention == null || soinAArchiver == null) 'infirmerie, calendrier, soin archivé',
+      if (rationPoste == null || provende == null || rappelSoins == null) 'Paramètres Élevage au poste',
+      if (!sessionsRefusees.containsKey(caisse1.nom) || !sessionsRefusees.containsKey(compta.nom)) 'sessions refusées',
+    ];
+    expect(manquants, isEmpty, reason: 'scénarios S-T12 qui n\'ont pas eu lieu (geste refusé au poste ? voir le journal) : $manquants');
+
+    // Les deux côtés de chaque flux ont bougé d'autant (au centime) : trésorerie dans les DEUX livres, créances, dettes,
+    // avances, créances sur fournisseurs.
+    final concordance = (etatServeur['concordance'] as Map).cast<String, dynamic>();
+    final discordances = <String>[
+      for (final MapEntry(key: code, value: v) in (concordance['tresorerie'] as Map).cast<String, dynamic>().entries)
+        if (((v as Map)['comptes'] as num) != (v['classe5'] as num))
+          'trésorerie $code : soldes des comptes ${v['comptes']} / classe 5 ${v['classe5']}',
+      for (final cle in ['creances_clients', 'dettes_fournisseurs', 'avances', 'creances_fournisseurs'])
+        if (((concordance[cle] as Map)['metier'] as num) != ((concordance[cle] as Map)['livre'] as num))
+          '$cle : tables ${(concordance[cle] as Map)['metier']} / grand livre ${(concordance[cle] as Map)['livre']}',
+    ];
+    expect(discordances, isEmpty, reason: 'les tables métier et le grand livre ont divergé pendant l\'essai : $discordances');
+
+    final depenses = (etatServeur['depenses'] as Map).cast<String, dynamic>();
+    expect(depenses, isNotEmpty, reason: 'aucune dépense saisie');
+    final malComptees = {for (final MapEntry(:key, :value) in depenses.entries) if (value != 1) key: value};
+    expect(malComptees, isEmpty, reason: 'dépenses comptabilisées zéro ou plusieurs fois : $malComptees');
+
+    // Avances : utilisé = somme des imputations reçues ; et chacune des deux imputations a bien été appliquée.
+    final avances = (etatServeur['avances'] as Map).cast<String, dynamic>();
+    final fausses = [
+      for (final MapEntry(:key, :value) in avances.entries)
+        if (value == null || (value as Map)['utilise'] != value['imputations']) '$key : $value',
+    ];
+    expect(fausses, isEmpty, reason: 'solde d\'avance faux (utilisé ≠ imputations) : $fausses');
+    for (final i in [?imputationCreance, ?imputationMemeEnvoi]) {
+      expect((avances[i.avance] as Map?)?['utilise'], i.montant, reason: 'avance ${i.avance} : ${i.montant} F imputés au poste');
+    }
+
+    expect((etatServeur['retours'] as Map).values.every((n) => (n as num) > 0), isTrue, reason: 'retour fournisseur sans ligne au serveur');
+    final doublons = (etatServeur['doublons'] as Map).cast<String, dynamic>();
+    expect(doublons['produits_meme_cle'], isEmpty, reason: 'le même produit existe plusieurs fois : fusion S-T5 en défaut');
+
+    // S-T12 — l'achat fait avant l'inventaire du web et arrivé après lui n'entre pas une seconde fois.
+    final web = inventaireWeb!;
+    final auServeur = ((stocks[web.produit] as Map?)?['stock'] as num?)?.toDouble();
+    expect(auServeur, web.attendu, reason: 'S-T12 : ${web.nom} — stock final au serveur $auServeur, attendu ${web.attendu} '
+        '(le comptage du web, qui contenait déjà l\'achat du bureau)');
+    final postesFaux = {for (final MapEntry(:key, :value) in stocksInventaireWebAuPoste.entries) if (value != web.attendu) key: value};
+    expect(postesFaux, isEmpty, reason: 'S-T12 : ${web.nom} — postes non recalés : $postesFaux');
+
+    // L'état final de chaque ligne saisie à l'élevage (cycle, infirmerie, calendrier, soin archivé, barèmes) est celui
+    // du poste, au serveur.
+    final lignes = (etatServeur['lignes'] as Map).cast<String, dynamic>();
+    bool egal(Object? a, Object? b) => switch ((a, b)) {
+      (bool x, num n) => (x ? 1 : 0) == n,
+      (bool x, bool y) => x == y,
+      (num x, num y) => (x - y).abs() < 0.001,
+      (num x, String y) => (x - (num.tryParse(y) ?? double.nan)).abs() < 0.001,
+      _ => '$a' == '$b',
+    };
+    final ecarts = <String>[];
+    saisiElevage.forEach((cle, saisi) {
+      final [table, id] = cle.split('|');
+      final serveur = ((lignes[table] as Map?)?[id] as Map?)?.cast<String, dynamic>();
+      final local = lignesLocales[cle];
+      saisi.forEach((colonne, valeur) {
+        if (!egal(valeur, serveur?[colonne])) ecarts.add('$table $id $colonne : saisi « $valeur », serveur « ${serveur?[colonne]} »');
+        if (!egal(valeur, local?[colonne])) ecarts.add('$table $id $colonne : saisi « $valeur », poste « ${local?[colonne]} »');
+      });
+    });
+    if (rappelSoins != null && (lignes['company_settings'] as Map)['rappel_soins_jours'] != rappelSoins) {
+      ecarts.add('rappel des soins : poste $rappelSoins, serveur ${(lignes['company_settings'] as Map)['rappel_soins_jours']}');
+    }
+    expect(saisiElevage, isNotEmpty, reason: 'aucune saisie de l\'élevage relevée');
+    expect(ecarts, isEmpty, reason: 'saisies de l\'élevage perdues (au serveur ou au poste) : $ecarts');
+
+    // Trois journées hors ligne, puis le retour : envoi par lots de 50 au plus (H13b), tirage en plusieurs pages (S-T4).
+    final c2 = caisse2.perturbateur;
+    expect(c2.pagesMax, greaterThanOrEqualTo(2), reason: 'poste-caisse-2 : le tirage de retour n\'a servi qu\'une page');
+    expect(c2.lignesParEnvoi.where((n) => n > 0).length, greaterThanOrEqualTo(2), reason: 'poste-caisse-2 : un seul envoi au retour (H13b non exercé)');
+    expect(c2.lignesParEnvoi.where((n) => n > SyncEngine.tailleLot), isEmpty, reason: 'un envoi de plus de ${SyncEngine.tailleLot} lignes');
+
+    // Session refusée (CFG-1 / S3) : la synchronisation automatique s'est arrêtée ; la reconnexion l'a reprise, et
+    // rien n'est resté en attente (vérifié pour tous les postes plus haut).
+    sessionsRefusees.forEach((poste, r) {
+      expect(r.suspendue, isTrue, reason: '$poste : synchronisation automatique NON suspendue après le refus de session (S-T1)');
+      expect(r.tentatives, 0, reason: '$poste : la synchronisation automatique a encore tenté ${r.tentatives} fois après le refus');
+    });
+
+    // Ticket S-T6 — la demande du web : servie, et le poste synchronisé dans les 30 s (plus le tirage).
+    expect(demandeServie, isTrue, reason: 'S-T6 : la demande de synchronisation n\'a pas été lue par le poste');
+    expect(delaiDemande, isNotNull, reason: 'S-T6 : la vente du web n\'est jamais arrivée sur le poste après la demande');
+    expect(delaiDemande!.inSeconds, lessThanOrEqualTo(35), reason: 'S-T6 : arrivée après ${delaiDemande!.inSeconds} s');
+
+    // Ticket 15.50 — réinitialisation au web : envoi sans la marque refusé, chaque poste purgé, rien ne ressuscite.
+    expect(statutsApresReinitialisation.values.toSet(), {401},
+        reason: '15.54 : les jetons des postes ne sont pas révoqués par la réinitialisation : $statutsApresReinitialisation');
+    expect(statutEnvoiSansMarque, 409, reason: '15.50 : l\'envoi d\'un poste sans la marque de réinitialisation est accepté');
+    apresReinitialisation.forEach((poste, r) {
+      expect(r.activite, 0, reason: '$poste : ${r.activite} ligne(s) d\'activité gardée(s) après la réinitialisation');
+      expect(r.enAttente, isEmpty, reason: '$poste : saisies encore en attente après la réinitialisation : ${r.enAttente}');
+    });
+    expect(apresReinitialisation[caisse1.nom]!.avertissements.join(' '), contains('pas encore été envoyée'),
+        reason: 'la caisse 1 perd une vente non envoyée sans être prévenue');
+    expect(serveurReinitialise['restantes'], isEmpty,
+        reason: '15.50 : données d\'activité au serveur après la réinitialisation : ${serveurReinitialise['restantes']}');
   }
 
   // ── Rapport ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1003,10 +1760,25 @@ class _Essai {
     b.writeln();
     final compte = inventaireCompte;
     if (compte != null) {
-      b.writeln('INVENTAIRE COMPTÉ (S-T10) : ${compte.nom}, attendu ${compte.attendu} ; '
+      b.writeln('INVENTAIRE COMPTÉ (S-T10, S-T12) : ${compte.nom}, attendu ${compte.attendu} '
+          '(dont $pimentVenduHorsLigne sac(s) vendus hors ligne avant le comptage) ; '
           'serveur ${((etatServeur['stocks'] as Map?)?[compte.produit] as Map?)?['stock']} ; postes $stocksComptesAuPoste');
-      b.writeln();
     }
+    final web = inventaireWeb;
+    if (web != null) {
+      b.writeln('INVENTAIRE DU WEB APRÈS UN ACHAT HORS LIGNE (S-T12) : ${web.nom}, attendu ${web.attendu} ; '
+          'serveur ${((etatServeur['stocks'] as Map?)?[web.produit] as Map?)?['stock']} ; postes $stocksInventaireWebAuPoste');
+    }
+    final c2 = _postesOuVide().isEmpty ? null : caisse2.perturbateur;
+    b
+      ..writeln('INTERBLOCAGES DE LA CAISSE WEB (défaut connu, non corrigé) : ${interblocagesWeb.length} $interblocagesWeb')
+      ..writeln('SESSIONS REFUSÉES (S-T1) : $sessionsRefusees')
+      ..writeln('RETOUR DE poste-caisse-2 : pages au plus ${c2?.pagesMax}, lignes par envoi ${c2?.lignesParEnvoi}')
+      ..writeln('DEMANDE DU WEB (S-T6) : délai $delaiDemande, servie $demandeServie, $tentativesDemande synchronisation(s)')
+      ..writeln('RÉINITIALISATION (15.50) : premières synchronisations $statutsApresReinitialisation ; '
+          'envoi sans marque → $statutEnvoiSansMarque ; postes $apresReinitialisation ; '
+          'serveur ${serveurReinitialise['restantes']}')
+      ..writeln();
     b.writeln('SERVEUR (fin d\'essai)');
     b.writeln(const JsonEncoder.withIndent('  ').convert(etatServeur));
     b.writeln();

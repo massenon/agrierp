@@ -5771,6 +5771,10 @@ class SyncEngine {
     'treasury_account_id': a.treasuryAccountId,
     'amount_paid': a.amountPaid,
     'purchase_date': _jour(a.purchaseDate),
+    // 🔴→✅ Ticket S-T12 — l'INSTANT de l'achat (heure du Bénin ramenée en UTC), comme `sold_at` pour une vente : le
+    // serveur date l'entrée en stock de l'achat, plus de sa réception. Sans lui, un achat fait AVANT un comptage et
+    // arrivé APRÈS lui entrait une seconde fois dans des rayons qui le contenaient déjà.
+    'purchased_at': HeureBenin.versInstant(a.purchaseDate).toIso8601String(),
     'lines': [
       for (final l in lignes)
         {'product_id': l.productId, 'qty': l.qty, 'unit_price': l.unitPrice},

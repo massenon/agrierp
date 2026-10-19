@@ -30,7 +30,7 @@
 #
 # Variables utiles : AGRIERP_LARAVEL (dossier Laravel ; défaut : ../agrierp_laravel du monorepo), ESSAI_BASE
 # (`mysql` par défaut, `sqlite`), ESSAI_SORTIE (dossier des rapports ; défaut : un dossier temporaire hors dépôt),
-# ESSAI_JOURS (journées simulées, défaut 4), ESSAI_FUSEAUX (ticket S-T11 : fuseau(x) horaire(s) des POSTES, séparés par
+# ESSAI_JOURS (journées simulées, défaut 5 — au moins 5 depuis S-T12), ESSAI_FUSEAUX (ticket S-T11 : fuseau(x) horaire(s) des POSTES, séparés par
 # des espaces ; défaut `Africa/Porto-Novo`). Flutter doit être dans le PATH (`/opt/flutter/bin`).
 #
 # ⚠️ Ticket S-T11 — le SERVEUR reste toujours à l'heure du Bénin (APP_TIMEZONE) ; c'est le processus des postes
@@ -196,7 +196,7 @@ for FUSEAU in "${FUSEAUX[@]}"; do
   # Les postes vivent dans le fuseau demandé (S-T11 : un Windows mal réglé) ; le serveur, à l'heure du Bénin.
   (cd "$POSTE" && TZ="$FUSEAU" AGRIERP_ESSAI_URL="http://127.0.0.1:$PORT_HTTP" AGRIERP_ESSAI_GRAINE="$GRAINE" \
     AGRIERP_ESSAI_RAPPORT="$SORTIE/rapport-$SUFFIXE.txt" AGRIERP_ESSAI_BASE="$DB_CONNECTION ($VERSION_BASE)" \
-    AGRIERP_ESSAI_JOURS="${ESSAI_JOURS:-4}" AGRIERP_LARAVEL="$LARAVEL" AGRIERP_ESSAI_FUSEAU="$FUSEAU" \
+    AGRIERP_ESSAI_JOURS="${ESSAI_JOURS:-5}" AGRIERP_LARAVEL="$LARAVEL" AGRIERP_ESSAI_FUSEAU="$FUSEAU" \
     flutter test test/essai_multipostes_test.dart --tags integration --reporter expanded \
     >"$SORTIE/flutter-$SUFFIXE.log" 2>&1)
   RESULTAT=$?
