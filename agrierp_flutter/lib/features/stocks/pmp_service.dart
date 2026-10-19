@@ -68,6 +68,38 @@ class PmpService {
     return echelle.round() / facteur;
   }
 
+  /// Ticket U9 — `number_format($valeur, $decimales, $virgule, $milliers)` de PHP : arrondi demi loin de zéro,
+  /// jamais « -0 » (PHP 8). Défauts = ceux du Blade de la ferme (`',', ' '`) ; `number_format($v, 1)` sans
+  /// séparateurs s'écrit `nombre(v, 1, virgule: '.', milliers: ',')`.
+  static String nombre(
+    double valeur,
+    int decimales, {
+    String virgule = ',',
+    String milliers = ' ',
+  }) {
+    final arrondie = arrondi(valeur, decimales);
+    final morceaux = arrondie.abs().toStringAsFixed(decimales).split('.');
+    final chiffres = morceaux[0];
+    final groupes = <String>[];
+    for (var i = chiffres.length; i > 0; i -= 3) {
+      groupes.insert(0, chiffres.substring(i - 3 < 0 ? 0 : i - 3, i));
+    }
+    final negatif = arrondie < 0 && RegExp('[1-9]').hasMatch(morceaux.join());
+    return '${negatif ? '-' : ''}${groupes.join(milliers)}'
+        '${decimales > 0 ? '$virgule${morceaux[1]}' : ''}';
+  }
+
+  /// Ticket U9 — quantité du Blade de Gestion des Stocks :
+  /// `rtrim(rtrim(number_format($q, 2, '.', ''), '0'), '.')` — « 12.5 », « 3.25 », « 150 », « -0.5 ».
+  static String quantite(double valeur) {
+    final texte = nombre(valeur, 2, virgule: '.', milliers: '');
+    return texte.contains('.')
+        ? texte
+              .replaceFirst(RegExp(r'0+$'), '')
+              .replaceFirst(RegExp(r'\.$'), '')
+        : texte;
+  }
+
   /// `number_format($valeur, 0, ',', ' ')` de PHP : arrondi demi loin de zéro, milliers séparés par une espace,
   /// signe « - » conservé (« -1 500 »), jamais « -0 ».
   static String francs(double valeur) {
@@ -79,4 +111,26 @@ class PmpService {
     }
     return '${entier < 0 ? '-' : ''}${groupes.join(' ')}';
   }
+}
+
+/// Clé de tri de `orderBy('name')` sous la collation du serveur (`utf8mb4_unicode_ci`) : insensible à la casse et
+/// aux accents ; égalité départagée par le texte brut, pour un ordre stable.
+int comparerCommeLeServeur(String a, String b) {
+  String cle(String t) {
+    const accents = {
+      'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ç': 'c', 'é': 'e', 'è': 'e', //
+      'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'í': 'i', 'ô': 'o', 'ö': 'o', //
+      'ó': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ÿ': 'y', 'œ': 'oe', //
+      'æ': 'ae',
+    };
+    final minuscules = t.toLowerCase();
+    final sortie = StringBuffer();
+    for (final c in minuscules.split('')) {
+      sortie.write(accents[c] ?? c);
+    }
+    return sortie.toString();
+  }
+
+  final parCle = cle(a).compareTo(cle(b));
+  return parCle != 0 ? parCle : a.compareTo(b);
 }

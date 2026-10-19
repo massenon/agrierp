@@ -140,6 +140,7 @@ void main() {
     int ne = 0,
     int? ponteTotal,
     int? ponteCasses,
+    SyncStatus statut = SyncStatus.pending,
   }) => db
       .into(db.livestockDailyEntries)
       .insert(
@@ -147,6 +148,7 @@ void main() {
           id: uuid(cle),
           deviceId: 'poste-test',
           updatedAt: date,
+          syncStatus: Value(statut),
           lotId: uuid(lot),
           entryDate: date,
           effectifFinal: Value(effectifFinal),
@@ -180,6 +182,29 @@ void main() {
           stockQty: Value(stock),
           priceMin: Value(prix),
           alertThreshold: Value(seuil),
+        ),
+      );
+
+  /// Ticket U9 — un mouvement du grand livre des stocks DESCENDU du serveur.
+  Future<void> mouvement(
+    String cle,
+    String produitCle,
+    String type,
+    double quantite,
+    DateTime quand, {
+    String reference = 'sale',
+    String? referenceId,
+  }) => db
+      .into(db.stockMovements)
+      .insert(
+        StockMovementsCompanion.insert(
+          id: uuid(cle),
+          productId: uuid(produitCle),
+          type: type,
+          quantity: quantite,
+          referenceType: reference,
+          referenceId: Value(referenceId),
+          movementDate: quand,
         ),
       );
 
@@ -467,90 +492,102 @@ void main() {
       },
     );
 
-    /// ⚠️⚠️ **LES TROIS FORMULES DU PIED DE TABLEAU, VÉRIFIÉES SUR DEUX
-    /// JOURNÉES.** Un stock d'œufs faux s'imprime sans un mot :
-    ///   Taux de Ponte % = (OR × 100) ÷ Effectif Final
-    ///   Total Stock (TS) = (OR − OF) + SRH
-    ///   Stock Final = TS − OS
-    test('⚠️⚠️ le tableau 3 applique les formules de la maquette', () async {
+    /// 🔴→✅ **TICKET U9 — LE TABLEAU 3 DU WEB** (`ElevageSynth` + `elevage-synth.blade.php`) : onze colonnes dont
+    /// « Lot », soldes de FERME en PLATEAUX lus dans le grand livre des stocks (`EggStockLedgerService`), une ligne
+    /// du grand livre par JOUR (deux bandes du même jour partagent le solde). Valeurs calculées à la main :
+    ///  - grand livre descendu (œufs) : achat +5 le 30/06 ; production +13 le 06/07 ; ventes −2 le 06/07 et −3 le
+    ///    10/07 ; casse (`inventaire`) −1 le 12/07 ; production +14 et vente −1 le 13/07 ;
+    ///  - 06/07 : commercialisables 392 → 13 plateaux + 2 vrac ; SRH = 5 ; TS = 18 ; OS = 2 ; final 16 ;
+    ///  - 13/07 : 428 (P1) + 100 (P2) = 528 → 17 plateaux + 18 vrac ; SRH = 5 + 13 − 2 − 3 − 1 = 12 ; TS = 29 ;
+    ///    OS = 1 (ni la casse du 12, ni celle de −2 le 13 au matin ne sont des ventes) ; final 28.
+    test('⚠️⚠️ U9 — le tableau 3 est celui du web : soldes de ferme en plateaux', () async {
+      await produit('oeufs', nom: 'Œufs de table (plateau)');
       await bande('b1', creee: DateTime(2026, 1, 5));
-      await journee(
-        'j1',
-        lot: 'b1',
-        date: DateTime(2026, 7, 6),
-        effectifFinal: 443,
-        ponteTotal: 398,
-        ponteCasses: 6,
-      );
-      await journee(
-        'j2',
-        lot: 'b1',
-        date: DateTime(2026, 7, 13),
-        effectifFinal: 461,
-        ponteTotal: 432,
-        ponteCasses: 4,
-      );
+      await bande('b2', code: 'Pondeuses Lot P2', creee: DateTime(2026, 7, 20));
+      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 6), effectifFinal: 443, ponteTotal: 398, ponteCasses: 6, statut: SyncStatus.synced);
+      await journee('j2', lot: 'b1', date: DateTime(2026, 7, 13), effectifFinal: 461, ponteTotal: 432, ponteCasses: 4, statut: SyncStatus.synced);
+      await journee('j3', lot: 'b2', date: DateTime(2026, 7, 13), effectifFinal: 0, ponteTotal: 100, statut: SyncStatus.synced);
+      // Hors du tableau : ponte nulle, et fiche hors période.
+      await journee('j4', lot: 'b1', date: DateTime(2026, 7, 14), ponteTotal: 0, statut: SyncStatus.synced);
+      await journee('j5', lot: 'b1', date: DateTime(2026, 8, 2), ponteTotal: 300, statut: SyncStatus.synced);
+      await mouvement('m1', 'oeufs', 'entree', 5, DateTime(2026, 6, 30, 10), reference: 'purchase');
+      await mouvement('m2', 'oeufs', 'entree', 13, DateTime(2026, 7, 6), reference: 'daily_entry', referenceId: uuid('j1'));
+      await mouvement('m3', 'oeufs', 'sortie', 2, DateTime(2026, 7, 6, 15));
+      await mouvement('m4', 'oeufs', 'sortie', 3, DateTime(2026, 7, 10, 9));
+      await mouvement('m5', 'oeufs', 'sortie', 1, DateTime(2026, 7, 12, 18), reference: 'inventaire');
+      await mouvement('m6', 'oeufs', 'entree', 14, DateTime(2026, 7, 13), reference: 'daily_entry', referenceId: uuid('j2'));
+      await mouvement('m7', 'oeufs', 'sortie', 1, DateTime(2026, 7, 13, 16));
+      // Une casse le jour même : elle n'est pas une sortie de VENTE (OS reste 1), et elle n'est pas « avant » le 13.
+      await mouvement('m8', 'oeufs', 'sortie', 2, DateTime(2026, 7, 13, 8), reference: 'inventaire');
 
       final d = await depot.charger(du: du, au: au);
-      // Rendu du plus ancien au plus récent, comme la maquette.
-      final veille = d.elevageT3[0].cellules;
-      final jour = d.elevageT3[1].cellules;
+      final lignes = {for (final l in d.elevageT3) '${l.cellules[1]} ${l.cellules[2]}': l.cellules};
 
-      expect(veille, hasLength(10));
-
-      // Journée du 06/07 : rien avant elle, donc SRH = 0.
-      expect(veille[2], '398'); // OR
-      expect(veille[4], '6'); // OF
-      expect(veille[5], '392'); // OR − OF
-      expect(veille[6], '0'); // SRH
-      expect(veille[7], '392'); // TS = 392 + 0
-
-      // Journée du 13/07 : SRH = le stock laissé par la veille.
-      expect(jour[2], '432');
-      expect(jour[5], '428'); // 432 − 4
-      expect(jour[6], '392'); // SRH
-      expect(jour[7], '820'); // TS = 428 + 392
-      // Aucune sortie imputée à la bande : le stock final est le total.
-      expect(jour[8], '0 (0 œufs)');
-      expect(jour[9], '27 plateaux + 10 vrac'); // 820 = 27×30 + 10
-
-      // Taux de ponte : 432 × 100 ÷ 461 = 93,7 %
-      expect(jour[3], '93.7 %');
+      expect(d.elevageT3, hasLength(3));
+      // Du plus récent au plus ancien, comme `orderByDesc('entry_date')`.
+      expect(d.elevageT3.last.cellules[1], '06/07/2026');
+      expect(lignes['06/07/2026 Pondeuses Lot P1'], [
+        '26', // 182 jours depuis le 05/01
+        '06/07/2026',
+        'Pondeuses Lot P1',
+        '398',
+        '89.8 %', // 398 × 100 ÷ 443 = 89,84
+        '6',
+        '392',
+        '5',
+        '18',
+        '2',
+        '16 plateaux + 2 vrac',
+      ]);
+      expect(lignes['13/07/2026 Pondeuses Lot P1'], [
+        '27',
+        '13/07/2026',
+        'Pondeuses Lot P1',
+        '432',
+        '93.7 %',
+        '4',
+        '428',
+        '12',
+        '29',
+        '1',
+        '28 plateaux + 18 vrac',
+      ]);
+      // P2 : même jour, MÊME solde de ferme ; bande créée APRÈS la fiche → âge signé −1 (Carbon 3 + `intdiv`) ;
+      // effectif nul → « — % » ; OF absent → cellule vide (comme `{{ $e->ponte_casses }}`).
+      expect(lignes['13/07/2026 Pondeuses Lot P2'], [
+        '-1',
+        '13/07/2026',
+        'Pondeuses Lot P2',
+        '100',
+        '— %',
+        '',
+        '100',
+        '12',
+        '29',
+        '1',
+        '28 plateaux + 18 vrac',
+      ]);
     });
 
-    /// 🔴→✅ TICKET U8 — OS (« Sorties Vente ») EST CELLE DU JOUR DE LA FICHE. Le web
-    /// (`EggStockLedgerService::ventesDu($date)`) ne compte que les ventes de ce jour-là ; le
-    /// poste additionnait toutes les ventes d'œufs de la bande à CHAQUE journée. Le jour d'une
-    /// vente est sa date effective (`sold_at`) ; une vente refusée par le serveur (`conflict`)
-    /// n'a rien fait sortir ; chaque vente antérieure est retranchée UNE fois du SRH, qu'il y ait
-    /// une fiche ce jour-là ou non.
-    test('⚠️⚠️ U8 — les sorties de vente d une journée sont celles de CE jour', () async {
-      await bande('b1', creee: DateTime(2026, 1, 5));
-      await bande('b2', code: 'Pondeuses Lot P2');
+    /// 🔴→✅ **TICKET U9 — RÈGLE DES SAISIES EN ATTENTE AU TABLEAU 3.** Une fiche de ponte ou une vente d'œufs saisie
+    /// ici n'est au grand livre du serveur qu'après l'envoi : le poste la PROJETTE selon la règle du serveur
+    /// (`RecordEggProductionStockAction` : ⌊(OR − OF) ÷ 30⌋ plateaux au jour de la fiche ; vente : sortie au jour
+    /// `sold_at`), la RETIRE dès que son mouvement est descendu (même `reference_id`), et n'en projette aucune
+    /// refusée. Calcul à la main, grand livre descendu : achat +10 le 01/07 ; fiche j5 (encore « en attente »,
+    /// envoi sans accusé) déjà rejouée : +2 le 18/07.
+    ///  - 18/07 (j5, 60 → 2 plateaux) : SRH 10 ; TS 12 ; OS 0 ; final 12 — j5 n'est PAS projetée en plus ;
+    ///  - 20/07 (j4 en attente, 90 → 3 plateaux ; vente en attente −2 ; vente refusée −5 ignorée) : SRH 10 + 2 = 12 ;
+    ///    TS 15 ; OS 2 ; final 13 ;
+    ///  - 21/07 (j6 acquittée, 30 → 1 plateau) : SRH = 10 + 2 + 3 (j4 projetée) − 2 = 13 ; TS 14 ; OS 0 ; final 14.
+    test('⚠️⚠️ U9 — saisies en attente projetées, jamais deux fois, jamais refusées', () async {
       await produit('oeufs', nom: 'Œufs de table (plateau)');
-      await journee(
-        'j1',
-        lot: 'b1',
-        date: DateTime(2026, 7, 6),
-        effectifFinal: 443,
-        ponteTotal: 398,
-        ponteCasses: 6,
-      );
-      await journee(
-        'j2',
-        lot: 'b1',
-        date: DateTime(2026, 7, 13),
-        effectifFinal: 461,
-        ponteTotal: 432,
-        ponteCasses: 4,
-      );
-      Future<void> venteOeufs(
-        String cle,
-        DateTime quand,
-        double plateaux, {
-        String lot = 'b1',
-        SyncStatus statut = SyncStatus.synced,
-      }) async {
+      await bande('b1', creee: DateTime(2026, 1, 5));
+      await mouvement('m1', 'oeufs', 'entree', 10, DateTime(2026, 7, 1, 8), reference: 'purchase');
+      await journee('j5', lot: 'b1', date: DateTime(2026, 7, 18), effectifFinal: 400, ponteTotal: 61, ponteCasses: 1);
+      await mouvement('m2', 'oeufs', 'entree', 2, DateTime(2026, 7, 18), reference: 'daily_entry', referenceId: uuid('j5'));
+      await journee('j4', lot: 'b1', date: DateTime(2026, 7, 20), effectifFinal: 400, ponteTotal: 95, ponteCasses: 5);
+      await journee('j6', lot: 'b1', date: DateTime(2026, 7, 21), effectifFinal: 400, ponteTotal: 30, ponteCasses: 0, statut: SyncStatus.synced);
+      Future<void> venteOeufs(String cle, DateTime quand, double plateaux, SyncStatus statut) async {
         await db.into(db.sales).insert(
           SalesCompanion.insert(
             id: uuid(cle),
@@ -567,7 +604,7 @@ void main() {
             id: uuid('l$cle'),
             saleId: uuid(cle),
             productId: uuid('oeufs'),
-            lotId: Value(uuid(lot)),
+            lotId: Value(uuid('b1')),
             qty: plateaux,
             unitPrice: 2500,
             manualTotalAmount: plateaux * 2500,
@@ -575,36 +612,26 @@ void main() {
         );
       }
 
-      await venteOeufs('v1', DateTime(2026, 7, 6, 15), 2); // 60 œufs le 06/07
-      await venteOeufs('v2', DateTime(2026, 7, 10, 9), 3); // 90 œufs le 10/07 (aucune fiche ce jour)
-      await venteOeufs('v3', DateTime(2026, 7, 13, 16), 1); // 30 œufs le 13/07
-      await venteOeufs(
-        'v4',
-        DateTime(2026, 7, 13, 17),
-        5,
-        statut: SyncStatus.conflict,
-      ); // refusée : rien n'est sorti
-      await venteOeufs('v5', DateTime(2026, 7, 13, 10), 4, lot: 'b2'); // autre bande
+      await venteOeufs('v1', DateTime(2026, 7, 20, 10), 2, SyncStatus.pending);
+      await venteOeufs('v2', DateTime(2026, 7, 20, 11), 5, SyncStatus.conflict);
 
       final d = await depot.charger(du: du, au: au);
-      final veille = d.elevageT3[0].cellules;
-      final jour = d.elevageT3[1].cellules;
+      final parJour = {for (final l in d.elevageT3) l.cellules[1]: l.cellules.sublist(7)};
 
-      // 06/07 : 398 − 6 = 392 ; SRH 0 ; TS 392 ; OS = 60 (v1 seule) ; final 332 = 11 × 30 + 2.
-      expect([veille[6], veille[7], veille[8], veille[9]], [
-        '0',
-        '392',
-        '2 (60 œufs)',
-        '11 plateaux + 2 vrac',
-      ]);
-      // 13/07 : 432 − 4 = 428 ; SRH = 392 − (60 + 90) = 242 ; TS 670 ; OS = 30 (v3 seule) ;
-      // final 640 = 21 × 30 + 10.
-      expect([jour[6], jour[7], jour[8], jour[9]], [
-        '242',
-        '670',
-        '1 (30 œufs)',
-        '21 plateaux + 10 vrac',
-      ]);
+      expect(parJour['18/07/2026'], ['10', '12', '0', '12 plateaux']);
+      expect(parJour['20/07/2026'], ['12', '15', '2', '13 plateaux']);
+      expect(parJour['21/07/2026'], ['13', '14', '0', '14 plateaux']);
+    });
+
+    /// Sans produit œufs au catalogue, le web lit des soldes nuls (`stockAvant` / `ventesDu` rendent 0) : le TS est la
+    /// seule production du jour, en plateaux — jamais un tiret.
+    test('U9 — sans produit œufs, les soldes valent zéro comme au web', () async {
+      await bande('b1', creee: DateTime(2026, 7, 1));
+      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13), effectifFinal: 200, ponteTotal: 95, ponteCasses: 5, statut: SyncStatus.synced);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(d.elevageT3.single.cellules.sublist(7), ['0', '3', '0', '3 plateaux']);
     });
 
     test('⚠️ sans date de création de bande, l âge est un tiret', () async {

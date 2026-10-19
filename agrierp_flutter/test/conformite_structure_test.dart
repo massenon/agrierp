@@ -145,6 +145,23 @@ void main() {
     'vms-registre.html': [
       ['Date', 'Lot / Espèce', "Type d'action", 'Produit', 'Dose', 'Actions', 'Statut'],
     ],
+    // Ticket U9 — Tableau 3 du Blade (`elevage-synth.blade.php`) : la colonne « Lot » s'ajoute après « Jour »
+    // (le rapport couvre plusieurs bandes). Tableaux 1 et 2 : ceux de la maquette, que le poste porte encore.
+    'rapport-elevage-synth.html': [
+      [
+        'Date', 'Lot / Souche', 'Mères Pondeuses', 'Mères Couveuses', 'Mères Éleveuses', 'Poussins S/Mères',
+        'Sevrés M', 'Sevrés F', 'Morts M', 'Morts F', 'Morts SM', 'Géniteurs', 'Effectif Malade',
+      ],
+      [
+        'Date', 'Lot', 'Sexe Vendu', 'Qté Vendue', 'Montant Vente (FCFA)', 'Effectif Final',
+        'Traitement Administré', 'Dose', 'Signes de Maladie Observés',
+      ],
+      [
+        'Âge (Sem.)', 'Jour', 'Lot', 'Total Œufs Récoltés (OR)', 'Taux Ponte %', 'Cassés/Fêlés (OF)',
+        'Commercialisables (OR-OF)', 'Stock Restant Hier (SRH)', 'Total Stock (TS)', 'Sorties Vente OS (Plateaux)',
+        'Stock Final (Plateaux + Vrac)',
+      ],
+    ],
   };
 
   /// Colonnes déclarées par un écran, sous ses DEUX formes.

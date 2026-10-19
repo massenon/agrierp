@@ -1417,6 +1417,40 @@ class StockAdjustments extends Table with SyncColumns {
   DateTimeColumn get movementDate => dateTime()();
 }
 
+/// Ticket U9 — LE GRAND LIVRE DES STOCKS du serveur (`stock_movements`), tiré au poste.
+///
+/// ⚠️⚠️ **JOURNAL EN LECTURE SEULE, ÉCRIT PAR LE SERVEUR SEUL** (`AdjustStockAction`, point de passage unique de
+/// toute mutation de `products.stock_qty`). Pas de [SyncColumns] : le poste ne l'écrit jamais et ne l'envoie jamais
+/// (le serveur ignorerait l'envoi et le compterait dans `referentiels_ignored`). Un ajustement saisi ici part dans
+/// [StockAdjustments] ; le serveur le rejoue, et le mouvement qui en naît redescend ici avec `reference_id` =
+/// identifiant de la ligne du poste.
+///
+/// Il alimente, comme au web : « Rotation du Stock » (`StockRotationService`), « Écarts d'Inventaire »
+/// (`GestionStocks`), le Journal des Mouvements et le Tableau 3 de la ponte (`EggStockLedgerService`). Les saisies
+/// encore EN ATTENTE d'envoi y sont ajoutées par `JournalStocks` (`lib/features/stocks/journal_stocks.dart`), jamais
+/// écrites dans cette table.
+class StockMovements extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+
+  /// `entree`, `sortie` ou `ajustement` (enum du serveur) ; la quantité est toujours positive.
+  TextColumn get type => text()();
+  RealColumn get quantity => real()();
+
+  /// `sale`, `purchase`, `daily_entry`, `adjustment`, `inventaire`… (motif du journal du web).
+  TextColumn get referenceType => text()();
+
+  /// Pièce d'origine (vente, achat, fiche, ligne d'ajustement du poste) ; `null` pour un ajustement du web.
+  TextColumn get referenceId => text().nullable()();
+  TextColumn get reason => text().nullable()();
+
+  /// Heure MURALE du serveur : le web compare des JOURS (`whereDate`).
+  DateTimeColumn get movementDate => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Enregistrement REFUSÉ par le serveur, avec son motif.
 ///
 /// Table prévue au CDC (§309, « Système / Synchronisation :
@@ -1584,6 +1618,7 @@ class SyncState extends Table {
     Sales,
     SaleLines,
     StockAdjustments,
+    StockMovements,
     SyncConflicts,
     TreasuryAccounts,
     ExpenseCategories,
@@ -1604,7 +1639,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 43;
+  int get schemaVersion => 44;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2060,6 +2095,13 @@ class AppDatabase extends _$AppDatabase {
           veterinaryRecords.isActive,
         );
       }
+
+      // v44 — ticket U9 : grand livre des stocks du serveur (`stock_movements`), en lecture seule.
+      if (from < 44) {
+        if (!await _tableExiste(m, stockMovements)) {
+          await m.createTable(stockMovements);
+        }
+      }
     },
   );
 
@@ -2213,7 +2255,7 @@ class AppDatabase extends _$AppDatabase {
     'advance_imputations', 'sales', 'sale_lines',
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
-    'expenses', 'stock_adjustments',
+    'expenses', 'stock_adjustments', 'stock_movements', // U9
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',

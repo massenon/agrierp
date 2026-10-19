@@ -144,8 +144,10 @@ class SyncEngine {
     final int accepte;
     final int rejete;
     final List<String> motifs;
+    final int saisiesDeStockAvant;
     try {
       tire0 = await _tirer();
+      saisiesDeStockAvant = await _saisiesDeStockEnAttente();
       (accepte, rejete, motifs) = await _pousser();
     } on DioException catch (e) {
       // ⚠️ TICKET S3 — UN REFUS DU SERVEUR EST NOMMÉ. Session expirée, compte désactivé ou débit dépassé
@@ -173,10 +175,14 @@ class SyncEngine {
     // F0.79 : et pour un document archivé accepté — le tirage de confirmation montre ce que
     // le serveur a réellement retenu (le poste n'invente aucune valeur côté serveur).
     // F0.80 : et pour un document administratif accepté — même raison.
+    // U9 : et pour un ajustement d'inventaire acquitté — il n'est plus projeté par `JournalStocks`, et sans ce
+    // tirage son mouvement manquerait aux « Écarts d'Inventaire » jusqu'à la synchronisation suivante. (Ventes,
+    // achats et fiches : leur mouvement descend au tirage suivant ; voir `JournalStocks`.)
     if (_financiersAcquittes > 0 ||
         _courriersAcquittes > 0 ||
         _archivesAcquittees > 0 ||
-        _documentsAcquittes > 0) {
+        _documentsAcquittes > 0 ||
+        await _saisiesDeStockEnAttente() < saisiesDeStockAvant) {
       try {
         tire += await _tirer();
       } on DioException {
@@ -198,6 +204,17 @@ class SyncEngine {
       motifs: motifs,
       avertissements: List.of(_avertissements),
     );
+  }
+
+  /// Ticket U9 — ajustements d'inventaire EN ATTENTE (`stock_adjustments`) : leur nombre baisse quand l'envoi en
+  /// acquitte (ou en refuse), et le tirage de confirmation rapporte alors le mouvement que le serveur a créé.
+  Future<int> _saisiesDeStockEnAttente() async {
+    final ligne = await _db
+        .customSelect(
+          "SELECT COUNT(*) AS n FROM stock_adjustments WHERE sync_status = 'pending'",
+        )
+        .getSingle();
+    return ligne.read<int>('n');
   }
 
   /// Avances, imputations, retours et remboursements fournisseurs acceptés par le dernier
@@ -262,6 +279,13 @@ class SyncEngine {
   /// règle que [cleLignesResync] : écrite après tous les absorbeurs, et seulement si le serveur sert les retours
   /// des achats qu'il sert.
   static const cleRetoursResync = 'retours_resync_u8';
+
+  /// Ticket U9 — resynchronisation UNIQUE du grand livre des stocks (`stock_movements`). Avant U9 le serveur ne le
+  /// servait pas ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait JAMAIS les
+  /// mouvements antérieurs (rotation, écarts d'inventaire et soldes d'œufs faux pour tout l'historique). Même règle
+  /// que [cleLignesResync] : écrite après tous les absorbeurs, et seulement si les produits servis l'ont été avec
+  /// leur grand livre (un serveur qui sert `products` sans `stock_movements` est antérieur à U9).
+  static const cleMouvementsResync = 'mouvements_resync_u9';
 
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
@@ -333,6 +357,8 @@ class SyncEngine {
         await _lireReglage(cleFichesResyncCategories) != null;
     final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
     final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
+    final resyncMouvementsFaite =
+        await _lireReglage(cleMouvementsResync) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -341,7 +367,8 @@ class SyncEngine {
         !resyncFichesFaite ||
         !resyncCategoriesFaite ||
         !resyncLignesFaite ||
-        !resyncRetoursFaite;
+        !resyncRetoursFaite ||
+        !resyncMouvementsFaite;
 
     final reponse = await _client.get<Map<String, dynamic>>(
       '/api/sync/pull',
@@ -434,6 +461,8 @@ class SyncEngine {
       corps['sales'],
       corps['sale_lines'],
     );
+    // Ticket U9 — APRÈS les produits : un mouvement d'un produit inconnu du poste est refusé.
+    recus += await _absorberMouvementsStock(corps['stock_movements']);
     recus += await _absorberEmployes(corps['employees']);
     recus += await _absorberStagiaires(corps['internships']);
     recus += await _absorberPointages(corps['attendance_records']);
@@ -506,6 +535,15 @@ class SyncEngine {
         !(corps.containsKey('purchases') &&
             !corps.containsKey('purchase_returns'))) {
       await _ecrireReglage(cleRetoursResync, '1');
+    }
+
+    // U9 : même place, et seulement si le serveur sert le grand livre des stocks. Un serveur qui sert les produits
+    // SANS leur grand livre est antérieur à U9 : le tirage reste complet tant que cela dure (même règle que U4 pour
+    // les pièces servies sans leurs lignes).
+    if (!resyncMouvementsFaite &&
+        !(corps.containsKey('products') &&
+            !corps.containsKey('stock_movements'))) {
+      await _ecrireReglage(cleMouvementsResync, '1');
     }
 
     // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
@@ -3159,6 +3197,98 @@ class SyncEngine {
           await _db.batch((b) => b.insertAll(_db.purchaseLines, lignes));
         },
       );
+
+  /// Ticket U9 — GRAND LIVRE DES STOCKS (`stock_movements`) servi par le tirage.
+  ///
+  /// Journal écrit par le serveur SEUL (`AdjustStockAction`) : au poste, une table en LECTURE SEULE que rien
+  /// n'écrit ni n'envoie — il n'y a donc aucune saisie locale à protéger. Tout au premier tirage, puis au curseur
+  /// avec un recouvrement de deux minutes (voir `SyncController::pull`) : un mouvement déjà reçu est REMPLACÉ par
+  /// identifiant, jamais dupliqué.
+  ///
+  /// ⚠️⚠️ **STRICT** : élément illisible, identifiant invalide ou servi deux fois, produit inconnu du poste, type
+  /// hors `entree`/`sortie`/`ajustement`, quantité absente, illisible ou négative, motif de référence absent,
+  /// référence ou motif qui n'est pas un texte, date illisible → [FormatException] : RIEN n'est écrit, le curseur
+  /// n'avance pas. Lisser — une quantité illisible devenue 0, un type inconnu lu comme une entrée — fausserait en
+  /// silence la rotation, les écarts d'inventaire et le stock d'œufs de la ferme.
+  ///
+  /// Clé absente (serveur antérieur à U9) : rien n'est touché. Les saisies EN ATTENTE du poste n'y sont jamais
+  /// écrites : `JournalStocks` les ajoute à la lecture, et les retire dès que leur mouvement est redescendu.
+  Future<int> _absorberMouvementsStock(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Mouvement de stock';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final produits = {
+      for (final p in await _db.select(_db.products).get()) p.id,
+    };
+    const types = {'entree', 'sortie', 'ajustement'};
+    final vus = <String>{};
+    final recus = <StockMovementsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final produit = l['product_id'];
+      final type = l['type'];
+      final quantite = _nombreStrict(l['quantity'], '$quoi $id : quantité');
+      final referenceType = _texteStrict(
+        l['reference_type'],
+        '$quoi $id : type de référence',
+      );
+      final referenceId = _texteStrict(
+        l['reference_id'],
+        '$quoi $id : référence',
+      );
+      final motif = _texteStrict(l['reason'], '$quoi $id : motif');
+      final date = l['movement_date'] is String
+          ? DateTime.tryParse(l['movement_date'] as String)
+          : null;
+      if (produit is! String || !produits.contains(produit)) {
+        throw FormatException(
+          "$quoi $id refusé : produit inconnu du poste ($produit).",
+        );
+      }
+      if (type is! String || !types.contains(type)) {
+        throw FormatException('$quoi $id refusé : type illisible ($type).');
+      }
+      if (quantite == null || quantite < 0) {
+        throw FormatException(
+          '$quoi $id refusé : quantité absente ou négative ($quantite).',
+        );
+      }
+      if (referenceType == null || referenceType.isEmpty) {
+        throw FormatException('$quoi $id refusé : type de référence absent.');
+      }
+      if (date == null) {
+        throw FormatException(
+          '$quoi $id refusé : date illisible (${l['movement_date']}).',
+        );
+      }
+      recus.add(
+        StockMovementsCompanion.insert(
+          id: id,
+          productId: produit,
+          type: type,
+          quantity: quantite,
+          referenceType: referenceType,
+          referenceId: Value(referenceId),
+          reason: Value(motif),
+          // ⚠️ Heure MURALE du serveur, lue telle quelle (jamais `toLocal()` : le jour du web doit rester le jour).
+          movementDate: date,
+        ),
+      );
+    }
+
+    await _db.batch(
+      (b) => b.insertAll(
+        _db.stockMovements,
+        recus,
+        mode: InsertMode.insertOrReplace,
+      ),
+    );
+
+    return recus.length;
+  }
 
   /// Ticket U8 — LIGNES DE RETOUR FOURNISSEUR servies par le tirage (`purchase_returns`).
   ///

@@ -1078,6 +1078,9 @@ void main() {
       'Recalculer PMP': 'le PMP est calculé par le serveur, pas au poste',
       'Modifier le Produit':
           'la modification se fait au Catalogue Produits, pas depuis ce hub',
+      // Ticket U9 — article 5 : le Blade (`gestion-stocks.blade.php`) n'a pas de bouton « Importer » (aucun import
+      // réel au web, « zéro placeholder » de `GestionStocks`) ; le poste le retire comme lui.
+      'Importer': 'absent de la vue web, qui fait foi (aucun import au web)',
     },
 
     'parametres.html': {

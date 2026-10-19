@@ -293,7 +293,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
           spacing: AgriSpacing.xs,
           runSpacing: AgriSpacing.xs,
           children: [
-            for (final c in ['Tous', ...d.categories])
+            for (final c in ['Tous', ...d.categories.map((c) => c.label)])
               InkWell(
                 key: Key('pastille-$c'),
                 onTap: () => setState(() => _categorie = c),

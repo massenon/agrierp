@@ -640,15 +640,34 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           vide: '— Aucune journée saisie sur la période —',
           lignes: d.elevageT2,
         ),
+        // 🔴→✅ Ticket U9 — le Tableau 3 du web (`elevage-synth.blade.php`) :
+        // onze colonnes dont « Lot », soldes de FERME en plateaux.
         'Tableau 3 : Suivi Intégral de la Ponte' => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: AgriSpacing.sm),
+              child: Text(
+                'Les quatre colonnes de stock (SRH / TS / OS / Stock Final) '
+                'sont des soldes de ferme, en plateaux : le stock d\'œufs est '
+                'tenu au niveau du produit, rien ne distingue l\'œuf issu '
+                'd\'une bande de celui issu d\'une autre. Deux bandes '
+                'pondeuses le même jour affichent donc le même solde.',
+                key: Key('legende-elevage-t3'),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: AgriColors.outline,
+                ),
+              ),
+            ),
             _tableau(
               cle: 'tableau-elevage-t3',
-              largeur: 1500,
+              largeur: 1650,
               colonnes: const [
                 ('Âge (Sem.)', 3),
                 ('Jour', 3),
+                ('Lot', 3),
                 ('Total Œufs Récoltés (OR)', 4),
                 ('Taux Ponte %', 3),
                 ('Cassés/Fêlés (OF)', 3),
@@ -658,7 +677,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
                 ('Sorties Vente OS (Plateaux)', 4),
                 ('Stock Final (Plateaux + Vrac)', 5),
               ],
-              vide: '— Aucune journée de ponte saisie sur la période —',
+              vide: 'Aucune ponte enregistrée sur la période.',
               lignes: d.elevageT3,
             ),
             const Padding(
@@ -702,13 +721,15 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       // complet — et une colonne de tirets passerait pour une ferme sans
       // mortalité.
       _mentionPoste(
-        "Ce rapport porte les journées saisies SUR CE POSTE : les fiches "
-        "d'élevage ne descendent jamais du serveur, elles n'y montent que. "
+        // Ticket U9 — phrase datée corrigée : les fiches descendent depuis F0.94.
+        "Ce rapport porte les journées connues du poste : celles du serveur "
+        "(descendues au tirage) et celles saisies ici. "
         "⚠️ Les colonnes en tiret (ventilation par sexe et par stade, "
         "traitement, dose, symptômes, montant de vente) ne quittent pas le "
         "poste à l'envoi : il ne les a jamais eues. Elles restent affichées "
         "parce que la maquette les demande — les retirer laisserait croire le "
-        "contraire. Le Tableau 3, lui, est intégralement calculé ici.",
+        "contraire. Le Tableau 3 reprend le calcul du web : soldes de ferme "
+        "en plateaux, lus dans le grand livre des stocks.",
       ),
     ],
   );
@@ -891,6 +912,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           const EnteteDocument([
             'Âge',
             'Jour',
+            'Lot',
             'OR',
             'Ponte%',
             'OF',
@@ -903,7 +925,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           for (final l in d.elevageT3) DonneesDocument(l.cellules),
         ],
         noteDePied:
-            "Journées saisies sur ce poste. Les colonnes en tiret ne font pas "
+            "Journées connues du poste. Les colonnes en tiret ne font pas "
             "partie de la charge utile d'envoi des fiches.",
       ),
 

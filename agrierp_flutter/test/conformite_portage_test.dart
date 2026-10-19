@@ -136,6 +136,8 @@ void main() {
     'purchase_lines',
     // Ticket U8 — lignes de retour des achats servis, avec leur achat.
     'purchase_returns',
+    // Ticket U9 — grand livre des stocks, en lecture seule au poste.
+    'stock_movements',
     'treasury_accounts',
     'expense_categories',
   };

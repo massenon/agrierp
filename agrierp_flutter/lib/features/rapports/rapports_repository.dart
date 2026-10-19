@@ -1,8 +1,9 @@
 import 'package:drift/drift.dart' show OrderingTerm, OrderingMode;
 
 import '../../core/database/app_database.dart';
-import '../../core/database/sync_columns.dart';
 import '../elevage/production_oeufs_service.dart';
+import '../stocks/journal_stocks.dart';
+import '../stocks/pmp_service.dart';
 
 /// Une ligne de rapport : ses cellules, dans l'ordre des colonnes de la
 /// maquette. Le tiret y est une VALEUR, pas une absence de cellule — c'est ce
@@ -165,7 +166,11 @@ class RapportsRepository {
     final produits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
     final bandes = await database.select(database.livestockLots).get();
-    final lignesDeVente = await database.select(database.saleLines).get();
+    // Ticket U9 — grand livre des stocks (descendu + saisies en attente) : Tableau 3 de la ponte.
+    final journal = await JournalStocks.charger(
+      database,
+      maintenant: DateTime.now(),
+    );
 
     final fiches =
         await (database.select(database.livestockDailyEntries)..orderBy([
@@ -192,13 +197,11 @@ class RapportsRepository {
       dettes: _dettes(dettes, fournisseurs),
       elevageT1: _elevageRecensement(dansLaPeriode, bandes),
       elevageT2: _elevageMouvements(dansLaPeriode, bandes),
-      elevageT3: _elevagePonte(
-        fiches,
+      elevageT3: elevagePonte(
         dansLaPeriode,
         bandes,
-        lignesDeVente,
-        produits,
-        ventes,
+        journal,
+        JournalStocks.produitOeufs(produits)?.id,
       ),
       indicateurs: _indicateurs(dansLaPeriode),
       stocks: _stocks(produits, categories),
@@ -415,210 +418,81 @@ class RapportsRepository {
     ];
   }
 
-  /// Tableau 3 — Suivi Intégral de la Ponte, dix colonnes.
+  /// Tableau 3 — Suivi Intégral de la Ponte : le tableau du WEB (`ElevageSynth` et son Blade), onze colonnes.
   ///
-  /// ⚠️ **C'EST LE SEUL DES TROIS QUI SOIT ENTIÈREMENT CALCULABLE AU POSTE**,
-  /// et c'est normal : la ponte est ce que le poste saisit lui-même.
+  /// 🔴→✅ **TICKET U9 — MÊME TABLEAU QU'AU WEB.** Le poste calculait des soldes PAR BANDE, EN ŒUFS, depuis ses
+  /// fiches et ses lignes de vente ; le web tient des soldes de FERME, EN PLATEAUX, lus dans le grand livre des
+  /// stocks (`EggStockLedgerService`) — qui descend au poste depuis U9 ([JournalStocks]). Le web est maître
+  /// (article 5) : mêmes colonnes (dont « Lot »), mêmes unités, même périmètre, même calcul.
   ///
-  /// Formules affichées par la maquette en pied de tableau, appliquées ici
-  /// telles quelles :
-  ///   Taux de Ponte % = (OR × 100) ÷ Effectif Final
-  ///   Total Stock (TS) = (OR − OF) + SRH
-  ///   Stock Final = TS − OS
-  List<LigneRapport> _elevagePonte(
-    List<LivestockDailyEntry> toutes,
+  ///   Lignes : les fiches de la période dont la ponte est > 0, de la plus récente à la plus ancienne.
+  ///   Âge (Sem.) = `intdiv(création de la bande → jour de la fiche, en jours, 7)` (signé, tronqué) ; « — » sans date.
+  ///   Taux Ponte % = `number_format(OR ÷ Effectif Final × 100, 1)` puis « % », « — % » sans effectif.
+  ///   Commercialisables = OR − OF, tels quels.
+  ///   SRH / TS / OS / Stock Final : `EggStockLedgerService::ligne(jour, Σ max(0, OR − OF) des fiches du JOUR)` —
+  ///   le même solde pour deux bandes pondeuses du même jour (le stock d'œufs est tenu au niveau du produit).
+  static List<LigneRapport> elevagePonte(
     List<LivestockDailyEntry> periode,
     List<LivestockLot> bandes,
-    List<SaleLine> lignesDeVente,
-    List<Product> produits,
-    List<Sale> ventes,
+    JournalStocks journal,
+    String? produitOeufs,
   ) {
     final bandeDe = {for (final b in bandes) b.id: b};
+    final pondeuses = [
+      for (final f in periode)
+        if ((f.ponteTotal ?? 0) > 0) f,
+    ]..sort((a, b) => b.entryDate.compareTo(a.entryDate));
 
-    // Ticket U8 — JOUR DE VENTE de chaque vente : sa date effective (`sold_at ?? created_at` au web ; le serveur la
-    // sert dans `sold_at`, et une vente du poste porte l'instant de la saisie), ramenée au jour. Une vente REFUSÉE
-    // par le serveur (`conflict`) n'a rien fait sortir du stock de la ferme : elle n'a pas de jour de sortie.
-    final jourDeVente = <String, DateTime>{
-      for (final v in ventes)
-        if (v.syncStatus != SyncStatus.conflict)
-          v.id: DateTime(v.soldAt.year, v.soldAt.month, v.soldAt.day),
+    // `getLedgerOeufsProperty()` : une ligne du grand livre par JOUR affiché, production commercialisable du jour
+    // agrégée une seule fois.
+    final commercialisablesDuJour = <DateTime, int>{};
+    for (final f in pondeuses) {
+      final j = JournalStocks.jour(f.entryDate);
+      final c = f.ponteTotal! - (f.ponteCasses ?? 0);
+      commercialisablesDuJour[j] =
+          (commercialisablesDuJour[j] ?? 0) + (c < 0 ? 0 : c);
+    }
+    final grandLivre = {
+      for (final e in commercialisablesDuJour.entries)
+        e.key: journal.ligneOeufs(produitOeufs, e.key, e.value),
     };
 
-    // ⚠️ LE STOCK RESTANT HIER SE LIT SUR LA VEILLE, PAS SUR LA PREMIÈRE LIGNE
-    // AFFICHÉE. Filtrer d'abord la période puis chercher la veille ferait
-    // repartir tout rapport de zéro à sa première journée : le SRH est
-    // cherché dans TOUTES les journées du poste.
-    final parBande = <String, List<LivestockDailyEntry>>{};
-    for (final f in toutes) {
-      parBande.putIfAbsent(f.lotId, () => []).add(f);
-    }
-    for (final liste in parBande.values) {
-      liste.sort((a, b) => a.entryDate.compareTo(b.entryDate));
-    }
+    String entier(double v) => PmpService.nombre(v, 0);
 
-    final oeufs = _produitOeufs(produits);
-
-    final lignes = <LigneRapport>[];
-
-    for (final f in periode) {
-      if (f.ponteTotal == null) continue;
-
-      final bande = bandeDe[f.lotId];
-      final or = f.ponteTotal ?? 0;
-      final of = f.ponteCasses ?? 0;
-      final commercialisables = ProductionOeufsService.commercialisables(
-        recoltes: or,
-        casses: of,
-      );
-
-      final srh = _stockDeLaVeille(
-        parBande[f.lotId] ?? const [],
-        f.entryDate,
-        lignesDeVente,
-        oeufs,
-        jourDeVente,
-      );
-      final ts = commercialisables + srh;
-      final osOeufs = _sortiesVente(f, lignesDeVente, oeufs, jourDeVente);
-      final finalOeufs = ts - osOeufs < 0 ? 0 : ts - osOeufs;
-
-      final taux = ProductionOeufsService.tauxDePonte(
-        recoltes: or,
-        effectif: f.effectifFinal,
-      );
-      final osPlateaux = ProductionOeufsService.enPlateaux(osOeufs);
-      final restant = ProductionOeufsService.enPlateaux(finalOeufs);
-
-      lignes.add(
-        LigneRapport([
-          _ageEnSemaines(bande, f.entryDate),
-          date(f.entryDate),
-          '$or',
-          taux == null ? '—' : '${taux.toStringAsFixed(1)} %',
-          '$of',
-          '$commercialisables',
-          '$srh',
-          '$ts',
-          '${osPlateaux.plateaux} ($osOeufs œufs)',
-          '${restant.plateaux} plateaux + ${restant.vrac} vrac',
-        ]),
-      );
-    }
-
-    return lignes.reversed.toList();
+    return [
+      for (final f in pondeuses)
+        () {
+          final bande = bandeDe[f.lotId];
+          final l = grandLivre[JournalStocks.jour(f.entryDate)]!;
+          final or = f.ponteTotal!;
+          return LigneRapport([
+            ageEnSemaines(bande?.createdDate, f.entryDate),
+            date(f.entryDate),
+            bande?.code ?? '',
+            '$or',
+            '${f.effectifFinal > 0 ? PmpService.nombre(or / f.effectifFinal * 100, 1, virgule: '.', milliers: ',') : '—'} %',
+            f.ponteCasses == null ? '' : '${f.ponteCasses}',
+            '${or - (f.ponteCasses ?? 0)}',
+            entier(l.srh),
+            entier(l.ts),
+            entier(l.os),
+            '${entier(l.stockFinal)} plateaux${l.vrac > 0 ? ' + ${l.vrac} vrac' : ''}',
+          ]);
+        }(),
+    ];
   }
 
-  /// ⚠️ **LES SORTIES SONT IMPUTÉES À LA BANDE, JAMAIS RÉPARTIES.**
-  /// `SaleLines.lotId` porte la bande d'origine, précisément pour éviter une
-  /// répartition inventée. Une vente d'œufs prise sur le stock sans bande
-  /// d'origine ne peut donc pas être imputée — et n'est pas devinée.
-  ///
-  /// 🔴→✅ **TICKET U8 — LES SORTIES DU JOUR DE LA FICHE, PAS DE TOUTE LA VIE DE
-  /// LA BANDE.** OS est la colonne « Sorties Vente » d'UNE journée : le web
-  /// (`EggStockLedgerService::ventesDu($date)`) ne compte que les ventes de ce
-  /// jour-là. Le poste additionnait toutes les lignes d'œufs de la bande à
-  /// chaque journée — une vente du 3 sortait aussi le 4, le 5… et le stock
-  /// final s'effondrait à tort. Le jour d'une vente est sa date effective
-  /// ([jourDeVente]) ; une ligne dont la vente est inconnue du poste n'a pas de
-  /// jour et ne sort nulle part.
-  int _sortiesVente(
-    LivestockDailyEntry fiche,
-    List<SaleLine> lignes,
-    Product? oeufs,
-    Map<String, DateTime> jourDeVente,
-  ) {
-    final jour = DateTime(
-      fiche.entryDate.year,
-      fiche.entryDate.month,
-      fiche.entryDate.day,
-    );
-    return _sorties(
-      fiche.lotId,
-      lignes,
-      oeufs,
-      jourDeVente,
-      (jourVente) => jourVente == jour,
-    );
-  }
-
-  /// Œufs sortis par les ventes de la bande [lotId] dont le jour de vente satisfait [retenu].
-  int _sorties(
-    String lotId,
-    List<SaleLine> lignes,
-    Product? oeufs,
-    Map<String, DateTime> jourDeVente,
-    bool Function(DateTime jourVente) retenu,
-  ) {
-    if (oeufs == null) return 0;
-
-    return lignes
-        .where((l) {
-          final jourVente = jourDeVente[l.saleId];
-          return l.productId == oeufs.id &&
-              l.lotId == lotId &&
-              jourVente != null &&
-              retenu(jourVente);
-        })
-        .fold<int>(
-          0,
-          (t, l) =>
-              t + (l.qty.round() * ProductionOeufsService.oeufsParPlateau),
-        );
-  }
-
-  int _stockDeLaVeille(
-    List<LivestockDailyEntry> journees,
-    DateTime jour,
-    List<SaleLine> lignes,
-    Product? oeufs,
-    Map<String, DateTime> jourDeVente,
-  ) {
-    final debutDuJour = DateTime(jour.year, jour.month, jour.day);
-    var stock = 0;
-
-    for (final f in journees) {
-      if (!f.entryDate.isBefore(debutDuJour)) break;
-      if (f.ponteTotal == null) continue;
-
-      stock += ProductionOeufsService.commercialisables(
-        recoltes: f.ponteTotal ?? 0,
-        casses: f.ponteCasses ?? 0,
-      );
-    }
-
-    // Ticket U8 — les ventes de la bande AVANT ce jour, chacune UNE fois, à son jour de vente (jour avec ou sans
-    // fiche) : sans le filtre par jour, chaque vente était retranchée autant de fois qu'il y avait de journées.
-    if (journees.isNotEmpty) {
-      stock -= _sorties(
-        journees.first.lotId,
-        lignes,
-        oeufs,
-        jourDeVente,
-        (jourVente) => jourVente.isBefore(debutDuJour),
-      );
-    }
-
-    return stock < 0 ? 0 : stock;
-  }
-
-  /// ⚠️ Même normalisation de ligature que `ProductionOeufsService` : le
-  /// catalogue écrit « **Œ**ufs de table (plateau) », et une comparaison qui
-  /// ne rapproche pas « Œ » de « oe » ne trouve rien — en silence.
-  Product? _produitOeufs(List<Product> produits) {
-    for (final p in produits.where((p) => p.isActive)) {
-      if (p.name.toLowerCase().replaceAll('œ', 'oe').contains('oeufs')) {
-        return p;
-      }
-    }
-    return null;
-  }
-
-  String _ageEnSemaines(LivestockLot? bande, DateTime jour) {
-    final debut = bande?.createdDate;
-    if (debut == null) return '—';
-
-    final jours = jour.difference(debut).inDays;
-    return jours < 0 ? '—' : '${jours ~/ 7}';
+  /// Colonne « Âge (Sem.) » du Blade : `intdiv($lot->created_date->diffInDays($e->entry_date), 7)` — Carbon 3 rend
+  /// un écart SIGNÉ (une fiche antérieure à la création de la bande donne un âge négatif), `intdiv` tronque vers
+  /// zéro ; « — » si la bande n'a pas de date de création.
+  static String ageEnSemaines(DateTime? creation, DateTime jour) {
+    if (creation == null) return '—';
+    final jours = DateTime.utc(
+      jour.year,
+      jour.month,
+      jour.day,
+    ).difference(DateTime.utc(creation.year, creation.month, creation.day)).inDays;
+    return '${jours ~/ 7}';
   }
 
   IndicateursElevage _indicateurs(List<LivestockDailyEntry> fiches) {

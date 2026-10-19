@@ -3,13 +3,16 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import 'journal_stocks.dart';
 import 'pmp_service.dart';
 
-/// Une ligne du tableau « Tableau & Valorisation ».
+/// Une ligne du tableau « Tableau & Valorisation » — une ligne de `GestionStocks::stockRowsRaw()`.
 class LigneStock {
   const LigneStock({required this.produit, required this.categorie, this.pmp});
 
   final Product produit;
+
+  /// `$row['product']->category?->label` : vide (et non « — ») pour un produit sans catégorie, comme le Blade.
   final String categorie;
 
   /// PMP unitaire du produit — `Product::computePmp()` du web, calculé par [PmpService] sur les lignes d'achat
@@ -31,56 +34,102 @@ class LigneStock {
           0,
         );
 
+  /// 🔴→✅ Ticket U9 — `'urgence' => $product->alert_threshold > 0 && $product->stock_qty <= $product->alert_threshold`.
+  /// Un seuil NUL (ou absent) ne déclenche rien au web ; le poste comptait « Sous seuil » tout produit à zéro dont le
+  /// seuil valait 0.
+  bool get urgence =>
+      (produit.alertThreshold ?? 0) > 0 &&
+      produit.stockQty <= produit.alertThreshold!;
+
+  /// Règle du CATALOGUE PRODUITS (`Product::is_stock_low` du web, `stock_qty <= alert_threshold`), lue par
+  /// `CatalogueProduitsScreen` : ce n'est PAS l'urgence de Gestion des Stocks ([urgence]).
   bool get sousSeuil =>
       produit.alertThreshold != null &&
       produit.stockQty <= produit.alertThreshold!;
 
-  /// ⚠️ **UN STOCK NÉGATIF N'EST PAS UNE FRAUDE** : c'est le signe d'une
-  /// ENTRÉE NON SAISIE (production ou achat pas encore enregistré),
-  /// régularisable par un ajustement d'inventaire. Le serveur pose la même
-  /// lecture (`Product`, ticket 14.30).
-  bool get negatif => produit.stockQty < 0;
+  /// ⚠️ **UN STOCK NÉGATIF N'EST PAS UNE FRAUDE** : c'est le signe d'une ENTRÉE NON SAISIE (production ou achat pas
+  /// encore enregistré), régularisable par un ajustement d'inventaire — `Product::stockEstNegatif()` (ticket 14.30).
+  /// Le Blade l'écrit dans la cellule Stock (« Entrée non saisie »), pas dans la pastille d'urgence.
+  bool get stockNegatif => produit.stockQty < 0;
 }
 
-/// Une ligne du « Journal des Mouvements ».
-class MouvementStock {
-  const MouvementStock({
-    required this.ajustement,
-    required this.designation,
-    this.pmp,
-  });
+/// Une ligne du « Journal des Mouvements » du web : un mouvement du grand livre (descendu ou en attente d'envoi).
+class LigneJournal {
+  const LigneJournal({required this.mouvement, this.designation, this.pmp});
 
-  final StockAdjustment ajustement;
-  final String designation;
+  final MouvementStock mouvement;
 
-  /// PMP du produit ajusté ([PmpService]), `null` s'il n'en a pas.
+  /// `$movement->product?->name` ; `null` pour un produit inconnu du poste.
+  final String? designation;
+
+  /// PMP du produit ([PmpService]), `null` s'il n'en a pas.
   final double? pmp;
 
-  /// Colonne « Valeur » du journal web : `abs(quantité) × PMP`, « — » sans PMP.
-  double? get valeur => pmp == null ? null : ajustement.quantity.abs() * pmp!;
+  /// Colonne « Valeur » du Blade : `abs(quantité) × PMP`, « — » sans PMP.
+  double? get valeur => pmp == null ? null : mouvement.quantity.abs() * pmp!;
 
-  /// Signe du Blade : `type === 'sortie' ? -quantité : quantité`.
-  double get quantiteSignee => ajustement.type == 'sortie'
-      ? -ajustement.quantity
-      : ajustement.quantity;
+  /// « Date / Heure » : `movement_date->format('d/m/Y H:i')`.
+  String get dateHeure {
+    final d = mouvement.date;
+    String deux(int n) => n.toString().padLeft(2, '0');
+    return '${deux(d.day)}/${deux(d.month)}/${d.year} ${deux(d.hour)}:${deux(d.minute)}';
+  }
+
+  /// « Référence » : `strtoupper(substr($reference_id, 0, 8))`, « — » sans pièce.
+  String get reference {
+    final r = mouvement.referenceId;
+    if (r == null || r.isEmpty) return '—';
+    return (r.length > 8 ? r.substring(0, 8) : r).toUpperCase();
+  }
+
+  /// « Motif » : `referenceLabel($reference_type)` puis « — motif » s'il y en a un.
+  String get motif {
+    final raison = mouvement.reason;
+    return '${JournalStocks.libelleReference(mouvement.referenceType)}'
+        '${raison == null || raison.isEmpty ? '' : ' — $raison'}';
+  }
+
+  /// « Quantité » : `-` pour une sortie, `+` sinon, puis la quantité au format du Blade.
+  String get quantite =>
+      '${mouvement.type == 'sortie' ? '-' : '+'}${PmpService.quantite(mouvement.quantity)}';
+
+  /// « Valeur » : `number_format(abs(quantité) × PMP, 0, ',', ' ').' FCFA'`, « — » sans PMP.
+  String get valeurAffichee =>
+      valeur == null ? '—' : '${PmpService.francs(valeur!)} FCFA';
 }
 
 class DonneesStocks {
   const DonneesStocks({
     required this.lignes,
-    required this.mouvements,
+    required this.journal,
     required this.categories,
+    required this.ecartsDuMois,
+    required this.rotation,
     this.maintenant,
   });
 
+  /// Produits ACTIFS triés par NOM (`Product::where('is_active', true)->orderBy('name')`).
   final List<LigneStock> lignes;
-  final List<MouvementStock> mouvements;
-  final List<String> categories;
 
-  /// Instant du chargement : borne le mois des « Écarts d'Inventaire ».
+  /// Les 100 derniers mouvements, du plus récent au plus ancien (`GestionStocks::getMovementsProperty()`).
+  final List<LigneJournal> journal;
+
+  /// Catégories ACTIVES triées par libellé (`ProductCategory::where('is_active', true)->orderBy('label')`) : le
+  /// filtre « Catégorie » porte sur l'identifiant, comme `$categoryFilter`.
+  final List<ProductCategory> categories;
+
+  /// « Écarts d'Inventaire » — [JournalStocks.ecartsDuMois] : écarts du MOIS saisis au web, sur ce poste ou sur un
+  /// autre (`adjustment` et `inventaire`), plus ceux de ce poste en attente d'envoi.
+  final double ecartsDuMois;
+
+  /// « Rotation du Stock » — [JournalStocks.rotation].
+  final RotationStock rotation;
+
+  /// Instant du chargement : borne le mois des « Écarts d'Inventaire » et de la rotation.
   final DateTime? maintenant;
 
-  int get alertesDeSeuil => lignes.where((l) => l.sousSeuil).length;
+  /// « Alertes de Seuil » : produits actifs en urgence (`$rows->filter(fn ($r) => $r['urgence'])->count()`).
+  int get alertesDeSeuil => lignes.where((l) => l.urgence).length;
 
   /// « Valorisation Stocks » — `GestionStocks::getKpisProperty()` : Σ des valeurs de TOUS les produits actifs (la
   /// recherche et le filtre de catégorie ne s'appliquent pas aux KPI), un produit sans PMP comptant pour 0 (il est
@@ -88,29 +137,6 @@ class DonneesStocks {
   /// toujours un montant, « 0 FCFA » compris : le poste aussi.
   double get valorisation =>
       lignes.fold<double>(0, (t, l) => t + (l.valeur ?? 0));
-
-  /// « Écarts d'Inventaire » — formule du web : `round(Σ quantité signée × PMP)` sur les ajustements du MOIS
-  /// courant, un produit sans PMP comptant pour 0.
-  ///
-  /// ⚠️⚠️ **PÉRIMÈTRE : LES AJUSTEMENTS SAISIS SUR CE POSTE.** Le web lit le grand livre `stock_movements`, qui
-  /// ne descend pas au poste : les ajustements saisis au web ou sur un autre poste n'y sont pas — la légende de la
-  /// carte le dit. Un ajustement REFUSÉ par le serveur (`conflict`) n'est pas compté : le web ne le connaîtra
-  /// jamais. Un ajustement en attente d'envoi l'est : c'est un fait du mois, le serveur l'aura à l'envoi.
-  double get ecartsDuMois {
-    final m = maintenant ?? DateTime.now();
-    final somme = mouvements
-        .where(
-          (x) =>
-              x.ajustement.syncStatus != SyncStatus.conflict &&
-              x.ajustement.movementDate.year == m.year &&
-              x.ajustement.movementDate.month == m.month,
-        )
-        .fold<double>(
-          0,
-          (t, x) => t + (x.pmp == null ? 0 : x.quantiteSignee * x.pmp!),
-        );
-    return PmpService.arrondi(somme, 0);
-  }
 }
 
 /// Lectures et écritures de `prototype_html/gestion-stocks.html`.
@@ -121,10 +147,10 @@ class DonneesStocks {
 /// l'alimentait**. Le canal d'envoi existait sans producteur : un inventaire
 /// physique constaté au magasin n'avait aucun moyen d'être saisi hors ligne.
 ///
-/// ⚠️ **LE JOURNAL DES MOUVEMENTS NE VOIT QUE LES AJUSTEMENTS DE CE POSTE.**
-/// `stock_movements` — le grand livre des entrées et sorties, alimenté par
-/// les ventes, les achats et la production — ne figure pas dans la charge du
-/// tirage. Le journal local est donc partiel, et le dit.
+/// 🔴→✅ **TICKET U9 — LE JOURNAL DES MOUVEMENTS EST CELUI DU WEB.** Le grand
+/// livre `stock_movements` (ventes, achats, production, ajustements de la
+/// ferme entière) descend au poste ; les saisies de ce poste encore en attente
+/// d'envoi y sont projetées par [JournalStocks] (règle des `pending`).
 class StocksRepository {
   StocksRepository({
     required this.database,
@@ -159,11 +185,9 @@ class StocksRepository {
   ];
 
   Future<DonneesStocks> charger() async {
-    final produits = await (database.select(
-      database.products,
-    )..where((t) => t.isActive.equals(true))).get();
+    final maintenant = _horloge();
+    final tousProduits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
-    final ajustements = await database.select(database.stockAdjustments).get();
     // Ticket U8 — PMP sur les lignes d'achat de la ferme (descendues depuis U4), règle de [PmpService].
     final pmpDe = PmpService.parProduit(
       PmpService.lignesRetenues(
@@ -171,33 +195,45 @@ class StocksRepository {
         await database.select(database.purchaseLines).get(),
       ),
     );
+    // Ticket U9 — grand livre descendu + saisies en attente projetées.
+    final journal = await JournalStocks.charger(
+      database,
+      maintenant: maintenant,
+    );
 
     final libelleDe = {for (final c in categories) c.id: c.label};
-    final nomDe = {for (final p in produits) p.id: p.name};
+    final nomDe = {for (final p in tousProduits) p.id: p.name};
+    final actifs =
+        tousProduits.where((p) => p.isActive).toList()
+          ..sort((a, b) => comparerCommeLeServeur(a.name, b.name));
 
     return DonneesStocks(
-      maintenant: _horloge(),
-      lignes: (produits.toList()..sort((a, b) => a.sku.compareTo(b.sku)))
-          .map(
-            (p) => LigneStock(
-              produit: p,
-              categorie: libelleDe[p.categoryId] ?? '—',
-              pmp: pmpDe[p.id],
-            ),
-          )
-          .toList(),
-      mouvements:
-          (ajustements.toList()
-                ..sort((a, b) => b.movementDate.compareTo(a.movementDate)))
-              .map(
-                (a) => MouvementStock(
-                  ajustement: a,
-                  designation: nomDe[a.productId] ?? 'Produit inconnu',
-                  pmp: pmpDe[a.productId],
-                ),
-              )
-              .toList(),
-      categories: (libelleDe.values.toSet().toList()..sort()),
+      maintenant: maintenant,
+      lignes: [
+        for (final p in actifs)
+          LigneStock(
+            produit: p,
+            categorie: libelleDe[p.categoryId] ?? '',
+            pmp: pmpDe[p.id],
+          ),
+      ],
+      journal: [
+        for (final m in journal.derniers())
+          LigneJournal(
+            mouvement: m,
+            designation: nomDe[m.productId],
+            pmp: pmpDe[m.productId],
+          ),
+      ],
+      categories:
+          categories.where((c) => c.isActive).toList()
+            ..sort((a, b) => comparerCommeLeServeur(a.label, b.label)),
+      ecartsDuMois: journal.ecartsDuMois(pmpDe, maintenant),
+      rotation: journal.rotation(
+        produits: tousProduits,
+        pmp: pmpDe,
+        maintenant: maintenant,
+      ),
     );
   }
 

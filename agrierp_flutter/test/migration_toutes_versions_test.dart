@@ -63,6 +63,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   41: [d.infirmaryRecords, d.veterinaryCalendarEvents],
   // Ticket U2 (D-U2) — objectifs de GMQ tirés du serveur.
   43: [d.growthStandards],
+  // Ticket U9 — grand livre des stocks du serveur, en lecture seule.
+  44: [d.stockMovements],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier

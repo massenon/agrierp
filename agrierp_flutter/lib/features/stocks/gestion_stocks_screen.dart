@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import 'journal_stocks.dart';
 import 'pmp_service.dart';
 import 'stocks_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -20,13 +21,27 @@ import '../../core/theme/symboles_agri.dart';
 /// là où le web en met un : produit sans PMP (jamais acheté). Jamais une
 /// estimation depuis le prix de VENTE — un actif gonflé au bilan.
 ///
-/// ⚠️ Restent hors de portée : la « Rotation du Stock » et la part des écarts
-/// saisie AILLEURS que sur ce poste — toutes deux lisent le grand livre
-/// `stock_movements`, qui ne descend pas.
+/// 🔴→✅ **TICKET U9 — LE GRAND LIVRE DESCEND.** `stock_movements` est tiré
+/// au poste : « Rotation du Stock », « Écarts d'Inventaire » (saisis au web,
+/// ici ou sur un autre poste) et le Journal des Mouvements reprennent les
+/// formules du web ([JournalStocks]) ; les saisies de ce poste en attente
+/// d'envoi y sont projetées, jamais comptées deux fois. Le tableau suit le
+/// Blade : tri par NOM, pastille « Critique » / « Normal », mention « Entrée
+/// non saisie » sous un stock négatif, colonnes alignées comme au web.
 class GestionStocksScreen extends StatefulWidget {
   const GestionStocksScreen({super.key, required this.depot});
 
   final StocksRepository depot;
+
+  /// Légende de « Rotation du Stock », construite comme dans le Blade : le périmètre du ratio se lit en même temps
+  /// que le ratio. Sans rotation : la légende de `x-kpi-card :pending`.
+  static String legendeRotation(RotationStock r) {
+    if (r.rotation == null) {
+      return 'Disponible après un stock valorisable non nul sur le mois';
+    }
+    return '${r.couverture == null ? '' : 'Couvre ${PmpService.nombre(r.couverture!, 0)} % des ventes du mois — '}'
+        "les marchandises produites à la ferme n'ont pas de coût d'achat";
+  }
 
   @override
   State<GestionStocksScreen> createState() => _GestionStocksScreenState();
@@ -132,13 +147,27 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           // (`sidebar.js`) : les deux existent dans la maquette, à deux
           // endroits différents. Reprendre celui du menu pour titrer la
           // page remplace un libellé validé par un autre.
-          child: Text(
-            'Gestion des Stocks',
-            style: TextStyle(
-              fontSize: large ? 24 : 20,
-              fontWeight: FontWeight.bold,
-              color: AgriColors.onSurface,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Gestion des Stocks',
+                style: TextStyle(
+                  fontSize: large ? 24 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.onSurface,
+                ),
+              ),
+              const SizedBox(height: AgriSpacing.xs),
+              // Ticket U9 — sous-titre du Blade.
+              const Text(
+                'Espace unifié : inventaire, mouvements et ajustements.',
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.outline,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -162,23 +191,32 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         AgriColors.brandEmerald,
         legende: 'Basée sur le PMP réel (achats)',
       ),
-      _carteKpi('Alertes de Seuil', '${d.alertesDeSeuil}', AgriColors.errorRed),
-      // ⚠️ Rotation = COGS du mois ÷ stock moyen. Les deux termes viennent
-      // du grand livre des mouvements, qui ne descend pas.
+      // Ticket U9 — `$kpis['alertes'].' réf.'` : produits actifs dont le seuil
+      // est strictement positif et atteint (`urgence` du web).
+      _carteKpi(
+        'Alertes de Seuil',
+        '${d.alertesDeSeuil} réf.',
+        AgriColors.errorRed,
+      ),
+      // 🔴→✅ Ticket U9 — `StockRotationService::pourLeMois()` sur le grand
+      // livre descendu ([JournalStocks.rotation]) ; sans stock valorisable
+      // sur le mois, la carte « en attente » du web (`x-kpi-card :pending`).
       _carteKpi(
         'Rotation du Stock',
-        '—',
+        d.rotation.rotation == null
+            ? '—'
+            : '${PmpService.nombre(d.rotation.rotation!, 1)} fois/mois',
         AgriColors.infoBlue,
-        legende: 'Journal des mouvements non synchronisé',
+        legende: GestionStocksScreen.legendeRotation(d.rotation),
       ),
-      // Ticket U8 — en FCFA, formule du web (ajustements du mois × PMP).
-      // ⚠️ Périmètre : les ajustements saisis sur CE poste (`stock_movements`
-      // ne descend pas) — la légende le dit.
+      // 🔴→✅ Ticket U9 — tous les écarts du mois de la ferme (web, ce poste,
+      // autres postes), plus ceux de ce poste en attente d'envoi ; légende du
+      // Blade.
       _carteKpi(
         "Écarts d'Inventaire",
         '${PmpService.francs(d.ecartsDuMois)} FCFA',
         AgriColors.accentYellow,
-        legende: 'Ajustements du mois saisis sur ce poste',
+        legende: 'Ajustements du mois',
       ),
     ],
   );
@@ -264,7 +302,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     final terme = _recherche.trim().toLowerCase();
 
     final lignes = d.lignes.where((l) {
-      if (_categorie.isNotEmpty && l.categorie != _categorie) return false;
+      if (_categorie.isNotEmpty && l.produit.categoryId != _categorie) {
+        return false;
+      }
       if (terme.isEmpty) return true;
       return l.produit.name.toLowerCase().contains(terme) ||
           l.produit.sku.toLowerCase().contains(terme);
@@ -292,7 +332,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   decoration: const InputDecoration(
                     isDense: true,
                     prefixIcon: Icon(SymbolesAgri.search, size: 18),
-                    hintText: 'Rechercher un produit...',
+                    hintText: 'Désignation ou SKU...',
                     hintStyle: TextStyle(fontSize: AgriTypography.xs),
                     border: OutlineInputBorder(),
                   ),
@@ -321,14 +361,16 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                         child: Text('Catégorie : Toutes'),
                       ),
                       for (final c in d.categories)
-                        DropdownMenuItem(value: c, child: Text(c)),
+                        DropdownMenuItem(value: c.id, child: Text(c.label)),
                     ],
                     onChanged: (v) => setState(() => _categorie = v ?? ''),
                   ),
                 ),
               ),
-              _boutonInerte(SymbolesAgri.file_download, 'Exporter'),
-              _boutonInerte(SymbolesAgri.upload_file, 'Importer'),
+              // ⚠️ « Importer » n'existe pas au web (`GestionStocks` : aucun
+              // import réel, « zéro placeholder ») : le poste ne l'affiche
+              // plus (ticket U9, article 5 — le web est maître).
+              _boutonInerte(SymbolesAgri.picture_as_pdf, 'Exporter'),
             ],
           ),
         ),
@@ -342,7 +384,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(
-              width: 1040,
+              width: 1140,
               child: Column(
                 children: [
                   Container(
@@ -367,23 +409,42 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                         ),
                         Expanded(
                           flex: 2,
-                          child: Text('STOCK', style: _enteteColonne),
+                          child: Text(
+                            'STOCK',
+                            textAlign: TextAlign.right,
+                            style: _enteteColonne,
+                          ),
                         ),
                         Expanded(
                           flex: 2,
-                          child: Text('PMP UNIT.', style: _enteteColonne),
+                          child: Text(
+                            'PMP UNIT.',
+                            textAlign: TextAlign.right,
+                            style: _enteteColonne,
+                          ),
                         ),
                         Expanded(
                           flex: 2,
-                          child: Text('VALEUR', style: _enteteColonne),
+                          child: Text(
+                            'VALEUR',
+                            textAlign: TextAlign.right,
+                            style: _enteteColonne,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Padding(
+                            padding: EdgeInsets.only(left: AgriSpacing.md),
+                            child: Text('URGENCE', style: _enteteColonne),
+                          ),
                         ),
                         Expanded(
                           flex: 2,
-                          child: Text('URGENCE', style: _enteteColonne),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text('ACTIONS', style: _enteteColonne),
+                          child: Text(
+                            'ACTIONS',
+                            textAlign: TextAlign.right,
+                            style: _enteteColonne,
+                          ),
                         ),
                       ],
                     ),
@@ -392,7 +453,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     const Padding(
                       padding: EdgeInsets.all(AgriSpacing.lg),
                       child: Text(
-                        '— Aucun produit pour ces critères —',
+                        'Aucun produit pour le moment.',
                         style: TextStyle(
                           fontSize: AgriTypography.xs,
                           fontStyle: FontStyle.italic,
@@ -411,6 +472,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     );
   }
 
+  /// Une ligne du tableau, cellule par cellule comme le Blade (ticket U9) : code en chasse fixe, désignation en
+  /// gras vert forêt, catégorie, stock aligné à droite (rouge gras et « Entrée non saisie » s'il est négatif), PMP,
+  /// valeur en gras, pastille d'urgence, action.
   Widget _ligneStock(LigneStock l, int index) => Container(
     key: Key('produit-$index'),
     color: index.isOdd ? AgriColors.surfaceZebra : AgriColors.surfaceCard,
@@ -424,9 +488,10 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           flex: 2,
           child: Text(
             l.produit.sku,
+            key: Key('code-$index'),
             style: const TextStyle(
               fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
             ),
           ),
         ),
@@ -434,8 +499,13 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           flex: 4,
           child: Text(
             l.produit.name,
+            key: Key('designation-$index'),
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: AgriTypography.xs),
+            style: const TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: FontWeight.bold,
+              color: AgriColors.brandForest,
+            ),
           ),
         ),
         Expanded(
@@ -445,17 +515,39 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             style: const TextStyle(fontSize: AgriTypography.xs),
           ),
         ),
+        // `rtrim(rtrim(number_format($stock, 2, '.', ''), '0'), '.').' '.$unit` ; un stock négatif en rouge gras,
+        // avec la mention « Entrée non saisie » (ticket 14.30), jamais une pastille.
         Expanded(
           flex: 2,
-          child: Text(
-            '${_nombre(l.produit.stockQty)} ${l.produit.unit}',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
-              // ⚠️ Un stock négatif se voit : c'est une entrée non saisie,
-              // pas une anomalie de données.
-              color: l.negatif ? AgriColors.errorDeep : AgriColors.onSurface,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${PmpService.quantite(l.produit.stockQty)} ${l.produit.unit}',
+                key: Key('stock-$index'),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: l.stockNegatif
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: l.stockNegatif
+                      ? AgriColors.errorDeep
+                      : AgriColors.onSurface,
+                ),
+              ),
+              if (l.stockNegatif)
+                Text(
+                  'ENTRÉE NON SAISIE',
+                  key: Key('entree-non-saisie-$index'),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AgriColors.errorDeep,
+                  ),
+                ),
+            ],
           ),
         ),
         // Ticket U8 — `number_format($row['pmp'], 0, ',', ' ')` et
@@ -465,6 +557,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           child: Text(
             l.pmp == null ? '—' : PmpService.francs(l.pmp!),
             key: Key('pmp-$index'),
+            textAlign: TextAlign.right,
             style: const TextStyle(fontSize: AgriTypography.xs),
           ),
         ),
@@ -473,50 +566,82 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           child: Text(
             l.valeur == null ? '—' : PmpService.francs(l.valeur!),
             key: Key('valeur-$index'),
+            textAlign: TextAlign.right,
             style: const TextStyle(
               fontSize: AgriTypography.xs,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        Expanded(flex: 2, child: _pastilleUrgence(l)),
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.only(left: AgriSpacing.md),
+            child: _pastilleUrgence(l, index),
+          ),
+        ),
+        // ⚠️ L'action du web ouvre l'écran d'édition du produit
+        // (`stocks.produits.modifier`) ; au poste la modification se fait au
+        // Catalogue Produits : l'icône reste inerte ici.
         const Expanded(
           flex: 2,
-          child: Opacity(
-            opacity: 0.4,
-            child: Icon(SymbolesAgri.edit, size: 16, color: AgriColors.outline),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Opacity(
+              opacity: 0.4,
+              child: Icon(
+                SymbolesAgri.edit,
+                size: 16,
+                color: AgriColors.outline,
+              ),
+            ),
           ),
         ),
       ],
     ),
   );
 
-  Widget _pastilleUrgence(LigneStock l) {
-    final (libelle, couleur) = l.negatif
-        ? ('Négatif', AgriColors.errorDeep)
-        : l.sousSeuil
-        ? ('Sous seuil', AgriColors.errorRed)
-        : ('Normal', AgriColors.brandEmerald);
+  /// 🔴→✅ Ticket U9 — les DEUX pastilles du Blade : « Critique » (fond rouge plein, texte blanc, icône
+  /// `priority_high`) quand le seuil est atteint, « Normal » (vert sur fond vert pâle) sinon. Le poste affichait
+  /// « Sous seuil » et « Négatif », que le web n'a pas : le stock négatif se lit dans la colonne Stock.
+  Widget _pastilleUrgence(LigneStock l, int index) {
+    final critique = l.urgence;
 
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
+        key: Key('urgence-$index'),
         padding: const EdgeInsets.symmetric(
           horizontal: AgriSpacing.sm,
           vertical: 2,
         ),
         decoration: BoxDecoration(
-          color: couleur.withValues(alpha: 0.10),
-          border: Border.all(color: couleur.withValues(alpha: 0.30)),
+          color: critique
+              ? AgriColors.errorRed
+              : AgriColors.brandEmerald.withValues(alpha: 0.10),
+          border: Border.all(
+            color: critique
+                ? AgriColors.errorRed
+                : AgriColors.brandEmerald.withValues(alpha: 0.30),
+          ),
           borderRadius: BorderRadius.circular(AgriRadius.full),
         ),
-        child: Text(
-          libelle,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: couleur,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (critique) ...[
+              const Icon(SymbolesAgri.priority_high, size: 13, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              critique ? 'Critique' : 'Normal',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: critique ? Colors.white : AgriColors.brandEmerald,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -527,22 +652,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   Widget _ongletJournal(DonneesStocks d) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      // ⚠️⚠️ LE JOURNAL LOCAL EST PARTIEL, ET LE DIT. `stock_movements` —
-      // le grand livre alimenté par les ventes, les achats et la
-      // production — ne descend pas au poste. Présenter ces seules lignes
-      // comme « le journal » ferait croire à un magasin sans mouvement.
-      const Padding(
-        padding: EdgeInsets.only(bottom: AgriSpacing.md),
-        child: Text(
-          'Ajustements d\'inventaire saisis sur ce poste. Les entrées et '
-          'sorties issues des ventes, des achats et de la production '
-          'vivent dans le journal du serveur, qui ne descend pas ici.',
-          style: TextStyle(
-            fontSize: AgriTypography.xs,
-            color: AgriColors.outline,
-          ),
-        ),
-      ),
+      // 🔴→✅ Ticket U9 — le journal est celui du web : les 100 derniers
+      // mouvements du grand livre de la ferme (descendu), plus les saisies de
+      // ce poste en attente d'envoi.
       Container(
         decoration: BoxDecoration(
           color: AgriColors.surfaceCard,
@@ -585,20 +697,28 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       ),
                       Expanded(
                         flex: 2,
-                        child: Text('QUANTITE', style: _enteteColonne),
+                        child: Text(
+                          'QUANTITE',
+                          textAlign: TextAlign.right,
+                          style: _enteteColonne,
+                        ),
                       ),
                       Expanded(
                         flex: 2,
-                        child: Text('VALEUR', style: _enteteColonne),
+                        child: Text(
+                          'VALEUR',
+                          textAlign: TextAlign.right,
+                          style: _enteteColonne,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                if (d.mouvements.isEmpty)
+                if (d.journal.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(AgriSpacing.lg),
                     child: Text(
-                      '— Aucun ajustement saisi sur ce poste —',
+                      'Aucun mouvement enregistré pour le moment.',
                       style: TextStyle(
                         fontSize: AgriTypography.xs,
                         fontStyle: FontStyle.italic,
@@ -606,8 +726,8 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       ),
                     ),
                   ),
-                for (var i = 0; i < d.mouvements.length; i++)
-                  _ligneMouvement(d.mouvements[i], i),
+                for (var i = 0; i < d.journal.length; i++)
+                  _ligneMouvement(d.journal[i], i),
               ],
             ),
           ),
@@ -616,78 +736,104 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ],
   );
 
-  Widget _ligneMouvement(MouvementStock m, int index) => Container(
-    key: Key('mouvement-$index'),
-    color: index.isOdd ? AgriColors.surfaceZebra : AgriColors.surfaceCard,
-    padding: const EdgeInsets.symmetric(
-      horizontal: AgriSpacing.md,
-      vertical: AgriSpacing.sm,
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: Text(
-            _horodatage(m.ajustement.movementDate),
-            style: const TextStyle(fontSize: AgriTypography.xs),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            m.ajustement.referenceType,
-            style: const TextStyle(fontSize: AgriTypography.xs),
-          ),
-        ),
-        Expanded(
-          flex: 4,
-          child: Text(
-            m.designation,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: AgriTypography.xs),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            m.ajustement.type == 'entree' ? 'Entrée' : 'Sortie',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
-              color: m.ajustement.type == 'entree'
-                  ? AgriColors.brandEmerald
-                  : AgriColors.errorDeep,
+  /// Une ligne du journal, cellule par cellule comme le Blade (ticket U9).
+  Widget _ligneMouvement(LigneJournal l, int index) {
+    final m = l.mouvement;
+    final (type, couleurType) = switch (m.type) {
+      'entree' => ('Entrée', AgriColors.brandEmerald),
+      'sortie' => ('Sortie', AgriColors.errorRed),
+      _ => ('Ajustement', AgriColors.accentYellow),
+    };
+    final sortie = m.type == 'sortie';
+
+    return Container(
+      key: Key('mouvement-$index'),
+      color: index.isOdd ? AgriColors.surfaceZebra : AgriColors.surfaceCard,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AgriSpacing.md,
+        vertical: AgriSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              l.dateHeure,
+              style: const TextStyle(fontSize: AgriTypography.xs),
             ),
           ),
-        ),
-        Expanded(
-          flex: 4,
-          child: Text(
-            m.ajustement.reason ?? '—',
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: AgriTypography.xs),
+          // `strtoupper(substr($reference_id, 0, 8))`, « — » sans pièce.
+          Expanded(
+            flex: 2,
+            child: Text(
+              l.reference,
+              key: Key('reference-mouvement-$index'),
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                fontFamily: 'monospace',
+              ),
+            ),
           ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            _nombre(m.ajustement.quantity),
-            style: const TextStyle(fontSize: AgriTypography.xs),
+          Expanded(
+            flex: 4,
+            child: Text(
+              l.designation ?? '',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: FontWeight.bold,
+                color: AgriColors.brandForest,
+              ),
+            ),
           ),
-        ),
-        // Ticket U8 — `number_format(abs(quantité) × PMP, 0, ',', ' ').' FCFA'`
-        // du Blade ; « — » sans PMP.
-        Expanded(
-          flex: 2,
-          child: Text(
-            m.valeur == null ? '—' : '${PmpService.francs(m.valeur!)} FCFA',
-            key: Key('valeur-mouvement-$index'),
-            style: const TextStyle(fontSize: AgriTypography.xs),
+          Expanded(
+            flex: 2,
+            child: Text(
+              type,
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: FontWeight.bold,
+                color: couleurType,
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          Expanded(
+            flex: 4,
+            child: Text(
+              l.motif,
+              key: Key('motif-mouvement-$index'),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: AgriTypography.xs),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              l.quantite,
+              key: Key('quantite-mouvement-$index'),
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: FontWeight.bold,
+                color: sortie ? AgriColors.errorRed : AgriColors.brandEmerald,
+              ),
+            ),
+          ),
+          // Ticket U8 — `number_format(abs(quantité) × PMP, 0, ',', ' ').' FCFA'`
+          // du Blade ; « — » sans PMP.
+          Expanded(
+            flex: 2,
+            child: Text(
+              l.valeurAffichee,
+              key: Key('valeur-mouvement-$index'),
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: AgriTypography.xs),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── Onglet 3 : Ajustement / Correction ────────────────────────────────────
 
@@ -745,7 +891,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       // d'écran.
                       child: Text(
                         '${l.produit.name} (Théorique : '
-                        '${_nombre(l.produit.stockQty)})',
+                        '${PmpService.quantite(l.produit.stockQty)})',
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -768,7 +914,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     _etiquette('Stock théorique'),
                     _champLecture(
                       key: const Key('adj-theorique'),
-                      valeur: _nombre(theorique),
+                      valeur: PmpService.quantite(theorique),
                     ),
                   ],
                 ),
@@ -800,7 +946,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       key: const Key('adj-ecart'),
                       valeur: ecart == null
                           ? '—'
-                          : '${ecart > 0 ? '+' : ''}${_nombre(ecart)}',
+                          : '${ecart > 0 ? '+' : ''}${PmpService.quantite(ecart)}',
                       couleur: ecart == null || ecart == 0
                           ? AgriColors.onSurface
                           : ecart > 0
@@ -995,13 +1141,4 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  /// Quantité sans décimale inutile : « 45 » et non « 45.0 ».
-  static String _nombre(double v) =>
-      v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(2);
-
-  static String _horodatage(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year} '
-      '${d.hour.toString().padLeft(2, '0')}:'
-      '${d.minute.toString().padLeft(2, '0')}';
 }

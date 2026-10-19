@@ -121,6 +121,8 @@ class SyncController extends Controller
         'feed_ration_standards', 'prophylaxis_schedule_standards',
         // Ticket U2 — objectifs de GMQ : référentiel en lecture seule au poste.
         'growth_standards',
+        // Ticket U9 — grand livre des stocks : lecture seule au poste.
+        'stock_movements',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -977,6 +979,48 @@ class SyncController extends Controller
             ],
         );
 
+        // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
+        //
+        // Trois écrans du web le lisent et le poste ne pouvait pas les reproduire : « Rotation du Stock »
+        // (`StockRotationService` : sorties de vente du mois et soldes reconstruits), « Écarts d'Inventaire »
+        // (`GestionStocks::TYPES_ECART_INVENTAIRE` du mois, saisis au web OU sur n'importe quel poste) et le Tableau 3
+        // de la ponte (`EggStockLedgerService` : SRH, OS, Stock Final en plateaux, soldes de FERME).
+        //
+        // ⚠️⚠️ C'EST UN JOURNAL ÉCRIT PAR LE SERVEUR SEUL : `AdjustStockAction` en est le point de passage unique. Au
+        // poste c'est un référentiel en LECTURE SEULE — jamais envoyé, et ignoré (compté) s'il l'était (voir `push`).
+        // Un ajustement saisi au poste part dans `stock_adjustments`, que le serveur REJOUE ; le mouvement qui en naît
+        // porte `reference_id` = identifiant de la ligne du poste, et c'est lui qui redescend ici.
+        //
+        // ⚠️ MÊME MÉCANISME QUE LES AUTRES TABLES D'HISTORIQUE (ventes, fiches) : tout au premier tirage, puis au
+        // curseur `since` (`updated_at`). Une ligne de quelques champs par vente, achat, ponte ou ajustement : la
+        // table croît comme les ventes et les achats réunis, servis de la même façon depuis U4.
+        //
+        // ⚠️ RECOUVREMENT DE DEUX MINUTES SOUS LE CURSEUR. `server_time` est lu APRÈS toutes les requêtes du tirage : un
+        // mouvement écrit pendant ce tirage (une vente encaissée au web à cet instant) porte un `updated_at` antérieur
+        // au curseur sans avoir été lu, et un journal immuable ne serait JAMAIS resservi — le poste perdrait une
+        // sortie pour toujours (F0.84-bis a rencontré le cas réel sur le journal comptable). Les lignes déjà reçues
+        // sont resservies pendant deux minutes : l'absorbeur du poste remplace par identifiant, sans doublon.
+        //
+        // ⚠️ COLONNES DU CALCUL ET DE L'AFFICHAGE DU JOURNAL, RIEN D'AUTRE (ni horodatages techniques, ni auteur).
+        // `movement_date` est servie en HEURE MURALE du serveur ('Y-m-d H:i:s') : le web compare des JOURS
+        // (`whereDate`), et un instant UTC lu par un poste réglé sur un autre fuseau changerait le jour d'un mouvement
+        // de fin de soirée — donc le mois d'un écart ou la ligne d'une ponte.
+        $mouvementsStock = \App\Models\StockMovement::query()
+            ->when($since, fn ($q) => $q->where('updated_at', '>', $since->copy()->subMinutes(2)))
+            ->orderBy('movement_date')
+            ->orderBy('id')
+            ->get(['id', 'product_id', 'type', 'quantity', 'reference_type', 'reference_id', 'reason', 'movement_date'])
+            ->map(fn ($m) => [
+                'id' => $m->id,
+                'product_id' => $m->product_id,
+                'type' => $m->type,
+                'quantity' => (float) $m->quantity,
+                'reference_type' => $m->reference_type,
+                'reference_id' => $m->reference_id,
+                'reason' => $m->reason,
+                'movement_date' => $m->movement_date?->format('Y-m-d H:i:s'),
+            ]);
+
         // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
         //
         // ⚠️ MEME REGLE QUE LES CREANCES CLIENTS (14.75) : seul ce qui RESTE
@@ -1080,6 +1124,8 @@ class SyncController extends Controller
             'sales' => $factures,
             // Ticket U4 (D-U4) — lignes des ventes servies ci-dessus, et d'elles seules.
             'sale_lines' => $lignesVente,
+            // Ticket U9 — grand livre des stocks, en lecture seule au poste.
+            'stock_movements' => $mouvementsStock,
             // ⚠️ TICKET 14.62 — CE QU'IL FAUT POUR SAISIR UNE DEPENSE HORS
             // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
             // QUI paie ; sans la liste des comptes de charge, il devrait la
@@ -1232,6 +1278,9 @@ class SyncController extends Controller
             'attestation_counts',
             // Ticket U2 — servie au tirage depuis D-U2, en lecture seule : le poste ne l'écrit jamais.
             'growth_standards',
+            // Ticket U9 — le grand livre des stocks est écrit par le serveur seul (`AdjustStockAction`) : un poste
+            // envoie ses ajustements dans `stock_adjustments`, jamais un mouvement.
+            'stock_movements',
         ] as $referentialTable) {
             if ($request->has($referentialTable)) {
                 $result['referentiels_ignored'] += count($request->input($referentialTable));
