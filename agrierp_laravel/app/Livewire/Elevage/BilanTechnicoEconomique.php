@@ -126,14 +126,24 @@ class BilanTechnicoEconomique extends Component
         }
 
         $provendeServieKg = (float) LivestockDailyEntry::where('lot_id', $lot->id)->sum('feed_qty_kg');
-        $prixMoyenKg = (float) (FeedType::where('species_id', $lot->species_id)->avg('price_per_kg') ?? 0);
-        $coutProvende = round($provendeServieKg * $prixMoyenKg);
+        // Décision D-U7 (19/10/2026) — même règle qu'au poste : types de provende ACTIFS seulement (un type archivé
+        // n'est plus acheté), et sans prix connu la provende n'est pas valorisée : « — » avec son motif, jamais 0.
+        $prixMoyenKg = FeedType::where('species_id', $lot->species_id)->where('is_active', true)
+            ->whereNotNull('price_per_kg')->avg('price_per_kg');
+        $coutProvende = $prixMoyenKg === null ? null : round($provendeServieKg * (float) $prixMoyenKg);
 
         $coutVeterinaire = (float) VeterinaryRecord::where('lot_id', $lot->id)->where('is_active', true)->sum('cost');   // soin archivé = supprimé
 
         return [
             ['label' => 'Acquisition initiale', 'montant' => $lot->acquisition_cost, 'reel' => $lot->acquisition_cost !== null],
-            ['label' => 'Provende servie (cumul, prix indicatif)', 'montant' => $coutProvende, 'reel' => true],
+            [
+                'label' => 'Provende servie (cumul, prix indicatif)',
+                'montant' => $coutProvende,
+                'reel' => $coutProvende !== null,
+                'motif' => $coutProvende === null
+                    ? "Aucun type de provende de l'espèce n'a de prix : la provende servie ne peut pas être valorisée."
+                    : null,
+            ],
             ['label' => 'Frais vétérinaires', 'montant' => $coutVeterinaire, 'reel' => true],
             [
                 'label' => "Main d'œuvre imputée",
