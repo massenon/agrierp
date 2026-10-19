@@ -43,8 +43,9 @@ void main() {
     // ajouts du poste), vérifiées dans cet ordre par `suivi_reproduction_blade_test.dart`.
     'vms-registre.html': 'lib/features/elevage/soins_vaccins_screen.dart',
     'vms-calendrier.html': 'lib/features/elevage/soins_vaccins_screen.dart',
-    'elevage-dashboard.html':
-        'lib/features/elevage/dashboard_elevage_screen.dart',
+    // Ticket H6 : le Blade fait foi — `elevage-dashboard.html` n'est plus comparé à la maquette :
+    // ses tableaux (GMQ, Analyse Sanitaire, Prévision) suivent `dashboard-elevage.blade.php`, colonne
+    // par colonne et dans l'ordre, dans `dashboard_elevage_blade_test.dart`.
     'parametres-elevage.html':
         'lib/features/elevage/parametres_elevage_screen.dart',
     'liste-clients.html': 'lib/features/clients/clients_creances_screen.dart',

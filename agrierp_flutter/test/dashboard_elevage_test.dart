@@ -12,15 +12,13 @@ import 'cartes_attendues.dart';
 
 /// Ticket F0.33 — DASHBOARD ÉLEVAGE (`prototype_html/elevage-dashboard.html`).
 ///
-/// ⚠️⚠️ **LE GMQ SE CALCULE SUR LES DEUX DERNIÈRES PESÉES**, comme l'écrit le
-/// prototype deux fois : en toutes lettres sur l'onglet (« (Poids actuel −
-/// Poids précédent) ÷ Jours écoulés ») et dans son JS, qui prend
-/// `entries[n-1]` et `entries[n-2]`. `GrowthAnalysisService::gmqCumule()` côté
-/// Laravel calcule au contraire un GMQ CUMULÉ depuis la première pesée : pour
-/// une même bande, les deux surfaces affichent deux chiffres différents. Le
-/// jeu d'essai ci-dessous est construit pour que l'écart soit visible —
-/// 14,3 g/j contre 28,6 — et le test échouerait si le poste basculait sur
-/// l'autre formule.
+/// ⚠️⚠️ **TICKET H6 : LE BLADE FAIT FOI — LE GMQ EST LE GMQ CUMULÉ DU SERVEUR**
+/// (`GrowthAnalysisService::gmqCumule()`, première → dernière pesée). Ce fichier
+/// vérifiait jusqu'ici la formule de la maquette (deux dernières pesées) : le jeu
+/// d'essai reste construit pour que l'écart soit visible — 28,6 g/j contre 14,3 —
+/// et le test échouerait si le poste revenait à l'ancienne formule. Les contrôles
+/// lus dans le Blade et la parité exécutée vivent dans
+/// `dashboard_elevage_blade_test.dart`.
 void main() {
   late AppDatabase db;
   late DashboardElevageRepository depot;
@@ -68,6 +66,8 @@ void main() {
               stage: Value(stage),
               initialQuantity: Value(initial),
               currentQuantity: Value(effectif),
+              // Ticket H6 : le Blade fait foi — le périmètre est `status = 'actif'` ET `is_active`.
+              status: const Value('actif'),
             ),
           );
     }
@@ -90,7 +90,7 @@ void main() {
   Future<void> pesee(
     String lot,
     int ilYAJours,
-    double poidsG, {
+    double? poidsG, {
     int mort = 0,
     int effectif = 65,
     int ponte = 0,
@@ -207,13 +207,14 @@ void main() {
         'EFFECTIF TOTAL VIVANT',
         'AUTONOMIE ALIMENT MIN.',
         'GMQ MOYEN',
-        'MORTALITÉ CUMULÉE (MOIS)',
+        // Ticket H6 : le Blade fait foi — « Mortalité Cumulée (7j) ».
+        'MORTALITÉ CUMULÉE (7J)',
       ]) {
         expect(find.text(libelle), findsOneWidget, reason: libelle);
       }
 
-      // 65 + 310 + 54 + 1250.
-      expect(find.text('1679'), findsOneWidget);
+      // 65 + 310 + 54 + 1250, au format `number_format(…, 0, ',', ' ')` du Blade.
+      expect(find.text('1 679'), findsOneWidget);
     },
   );
 
@@ -253,11 +254,10 @@ void main() {
   });
 
   /// ⚠️⚠️ LE CŒUR DU TICKET. Pesées à J-14 = 500 g, J-7 = 800 g, J-0 = 900 g.
-  ///   • formule du prototype (deux dernières)  : (900 − 800) ÷ 7 = 14,3 g/j
-  ///   • formule cumulée de Laravel             : (900 − 500) ÷ 14 = 28,6 g/j
-  testWidgets('⚠️⚠️ le GMQ se calcule sur les deux dernières pesées', (
-    tester,
-  ) async {
+  ///   • formule de la maquette (deux dernières) : (900 − 800) ÷ 7 = 14,3 g/j
+  ///   • formule cumulée du serveur (Blade)      : (900 − 500) ÷ 14 = 28,6 g/j
+  /// Ticket H6 : le Blade fait foi — 28,6, et le tableau porte le poids INITIAL.
+  testWidgets('⚠️⚠️ le GMQ est le GMQ cumulé du serveur', (tester) async {
     await pesee(lapins, 14, 500);
     await pesee(lapins, 7, 800);
     await pesee(lapins, 0, 900);
@@ -265,17 +265,17 @@ void main() {
     await afficher(tester);
     await ouvrir(tester, 'GMQ & Croissance');
 
-    expect(find.text('14.3'), findsOneWidget);
-    expect(find.text('28.6'), findsNothing);
+    expect(find.text('28.6 g/j'), findsOneWidget);
+    expect(find.text('14.3 g/j'), findsNothing);
 
-    // Le tableau porte bien le poids PRÉCÉDENT, pas le poids initial.
-    expect(find.text('800'), findsWidgets);
-    expect(find.text('500'), findsNothing);
+    // Le tableau porte le poids INITIAL (première pesée), plus le précédent.
+    expect(find.text('500'), findsOneWidget);
+    expect(find.text('800'), findsNothing);
   });
 
-  testWidgets('le tableau GMQ porte les huit colonnes de la maquette', (
-    tester,
-  ) async {
+  /// Ticket H6 : le Blade fait foi — six colonnes (`dashboard-elevage.blade.php`), et non plus
+  /// les huit de la maquette ; elles sont lues dans le Blade par `dashboard_elevage_blade_test`.
+  testWidgets('le tableau GMQ porte les six colonnes du Blade', (tester) async {
     await pesee(lapins, 7, 800);
     await pesee(lapins, 0, 900);
 
@@ -284,44 +284,34 @@ void main() {
 
     for (final colonne in [
       'BANDE',
-      'ESPÈCE',
-      'DERNIÈRE PESÉE',
-      'POIDS PRÉCÉDENT (G)',
+      'FILIÈRE',
+      'POIDS INITIAL (G)',
       'POIDS ACTUEL (G)',
-      'JOURS ÉCOULÉS',
+      'JOURS',
       'GMQ (G/JOUR)',
-      'STATUT VS OBJECTIF',
     ]) {
       expect(find.text(colonne), findsOneWidget, reason: colonne);
     }
   });
 
-  /// Objectif cuniculture : 15–20 g/j (table du JS du prototype).
-  /// (900 − 800) ÷ 7 = 14,3 → sous objectif.
-  testWidgets('le statut compare au barème du prototype', (tester) async {
-    await pesee(lapins, 7, 800);
-    await pesee(lapins, 0, 900);
-
-    await afficher(tester);
-    await ouvrir(tester, 'GMQ & Croissance');
-
-    expect(find.text('Sous objectif'), findsOneWidget);
-  });
-
-  /// ⚠️ Le JS du prototype retombe sur `{min:0, max:9999}` pour une espèce
-  /// sans barème et affiche « Dans la cible » — un satisfecit délivré sans
-  /// objectif. L'héliciculture n'a pas de barème : elle le dit.
-  testWidgets("⚠️ une espèce sans barème ne reçoit pas de satisfecit", (
+  /// Ticket H6 : le Blade fait foi — la colonne « Statut vs Objectif » de la maquette n'est pas
+  /// au Blade, ses pastilles (« Sous objectif », « Sans objectif défini »…) disparaissent. Les
+  /// objectifs restent lisibles sur les cartes de l'onglet, AJOUT du poste conservé.
+  testWidgets('plus de pastille de statut : les objectifs restent sur les cartes', (
     tester,
   ) async {
+    await pesee(lapins, 7, 800);
+    await pesee(lapins, 0, 900);
     await pesee(escargots, 7, 10, effectif: 1250);
     await pesee(escargots, 0, 12, effectif: 1250);
 
     await afficher(tester);
     await ouvrir(tester, 'GMQ & Croissance');
 
-    expect(find.text('Sans objectif défini'), findsOneWidget);
+    expect(find.text('STATUT VS OBJECTIF'), findsNothing);
+    expect(find.text('Sous objectif'), findsNothing);
     expect(find.text('Dans la cible'), findsNothing);
+    expect(find.text('Objectif : 15-20 g/j'), findsOneWidget);
   });
 
   testWidgets('le filtre d espèce restreint le tableau', (tester) async {
@@ -355,7 +345,8 @@ void main() {
     await ouvrir(tester, 'Analyse Sanitaire');
 
     expect(find.text('2'), findsWidgets);
-    expect(find.text('15000 F'), findsWidgets);
+    // Ticket H6 : le Blade fait foi — `number_format(…, 0, ',', ' ').' FCFA'`.
+    expect(find.text('15 000 FCFA'), findsWidgets);
   });
 
   /// ⚠️⚠️ Le taux de morbidité se lit sur `infirmary_records`, table qui
@@ -456,20 +447,21 @@ void main() {
     );
   });
 
-  /// ⚠️ Une pesée à zéro n'est pas une pesée : c'est l'absence de saisie. La
-  /// retenir produirait un GMQ massivement négatif le lendemain.
+  /// ⚠️ Une journée sans pesée (`null`) ne compte pas. Ticket H6 : le Blade fait foi — le serveur
+  /// lit `whereNotNull('weight_sample_avg_g')` : une pesée à 0 EST retenue (voir
+  /// `dashboard_elevage_blade_test`), seule l'absence de valeur est ignorée.
   testWidgets('⚠️ une journée sans pesée ne compte pas comme une pesée', (
     tester,
   ) async {
     await pesee(lapins, 7, 800);
-    await pesee(lapins, 3, 0);
+    await pesee(lapins, 3, null);
     await pesee(lapins, 0, 900);
 
     await afficher(tester);
     await ouvrir(tester, 'GMQ & Croissance');
 
-    // Sur 7 jours, pas sur 3.
-    expect(find.text('14.3'), findsOneWidget);
+    // (900 − 800) ÷ 7 = 14,3, sur 7 jours.
+    expect(find.text('14.3 g/j'), findsOneWidget);
     expect(find.text('7'), findsWidgets);
   });
 }

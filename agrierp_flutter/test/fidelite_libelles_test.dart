@@ -171,6 +171,8 @@ void main() {
     'vms-calendrier.html': ['lib/features/elevage/soins_vaccins_screen.dart'],
     'elevage-dashboard.html': [
       'lib/features/elevage/dashboard_elevage_screen.dart',
+      // Ticket H6 : les titres des cartes de filière viennent du repository (espèces activées).
+      'lib/features/elevage/dashboard_elevage_repository.dart',
     ],
     'dashboard.html': ['lib/features/pilotage/tableau_de_bord_screen.dart'],
     // Mon Profil (ticket F0.57).
@@ -740,6 +742,13 @@ void main() {
     //    décision client du 17/10/2026, appliquée d'abord sur le web. Écart ASSUMÉ au prototype.
     'elevage-dashboard.html': {
       'Bilan Technico-Économique': 'renommé « Rentabilité » (décision client du 17/10/2026)',
+      // Ticket H6 : le Blade fait foi — le tableau GMQ est celui de `dashboard-elevage.blade.php`
+      // (six colonnes, GMQ cumulé depuis la PREMIÈRE pesée, sans statut), vérifié par
+      // `dashboard_elevage_blade_test.dart`.
+      'Dernière Pesée': 'Ticket H6 : le Blade fait foi — colonne absente du tableau GMQ du Blade',
+      'Poids Précédent (g)': 'Ticket H6 : le Blade fait foi — « Poids Initial (g) » (GMQ cumulé)',
+      'Jours Écoulés': 'Ticket H6 : le Blade fait foi — « Jours »',
+      'Statut vs Objectif': 'Ticket H6 : le Blade fait foi — colonne absente du tableau GMQ du Blade',
     },
     'bilan-technico-economique.html': {
       'Bilan Technico-Économique de Lot':

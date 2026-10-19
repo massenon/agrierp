@@ -709,6 +709,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.dashboardElevage => DashboardElevageScreen(
           depot: widget.dashboardElevage,
+          onOuvrirSoins: () =>
+              setState(() => _ecran = EcranPoste.soinsEtVaccins),
         ),
         EcranPoste.suiviReproduction => SuiviReproductionScreen(
           depot: widget.reproduction,

@@ -232,13 +232,15 @@ void main() {
       expect(b.coutTotalConnu, 200000);
     });
 
-    test('⚠️ acquisition non renseignée : « — » et motif, pas zéro', () async {
+    // Ticket H6 : le Blade fait foi — sans coût d'acquisition, le web écrit « En attente »
+    // (`$cout['motif'] ?? 'En attente'`) : aucun montant, aucun motif propre au poste.
+    test('⚠️ acquisition non renseignée : « En attente », pas zéro', () async {
       await lot(lotA, 'AVI-1', acquisition: null);
 
       final b = (await depot.charger(lotA))!;
 
       expect(b.couts[0].montant, isNull);
-      expect(b.couts[0].motif, contains('non renseigné'));
+      expect(b.couts[0].motif, isNull);
     });
 
     test(

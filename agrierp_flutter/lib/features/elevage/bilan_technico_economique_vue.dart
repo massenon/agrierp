@@ -289,9 +289,8 @@ class _BilanTechnicoEconomiqueVueState
           valeur: parSujet == null ? '—' : _montant(parSujet),
           unite: parSujet == null ? null : 'FCFA',
           couleurLisere: AgriColors.errorRed,
-          legende: parSujet == null
-              ? "Effectif initial de la bande inconnu"
-              : 'Sur coûts connus ÷ effectif initial',
+          // Ticket H6 : le Blade fait foi — même légende, que la valeur soit connue ou « — ».
+          legende: 'Sur coûts connus ÷ effectif initial',
         ),
       ],
     );

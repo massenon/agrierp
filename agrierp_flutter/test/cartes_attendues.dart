@@ -155,11 +155,11 @@ const ecartsPanneaux = <String, (int, String)>{
   'elevage-dashboard.html#dash-tab-sanitaire': (
     3,
     "⚠️ TROIS CARTES QUE LA MAQUETTE N'A PAS. Son onglet sanitaire n'affiche "
-        "qu'un tableau de morbidité. Le poste y ajoute « Traitements du Mois », "
-        "« Coût Sanitaire du Mois » et « Traitement le Plus Fréquent » — trois "
-        "chiffres qu'il détient réellement, `veterinary_records` étant tirée. "
-        "AJOUT ASSUMÉ, à faire valider : il enrichit l'écran mais s'écarte de "
-        "la maquette, et rien ne le signalait avant ce ticket.",
+        "qu'un tableau de morbidité. Ticket H6 : le Blade fait foi — ce sont les "
+        "trois cartes de `dashboard-elevage.blade.php` (« Traitements Administrés "
+        "(mois) », « Coût Sanitaire Total (mois) », « Traitement le Plus "
+        "Fréquent »), libellés lus dans le Blade par "
+        "`dashboard_elevage_blade_test.dart`.",
   ),
 };
 
