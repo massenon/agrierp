@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import 'soins_repository.dart';
 
 /// Un soin du registre, avec sa bande et l'espèce de celle-ci.
@@ -226,7 +227,7 @@ class SoinsVaccinsRepository {
   }
 
   Future<DonneesSoinsVaccins> charger({DateTime? quand}) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
 
     final toutesBandes = await database.select(database.livestockLots).get();

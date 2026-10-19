@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -723,8 +724,9 @@ void main() {
               'reçu le 14/10 à 16:00, et non antidaté au 11/10 (${v.updatedAt})',
         );
         expect(
-          v.soldAt.isAtSameMomentAs(DateTime.utc(2026, 10, 11, 8)),
-          isTrue,
+          v.soldAt,
+          // S-T11 : 09:00 au Bénin (`+01:00`), en heure MURALE du Bénin quel que soit le fuseau du poste.
+          DateTime(2026, 10, 11, 9),
           reason: 'la date de la vente, elle, reste celle du serveur',
         );
         expect(v.syncStatus, SyncStatus.synced);
@@ -753,9 +755,9 @@ void main() {
         final v = await venteLocale(vente.id);
         expect(v.mecefStatus, 'transmise', reason: 'la fusion a bien eu lieu');
         expect(
-          v.updatedAt.isAtSameMomentAs(saisie),
+          v.updatedAt.isAtSameMomentAs(HeureBenin.versInstant(saisie)),
           isTrue,
-          reason: 'saisie le 14/10 à 10:15:30 (${v.updatedAt})',
+          reason: 'saisie le 14/10 à 10:15:30 au Bénin (${v.updatedAt})',
         );
       },
     );
@@ -780,7 +782,8 @@ void main() {
 
         final v = await venteLocale(id);
         expect(
-          v.soldAt.isAtSameMomentAs(reception),
+          // S-T11 : le repli est l'horloge injectée (un instant), lue à l'heure du Bénin.
+          v.soldAt == HeureBenin.depuisInstant(reception),
           isTrue,
           reason: 'horloge figée au 14/10 16:00, lu ${v.soldAt}',
         );
@@ -802,7 +805,8 @@ void main() {
 
         final v = await venteLocale(id);
         expect(
-          v.soldAt.isAtSameMomentAs(reception),
+          // S-T11 : le repli est l'horloge injectée (un instant), lue à l'heure du Bénin.
+          v.soldAt == HeureBenin.depuisInstant(reception),
           isTrue,
           reason: '${v.soldAt}',
         );
@@ -826,7 +830,7 @@ void main() {
         await moteur(serveur).synchroniser();
 
         final v = await venteLocale(vente.id);
-        expect(v.updatedAt.isAtSameMomentAs(saisie), isTrue);
+        expect(v.updatedAt.isAtSameMomentAs(HeureBenin.versInstant(saisie)), isTrue);
         expect(v.soldAt.isAtSameMomentAs(saisie), isTrue);
         expect(v.mecefStatus, isNull);
       },

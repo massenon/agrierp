@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
@@ -521,7 +522,7 @@ class _ModaleReglementProfilState extends State<_ModaleReglementProfil> {
         fournisseurId: widget.profil.fournisseur.id,
         montant: montant,
         compteId: _compte,
-        date: DateTime.now(),
+        date: HeureBenin.maintenant(),
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);

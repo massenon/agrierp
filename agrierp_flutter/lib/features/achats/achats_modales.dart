@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'achats_repository.dart';
@@ -240,7 +241,7 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
   @override
   void initState() {
     super.initState();
-    _date = DateTime.now();
+    _date = HeureBenin.aujourdhui();
     // La maquette ouvre « Compte de Trésorerie » sur sa première option.
     final comptes = widget.donnees.comptes;
     _compte = comptes.isEmpty ? '' : comptes.first.id;
@@ -396,7 +397,7 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
                   context: context,
                   initialDate: _date,
                   firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
+                  lastDate: HeureBenin.maintenant(),
                 );
                 if (choisie != null) setState(() => _date = choisie);
               },

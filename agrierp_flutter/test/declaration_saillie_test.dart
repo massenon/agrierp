@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
 import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/features/elevage/suivi_reproduction_repository.dart';
@@ -27,7 +28,7 @@ void main() {
   const bandeLapins = 'aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa';
   const bandeVolailles = 'cccccccc-0000-4000-8000-cccccccccccc';
 
-  final aujourdhui = DateTime.now();
+  final aujourdhui = HeureBenin.maintenant();
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());

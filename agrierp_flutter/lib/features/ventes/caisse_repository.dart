@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
+import '../../core/temps/heure_benin.dart';
 import '../elevage/fiche_journaliere_repository.dart';
 
 /// Ligne du panier de caisse.
@@ -64,7 +65,7 @@ class CaisseRepository {
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
        _uuid = uuid ?? const Uuid(),
-       maintenant = maintenant ?? DateTime.now,
+       maintenant = maintenant ?? HeureBenin.maintenant,
        // ignore: prefer_initializing_formals
        _gestes = gestes;
 
@@ -287,7 +288,8 @@ class CaisseRepository {
               id: venteId,
               deviceId: _deviceId,
               syncStatus: const Value(SyncStatus.pending),
-              updatedAt: saisie,
+              // S-T11 : `saisie` est l'heure murale du Bénin ; `updatedAt` reste un INSTANT.
+              updatedAt: HeureBenin.versInstant(saisie),
               customerId: Value(clientId),
               paymentMode: modePaiement,
               subtotal: Value(sousTotal),

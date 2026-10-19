@@ -3,6 +3,7 @@ import 'package:printing/printing.dart';
 
 import '../../core/export/document_officiel.dart';
 import '../../core/export/export_tableur.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -99,7 +100,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
 
   DonneesRapports? _donnees;
 
-  DateTime get _maintenant => (widget.maintenant ?? DateTime.now)();
+  DateTime get _maintenant => (widget.maintenant ?? HeureBenin.maintenant)();
 
   @override
   void initState() {

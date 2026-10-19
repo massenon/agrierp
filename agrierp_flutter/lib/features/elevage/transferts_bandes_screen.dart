@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -120,7 +121,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
       );
     }
 
-    final maintenant = DateTime.now();
+    final maintenant = HeureBenin.maintenant();
     final duMois = _transferts.where(
       (t) =>
           t.isActive &&
@@ -378,7 +379,7 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
     super.initState();
     final r = _rattachee;
     _cible = r?.id;
-    _jour = r?.createdDate ?? DateTime.now();
+    _jour = r?.createdDate ?? HeureBenin.aujourdhui();
     _quantite = TextEditingController(text: '${r?.initialQuantity ?? 1}');
     _categorie = r == null ? null : TransfertsRepository.categorieDuStade(r.stage);
   }
@@ -523,7 +524,7 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
                       context: context,
                       initialDate: _jour,
                       firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
+                      lastDate: HeureBenin.maintenant(),
                     );
                     if (choisi != null) setState(() => _jour = choisi);
                   },

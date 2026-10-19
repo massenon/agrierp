@@ -65,6 +65,7 @@ flutter build windows --release    # → build\windows\x64\runner\Release\agrier
 ```bash
 agrierp_flutter/outils/essai_multipostes.sh 42 7 2026     # une graine par essai ; sans argument, une graine au hasard
 ESSAI_BASE=sqlite agrierp_flutter/outils/essai_multipostes.sh 42   # sans MariaDB (le script le dit)
+ESSAI_FUSEAUX="UTC America/New_York Asia/Tokyo" agrierp_flutter/outils/essai_multipostes.sh 42   # S-T11 : postes dans d'autres fuseaux
 ```
 
 Le script fait tout, sans jamais lire ni modifier un `.env` ni ouvrir une base existante : MariaDB/MySQL privé dans un dossier temporaire (port et socket propres, base `agrierp_essai` en `utf8mb4_unicode_ci`), `migrate:fresh --seed` puis `DemoDataSeeder` (cinq mois d'activité : de vraies pages de tirage), `php artisan serve --no-reload` avec 4 processus (`PHP_CLI_SERVER_WORKERS`), le test `test/essai_multipostes_test.dart` à l'heure du Bénin (`TZ`), puis l'arrêt du **groupe** de processus du serveur (tuer `artisan serve` seul laisse `php -S` tenir le port) et de MariaDB. Rapports (`rapport-<graine>.txt` : journal des coupures et des envois, compteurs, invariants, état du serveur) et journaux dans un dossier temporaire hors dépôt, affiché à la fin.
@@ -74,6 +75,8 @@ Le script fait tout, sans jamais lire ni modifier un `.env` ni ouvrir une base e
 - ⚠️ **Le test écrit sur le serveur** : il exige `AGRIERP_ESSAI_URL` (posée par le script) et se marque SAUTÉ sinon — jamais contre le serveur de développement par accident.
 - ⚠️ Le rejeu d'une graine est fidèle pour les coupures de chaque poste ; l'entrelacement des cinq postes au serveur dépend de l'horloge (c'est ce qui a fait sortir les interblocages MariaDB).
 - Défauts trouvés et corrigés (S-T9) : voir `test/synchronisation_multipostes_test.dart` et `agrierp_laravel/tests/Feature/SyncEssaiMultipostesTest.php`.
+- S-T10 : le bureau, hors ligne, fait l'inventaire du piment pendant que le web puis la caisse 1 en vendent ; invariant : stock final = comptage − vente postérieure, au serveur et sur chaque poste.
+- S-T11 : `ESSAI_FUSEAUX` rejoue chaque graine avec le processus des postes dans chaque fuseau (le serveur reste à l'heure du Bénin). Les cinq postes d'un essai partagent un processus, donc un fuseau.
 
 ### Regenerating the prototype fixtures
 
@@ -151,6 +154,13 @@ Per-table server rules the client must respect:
 - **`livestock_daily_entries`** — last writer wins, upsert on the client UUID.
 - **`sales`** — never updated. A repeated push of an already-synced sale is a **silent success**, not an error: the client may safely re-send what it never got an acknowledgement for.
 - **`stock_adjustments`** — never applied as-is. The server replays them through its own adjust-stock action, recomputing from the product's real state. A blindly-applied offline delta would double-decrement undetectably.
+  - ⚠️ **S-T10 : un inventaire envoie la QUANTITÉ COMPTÉE et l'INSTANT du comptage** (`counted_quantity`, `counted_at` en UTC), en plus de l'écart local (affichage, serveur ancien). Le serveur calcule l'écart contre son grand livre à cet instant (`InventaireAuComptageService`) ; le poste se recale au tirage de confirmation.
+
+### Dates — ticket S-T11 (`lib/core/temps/heure_benin.dart`, point de passage unique)
+
+- **Le jour métier est toujours le jour à l'heure du Bénin** (UTC+1 toute l'année, sans heure d'été : décalage fixe, pas de paquet `timezone`). Une date métier est tenue en HEURE MURALE du Bénin : `HeureBenin.maintenant()` / `aujourdhui()` au lieu de `DateTime.now()`, `HeureBenin.lire()` pour une date servie (un instant ISO `Z` / `+01:00` est ramené à l'heure du Bénin, jamais par `toLocal()`), `HeureBenin.plusJours()` au lieu de `add(Duration(days: n))` (sur un Windows à heure d'été, on tomberait à 23 h la veille).
+- **Les instants techniques restent des instants** : `updatedAt` (écrit `HeureBenin.versInstant(heureMurale)` quand il vient d'une horloge métier), `server_time`, horodatages de synchronisation ; affichés par `HeureBenin.depuisInstant`.
+- `test/heure_benin_test.dart` doit passer dans tout fuseau (`TZ=America/New_York flutter test …` : `flutter test` respecte `TZ`).
 
 Client-side invariants, each paid for once:
 

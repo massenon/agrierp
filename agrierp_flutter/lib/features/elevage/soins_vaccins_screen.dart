@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -770,7 +771,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
 
   Widget _ongletCalendrier() {
     final d = _donnees!;
-    final aujourdhui = DateTime.now();
+    final aujourdhui = HeureBenin.maintenant();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1201,7 +1202,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
 
     String? bande;
     String? type;
-    var date = DateTime.now();
+    var date = HeureBenin.aujourdhui();
     String? erreur;
 
     final delai = await afficherModale<int>(
@@ -1228,7 +1229,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 date: date,
                 // Décision D-U6 étendue (« pas de divergence ») — le web accepte une date future (`'soinDate' =>
                 // ['required', 'date']`), l'envoi aussi (`record_date` : `required|date`) : le poste de même.
-                dernier: DateTime(DateTime.now().year + 5, 12, 31),
+                dernier: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
                 surChoix: (d) => rafraichir(() => date = d),
               ),
               const SizedBox(height: AgriSpacing.md),
@@ -1365,7 +1366,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
 
     _intervention.clear();
     String? bande;
-    var date = DateTime.now();
+    var date = HeureBenin.aujourdhui();
     String? erreur;
 
     final enregistre = await afficherModale<bool>(
@@ -1397,7 +1398,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 cle: 'plan-date',
                 date: date,
                 // Une intervention se PLANIFIE : aucune borne haute au web (`'date'`).
-                dernier: DateTime(DateTime.now().year + 5, 12, 31),
+                dernier: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
                 surChoix: (d) => rafraichir(() => date = d),
               ),
               if (erreur != null) _erreur('plan-erreur', erreur!),
@@ -1454,7 +1455,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
     _motif.clear();
     String? bande;
     String? isolement;
-    var date = DateTime.now();
+    var date = HeureBenin.aujourdhui();
     String? erreur;
 
     final enregistre = await afficherModale<bool>(
@@ -1505,7 +1506,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 // Ticket U6 (décision client D-U6 du 19/10/2026) — mêmes règles que le web (`'infDate' =>
                 // ['required', 'date']`) : une date FUTURE est acceptée, et l'envoi l'accepte aussi. Borne du
                 // sélecteur seulement, comme « Planifier une Intervention ».
-                dernier: DateTime(DateTime.now().year + 5, 12, 31),
+                dernier: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
                 surChoix: (d) => rafraichir(() => date = d),
               ),
               if (erreur != null) _erreur('infirmerie-erreur', erreur!),

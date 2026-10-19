@@ -4440,6 +4440,10 @@ class SyncController extends Controller
                     'reason' => ['nullable', 'string'],
                     // Ticket U10 — date du mouvement, lue pour un « Ajout Manuel » seulement (voir plus bas).
                     'movement_date' => ['nullable', 'date'],
+                    // Ticket S-T10 — inventaire du poste : la QUANTITÉ COMPTÉE et l'INSTANT du comptage (ISO 8601 avec
+                    // fuseau). Absents (poste ancien) : l'écart local `type` + `quantity` est appliqué comme avant.
+                    'counted_quantity' => ['nullable', 'numeric', 'min:0'],
+                    'counted_at' => ['nullable', 'required_with:counted_quantity', 'date'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 // 🔴→✅ TICKET U10 — « AJOUTER STOCK » SAISI AU POSTE (`reference_type = manual_addition`).
@@ -4468,6 +4472,7 @@ class SyncController extends Controller
                 // retour (perte d'inventaire) s'applique normalement.
                 if ($validated['type'] === 'sortie' && $this->sortieDeRetourFournisseur($validated, $clientRef, $identifiantsDeRetours)) {
                     $rejected[] = [
+                        'id' => $clientRef,
                         'client_ref' => $clientRef,
                         'reason' => "Cette sortie désigne un retour fournisseur : le serveur décrémente lui-même le stock d'un retour (purchase_returns). Ne pas l'envoyer en ajustement de stock.",
                     ];
@@ -4487,6 +4492,33 @@ class SyncController extends Controller
 
                 $product = Product::findOrFail($validated['product_id']);
                 $delta = $validated['type'] === 'entree' ? $validated['quantity'] : -$validated['quantity'];
+                $dateDuMouvement = $ajoutManuel ? \Carbon\Carbon::parse($validated['movement_date']) : null;
+
+                // 🔴→✅ TICKET S-T10 — L'ÉCART D'UN INVENTAIRE EST CALCULÉ ICI, CONTRE LE STOCK DU SERVEUR À L'INSTANT
+                // DU COMPTAGE (`InventaireAuComptageService`), jamais repris du poste. L'écart local (`type`,
+                // `quantity`) était calculé sur un stock local qui ignorait les ventes faites ailleurs et pas encore
+                // descendues : chacune était décomptée deux fois. Le poste ancien, qui n'envoie que l'écart, garde
+                // l'ancien comportement (bloc suivant inchangé).
+                if (! $ajoutManuel && isset($validated['counted_quantity'])) {
+                    $comptage = app(\App\Services\InventaireAuComptageService::class);
+                    $instant = $comptage->instantDuComptage((string) $validated['counted_at']);
+                    // ⚠️ Ligne du produit verrouillée jusqu'à la fin de l'envoi (une transaction, S-T9) : une vente
+                    // reçue en même temps ne glisse pas entre la lecture du stock et l'application de l'écart.
+                    $product = Product::query()->lockForUpdate()->findOrFail($validated['product_id']);
+                    $evaluation = $comptage->evaluer($product, (float) $validated['counted_quantity'], $instant);
+
+                    if ($evaluation['depasse'] || $evaluation['ecart'] == 0) {
+                        // Rien à ajuster (le web dit « Aucun écart détecté ») ou comptage remplacé par un inventaire
+                        // plus récent : acquitté, aucun mouvement, aucune écriture — la trace reste à l'audit.
+                        AuditLog::record($evaluation['depasse'] ? 'stock.inventaire_depasse' : 'stock.inventaire_sans_ecart', 'stocks');
+                        $accepted[] = $clientRef ?? $validated['product_id'];
+
+                        continue;
+                    }
+
+                    $delta = $evaluation['ecart'];
+                    $dateDuMouvement = $instant;
+                }
 
                 app(AdjustStockAction::class)->execute(
                     product: $product,
@@ -4494,7 +4526,9 @@ class SyncController extends Controller
                     referenceType: $validated['reference_type'],
                     // ⚠️ C'est cette trace qui rend le renvoi inoffensif.
                     referenceId: $clientRef,
-                    movementDate: $ajoutManuel ? \Carbon\Carbon::parse($validated['movement_date']) : null,
+                    // Ajout manuel : le jour choisi (U10). Inventaire compté (S-T10) : l'instant du comptage, pour
+                    // que le grand livre le place avant les mouvements qui l'ont suivi. Sinon : la réception.
+                    movementDate: $dateDuMouvement,
                     reason: $validated['reason'] ?? null,
                 );
 
@@ -4531,10 +4565,14 @@ class SyncController extends Controller
                 // meme produit auraient d'ailleurs porte le meme accuse.
                 $accepted[] = $clientRef ?? $validated['product_id'];
             } catch (ValidationException $e) {
-                $rejected[] = ['client_ref' => $adj['client_ref'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+                // 🔴→✅ TICKET S-T10 (trouvé par l'essai à plusieurs postes) — LE REFUS PORTE AUSSI `id`. Le poste
+                // range un refus sous `id`, comme pour toutes les autres tables ; ce canal ne rendait que
+                // `client_ref` : un inventaire refusé restait EN ATTENTE au poste, renvoyé à chaque synchronisation,
+                // sans que personne ne voie jamais le motif.
+                $rejected[] = ['id' => $adj['client_ref'] ?? null, 'client_ref' => $adj['client_ref'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
             } catch (\Throwable $e) {
                 // Ticket U5 : un motif technique du framework (anglais) devient une phrase française.
-                $rejected[] = ['client_ref' => $adj['client_ref'] ?? null, 'reason' => MessagesErreurFr::pourUtilisateur($e)];
+                $rejected[] = ['id' => $adj['client_ref'] ?? null, 'client_ref' => $adj['client_ref'] ?? null, 'reason' => MessagesErreurFr::pourUtilisateur($e)];
             }
         }
 

@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_pondeuses_screen.dart';
 import 'package:agrierp/features/elevage/production_oeufs_service.dart';
@@ -38,7 +39,7 @@ void main() {
             speciesId: 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee',
             speciesCode: Value(codeEspece),
             stage: Value(stade),
-            createdDate: Value(DateTime.now()),
+            createdDate: Value(HeureBenin.maintenant()),
             initialQuantity: Value(effectif),
             currentQuantity: Value(effectif),
           ),
@@ -339,7 +340,7 @@ void main() {
         reason: 'sans cela la caisse du poste refuserait de vendre ces œufs',
       );
 
-      final fiche = await depot.chargerJour(bandeId, DateTime.now());
+      final fiche = await depot.chargerJour(bandeId, HeureBenin.maintenant());
       expect(fiche?.ponteTotal, 435);
       expect(fiche?.ponteCasses, 15);
     },

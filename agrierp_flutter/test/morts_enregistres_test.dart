@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_escargots_screen.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_pondeuses_screen.dart';
@@ -32,7 +33,7 @@ void main() {
   tearDown(() async => db.close());
 
   Future<void> bandeEtFiche({required String espece, required String stade}) async {
-    final aujourdhui = DateTime.now();
+    final aujourdhui = HeureBenin.maintenant();
     await db.into(db.livestockLots).insert(
       LivestockLotsCompanion.insert(
         id: bandeId,

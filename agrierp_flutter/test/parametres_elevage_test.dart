@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
 import 'package:agrierp/core/widgets/toast_agri.dart';
@@ -413,7 +414,7 @@ void main() {
             r.rationGPerDay,
             r.isActive,
             r.syncStatus,
-            r.updatedAt,
+            r.updatedAt?.toUtc(),
           ],
           [
             id,
@@ -422,7 +423,8 @@ void main() {
             60.0,
             true,
             SyncStatus.pending,
-            DateTime(2026, 10, 19, 10),
+            // S-T11 : instant de la saisie (heure murale du Bénin de l'horloge injectée).
+            HeureBenin.versInstant(DateTime(2026, 10, 19, 10)),
           ],
         );
       },

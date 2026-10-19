@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 132 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 134 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -83,6 +83,8 @@ class LibellesAudit {
     'product.threshold_updated': 'Seuil d\'alerte modifié',
     'stock.adjusted': 'Stock ajusté',
     'stock.manual_addition': 'Ajout manuel de stock',
+    'stock.inventaire_sans_ecart': 'Inventaire du poste sans écart au serveur',
+    'stock.inventaire_depasse': 'Inventaire du poste remplacé par un inventaire plus récent',
     'transformation.recorded': 'Transformation enregistrée',
     'livestock_lot.created': 'Lot créé',
     'livestock_lot.updated': 'Lot modifié',

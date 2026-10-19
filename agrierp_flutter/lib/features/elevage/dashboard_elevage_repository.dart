@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import 'production_oeufs_service.dart';
 import 'soins_repository.dart';
 
@@ -364,7 +365,7 @@ class DashboardElevageRepository {
   }
 
   Future<DonneesDashboardElevage> charger({DateTime? quand}) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = _date(maintenant);
 
     final toutes = await (database.select(
@@ -433,7 +434,7 @@ class DashboardElevageRepository {
         bandes,
         parLot,
         // Ticket H6 — sept jours CALENDAIRES (J-6 à aujourd'hui), comme le web corrigé : la borne n'a plus d'heure.
-        (d) => !d.isBefore(jour.subtract(const Duration(days: 6))) && !d.isAfter(jour),
+        (d) => !d.isBefore(HeureBenin.plusJours(jour, -6)) && !d.isAfter(jour),
       ),
       especes: _cartes(bandes, parLot, especes, jour),
       gmqParEspeceParSemaine: {
@@ -583,7 +584,7 @@ class DashboardElevageRepository {
     final serie = <double?>[];
 
     for (var i = semaines - 1; i >= 0; i--) {
-      final borne = jour.subtract(Duration(days: 7 * i));
+      final borne = HeureBenin.plusJours(jour, -7 * i);
       final valeurs = bandes
           .map(
             (b) => gmqCumule(_pesees(parLot[b.id] ?? const [], jusquA: borne)),
@@ -739,7 +740,7 @@ class DashboardElevageRepository {
       if (code == null) continue;
 
       for (var d = 0; d <= horizonRappels; d++) {
-        final quand = jour.add(Duration(days: d));
+        final quand = HeureBenin.plusJours(jour, d);
         final protocole = await soins.protocoleDuJour(
           bande: bande,
           codeEspece: code,

@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_reproducteurs_screen.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
@@ -38,7 +39,7 @@ void main() {
             speciesId: 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee',
             speciesCode: Value(codeEspece),
             stage: Value(stade),
-            createdDate: Value(DateTime.now()),
+            createdDate: Value(HeureBenin.maintenant()),
             initialQuantity: Value(effectif),
             currentQuantity: Value(effectif),
           ),
@@ -211,7 +212,7 @@ void main() {
       await tester.tap(bouton);
       await tester.pumpAndSettle();
 
-      final fiche = await depot.chargerJour(bandeId, DateTime.now());
+      final fiche = await depot.chargerJour(bandeId, HeureBenin.maintenant());
       expect(fiche?.ponteTotal, 40, reason: 'les œufs mis en incubation');
       expect(fiche?.ne, 34, reason: 'les naissances du jour');
     },

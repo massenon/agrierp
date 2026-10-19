@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/permissions_poste.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'tableau_de_bord_repository.dart';
@@ -150,8 +151,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         ),
         const SizedBox(height: AgriSpacing.xs),
         Text(
-          'Rapport généré le ${_dateCourte(DateTime.now())} '
-          'à ${_heure(DateTime.now())} · '
+          'Rapport généré le ${_dateCourte(HeureBenin.maintenant())} '
+          'à ${_heure(HeureBenin.maintenant())} · '
           '${exercice == null ? 'Aucun exercice ouvert' : 'Exercice $exercice actif'}',
           style: const TextStyle(
             fontSize: AgriTypography.xs,
@@ -753,7 +754,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       titre: 'Statistiques de Ventes',
       icone: SymbolesAgri.bar_chart,
       apresTitre: Text(
-        '${DateTime.now().year}',
+        '${HeureBenin.maintenant().year}',
         style: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,

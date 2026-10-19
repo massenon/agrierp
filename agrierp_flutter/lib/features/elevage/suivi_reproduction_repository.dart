@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Un cycle de reproduction, tel que l'écran l'affiche.
 class CycleReproduction {
@@ -22,7 +23,7 @@ class CycleReproduction {
   bool palpationDue(DateTime jour, int delai) {
     final saillie = evenement.saillieDate;
     if (saillie == null || evenement.palpationDate != null) return false;
-    return !jour.isBefore(saillie.add(Duration(days: delai)));
+    return !jour.isBefore(HeureBenin.plusJours(saillie, delai));
   }
 
   bool get _porcs => codeEspece == 'porciculture';
@@ -41,7 +42,7 @@ class CycleReproduction {
 
   /// `$checkDue` du Blade : saillie + 14 (lapins) ou + 21 (porcs).
   DateTime? get echeanceControle =>
-      evenement.saillieDate?.add(Duration(days: _decalageControle));
+      (evenement.saillieDate == null ? null : HeureBenin.plusJours(evenement.saillieDate!, _decalageControle));
 
   /// `now()->gte($checkDue)` : l'échéance est atteinte dès son jour (« Prévue » en rouge).
   bool controleEchu(DateTime maintenant) {
@@ -53,7 +54,7 @@ class CycleReproduction {
   /// + 30 (lapins) ou + 114 (porcs). ⚠️ Le Blade ignore `mise_bas_date_expected` ; le poste aussi.
   DateTime? get miseBasAffichee =>
       evenement.miseBasDateActual ??
-      evenement.saillieDate?.add(Duration(days: _decalageMiseBas));
+      (evenement.saillieDate == null ? null : HeureBenin.plusJours(evenement.saillieDate!, _decalageMiseBas));
 
   /// Colonne « Nés (Vivants) » : `X (Y morts)`, ou `—` tant que la mise bas n'est pas saisie.
   /// ⚠️ Concaténation PHP : des morts inconnus s'écrivent vides, pas « 0 ».
@@ -231,7 +232,7 @@ class SuiviReproductionRepository {
   static const cyclePorcs = (retourChaleur: 21, miseBas: 114, sevrage: 42);
 
   Future<DonneesSuiviReproduction> charger({DateTime? quand}) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
 
     final bandes = await database.select(database.livestockLots).get();
@@ -323,7 +324,7 @@ class SuiviReproductionRepository {
     required DateTime dateSaillie,
     DateTime? maintenant,
   }) async {
-    final jour = maintenant ?? DateTime.now();
+    final jour = maintenant ?? HeureBenin.maintenant();
 
     final bande = await (database.select(
       database.livestockLots,
@@ -380,7 +381,7 @@ class SuiviReproductionRepository {
             // ⚠️ `pending` : c'est ce statut qui met la saillie dans la file
             // d'envoi et la fait compter dans le badge « en attente ».
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: jour,
+            updatedAt: HeureBenin.versInstant(jour),
             lotId: lotId,
             motherRef: numeroFemelle,
             sireRef: Value(numeroMale),
@@ -399,7 +400,7 @@ class SuiviReproductionRepository {
     required bool positive,
     DateTime? maintenant,
   }) {
-    final quand = maintenant ?? DateTime.now();
+    final quand = maintenant ?? HeureBenin.maintenant();
     return _mettreAJourCycle(
       id,
       quand,
@@ -422,7 +423,7 @@ class SuiviReproductionRepository {
         'Les nombres de nés vivants et de nés morts sont des entiers positifs ou nuls.',
       );
     }
-    final quand = maintenant ?? DateTime.now();
+    final quand = maintenant ?? HeureBenin.maintenant();
     return _mettreAJourCycle(
       id,
       quand,
@@ -438,7 +439,7 @@ class SuiviReproductionRepository {
   Future<void> cloturerCycle(String id, {DateTime? maintenant}) =>
       _mettreAJourCycle(
         id,
-        maintenant ?? DateTime.now(),
+        maintenant ?? HeureBenin.maintenant(),
         const LivestockReproductionEventsCompanion(status: Value('termine')),
       );
 
@@ -459,7 +460,7 @@ class SuiviReproductionRepository {
         )..where((t) => t.id.equals(id))).write(
           champs.copyWith(
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: Value(quand),
+            updatedAt: Value(HeureBenin.versInstant(quand)),
           ),
         );
 

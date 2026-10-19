@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart' show Customer;
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
@@ -31,7 +32,7 @@ class ClientsCreancesScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.imprimer,
-    this.maintenant = DateTime.now,
+    this.maintenant = HeureBenin.maintenant,
   });
 
   final ClientsCreancesRepository depot;
@@ -550,7 +551,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   // ── Onglet 2 : Suivi des Dettes ───────────────────────────────────────────
 
   Widget _ongletDettes(DonneesClients d, bool large) {
-    final jour = DateTime.now();
+    final jour = HeureBenin.maintenant();
     final terme = _recherche.trim().toLowerCase();
 
     final lignes = d.creances.where((l) {
@@ -705,7 +706,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   /// depuis le web le lendemain. Le motif est affiché à l'écran, pas seulement
   /// ici.
   Widget _ongletRelances(DonneesClients d, bool large) {
-    final jour = DateTime.now();
+    final jour = HeureBenin.maintenant();
     final file = d.fileDeRelance(jour);
 
     return Column(

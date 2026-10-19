@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Une ligne de « Liste des Clients ».
 class LigneClient {
@@ -543,7 +544,7 @@ class ClientsCreancesRepository {
       throw const SaisieRefusee('Mode de paiement inconnu.');
     }
 
-    final jour = date ?? DateTime.now();
+    final jour = date ?? HeureBenin.maintenant();
     final id = _uuid.v4();
 
     await database
@@ -643,7 +644,7 @@ class ClientsCreancesRepository {
       );
     }
 
-    final jour = date ?? DateTime.now();
+    final jour = date ?? HeureBenin.maintenant();
     final id = _uuid.v4();
 
     await database

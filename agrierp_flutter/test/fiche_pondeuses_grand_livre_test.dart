@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_pondeuses_screen.dart';
 import 'package:agrierp/features/elevage/production_oeufs_service.dart';
@@ -80,7 +81,7 @@ void main() {
   testWidgets(
     '⚠️⚠️ U10 — le bloc « Jour Sélectionné » et la ligne du jour portent SRH, TS, OS et Stock Final ; les autres lignes « — »',
     (tester) async {
-      final aujourdHui = DateTime.now();
+      final aujourdHui = HeureBenin.maintenant();
       final jour = DateTime(aujourdHui.year, aujourdHui.month, aujourdHui.day);
       final autre = DateTime(jour.year, jour.month, jour.day == 1 ? 2 : 1);
       final hier = jour.subtract(const Duration(days: 1));

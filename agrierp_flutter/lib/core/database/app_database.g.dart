@@ -30329,6 +30329,17 @@ class $StockAdjustmentsTable extends StockAdjustments
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _countedQuantityMeta = const VerificationMeta(
+    'countedQuantity',
+  );
+  @override
+  late final GeneratedColumn<double> countedQuantity = GeneratedColumn<double>(
+    'counted_quantity',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -30341,6 +30352,7 @@ class $StockAdjustmentsTable extends StockAdjustments
     referenceType,
     reason,
     movementDate,
+    countedQuantity,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -30427,6 +30439,15 @@ class $StockAdjustmentsTable extends StockAdjustments
     } else if (isInserting) {
       context.missing(_movementDateMeta);
     }
+    if (data.containsKey('counted_quantity')) {
+      context.handle(
+        _countedQuantityMeta,
+        countedQuantity.isAcceptableOrUnknown(
+          data['counted_quantity']!,
+          _countedQuantityMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -30478,6 +30499,10 @@ class $StockAdjustmentsTable extends StockAdjustments
         DriftSqlType.dateTime,
         data['${effectivePrefix}movement_date'],
       )!,
+      countedQuantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}counted_quantity'],
+      ),
     );
   }
 
@@ -30502,7 +30527,14 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   final double quantity;
   final String referenceType;
   final String? reason;
+
+  /// Écart d'inventaire : l'INSTANT du comptage (heure murale du Bénin, S-T11). Ajout manuel : le jour choisi.
   final DateTime movementDate;
+
+  /// Ticket S-T10 — inventaire : la QUANTITÉ COMPTÉE. Le serveur calcule l'écart contre SON stock à l'instant du
+  /// comptage (`InventaireAuComptageService`) ; `type` + `quantity` (écart contre le stock LOCAL) ne servent plus qu'à
+  /// l'affichage et à un serveur ancien. `null` : ajout manuel, ou inventaire saisi avant S-T10.
+  final double? countedQuantity;
   const StockAdjustment({
     required this.id,
     required this.deviceId,
@@ -30514,6 +30546,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
     required this.referenceType,
     this.reason,
     required this.movementDate,
+    this.countedQuantity,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -30534,6 +30567,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       map['reason'] = Variable<String>(reason);
     }
     map['movement_date'] = Variable<DateTime>(movementDate);
+    if (!nullToAbsent || countedQuantity != null) {
+      map['counted_quantity'] = Variable<double>(countedQuantity);
+    }
     return map;
   }
 
@@ -30551,6 +30587,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           ? const Value.absent()
           : Value(reason),
       movementDate: Value(movementDate),
+      countedQuantity: countedQuantity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(countedQuantity),
     );
   }
 
@@ -30572,6 +30611,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       referenceType: serializer.fromJson<String>(json['referenceType']),
       reason: serializer.fromJson<String?>(json['reason']),
       movementDate: serializer.fromJson<DateTime>(json['movementDate']),
+      countedQuantity: serializer.fromJson<double?>(json['countedQuantity']),
     );
   }
   @override
@@ -30590,6 +30630,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       'referenceType': serializer.toJson<String>(referenceType),
       'reason': serializer.toJson<String?>(reason),
       'movementDate': serializer.toJson<DateTime>(movementDate),
+      'countedQuantity': serializer.toJson<double?>(countedQuantity),
     };
   }
 
@@ -30604,6 +30645,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
     String? referenceType,
     Value<String?> reason = const Value.absent(),
     DateTime? movementDate,
+    Value<double?> countedQuantity = const Value.absent(),
   }) => StockAdjustment(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -30615,6 +30657,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
     referenceType: referenceType ?? this.referenceType,
     reason: reason.present ? reason.value : this.reason,
     movementDate: movementDate ?? this.movementDate,
+    countedQuantity: countedQuantity.present
+        ? countedQuantity.value
+        : this.countedQuantity,
   );
   StockAdjustment copyWithCompanion(StockAdjustmentsCompanion data) {
     return StockAdjustment(
@@ -30634,6 +30679,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       movementDate: data.movementDate.present
           ? data.movementDate.value
           : this.movementDate,
+      countedQuantity: data.countedQuantity.present
+          ? data.countedQuantity.value
+          : this.countedQuantity,
     );
   }
 
@@ -30649,7 +30697,8 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           ..write('quantity: $quantity, ')
           ..write('referenceType: $referenceType, ')
           ..write('reason: $reason, ')
-          ..write('movementDate: $movementDate')
+          ..write('movementDate: $movementDate, ')
+          ..write('countedQuantity: $countedQuantity')
           ..write(')'))
         .toString();
   }
@@ -30666,6 +30715,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
     referenceType,
     reason,
     movementDate,
+    countedQuantity,
   );
   @override
   bool operator ==(Object other) =>
@@ -30680,7 +30730,8 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           other.quantity == this.quantity &&
           other.referenceType == this.referenceType &&
           other.reason == this.reason &&
-          other.movementDate == this.movementDate);
+          other.movementDate == this.movementDate &&
+          other.countedQuantity == this.countedQuantity);
 }
 
 class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
@@ -30694,6 +30745,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
   final Value<String> referenceType;
   final Value<String?> reason;
   final Value<DateTime> movementDate;
+  final Value<double?> countedQuantity;
   final Value<int> rowid;
   const StockAdjustmentsCompanion({
     this.id = const Value.absent(),
@@ -30706,6 +30758,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     this.referenceType = const Value.absent(),
     this.reason = const Value.absent(),
     this.movementDate = const Value.absent(),
+    this.countedQuantity = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StockAdjustmentsCompanion.insert({
@@ -30719,6 +30772,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     required String referenceType,
     this.reason = const Value.absent(),
     required DateTime movementDate,
+    this.countedQuantity = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -30739,6 +30793,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     Expression<String>? referenceType,
     Expression<String>? reason,
     Expression<DateTime>? movementDate,
+    Expression<double>? countedQuantity,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -30752,6 +30807,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       if (referenceType != null) 'reference_type': referenceType,
       if (reason != null) 'reason': reason,
       if (movementDate != null) 'movement_date': movementDate,
+      if (countedQuantity != null) 'counted_quantity': countedQuantity,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -30767,6 +30823,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     Value<String>? referenceType,
     Value<String?>? reason,
     Value<DateTime>? movementDate,
+    Value<double?>? countedQuantity,
     Value<int>? rowid,
   }) {
     return StockAdjustmentsCompanion(
@@ -30780,6 +30837,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       referenceType: referenceType ?? this.referenceType,
       reason: reason ?? this.reason,
       movementDate: movementDate ?? this.movementDate,
+      countedQuantity: countedQuantity ?? this.countedQuantity,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -30819,6 +30877,9 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     if (movementDate.present) {
       map['movement_date'] = Variable<DateTime>(movementDate.value);
     }
+    if (countedQuantity.present) {
+      map['counted_quantity'] = Variable<double>(countedQuantity.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -30838,6 +30899,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
           ..write('referenceType: $referenceType, ')
           ..write('reason: $reason, ')
           ..write('movementDate: $movementDate, ')
+          ..write('countedQuantity: $countedQuantity, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -48434,6 +48496,7 @@ typedef $$StockAdjustmentsTableCreateCompanionBuilder =
       required String referenceType,
       Value<String?> reason,
       required DateTime movementDate,
+      Value<double?> countedQuantity,
       Value<int> rowid,
     });
 typedef $$StockAdjustmentsTableUpdateCompanionBuilder =
@@ -48448,6 +48511,7 @@ typedef $$StockAdjustmentsTableUpdateCompanionBuilder =
       Value<String> referenceType,
       Value<String?> reason,
       Value<DateTime> movementDate,
+      Value<double?> countedQuantity,
       Value<int> rowid,
     });
 
@@ -48510,6 +48574,11 @@ class $$StockAdjustmentsTableFilterComposer
     column: $table.movementDate,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<double> get countedQuantity => $composableBuilder(
+    column: $table.countedQuantity,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$StockAdjustmentsTableOrderingComposer
@@ -48570,6 +48639,11 @@ class $$StockAdjustmentsTableOrderingComposer
     column: $table.movementDate,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get countedQuantity => $composableBuilder(
+    column: $table.countedQuantity,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$StockAdjustmentsTableAnnotationComposer
@@ -48615,6 +48689,11 @@ class $$StockAdjustmentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get movementDate => $composableBuilder(
     column: $table.movementDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get countedQuantity => $composableBuilder(
+    column: $table.countedQuantity,
     builder: (column) => column,
   );
 }
@@ -48666,6 +48745,7 @@ class $$StockAdjustmentsTableTableManager
                 Value<String> referenceType = const Value.absent(),
                 Value<String?> reason = const Value.absent(),
                 Value<DateTime> movementDate = const Value.absent(),
+                Value<double?> countedQuantity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockAdjustmentsCompanion(
                 id: id,
@@ -48678,6 +48758,7 @@ class $$StockAdjustmentsTableTableManager
                 referenceType: referenceType,
                 reason: reason,
                 movementDate: movementDate,
+                countedQuantity: countedQuantity,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -48692,6 +48773,7 @@ class $$StockAdjustmentsTableTableManager
                 required String referenceType,
                 Value<String?> reason = const Value.absent(),
                 required DateTime movementDate,
+                Value<double?> countedQuantity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockAdjustmentsCompanion.insert(
                 id: id,
@@ -48704,6 +48786,7 @@ class $$StockAdjustmentsTableTableManager
                 referenceType: referenceType,
                 reason: reason,
                 movementDate: movementDate,
+                countedQuantity: countedQuantity,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

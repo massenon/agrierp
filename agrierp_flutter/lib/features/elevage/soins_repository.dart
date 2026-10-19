@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Soins vétérinaires saisis au poste.
 ///
@@ -151,7 +152,7 @@ class SoinsRepository {
     required String codeEspece,
     DateTime? quand,
   }) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
 
     final standards = await protocole(codeEspece);
@@ -317,7 +318,7 @@ class SoinsRepository {
     int delaiAttenteJours = 0,
     DateTime? quand,
   }) async {
-    final jour = quand ?? DateTime.now();
+    final jour = quand ?? HeureBenin.maintenant();
     late final String soinId;
 
     await _db.transaction(() async {
@@ -431,7 +432,7 @@ class SoinsRepository {
             id: soinId,
             deviceId: _deviceId,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: jour,
+            updatedAt: HeureBenin.versInstant(jour),
             lotId: lotId,
             actionType: typeAction,
             productUsed: Value(produit),
@@ -454,7 +455,7 @@ class SoinsRepository {
               id: soinId,
               lotId: lotId,
               productUsed: Value(produit),
-              endDate: date.add(Duration(days: delaiAttenteJours)),
+              endDate: HeureBenin.plusJours(date, delaiAttenteJours),
             ),
           );
     }

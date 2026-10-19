@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Statuts de pointage, tels que la maquette les nomme.
 enum StatutPointage {
@@ -230,7 +231,7 @@ class PersonnelRepository {
 
     return DonneesPersonnel(
       attestationsEmises: emises == null ? null : int.tryParse(emises.value),
-      jour: jour ?? DateTime.now(),
+      jour: jour ?? HeureBenin.maintenant(),
       employes: employes.toList()
         ..sort((a, b) => a.lastName.compareTo(b.lastName)),
       stagiaires: stagiaires.toList()

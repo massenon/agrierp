@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
@@ -189,7 +190,7 @@ class _ModaleCourrierState extends State<_ModaleCourrier> {
               onPressed: () async {
                 final choisie = await showDatePicker(
                   context: context,
-                  initialDate: _date ?? DateTime.now(),
+                  initialDate: _date ?? HeureBenin.maintenant(),
                   firstDate: DateTime(2000),
                   lastDate: DateTime(2100),
                 );

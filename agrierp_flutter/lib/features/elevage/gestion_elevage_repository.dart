@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Les indicateurs du hub « Gestion Élevage », calculés comme `App\Livewire\Elevage\GestionElevage`.
 class IndicateursGestionElevage {
@@ -31,7 +32,7 @@ class IndicateursGestionElevage {
 class GestionElevageRepository {
   GestionElevageRepository({required AppDatabase database, DateTime Function()? horloge})
     : _db = database,
-      _horloge = horloge ?? DateTime.now;
+      _horloge = horloge ?? HeureBenin.maintenant;
 
   final AppDatabase _db;
 

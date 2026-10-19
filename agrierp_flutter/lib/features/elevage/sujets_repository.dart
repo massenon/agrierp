@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/export/pdf_recu.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Échec d'une opération sur la fiche d'un sujet, avec une phrase lisible.
 class EchecSujet implements Exception {
@@ -304,7 +305,7 @@ class SujetsRepository {
       sujet: sujet,
       ageEnMois: sujet.birthDate == null
           ? null
-          : moisEntre(sujet.birthDate!, maintenant ?? DateTime.now()),
+          : moisEntre(sujet.birthDate!, maintenant ?? HeureBenin.maintenant()),
       reproduction: reproduction,
       soins: soins,
       mouvements: mouvements,

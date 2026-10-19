@@ -13,6 +13,7 @@ import 'package:agrierp/core/sync/gestes_importants.dart';
 import 'package:agrierp/core/sync/perimetre_tirage.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/sync/synchronisation_automatique.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/achats/achats_repository.dart';
 import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
@@ -81,6 +82,7 @@ void main() {
         graine: graine,
         jours: nombreDeJours,
         base: env['AGRIERP_ESSAI_BASE'] ?? '?',
+        fuseau: env['AGRIERP_ESSAI_FUSEAU'] ?? env['TZ'] ?? '?',
       );
       try {
         await essai.derouler();
@@ -306,10 +308,11 @@ class _Poste {
   late final SyncEngine moteur;
   late final SynchronisationAutomatique auto;
 
-  /// Jour simulé du poste (minuit) et horloge qui en découle (l'heure réelle, ce jour-là).
-  DateTime jour = DateTime.now();
+  /// Jour simulé du poste (minuit) et horloge qui en découle (l'heure réelle, ce jour-là) — à l'heure du BÉNIN
+  /// (S-T11), quel que soit le fuseau du processus (`TZ`, paramètre `ESSAI_FUSEAUX` du script).
+  DateTime jour = HeureBenin.aujourdhui();
   DateTime maintenant() {
-    final n = DateTime.now();
+    final n = HeureBenin.maintenant();
     return DateTime(jour.year, jour.month, jour.day, n.hour, n.minute, n.second, n.millisecond);
   }
 
@@ -395,12 +398,15 @@ class _Poste {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 class _Essai {
-  _Essai({required this.adresse, required this.graine, required this.jours, required this.base});
+  _Essai({required this.adresse, required this.graine, required this.jours, required this.base, required this.fuseau});
 
   final String adresse;
   final int graine;
   final int jours;
   final String base;
+
+  /// Ticket S-T11 — fuseau horaire des postes (processus Dart), le serveur restant à l'heure du Bénin.
+  final String fuseau;
   final debut = DateTime.now();
   final _journal = <String>[];
   final _evenements = <String>[];
@@ -444,7 +450,8 @@ class _Essai {
   Future<void> derouler() async {
     _travail = await Directory.systemTemp.createTemp('agrierp-essai-');
     _instantane = '${_travail.path}/instantane.json';
-    journaliser('Essai S-T9 — graine $graine, $jours journées, base $base, serveur $adresse');
+    journaliser('Essai S-T9 — graine $graine, $jours journées, base $base, serveur $adresse, postes en $fuseau '
+        '(décalage ${DateTime.now().timeZoneOffset.inHours} h)');
 
     // Deux bandes créées AU WEB, sans fiche dans la fenêtre de l'essai : c'est là que deux postes se disputeront
     // la fiche (bande, jour). Puis l'instantané du serveur (stocks, grand livre, fiches, ventes connues).
@@ -477,9 +484,9 @@ class _Essai {
       p.perturbateur.actif = true;
       p.auto.demarrer();
     }
-    final aujourdHui = DateTime.now();
+    final aujourdHui = HeureBenin.aujourdhui();
     for (var d = 0; d < jours; d++) {
-      final jour = DateTime(aujourdHui.year, aujourdHui.month, aujourdHui.day).subtract(Duration(days: jours - 1 - d));
+      final jour = HeureBenin.plusJours(aujourdHui, -(jours - 1 - d));
       for (final p in postes) {
         p.jour = jour;
       }
@@ -522,7 +529,7 @@ class _Essai {
     }
 
     // ── Relevés ──────────────────────────────────────────────────────────────────────────────────────────────
-    final depuis = DateTime(aujourdHui.year, aujourdHui.month, aujourdHui.day).subtract(Duration(days: jours + 2));
+    final depuis = HeureBenin.plusJours(aujourdHui, -(jours + 2));
     for (final p in postes) {
       enAttenteFin[p.nom] = await p.enAttente();
       conflits[p.nom] = await p.moteur.conflits();
@@ -534,6 +541,11 @@ class _Essai {
       } catch (e) {
         p.erreursInattendues.add('contrôle de cohérence : $e');
         coherence[p.nom] = null;
+      }
+      final compte = inventaireCompte;
+      if (compte != null) {
+        final local = await (p.db.select(p.db.products)..where((t) => t.id.equals(compte.produit))).getSingleOrNull();
+        if (local != null) stocksComptesAuPoste[p.nom] = local.stockQty;
       }
       final ventesLocales = {for (final v in await p.db.select(p.db.sales).get()) v.id};
       webRecu[p.nom] = [
@@ -655,6 +667,7 @@ class _Essai {
           final a = await p.stocks.ajouterStock(date: p.jour, productId: (await p.produit('Lapin vivant')).id, quantite: '5');
           p.noter('stock_adjustments', a.id);
         });
+        await _inventairePendantUneVente();
       default:
         await _geste(p, 'inventaire : vitamines, 1 sachet en trop', () async {
           final pr = await p.produit('Vitamines');
@@ -664,6 +677,55 @@ class _Essai {
     }
     if (p.alea.nextBool()) await p.synchroniser('bureau, en cours de journée ${d + 1}');
   }
+
+  /// Ticket S-T10 — INVENTAIRE SUR UN POSTE PENDANT QUE LE WEB ET UNE CAISSE VENDENT LE MÊME PRODUIT.
+  ///
+  /// Le bureau est hors ligne (son stock local de piment ignore donc ce qui suit) ; le web vend 3 sacs de piment ;
+  /// le bureau compte ce que les rayons contiennent, moins 2 sacs réellement disparus ; une seconde plus tard la
+  /// caisse 1 vend 1 sac. Puis le bureau revient en ligne et envoie son inventaire — APRÈS la vente de la caisse, au
+  /// gré des coupures. Stock final attendu (à la main) : quantité comptée − 1. Avant S-T10, le poste envoyait son
+  /// écart LOCAL (−5) et le serveur décomptait la vente du web une seconde fois : 3 sacs de moins, sans erreur.
+  Future<void> _inventairePendantUneVente() async {
+    final p = bureau;
+    p.connectivite.enLigne = false;
+    evenement('poste-bureau hors ligne : inventaire du piment pendant que le web et la caisse 1 en vendent (S-T10)');
+    try {
+      final piment = await p.produit('Piment frais');
+      final r = await _serveur(['vente-web', jsonEncode({
+        'produit': piment.id,
+        'quantite': 3,
+        'montant': 3600,
+        'jour': _jourIso(p.jour),
+      })]);
+      webVentes.add(r['vente'] as String);
+      final rayon = (r['stock_apres'] as num).toDouble();
+      evenement('Web : vente de 3 sacs de piment (${r['vente']}) — serveur : $rayon, poste-bureau : ${piment.stockQty}');
+
+      final compte = rayon - 2;
+      final a = await p.stocks.enregistrerEcart(
+        productId: piment.id,
+        stockPhysique: compte,
+        motif: StocksRepository.motifs[1],
+        quand: p.maintenant(),
+      );
+      p.noter('stock_adjustments', a.id);
+      evenement('poste-bureau : inventaire du piment, $compte comptés (écart LOCAL ${a.type} ${a.quantity}, '
+          'écart attendu au serveur : −2) à ${a.movementDate}');
+
+      // Une seconde plus tard (le grand livre est daté à la seconde) : la caisse 1 vend un sac.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      await _vente(caisse1, 'Piment frais', 1, 1200);
+      inventaireCompte = (produit: piment.id, nom: piment.name, attendu: compte - 1);
+    } finally {
+      p.connectivite.enLigne = true;
+    }
+  }
+
+  /// Ticket S-T10 — produit compté par le bureau et son stock final attendu (comptage − ventes postérieures).
+  ({String produit, String nom, double attendu})? inventaireCompte;
+
+  /// Ticket S-T10 — stock du produit compté sur chaque poste après le tirage final (il se recale sur le serveur).
+  final stocksComptesAuPoste = <String, double>{};
 
   Future<void> _journeeCaisse(_Poste p, int d) async {
     final bandeDuJour = p.alea.nextBool() ? 'ESSAI-A' : 'ESSAI-B';
@@ -870,6 +932,20 @@ class _Essai {
     ];
     expect(derives, isEmpty, reason: 'stock du produit ≠ somme de son grand livre (AdjustStockAction contourné) : $derives');
 
+    // Ticket S-T10 — l'inventaire compté au bureau pendant les ventes du web et de la caisse 1 : le stock final est le
+    // comptage moins la vente postérieure, au serveur ET sur chaque poste (recalé au tirage).
+    final compte = inventaireCompte;
+    expect(compte, isNotNull, reason: 'le scénario d\'inventaire S-T10 n\'a pas eu lieu');
+    final auServeur = ((stocks[compte!.produit] as Map?)?['stock'] as num?)?.toDouble();
+    expect(auServeur, compte.attendu,
+        reason: 'S-T10 : ${compte.nom} — stock final au serveur $auServeur, attendu ${compte.attendu} '
+            '(comptage − 1 vendu après) : une vente comptée deux fois, ou l\'inventaire perdu');
+    final postesFaux = {
+      for (final MapEntry(:key, :value) in stocksComptesAuPoste.entries)
+        if (value != compte.attendu) key: value,
+    };
+    expect(postesFaux, isEmpty, reason: 'S-T10 : ${compte.nom} — postes non recalés sur le serveur : $postesFaux');
+
     // La saisie de l'animalier (morts) est arrivée au serveur, quelle que soit la fiche qui tient la (bande, jour) —
     // sauf refus attendu et motivé, qui reste au poste pour que l'éleveur tranche.
     final fichesApres = (etatServeur['fiches_apres'] as Map).cast<String, dynamic>();
@@ -892,7 +968,8 @@ class _Essai {
     final b = StringBuffer()
       ..writeln('ESSAI À PLUSIEURS POSTES — ticket S-T9 (méthode TATACORA)')
       ..writeln('Graine : $graine   Journées : $jours   Base : $base   Serveur : $adresse')
-      ..writeln('Rejouer : agrierp_flutter/outils/essai_multipostes.sh $graine')
+      ..writeln('Fuseau des postes : $fuseau (S-T11 ; serveur : Africa/Porto-Novo)')
+      ..writeln('Rejouer : ESSAI_FUSEAUX=$fuseau agrierp_flutter/outils/essai_multipostes.sh $graine')
       ..writeln('Début : $debut   Durée : ${DateTime.now().difference(debut).inSeconds} s')
       ..writeln();
     b.writeln('ÉVÉNEMENTS');
@@ -924,6 +1001,12 @@ class _Essai {
       }
     }
     b.writeln();
+    final compte = inventaireCompte;
+    if (compte != null) {
+      b.writeln('INVENTAIRE COMPTÉ (S-T10) : ${compte.nom}, attendu ${compte.attendu} ; '
+          'serveur ${((etatServeur['stocks'] as Map?)?[compte.produit] as Map?)?['stock']} ; postes $stocksComptesAuPoste');
+      b.writeln();
+    }
     b.writeln('SERVEUR (fin d\'essai)');
     b.writeln(const JsonEncoder.withIndent('  ').convert(etatServeur));
     b.writeln();

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 import 'journal_stocks.dart';
 import 'pmp_service.dart';
 
@@ -159,7 +160,7 @@ class StocksRepository {
     Uuid? uuid,
     DateTime Function()? horloge,
   }) : _uuid = uuid ?? const Uuid(),
-       _horloge = horloge ?? DateTime.now;
+       _horloge = horloge ?? HeureBenin.maintenant;
 
   final AppDatabase database;
   final String deviceId;
@@ -386,7 +387,7 @@ class StocksRepository {
               deviceId: deviceId,
               syncStatus: const Value(SyncStatus.pending),
               // ⚠️ L'instant de la SAISIE (règle de `updatedAt`), pas le jour choisi.
-              updatedAt: quand ?? _horloge(),
+              updatedAt: HeureBenin.versInstant(quand ?? _horloge()),
               productId: produit.id,
               type: 'entree',
               quantity: qte,
@@ -413,17 +414,26 @@ class StocksRepository {
   /// contrôle de sens et remonterait le stock au lieu de le baisser.
   ///
   /// ⚠️ **LE STOCK LOCAL SUIT IMMÉDIATEMENT.** C'est tout l'objet d'un
-  /// inventaire : le comptage physique devient la vérité. Le serveur, lui, ne
-  /// rejoue jamais le delta tel quel — il recalcule depuis l'état réel du
-  /// produit au moment de la réception, ce qui rend l'opération sûre même si
-  /// l'envoi part deux fois.
+  /// inventaire : le comptage physique devient la vérité.
+  ///
+  /// 🔴→✅ **TICKET S-T10 — CE QUI PART, C'EST LE COMPTAGE, PAS L'ÉCART.** L'écart
+  /// local se calcule contre le stock de CE poste, qui ignore une vente faite
+  /// ailleurs et pas encore descendue : envoyé seul, il faisait décompter cette
+  /// vente une seconde fois au serveur. La ligne garde donc la QUANTITÉ COMPTÉE
+  /// ([StockAdjustment.countedQuantity]) et l'INSTANT du comptage
+  /// (`movementDate`, heure murale du Bénin) ; le serveur calcule l'écart contre
+  /// son grand livre à cet instant (règle du web) et le rejoue. `type` +
+  /// `quantity` (écart local) restent pour l'affichage et pour un serveur
+  /// ancien. Le poste se recale au tirage de confirmation qui suit l'acquittement
+  /// (stock du produit et mouvement du serveur).
   Future<StockAdjustment> enregistrerEcart({
     required String productId,
     required double stockPhysique,
     required String motif,
     DateTime? quand,
   }) async {
-    final maintenant = quand ?? DateTime.now();
+    // Ticket S-T11 : l'instant du comptage en heure murale du Bénin.
+    final maintenant = quand ?? _horloge();
 
     final produit = await (database.select(
       database.products,
@@ -459,13 +469,14 @@ class StocksRepository {
               id: id,
               deviceId: deviceId,
               syncStatus: const Value(SyncStatus.pending),
-              updatedAt: maintenant,
+              updatedAt: HeureBenin.versInstant(maintenant),
               productId: productId,
               type: ecart > 0 ? 'entree' : 'sortie',
               quantity: ecart.abs(),
               referenceType: 'inventaire',
               reason: Value(motif),
               movementDate: maintenant,
+              countedQuantity: Value(stockPhysique),
             ),
           );
 

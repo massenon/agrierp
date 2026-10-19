@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 import '../../core/sync/agregats_coherence.dart';
 import '../../core/sync/perimetre_tirage.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Nombre de lignes et total d'un jour, d'un côté.
 class TotauxJour {
@@ -85,7 +86,7 @@ class ControleCoherenceRepository {
        // Paramètre NOMMÉ : Dart interdit `this._serveur` (voir `SyncEngine`).
        // ignore: prefer_initializing_formals
        _serveur = serveur,
-       _maintenant = maintenant ?? DateTime.now;
+       _maintenant = maintenant ?? HeureBenin.maintenant;
 
   final AppDatabase _db;
   final Future<Map<String, dynamic>> Function(String depuis) _serveur;
@@ -220,8 +221,7 @@ class ControleCoherenceRepository {
     final aujourdhui = _maintenant();
     final debut =
         depuis ??
-        DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day)
-            .subtract(const Duration(days: joursParDefaut - 1));
+        HeureBenin.plusJours(HeureBenin.jour(aujourdhui), -(joursParDefaut - 1));
 
     final corps = await _serveur(cleJour(debut));
     final local = await calculerLocal(debut);

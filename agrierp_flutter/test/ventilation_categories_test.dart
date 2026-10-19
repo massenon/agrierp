@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_lapins_screen.dart';
 import 'package:agrierp/features/elevage/fiche_porcs_screen.dart';
@@ -164,7 +165,7 @@ void main() {
     int? mortSevre,
     int? mortJeune,
   }) async {
-    final aujourdhui = DateTime.now();
+    final aujourdhui = HeureBenin.maintenant();
     await db
         .into(db.livestockDailyEntries)
         .insert(
@@ -194,7 +195,7 @@ void main() {
         await creerBande(
           espece: 'porciculture',
           stade: 'engraissement',
-          creation: DateTime.now().subtract(const Duration(days: 5)),
+          creation: HeureBenin.maintenant().subtract(const Duration(days: 5)),
         );
         await ficheDuJour(mort: 3, mortRepro: 1, mortSevre: 0, mortJeune: 2);
 
@@ -218,7 +219,7 @@ void main() {
         await creerBande(
           espece: 'cuniculture',
           stade: 'engraissement',
-          creation: DateTime.now().subtract(const Duration(days: 5)),
+          creation: HeureBenin.maintenant().subtract(const Duration(days: 5)),
         );
         await ficheDuJour(mort: 3);
 

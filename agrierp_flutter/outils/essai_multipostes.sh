@@ -25,10 +25,18 @@
 #   agrierp_flutter/outils/essai_multipostes.sh                 # une graine tirée au hasard
 #   agrierp_flutter/outils/essai_multipostes.sh 42 7 2026       # trois essais, graines 42, 7 et 2026
 #   ESSAI_BASE=sqlite agrierp_flutter/outils/essai_multipostes.sh 42   # forcer SQLite
+#   ESSAI_FUSEAUX="UTC America/New_York Asia/Tokyo" agrierp_flutter/outils/essai_multipostes.sh 42 7
+#                                      # ticket S-T11 : chaque graine rejouée avec les postes dans chacun de ces fuseaux
 #
 # Variables utiles : AGRIERP_LARAVEL (dossier Laravel ; défaut : ../agrierp_laravel du monorepo), ESSAI_BASE
 # (`mysql` par défaut, `sqlite`), ESSAI_SORTIE (dossier des rapports ; défaut : un dossier temporaire hors dépôt),
-# ESSAI_JOURS (journées simulées, défaut 4). Flutter doit être dans le PATH (`/opt/flutter/bin`).
+# ESSAI_JOURS (journées simulées, défaut 4), ESSAI_FUSEAUX (ticket S-T11 : fuseau(x) horaire(s) des POSTES, séparés par
+# des espaces ; défaut `Africa/Porto-Novo`). Flutter doit être dans le PATH (`/opt/flutter/bin`).
+#
+# ⚠️ Ticket S-T11 — le SERVEUR reste toujours à l'heure du Bénin (APP_TIMEZONE) ; c'est le processus des postes
+# (`flutter test`, variable TZ) qui prend le fuseau demandé, comme un Windows mal réglé. Les cinq postes d'un essai
+# vivent dans le MÊME processus Dart, donc dans le même fuseau : pour éprouver plusieurs fuseaux, la graine est
+# rejouée une fois par fuseau (base remise à neuf à chaque fois).
 #
 # Sortie : pour chaque graine, `rapport-<graine>.txt` (journal des coupures, compteurs, invariants) dans le dossier
 # de sortie, dont le chemin est affiché à la fin. Code de retour non nul si un essai échoue.
@@ -165,8 +173,17 @@ demarrer_serveur() {
 # ── 4. Un essai par graine (base remise à neuf à chaque fois) ────────────────────────────────────────────────────
 STATUT=0
 export PATH="/opt/flutter/bin:$PATH"
+read -r -a FUSEAUX <<<"${ESSAI_FUSEAUX:-Africa/Porto-Novo}"
 for GRAINE in "${GRAINES[@]}"; do
-  echo "── Graine $GRAINE ──"
+for FUSEAU in "${FUSEAUX[@]}"; do
+  if [ ! -f "/usr/share/zoneinfo/$FUSEAU" ]; then
+    echo "Fuseau inconnu : $FUSEAU" >&2
+    STATUT=1
+    continue
+  fi
+  # Suffixe des rapports : la graine seule au fuseau du Bénin (comme avant S-T11), la graine et le fuseau sinon.
+  if [ "$FUSEAU" = "Africa/Porto-Novo" ]; then SUFFIXE="$GRAINE"; else SUFFIXE="$GRAINE-${FUSEAU//\//_}"; fi
+  echo "── Graine $GRAINE, postes en $FUSEAU ──"
   if [ "$BASE" = "mysql" ]; then
     "$CLIENT_MYSQL" --no-defaults --socket="$TRAVAIL/mysqld.sock" -uroot \
       -e "DROP DATABASE IF EXISTS agrierp_essai; CREATE DATABASE agrierp_essai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
@@ -176,22 +193,22 @@ for GRAINE in "${GRAINES[@]}"; do
   preparer_base || { STATUT=1; continue; }
   demarrer_serveur || { STATUT=1; continue; }
 
-  # Le poste vit à l'heure de la ferme (Bénin), comme le serveur (APP_TIMEZONE).
-  (cd "$POSTE" && TZ=Africa/Porto-Novo AGRIERP_ESSAI_URL="http://127.0.0.1:$PORT_HTTP" AGRIERP_ESSAI_GRAINE="$GRAINE" \
-    AGRIERP_ESSAI_RAPPORT="$SORTIE/rapport-$GRAINE.txt" AGRIERP_ESSAI_BASE="$DB_CONNECTION ($VERSION_BASE)" \
-    AGRIERP_ESSAI_JOURS="${ESSAI_JOURS:-4}" AGRIERP_LARAVEL="$LARAVEL" \
+  # Les postes vivent dans le fuseau demandé (S-T11 : un Windows mal réglé) ; le serveur, à l'heure du Bénin.
+  (cd "$POSTE" && TZ="$FUSEAU" AGRIERP_ESSAI_URL="http://127.0.0.1:$PORT_HTTP" AGRIERP_ESSAI_GRAINE="$GRAINE" \
+    AGRIERP_ESSAI_RAPPORT="$SORTIE/rapport-$SUFFIXE.txt" AGRIERP_ESSAI_BASE="$DB_CONNECTION ($VERSION_BASE)" \
+    AGRIERP_ESSAI_JOURS="${ESSAI_JOURS:-4}" AGRIERP_LARAVEL="$LARAVEL" AGRIERP_ESSAI_FUSEAU="$FUSEAU" \
     flutter test test/essai_multipostes_test.dart --tags integration --reporter expanded \
-    >"$SORTIE/flutter-$GRAINE.log" 2>&1)
+    >"$SORTIE/flutter-$SUFFIXE.log" 2>&1)
   RESULTAT=$?
-  tail -5 "$SORTIE/flutter-$GRAINE.log"
+  tail -5 "$SORTIE/flutter-$SUFFIXE.log"
   if [ "$RESULTAT" -ne 0 ]; then
     STATUT=1
-    echo "❌ Graine $GRAINE : échec (voir $SORTIE/flutter-$GRAINE.log et $SORTIE/rapport-$GRAINE.txt)"
-  elif grep -q "Skip:" "$SORTIE/flutter-$GRAINE.log"; then
+    echo "❌ Graine $GRAINE ($FUSEAU) : échec (voir $SORTIE/flutter-$SUFFIXE.log et $SORTIE/rapport-$SUFFIXE.txt)"
+  elif grep -q "Skip:" "$SORTIE/flutter-$SUFFIXE.log"; then
     STATUT=1
-    echo "⚠️  Graine $GRAINE : essai SAUTÉ — voir $SORTIE/flutter-$GRAINE.log"
+    echo "⚠️  Graine $GRAINE ($FUSEAU) : essai SAUTÉ — voir $SORTIE/flutter-$SUFFIXE.log"
   else
-    echo "✅ Graine $GRAINE : tous les invariants tiennent ($SORTIE/rapport-$GRAINE.txt)"
+    echo "✅ Graine $GRAINE ($FUSEAU) : tous les invariants tiennent ($SORTIE/rapport-$SUFFIXE.txt)"
   fi
 
   # Le serveur est arrêté entre deux graines : la base est remise à neuf, et le limiteur de connexion (5 / min par
@@ -202,6 +219,7 @@ for GRAINE in "${GRAINES[@]}"; do
     kill -KILL -- "-$PID_SERVEUR" 2>/dev/null
     PID_SERVEUR=""
   fi
+done
 done
 
 echo "Rapports et journaux : $SORTIE"

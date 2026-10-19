@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../temps/heure_benin.dart';
 import 'fusion_referentiels.dart';
 import 'perimetre_tirage.dart';
 
@@ -494,7 +495,7 @@ class SyncEngine {
             reinitialisation != await _lireReglage(cleReinitialisation)) {
           final perdus = await _db.purgerDonneesDActivite();
           await _ecrireReglage(cleReinitialisation, reinitialisation);
-          final le = DateTime.parse(reinitialisation).toLocal();
+          final le = HeureBenin.depuisInstant(DateTime.parse(reinitialisation));
           final date =
               '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
           // Un poste neuf (jamais tiré, rien en attente) n'avait rien : aucun avertissement à lui faire lire.
@@ -727,7 +728,7 @@ class SyncEngine {
           id: l['id'] as String,
           label: (l['label'] ?? '') as String,
           isActive: Value(_bool(l['is_active'])),
-          updatedAt: Value(_date(l['updated_at'])),
+          updatedAt: Value(_instantTechnique(l['updated_at'])),
         );
         // Le serveur fait autorite sur les referentiels : l'existant local est
         // remplace, jamais fusionne champ par champ.
@@ -788,7 +789,7 @@ class SyncEngine {
         description: Value(l['description'] as String?),
         syncStatus: const Value(SyncStatus.synced),
         isActive: Value(_bool(l['is_active'])),
-        updatedAt: Value(_date(l['updated_at'])),
+        updatedAt: Value(_instantTechnique(l['updated_at'])),
       );
 
   Future<int> _absorberBandes(Object? brut) async {
@@ -809,7 +810,7 @@ class SyncEngine {
           productId: Value(l['product_id'] as String?),
           status: Value(l['status'] as String?),
           isActive: Value(_bool(l['is_active'])),
-          updatedAt: Value(_date(l['updated_at'])),
+          updatedAt: Value(_instantTechnique(l['updated_at'])),
           // Ticket 15.46 — bande d'origine ; clé absente (serveur antérieur) = valeur locale gardée.
           lotSourceId: l.containsKey('lot_source_id')
               ? Value(l['lot_source_id'] as String?)
@@ -867,7 +868,7 @@ class SyncEngine {
           motif: Value(l['motif'] as String?),
           isActive: Value(_bool(l['is_active'])),
           syncStatus: const Value(SyncStatus.synced),
-          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
         ),
       );
     }
@@ -938,7 +939,7 @@ class SyncEngine {
           id: id,
           deviceId: 'serveur',
           syncStatus: const Value(SyncStatus.synced),
-          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
           lotId: lot,
           sujetRef: Value(sujet as String?),
           motif: motif,
@@ -1005,7 +1006,7 @@ class SyncEngine {
           id: id,
           deviceId: 'serveur',
           syncStatus: const Value(SyncStatus.synced),
-          updatedAt: _date(l['updated_at']) ?? _maintenant(),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
           lotId: lot,
           taskType: tache,
           scheduledDate: DateTime(date.year, date.month, date.day),
@@ -1224,7 +1225,7 @@ class SyncEngine {
       final horodatageBrut = l['updated_at'];
       DateTime? horodatage;
       if (horodatageBrut != null) {
-        horodatage = horodatageBrut is String ? _date(horodatageBrut) : null;
+        horodatage = horodatageBrut is String ? _instantTechnique(horodatageBrut) : null;
         if (horodatage == null) {
           throw FormatException(
             'Fiche $id refusée : horodatage illisible ($horodatageBrut).',
@@ -1759,7 +1760,7 @@ class SyncEngine {
       }
 
       final creation = l['created_at'];
-      final creee = creation == null ? null : _date(creation);
+      final creee = creation == null ? null : _instantTechnique(creation);
       if (creation != null && creee == null) {
         throw FormatException('Échéance $id : created_at illisible ($creation).');
       }
@@ -1829,7 +1830,7 @@ class SyncEngine {
                 id: l['id'] as String,
                 lotId: (l['lot_id'] ?? '') as String,
                 productUsed: Value(l['product_used'] as String?),
-                endDate: _date(l['end_date']) ?? DateTime.now(),
+                endDate: _date(l['end_date']) ?? HeureBenin.aujourdhui(),
               ),
             );
       }
@@ -1884,7 +1885,7 @@ class SyncEngine {
             nesVivants: Value(_entier(l['nes_vivants'])),
             nesMorts: Value(_entier(l['nes_morts'])),
             status: Value((l['status'] ?? 'en_cours') as String),
-            updatedAt: _date(l['updated_at']) ?? DateTime.now(),
+            updatedAt: _instantTechnique(l['updated_at']) ?? DateTime.now(),
           ),
           mode: InsertMode.insertOrReplace,
         );
@@ -2250,7 +2251,7 @@ class SyncEngine {
         _journalSansDateCreation = true;
       } else if (l['created_at'] != null) {
         final brute = l['created_at'];
-        creeLe = brute is String ? _date(brute) : null;
+        creeLe = brute is String ? _instantTechnique(brute) : null;
         if (creeLe == null) {
           throw FormatException(
             'Journal refusé : écriture $id, date de création illisible ($brute).',
@@ -2597,7 +2598,7 @@ class SyncEngine {
                 action: (l['action'] ?? '') as String,
                 module: Value(l['module'] as String?),
                 ipAddress: Value(l['ip_address'] as String?),
-                createdAt: Value(_date(l['created_at'])),
+                createdAt: Value(_instantTechnique(l['created_at'])),
               ),
             );
       }
@@ -2637,7 +2638,7 @@ class SyncEngine {
                 message: l['message'] as String,
                 linkUrl: Value(l['link_url'] as String?),
                 isRead: Value(_bool(l['is_read'])),
-                createdAt: Value(_date(l['created_at'])),
+                createdAt: Value(_instantTechnique(l['created_at'])),
               ),
             );
       }
@@ -3221,7 +3222,7 @@ class SyncEngine {
 
       if (local != null && local.syncStatus != SyncStatus.synced) continue;
 
-      final jour = _date(l['attendance_date']) ?? DateTime.now();
+      final jour = _date(l['attendance_date']) ?? HeureBenin.aujourdhui();
 
       final ligne = AttendanceRecordsCompanion.insert(
         id: id,
@@ -3270,7 +3271,7 @@ class SyncEngine {
 
       // TICKET F0.93 (réserve 2 de l'audit indépendant) : le repli lit l'horloge INJECTÉE,
       // comme `horodatage` ci-dessous — jamais `DateTime.now()`, invisible à un test figé.
-      final vendueLe = _date(l['sold_at']) ?? _maintenant();
+      final vendueLe = _date(l['sold_at']) ?? HeureBenin.depuisInstant(_maintenant());
 
       // 🔴→✅ TICKET F0.90 (remarque B2 de l'audit) — `updatedAt` N'EST PLUS `sold_at`. Règle du
       // poste : `updatedAt` = instant de la SAISIE (ou, pour ce qui vient d'ailleurs, de la
@@ -3443,7 +3444,7 @@ class SyncEngine {
       );
       final motif = _texteStrict(l['reason'], '$quoi $id : motif');
       final date = l['movement_date'] is String
-          ? DateTime.tryParse(l['movement_date'] as String)
+          ? HeureBenin.lire(l['movement_date'])
           : null;
       if (produit is! String || !produits.contains(produit)) {
         throw FormatException(
@@ -3785,7 +3786,7 @@ class SyncEngine {
         paymentMode: (l['payment_mode'] ?? 'especes') as String,
         total: _reel(l['total']) ?? 0,
         hasDebt: Value(_bool(l['has_debt'])),
-        purchaseDate: _date(l['purchase_date']) ?? DateTime.now(),
+        purchaseDate: _date(l['purchase_date']) ?? HeureBenin.aujourdhui(),
         // ⚠️ TICKET F0.74 — LE RETOUR EST SERVI PAR LE SERVEUR ET REMPLACE L'ÉTAT LOCAL.
         // `returned_at` et `supplier_credit` ne s'écrivent JAMAIS au poste. Une clé
         // ABSENTE (serveur plus ancien) laisse la colonne telle quelle ; une clé présente
@@ -3965,7 +3966,7 @@ class SyncEngine {
           id: l['id'] as String,
           deviceId: (l['device_id'] ?? 'serveur') as String,
           syncStatus: const Value(SyncStatus.synced),
-          updatedAt: _date(l['updated_at']) ?? DateTime.now(),
+          updatedAt: _instantTechnique(l['updated_at']) ?? DateTime.now(),
           lotId: (l['lot_id'] ?? '') as String,
           actionType: (l['action_type'] ?? '') as String,
           productUsed: Value(l['product_used'] as String?),
@@ -3973,7 +3974,7 @@ class SyncEngine {
           vetName: Value(l['vet_name'] as String?),
           symptomes: Value(l['symptomes'] as String?),
           cost: Value(_reel(l['cost'])),
-          recordDate: _date(l['record_date']) ?? DateTime.now(),
+          recordDate: _date(l['record_date']) ?? HeureBenin.aujourdhui(),
           isActive: Value(actifs[i]),
         );
         b.insert(
@@ -5156,7 +5157,10 @@ class SyncEngine {
       final motif = r['reason']?.toString() ?? 'Refus sans motif communiqué.';
       motifs.add(motif);
 
-      final id = r['id']?.toString();
+      // 🔴→✅ Ticket S-T10 (trouvé par l'essai à plusieurs postes) — `stock_adjustments` ne rendait que
+      // `client_ref` dans ses refus : l'inventaire refusé restait `pending`, renvoyé à chaque synchronisation, et
+      // son motif n'arrivait jamais à l'écran. Le serveur rend désormais aussi `id` ; un serveur ancien, non.
+      final id = (r['id'] ?? r['client_ref'])?.toString();
       if (id == null) continue;
 
       refuses.add(id);
@@ -5957,6 +5961,13 @@ class SyncEngine {
     'movement_date': _jour(a.movementDate),
     'device_id': a.deviceId,
     'updated_at': a.updatedAt.toUtc().toIso8601String(),
+    // 🔴→✅ Ticket S-T10 — inventaire : la QUANTITÉ COMPTÉE et l'INSTANT du comptage (UTC, avec son fuseau : le
+    // serveur le ramène à son heure, S-T11). Le serveur calcule l'écart contre son grand livre à cet instant ;
+    // `type` + `quantity` (écart LOCAL) ne servent plus qu'à un serveur ancien, qui ignore ces deux clés.
+    if (a.countedQuantity != null) ...{
+      'counted_quantity': a.countedQuantity,
+      'counted_at': HeureBenin.versInstant(a.movementDate).toIso8601String(),
+    },
   };
 
   static List<Map<String, dynamic>> _lignes(Object? brut) =>
@@ -5970,18 +5981,19 @@ class SyncEngine {
   static int? _entier(Object? v) =>
       v == null ? null : int.tryParse(v.toString().split('.').first);
 
-  /// ⚠️⚠️ **RAMENÉE À L'HEURE LOCALE, TOUJOURS.** Une colonne DATE pure
-  /// (`entry_date`, `record_date`) arrive en `2026-08-17` et se lit déjà en
-  /// local. Mais une date qu'Eloquent sérialise en instant — `due_date` d'une
-  /// créance, servie `2026-04-01T23:00:00Z` depuis un serveur en
-  /// Africa/Porto-Novo — se lirait **la veille** si on la gardait en UTC. Une
-  /// échéance décalée d'un jour, c'est une relance envoyée trop tôt ou une
-  /// facture crue encore à terme.
+  /// Une date MÉTIER servie, en heure murale du Bénin (ticket S-T11, [HeureBenin.lire]).
   ///
-  /// `toLocal()` est sans effet sur une date déjà locale : la correction ne
-  /// coûte rien là où elle ne sert pas.
-  static DateTime? _date(Object? v) =>
-      v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
+  /// ⚠️⚠️ Une colonne DATE pure (`entry_date`, `record_date`) arrive en `2026-08-17` et se lit telle quelle. Mais une
+  /// date qu'Eloquent sérialise en instant — `due_date` d'une créance, `advance_date` d'une avance, servies
+  /// `2026-04-01T23:00:00Z` depuis un serveur en Africa/Porto-Novo — se lirait **la veille** gardée en UTC (F0.x),
+  /// et encore la veille ramenée par `toLocal()` sur un Windows réglé en UTC ou à New York (S-T11 : écarts du
+  /// contrôle de cohérence sur les soins et les avances, vus par l'essai S-T9). Elle est donc ramenée à l'heure
+  /// du BÉNIN, jamais à celle de Windows.
+  static DateTime? _date(Object? v) => HeureBenin.lire(v);
+
+  /// Un INSTANT technique servi (`updated_at`, `created_at` du journal) : gardé comme instant — il ne sert qu'à
+  /// ordonner ou départager, jamais à dire un jour métier.
+  static DateTime? _instantTechnique(Object? v) => HeureBenin.lireInstant(v);
 
   /// Format `Y-m-d` attendu par le serveur pour une DATE pure.
   ///

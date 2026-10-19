@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../database/app_database.dart';
 import '../erreurs/message_erreur.dart';
+import '../temps/heure_benin.dart';
 import '../theme/agri_tokens.dart';
 import '../widgets/carte_kpi.dart';
 import '../widgets/modale_agri.dart';
@@ -299,9 +300,9 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
 
   Widget _texte(String t, Color couleur) => Text(t, style: TextStyle(fontSize: AgriTypography.xs, color: couleur));
 
-  /// `dd/mm/AAAA HH:MM`, heure locale — même format que l'écran Synchronisation.
+  /// `dd/mm/AAAA HH:MM`, à l'heure du Bénin (S-T11) — même format que l'écran Synchronisation.
   static String horodatage(DateTime d) {
-    final l = d.toLocal();
+    final l = HeureBenin.depuisInstant(d);
     return '${l.day.toString().padLeft(2, '0')}/'
         '${l.month.toString().padLeft(2, '0')}/${l.year} '
         '${l.hour.toString().padLeft(2, '0')}:'

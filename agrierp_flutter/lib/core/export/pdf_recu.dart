@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+import '../temps/heure_benin.dart';
 
 /// Un PDF produit PAR LE SERVEUR et reçu en octets.
 ///
@@ -45,7 +46,7 @@ class LivraisonPdf {
     final dossier = Directory(p.join(racine.path, 'AgriERP'));
     if (!dossier.existsSync()) dossier.createSync(recursive: true);
 
-    final h = maintenant ?? DateTime.now();
+    final h = maintenant ?? HeureBenin.maintenant();
     String d(int n) => n.toString().padLeft(2, '0');
     final base = pdf.fichier.replaceAll(
       RegExp(r'\.pdf$', caseSensitive: false),

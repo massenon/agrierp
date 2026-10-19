@@ -2,6 +2,7 @@ import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -1313,9 +1314,9 @@ void main() {
             // (« 09/10/2026 ») et le test est devenu rouge dès le lendemain, sans défaut de code.
             [
               'Date',
-              '${DateTime.now().day.toString().padLeft(2, '0')}/'
-                  '${DateTime.now().month.toString().padLeft(2, '0')}/'
-                  '${DateTime.now().year}',
+              '${HeureBenin.maintenant().day.toString().padLeft(2, '0')}/'
+                  '${HeureBenin.maintenant().month.toString().padLeft(2, '0')}/'
+                  '${HeureBenin.maintenant().year}',
             ],
           ]),
         );

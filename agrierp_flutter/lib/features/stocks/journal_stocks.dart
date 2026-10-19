@@ -192,9 +192,13 @@ class JournalStocks {
           referenceId: a.id,
           reason: a.reason,
           // Ticket U10 — un « Ajout Manuel » est daté par le serveur du JOUR CHOISI (`movement_date`, minuit), comme
-          // au web ; un écart d'inventaire, de sa réception.
+          // au web. Ticket S-T10 — un inventaire COMPTÉ (`countedQuantity`), de l'instant du comptage ; un écart d'un
+          // poste d'avant S-T10, de sa réception. (Quantité projetée : l'écart LOCAL — le serveur, qui calcule le
+          // sien contre son grand livre, le remplace au tirage de confirmation.)
           date: a.referenceType == 'manual_addition'
               ? jour(a.movementDate)
+              : a.countedQuantity != null
+              ? a.movementDate
               : maintenant,
           enAttente: true,
         ),

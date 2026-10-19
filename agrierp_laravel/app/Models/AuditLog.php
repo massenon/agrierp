@@ -150,6 +150,9 @@ class AuditLog extends Model
         'product.threshold_updated' => "Seuil d'alerte modifié",
         'stock.adjusted' => 'Stock ajusté',
         'stock.manual_addition' => 'Ajout manuel de stock',
+        // Ticket S-T10 — inventaire du poste acquitté sans mouvement.
+        'stock.inventaire_sans_ecart' => "Inventaire du poste sans écart au serveur",
+        'stock.inventaire_depasse' => 'Inventaire du poste remplacé par un inventaire plus récent',
         'transformation.recorded' => 'Transformation enregistrée',
         'livestock_lot.created' => 'Lot créé',
         'livestock_lot.updated' => 'Lot modifié',

@@ -196,6 +196,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.livestockDailyEntries, d.livestockDailyEntries.treatmentDose),
     (d.livestockDailyEntries, d.livestockDailyEntries.symptomes),
   ],
+  // Ticket S-T10 — quantité comptée d'un inventaire.
+  46: [(d.stockAdjustments, d.stockAdjustments.countedQuantity)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

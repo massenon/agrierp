@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
 import 'package:agrierp/features/elevage/fiche_lapins_screen.dart';
@@ -144,7 +145,7 @@ void main() {
 
     expect(await db.pendingCount(), 1);
 
-    final fiche = await depot.chargerJour(bande, DateTime.now());
+    final fiche = await depot.chargerJour(bande, HeureBenin.maintenant());
     expect(fiche!.mort, 1);
     expect(fiche.effectifFinal, 39);
   });

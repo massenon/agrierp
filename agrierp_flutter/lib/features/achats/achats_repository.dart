@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Une ligne du panier d'achat, avant enregistrement.
 class LigneSaisieAchat {
@@ -375,7 +376,7 @@ class AchatsRepository {
   /// Horloge injectée (tests) : « date future refusée » se juge sur le jour du poste.
   final DateTime Function()? horloge;
 
-  DateTime get _maintenant => (horloge ?? DateTime.now)();
+  DateTime get _maintenant => (horloge ?? HeureBenin.maintenant)();
 
   static DateTime _jourSeul(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -565,7 +566,7 @@ class AchatsRepository {
     )..where((t) => t.id.equals(fournisseurId))).getSingleOrNull();
 
     final total = lignes.fold<double>(0, (t, l) => t + l.total);
-    final jour = date ?? DateTime.now();
+    final jour = date ?? HeureBenin.maintenant();
     final id = _uuid.v4();
 
     await database.transaction(() async {
@@ -575,7 +576,7 @@ class AchatsRepository {
             PurchasesCompanion.insert(
               id: id,
               deviceId: identifiantPoste,
-              updatedAt: jour,
+              updatedAt: HeureBenin.versInstant(jour),
               supplierId: fournisseurId,
               supplierName: Value(fournisseur?.name),
               supplierCategory: Value(fournisseur?.category),
@@ -705,7 +706,7 @@ class AchatsRepository {
             id: id,
             deviceId: identifiantPoste,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: _maintenant,
+            updatedAt: HeureBenin.versInstant(_maintenant),
             purchaseId: achatId,
             reason: motifNet,
             returnDate: jour,
@@ -814,7 +815,7 @@ class AchatsRepository {
             id: id,
             deviceId: identifiantPoste,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: _maintenant,
+            updatedAt: HeureBenin.versInstant(_maintenant),
             supplierId: fournisseurId,
             treasuryAccountId: compteId,
             amount: montant,

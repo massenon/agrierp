@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show OrderingTerm, OrderingMode;
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 
@@ -171,7 +172,7 @@ class RapportsRepository {
     // Ticket U9 — grand livre des stocks (descendu + saisies en attente) : Tableau 3 de la ponte.
     final journal = await JournalStocks.charger(
       database,
-      maintenant: DateTime.now(),
+      maintenant: HeureBenin.maintenant(),
     );
 
     final fiches =

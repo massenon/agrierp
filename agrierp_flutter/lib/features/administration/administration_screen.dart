@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
@@ -409,7 +410,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
 
   /// Le jour LOCAL du poste, sans heure : la règle de statut du serveur compte en jours
   /// calendaires (F0.79).
-  DateTime get _maintenant => widget.maintenant?.call() ?? DateTime.now();
+  DateTime get _maintenant => widget.maintenant?.call() ?? HeureBenin.maintenant();
 
   DateTime _aujourdhui() {
     final n = _maintenant;

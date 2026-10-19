@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -369,7 +370,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   // ── Onglet 3 : Dettes Fournisseurs ────────────────────────────────────────
 
   Widget _ongletDettes(DonneesFournisseurs d, bool large) {
-    final jour = DateTime.now();
+    final jour = HeureBenin.maintenant();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -791,7 +792,7 @@ class _ModaleReglementState extends State<_ModaleReglement> {
   final _montant = TextEditingController();
   String _fournisseur = '';
   String _compte = '';
-  DateTime _date = DateTime.now();
+  DateTime _date = HeureBenin.aujourdhui();
   String? _erreur;
   bool _envoi = false;
 
@@ -912,7 +913,7 @@ class _ModaleReglementState extends State<_ModaleReglement> {
                 context: context,
                 initialDate: _date,
                 firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
+                lastDate: HeureBenin.maintenant(),
               );
               if (choisie != null) setState(() => _date = choisie);
             },

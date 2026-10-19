@@ -153,6 +153,22 @@ switch ($commande) {
             $bandes[$code] = $lot->id;
         }
 
+        // Ticket S-T10 — 30 sacs de piment entrés AU WEB (« Ajouter Stock » de Gestion des Stocks) : le produit que le
+        // bureau comptera pendant que le web et la caisse 1 en vendent. Le jeu de démonstration l'a épuisé.
+        $piment = Product::where('name', 'like', 'Piment frais%')->firstOrFail();
+        $ajout = Livewire::actingAs(administrateur())
+            ->test(App\Livewire\Stocks\GestionStocks::class)
+            ->call('openAddStockModal')
+            // Daté AVANT la fenêtre de l'essai (comme les bandes) : l'essai rejoue ses journées dans le passé, et un
+            // ajout daté d'aujourd'hui serait, pour le grand livre, POSTÉRIEUR au comptage simulé d'hier.
+            ->set('addDate', now()->subDays(10)->format('Y-m-d'))
+            ->set('addProductId', $piment->id)
+            ->set('addQty', 30)
+            ->call('submitAjouterStock');
+        if ((float) $piment->fresh()->stock_qty < 30) {
+            echec('Ajout de stock du piment non enregistré au web : '.diagnostic($ajout));
+        }
+
         $suivies = array_values(array_merge(
             $bandes,
             LivestockLot::where('status', 'actif')->whereNotIn('code', array_keys($bandes))->pluck('id')->all(),
@@ -185,7 +201,9 @@ switch ($commande) {
             echec('Vente web non enregistrée ('.count($nouvelles).' vente(s) nouvelle(s)) : '.diagnostic($caisse));
         }
 
-        sortie(['vente' => $nouvelles[0]]);
+        // Ticket S-T10 — le stock du produit au serveur JUSTE APRÈS la vente : ce que les rayons contiennent (l'essai
+        // en déduit la quantité que le bureau compte, alors que son stock local ignore encore cette vente).
+        sortie(['vente' => $nouvelles[0], 'stock_apres' => round((float) Product::findOrFail($p['produit'])->stock_qty, 2)]);
 
     // ── Une ration modifiée AU WEB (Paramètres Élevage) ───────────────────────────────────────────────────────────
     case 'ration-web':
@@ -302,6 +320,8 @@ switch ($commande) {
             $a = $avant['stocks'][$id] ?? ['stock' => 0.0, 'livre' => 0.0];
             $stocks[$id] = [
                 'nom' => $s['nom'],
+                // Ticket S-T10 — le stock final, comparé à l'attendu de l'inventaire compté au bureau.
+                'stock' => $s['stock'],
                 'ecart_ouverture' => round(($a['stock'] ?? 0) - ($a['livre'] ?? 0), 2),
                 'ecart_fin' => round(($s['stock'] ?? 0) - ($s['livre'] ?? 0), 2),
             ];

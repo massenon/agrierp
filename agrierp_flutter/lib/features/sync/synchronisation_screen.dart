@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/erreurs/message_erreur.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/sync/synchronisation_automatique.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/toast_agri.dart';
@@ -661,8 +662,9 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     _ => table,
   };
 
+  /// Un instant technique, affiché à l'heure du Bénin quel que soit le réglage de Windows (S-T11).
   static String _horodatage(DateTime d) {
-    final l = d.toLocal();
+    final l = HeureBenin.depuisInstant(d);
     return '${l.day.toString().padLeft(2, '0')}/'
         '${l.month.toString().padLeft(2, '0')}/${l.year} '
         '${l.hour.toString().padLeft(2, '0')}:'

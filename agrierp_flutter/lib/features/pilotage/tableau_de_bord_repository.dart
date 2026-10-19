@@ -4,6 +4,7 @@ import '../../core/audit/libelles_audit.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import '../stocks/pmp_service.dart';
 
 /// Une mesure du tableau de bord : un chiffre, ou une absence assumée.
@@ -213,7 +214,7 @@ class DonneesTableauDeBord {
 /// Reste propre au poste (non servie par le tirage) : `expenses` — voir l'onglet Dépenses.
 class TableauDeBordRepository {
   TableauDeBordRepository({required this.database, DateTime Function()? horloge})
-    : _horloge = horloge ?? DateTime.now;
+    : _horloge = horloge ?? HeureBenin.maintenant;
 
   final AppDatabase database;
   final DateTime Function() _horloge;
@@ -766,7 +767,9 @@ class TableauDeBordRepository {
             .where(
               (j) =>
                   j.createdAt != null &&
-                  _jour(j.createdAt!) == _jour(maintenant),
+                  // S-T11 : `created_at` est un INSTANT ; le « jour » du web (`whereDate`, serveur en
+                  // Africa/Porto-Novo) est son jour à l'heure du Bénin, jamais celui de Windows.
+                  _jour(HeureBenin.depuisInstant(j.createdAt!)) == _jour(maintenant),
             )
             .toList()
           ..sort((a, b) => b.createdAt!.compareTo(a.createdAt!));
@@ -776,7 +779,7 @@ class TableauDeBordRepository {
       return LigneActivite(
         libelle: LibellesAudit.action(j.action),
         detail:
-            '${_heure(j.createdAt!)} — ${j.userName ?? 'Système'}'
+            '${_heure(HeureBenin.depuisInstant(j.createdAt!))} — ${j.userName ?? 'Système'}'
             '${module == null || module.isEmpty ? '' : ' · $module'}',
       );
     }).toList();

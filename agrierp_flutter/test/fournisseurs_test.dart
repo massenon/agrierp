@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/achats/fournisseurs_repository.dart';
@@ -67,7 +68,7 @@ void main() {
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
-  final aujourdhui = DateTime.now();
+  final aujourdhui = HeureBenin.maintenant();
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -415,7 +416,7 @@ void main() {
           fournisseurId: f.id,
           montant: 100,
           compteId: 'x',
-          date: DateTime.now(),
+          date: HeureBenin.maintenant(),
         ),
         throwsA(isA<ReglementRefuse>()),
       );

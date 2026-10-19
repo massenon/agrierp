@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -112,7 +113,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// `null` : le hub.
   String? _profilFournisseur;
 
-  DateTime get _maintenant => (widget.maintenant ?? DateTime.now)();
+  DateTime get _maintenant => (widget.maintenant ?? HeureBenin.maintenant)();
 
   @override
   void initState() {

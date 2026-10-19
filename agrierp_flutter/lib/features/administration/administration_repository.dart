@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Ce que l'utilisateur saisit dans « Nouveau Courrier » / « Modifier — Gestion des Courriers ».
 class FormulaireCourrier {
@@ -735,7 +736,7 @@ class AdministrationRepository {
     };
 
     return DonneesAdministration(
-      mois: mois ?? DateTime.now(),
+      mois: mois ?? HeureBenin.maintenant(),
       refusCourriers: refus,
       refusArchives: refusDesArchives,
       refusDocuments: refusDesDocuments,

@@ -126,7 +126,7 @@ Only 5 routes are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-
 | Daily élevage sheets | Last writer wins (upsert by id) on the breeder columns. S-T9: the `vente` column of a sheet the server already knows is **never** taken from the device — each sale increments it once (15.30 exemption only for a sheet created by the same request, from which a rejected sale is removed); a device sheet on a (lot, day) already held under another id is **merged** (`merged`) when one of the two carries only the sale or both carry the same entry, refused otherwise |
 | POS sales | Never merged — each offline sale is inserted as an independent transaction |
 | The whole push | S-T9: one DB transaction (`traiterEnvoi`), retried 3 times on a deadlock — a request that fails writes nothing (MariaDB deadlocks between two counters used to leave the sheet written without its sales) |
-| Stock movements | Never accepted as-is — replayed through `AdjustStockAction` for full server recomputation |
+| Stock movements | Never accepted as-is — replayed through `AdjustStockAction` for full server recomputation. S-T10 : un inventaire du poste porte `counted_quantity` + `counted_at` ; l'écart est calculé par `InventaireAuComptageService` contre le grand livre à l'instant du comptage (règle du web), daté de cet instant ; comptage dépassé par un inventaire plus récent ou sans écart : acquitté sans mouvement. Sans ces clés (poste ancien) : l'écart envoyé, comme avant |
 | Fiscal year closure | Never synced — the API refuses it in any form |
 
 The controller demonstrates each rule on a representative subset of tables, not all ~60. Extending to a new table follows the same block pattern.

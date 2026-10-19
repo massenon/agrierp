@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../stocks/journal_stocks.dart';
 
 /// Conversion des œufs récoltés en plateaux, et entrée au stock du poste.
@@ -79,7 +80,7 @@ class ProductionOeufsService {
   }) async {
     final journal = await JournalStocks.charger(
       _db,
-      maintenant: maintenant ?? DateTime.now(),
+      maintenant: maintenant ?? HeureBenin.maintenant(),
     );
     final produits = await _db.select(_db.products).get();
     return (journal: journal, produit: JournalStocks.produitOeufs(produits)?.id);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -1180,7 +1181,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   Future<void> _exporter(List<LigneStock> lignes, DonneesStocks d) async {
     final editeur = widget.imprimer;
     if (editeur == null) return;
-    final maintenant = d.maintenant ?? DateTime.now();
+    final maintenant = d.maintenant ?? HeureBenin.maintenant();
     final message = await editeur(
       StocksRepository.documentTableau(lignes, maintenant),
       maintenant,
@@ -1197,7 +1198,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   /// succès. ».
   Future<void> _ouvrirAjouterStock(DonneesStocks d) async {
     // `openAddStockModal()` : produit et quantité remis à vide, date du jour.
-    var date = DateTime.now();
+    var date = HeureBenin.maintenant();
     String? produit;
     final quantite = _quantiteAjout..clear();
     var erreurs = <String, String>{};
@@ -1220,7 +1221,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     context: context,
                     initialDate: date,
                     firstDate: DateTime(2020),
-                    lastDate: DateTime(DateTime.now().year + 5, 12, 31),
+                    lastDate: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
                   );
                   if (choisie != null) rafraichir(() => date = choisie);
                 },

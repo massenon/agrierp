@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/theme/agri_theme.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
@@ -253,7 +254,7 @@ void main() {
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
-  final maintenant = DateTime.now();
+  final maintenant = HeureBenin.maintenant();
   final aujourdhui = DateTime(
     maintenant.year,
     maintenant.month,
@@ -794,7 +795,7 @@ void main() {
       expect(e.status, 'en_cours');
       expect(e.syncStatus, SyncStatus.pending);
       // ⚠️ L'instant de la SAISIE, jamais celui de l'envoi.
-      expect(e.updatedAt, saisie);
+      expect(e.updatedAt.toUtc(), HeureBenin.versInstant(saisie));
     });
 
     test('une palpation négative passe le cycle en échec', () async {
@@ -824,7 +825,7 @@ void main() {
       expect(e.nesMorts, 1);
       expect(e.status, 'en_cours');
       expect(e.syncStatus, SyncStatus.pending);
-      expect(e.updatedAt, saisie);
+      expect(e.updatedAt.toUtc(), HeureBenin.versInstant(saisie));
     });
 
     test('une mise bas négative est refusée, comme `min:0`', () async {
@@ -853,7 +854,7 @@ void main() {
       final e = await ligne(id);
       expect(e.status, 'termine');
       expect(e.syncStatus, SyncStatus.pending);
-      expect(e.updatedAt, saisie);
+      expect(e.updatedAt.toUtc(), HeureBenin.versInstant(saisie));
     });
 
     /// ⚠️⚠️ Verrou de sécurité, OUVERT par défaut depuis que le serveur applique les étapes (ticket H7) : fermé, rien

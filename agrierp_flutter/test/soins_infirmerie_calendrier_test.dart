@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/theme/symboles_agri.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
@@ -135,7 +136,7 @@ void main() {
   const especeLapins = 'eeeeeeee-0000-4000-8000-000000000001';
   const especeVolailles = 'eeeeeeee-0000-4000-8000-000000000002';
 
-  final maintenant = DateTime.now();
+  final maintenant = HeureBenin.maintenant();
   final aujourdhui = DateTime(maintenant.year, maintenant.month, maintenant.day);
   DateTime jourDe(int decalage) => DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day + decalage);
 

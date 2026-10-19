@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
 import 'package:agrierp/features/administration/administration_screen.dart';
@@ -115,7 +116,7 @@ void main() {
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
   DateTime jourLocal() {
-    final n = DateTime.now();
+    final n = HeureBenin.maintenant();
     return DateTime(n.year, n.month, n.day);
   }
 

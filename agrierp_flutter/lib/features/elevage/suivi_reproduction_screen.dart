@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -711,7 +712,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       );
     }
 
-    final echu = c.controleEchu(DateTime.now());
+    final echu = c.controleEchu(HeureBenin.maintenant());
     return Text(
       'Prévue ${_date(c.echeanceControle)}',
       overflow: TextOverflow.ellipsis,
@@ -1146,7 +1147,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     _male.clear();
     // `newDeclaration()` : aucune bande choisie, date du jour.
     var bande = '';
-    var date = DateTime.now();
+    var date = HeureBenin.aujourdhui();
     String? erreur;
 
     final declaree = await afficherModale<bool>(
@@ -1233,7 +1234,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                         context: context,
                         initialDate: date,
                         firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
+                        lastDate: HeureBenin.maintenant(),
                       );
                       if (choisie != null) rafraichir(() => date = choisie);
                     },
@@ -1391,7 +1392,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         text: '$libelle : ',
         children: [
           TextSpan(
-            text: _date(origine.add(Duration(days: jours))),
+            text: _date(HeureBenin.plusJours(origine, jours)),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ],
@@ -1447,7 +1448,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             '${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   static String _dateDecalee(DateTime? origine, int jours) =>
-      origine == null ? '—' : _date(origine.add(Duration(days: jours)));
+      origine == null ? '—' : _date(HeureBenin.plusJours(origine, jours));
 }
 
 /// Les variantes `color` de `kpi-card.blade.php` : liseré et icône.

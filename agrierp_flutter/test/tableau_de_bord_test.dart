@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_repository.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -32,7 +33,7 @@ void main() {
   /// un UUID. Les jeux d'essai les fabriquent plutot que de les ecrire.
   String uuid(String graine) => graine.padRight(36, '0');
 
-  final maintenant = DateTime.now();
+  final maintenant = HeureBenin.maintenant();
   DateTime ceMois(int jour, [int heure = 10]) =>
       DateTime(maintenant.year, maintenant.month, jour, heure);
 

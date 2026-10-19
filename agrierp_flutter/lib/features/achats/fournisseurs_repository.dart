@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import 'achats_repository.dart' show AchatsRepository, LigneAchat;
 
 /// Une ligne de « Fiches Fournisseurs » et de « Ajouter Fournisseur ».
@@ -452,7 +453,7 @@ class FournisseursRepository {
   }
 
   Future<DonneesFournisseurs> charger({DateTime? jour}) async {
-    final aujourdhui = jour ?? DateTime.now();
+    final aujourdhui = jour ?? HeureBenin.maintenant();
 
     final fournisseurs = await (database.select(
       database.suppliers,

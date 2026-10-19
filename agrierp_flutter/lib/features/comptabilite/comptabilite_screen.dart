@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
@@ -23,7 +24,7 @@ class ComptabiliteScreen extends StatefulWidget {
   const ComptabiliteScreen({
     super.key,
     required this.depot,
-    this.maintenant = DateTime.now,
+    this.maintenant = HeureBenin.maintenant,
     this.imprimer,
   });
 
@@ -413,7 +414,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           key: const Key('kpi-journal-ecritures'),
           libelle: 'Écritures (mois)',
-          valeur: '${d.ecrituresDuMois(DateTime.now())}',
+          valeur: '${d.ecrituresDuMois(HeureBenin.maintenant())}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.receipt_long,
           couleurIcone: AgriColors.outline,

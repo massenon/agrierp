@@ -4,6 +4,7 @@ import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/theme/symboles_agri.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/stocks/catalogue_produits_screen.dart';
@@ -146,7 +147,8 @@ void main() {
         expect(a.syncStatus, SyncStatus.pending);
         // `Carbon::parse($addDate)` : le jour, à minuit — jamais l'heure de la saisie.
         expect(a.movementDate, DateTime(2026, 10, 3));
-        expect(a.updatedAt, maintenant);
+        // S-T11 : `updatedAt` est l'INSTANT que désigne l'heure murale du Bénin de la saisie.
+        expect(a.updatedAt.toUtc(), HeureBenin.versInstant(maintenant));
 
         final p = await (db.select(
           db.products,

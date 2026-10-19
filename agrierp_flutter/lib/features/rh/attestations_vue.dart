@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/erreurs/message_erreur.dart';
 import '../../core/export/pdf_recu.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'attestations_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -118,7 +119,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
     super.dispose();
   }
 
-  DateTime get _aujourdhui => widget.maintenant ?? DateTime.now();
+  DateTime get _aujourdhui => widget.maintenant ?? HeureBenin.maintenant();
 
   Future<void> _charger() async {
     final personnes = await widget.depot.personnes(_type);

@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_lapins_screen.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
@@ -22,7 +23,7 @@ void main() {
   const bandeId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
   // La bande est mise en lot le jour même du test : le protocole borné à J1
   // est donc dû aujourd'hui, sans dépendre de la date réelle d'exécution.
-  final aujourdHui = DateTime.now();
+  final aujourdHui = HeureBenin.maintenant();
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());

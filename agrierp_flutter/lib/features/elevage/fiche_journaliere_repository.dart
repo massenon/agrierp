@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
+import '../../core/temps/heure_benin.dart';
 import 'effectif_par_categorie.dart';
 
 /// Ticket F0.95 — compte rendu de [FicheJournaliereRepository.recalculerEnCascade].
@@ -853,7 +854,7 @@ class FicheJournaliereRepository {
     String lotId, {
     DateTime? quand,
   }) {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final debut = DateTime(maintenant.year, maintenant.month, 1);
     final finExclue = DateTime(maintenant.year, maintenant.month + 1, 1);
 
@@ -885,7 +886,7 @@ class FicheJournaliereRepository {
     required List<LivestockLot> bandes,
     DateTime? quand,
   }) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final debut = DateTime(maintenant.year, maintenant.month, 1);
     final finExclue = DateTime(maintenant.year, maintenant.month + 1, 1);
 

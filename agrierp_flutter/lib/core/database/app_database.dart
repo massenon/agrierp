@@ -1432,7 +1432,14 @@ class StockAdjustments extends Table with SyncColumns {
   RealColumn get quantity => real()();
   TextColumn get referenceType => text()();
   TextColumn get reason => text().nullable()();
+
+  /// Écart d'inventaire : l'INSTANT du comptage (heure murale du Bénin, S-T11). Ajout manuel : le jour choisi.
   DateTimeColumn get movementDate => dateTime()();
+
+  /// Ticket S-T10 — inventaire : la QUANTITÉ COMPTÉE. Le serveur calcule l'écart contre SON stock à l'instant du
+  /// comptage (`InventaireAuComptageService`) ; `type` + `quantity` (écart contre le stock LOCAL) ne servent plus qu'à
+  /// l'affichage et à un serveur ancien. `null` : ajout manuel, ou inventaire saisi avant S-T10.
+  RealColumn get countedQuantity => real().nullable()();
 }
 
 /// Ticket U9 — LE GRAND LIVRE DES STOCKS du serveur (`stock_movements`), tiré au poste.
@@ -1657,7 +1664,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 45;
+  int get schemaVersion => 46;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2132,6 +2139,11 @@ class AppDatabase extends _$AppDatabase {
         ]) {
           await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
         }
+      }
+
+      // v46 — ticket S-T10 : quantité comptée d'un inventaire (l'écart est calculé par le serveur).
+      if (from < 46) {
+        await _ajouterColonneSiAbsente(m, stockAdjustments, stockAdjustments.countedQuantity);
       }
     },
   );

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/sync_engine.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// État de synchronisation d'une ligne saisie au poste (ticket H9b).
 ///
@@ -144,7 +145,7 @@ class ParametresElevageRepository {
     required this.database,
     DateTime Function()? maintenant,
     Uuid? uuid,
-  }) : _maintenant = maintenant ?? DateTime.now,
+  }) : _maintenant = maintenant ?? HeureBenin.maintenant,
        _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
@@ -422,7 +423,7 @@ class ParametresElevageRepository {
       rationGPerDay: grammes.toDouble(),
       isActive: const Value(true),
       syncStatus: const Value(SyncStatus.pending),
-      updatedAt: Value(_maintenant()),
+      updatedAt: Value(HeureBenin.versInstant(_maintenant())),
     );
     await database
         .into(database.feedRationStandards)
@@ -438,7 +439,7 @@ class ParametresElevageRepository {
         FeedRationStandardsCompanion(
           isActive: const Value(false),
           syncStatus: const Value(SyncStatus.pending),
-          updatedAt: Value(_maintenant()),
+          updatedAt: Value(HeureBenin.versInstant(_maintenant())),
         ),
       );
 
@@ -474,7 +475,7 @@ class ParametresElevageRepository {
       createdAt: Value(existante == null ? maintenant : existante.createdAt),
       isActive: const Value(true),
       syncStatus: const Value(SyncStatus.pending),
-      updatedAt: Value(maintenant),
+      updatedAt: Value(HeureBenin.versInstant(maintenant)),
     );
     await database
         .into(database.prophylaxisScheduleStandards)
@@ -489,7 +490,7 @@ class ParametresElevageRepository {
         ProphylaxisScheduleStandardsCompanion(
           isActive: const Value(false),
           syncStatus: const Value(SyncStatus.pending),
-          updatedAt: Value(_maintenant()),
+          updatedAt: Value(HeureBenin.versInstant(_maintenant())),
         ),
       );
 
@@ -513,7 +514,7 @@ class ParametresElevageRepository {
       pricePerKg: Value(prixKg),
       isActive: const Value(true),
       syncStatus: const Value(SyncStatus.pending),
-      updatedAt: Value(_maintenant()),
+      updatedAt: Value(HeureBenin.versInstant(_maintenant())),
     );
     await database
         .into(database.feedTypes)
@@ -528,7 +529,7 @@ class ParametresElevageRepository {
         FeedTypesCompanion(
           isActive: const Value(false),
           syncStatus: const Value(SyncStatus.pending),
-          updatedAt: Value(_maintenant()),
+          updatedAt: Value(HeureBenin.versInstant(_maintenant())),
         ),
       );
 
@@ -547,7 +548,7 @@ class ParametresElevageRepository {
       parcPrefix: Value(v('parc_prefix')),
       escargotPrefix: Value(v('escargot_prefix')),
       syncStatus: const Value(SyncStatus.pending),
-      updatedAt: Value(_maintenant()),
+      updatedAt: Value(HeureBenin.versInstant(_maintenant())),
     );
     await database
         .into(database.elevageNumberingSettings)
@@ -560,7 +561,7 @@ class ParametresElevageRepository {
       id: const Value('unique'),
       rappelSoinsJours: Value(jours),
       syncStatus: const Value(SyncStatus.pending),
-      updatedAt: Value(_maintenant()),
+      updatedAt: Value(HeureBenin.versInstant(_maintenant())),
     );
     await database
         .into(database.companySettings)

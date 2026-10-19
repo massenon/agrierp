@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
@@ -60,7 +61,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
 
   List<LivestockLot> _bandes = const [];
   LivestockLot? _bande;
-  DateTime _jour = DateTime.now();
+  DateTime _jour = HeureBenin.aujourdhui();
   bool _chargement = true;
 
   int _achat = 0;

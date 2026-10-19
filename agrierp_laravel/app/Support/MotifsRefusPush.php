@@ -80,7 +80,7 @@ class MotifsRefusPush
             'check_out' => 'heure de départ', 'status' => 'statut', 'record_date' => 'date du soin',
             'action_type' => 'type de soin', 'withdrawal_days' => 'jours de retrait',
             'product_id' => 'produit', 'type' => 'type', 'quantity' => 'quantité', 'reference_type' => 'type de référence',
-            'client_ref' => 'référence du poste', 'movement_date' => 'date du mouvement', 'name' => 'nom', 'phone' => 'téléphone', 'email' => 'courriel',
+            'client_ref' => 'référence du poste', 'movement_date' => 'date du mouvement', 'counted_quantity' => 'quantité comptée', 'counted_at' => 'instant du comptage', 'name' => 'nom', 'phone' => 'téléphone', 'email' => 'courriel',
             'subject' => 'objet', 'party' => 'correspondant', 'mail_date' => 'date du courrier',
             'title' => 'titre', 'archived_date' => 'date d\'archivage', 'expiry_date' => 'date d\'expiration',
             'beneficiary' => 'bénéficiaire', 'doc_date' => 'date du document', 'is_active' => 'actif',

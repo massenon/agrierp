@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
@@ -34,7 +35,7 @@ void main() {
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
-  final aujourdhui = DateTime.now();
+  final aujourdhui = HeureBenin.maintenant();
   DateTime jourDe(int decalage) =>
       DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day + decalage);
 

@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import 'effectif_par_categorie.dart';
 import 'fiche_journaliere_repository.dart';
 
@@ -243,7 +244,7 @@ class TransfertsRepository {
     if (quantite < 1) {
       refus('Le nombre de sujets transférés doit être au moins 1.');
     }
-    if (date.isAfter(_minuit(DateTime.now()))) {
+    if (date.isAfter(HeureBenin.aujourdhui())) {
       refus('Un transfert ne peut pas être daté dans le futur.');
     }
     for (final lot in [source, cible]) {

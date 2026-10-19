@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'depenses_repository.dart';
@@ -48,7 +49,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   List<Expense> _depenses = const [];
   double _totalDuMois = 0;
 
-  DateTime _date = DateTime.now();
+  DateTime _date = HeureBenin.aujourdhui();
   final _libelle = TextEditingController();
   String? _categorie;
   final _montant = TextEditingController();
@@ -74,7 +75,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     final categories = await widget.depot.categories();
     final comptes = await widget.depot.comptesTresorerie();
     final depenses = await widget.depot.mesDepenses();
-    final total = await widget.depot.totalDuMois(DateTime.now());
+    final total = await widget.depot.totalDuMois(HeureBenin.maintenant());
 
     if (!mounted) return;
 
@@ -364,7 +365,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
               context: context,
               initialDate: _date,
               firstDate: DateTime(_date.year - 2),
-              lastDate: DateTime.now(),
+              lastDate: HeureBenin.maintenant(),
             );
             if (choisie != null) setState(() => _date = choisie);
           },

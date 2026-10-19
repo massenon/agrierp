@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_repository.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -378,21 +379,22 @@ void main() {
       ),
     );
 
-    // Journal d'audit : deux actions du 19/10, une de la veille (exclue).
+    // Journal d'audit : deux actions du 19/10, une de la veille (exclue). `created_at` est un INSTANT (S-T11) : les
+    // heures du Bénin sont converties, et l'écran les rend à l'heure du Bénin.
     await db.into(db.auditLogs).insert(
       AuditLogsCompanion.insert(
         id: uuid('a1'),
         action: 'sale.created',
         userName: const Value('KPOSSOU Éléonore'),
         module: const Value('ventes'),
-        createdAt: Value(DateTime(2026, 10, 19, 9, 12)),
+        createdAt: Value(HeureBenin.versInstant(DateTime(2026, 10, 19, 9, 12))),
       ),
     );
     await db.into(db.auditLogs).insert(
-      AuditLogsCompanion.insert(id: uuid('a2'), action: 'login', createdAt: Value(DateTime(2026, 10, 19, 8))),
+      AuditLogsCompanion.insert(id: uuid('a2'), action: 'login', createdAt: Value(HeureBenin.versInstant(DateTime(2026, 10, 19, 8)))),
     );
     await db.into(db.auditLogs).insert(
-      AuditLogsCompanion.insert(id: uuid('a3'), action: 'logout', createdAt: Value(DateTime(2026, 10, 18, 18))),
+      AuditLogsCompanion.insert(id: uuid('a3'), action: 'logout', createdAt: Value(HeureBenin.versInstant(DateTime(2026, 10, 18, 18)))),
     );
   }
 

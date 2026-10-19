@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -612,7 +613,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               onPressed: () async {
                 await widget.depot.pointer(
                   employeId: employeId,
-                  jour: DateTime.now(),
+                  jour: HeureBenin.maintenant(),
                   statut: statut,
                   arrivee: arrivee.text.trim().isEmpty
                       ? null

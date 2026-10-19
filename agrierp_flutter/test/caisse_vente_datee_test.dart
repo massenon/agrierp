@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:agrierp/features/ventes/caisse_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -323,8 +324,9 @@ void main() {
 
         expect(vente.soldAt, DateTime(2026, 10, 11, 10, 15, 30));
         expect(
-          vente.updatedAt,
-          DateTime(2026, 10, 14, 10, 15, 30),
+          vente.updatedAt.toUtc(),
+          // S-T11 : l'horloge de la caisse est l'heure murale du Bénin ; `updatedAt` est l'INSTANT qu'elle désigne.
+          HeureBenin.versInstant(DateTime(2026, 10, 14, 10, 15, 30)),
           reason: 'updated_at = instant de la SAISIE, jamais antidaté',
         );
         expect(vente.syncStatus, SyncStatus.pending);
@@ -349,7 +351,7 @@ void main() {
 
         for (final v in [sansDate, aujourdhui]) {
           expect(v.soldAt, maintenant);
-          expect(v.updatedAt, maintenant);
+          expect(v.updatedAt.toUtc(), HeureBenin.versInstant(maintenant));
         }
 
         final fiche = await db.select(db.livestockDailyEntries).getSingle();
@@ -611,7 +613,7 @@ void main() {
         // horodatage (la vente l'inscrit elle-même au serveur ; renvoyée, elle porterait des morts périmés).
         expect(duJour.syncStatus, SyncStatus.synced);
         expect(
-          duJour.updatedAt.isBefore(maintenant),
+          duJour.updatedAt.isBefore(HeureBenin.versInstant(maintenant)),
           isTrue,
           reason: 'une fiche qui ne repart pas garde l\'horodatage de la saisie qui l\'a produite',
         );
@@ -707,7 +709,7 @@ void main() {
         );
         expect(
           envoyee['updated_at'],
-          DateTime(2026, 10, 14, 10, 15, 30).toUtc().toIso8601String(),
+          HeureBenin.versInstant(DateTime(2026, 10, 14, 10, 15, 30)).toIso8601String(),
         );
 
         final relue = await (db.select(
@@ -1177,7 +1179,7 @@ void main() {
 
         final vente = await db.select(db.sales).getSingle();
         expect(vente.soldAt, DateTime(2026, 10, 11, 10, 15, 30));
-        expect(vente.updatedAt, maintenant);
+        expect(vente.updatedAt.toUtc(), HeureBenin.versInstant(maintenant));
 
         await tester.tap(find.byKey(const Key('bouton-nouvelle-vente')));
         await tester.pumpAndSettle();
@@ -1236,7 +1238,7 @@ void main() {
 
         final vente = await db.select(db.sales).getSingle();
         expect(vente.soldAt, maintenant);
-        expect(vente.updatedAt, maintenant);
+        expect(vente.updatedAt.toUtc(), HeureBenin.versInstant(maintenant));
         expect(find.textContaining('Vente antérieure'), findsNothing);
       },
     );
