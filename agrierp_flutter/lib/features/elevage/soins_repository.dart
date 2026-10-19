@@ -82,9 +82,16 @@ class SoinsRepository {
   ///
   /// ⚠️ Jamais de traitement codé en dur : le protocole est éditable depuis
   /// l'écran Paramètres > Élevage, et le figer proposerait un soin périmé.
+  ///
+  /// ⚠️ Ticket H9b — une échéance ARCHIVÉE (au poste ou ailleurs) ne se propose plus.
   Future<List<ProphylaxisScheduleStandard>> protocole(String codeEspece) {
     return (_db.select(_db.prophylaxisScheduleStandards)
-          ..where((t) => t.speciesCode.equals(codeEspece))
+          ..where(
+            (t) => Expression.and([
+              t.speciesCode.equals(codeEspece),
+              t.isActive.equals(true),
+            ]),
+          )
           ..orderBy([(t) => OrderingTerm(expression: t.periodLabel)]))
         .get();
   }

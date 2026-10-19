@@ -180,8 +180,10 @@ class BilanTechnicoEconomiqueRepository {
     )..where((f) => f.lotId.equals(lotId))).get();
     final provendeKg = fiches.fold<double>(0, (t, f) => t + (f.feedQtyKg ?? 0));
 
+    // ⚠️ Ticket H9b — types ACTIFS seulement, comme avant H9b (le tirage effaçait alors les archivés) : un
+    // type archivé au poste reste en base pour son libellé, il ne pèse pas sur le prix moyen.
     final prix = (await database.select(database.feedTypes).get())
-        .where((p) => p.speciesId == lot.speciesId)
+        .where((p) => p.isActive && p.speciesId == lot.speciesId)
         .map((p) => p.pricePerKg)
         .whereType<double>()
         .toList();

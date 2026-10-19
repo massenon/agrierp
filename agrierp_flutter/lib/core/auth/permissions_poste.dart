@@ -358,4 +358,34 @@ class PermissionsPoste {
   /// Écrans réellement accessibles, dans l'ordre de la barre latérale.
   static List<EcranPoste> ecransDe(String role) =>
       EcranPoste.values.where((e) => autorise(role, e)).toList();
+
+  /// Ticket H9b — PERMISSIONS DU WEB par rôle, transposées de `RolesAndPermissionsSeeder` (Laravel) : l'administrateur
+  /// a tout (`Permission::all()`), les trois autres rôles leur liste. Un test relit le seeder et compare : une
+  /// permission ajoutée côté web sans l'être ici le fait échouer.
+  ///
+  /// ⚠️ Ce n'est pas l'accès aux ÉCRANS ([carte], la maquette) : c'est le droit d'ÉCRIRE, celui que le serveur
+  /// vérifie à l'envoi (`$user->can(...)`). Un bouton montré à un rôle sans ce droit produirait une saisie
+  /// refusée à la synchronisation.
+  static const Map<String, Set<String>> permissionsDuRole = {
+    'comptable': {
+      'view-comptabilite',
+      'manage-comptabilite',
+      'close-fiscal-year',
+      'view-rapports',
+      'export-rapports',
+    },
+    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes'},
+    'animalier': {
+      'view-elevage',
+      'manage-elevage',
+      'archive-elevage',
+      'export-elevage',
+    },
+  };
+
+  /// `$user->can($permission)` du web, pour le rôle de la session du poste. Rôle inconnu : aucun droit
+  /// d'écriture (le serveur refuserait de toute façon).
+  static bool peut(String role, String permission) =>
+      role == 'admin' ||
+      (permissionsDuRole[role]?.contains(permission) ?? false);
 }

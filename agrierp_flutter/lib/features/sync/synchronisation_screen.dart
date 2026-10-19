@@ -383,6 +383,12 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'mails' => 'Courrier',
     'archived_documents' => 'Document archivé',
     'administrative_documents' => 'Document administratif',
+    // Ticket H9b — Paramètres Élevage modifiés au poste.
+    'feed_ration_standards' => 'Ration (Paramètres Élevage)',
+    'prophylaxis_schedule_standards' => 'Échéance de prophylaxie',
+    'feed_types' => 'Type de provende',
+    'elevage_numbering' => 'Numérotation des bandes et sujets',
+    'company_settings' => 'Rappel des soins planifiés',
     _ => table,
   };
 

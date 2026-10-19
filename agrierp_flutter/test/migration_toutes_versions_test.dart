@@ -160,6 +160,28 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket H2 — instant de la dernière synchronisation aboutie.
   40: [(d.syncState, d.syncState.lastSucceededAt)],
+  // Ticket H9b (D-H9) — Paramètres Élevage modifiables au poste : archivage logique, statut d'envoi, instant
+  // de saisie ; délai du rappel des soins ; instant de création de la prophylaxie (tri du web, H9).
+  42: [
+    (d.feedRationStandards, d.feedRationStandards.isActive),
+    (d.feedRationStandards, d.feedRationStandards.syncStatus),
+    (d.feedRationStandards, d.feedRationStandards.updatedAt),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.isActive),
+    (
+      d.prophylaxisScheduleStandards,
+      d.prophylaxisScheduleStandards.syncStatus,
+    ),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.updatedAt),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.createdAt),
+    (d.feedTypes, d.feedTypes.isActive),
+    (d.feedTypes, d.feedTypes.syncStatus),
+    (d.feedTypes, d.feedTypes.updatedAt),
+    (d.elevageNumberingSettings, d.elevageNumberingSettings.syncStatus),
+    (d.elevageNumberingSettings, d.elevageNumberingSettings.updatedAt),
+    (d.companySettings, d.companySettings.rappelSoinsJours),
+    (d.companySettings, d.companySettings.syncStatus),
+    (d.companySettings, d.companySettings.updatedAt),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

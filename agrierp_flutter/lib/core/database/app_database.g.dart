@@ -2106,6 +2106,44 @@ class $FeedRationStandardsTable extends FeedRationStandards
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $FeedRationStandardsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>(
+        $FeedRationStandardsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -2154,6 +2192,9 @@ class $FeedRationStandardsTable extends FeedRationStandards
   );
   @override
   List<GeneratedColumn> get $columns => [
+    isActive,
+    syncStatus,
+    updatedAt,
     id,
     speciesCode,
     stageLabel,
@@ -2171,6 +2212,18 @@ class $FeedRationStandardsTable extends FeedRationStandards
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -2215,6 +2268,20 @@ class $FeedRationStandardsTable extends FeedRationStandards
   FeedRationStandard map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return FeedRationStandard(
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      syncStatus: $FeedRationStandardsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -2238,15 +2305,30 @@ class $FeedRationStandardsTable extends FeedRationStandards
   $FeedRationStandardsTable createAlias(String alias) {
     return $FeedRationStandardsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class FeedRationStandard extends DataClass
     implements Insertable<FeedRationStandard> {
+  final bool isActive;
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  final SyncStatus syncStatus;
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  final DateTime? updatedAt;
   final String id;
   final String speciesCode;
   final String stageLabel;
   final double rationGPerDay;
   const FeedRationStandard({
+    required this.isActive,
+    required this.syncStatus,
+    this.updatedAt,
     required this.id,
     required this.speciesCode,
     required this.stageLabel,
@@ -2255,6 +2337,15 @@ class FeedRationStandard extends DataClass
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['is_active'] = Variable<bool>(isActive);
+    {
+      map['sync_status'] = Variable<String>(
+        $FeedRationStandardsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     map['id'] = Variable<String>(id);
     map['species_code'] = Variable<String>(speciesCode);
     map['stage_label'] = Variable<String>(stageLabel);
@@ -2264,6 +2355,11 @@ class FeedRationStandard extends DataClass
 
   FeedRationStandardsCompanion toCompanion(bool nullToAbsent) {
     return FeedRationStandardsCompanion(
+      isActive: Value(isActive),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
       id: Value(id),
       speciesCode: Value(speciesCode),
       stageLabel: Value(stageLabel),
@@ -2277,6 +2373,11 @@ class FeedRationStandard extends DataClass
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return FeedRationStandard(
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      syncStatus: $FeedRationStandardsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       id: serializer.fromJson<String>(json['id']),
       speciesCode: serializer.fromJson<String>(json['speciesCode']),
       stageLabel: serializer.fromJson<String>(json['stageLabel']),
@@ -2287,6 +2388,11 @@ class FeedRationStandard extends DataClass
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'isActive': serializer.toJson<bool>(isActive),
+      'syncStatus': serializer.toJson<String>(
+        $FeedRationStandardsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'id': serializer.toJson<String>(id),
       'speciesCode': serializer.toJson<String>(speciesCode),
       'stageLabel': serializer.toJson<String>(stageLabel),
@@ -2295,11 +2401,17 @@ class FeedRationStandard extends DataClass
   }
 
   FeedRationStandard copyWith({
+    bool? isActive,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
     String? id,
     String? speciesCode,
     String? stageLabel,
     double? rationGPerDay,
   }) => FeedRationStandard(
+    isActive: isActive ?? this.isActive,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     id: id ?? this.id,
     speciesCode: speciesCode ?? this.speciesCode,
     stageLabel: stageLabel ?? this.stageLabel,
@@ -2307,6 +2419,11 @@ class FeedRationStandard extends DataClass
   );
   FeedRationStandard copyWithCompanion(FeedRationStandardsCompanion data) {
     return FeedRationStandard(
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       id: data.id.present ? data.id.value : this.id,
       speciesCode: data.speciesCode.present
           ? data.speciesCode.value
@@ -2323,6 +2440,9 @@ class FeedRationStandard extends DataClass
   @override
   String toString() {
     return (StringBuffer('FeedRationStandard(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
           ..write('stageLabel: $stageLabel, ')
@@ -2332,11 +2452,22 @@ class FeedRationStandard extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, speciesCode, stageLabel, rationGPerDay);
+  int get hashCode => Object.hash(
+    isActive,
+    syncStatus,
+    updatedAt,
+    id,
+    speciesCode,
+    stageLabel,
+    rationGPerDay,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FeedRationStandard &&
+          other.isActive == this.isActive &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.id == this.id &&
           other.speciesCode == this.speciesCode &&
           other.stageLabel == this.stageLabel &&
@@ -2344,12 +2475,18 @@ class FeedRationStandard extends DataClass
 }
 
 class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
+  final Value<bool> isActive;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<String> id;
   final Value<String> speciesCode;
   final Value<String> stageLabel;
   final Value<double> rationGPerDay;
   final Value<int> rowid;
   const FeedRationStandardsCompanion({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.id = const Value.absent(),
     this.speciesCode = const Value.absent(),
     this.stageLabel = const Value.absent(),
@@ -2357,6 +2494,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
     this.rowid = const Value.absent(),
   });
   FeedRationStandardsCompanion.insert({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     required String id,
     required String speciesCode,
     required String stageLabel,
@@ -2367,6 +2507,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
        stageLabel = Value(stageLabel),
        rationGPerDay = Value(rationGPerDay);
   static Insertable<FeedRationStandard> custom({
+    Expression<bool>? isActive,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? id,
     Expression<String>? speciesCode,
     Expression<String>? stageLabel,
@@ -2374,6 +2517,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (isActive != null) 'is_active': isActive,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (id != null) 'id': id,
       if (speciesCode != null) 'species_code': speciesCode,
       if (stageLabel != null) 'stage_label': stageLabel,
@@ -2383,6 +2529,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
   }
 
   FeedRationStandardsCompanion copyWith({
+    Value<bool>? isActive,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<String>? id,
     Value<String>? speciesCode,
     Value<String>? stageLabel,
@@ -2390,6 +2539,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
     Value<int>? rowid,
   }) {
     return FeedRationStandardsCompanion(
+      isActive: isActive ?? this.isActive,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       id: id ?? this.id,
       speciesCode: speciesCode ?? this.speciesCode,
       stageLabel: stageLabel ?? this.stageLabel,
@@ -2401,6 +2553,17 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $FeedRationStandardsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -2422,6 +2585,9 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
   @override
   String toString() {
     return (StringBuffer('FeedRationStandardsCompanion(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
           ..write('stageLabel: $stageLabel, ')
@@ -5854,6 +6020,42 @@ class $FeedTypesTable extends FeedTypes
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $FeedTypesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($FeedTypesTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -5933,6 +6135,9 @@ class $FeedTypesTable extends FeedTypes
   );
   @override
   List<GeneratedColumn> get $columns => [
+    isActive,
+    syncStatus,
+    updatedAt,
     id,
     name,
     speciesId,
@@ -5953,6 +6158,18 @@ class $FeedTypesTable extends FeedTypes
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -6017,6 +6234,20 @@ class $FeedTypesTable extends FeedTypes
   FeedType map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return FeedType(
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      syncStatus: $FeedTypesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -6052,9 +6283,21 @@ class $FeedTypesTable extends FeedTypes
   $FeedTypesTable createAlias(String alias) {
     return $FeedTypesTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class FeedType extends DataClass implements Insertable<FeedType> {
+  final bool isActive;
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  final SyncStatus syncStatus;
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  final DateTime? updatedAt;
   final String id;
   final String name;
   final String? speciesId;
@@ -6063,6 +6306,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   final double? standardBagWeightKg;
   final double? pricePerKg;
   const FeedType({
+    required this.isActive,
+    required this.syncStatus,
+    this.updatedAt,
     required this.id,
     required this.name,
     this.speciesId,
@@ -6074,6 +6320,15 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['is_active'] = Variable<bool>(isActive);
+    {
+      map['sync_status'] = Variable<String>(
+        $FeedTypesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || speciesId != null) {
@@ -6096,6 +6351,11 @@ class FeedType extends DataClass implements Insertable<FeedType> {
 
   FeedTypesCompanion toCompanion(bool nullToAbsent) {
     return FeedTypesCompanion(
+      isActive: Value(isActive),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
       id: Value(id),
       name: Value(name),
       speciesId: speciesId == null && nullToAbsent
@@ -6122,6 +6382,11 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return FeedType(
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      syncStatus: $FeedTypesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       speciesId: serializer.fromJson<String?>(json['speciesId']),
@@ -6137,6 +6402,11 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'isActive': serializer.toJson<bool>(isActive),
+      'syncStatus': serializer.toJson<String>(
+        $FeedTypesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'speciesId': serializer.toJson<String?>(speciesId),
@@ -6148,6 +6418,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   }
 
   FeedType copyWith({
+    bool? isActive,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
     String? id,
     String? name,
     Value<String?> speciesId = const Value.absent(),
@@ -6156,6 +6429,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
     Value<double?> standardBagWeightKg = const Value.absent(),
     Value<double?> pricePerKg = const Value.absent(),
   }) => FeedType(
+    isActive: isActive ?? this.isActive,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     id: id ?? this.id,
     name: name ?? this.name,
     speciesId: speciesId.present ? speciesId.value : this.speciesId,
@@ -6168,6 +6444,11 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   );
   FeedType copyWithCompanion(FeedTypesCompanion data) {
     return FeedType(
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       speciesId: data.speciesId.present ? data.speciesId.value : this.speciesId,
@@ -6189,6 +6470,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   @override
   String toString() {
     return (StringBuffer('FeedType(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('speciesId: $speciesId, ')
@@ -6202,6 +6486,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
 
   @override
   int get hashCode => Object.hash(
+    isActive,
+    syncStatus,
+    updatedAt,
     id,
     name,
     speciesId,
@@ -6214,6 +6501,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FeedType &&
+          other.isActive == this.isActive &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.id == this.id &&
           other.name == this.name &&
           other.speciesId == this.speciesId &&
@@ -6224,6 +6514,9 @@ class FeedType extends DataClass implements Insertable<FeedType> {
 }
 
 class FeedTypesCompanion extends UpdateCompanion<FeedType> {
+  final Value<bool> isActive;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<String> id;
   final Value<String> name;
   final Value<String?> speciesId;
@@ -6233,6 +6526,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
   final Value<double?> pricePerKg;
   final Value<int> rowid;
   const FeedTypesCompanion({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.speciesId = const Value.absent(),
@@ -6243,6 +6539,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
     this.rowid = const Value.absent(),
   });
   FeedTypesCompanion.insert({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     required String id,
     required String name,
     this.speciesId = const Value.absent(),
@@ -6254,6 +6553,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
   }) : id = Value(id),
        name = Value(name);
   static Insertable<FeedType> custom({
+    Expression<bool>? isActive,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? speciesId,
@@ -6264,6 +6566,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (isActive != null) 'is_active': isActive,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (speciesId != null) 'species_id': speciesId,
@@ -6277,6 +6582,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
   }
 
   FeedTypesCompanion copyWith({
+    Value<bool>? isActive,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<String>? id,
     Value<String>? name,
     Value<String?>? speciesId,
@@ -6287,6 +6595,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
     Value<int>? rowid,
   }) {
     return FeedTypesCompanion(
+      isActive: isActive ?? this.isActive,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       id: id ?? this.id,
       name: name ?? this.name,
       speciesId: speciesId ?? this.speciesId,
@@ -6301,6 +6612,17 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $FeedTypesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -6333,6 +6655,9 @@ class FeedTypesCompanion extends UpdateCompanion<FeedType> {
   @override
   String toString() {
     return (StringBuffer('FeedTypesCompanion(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('speciesId: $speciesId, ')
@@ -6361,6 +6686,29 @@ class $ElevageNumberingSettingsTable extends ElevageNumberingSettings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultValue: const Constant('unique'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>(
+        $ElevageNumberingSettingsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _bandeFormatMeta = const VerificationMeta(
     'bandeFormat',
@@ -6464,6 +6812,8 @@ class $ElevageNumberingSettingsTable extends ElevageNumberingSettings
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    syncStatus,
+    updatedAt,
     bandeFormat,
     lapinePrefix,
     malePrefix,
@@ -6488,6 +6838,12 @@ class $ElevageNumberingSettingsTable extends ElevageNumberingSettings
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
     }
     if (data.containsKey('bande_format')) {
       context.handle(
@@ -6580,6 +6936,16 @@ class $ElevageNumberingSettingsTable extends ElevageNumberingSettings
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      syncStatus: $ElevageNumberingSettingsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
       bandeFormat: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}bande_format'],
@@ -6623,11 +6989,22 @@ class $ElevageNumberingSettingsTable extends ElevageNumberingSettings
   $ElevageNumberingSettingsTable createAlias(String alias) {
     return $ElevageNumberingSettingsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class ElevageNumberingSetting extends DataClass
     implements Insertable<ElevageNumberingSetting> {
   final String id;
+
+  /// Ticket H9b — `pending` tant que l'enregistrement du poste n'est pas acquitté ; `conflict` s'il est
+  /// refusé (motif dans `sync_conflicts`). Défaut `synced` : ce qui descend du serveur l'est.
+  final SyncStatus syncStatus;
+
+  /// Ticket H9b — instant de la SAISIE au poste (nul pour une ligne tirée) : seule la version partie est
+  /// acquittée.
+  final DateTime? updatedAt;
   final String? bandeFormat;
   final String? lapinePrefix;
   final String? malePrefix;
@@ -6639,6 +7016,8 @@ class ElevageNumberingSetting extends DataClass
   final String? escargotPrefix;
   const ElevageNumberingSetting({
     required this.id,
+    required this.syncStatus,
+    this.updatedAt,
     this.bandeFormat,
     this.lapinePrefix,
     this.malePrefix,
@@ -6653,6 +7032,14 @@ class ElevageNumberingSetting extends DataClass
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    {
+      map['sync_status'] = Variable<String>(
+        $ElevageNumberingSettingsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     if (!nullToAbsent || bandeFormat != null) {
       map['bande_format'] = Variable<String>(bandeFormat);
     }
@@ -6686,6 +7073,10 @@ class ElevageNumberingSetting extends DataClass
   ElevageNumberingSettingsCompanion toCompanion(bool nullToAbsent) {
     return ElevageNumberingSettingsCompanion(
       id: Value(id),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
       bandeFormat: bandeFormat == null && nullToAbsent
           ? const Value.absent()
           : Value(bandeFormat),
@@ -6723,6 +7114,10 @@ class ElevageNumberingSetting extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ElevageNumberingSetting(
       id: serializer.fromJson<String>(json['id']),
+      syncStatus: $ElevageNumberingSettingsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       bandeFormat: serializer.fromJson<String?>(json['bandeFormat']),
       lapinePrefix: serializer.fromJson<String?>(json['lapinePrefix']),
       malePrefix: serializer.fromJson<String?>(json['malePrefix']),
@@ -6739,6 +7134,10 @@ class ElevageNumberingSetting extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'syncStatus': serializer.toJson<String>(
+        $ElevageNumberingSettingsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'bandeFormat': serializer.toJson<String?>(bandeFormat),
       'lapinePrefix': serializer.toJson<String?>(lapinePrefix),
       'malePrefix': serializer.toJson<String?>(malePrefix),
@@ -6753,6 +7152,8 @@ class ElevageNumberingSetting extends DataClass
 
   ElevageNumberingSetting copyWith({
     String? id,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
     Value<String?> bandeFormat = const Value.absent(),
     Value<String?> lapinePrefix = const Value.absent(),
     Value<String?> malePrefix = const Value.absent(),
@@ -6764,6 +7165,8 @@ class ElevageNumberingSetting extends DataClass
     Value<String?> escargotPrefix = const Value.absent(),
   }) => ElevageNumberingSetting(
     id: id ?? this.id,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     bandeFormat: bandeFormat.present ? bandeFormat.value : this.bandeFormat,
     lapinePrefix: lapinePrefix.present ? lapinePrefix.value : this.lapinePrefix,
     malePrefix: malePrefix.present ? malePrefix.value : this.malePrefix,
@@ -6783,6 +7186,10 @@ class ElevageNumberingSetting extends DataClass
   ) {
     return ElevageNumberingSetting(
       id: data.id.present ? data.id.value : this.id,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       bandeFormat: data.bandeFormat.present
           ? data.bandeFormat.value
           : this.bandeFormat,
@@ -6817,6 +7224,8 @@ class ElevageNumberingSetting extends DataClass
   String toString() {
     return (StringBuffer('ElevageNumberingSetting(')
           ..write('id: $id, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('bandeFormat: $bandeFormat, ')
           ..write('lapinePrefix: $lapinePrefix, ')
           ..write('malePrefix: $malePrefix, ')
@@ -6833,6 +7242,8 @@ class ElevageNumberingSetting extends DataClass
   @override
   int get hashCode => Object.hash(
     id,
+    syncStatus,
+    updatedAt,
     bandeFormat,
     lapinePrefix,
     malePrefix,
@@ -6848,6 +7259,8 @@ class ElevageNumberingSetting extends DataClass
       identical(this, other) ||
       (other is ElevageNumberingSetting &&
           other.id == this.id &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.bandeFormat == this.bandeFormat &&
           other.lapinePrefix == this.lapinePrefix &&
           other.malePrefix == this.malePrefix &&
@@ -6862,6 +7275,8 @@ class ElevageNumberingSetting extends DataClass
 class ElevageNumberingSettingsCompanion
     extends UpdateCompanion<ElevageNumberingSetting> {
   final Value<String> id;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<String?> bandeFormat;
   final Value<String?> lapinePrefix;
   final Value<String?> malePrefix;
@@ -6874,6 +7289,8 @@ class ElevageNumberingSettingsCompanion
   final Value<int> rowid;
   const ElevageNumberingSettingsCompanion({
     this.id = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.bandeFormat = const Value.absent(),
     this.lapinePrefix = const Value.absent(),
     this.malePrefix = const Value.absent(),
@@ -6887,6 +7304,8 @@ class ElevageNumberingSettingsCompanion
   });
   ElevageNumberingSettingsCompanion.insert({
     this.id = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.bandeFormat = const Value.absent(),
     this.lapinePrefix = const Value.absent(),
     this.malePrefix = const Value.absent(),
@@ -6900,6 +7319,8 @@ class ElevageNumberingSettingsCompanion
   });
   static Insertable<ElevageNumberingSetting> custom({
     Expression<String>? id,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? bandeFormat,
     Expression<String>? lapinePrefix,
     Expression<String>? malePrefix,
@@ -6913,6 +7334,8 @@ class ElevageNumberingSettingsCompanion
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (bandeFormat != null) 'bande_format': bandeFormat,
       if (lapinePrefix != null) 'lapine_prefix': lapinePrefix,
       if (malePrefix != null) 'male_prefix': malePrefix,
@@ -6928,6 +7351,8 @@ class ElevageNumberingSettingsCompanion
 
   ElevageNumberingSettingsCompanion copyWith({
     Value<String>? id,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<String?>? bandeFormat,
     Value<String?>? lapinePrefix,
     Value<String?>? malePrefix,
@@ -6941,6 +7366,8 @@ class ElevageNumberingSettingsCompanion
   }) {
     return ElevageNumberingSettingsCompanion(
       id: id ?? this.id,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       bandeFormat: bandeFormat ?? this.bandeFormat,
       lapinePrefix: lapinePrefix ?? this.lapinePrefix,
       malePrefix: malePrefix ?? this.malePrefix,
@@ -6959,6 +7386,16 @@ class ElevageNumberingSettingsCompanion
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $ElevageNumberingSettingsTable.$convertersyncStatus.toSql(
+          syncStatus.value,
+        ),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (bandeFormat.present) {
       map['bande_format'] = Variable<String>(bandeFormat.value);
@@ -6997,6 +7434,8 @@ class ElevageNumberingSettingsCompanion
   String toString() {
     return (StringBuffer('ElevageNumberingSettingsCompanion(')
           ..write('id: $id, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('bandeFormat: $bandeFormat, ')
           ..write('lapinePrefix: $lapinePrefix, ')
           ..write('malePrefix: $malePrefix, ')
@@ -13608,6 +14047,38 @@ class $CompanySettingsTable extends CompanySettings
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _rappelSoinsJoursMeta = const VerificationMeta(
+    'rappelSoinsJours',
+  );
+  @override
+  late final GeneratedColumn<int> rappelSoinsJours = GeneratedColumn<int>(
+    'rappel_soins_jours',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($CompanySettingsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -13620,6 +14091,9 @@ class $CompanySettingsTable extends CompanySettings
     rccm,
     tvaEnabled,
     tvaDefaultRate,
+    rappelSoinsJours,
+    syncStatus,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -13699,6 +14173,21 @@ class $CompanySettingsTable extends CompanySettings
         ),
       );
     }
+    if (data.containsKey('rappel_soins_jours')) {
+      context.handle(
+        _rappelSoinsJoursMeta,
+        rappelSoinsJours.isAcceptableOrUnknown(
+          data['rappel_soins_jours']!,
+          _rappelSoinsJoursMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -13748,6 +14237,20 @@ class $CompanySettingsTable extends CompanySettings
         DriftSqlType.double,
         data['${effectivePrefix}tva_default_rate'],
       ),
+      rappelSoinsJours: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rappel_soins_jours'],
+      ),
+      syncStatus: $CompanySettingsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
     );
   }
 
@@ -13755,6 +14258,9 @@ class $CompanySettingsTable extends CompanySettings
   $CompanySettingsTable createAlias(String alias) {
     return $CompanySettingsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class CompanySetting extends DataClass implements Insertable<CompanySetting> {
@@ -13768,6 +14274,18 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
   final String? rccm;
   final bool tvaEnabled;
   final double? tvaDefaultRate;
+
+  /// Ticket H9b (D-H9) — délai du rappel des soins planifiés (règle R-SOINS-01), en jours (0 à 30), servi
+  /// au tirage et réglé au poste comme au web (`ParametresElevage::saveRappelSoins()`). Nul tant que rien
+  /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
+  final int? rappelSoinsJours;
+
+  /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
+  /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
+  final SyncStatus syncStatus;
+
+  /// Ticket H9b — instant de la saisie du délai au poste (nul pour une ligne tirée).
+  final DateTime? updatedAt;
   const CompanySetting({
     required this.id,
     this.companyName,
@@ -13779,6 +14297,9 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     this.rccm,
     required this.tvaEnabled,
     this.tvaDefaultRate,
+    this.rappelSoinsJours,
+    required this.syncStatus,
+    this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -13809,6 +14330,17 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     if (!nullToAbsent || tvaDefaultRate != null) {
       map['tva_default_rate'] = Variable<double>(tvaDefaultRate);
     }
+    if (!nullToAbsent || rappelSoinsJours != null) {
+      map['rappel_soins_jours'] = Variable<int>(rappelSoinsJours);
+    }
+    {
+      map['sync_status'] = Variable<String>(
+        $CompanySettingsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     return map;
   }
 
@@ -13836,6 +14368,13 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       tvaDefaultRate: tvaDefaultRate == null && nullToAbsent
           ? const Value.absent()
           : Value(tvaDefaultRate),
+      rappelSoinsJours: rappelSoinsJours == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rappelSoinsJours),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
     );
   }
 
@@ -13855,6 +14394,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       rccm: serializer.fromJson<String?>(json['rccm']),
       tvaEnabled: serializer.fromJson<bool>(json['tvaEnabled']),
       tvaDefaultRate: serializer.fromJson<double?>(json['tvaDefaultRate']),
+      rappelSoinsJours: serializer.fromJson<int?>(json['rappelSoinsJours']),
+      syncStatus: $CompanySettingsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
     );
   }
   @override
@@ -13871,6 +14415,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       'rccm': serializer.toJson<String?>(rccm),
       'tvaEnabled': serializer.toJson<bool>(tvaEnabled),
       'tvaDefaultRate': serializer.toJson<double?>(tvaDefaultRate),
+      'rappelSoinsJours': serializer.toJson<int?>(rappelSoinsJours),
+      'syncStatus': serializer.toJson<String>(
+        $CompanySettingsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
     };
   }
 
@@ -13885,6 +14434,9 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     Value<String?> rccm = const Value.absent(),
     bool? tvaEnabled,
     Value<double?> tvaDefaultRate = const Value.absent(),
+    Value<int?> rappelSoinsJours = const Value.absent(),
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
   }) => CompanySetting(
     id: id ?? this.id,
     companyName: companyName.present ? companyName.value : this.companyName,
@@ -13898,6 +14450,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     tvaDefaultRate: tvaDefaultRate.present
         ? tvaDefaultRate.value
         : this.tvaDefaultRate,
+    rappelSoinsJours: rappelSoinsJours.present
+        ? rappelSoinsJours.value
+        : this.rappelSoinsJours,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
   CompanySetting copyWithCompanion(CompanySettingsCompanion data) {
     return CompanySetting(
@@ -13919,6 +14476,13 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       tvaDefaultRate: data.tvaDefaultRate.present
           ? data.tvaDefaultRate.value
           : this.tvaDefaultRate,
+      rappelSoinsJours: data.rappelSoinsJours.present
+          ? data.rappelSoinsJours.value
+          : this.rappelSoinsJours,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -13934,7 +14498,10 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
           ..write('ifu: $ifu, ')
           ..write('rccm: $rccm, ')
           ..write('tvaEnabled: $tvaEnabled, ')
-          ..write('tvaDefaultRate: $tvaDefaultRate')
+          ..write('tvaDefaultRate: $tvaDefaultRate, ')
+          ..write('rappelSoinsJours: $rappelSoinsJours, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -13951,6 +14518,9 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     rccm,
     tvaEnabled,
     tvaDefaultRate,
+    rappelSoinsJours,
+    syncStatus,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -13965,7 +14535,10 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
           other.ifu == this.ifu &&
           other.rccm == this.rccm &&
           other.tvaEnabled == this.tvaEnabled &&
-          other.tvaDefaultRate == this.tvaDefaultRate);
+          other.tvaDefaultRate == this.tvaDefaultRate &&
+          other.rappelSoinsJours == this.rappelSoinsJours &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt);
 }
 
 class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
@@ -13979,6 +14552,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
   final Value<String?> rccm;
   final Value<bool> tvaEnabled;
   final Value<double?> tvaDefaultRate;
+  final Value<int?> rappelSoinsJours;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<int> rowid;
   const CompanySettingsCompanion({
     this.id = const Value.absent(),
@@ -13991,6 +14567,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     this.rccm = const Value.absent(),
     this.tvaEnabled = const Value.absent(),
     this.tvaDefaultRate = const Value.absent(),
+    this.rappelSoinsJours = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompanySettingsCompanion.insert({
@@ -14004,6 +14583,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     this.rccm = const Value.absent(),
     this.tvaEnabled = const Value.absent(),
     this.tvaDefaultRate = const Value.absent(),
+    this.rappelSoinsJours = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   static Insertable<CompanySetting> custom({
@@ -14017,6 +14599,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     Expression<String>? rccm,
     Expression<bool>? tvaEnabled,
     Expression<double>? tvaDefaultRate,
+    Expression<int>? rappelSoinsJours,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -14030,6 +14615,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
       if (rccm != null) 'rccm': rccm,
       if (tvaEnabled != null) 'tva_enabled': tvaEnabled,
       if (tvaDefaultRate != null) 'tva_default_rate': tvaDefaultRate,
+      if (rappelSoinsJours != null) 'rappel_soins_jours': rappelSoinsJours,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -14045,6 +14633,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     Value<String?>? rccm,
     Value<bool>? tvaEnabled,
     Value<double?>? tvaDefaultRate,
+    Value<int?>? rappelSoinsJours,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<int>? rowid,
   }) {
     return CompanySettingsCompanion(
@@ -14058,6 +14649,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
       rccm: rccm ?? this.rccm,
       tvaEnabled: tvaEnabled ?? this.tvaEnabled,
       tvaDefaultRate: tvaDefaultRate ?? this.tvaDefaultRate,
+      rappelSoinsJours: rappelSoinsJours ?? this.rappelSoinsJours,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -14095,6 +14689,17 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     if (tvaDefaultRate.present) {
       map['tva_default_rate'] = Variable<double>(tvaDefaultRate.value);
     }
+    if (rappelSoinsJours.present) {
+      map['rappel_soins_jours'] = Variable<int>(rappelSoinsJours.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $CompanySettingsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -14114,6 +14719,9 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
           ..write('rccm: $rccm, ')
           ..write('tvaEnabled: $tvaEnabled, ')
           ..write('tvaDefaultRate: $tvaDefaultRate, ')
+          ..write('rappelSoinsJours: $rappelSoinsJours, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -24669,6 +25277,44 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ProphylaxisScheduleStandardsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>(
+        $ProphylaxisScheduleStandardsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -24769,8 +25415,22 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
+    isActive,
+    syncStatus,
+    updatedAt,
     id,
     speciesCode,
     periodLabel,
@@ -24780,6 +25440,7 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
     productRecommended,
     dosage,
     withdrawalDays,
+    createdAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -24793,6 +25454,18 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -24870,6 +25543,12 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
         ),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     return context;
   }
 
@@ -24882,6 +25561,21 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
   }) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ProphylaxisScheduleStandard(
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      syncStatus: $ProphylaxisScheduleStandardsTable.$convertersyncStatus
+          .fromSql(
+            attachedDatabase.typeMapping.read(
+              DriftSqlType.string,
+              data['${effectivePrefix}sync_status'],
+            )!,
+          ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -24918,6 +25612,10 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
         DriftSqlType.int,
         data['${effectivePrefix}withdrawal_days'],
       )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
     );
   }
 
@@ -24925,10 +25623,22 @@ class $ProphylaxisScheduleStandardsTable extends ProphylaxisScheduleStandards
   $ProphylaxisScheduleStandardsTable createAlias(String alias) {
     return $ProphylaxisScheduleStandardsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class ProphylaxisScheduleStandard extends DataClass
     implements Insertable<ProphylaxisScheduleStandard> {
+  final bool isActive;
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  final SyncStatus syncStatus;
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  final DateTime? updatedAt;
   final String id;
   final String speciesCode;
   final String periodLabel;
@@ -24947,7 +25657,15 @@ class ProphylaxisScheduleStandard extends DataClass
   final String? productRecommended;
   final String? dosage;
   final int withdrawalDays;
+
+  /// Ticket H9 — instant de création côté serveur (`created_at`), pour TRIER COMME LE WEB
+  /// (`getProphylaxiesProperty` : `orderBy('created_at')`). Une échéance créée au poste prend l'instant de sa
+  /// saisie ; nul pour une ligne tirée d'un serveur qui ne le sert pas.
+  final DateTime? createdAt;
   const ProphylaxisScheduleStandard({
+    required this.isActive,
+    required this.syncStatus,
+    this.updatedAt,
     required this.id,
     required this.speciesCode,
     required this.periodLabel,
@@ -24957,10 +25675,22 @@ class ProphylaxisScheduleStandard extends DataClass
     this.productRecommended,
     this.dosage,
     required this.withdrawalDays,
+    this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['is_active'] = Variable<bool>(isActive);
+    {
+      map['sync_status'] = Variable<String>(
+        $ProphylaxisScheduleStandardsTable.$convertersyncStatus.toSql(
+          syncStatus,
+        ),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     map['id'] = Variable<String>(id);
     map['species_code'] = Variable<String>(speciesCode);
     map['period_label'] = Variable<String>(periodLabel);
@@ -24978,11 +25708,19 @@ class ProphylaxisScheduleStandard extends DataClass
       map['dosage'] = Variable<String>(dosage);
     }
     map['withdrawal_days'] = Variable<int>(withdrawalDays);
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
     return map;
   }
 
   ProphylaxisScheduleStandardsCompanion toCompanion(bool nullToAbsent) {
     return ProphylaxisScheduleStandardsCompanion(
+      isActive: Value(isActive),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
       id: Value(id),
       speciesCode: Value(speciesCode),
       periodLabel: Value(periodLabel),
@@ -25000,6 +25738,9 @@ class ProphylaxisScheduleStandard extends DataClass
           ? const Value.absent()
           : Value(dosage),
       withdrawalDays: Value(withdrawalDays),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
     );
   }
 
@@ -25009,6 +25750,10 @@ class ProphylaxisScheduleStandard extends DataClass
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ProphylaxisScheduleStandard(
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      syncStatus: $ProphylaxisScheduleStandardsTable.$convertersyncStatus
+          .fromJson(serializer.fromJson<String>(json['syncStatus'])),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       id: serializer.fromJson<String>(json['id']),
       speciesCode: serializer.fromJson<String>(json['speciesCode']),
       periodLabel: serializer.fromJson<String>(json['periodLabel']),
@@ -25020,12 +25765,20 @@ class ProphylaxisScheduleStandard extends DataClass
       ),
       dosage: serializer.fromJson<String?>(json['dosage']),
       withdrawalDays: serializer.fromJson<int>(json['withdrawalDays']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'isActive': serializer.toJson<bool>(isActive),
+      'syncStatus': serializer.toJson<String>(
+        $ProphylaxisScheduleStandardsTable.$convertersyncStatus.toJson(
+          syncStatus,
+        ),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'id': serializer.toJson<String>(id),
       'speciesCode': serializer.toJson<String>(speciesCode),
       'periodLabel': serializer.toJson<String>(periodLabel),
@@ -25035,10 +25788,14 @@ class ProphylaxisScheduleStandard extends DataClass
       'productRecommended': serializer.toJson<String?>(productRecommended),
       'dosage': serializer.toJson<String?>(dosage),
       'withdrawalDays': serializer.toJson<int>(withdrawalDays),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
     };
   }
 
   ProphylaxisScheduleStandard copyWith({
+    bool? isActive,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
     String? id,
     String? speciesCode,
     String? periodLabel,
@@ -25048,7 +25805,11 @@ class ProphylaxisScheduleStandard extends DataClass
     Value<String?> productRecommended = const Value.absent(),
     Value<String?> dosage = const Value.absent(),
     int? withdrawalDays,
+    Value<DateTime?> createdAt = const Value.absent(),
   }) => ProphylaxisScheduleStandard(
+    isActive: isActive ?? this.isActive,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     id: id ?? this.id,
     speciesCode: speciesCode ?? this.speciesCode,
     periodLabel: periodLabel ?? this.periodLabel,
@@ -25062,11 +25823,17 @@ class ProphylaxisScheduleStandard extends DataClass
         : this.productRecommended,
     dosage: dosage.present ? dosage.value : this.dosage,
     withdrawalDays: withdrawalDays ?? this.withdrawalDays,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
   );
   ProphylaxisScheduleStandard copyWithCompanion(
     ProphylaxisScheduleStandardsCompanion data,
   ) {
     return ProphylaxisScheduleStandard(
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       id: data.id.present ? data.id.value : this.id,
       speciesCode: data.speciesCode.present
           ? data.speciesCode.value
@@ -25088,12 +25855,16 @@ class ProphylaxisScheduleStandard extends DataClass
       withdrawalDays: data.withdrawalDays.present
           ? data.withdrawalDays.value
           : this.withdrawalDays,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
   @override
   String toString() {
     return (StringBuffer('ProphylaxisScheduleStandard(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
           ..write('periodLabel: $periodLabel, ')
@@ -25102,13 +25873,17 @@ class ProphylaxisScheduleStandard extends DataClass
           ..write('treatment: $treatment, ')
           ..write('productRecommended: $productRecommended, ')
           ..write('dosage: $dosage, ')
-          ..write('withdrawalDays: $withdrawalDays')
+          ..write('withdrawalDays: $withdrawalDays, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(
+    isActive,
+    syncStatus,
+    updatedAt,
     id,
     speciesCode,
     periodLabel,
@@ -25118,11 +25893,15 @@ class ProphylaxisScheduleStandard extends DataClass
     productRecommended,
     dosage,
     withdrawalDays,
+    createdAt,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ProphylaxisScheduleStandard &&
+          other.isActive == this.isActive &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.id == this.id &&
           other.speciesCode == this.speciesCode &&
           other.periodLabel == this.periodLabel &&
@@ -25131,11 +25910,15 @@ class ProphylaxisScheduleStandard extends DataClass
           other.treatment == this.treatment &&
           other.productRecommended == this.productRecommended &&
           other.dosage == this.dosage &&
-          other.withdrawalDays == this.withdrawalDays);
+          other.withdrawalDays == this.withdrawalDays &&
+          other.createdAt == this.createdAt);
 }
 
 class ProphylaxisScheduleStandardsCompanion
     extends UpdateCompanion<ProphylaxisScheduleStandard> {
+  final Value<bool> isActive;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<String> id;
   final Value<String> speciesCode;
   final Value<String> periodLabel;
@@ -25145,8 +25928,12 @@ class ProphylaxisScheduleStandardsCompanion
   final Value<String?> productRecommended;
   final Value<String?> dosage;
   final Value<int> withdrawalDays;
+  final Value<DateTime?> createdAt;
   final Value<int> rowid;
   const ProphylaxisScheduleStandardsCompanion({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.id = const Value.absent(),
     this.speciesCode = const Value.absent(),
     this.periodLabel = const Value.absent(),
@@ -25156,9 +25943,13 @@ class ProphylaxisScheduleStandardsCompanion
     this.productRecommended = const Value.absent(),
     this.dosage = const Value.absent(),
     this.withdrawalDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProphylaxisScheduleStandardsCompanion.insert({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     required String id,
     required String speciesCode,
     required String periodLabel,
@@ -25168,12 +25959,16 @@ class ProphylaxisScheduleStandardsCompanion
     this.productRecommended = const Value.absent(),
     this.dosage = const Value.absent(),
     this.withdrawalDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        speciesCode = Value(speciesCode),
        periodLabel = Value(periodLabel),
        treatment = Value(treatment);
   static Insertable<ProphylaxisScheduleStandard> custom({
+    Expression<bool>? isActive,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? id,
     Expression<String>? speciesCode,
     Expression<String>? periodLabel,
@@ -25183,9 +25978,13 @@ class ProphylaxisScheduleStandardsCompanion
     Expression<String>? productRecommended,
     Expression<String>? dosage,
     Expression<int>? withdrawalDays,
+    Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (isActive != null) 'is_active': isActive,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (id != null) 'id': id,
       if (speciesCode != null) 'species_code': speciesCode,
       if (periodLabel != null) 'period_label': periodLabel,
@@ -25195,11 +25994,15 @@ class ProphylaxisScheduleStandardsCompanion
       if (productRecommended != null) 'product_recommended': productRecommended,
       if (dosage != null) 'dosage': dosage,
       if (withdrawalDays != null) 'withdrawal_days': withdrawalDays,
+      if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   ProphylaxisScheduleStandardsCompanion copyWith({
+    Value<bool>? isActive,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<String>? id,
     Value<String>? speciesCode,
     Value<String>? periodLabel,
@@ -25209,9 +26012,13 @@ class ProphylaxisScheduleStandardsCompanion
     Value<String?>? productRecommended,
     Value<String?>? dosage,
     Value<int>? withdrawalDays,
+    Value<DateTime?>? createdAt,
     Value<int>? rowid,
   }) {
     return ProphylaxisScheduleStandardsCompanion(
+      isActive: isActive ?? this.isActive,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       id: id ?? this.id,
       speciesCode: speciesCode ?? this.speciesCode,
       periodLabel: periodLabel ?? this.periodLabel,
@@ -25221,6 +26028,7 @@ class ProphylaxisScheduleStandardsCompanion
       productRecommended: productRecommended ?? this.productRecommended,
       dosage: dosage ?? this.dosage,
       withdrawalDays: withdrawalDays ?? this.withdrawalDays,
+      createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -25228,6 +26036,19 @@ class ProphylaxisScheduleStandardsCompanion
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $ProphylaxisScheduleStandardsTable.$convertersyncStatus.toSql(
+          syncStatus.value,
+        ),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -25255,6 +26076,9 @@ class ProphylaxisScheduleStandardsCompanion
     if (withdrawalDays.present) {
       map['withdrawal_days'] = Variable<int>(withdrawalDays.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -25264,6 +26088,9 @@ class ProphylaxisScheduleStandardsCompanion
   @override
   String toString() {
     return (StringBuffer('ProphylaxisScheduleStandardsCompanion(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
           ..write('periodLabel: $periodLabel, ')
@@ -25273,6 +26100,7 @@ class ProphylaxisScheduleStandardsCompanion
           ..write('productRecommended: $productRecommended, ')
           ..write('dosage: $dosage, ')
           ..write('withdrawalDays: $withdrawalDays, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -32475,6 +33303,9 @@ typedef $$LivestockLotsTableProcessedTableManager =
     >;
 typedef $$FeedRationStandardsTableCreateCompanionBuilder =
     FeedRationStandardsCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       required String id,
       required String speciesCode,
       required String stageLabel,
@@ -32483,6 +33314,9 @@ typedef $$FeedRationStandardsTableCreateCompanionBuilder =
     });
 typedef $$FeedRationStandardsTableUpdateCompanionBuilder =
     FeedRationStandardsCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<String> id,
       Value<String> speciesCode,
       Value<String> stageLabel,
@@ -32499,6 +33333,22 @@ class $$FeedRationStandardsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -32529,6 +33379,21 @@ class $$FeedRationStandardsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -32559,6 +33424,18 @@ class $$FeedRationStandardsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -32621,12 +33498,18 @@ class $$FeedRationStandardsTableTableManager
               ),
           updateCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> speciesCode = const Value.absent(),
                 Value<String> stageLabel = const Value.absent(),
                 Value<double> rationGPerDay = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FeedRationStandardsCompanion(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 speciesCode: speciesCode,
                 stageLabel: stageLabel,
@@ -32635,12 +33518,18 @@ class $$FeedRationStandardsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 required String id,
                 required String speciesCode,
                 required String stageLabel,
                 required double rationGPerDay,
                 Value<int> rowid = const Value.absent(),
               }) => FeedRationStandardsCompanion.insert(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 speciesCode: speciesCode,
                 stageLabel: stageLabel,
@@ -34376,6 +35265,9 @@ typedef $$CustomerRemindersTableProcessedTableManager =
     >;
 typedef $$FeedTypesTableCreateCompanionBuilder =
     FeedTypesCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       required String id,
       required String name,
       Value<String?> speciesId,
@@ -34387,6 +35279,9 @@ typedef $$FeedTypesTableCreateCompanionBuilder =
     });
 typedef $$FeedTypesTableUpdateCompanionBuilder =
     FeedTypesCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<String> id,
       Value<String> name,
       Value<String?> speciesId,
@@ -34406,6 +35301,22 @@ class $$FeedTypesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -34451,6 +35362,21 @@ class $$FeedTypesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -34496,6 +35422,18 @@ class $$FeedTypesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -34554,6 +35492,9 @@ class $$FeedTypesTableTableManager
               $$FeedTypesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> speciesId = const Value.absent(),
@@ -34563,6 +35504,9 @@ class $$FeedTypesTableTableManager
                 Value<double?> pricePerKg = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FeedTypesCompanion(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 name: name,
                 speciesId: speciesId,
@@ -34574,6 +35518,9 @@ class $$FeedTypesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 required String id,
                 required String name,
                 Value<String?> speciesId = const Value.absent(),
@@ -34583,6 +35530,9 @@ class $$FeedTypesTableTableManager
                 Value<double?> pricePerKg = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FeedTypesCompanion.insert(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 name: name,
                 speciesId: speciesId,
@@ -34617,6 +35567,8 @@ typedef $$FeedTypesTableProcessedTableManager =
 typedef $$ElevageNumberingSettingsTableCreateCompanionBuilder =
     ElevageNumberingSettingsCompanion Function({
       Value<String> id,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<String?> bandeFormat,
       Value<String?> lapinePrefix,
       Value<String?> malePrefix,
@@ -34631,6 +35583,8 @@ typedef $$ElevageNumberingSettingsTableCreateCompanionBuilder =
 typedef $$ElevageNumberingSettingsTableUpdateCompanionBuilder =
     ElevageNumberingSettingsCompanion Function({
       Value<String> id,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<String?> bandeFormat,
       Value<String?> lapinePrefix,
       Value<String?> malePrefix,
@@ -34654,6 +35608,17 @@ class $$ElevageNumberingSettingsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -34717,6 +35682,16 @@ class $$ElevageNumberingSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get bandeFormat => $composableBuilder(
     column: $table.bandeFormat,
     builder: (column) => ColumnOrderings(column),
@@ -34774,6 +35749,15 @@ class $$ElevageNumberingSettingsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get bandeFormat => $composableBuilder(
     column: $table.bandeFormat,
@@ -34868,6 +35852,8 @@ class $$ElevageNumberingSettingsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String?> bandeFormat = const Value.absent(),
                 Value<String?> lapinePrefix = const Value.absent(),
                 Value<String?> malePrefix = const Value.absent(),
@@ -34880,6 +35866,8 @@ class $$ElevageNumberingSettingsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => ElevageNumberingSettingsCompanion(
                 id: id,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 bandeFormat: bandeFormat,
                 lapinePrefix: lapinePrefix,
                 malePrefix: malePrefix,
@@ -34894,6 +35882,8 @@ class $$ElevageNumberingSettingsTableTableManager
           createCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String?> bandeFormat = const Value.absent(),
                 Value<String?> lapinePrefix = const Value.absent(),
                 Value<String?> malePrefix = const Value.absent(),
@@ -34906,6 +35896,8 @@ class $$ElevageNumberingSettingsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => ElevageNumberingSettingsCompanion.insert(
                 id: id,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 bandeFormat: bandeFormat,
                 lapinePrefix: lapinePrefix,
                 malePrefix: malePrefix,
@@ -38245,6 +39237,9 @@ typedef $$CompanySettingsTableCreateCompanionBuilder =
       Value<String?> rccm,
       Value<bool> tvaEnabled,
       Value<double?> tvaDefaultRate,
+      Value<int?> rappelSoinsJours,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 typedef $$CompanySettingsTableUpdateCompanionBuilder =
@@ -38259,6 +39254,9 @@ typedef $$CompanySettingsTableUpdateCompanionBuilder =
       Value<String?> rccm,
       Value<bool> tvaEnabled,
       Value<double?> tvaDefaultRate,
+      Value<int?> rappelSoinsJours,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 
@@ -38318,6 +39316,22 @@ class $$CompanySettingsTableFilterComposer
 
   ColumnFilters<double> get tvaDefaultRate => $composableBuilder(
     column: $table.tvaDefaultRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rappelSoinsJours => $composableBuilder(
+    column: $table.rappelSoinsJours,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -38380,6 +39394,21 @@ class $$CompanySettingsTableOrderingComposer
     column: $table.tvaDefaultRate,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get rappelSoinsJours => $composableBuilder(
+    column: $table.rappelSoinsJours,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompanySettingsTableAnnotationComposer
@@ -38428,6 +39457,20 @@ class $$CompanySettingsTableAnnotationComposer
     column: $table.tvaDefaultRate,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get rappelSoinsJours => $composableBuilder(
+    column: $table.rappelSoinsJours,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
 class $$CompanySettingsTableTableManager
@@ -38477,6 +39520,9 @@ class $$CompanySettingsTableTableManager
                 Value<String?> rccm = const Value.absent(),
                 Value<bool> tvaEnabled = const Value.absent(),
                 Value<double?> tvaDefaultRate = const Value.absent(),
+                Value<int?> rappelSoinsJours = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompanySettingsCompanion(
                 id: id,
@@ -38489,6 +39535,9 @@ class $$CompanySettingsTableTableManager
                 rccm: rccm,
                 tvaEnabled: tvaEnabled,
                 tvaDefaultRate: tvaDefaultRate,
+                rappelSoinsJours: rappelSoinsJours,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -38503,6 +39552,9 @@ class $$CompanySettingsTableTableManager
                 Value<String?> rccm = const Value.absent(),
                 Value<bool> tvaEnabled = const Value.absent(),
                 Value<double?> tvaDefaultRate = const Value.absent(),
+                Value<int?> rappelSoinsJours = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompanySettingsCompanion.insert(
                 id: id,
@@ -38515,6 +39567,9 @@ class $$CompanySettingsTableTableManager
                 rccm: rccm,
                 tvaEnabled: tvaEnabled,
                 tvaDefaultRate: tvaDefaultRate,
+                rappelSoinsJours: rappelSoinsJours,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -43768,6 +44823,9 @@ typedef $$LivestockTransfersTableProcessedTableManager =
     >;
 typedef $$ProphylaxisScheduleStandardsTableCreateCompanionBuilder =
     ProphylaxisScheduleStandardsCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       required String id,
       required String speciesCode,
       required String periodLabel,
@@ -43777,10 +44835,14 @@ typedef $$ProphylaxisScheduleStandardsTableCreateCompanionBuilder =
       Value<String?> productRecommended,
       Value<String?> dosage,
       Value<int> withdrawalDays,
+      Value<DateTime?> createdAt,
       Value<int> rowid,
     });
 typedef $$ProphylaxisScheduleStandardsTableUpdateCompanionBuilder =
     ProphylaxisScheduleStandardsCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<String> id,
       Value<String> speciesCode,
       Value<String> periodLabel,
@@ -43790,6 +44852,7 @@ typedef $$ProphylaxisScheduleStandardsTableUpdateCompanionBuilder =
       Value<String?> productRecommended,
       Value<String?> dosage,
       Value<int> withdrawalDays,
+      Value<DateTime?> createdAt,
       Value<int> rowid,
     });
 
@@ -43802,6 +44865,22 @@ class $$ProphylaxisScheduleStandardsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -43846,6 +44925,11 @@ class $$ProphylaxisScheduleStandardsTableFilterComposer
     column: $table.withdrawalDays,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$ProphylaxisScheduleStandardsTableOrderingComposer
@@ -43857,6 +44941,21 @@ class $$ProphylaxisScheduleStandardsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -43901,6 +45000,11 @@ class $$ProphylaxisScheduleStandardsTableOrderingComposer
     column: $table.withdrawalDays,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProphylaxisScheduleStandardsTableAnnotationComposer
@@ -43912,6 +45016,18 @@ class $$ProphylaxisScheduleStandardsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -43950,6 +45066,9 @@ class $$ProphylaxisScheduleStandardsTableAnnotationComposer
     column: $table.withdrawalDays,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
 
 class $$ProphylaxisScheduleStandardsTableTableManager
@@ -43998,6 +45117,9 @@ class $$ProphylaxisScheduleStandardsTableTableManager
               ),
           updateCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> speciesCode = const Value.absent(),
                 Value<String> periodLabel = const Value.absent(),
@@ -44007,8 +45129,12 @@ class $$ProphylaxisScheduleStandardsTableTableManager
                 Value<String?> productRecommended = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
                 Value<int> withdrawalDays = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProphylaxisScheduleStandardsCompanion(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 speciesCode: speciesCode,
                 periodLabel: periodLabel,
@@ -44018,10 +45144,14 @@ class $$ProphylaxisScheduleStandardsTableTableManager
                 productRecommended: productRecommended,
                 dosage: dosage,
                 withdrawalDays: withdrawalDays,
+                createdAt: createdAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 required String id,
                 required String speciesCode,
                 required String periodLabel,
@@ -44031,8 +45161,12 @@ class $$ProphylaxisScheduleStandardsTableTableManager
                 Value<String?> productRecommended = const Value.absent(),
                 Value<String?> dosage = const Value.absent(),
                 Value<int> withdrawalDays = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProphylaxisScheduleStandardsCompanion.insert(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 id: id,
                 speciesCode: speciesCode,
                 periodLabel: periodLabel,
@@ -44042,6 +45176,7 @@ class $$ProphylaxisScheduleStandardsTableTableManager
                 productRecommended: productRecommended,
                 dosage: dosage,
                 withdrawalDays: withdrawalDays,
+                createdAt: createdAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -649,9 +649,16 @@ class FicheJournaliereRepository {
   /// ⚠️ JAMAIS DE GRAMMAGE CODÉ EN DUR. Ces valeurs sont éditables depuis
   /// l'écran Paramètres > Élevage : les figer ici ferait diverger la provende
   /// calculée le jour d'une correction, sans le moindre signal.
+  ///
+  /// ⚠️ Ticket H9b — une ration ARCHIVÉE (au poste ou ailleurs) ne calcule plus rien.
   Future<List<FeedRationStandard>> rations(String codeEspece) {
     return (_db.select(_db.feedRationStandards)
-          ..where((t) => t.speciesCode.equals(codeEspece))
+          ..where(
+            (t) => Expression.and([
+              t.speciesCode.equals(codeEspece),
+              t.isActive.equals(true),
+            ]),
+          )
           ..orderBy([(t) => OrderingTerm(expression: t.stageLabel)]))
         .get();
   }

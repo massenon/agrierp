@@ -108,6 +108,8 @@ def fabriquer(noms, cat, source):
         source, {'FILL': 0, 'wght': 400, 'GRAD': 0, 'opsz': 24}, inplace=True, updateFontNames=False)
     # ⚠️ La source est un WOFF2 : sans ceci, `save` réécrit du WOFF2 sous l'extension .ttf, que Flutter ne lit pas.
     source.flavor = None
+    # Fonte reproductible : sans ceci, `head.modified` change à chaque lancement et la fonte paraît modifiée.
+    source.recalcTimestamp = False
     os.makedirs(os.path.dirname(FONTE), exist_ok=True)
     source.save(FONTE)
 

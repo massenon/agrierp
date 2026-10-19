@@ -801,6 +801,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.parametresElevage => ParametresElevageScreen(
           depot: widget.parametresElevage,
+          // Ticket H9b — modifier les barèmes = droit `manage-elevage` du web (sinon l'envoi serait refusé).
+          peutModifier: PermissionsPoste.peut(_role, 'manage-elevage'),
         ),
         EcranPoste.clientsEtCreances => ClientsCreancesScreen(
           depot: widget.clients,

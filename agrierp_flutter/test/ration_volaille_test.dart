@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/elevage/ration_volaille.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +14,8 @@ void main() {
     speciesCode: 'aviculture',
     stageLabel: libelle,
     rationGPerDay: g,
+    isActive: true,
+    syncStatus: SyncStatus.synced,
   );
 
   // Barème du semis, trié par libellé comme le dépôt le sert.

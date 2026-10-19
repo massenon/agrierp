@@ -58,13 +58,10 @@ class RechercheGlobaleRepository {
   /// Permissions du web (`RolesAndPermissionsSeeder`) utilisées par `GlobalSearch` : l'administrateur a tout, le
   /// comptable `view-comptabilite`, le caissier `view-ventes`, l'animalier `view-elevage` ; `view-stocks`,
   /// `view-achats` et `view-rh` n'appartiennent qu'à l'administrateur.
-  static bool peut(String role, String permission) => switch (role) {
-    'admin' => true,
-    'comptable' => permission == 'view-comptabilite',
-    'caissier' => permission == 'view-ventes',
-    'animalier' => permission == 'view-elevage',
-    _ => false,
-  };
+  ///
+  /// Ticket H9b — une seule transposition du seeder pour tout le poste : [PermissionsPoste.peut].
+  static bool peut(String role, String permission) =>
+      PermissionsPoste.peut(role, permission);
 
   /// Texte comparable : minuscules, sans accents ni ligatures.
   static String normaliser(String? texte) {

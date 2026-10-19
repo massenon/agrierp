@@ -1103,42 +1103,163 @@ class SyncEngine {
         '$suite';
   }
 
-  /// Rations normatives : référentiel éditable, remplacé à chaque tirage.
+  // ── Ticket H9b (D-H9) — PARAMÈTRES ÉLEVAGE : barèmes reçus ET envoyés ─────────────────────────────────
+  //
+  // ⚠️⚠️ **STRICTS, COMME [_absorberInfirmerie]** : une ligne incohérente (identifiant absent ou de mauvaise
+  // longueur, champ obligatoire manquant, nombre illisible, ligne servie deux fois) refuse le LOT entier
+  // ([FormatException], rien n'est écrit, le curseur n'avance pas). Lisser — un grammage illisible devenu 0 —
+  // ferait calculer une provende nulle sans que rien ne le signale.
+  //
+  // ⚠️⚠️ **UNE SAISIE LOCALE N'EST JAMAIS ÉCRASÉE** : une ligne `pending` (créée, modifiée ou archivée sur ce
+  // poste, pas encore acquittée) ou `conflict` (refusée, en attente de correction) garde sa valeur locale ;
+  // le tirage précède toujours l'envoi. Sinon : dernière valeur du serveur, `synced`.
+  //
+  // ⚠️ **LE SERVEUR SERT L'ENSEMBLE ACTIF COMPLET** (sans filtre `since`, `where is_active`) : une ligne
+  // `synced` qu'il ne sert plus a été ARCHIVÉE ailleurs (web, autre poste) — elle est archivée ici aussi
+  // (`is_active = false`), jamais effacée, comme au serveur. Une réponse SANS la clé (serveur ancien) laisse
+  // tout intact.
+
+  /// Lignes d'un barème : une LISTE de MAPS, sinon le lot est refusé.
+  static List<Map<String, dynamic>> _lignesStrictes(
+    Object? brut,
+    String bareme,
+  ) {
+    if (brut is! List) {
+      throw FormatException('$bareme refusé : la clé n\'est pas une liste.');
+    }
+    return [
+      for (final l in brut)
+        if (l is Map)
+          l.map((c, v) => MapEntry(c.toString(), v))
+        else
+          throw FormatException('$bareme refusé : élément illisible ($l).'),
+    ];
+  }
+
+  /// Nombre strict : absent → `null`, illisible → [FormatException].
+  static double? _nombreStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    final n = v is num ? v.toDouble() : double.tryParse(v.toString());
+    if (n == null) throw FormatException('$quoi illisible ($v).');
+    return n;
+  }
+
+  /// Texte strict : absent → `null`, autre chose qu'un texte → [FormatException].
+  static String? _texteStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    if (v is! String) throw FormatException('$quoi illisible ($v).');
+    return v;
+  }
+
+  /// `is_active` servi (le tirage ne sert que des lignes actives) ; absent = actif.
+  static bool _actifStrict(Map<String, dynamic> l, String quoi) {
+    if (!l.containsKey('is_active')) return true;
+    final v = l['is_active'];
+    if (v == true || v == 1 || v == '1') return true;
+    if (v == false || v == 0 || v == '0') return false;
+    throw FormatException('$quoi : « is_active » illisible ($v).');
+  }
+
+  /// Identifiant strict d'une ligne de barème (UUID de 36 caractères, jamais servi deux fois).
+  static String _identifiantStrict(
+    Map<String, dynamic> l,
+    Set<String> vus,
+    String bareme,
+  ) {
+    final id = l['id'];
+    if (id is! String || id.length != 36) {
+      throw FormatException('$bareme refusé : identifiant invalide ($id).');
+    }
+    if (!vus.add(id)) {
+      throw FormatException('$bareme $id refusé : servi deux fois.');
+    }
+    return id;
+  }
+
+  /// Fusion commune aux trois barèmes : les lignes servies remplacent les `synced`, les `pending`/`conflict`
+  /// sont protégées, les `synced` absentes de l'ensemble actif servi sont archivées.
+  Future<void> _fusionnerBareme<T extends Table, D>({
+    required TableInfo<T, D> table,
+    required List<Insertable<D>> recues,
+    required List<String> idsServis,
+    required String Function(D) idDe,
+    required SyncStatus Function(D) statutDe,
+    required Expression<bool> Function(T) synceeHorsServis,
+    required Insertable<D> archivage,
+  }) async {
+    await _db.transaction(() async {
+      final protegees = {
+        for (final l in await _db.select(table).get())
+          if (statutDe(l) != SyncStatus.synced) idDe(l),
+      };
+      for (var i = 0; i < recues.length; i++) {
+        if (protegees.contains(idsServis[i])) continue;
+        await _db
+            .into(table)
+            .insert(recues[i], onConflict: DoUpdate((_) => recues[i]));
+      }
+      await (_db.update(
+        table,
+      )..where((t) => synceeHorsServis(t))).write(archivage);
+    });
+  }
+
+  /// Catalogue des types de provende — ensemble actif complet, FUSIONNÉ (ticket H9b).
   ///
-  /// ⚠️ Une réponse SANS la clé laisse les rations locales intactes plutôt que
-  /// de les effacer : un serveur plus ancien qui ne les sert pas encore ne doit
-  /// pas vider le référentiel d'un poste déjà à jour.
-  /// Catalogue des types de provende — référentiel remplacé à chaque tirage.
-  ///
-  /// ⚠️ **REMPLACEMENT COMPLET** : un type d'aliment archivé côté serveur ne
-  /// descend plus, et doit donc quitter l'écran du poste. Le garder ferait
-  /// figurer au catalogue une provende que la ferme ne sert plus.
+  /// ⚠️ Avant H9b la table était vidée puis réécrite : un type créé au poste et pas encore acquitté aurait
+  /// disparu au tirage suivant. Le libellé de l'espèce voyage avec le type (le poste n'a pas de table des
+  /// espèces désactivées).
   Future<int> _absorberProvendes(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
-
-    await _db.transaction(() async {
-      await _db.delete(_db.feedTypes).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.feedTypes)
-            .insert(
-              FeedTypesCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                speciesId: Value(l['species_id'] as String?),
-                speciesCode: Value(l['species_code'] as String?),
-                speciesLabel: Value(l['species_label'] as String?),
-                standardBagWeightKg: Value(_reel(l['standard_bag_weight_kg'])),
-                pricePerKg: Value(_reel(l['price_per_kg'])),
-              ),
-            );
+    final lignes = _lignesStrictes(brut, 'Type de provende');
+    final vus = <String>{};
+    final recues = <FeedTypesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Type de provende');
+      final nom = l['name'];
+      if (nom is! String || nom.isEmpty) {
+        throw FormatException('Type de provende $id refusé : nom absent.');
       }
-    });
+      recues.add(
+        FeedTypesCompanion.insert(
+          id: id,
+          name: nom,
+          speciesId: Value(_texteStrict(l['species_id'], 'Type $id : espèce')),
+          speciesCode: Value(
+            _texteStrict(l['species_code'], 'Type $id : code espèce'),
+          ),
+          speciesLabel: Value(
+            _texteStrict(l['species_label'], 'Type $id : libellé espèce'),
+          ),
+          standardBagWeightKg: Value(
+            _nombreStrict(l['standard_bag_weight_kg'], 'Type $id : poids du sac'),
+          ),
+          pricePerKg: Value(
+            _nombreStrict(l['price_per_kg'], 'Type $id : prix au kilo'),
+          ),
+          isActive: Value(_actifStrict(l, 'Type $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
 
-    return lignes.length;
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.feedTypes,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FeedType t) => t.id,
+      statutDe: (FeedType t) => t.syncStatus,
+      synceeHorsServis: ($FeedTypesTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FeedTypesCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
   }
 
   /// Préfixes de numérotation — un OBJET, pas une collection.
@@ -1147,53 +1268,174 @@ class SyncEngine {
   /// préfixes, pas une liste de lignes : la passer à `_lignes()` comme les
   /// autres tables ne donnerait rien. Elle est écrite sous une clé fixe pour
   /// qu'un second tirage remplace la ligne au lieu d'en empiler une autre.
+  ///
+  /// Ticket H9b — STRICTE (un format qui n'est pas un texte refuse la ligne) et PROTÉGÉE (des formats
+  /// enregistrés au poste et pas encore acquittés ne sont pas écrasés).
   Future<int> _absorberNumerotation(Object? brut) async {
-    if (brut is! Map) return 0;
+    if (brut == null) return 0;
+    if (brut is! Map) {
+      throw FormatException('Numérotation refusée : objet attendu ($brut).');
+    }
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
+    String? format(String cle) => _texteStrict(l[cle], 'Numérotation : $cle');
 
     final ligne = ElevageNumberingSettingsCompanion.insert(
       id: const Value('unique'),
-      bandeFormat: Value(l['bande_format'] as String?),
-      lapinePrefix: Value(l['lapine_prefix'] as String?),
-      malePrefix: Value(l['male_prefix'] as String?),
-      truiePrefix: Value(l['truie_prefix'] as String?),
-      verratPrefix: Value(l['verrat_prefix'] as String?),
-      porteePrefix: Value(l['portee_prefix'] as String?),
-      volaillePrefix: Value(l['volaille_prefix'] as String?),
-      parcPrefix: Value(l['parc_prefix'] as String?),
-      escargotPrefix: Value(l['escargot_prefix'] as String?),
+      bandeFormat: Value(format('bande_format')),
+      lapinePrefix: Value(format('lapine_prefix')),
+      malePrefix: Value(format('male_prefix')),
+      truiePrefix: Value(format('truie_prefix')),
+      verratPrefix: Value(format('verrat_prefix')),
+      porteePrefix: Value(format('portee_prefix')),
+      volaillePrefix: Value(format('volaille_prefix')),
+      parcPrefix: Value(format('parc_prefix')),
+      escargotPrefix: Value(format('escargot_prefix')),
+      syncStatus: const Value(SyncStatus.synced),
+      updatedAt: const Value(null),
     );
 
-    await _db
-        .into(_db.elevageNumberingSettings)
-        .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    await _db.transaction(() async {
+      final locale = await (_db.select(
+        _db.elevageNumberingSettings,
+      )..where((t) => t.id.equals('unique'))).getSingleOrNull();
+      if (locale != null && locale.syncStatus != SyncStatus.synced) return;
+      await _db
+          .into(_db.elevageNumberingSettings)
+          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    });
 
     return 1;
   }
 
+  /// Rations normatives — ensemble actif complet, FUSIONNÉ (ticket H9b).
+  ///
+  /// ⚠️ Une réponse SANS la clé laisse les rations locales intactes plutôt que
+  /// de les effacer : un serveur plus ancien qui ne les sert pas encore ne doit
+  /// pas vider le référentiel d'un poste déjà à jour.
+  ///
+  /// 🔴→✅ Avant H9b, une ration ARCHIVÉE sur le web (ticket 14.55 : elle ne descend plus) restait active sur
+  /// le poste pour toujours — l'absorbeur ne faisait qu'ajouter. Elle s'archive désormais ici aussi.
   Future<int> _absorberRations(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    final lignes = _lignesStrictes(brut, 'Ration');
+    final vus = <String>{};
+    final recues = <FeedRationStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Ration');
+      final espece = l['species_code'];
+      final stade = l['stage_label'];
+      final grammes = _nombreStrict(l['ration_g_per_day'], 'Ration $id : grammage');
+      if (espece is! String || espece.isEmpty || stade is! String || grammes == null) {
+        throw FormatException('Ration $id refusée : élément incomplet ou illisible.');
+      }
+      recues.add(
+        FeedRationStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          stageLabel: stade,
+          rationGPerDay: grammes,
+          isActive: Value(_actifStrict(l, 'Ration $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
 
-    await _db.batch((b) {
-      for (final l in lignes) {
-        final ligne = FeedRationStandardsCompanion.insert(
-          id: l['id'] as String,
-          speciesCode: (l['species_code'] ?? '') as String,
-          stageLabel: (l['stage_label'] ?? '') as String,
-          rationGPerDay: _reel(l['ration_g_per_day']) ?? 0,
-        );
-        b.insert(
-          _db.feedRationStandards,
-          ligne,
-          onConflict: DoUpdate((_) => ligne),
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.feedRationStandards,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FeedRationStandard r) => r.id,
+      statutDe: (FeedRationStandard r) => r.syncStatus,
+      synceeHorsServis: ($FeedRationStandardsTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FeedRationStandardsCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
+  }
+
+  /// Calendrier prophylactique — ensemble actif complet, FUSIONNÉ (ticket H9b).
+  ///
+  /// ⚠️ Les bornes de cycle ABSENTES restent NULLES, JAMAIS ZÉRO : le serveur les laisse vides pour les
+  /// entrées calendaires (« Le 1er du mois ») dont la base de calcul n'est pas le jour de cycle. Les remplacer
+  /// par 0 les rendrait dues au premier jour de chaque bande. `created_at` sert au tri du web (H9).
+  Future<int> _absorberProphylaxie(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignesStrictes(brut, 'Échéance de prophylaxie');
+    final vus = <String>{};
+    final recues = <ProphylaxisScheduleStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Échéance de prophylaxie');
+      final espece = l['species_code'];
+      final periode = l['period_label'];
+      final traitement = l['treatment'];
+      if (espece is! String ||
+          espece.isEmpty ||
+          periode is! String ||
+          traitement is! String) {
+        throw FormatException(
+          'Échéance de prophylaxie $id refusée : élément incomplet ou illisible.',
         );
       }
-    });
+      int? entier(String cle) {
+        final n = _nombreStrict(l[cle], 'Échéance $id : $cle');
+        if (n != null && n != n.roundToDouble()) {
+          throw FormatException('Échéance $id : $cle non entier ($n).');
+        }
+        return n?.round();
+      }
 
-    return lignes.length;
+      final creation = l['created_at'];
+      final creee = creation == null ? null : _date(creation);
+      if (creation != null && creee == null) {
+        throw FormatException('Échéance $id : created_at illisible ($creation).');
+      }
+
+      recues.add(
+        ProphylaxisScheduleStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          periodLabel: periode,
+          cycleDayStart: Value(entier('cycle_day_start')),
+          cycleDayEnd: Value(entier('cycle_day_end')),
+          treatment: traitement,
+          productRecommended: Value(
+            _texteStrict(l['product_recommended'], 'Échéance $id : produit'),
+          ),
+          dosage: Value(_texteStrict(l['dosage'], 'Échéance $id : posologie')),
+          withdrawalDays: Value(entier('withdrawal_days') ?? 0),
+          createdAt: Value(creee),
+          isActive: Value(_actifStrict(l, 'Échéance $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
+
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.prophylaxisScheduleStandards,
+      recues: recues,
+      idsServis: servis,
+      idDe: (ProphylaxisScheduleStandard p) => p.id,
+      statutDe: (ProphylaxisScheduleStandard p) => p.syncStatus,
+      synceeHorsServis: ($ProphylaxisScheduleStandardsTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const ProphylaxisScheduleStandardsCompanion(
+        isActive: Value(false),
+      ),
+    );
+
+    return recues.length;
   }
 
   /// Périodes de rémanence vétérinaire encore actives.
@@ -1829,27 +2071,57 @@ class SyncEngine {
   /// colonne où en ranger : mots de passe SMTP et jetons SMS restent sur le
   /// serveur, même chiffrés. Un poste volé ne donne pas la boîte mail de la
   /// ferme.
+  ///
+  /// Ticket H9b (D-H9) — le DÉLAI DU RAPPEL DES SOINS (`rappel_soins_jours`, 0 à 30) descend avec l'identité.
+  /// ⚠️⚠️ **STRICT** : une valeur qui n'est pas un entier de 0 à 30 refuse la ligne entière
+  /// ([FormatException], rien n'est écrit). ⚠️ Un délai réglé sur ce poste et pas encore acquitté (`pending`,
+  /// `conflict`) n'est JAMAIS écrasé ; l'identité de la ferme, elle, se met à jour. Clé absente (serveur
+  /// antérieur à H9b) : le délai local est laissé tel quel.
   Future<int> _absorberEntreprise(Object? brut) async {
     if (brut is! Map) return 0;
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
 
-    final ligne = CompanySettingsCompanion.insert(
-      id: const Value('unique'),
-      companyName: Value(l['company_name'] as String?),
-      promoterName: Value(l['promoter_name'] as String?),
-      address: Value(l['address'] as String?),
-      phone: Value(l['phone'] as String?),
-      email: Value(l['email'] as String?),
-      ifu: Value(l['ifu'] as String?),
-      rccm: Value(l['rccm'] as String?),
-      tvaEnabled: Value(_bool(l['tva_enabled'])),
-      tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
-    );
+    final delaiServi = l.containsKey('rappel_soins_jours');
+    final delai = l['rappel_soins_jours'];
+    if (delaiServi &&
+        delai != null &&
+        (delai is! int || delai < 0 || delai > 30)) {
+      throw FormatException(
+        'Paramètres de l\'entreprise refusés : délai du rappel des soins illisible ($delai).',
+      );
+    }
 
-    await _db
-        .into(_db.companySettings)
-        .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    await _db.transaction(() async {
+      final locale = await (_db.select(
+        _db.companySettings,
+      )..where((t) => t.id.equals('unique'))).getSingleOrNull();
+      final protege =
+          locale != null && locale.syncStatus != SyncStatus.synced;
+
+      final ligne = CompanySettingsCompanion.insert(
+        id: const Value('unique'),
+        companyName: Value(l['company_name'] as String?),
+        promoterName: Value(l['promoter_name'] as String?),
+        address: Value(l['address'] as String?),
+        phone: Value(l['phone'] as String?),
+        email: Value(l['email'] as String?),
+        ifu: Value(l['ifu'] as String?),
+        rccm: Value(l['rccm'] as String?),
+        tvaEnabled: Value(_bool(l['tva_enabled'])),
+        tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
+        rappelSoinsJours: delaiServi && !protege
+            ? Value(delai as int?)
+            : const Value.absent(),
+        syncStatus: delaiServi && !protege
+            ? const Value(SyncStatus.synced)
+            : const Value.absent(),
+      );
+
+      await _db
+          .into(_db.companySettings)
+          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    });
 
     return 1;
   }
@@ -2910,39 +3182,6 @@ class SyncEngine {
     return libelles.length;
   }
 
-  Future<int> _absorberProphylaxie(Object? brut) async {
-    if (brut == null) return 0;
-
-    final lignes = _lignes(brut);
-
-    await _db.batch((b) {
-      for (final l in lignes) {
-        final ligne = ProphylaxisScheduleStandardsCompanion.insert(
-          id: l['id'] as String,
-          speciesCode: (l['species_code'] ?? '') as String,
-          periodLabel: (l['period_label'] ?? '') as String,
-          // ⚠️ ABSENTES = NULLES, JAMAIS ZERO. Le serveur laisse ces bornes
-          // vides pour les entrees calendaires (« Le 1er du mois ») dont la
-          // base de calcul n'est pas le jour de cycle. Les remplacer par 0
-          // les rendrait dues au premier jour de chaque bande.
-          cycleDayStart: Value(_entier(l['cycle_day_start'])),
-          cycleDayEnd: Value(_entier(l['cycle_day_end'])),
-          treatment: (l['treatment'] ?? '') as String,
-          productRecommended: Value(l['product_recommended'] as String?),
-          dosage: Value(l['dosage'] as String?),
-          withdrawalDays: Value(_entier(l['withdrawal_days']) ?? 0),
-        );
-        b.insert(
-          _db.prophylaxisScheduleStandards,
-          ligne,
-          onConflict: DoUpdate((_) => ligne),
-        );
-      }
-    });
-
-    return lignes.length;
-  }
-
   /// Registre des soins déjà administrés.
   ///
   /// ⚠️ CE QUI VIENT DU SERVEUR EST MARQUÉ `synced` : le renvoyer le ferait
@@ -3085,6 +3324,27 @@ class SyncEngine {
       _db.veterinaryCalendarEvents,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket H9b (D-H9) — Paramètres Élevage modifiés au poste (`RecordParametresElevageFromDeviceAction`).
+    final rations = await (_db.select(
+      _db.feedRationStandards,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final echeances = await (_db.select(
+      _db.prophylaxisScheduleStandards,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final provendes = await (_db.select(
+      _db.feedTypes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final numerotations = await (_db.select(
+      _db.elevageNumberingSettings,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final entreprise = await (_db.select(
+      _db.companySettings,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     _financiersAcquittes = 0;
     _courriersAcquittes = 0;
     _archivesAcquittees = 0;
@@ -3094,6 +3354,11 @@ class SyncEngine {
         transferts.isEmpty &&
         infirmerie.isEmpty &&
         interventions.isEmpty &&
+        rations.isEmpty &&
+        echeances.isEmpty &&
+        provendes.isEmpty &&
+        numerotations.isEmpty &&
+        entreprise.isEmpty &&
         courriers.isEmpty &&
         archives.isEmpty &&
         documents.isEmpty &&
@@ -3183,6 +3448,20 @@ class SyncEngine {
         'veterinary_calendar_events': interventions
             .map(_interventionEnJson)
             .toList(),
+        // Ticket H9b — clés et formats de `RecordParametresElevageFromDeviceAction` (droit `manage-elevage`).
+        // ⚠️ Une clé VIDE n'est pas envoyée : le serveur répondrait par une liste vide, sans objet.
+        if (rations.isNotEmpty)
+          'feed_ration_standards': rations.map(_rationEnJson).toList(),
+        if (echeances.isNotEmpty)
+          'prophylaxis_schedule_standards': echeances
+              .map(_echeanceEnJson)
+              .toList(),
+        if (provendes.isNotEmpty)
+          'feed_types': provendes.map(_provendeEnJson).toList(),
+        if (numerotations.isNotEmpty)
+          'elevage_numbering': numerotations.map(_numerotationEnJson).toList(),
+        if (entreprise.isNotEmpty)
+          'company_settings': entreprise.map(_rappelSoinsEnJson).toList(),
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
@@ -3284,6 +3563,126 @@ class SyncEngine {
                 .write(
                   VeterinaryCalendarEventsCompanion(syncStatus: Value(statut)),
                 ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket H9b — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]).
+    accepte += await _acquitter(
+      'feed_ration_standards',
+      corps['feed_ration_standards'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final r in rations) (r.id, r.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.feedRationStandards)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FeedRationStandardsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'prophylaxis_schedule_standards',
+      corps['prophylaxis_schedule_standards'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in echeances) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.prophylaxisScheduleStandards)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  ProphylaxisScheduleStandardsCompanion(
+                    syncStatus: Value(statut),
+                  ),
+                ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'feed_types',
+      corps['feed_types'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final p in provendes) (p.id, p.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.feedTypes)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FeedTypesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // ⚠️ Lignes UNIQUES : le serveur acquitte sous le nom de la clé (`elevage_numbering`, `company_settings`),
+    // l'identifiant envoyé avec la ligne — la ligne locale porte la clé fixe `unique`.
+    accepte += await _acquitter(
+      'elevage_numbering',
+      corps['elevage_numbering'],
+      (ids, statut) => _marquerSiInchangee(
+        [
+          for (final n in numerotations)
+            (ParametresElevageCles.numerotation, n.updatedAt),
+        ],
+        ids,
+        (_, saisie) =>
+            (_db.update(_db.elevageNumberingSettings)..where(
+                  (t) => Expression.and([
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  ElevageNumberingSettingsCompanion(syncStatus: Value(statut)),
+                ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'company_settings',
+      corps['company_settings'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in entreprise) (ParametresElevageCles.rappelSoins, e.updatedAt)],
+        ids,
+        (_, saisie) =>
+            (_db.update(_db.companySettings)..where(
+                  (t) => Expression.and([
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(CompanySettingsCompanion(syncStatus: Value(statut))),
       ),
       motifs,
       (n) => rejete += n,
@@ -3505,6 +3904,23 @@ class SyncEngine {
   ) async {
     for (final (id, statutMetier) in envoyes) {
       if (ids.contains(id)) await marquer(id, statutMetier);
+    }
+  }
+
+  /// Ticket H9b — acquitte ou refuse des Paramètres Élevage. [envoyes] = (identifiant, instant de saisie) de ce
+  /// qui est PARTI.
+  ///
+  /// ⚠️⚠️ **LE STATUT NE CHANGE QUE SI LA LIGNE EST ENCORE CELLE QUI EST PARTIE** (même règle que
+  /// [_marquerCourriers] et [_marquerParStatut]) : une ration corrigée PENDANT l'envoi garde un instant de
+  /// saisie plus récent, reste `pending` et repart au prochain envoi — sinon l'accusé de l'ancienne version la
+  /// marquerait `synced` et la correction ne partirait jamais.
+  Future<void> _marquerSiInchangee(
+    List<(String, DateTime?)> envoyes,
+    List<String> ids,
+    Future<void> Function(String id, DateTime? saisie) marquer,
+  ) async {
+    for (final (id, saisie) in envoyes) {
+      if (ids.contains(id)) await marquer(id, saisie);
     }
   }
 
@@ -3862,6 +4278,53 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket H9b — Paramètres Élevage refusés : « Relancer » les remet en file, comme les autres tables.
+      'feed_ration_standards' =>
+        () =>
+            (_db.update(
+              _db.feedRationStandards,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FeedRationStandardsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'prophylaxis_schedule_standards' =>
+        () =>
+            (_db.update(
+              _db.prophylaxisScheduleStandards,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ProphylaxisScheduleStandardsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'feed_types' =>
+        () =>
+            (_db.update(
+              _db.feedTypes,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FeedTypesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Lignes uniques : le refus porte le nom de la clé, la ligne locale est `unique`.
+      'elevage_numbering' =>
+        () =>
+            (_db.update(_db.elevageNumberingSettings)..where(
+                  (t) => t.syncStatus.equalsValue(SyncStatus.conflict),
+                ))
+                .write(
+                  const ElevageNumberingSettingsCompanion(
+                    syncStatus: Value(SyncStatus.pending),
+                  ),
+                ),
+      'company_settings' =>
+        () =>
+            (_db.update(_db.companySettings)..where(
+                  (t) => t.syncStatus.equalsValue(SyncStatus.conflict),
+                ))
+                .write(
+                  const CompanySettingsCompanion(
+                    syncStatus: Value(SyncStatus.pending),
+                  ),
+                ),
       _ => null,
     };
 
@@ -4245,6 +4708,64 @@ class SyncEngine {
     'updated_at': e.updatedAt.toUtc().toIso8601String(),
   };
 
+  /// Ticket H9b — ration telle que `RecordParametresElevageFromDeviceAction::ration()` la valide :
+  /// `ration_g_per_day` ENTIER (`integer|min:1`), `is_active = false` = archivage.
+  static Map<String, dynamic> _rationEnJson(FeedRationStandard r) => {
+    'id': r.id,
+    'species_code': r.speciesCode,
+    'stage_label': r.stageLabel,
+    'ration_g_per_day': r.rationGPerDay.round(),
+    'is_active': r.isActive,
+  };
+
+  /// Ticket H9b — échéance de prophylaxie (`prophylaxie()` de l'Action). Les bornes de cycle ne partent pas :
+  /// le serveur ne les lit pas (le web ne les saisit pas non plus).
+  static Map<String, dynamic> _echeanceEnJson(ProphylaxisScheduleStandard e) => {
+    'id': e.id,
+    'species_code': e.speciesCode,
+    'period_label': e.periodLabel,
+    'treatment': e.treatment,
+    'product_recommended': e.productRecommended,
+    'dosage': e.dosage,
+    'withdrawal_days': e.withdrawalDays,
+    'is_active': e.isActive,
+  };
+
+  /// Ticket H9b — type de provende (`provende()` de l'Action) : l'espèce part par son IDENTIFIANT
+  /// (`exists:livestock_species,id`), jamais par son libellé.
+  static Map<String, dynamic> _provendeEnJson(FeedType p) => {
+    'id': p.id,
+    'name': p.name,
+    'species_id': p.speciesId,
+    'standard_bag_weight_kg': p.standardBagWeightKg,
+    'price_per_kg': p.pricePerKg,
+    'is_active': p.isActive,
+  };
+
+  /// Ticket H9b — les neuf formats (`numerotation()` de l'Action). L'`id` n'est lu par aucune règle : il
+  /// sert au serveur à nommer la ligne dans un REFUS (`rejected[].id`), sans quoi le refus n'aurait pas de
+  /// destinataire au poste.
+  static Map<String, dynamic> _numerotationEnJson(ElevageNumberingSetting n) =>
+      {
+        'id': ParametresElevageCles.numerotation,
+        'bande_format': n.bandeFormat,
+        'lapine_prefix': n.lapinePrefix,
+        'male_prefix': n.malePrefix,
+        'truie_prefix': n.truiePrefix,
+        'verrat_prefix': n.verratPrefix,
+        'portee_prefix': n.porteePrefix,
+        'volaille_prefix': n.volaillePrefix,
+        'parc_prefix': n.parcPrefix,
+        'escargot_prefix': n.escargotPrefix,
+      };
+
+  /// Ticket H9b — `{rappel_soins_jours}`, SEUL champ de l'entreprise accepté par ce canal (`rappelSoins()`).
+  /// ⚠️ Aucune donnée d'identité ne part : elle reste un référentiel du serveur.
+  static Map<String, dynamic> _rappelSoinsEnJson(CompanySetting e) => {
+    'id': ParametresElevageCles.rappelSoins,
+    'rappel_soins_jours': e.rappelSoinsJours,
+  };
+
   Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {
     'id': v.id,
     'customer_id': v.customerId,
@@ -4396,4 +4917,13 @@ class SyncEngine {
       '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
+}
+
+/// Ticket H9b — identifiants sous lesquels le serveur acquitte (ou refuse) les deux LIGNES UNIQUES des
+/// Paramètres Élevage (`RecordParametresElevageFromDeviceAction::numerotation()` rend `elevage_numbering`,
+/// `rappelSoins()` rend `company_settings`). Le poste les envoie aussi comme `id` de la ligne : un refus a
+/// ainsi un destinataire.
+abstract final class ParametresElevageCles {
+  static const numerotation = 'elevage_numbering';
+  static const rappelSoins = 'company_settings';
 }

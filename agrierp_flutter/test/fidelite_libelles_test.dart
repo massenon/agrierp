@@ -295,10 +295,9 @@ void main() {
       'lib/features/achats/achats_modales.dart',
     ],
     'bons-commande.html': ['lib/features/achats/achats_commandes_screen.dart'],
-    'parametres-elevage.html': [
-      'lib/features/elevage/parametres_elevage_screen.dart',
-      'lib/features/elevage/parametres_elevage_repository.dart',
-    ],
+    // Ticket H9 : le Blade fait foi. `parametres-elevage.html` ne se compare plus à la maquette : onglets,
+    // titres, colonnes, modales, boutons et messages sont lus dans `parametres-elevage.blade.php` et
+    // `ParametresElevage.php` par `parametres_elevage_blade_test.dart`.
     // Les quatre onglets du hub Clients et Créances (ticket F0.43).
     'liste-clients.html': [
       'lib/features/clients/clients_creances_screen.dart',
@@ -815,9 +814,8 @@ void main() {
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
-    'parametres-elevage.html': {
-      'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-    },
+    // Ticket H9 : `parametres-elevage.html` est contrôlée contre le Blade — son exemption « Exporter PDF »
+    // (bouton absent du Blade) part avec la page.
     // ── Ticket F0.65 — Fiche Sujet. Les écarts sont ceux de la page web (ticket
     //    Laravel 14.16), qui a construit l'écran « après arbitrage explicite du
     //    client » en écartant ce qui n'a aucune source réelle.
@@ -1120,7 +1118,9 @@ void main() {
   /// Ticket H7 : le Blade fait foi — 268 → 239. Les 29 couples masqués de
   /// `suivi-reproduction.html` sortent du compte avec la page (contrôlée contre le Blade).
   /// H8 / H8b (19/10/2026) : 239 → 237 (« Résumé sanitaire » et « Planifier une Intervention » portés).
-  const plafondManquesMasques = 237;
+  /// H9 / H9b (19/10/2026) : 237 → 210. Les 27 couples masqués de `parametres-elevage.html` sortent du compte
+  /// avec la page (contrôlée contre le Blade).
+  const plafondManquesMasques = 210;
 
   for (final entree in portages.entries) {
     final page = entree.key;

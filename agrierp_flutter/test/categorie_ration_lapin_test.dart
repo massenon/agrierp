@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/elevage/categorie_ration_lapin.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -178,6 +179,8 @@ void main() {
           speciesCode: 'cuniculture',
           stageLabel: libelle,
           rationGPerDay: g,
+          isActive: true,
+          syncStatus: SyncStatus.synced,
         );
 
     // Rations VOLONTAIREMENT différentes des secours (150/40/70, comme le

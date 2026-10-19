@@ -46,8 +46,9 @@ void main() {
     // Ticket H6 : le Blade fait foi — `elevage-dashboard.html` n'est plus comparé à la maquette :
     // ses tableaux (GMQ, Analyse Sanitaire, Prévision) suivent `dashboard-elevage.blade.php`, colonne
     // par colonne et dans l'ordre, dans `dashboard_elevage_blade_test.dart`.
-    'parametres-elevage.html':
-        'lib/features/elevage/parametres_elevage_screen.dart',
+    // Ticket H9 : le Blade fait foi — `parametres-elevage.html` n'est plus comparé à la maquette (« Ration
+    // (g/tête/jour) », « Prix Indicatif (FCFA/Kg) ») : ses trois tableaux suivent `parametres-elevage.blade.php`,
+    // colonne par colonne et dans l'ordre, dans `parametres_elevage_blade_test.dart`.
     'liste-clients.html': 'lib/features/clients/clients_creances_screen.dart',
     'suivi-dettes.html': 'lib/features/clients/clients_creances_screen.dart',
     'historique-avances.html':

@@ -17,6 +17,11 @@ part 'app_database.g.dart';
 // plutôt que d'accepter puis d'écraser au pull suivant. Les rendre modifiables
 // localement produirait une saisie que l'utilisateur verrait disparaître sans
 // explication à la synchronisation suivante.
+//
+// ⚠️ EXCEPTION (ticket H9b, décision client D-H9 du 19/10/2026) : les barèmes
+// d'élevage (rations, prophylaxie, provendes, numérotation, délai du rappel des
+// soins) sont désormais ACCEPTÉS par le serveur (`manage-elevage`) et envoyés
+// par le poste — voir [BaremeElevageSynchronisable].
 
 class ProductCategories extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
@@ -181,6 +186,31 @@ class LivestockLots extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket H9b (décision client D-H9 du 19/10/2026 : « Paramètres Élevage modifiables sur le poste et le web »)
+/// — colonnes communes aux trois barèmes d'élevage désormais ENVOYÉS par le poste (rations, prophylaxie,
+/// provendes).
+///
+/// ⚠️ Ce n'est pas [SyncColumns] : ces tables existaient avant la décision, leurs lignes tirées n'ont ni
+/// appareil d'origine ni instant de saisie, et le serveur (`RecordParametresElevageFromDeviceAction`) n'en lit
+/// aucun. Elles reçoivent donc, comme `customers` au ticket F0.72, un statut de synchronisation par défaut
+/// `synced` (tout ce qui descend du serveur l'est) et un instant de saisie NULLABLE.
+///
+/// ⚠️⚠️ **SUPPRIMER = ARCHIVER** (ticket 14.55 du web) : `is_active = false`, la ligne disparaît de l'écran
+/// et des calculs (provende, protocole) mais reste restaurable côté serveur. Un barème effacé faisait
+/// disparaître la provende calculée de toute une catégorie sans que rien ne l'explique.
+mixin BaremeElevageSynchronisable on Table {
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+}
+
 /// Ration normative par espèce et par stade, en grammes par jour.
 ///
 /// ⚠️ RÉFÉRENTIEL ÉDITABLE CÔTÉ SERVEUR (écran Paramètres > Élevage) : ces
@@ -190,7 +220,11 @@ class LivestockLots extends Table {
 ///
 /// ⚠️ Ils sont servis SANS filtre `since`, pour qu'un poste resté longtemps
 /// hors ligne ne garde pas un grammage périmé qui fausserait tous ses calculs.
-class FeedRationStandards extends Table {
+///
+/// Ticket H9b (décision client D-H9 du 19/10/2026) — **MODIFIABLE AU POSTE COMME AU WEB** : création,
+/// modification et archivage (`is_active = false`, jamais de suppression) partent en `pending` vers
+/// `RecordParametresElevageFromDeviceAction` (droit `manage-elevage`). Voir [BaremeElevageSynchronisable].
+class FeedRationStandards extends Table with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get speciesCode => text()();
   TextColumn get stageLabel => text()();
@@ -216,7 +250,10 @@ class FeedRationStandards extends Table {
 ///
 /// ⚠️ Le libellé de l'espèce voyage avec le type — le poste n'a pas de table
 /// des espèces, exactement comme pour le code espèce des bandes (F0.14).
-class FeedTypes extends Table {
+///
+/// Ticket H9b (D-H9) — modifiable au poste comme au web, archivage logique : voir
+/// [BaremeElevageSynchronisable].
+class FeedTypes extends Table with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get name => text()();
   TextColumn get speciesId => text().nullable()();
@@ -240,8 +277,21 @@ class FeedTypes extends Table {
 ///
 /// ⚠️ **UNE SEULE LIGNE, `id = 'unique'`.** Le serveur sert un objet, pas une
 /// collection : la clé fixe évite qu'un tirage n'empile des variantes.
+///
+/// Ticket H9b (D-H9) — les neuf formats s'enregistrent au poste comme au web (`saveNumbering()`) et partent
+/// sous la clé `elevage_numbering`. ⚠️ PAS de `is_active` : la table est un singleton, jamais archivé (le
+/// serveur n'en a pas non plus).
 class ElevageNumberingSettings extends Table {
   TextColumn get id => text().withDefault(const Constant('unique'))();
+
+  /// Ticket H9b — `pending` tant que l'enregistrement du poste n'est pas acquitté ; `conflict` s'il est
+  /// refusé (motif dans `sync_conflicts`). Défaut `synced` : ce qui descend du serveur l'est.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket H9b — instant de la SAISIE au poste (nul pour une ligne tirée) : seule la version partie est
+  /// acquittée.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 
   TextColumn get bandeFormat => text().nullable()();
   TextColumn get lapinePrefix => text().nullable()();
@@ -263,7 +313,11 @@ class ElevageNumberingSettings extends Table {
 /// d'attente se corrigent depuis l'écran Paramètres > Élevage. Servi sans
 /// filtre `since` pour qu'un poste longtemps hors ligne ne propose pas un
 /// protocole périmé — sur un sujet sanitaire, la valeur périmée est le pire cas.
-class ProphylaxisScheduleStandards extends Table {
+///
+/// Ticket H9b (D-H9) — modifiable au poste comme au web, archivage logique : voir
+/// [BaremeElevageSynchronisable].
+class ProphylaxisScheduleStandards extends Table
+    with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get speciesCode => text()();
   TextColumn get periodLabel => text()();
@@ -282,6 +336,11 @@ class ProphylaxisScheduleStandards extends Table {
   TextColumn get productRecommended => text().nullable()();
   TextColumn get dosage => text().nullable()();
   IntColumn get withdrawalDays => integer().withDefault(const Constant(0))();
+
+  /// Ticket H9 — instant de création côté serveur (`created_at`), pour TRIER COMME LE WEB
+  /// (`getProphylaxiesProperty` : `orderBy('created_at')`). Une échéance créée au poste prend l'instant de sa
+  /// saisie ; nul pour une ligne tirée d'un serveur qui ne le sert pas.
+  DateTimeColumn get createdAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -515,6 +574,19 @@ class CompanySettings extends Table {
   TextColumn get rccm => text().nullable()();
   BoolColumn get tvaEnabled => boolean().withDefault(const Constant(false))();
   RealColumn get tvaDefaultRate => real().nullable()();
+
+  /// Ticket H9b (D-H9) — délai du rappel des soins planifiés (règle R-SOINS-01), en jours (0 à 30), servi
+  /// au tirage et réglé au poste comme au web (`ParametresElevage::saveRappelSoins()`). Nul tant que rien
+  /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
+  IntColumn get rappelSoinsJours => integer().nullable()();
+
+  /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
+  /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket H9b — instant de la saisie du délai au poste (nul pour une ligne tirée).
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1498,7 +1570,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 41;
+  int get schemaVersion => 42;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1892,6 +1964,54 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(veterinaryCalendarEvents);
         }
       }
+
+      // v42 — ticket H9b (D-H9) : Paramètres Élevage modifiables au poste comme au web. Les trois barèmes
+      // reçoivent l'archivage logique et leur statut de synchronisation ; la numérotation et l'entreprise
+      // (délai du rappel des soins) leur statut ; la prophylaxie son instant de création (tri du web, H9).
+      if (from < 42) {
+        for (final (table, colonnes) in <(TableInfo, List<GeneratedColumn>)>[
+          (
+            feedRationStandards,
+            [
+              feedRationStandards.isActive,
+              feedRationStandards.syncStatus,
+              feedRationStandards.updatedAt,
+            ],
+          ),
+          (
+            prophylaxisScheduleStandards,
+            [
+              prophylaxisScheduleStandards.isActive,
+              prophylaxisScheduleStandards.syncStatus,
+              prophylaxisScheduleStandards.updatedAt,
+              prophylaxisScheduleStandards.createdAt,
+            ],
+          ),
+          (
+            feedTypes,
+            [feedTypes.isActive, feedTypes.syncStatus, feedTypes.updatedAt],
+          ),
+          (
+            elevageNumberingSettings,
+            [
+              elevageNumberingSettings.syncStatus,
+              elevageNumberingSettings.updatedAt,
+            ],
+          ),
+          (
+            companySettings,
+            [
+              companySettings.rappelSoinsJours,
+              companySettings.syncStatus,
+              companySettings.updatedAt,
+            ],
+          ),
+        ]) {
+          for (final colonne in colonnes) {
+            await _ajouterColonneSiAbsente(m, table, colonne);
+          }
+        }
+      }
     },
   );
 
@@ -1992,6 +2112,13 @@ class AppDatabase extends _$AppDatabase {
     // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
     'infirmary_records',
     'veterinary_calendar_events',
+    // Ticket H9b (D-H9) — Paramètres Élevage modifiables au poste (le délai du rappel des soins vit dans
+    // `company_settings`).
+    'feed_ration_standards',
+    'prophylaxis_schedule_standards',
+    'feed_types',
+    'elevage_numbering_settings',
+    'company_settings',
   ];
 
   /// Nombre d'enregistrements en attente d'envoi, toutes tables confondues.
@@ -2058,8 +2185,18 @@ class AppDatabase extends _$AppDatabase {
 
   /// Efface les données d'activité, remet à zéro les soldes qui en dérivent (stock, trésorerie,
   /// comme le serveur) et le curseur de tirage. Rend le nombre d'enregistrements EN ATTENTE perdus.
+  ///
+  /// ⚠️ Ticket H9b — SEULES LES TABLES EFFACÉES COMPTENT : un barème d'élevage (ou un produit) en attente est
+  /// conservé par la purge et repartira ; le compter dans « saisies perdues » annoncerait une perte qui n'a pas
+  /// eu lieu.
   Future<int> purgerDonneesDActivite() async {
-    final perdus = await pendingCount();
+    final effacees = tablesEnvoyees.where(tablesDActivite.contains);
+    final perdus = effacees.isEmpty
+        ? 0
+        : (await customSelect(
+            'SELECT COUNT(*) AS n FROM ('
+            '${effacees.map((t) => "SELECT 1 FROM $t WHERE sync_status <> 'synced'").join(' UNION ALL ')})',
+          ).getSingle()).read<int>('n');
     await transaction(() async {
       for (final table in tablesDActivite) {
         await customStatement('DELETE FROM $table');
