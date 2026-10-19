@@ -1382,6 +1382,10 @@ class SyncState extends Table {
   DateTimeColumn get lastPulledAt => dateTime().nullable()();
   DateTimeColumn get lastPushedAt => dateTime().nullable()();
 
+  /// Ticket H2 — fin de la dernière synchronisation ABOUTIE (tirage puis envoi, refus compris : la liaison a
+  /// marché). À l'heure du SERVEUR : c'est l'instant du tirage de cette synchronisation, jamais l'horloge du poste.
+  DateTimeColumn get lastSucceededAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1457,7 +1461,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 39;
+  int get schemaVersion => 40;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1836,6 +1840,11 @@ class AppDatabase extends _$AppDatabase {
           livestockLots.lotSourceId,
         );
       }
+
+      // v40 — ticket H2 : instant de la dernière synchronisation aboutie (modale « Synchronisation »).
+      if (from < 40) {
+        await _ajouterColonneSiAbsente(m, syncState, syncState.lastSucceededAt);
+      }
     },
   );
 
@@ -1888,6 +1897,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> noterEtatDeSynchronisation({
     DateTime? tire,
     DateTime? envoye,
+    DateTime? reussi,
   }) async {
     await transaction(() async {
       final actuel = await etatDeSynchronisation();
@@ -1898,55 +1908,68 @@ class AppDatabase extends _$AppDatabase {
           id: const Value(1),
           lastPulledAt: Value(tire ?? actuel?.lastPulledAt),
           lastPushedAt: Value(envoye ?? actuel?.lastPushedAt),
+          lastSucceededAt: Value(reussi ?? actuel?.lastSucceededAt),
         ),
       );
     });
   }
 
+  /// Ticket H2 — TABLES QUE LE POSTE ENVOIE au serveur (`SyncEngine._pousser`), nom SQL.
+  ///
+  /// 🔴 Le compteur « en attente » était une liste tenue à la main, ajoutée table par table (F0.35, F0.45,
+  /// F0.48, F0.78…) : huit tables envoyées y manquaient (produits, fournisseurs, clients, règlements, avances,
+  /// imputations, retours, remboursements). Un client ou un article créé hors ligne affichait « 0 en
+  /// attente », et la confirmation de fermeture laissait quitter sans prévenir. Un test compare désormais
+  /// cette liste aux tables lues par `_pousser` : la prochaine table envoyée ne peut plus être oubliée ici.
+  static const tablesEnvoyees = <String>[
+    'livestock_daily_entries',
+    'sales',
+    'stock_adjustments',
+    'veterinary_records',
+    'expenses',
+    'livestock_reproduction_events',
+    'purchases',
+    'attendance_records',
+    'products',
+    'suppliers',
+    'supplier_payments',
+    'customers',
+    'mails',
+    'archived_documents',
+    'administrative_documents',
+    'customer_advances',
+    'advance_imputations',
+    'purchase_returns',
+    'supplier_refunds',
+    'livestock_transfers',
+  ];
+
   /// Nombre d'enregistrements en attente d'envoi, toutes tables confondues.
   /// C'est le chiffre porté par le badge du bouton « Synchroniser ».
+  ///
+  /// ⚠️ LES REFUSÉS COMPTENT AUSSI. Un enregistrement en conflit n'est PAS
+  /// arrivé au serveur : l'exclure du compteur afficherait « 0 en attente »
+  /// alors que des ventes n'existent que sur ce poste — et l'utilisateur
+  /// éteindrait la machine en croyant son travail à l'abri.
   Future<int> pendingCount() async {
-    // ⚠️ LES REFUSÉS COMPTENT AUSSI. Un enregistrement en conflit n'est PAS
-    // arrivé au serveur : l'exclure du compteur afficherait « 0 en attente »
-    // alors que des ventes n'existent que sur ce poste — et l'utilisateur
-    // éteindrait la machine en croyant son travail à l'abri.
-    final enAttente = await customSelect(
+    final c = await compteursSynchronisation();
+    return c.aEnvoyer + c.refuses;
+  }
+
+  /// Ticket H2 — enregistrements non synchronisés, séparés en « à envoyer » (`pending`) et « refusés par le
+  /// serveur » (`conflict`), sur toutes les [tablesEnvoyees]. Lu par la modale « Synchronisation ».
+  Future<({int aEnvoyer, int refuses})> compteursSynchronisation() async {
+    final unions = tablesEnvoyees
+        .map((t) => "SELECT sync_status FROM $t WHERE sync_status <> 'synced'")
+        .join(' UNION ALL ');
+    final ligne = await customSelect(
       "SELECT "
-      "(SELECT COUNT(*) FROM livestock_daily_entries WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM sales WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM stock_adjustments WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM veterinary_records WHERE sync_status <> 'synced') + "
-      // 🔴→✅ TICKET F0.35 — `expenses` MANQUAIT A CE COMPTE depuis le ticket
-      // F0.18 qui l'a rendue envoyable. Une depense saisie hors ligne
-      // n'apparaissait donc PAS dans le badge « en attente » : c'est
-      // exactement le cas que le commentaire ci-dessus decrit, et il vivait
-      // deux lignes plus bas.
-      "(SELECT COUNT(*) FROM expenses WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM livestock_reproduction_events "
-      "WHERE sync_status <> 'synced') + "
-      // 🔴 TICKET F0.45 — un achat saisi hors ligne engage la ferme (stock,
-      // caisse, dette) : l'omettre du badge afficherait « 0 en attente » alors
-      // qu'une livraison n'existe que sur ce poste.
-      "(SELECT COUNT(*) FROM purchases WHERE sync_status <> 'synced') + "
-      // 🔴 TICKET F0.48 — un pointage saisi a 7 h n'existe que sur ce poste
-      // tant qu'il n'est pas parti : la paie du mois se calcule dessus.
-      "(SELECT COUNT(*) FROM attendance_records "
-      "WHERE sync_status <> 'synced') + "
-      // TICKET F0.78 — un courrier saisi au poste n'existe que sur ce poste tant que le
-      // serveur ne l'a pas acquitté (et ne lui a pas attribué sa référence).
-      "(SELECT COUNT(*) FROM mails WHERE sync_status <> 'synced') + "
-      // TICKET F0.79 — un document archivé saisi ou retiré au poste n'existe (ou n'est
-      // retiré) que sur ce poste tant que le serveur ne l'a pas acquitté.
-      "(SELECT COUNT(*) FROM archived_documents WHERE sync_status <> 'synced') + "
-      // TICKET F0.80 — un document administratif saisi ou retiré au poste n'existe (ou n'est
-      // retiré) que sur ce poste tant que le serveur ne l'a pas acquitté.
-      "(SELECT COUNT(*) FROM administrative_documents WHERE sync_status <> 'synced') + "
-      // Ticket 15.46 — un transfert entre bandes créé ou annulé au poste n'existe que sur ce poste.
-      "(SELECT COUNT(*) FROM livestock_transfers WHERE sync_status <> 'synced') "
-      "AS total",
+      "COALESCE(SUM(CASE WHEN sync_status = 'conflict' THEN 0 ELSE 1 END), 0) AS a_envoyer, "
+      "COALESCE(SUM(CASE WHEN sync_status = 'conflict' THEN 1 ELSE 0 END), 0) AS refuses "
+      "FROM ($unions)",
     ).getSingle();
 
-    return enAttente.read<int>('total');
+    return (aEnvoyer: ligne.read<int>('a_envoyer'), refuses: ligne.read<int>('refuses'));
   }
 
   /// Ticket 15.50 — tables d'ACTIVITÉ effacées quand le serveur a été réinitialisé : le miroir de

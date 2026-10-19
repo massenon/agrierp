@@ -21916,3 +21916,52 @@ Tout soin du calendrier vétérinaire au statut « planifié », rattaché à un
 ### Mesures
 - Web : `RationVolailleTest` (4). Suite Feature : 1 677 verts.
 - Poste : `ration_volaille_test.dart` (5, dont la parité EXÉCUTÉE sur 60 barèmes au hasard), `sections_deux_cotes_test.dart` (5, mutation vérifiée sur le refus du départ), tests mensuels à la casse du web. Suite : 2 052 verts, 16 sautés, 0 rouge.
+
+---
+
+## Audit de fidélité des écrans clés et Sprint H (19/10/2026)
+
+Audit écran par écran, web (Blade, maître) contre poste : châssis, Tableau de bord, Gestion Élevage, Dashboard Élevage, Suivi Reproduction, Soins et vaccins, Paramètres Élevage, synchronisation. Les directives d'ergonomie du client servent de liste de contrôle ; toutes les valeurs viennent du Blade (plusieurs valeurs des directives — `#0E2A1D`, 260 px, en-têtes `#0F172A`, initiales « MO » — sont contredites par le Blade et ne sont pas appliquées). Résultat : `AUDIT_FIDELITE_ECRANS.md` ; PRD `docs/prd/synchronisation-barre-superieure.md` ; tickets H1 à H10 et décisions D-SYNC-1 à 6, D-H8, D-H9 dans `PLAN_FINALISATION.md`.
+
+Constat transversal : la plupart des écrans du poste ont été portés depuis la MAQUETTE, pas depuis le Blade ; leurs garde-fous comparent à la maquette. Là où le Blade a réécrit la maquette, le poste diverge du maître sans qu'aucun test ne le signale (H10).
+
+---
+
+## Ticket H3 — Bouton « Synchroniser » et état des postes au web (19/10/2026)
+
+### Décision client
+« Créer un bouton de synchronisation dans le haut, avec une modale, dans le poste et la vue Blade » (19/10/2026). Elle revient sur l'exclusion du Sprint 0 §0.2 (« un bouton Synchroniser serait un décor ») en donnant au web un objet RÉEL : le serveur ne synchronise rien, il montre l'état des postes.
+
+### Corrections
+- Table serveur `journal_synchronisation` (UUID, jamais tirée ni poussée) : une ligne par tirage et par envoi, poste = nom du jeton Sanctum, compteurs reçus / acceptés / refusés. Écrite après le calcul de la réponse ; un échec du journal ne fait jamais échouer la synchronisation. Vidée à la réinitialisation (15.50).
+- Barre supérieure web, administrateur (`manage-users`, comme « Vider les sessions ») : bouton `sync` → modale « Synchronisation / Postes de la ferme » : un poste par jeton non expiré, dernier contact, dernier envoi, acceptés / refusés, pastille « À jour » / « Inactif depuis N jours » (> 3 j, D-SYNC-6) / « Refus à corriger » (prioritaire).
+
+### Mesures
+- `EtatSynchronisationPostesTest` (4) : droits des 4 rôles ; jeu P1 / P2 / P3 du PRD ; journal d'un tirage et d'un envoi 1 accepté / 1 refusé ; journal en panne sans effet. Mutation : retirer la journalisation de l'envoi rougit le test. Suite Feature : 1 681 verts.
+- Non vérifié : rendu navigateur (Dusk non lancé ici), `php artisan migrate` sur MySQL (migration `2026_10_19_000001`).
+
+---
+
+## Ticket H2 (+ H1, première partie) — Synchronisation dans la barre supérieure du poste, Accès Rapide, barre latérale du web (19/10/2026)
+
+### Constat
+- 🔴 Le seul bouton « Synchroniser » était en pied de barre latérale, et la barre ne défilait pas : il devenait inatteignable sur un petit écran. La barre supérieure n'avait qu'une pastille non cliquable.
+- 🔴 `pendingCount()` oubliait 8 tables pourtant envoyées (produits, fournisseurs, clients, règlements, avances, imputations, retours, remboursements) : un client créé hors ligne affichait « 0 en attente » et la fermeture ne prévenait pas.
+- 🔴 Le panneau « Accès Rapide » du web (bouton flottant, 13 entrées) n'existait pas au poste.
+
+### Corrections (poste)
+- `AppDatabase.tablesEnvoyees` (20 tables) : `pendingCount()` et `compteursSynchronisation()` (à envoyer / refusés) en sont dérivés. Drift v40 : `sync_state.last_succeeded_at`, posé à l'heure du SERVEUR (tirage) à chaque synchronisation aboutie, refus compris.
+- Barre supérieure : bouton `sync` à la place de la pastille, badge sur le modèle de la cloche web (« 9+ », rouge s'il y a un refus, émeraude sinon). Modale « Synchronisation » : liaison, « En attente d'envoi », « Refusés par le serveur », « Dernière synchronisation réussie », dernières réception et envoi, résultat de la dernière tentative avec TOUS les motifs, « Synchroniser maintenant » / « Voir le détail » / « Fermer ». Le bouton du pied de barre (`sync_button.dart`) est retiré.
+- Composant unique `ToastAgri` (haut droite, 3,5 s, succès / erreur / avertissement, valeurs de `toast-container.blade.php`), employé par la modale ; les autres écrans gardent leurs SnackBar jusqu'à la suite de H1.
+- Barre latérale aux valeurs du web : 288 px, dégradé, « Agri » blanc + « ERP » jaune, sous-titre, séparateurs, navigation qui DÉFILE, lien icône 20 / libellé 13, entrée active jaune, rôle technique en capitales. Seules les entrées autorisées sont affichées et un groupe vide est masqué, comme les `@hasanyrole` du web (l'ancien message « vit sur l'application web » était faux pour un refus de droit).
+- Bouton flottant et tiroir « Accès Rapide » (13 entrées, 3 groupes, libellés et couleurs du Blade). Le bouton « Visite guidée » du web est inerte : non porté.
+- Cloche : plafond « 9+ » comme le web.
+- Tableau de bord : grilles de KPI à hauteur fixe (la barre à 288 px faisait déborder les cartes en 1280 px).
+
+### Mesures
+- `synchronisation_barre_test.dart` (4) : jeu du PRD (2 fiches, 1 client, 1 article en attente, 1 vente refusée) → 4 / 1, badge « 5 » rouge, modale « — » pour la dernière réussite, hors ligne en avertissement ; la barre latérale défile en 1280 × 600.
+- `compteur_attente_test.dart` : `tablesEnvoyees` == tables lues par `_pousser` (lecture du source). Mutation : retirer `customers` rougit 4 tests.
+- `acces_rapide_test.dart` (3) : entrées, icônes, groupes et couleurs LUS DANS LE BLADE ; navigation et fermeture. Mutation : « Rapports & Exports » rougit le test.
+- `test/coque_poste.dart` : coque complète partagée (tests du châssis, captures).
+- Suite : 2 062 verts, 16 sautés, 0 rouge ; `flutter analyze` propre.
+- Reste de H1 (non fait) : menu du compte (Paramètres, Déconnexion), titre de la barre supérieure, recherche globale, ruban replié, migration des SnackBar vers `ToastAgri`, icônes Material Symbols « Outlined ».

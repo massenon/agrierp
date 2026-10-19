@@ -712,10 +712,12 @@ void main() {
       },
     );
 
-    testWidgets('au-delà de 99, « 99+ »', (tester) async {
+    // Ticket H1 — plafond du web (`notification-bell.blade.php`) : « 9+ », et non plus « 99+ ».
+    testWidgets('au-delà de 9, « 9+ » comme la cloche du web', (tester) async {
       await barre(tester, nonLues: 150, onNotifications: () {});
 
-      expect(find.text('99+'), findsOneWidget);
+      expect(find.text('9+'), findsOneWidget);
+      expect(find.text('99+'), findsNothing);
     });
 
     testWidgets('le menu montre QUATRE notifications au plus', (tester) async {

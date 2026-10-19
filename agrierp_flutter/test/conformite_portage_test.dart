@@ -189,8 +189,9 @@ void main() {
     () {
       final source = controleur.readAsStringSync();
       final debut = source.indexOf('public function pull(');
-      final reponse = source.indexOf('return response()->json([', debut);
-      final fin = source.indexOf(']);', reponse);
+      // Ticket H3 : le corps du tirage est construit dans `$reponse = [ … ];` (journalisé avant d'être renvoyé).
+      final reponse = source.indexOf(r'$reponse = [', debut);
+      final fin = source.indexOf('];', reponse);
       expect(debut, greaterThan(-1));
       expect(reponse, greaterThan(debut));
       final bloc = source.substring(reponse, fin);

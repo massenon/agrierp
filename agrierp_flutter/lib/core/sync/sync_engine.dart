@@ -173,6 +173,13 @@ class SyncEngine {
       }
     }
 
+    // Ticket H2 — la liaison a abouti (refus compris) : « Dernière synchronisation réussie » prend l'heure
+    // du SERVEUR, celle du tirage qui vient d'avoir lieu (`server_time`), jamais l'horloge du poste.
+    final etat = await _db.etatDeSynchronisation();
+    if (etat?.lastPulledAt != null) {
+      await _db.noterEtatDeSynchronisation(reussi: etat!.lastPulledAt);
+    }
+
     return SyncOutcome(
       tire: tire,
       accepte: accepte,

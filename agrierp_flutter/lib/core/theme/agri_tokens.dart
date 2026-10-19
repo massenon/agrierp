@@ -135,6 +135,10 @@ class AgriTypography {
   static const double xsInterligne = 16;
 
   static const double sm = 14;
+
+  /// Libellé d'un lien de la barre latérale : `text-[13px]` EXPLICITE de `components/sidebar-link.blade.php`
+  /// (ticket H1). Ce n'est pas un `text-xs` mal mesuré : le web l'écrit en pixels.
+  static const double lienBarreLaterale = 13;
   static const double base = 16;
   static const double lg = 18;
   static const double xl = 20;

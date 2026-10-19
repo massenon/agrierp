@@ -46,6 +46,8 @@ class BarreSuperieure extends StatelessWidget {
     required this.ecran,
     required this.enAttente,
     required this.onBasculerMenu,
+    this.refuses = 0,
+    this.onSynchroniser,
     this.menuOuvert = true,
     this.nomUtilisateur,
     this.onMonProfil,
@@ -85,8 +87,14 @@ class BarreSuperieure extends StatelessWidget {
   /// Écran courant — seconde partie du fil d'Ariane.
   final String ecran;
 
-  /// Nombre d'enregistrements en attente d'envoi, pour l'indicateur Sync.
+  /// Nombre d'enregistrements non synchronisés (à envoyer + refusés), badge du bouton « Synchroniser ».
   final int enAttente;
+
+  /// Dont refusés par le serveur : le badge passe au rouge (ticket H2, EF3).
+  final int refuses;
+
+  /// Ouvre la modale « Synchronisation » (ticket H2). `null` : bouton inerte (aucun moteur branché).
+  final VoidCallback? onSynchroniser;
 
   final VoidCallback onBasculerMenu;
   final bool menuOuvert;
@@ -158,13 +166,14 @@ class BarreSuperieure extends StatelessWidget {
           ),
           const SizedBox(width: AgriSpacing.md),
 
-          // 4. Indicateur Sync.
+          // 4. Bouton « Synchroniser » (ticket H2, même place et même gabarit qu'au web, entre la recherche
+          // et la cloche). Il remplace la pastille non cliquable et le bouton du pied de la barre latérale,
+          // inatteignable quand celle-ci débordait.
           //
-          // ⚠️ IL COMPTE CE QUI ATTEND D'ÊTRE ENVOYÉ, pas un état décoratif :
-          // c'est le seul chiffre qui dise à l'animalier si sa journée est
-          // partie.
-          _pastilleSync(),
-          const SizedBox(width: AgriSpacing.md),
+          // ⚠️ SON BADGE COMPTE CE QUI N'EST PAS ENCORE AU SERVEUR, pas un état décoratif : c'est le seul
+          // chiffre qui dise à l'animalier si sa journée est partie.
+          _boutonSynchroniser(),
+          const SizedBox(width: AgriSpacing.sm),
 
           // 5. Cloche de notifications, avec son compteur et son menu des
           // quatre plus récentes (`dd-notif` de la maquette).
@@ -350,7 +359,8 @@ class BarreSuperieure extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AgriRadius.full),
                 ),
                 child: Text(
-                  n > 99 ? '99+' : '$n',
+                  // Plafond du web : « 9+ » (`notification-bell.blade.php`), pas « 99+ ».
+                  n > 9 ? '9+' : '$n',
                   style: const TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
@@ -461,38 +471,45 @@ class BarreSuperieure extends StatelessWidget {
       ),
   ];
 
-  Widget _pastilleSync() {
-    final aEnvoyer = enAttente > 0;
+  /// Badge sur le modèle de celui de la cloche (`notification-bell.blade.php`) : 16 px, 9 px gras, plafonné à
+  /// « 9+ ». Rouge s'il y a au moins un refus à corriger, émeraude sinon ; absent à 0 (PRD, EF3).
+  Widget _boutonSynchroniser() {
+    final badge = enAttente > 9 ? '9+' : '$enAttente';
 
-    return Container(
-      key: const Key('pastille-sync'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: aEnvoyer
-            ? AgriColors.accentYellow.withValues(alpha: 0.22)
-            : AgriColors.brandEmerald.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            aEnvoyer ? Icons.sync_problem : Icons.sync,
-            size: 14,
-            color: aEnvoyer ? AgriColors.brandForest : AgriColors.brandEmerald,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            aEnvoyer ? 'Sync · $enAttente en attente' : 'Sync',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: aEnvoyer
-                  ? AgriColors.brandForest
-                  : AgriColors.brandEmerald,
+    return InkWell(
+      key: const Key('bouton-synchroniser'),
+      onTap: onSynchroniser,
+      borderRadius: BorderRadius.circular(AgriRadius.full),
+      child: Tooltip(
+        message: 'Synchroniser',
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.sync, size: 22, color: AgriColors.outline),
             ),
-          ),
-        ],
+            if (enAttente > 0)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  key: const Key('bouton-synchroniser-badge'),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: refuses > 0 ? AgriColors.errorRed : AgriColors.brandEmerald,
+                    borderRadius: BorderRadius.circular(AgriRadius.full),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

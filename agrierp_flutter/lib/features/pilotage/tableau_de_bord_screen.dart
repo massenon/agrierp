@@ -403,13 +403,18 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: moyen ? 4 : 2,
+    // ⚠️ HAUTEUR FIXE, PAS UN RAPPORT LARGEUR / HAUTEUR. Une carte KPI garde la hauteur de son contenu quelle que
+    // soit sa largeur (la grille web n'impose aucun rapport) : avec `childAspectRatio`, la barre latérale passée à
+    // 288 px comme au web (ticket H1) rétrécissait les cartes en 1280 px et leur contenu débordait.
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: moyen ? 1.9 : 1.5,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: moyen ? 4 : 2,
+        mainAxisSpacing: AgriSpacing.md,
+        crossAxisSpacing: AgriSpacing.md,
+        mainAxisExtent: 160,
+      ),
       children: cartes,
     );
   }
@@ -648,13 +653,16 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             ],
           ),
           const SizedBox(height: AgriSpacing.sm),
-          GridView.count(
-            crossAxisCount: 2,
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AgriSpacing.sm,
-            crossAxisSpacing: AgriSpacing.sm,
-            childAspectRatio: 2.6,
+            // Hauteur fixe, même raison que la grille des KPI.
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: AgriSpacing.sm,
+              crossAxisSpacing: AgriSpacing.sm,
+              mainAxisExtent: 68,
+            ),
             children: [
               for (var i = 0; i < mesures.length; i++)
                 Column(

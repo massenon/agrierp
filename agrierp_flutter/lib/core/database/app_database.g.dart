@@ -29849,8 +29849,25 @@ class $SyncStateTable extends SyncState
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lastSucceededAtMeta = const VerificationMeta(
+    'lastSucceededAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, lastPulledAt, lastPushedAt];
+  late final GeneratedColumn<DateTime> lastSucceededAt =
+      GeneratedColumn<DateTime>(
+        'last_succeeded_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    lastPulledAt,
+    lastPushedAt,
+    lastSucceededAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -29884,6 +29901,15 @@ class $SyncStateTable extends SyncState
         ),
       );
     }
+    if (data.containsKey('last_succeeded_at')) {
+      context.handle(
+        _lastSucceededAtMeta,
+        lastSucceededAt.isAcceptableOrUnknown(
+          data['last_succeeded_at']!,
+          _lastSucceededAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -29905,6 +29931,10 @@ class $SyncStateTable extends SyncState
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_pushed_at'],
       ),
+      lastSucceededAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_succeeded_at'],
+      ),
     );
   }
 
@@ -29918,7 +29948,16 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
   final int id;
   final DateTime? lastPulledAt;
   final DateTime? lastPushedAt;
-  const SyncStateData({required this.id, this.lastPulledAt, this.lastPushedAt});
+
+  /// Ticket H2 — fin de la dernière synchronisation ABOUTIE (tirage puis envoi, refus compris : la liaison a
+  /// marché). À l'heure du SERVEUR : c'est l'instant du tirage de cette synchronisation, jamais l'horloge du poste.
+  final DateTime? lastSucceededAt;
+  const SyncStateData({
+    required this.id,
+    this.lastPulledAt,
+    this.lastPushedAt,
+    this.lastSucceededAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -29928,6 +29967,9 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     }
     if (!nullToAbsent || lastPushedAt != null) {
       map['last_pushed_at'] = Variable<DateTime>(lastPushedAt);
+    }
+    if (!nullToAbsent || lastSucceededAt != null) {
+      map['last_succeeded_at'] = Variable<DateTime>(lastSucceededAt);
     }
     return map;
   }
@@ -29941,6 +29983,9 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       lastPushedAt: lastPushedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastPushedAt),
+      lastSucceededAt: lastSucceededAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSucceededAt),
     );
   }
 
@@ -29953,6 +29998,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       id: serializer.fromJson<int>(json['id']),
       lastPulledAt: serializer.fromJson<DateTime?>(json['lastPulledAt']),
       lastPushedAt: serializer.fromJson<DateTime?>(json['lastPushedAt']),
+      lastSucceededAt: serializer.fromJson<DateTime?>(json['lastSucceededAt']),
     );
   }
   @override
@@ -29962,6 +30008,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       'id': serializer.toJson<int>(id),
       'lastPulledAt': serializer.toJson<DateTime?>(lastPulledAt),
       'lastPushedAt': serializer.toJson<DateTime?>(lastPushedAt),
+      'lastSucceededAt': serializer.toJson<DateTime?>(lastSucceededAt),
     };
   }
 
@@ -29969,10 +30016,14 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     int? id,
     Value<DateTime?> lastPulledAt = const Value.absent(),
     Value<DateTime?> lastPushedAt = const Value.absent(),
+    Value<DateTime?> lastSucceededAt = const Value.absent(),
   }) => SyncStateData(
     id: id ?? this.id,
     lastPulledAt: lastPulledAt.present ? lastPulledAt.value : this.lastPulledAt,
     lastPushedAt: lastPushedAt.present ? lastPushedAt.value : this.lastPushedAt,
+    lastSucceededAt: lastSucceededAt.present
+        ? lastSucceededAt.value
+        : this.lastSucceededAt,
   );
   SyncStateData copyWithCompanion(SyncStateCompanion data) {
     return SyncStateData(
@@ -29983,6 +30034,9 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       lastPushedAt: data.lastPushedAt.present
           ? data.lastPushedAt.value
           : this.lastPushedAt,
+      lastSucceededAt: data.lastSucceededAt.present
+          ? data.lastSucceededAt.value
+          : this.lastSucceededAt,
     );
   }
 
@@ -29991,45 +30045,53 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     return (StringBuffer('SyncStateData(')
           ..write('id: $id, ')
           ..write('lastPulledAt: $lastPulledAt, ')
-          ..write('lastPushedAt: $lastPushedAt')
+          ..write('lastPushedAt: $lastPushedAt, ')
+          ..write('lastSucceededAt: $lastSucceededAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, lastPulledAt, lastPushedAt);
+  int get hashCode =>
+      Object.hash(id, lastPulledAt, lastPushedAt, lastSucceededAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncStateData &&
           other.id == this.id &&
           other.lastPulledAt == this.lastPulledAt &&
-          other.lastPushedAt == this.lastPushedAt);
+          other.lastPushedAt == this.lastPushedAt &&
+          other.lastSucceededAt == this.lastSucceededAt);
 }
 
 class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   final Value<int> id;
   final Value<DateTime?> lastPulledAt;
   final Value<DateTime?> lastPushedAt;
+  final Value<DateTime?> lastSucceededAt;
   const SyncStateCompanion({
     this.id = const Value.absent(),
     this.lastPulledAt = const Value.absent(),
     this.lastPushedAt = const Value.absent(),
+    this.lastSucceededAt = const Value.absent(),
   });
   SyncStateCompanion.insert({
     this.id = const Value.absent(),
     this.lastPulledAt = const Value.absent(),
     this.lastPushedAt = const Value.absent(),
+    this.lastSucceededAt = const Value.absent(),
   });
   static Insertable<SyncStateData> custom({
     Expression<int>? id,
     Expression<DateTime>? lastPulledAt,
     Expression<DateTime>? lastPushedAt,
+    Expression<DateTime>? lastSucceededAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (lastPulledAt != null) 'last_pulled_at': lastPulledAt,
       if (lastPushedAt != null) 'last_pushed_at': lastPushedAt,
+      if (lastSucceededAt != null) 'last_succeeded_at': lastSucceededAt,
     });
   }
 
@@ -30037,11 +30099,13 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     Value<int>? id,
     Value<DateTime?>? lastPulledAt,
     Value<DateTime?>? lastPushedAt,
+    Value<DateTime?>? lastSucceededAt,
   }) {
     return SyncStateCompanion(
       id: id ?? this.id,
       lastPulledAt: lastPulledAt ?? this.lastPulledAt,
       lastPushedAt: lastPushedAt ?? this.lastPushedAt,
+      lastSucceededAt: lastSucceededAt ?? this.lastSucceededAt,
     );
   }
 
@@ -30057,6 +30121,9 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     if (lastPushedAt.present) {
       map['last_pushed_at'] = Variable<DateTime>(lastPushedAt.value);
     }
+    if (lastSucceededAt.present) {
+      map['last_succeeded_at'] = Variable<DateTime>(lastSucceededAt.value);
+    }
     return map;
   }
 
@@ -30065,7 +30132,8 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     return (StringBuffer('SyncStateCompanion(')
           ..write('id: $id, ')
           ..write('lastPulledAt: $lastPulledAt, ')
-          ..write('lastPushedAt: $lastPushedAt')
+          ..write('lastPushedAt: $lastPushedAt, ')
+          ..write('lastSucceededAt: $lastSucceededAt')
           ..write(')'))
         .toString();
   }
@@ -45120,12 +45188,14 @@ typedef $$SyncStateTableCreateCompanionBuilder =
       Value<int> id,
       Value<DateTime?> lastPulledAt,
       Value<DateTime?> lastPushedAt,
+      Value<DateTime?> lastSucceededAt,
     });
 typedef $$SyncStateTableUpdateCompanionBuilder =
     SyncStateCompanion Function({
       Value<int> id,
       Value<DateTime?> lastPulledAt,
       Value<DateTime?> lastPushedAt,
+      Value<DateTime?> lastSucceededAt,
     });
 
 class $$SyncStateTableFilterComposer
@@ -45149,6 +45219,11 @@ class $$SyncStateTableFilterComposer
 
   ColumnFilters<DateTime> get lastPushedAt => $composableBuilder(
     column: $table.lastPushedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSucceededAt => $composableBuilder(
+    column: $table.lastSucceededAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -45176,6 +45251,11 @@ class $$SyncStateTableOrderingComposer
     column: $table.lastPushedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get lastSucceededAt => $composableBuilder(
+    column: $table.lastSucceededAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncStateTableAnnotationComposer
@@ -45197,6 +45277,11 @@ class $$SyncStateTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastPushedAt => $composableBuilder(
     column: $table.lastPushedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSucceededAt => $composableBuilder(
+    column: $table.lastSucceededAt,
     builder: (column) => column,
   );
 }
@@ -45235,20 +45320,24 @@ class $$SyncStateTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<DateTime?> lastPulledAt = const Value.absent(),
                 Value<DateTime?> lastPushedAt = const Value.absent(),
+                Value<DateTime?> lastSucceededAt = const Value.absent(),
               }) => SyncStateCompanion(
                 id: id,
                 lastPulledAt: lastPulledAt,
                 lastPushedAt: lastPushedAt,
+                lastSucceededAt: lastSucceededAt,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<DateTime?> lastPulledAt = const Value.absent(),
                 Value<DateTime?> lastPushedAt = const Value.absent(),
+                Value<DateTime?> lastSucceededAt = const Value.absent(),
               }) => SyncStateCompanion.insert(
                 id: id,
                 lastPulledAt: lastPulledAt,
                 lastPushedAt: lastPushedAt,
+                lastSucceededAt: lastSucceededAt,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

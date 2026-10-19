@@ -156,6 +156,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
       (d.livestockDailyEntries, c),
     (d.livestockLots, d.livestockLots.lotSourceId),
   ],
+  // Ticket H2 — instant de la dernière synchronisation aboutie.
+  40: [(d.syncState, d.syncState.lastSucceededAt)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

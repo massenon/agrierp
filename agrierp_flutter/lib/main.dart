@@ -7,7 +7,9 @@ import 'core/auth/permissions_poste.dart';
 import 'core/config/parametres_poste.dart';
 import 'core/database/app_database.dart';
 import 'core/export/pdf_recu.dart';
-import 'core/sync/sync_button.dart';
+import 'core/sync/modale_synchronisation.dart';
+import 'core/widgets/acces_rapide.dart';
+import 'core/widgets/modale_agri.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
 import 'core/widgets/barre_superieure.dart';
@@ -567,23 +569,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // comme `menu` / `menu_open` dans la maquette.
           if (_menuOuvert)
             _BarreLaterale(
-              database: widget.database,
-              engine: widget.engine,
               auth: widget.auth,
               actif: _ecran,
               ecrans: PermissionsPoste.ecransDe(_role),
               onNaviguer: (e) => setState(() => _ecran = e),
-              onSynchronise: () => setState(() => _versionTirage++),
-              onIndisponible: (libelle) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '« $libelle » vit sur l\'application web : ce poste '
-                      "n'embarque que la saisie de terrain.",
-                    ),
-                  ),
-                );
-              },
             ),
           Expanded(
             child: Column(
@@ -591,12 +580,14 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 // ⚠️ LE COMPTEUR EST LU EN DIRECT : figer sa valeur au
                 // montage laisserait la pastille annoncer « Sync » alors
                 // qu'une journée vient d'être saisie.
-                FutureBuilder<(int, DonneesNotifications)>(
+                FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
                   future: _etatDeLaBarre(),
                   builder: (context, instantane) => BarreSuperieure(
                     groupe: groupe,
                     ecran: ecranCourant,
-                    enAttente: instantane.data?.$1 ?? 0,
+                    enAttente: (instantane.data?.$1.aEnvoyer ?? 0) + (instantane.data?.$1.refuses ?? 0),
+                    refuses: instantane.data?.$1.refuses ?? 0,
+                    onSynchroniser: _ouvrirSynchronisation,
                     nonLues: instantane.data?.$2.nonLues,
                     recentes: [
                       for (final n in (instantane.data?.$2.lignes ?? []).take(
@@ -637,7 +628,15 @@ class _SocleAccueilState extends State<SocleAccueil> {
                         setState(() => _menuOuvert = !_menuOuvert),
                   ),
                 ),
-                Expanded(child: _contenu()),
+                // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _contenu()),
+                      BoutonAccesRapide(onNaviguer: (e) => setState(() => _ecran = e)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -646,10 +645,27 @@ class _SocleAccueilState extends State<SocleAccueil> {
     );
   }
 
-  /// Ce que lit la barre supérieure : la file d'attente et les notifications.
-  Future<(int, DonneesNotifications)> _etatDeLaBarre() async => (
-    await widget.database.pendingCount(),
+  /// Ce que lit la barre supérieure : la file d'attente (à envoyer, refusés) et les notifications.
+  Future<(({int aEnvoyer, int refuses}), DonneesNotifications)> _etatDeLaBarre() async => (
+    await widget.database.compteursSynchronisation(),
     await widget.notifications.charger(),
+  );
+
+  /// Ticket H2 — bouton « Synchroniser » de la barre supérieure : ouvre la modale, ouverte à TOUS les rôles
+  /// (un caissier doit pouvoir pousser ses ventes, comme sur l'écran Synchronisation).
+  Future<void> _ouvrirSynchronisation() => afficherModale<void>(
+    context: context,
+    constructeur: (_) => ModaleSynchronisation(
+      engine: widget.engine,
+      database: widget.database,
+      onVoirDetail: PermissionsPoste.autorise(_role, EcranPoste.synchronisation)
+          ? () => setState(() => _ecran = EcranPoste.synchronisation)
+          : null,
+      // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
+      onTermine: () {
+        if (mounted) setState(() => _versionTirage++);
+      },
+    ),
   );
 
   /// ⚠️ SECOND NIVEAU : la garde est posée sur l'écran, pas seulement sur
@@ -902,46 +918,26 @@ class EtatDuSocle extends StatelessWidget {
 
 class _BarreLaterale extends StatelessWidget {
   const _BarreLaterale({
-    required this.database,
-    required this.engine,
     required this.auth,
     required this.actif,
     required this.ecrans,
     required this.onNaviguer,
-    required this.onIndisponible,
-    this.onSynchronise,
   });
 
-  /// Appelé à la fin d'une synchronisation : le tirage a pu apporter de
-  /// nouvelles notifications, que la cloche doit montrer.
-  final VoidCallback? onSynchronise;
-
-  final AppDatabase database;
-  final SyncEngine engine;
   final AuthService auth;
   final EcranPoste actif;
   final List<EcranPoste> ecrans;
   final void Function(EcranPoste) onNaviguer;
 
-  /// Appelé quand l'utilisateur touche une entrée dont le poste n'embarque pas
-  /// l'écran — pour le dire, plutôt que de ne rien faire du tout.
-  final void Function(String libelle) onIndisponible;
-
-  /// Arborescence **complète** de la barre latérale de la maquette
-  /// (`assets/js/sidebar.js`) : chaque groupe, chaque entrée, chaque icône,
-  /// dans l'ordre exact.
+  /// Arborescence **complète** de la barre latérale (`layouts/app.blade.php`, et avant lui
+  /// `assets/js/sidebar.js` de la maquette) : chaque groupe, chaque entrée, chaque icône, dans l'ordre exact.
   ///
-  /// ⚠️⚠️ **TOUTES LES ENTRÉES SONT RENDUES, PAS SEULEMENT LES ÉCRANS DU
-  /// POSTE.** J'avais d'abord retenu l'inverse — n'afficher que les écrans
-  /// construits, pour ne pas promettre d'écran inexistant. Le client a tranché
-  /// autrement : la maquette est la référence de mise en page, et sa barre se
-  /// reproduit intégralement. Les entrées sans écran embarqué restent donc
-  /// visibles, **estompées**, et disent au clic qu'elles vivent sur
-  /// l'application web — c'est la seule façon de tenir la mise en page sans
-  /// mentir sur ce que le poste sait faire.
+  /// ⚠️ Ticket H1 — ce qui est AFFICHÉ suit le web : seules les entrées autorisées au rôle, et un groupe sans
+  /// entrée autorisée est masqué (`@hasanyrole`). Les entrées « estompées » (écran non embarqué) n'ont plus lieu
+  /// d'être : tous les écrans de la barre web sont embarqués au poste.
   ///
-  /// ⚠️ Le troisième champ est l'écran atteint, `null` si le poste ne
-  /// l'embarque pas.
+  /// ⚠️ Le troisième champ est l'écran atteint, `null` si le poste ne l'embarque pas (l'entrée n'est alors pas
+  /// affichée).
   static const arborescence = <(String, List<(IconData, String, EcranPoste?)>)>[
     (
       'PILOTAGE',
@@ -1038,73 +1034,58 @@ class _BarreLaterale extends StatelessWidget {
     ),
   ];
 
-  /// En-tête de groupe — même graisse et même casse que la maquette.
+  /// En-tête de groupe : `text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm`.
   Widget _titreGroupe(String titre) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: AgriSpacing.xs,
-        top: AgriSpacing.sm,
-        bottom: 2,
-      ),
+      padding: const EdgeInsets.only(left: AgriSpacing.xs, top: AgriSpacing.sm, bottom: AgriSpacing.xs),
       child: Text(
         titre,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          letterSpacing: 0.8,
-          color: Colors.white38,
+          letterSpacing: 0.5,
+          color: Colors.white.withValues(alpha: 0.40),
         ),
       ),
     );
   }
 
-  Widget _entree(IconData icone, String libelle, EcranPoste? ecran) {
-    final selectionne = ecran != null && ecran == actif;
+  /// Lien de `components/sidebar-link.blade.php` : `flex items-center gap-sm px-sm py-xs rounded-lg`, icône
+  /// `text-[20px]`, libellé `text-[13px]`. Actif : `bg-white/10 font-bold text-accent-yellow` ; sinon
+  /// `text-white/90`.
+  Widget _entree(IconData icone, String libelle, EcranPoste ecran) {
+    final selectionne = ecran == actif;
+    final couleur = selectionne ? AgriColors.accentYellow : Colors.white.withValues(alpha: 0.90);
 
-    // ⚠️ TROIS ÉTATS, PAS DEUX. Une entrée peut être : active, disponible, ou
-    // **présente mais non embarquée**. Ce dernier cas est celui de la plupart
-    // des écrans de la maquette : le poste n'en porte que quelques-uns.
-    final embarque = ecran != null && ecrans.contains(ecran);
-
-    return InkWell(
-      key: Key('nav-${ecran?.name ?? libelle}'),
-      onTap: () {
-        if (embarque) {
-          onNaviguer(ecran);
-          return;
-        }
-        onIndisponible(libelle);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AgriSpacing.md,
-          vertical: 9,
-        ),
-        margin: const EdgeInsets.only(bottom: 2),
-        decoration: BoxDecoration(
-          color: selectionne ? Colors.white.withValues(alpha: 0.14) : null,
-          borderRadius: BorderRadius.circular(AgriRadius.lg),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icone,
-              size: 18,
-              // Estompé quand l'écran n'est pas embarqué.
-              color: embarque ? Colors.white : Colors.white30,
-            ),
-            const SizedBox(width: AgriSpacing.sm),
-            Expanded(
-              child: Text(
-                libelle,
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontWeight: selectionne ? FontWeight.bold : FontWeight.w500,
-                  color: embarque ? Colors.white : Colors.white38,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
+      child: InkWell(
+        key: Key('nav-${ecran.name}'),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+        hoverColor: Colors.white.withValues(alpha: 0.10),
+        onTap: () => onNaviguer(ecran),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: AgriSpacing.xs),
+          decoration: BoxDecoration(
+            color: selectionne ? Colors.white.withValues(alpha: 0.10) : null,
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            children: [
+              Icon(icone, size: 20, color: couleur),
+              const SizedBox(width: AgriSpacing.sm),
+              Expanded(
+                child: Text(
+                  libelle,
+                  style: TextStyle(
+                    fontSize: AgriTypography.lienBarreLaterale,
+                    fontWeight: selectionne ? FontWeight.bold : FontWeight.w500,
+                    color: couleur,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1112,96 +1093,129 @@ class _BarreLaterale extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ticket H1 — valeurs de `layouts/app.blade.php` (le maître) : `w-72` (288 px), dégradé `sidebar-gradient`
+    // (#052e16 → #00210d, `app.css`), en-tête `px-md py-lg border-b border-white/10`, navigation
+    // `flex-1 overflow-y-auto px-md py-md`, pied `p-md border-t border-white/10`.
+    //
+    // 🔴 La navigation ne DÉFILAIT PAS (`Column` + `Spacer`) : avec ses onze groupes, la barre débordait sur un
+    // petit écran et le bouton « Synchroniser » du pied devenait inatteignable. Le bouton est passé dans la barre
+    // supérieure (ticket H2), et la navigation défile.
     return Container(
-      width: 240,
-      color: AgriColors.brandForest,
+      key: const Key('barre-laterale'),
+      width: 288,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AgriColors.brandForest, AgriColors.brandForestDark],
+        ),
+      ),
       child: Column(
         children: [
-          const SizedBox(height: AgriSpacing.lg),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-            child: Row(
-              children: [
-                Icon(Icons.agriculture, color: AgriColors.accentYellow),
-                SizedBox(width: AgriSpacing.sm),
-                Text(
-                  'AgriERP',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.lg),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.10))),
             ),
-          ),
-          const SizedBox(height: AgriSpacing.lg),
-          // ⚠️ REGROUPÉES COMME DANS LA MAQUETTE. Seuls les écrans autorisés
-          // par le rôle sont proposés, et un groupe dont aucun écran ne l'est
-          // ne s'affiche pas du tout — plutôt qu'un titre suivi du vide.
-          // ⚠️ TOUS LES GROUPES ET TOUTES LES ENTRÉES DE LA MAQUETTE, dans son
-          // ordre. Une entrée dont le poste n'embarque pas l'écran reste
-          // visible mais estompée — la mise en page est tenue sans mentir sur
-          // ce que l'application sait faire.
-          for (final (titre, entrees) in arborescence) ...[
-            _titreGroupe(titre),
-            for (final (icone, libelle, ecran) in entrees)
-              _entree(icone, libelle, ecran),
-          ],
-          const Spacer(),
-          // Pied de barre latérale : le bouton « Synchroniser » y est placé
-          // exactement comme dans la maquette, au-dessus du bloc utilisateur.
-          Padding(
-            padding: const EdgeInsets.all(AgriSpacing.md),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SyncButton(
-                  engine: engine,
-                  pendingCount: database.pendingCount,
-                  onTermine: onSynchronise,
-                ),
-                const SizedBox(height: AgriSpacing.sm),
-                // Bloc utilisateur, sous le bouton comme dans la maquette.
                 Row(
                   children: [
-                    const CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.white24,
-                      child: Icon(
-                        Icons.account_circle,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
+                    const Icon(Icons.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
+                    RichText(
+                      key: const Key('barre-laterale-marque'),
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: AgriTypography.lg, fontWeight: FontWeight.w800, color: Colors.white),
                         children: [
-                          Text(
-                            auth.utilisateur?.nom ?? 'Utilisateur',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: AgriTypography.xs,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            (auth.utilisateur?.roleLibelle ?? '').toUpperCase(),
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              letterSpacing: 1,
-                              color: Colors.white54,
-                            ),
-                          ),
+                          TextSpan(text: 'Agri'),
+                          TextSpan(text: 'ERP', style: TextStyle(color: AgriColors.accentYellow)),
                         ],
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: AgriSpacing.xs),
+                Text(
+                  'Ferme École Olouwachegoun'.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                    color: Colors.white.withValues(alpha: 0.50),
+                  ),
+                ),
               ],
+            ),
+          ),
+          // ⚠️ SEULS LES ÉCRANS AUTORISÉS SONT PROPOSÉS, ET UN GROUPE SANS ÉCRAN AUTORISÉ N'EST PAS AFFICHÉ —
+          // comme les `@hasanyrole` du web, qui masquent les sections. Toutes les entrées du web sont désormais
+          // embarquées au poste : une entrée « estompée » ne pouvait plus signifier qu'un refus de droit, et
+          // annonçait à tort « vit sur l'application web ». L'écran se garde lui-même (`GardeEcran`).
+          Expanded(
+            child: SingleChildScrollView(
+              key: const Key('barre-laterale-navigation'),
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (titre, entrees) in arborescence)
+                    if (entrees.any((e) => e.$3 != null && ecrans.contains(e.$3))) ...[
+                      _titreGroupe(titre),
+                      for (final (icone, libelle, ecran) in entrees)
+                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, libelle, ecran),
+                      const SizedBox(height: AgriSpacing.sm),
+                    ],
+                ],
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.10))),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AgriSpacing.xs),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
+                    child: const Icon(Icons.account_circle, size: 18, color: Colors.white),
+                  ),
+                  const SizedBox(width: AgriSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.utilisateur?.nom ?? '—',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // Le web affiche le NOM TECHNIQUE du rôle (`roles->first()?->name`), en capitales.
+                        Text(
+                          (auth.utilisateur?.role ?? '').toUpperCase(),
+                          key: const Key('barre-laterale-role'),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            letterSpacing: 0.45,
+                            color: Colors.white.withValues(alpha: 0.50),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
