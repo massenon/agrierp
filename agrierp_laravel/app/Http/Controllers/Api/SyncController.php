@@ -1557,7 +1557,7 @@ class SyncController extends Controller
                 'requete' => fn () => \App\Models\Expense::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                     ->select(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active',
-                        'updated_at']),
+                        'status', 'accounting_entry_id', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('expense_date')->orderBy('id'),
                 'enJson' => fn (\App\Models\Expense $d) => [
                     'id' => $d->id,
@@ -1567,6 +1567,10 @@ class SyncController extends Controller
                     'amount' => (float) $d->amount,
                     'treasury_account_id' => $d->treasury_account_id,
                     'is_active' => (bool) $d->is_active,
+                    // Ticket U14 — le badge et le filtre « Statut » du Blade (`payee` / `en_attente`), et la règle de
+                    // modification d'une dépense COMPTABILISÉE, que le poste applique avant d'écrire (`SaisieDepenseAction`).
+                    'status' => $d->status,
+                    'accounting_entry_id' => $d->accounting_entry_id,
                     'updated_at' => $d->updated_at?->toIso8601String(),
                 ],
             ],
@@ -4080,10 +4084,30 @@ class SyncController extends Controller
         return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
+    /**
+     * Dépenses saisies, MODIFIÉES ou ARCHIVÉES au poste.
+     *
+     * 🔴→✅ TICKET U14 — le poste fait ce que fait « Saisie des Dépenses » au web : créer, modifier, archiver. Les trois
+     * gestes passent par `SaisieDepenseAction`, le point de passage du composant Livewire : mêmes règles (une dépense
+     * comptabilisée ne change ni de montant, ni de compte de charge, ni de compte de trésorerie ; une dépense archivée
+     * ne se modifie plus), mêmes effets (trésorerie, écriture, contre-passation, journal d'audit), mêmes messages — un
+     * refus revient au poste avec la phrase que le web affiche sous « Montant ». Droit `manage-achats`
+     * (`PERMISSION_PAR_TABLE`), celui de l'écran web. Avant U14 une dépense connue était acquittée sans rien rejouer :
+     * une modification ou un archivage faits au poste étaient perdus en silence.
+     *
+     * Une ligne CONNUE du serveur :
+     *  - `is_active: false` → archivée comme par `archiveExpense()` (contre-passation, trésorerie réintégrée) ; déjà
+     *    archivée : acquittée sans rien refaire (renvoi d'un archivage dont la réponse s'est perdue) ;
+     *  - identique à la dépense du serveur → acquittée sans rien rejouer (IDEMPOTENCE : renvoi d'une saisie déjà reçue) ;
+     *  - différente → modifiée comme par `submitExpense()` en modification (dernier écrivain gagne, comme au web).
+     * Une ligne INCONNUE est créée (décaissée, comptabilisée) ; arrivée archivée (saisie puis archivée hors ligne), elle
+     * est créée PUIS archivée, comme au web : la trace des deux gestes reste au grand livre et au journal d'audit.
+     */
     private function pushExpenses(array $expenses): array
     {
         $accepted = [];
         $rejected = [];
+        $saisie = app(\App\Actions\SaisieDepenseAction::class);
 
         foreach ($expenses as $data) {
             try {
@@ -4094,53 +4118,44 @@ class SyncController extends Controller
                     'category' => ['required', 'string', 'in:'.implode(',', \App\Models\Expense::CATEGORIES)],
                     'amount' => ['required', 'numeric', 'min:1'],
                     'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
+                    'is_active' => ['sometimes', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
-                // ⚠️ IDEMPOTENCE : deja recue, on acquitte sans rien rejouer.
-                if (\App\Models\Expense::find($validated['id']) !== null) {
-                    $accepted[] = $validated['id'];
+                $archivee = array_key_exists('is_active', $validated) && ! filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $existante = \App\Models\Expense::find($validated['id']);
 
-                    continue;
-                }
-
-                DB::transaction(function () use ($validated) {
-                    $depense = new \App\Models\Expense();
-                    $depense->id = $validated['id'];
-                    $depense->fill([
-                        'expense_date' => $validated['expense_date'],
-                        'label' => $validated['label'],
-                        'category' => $validated['category'],
-                        'amount' => $validated['amount'],
-                        'treasury_account_id' => $validated['treasury_account_id'],
-                        // Meme regle que l'ecran : une depense saisie est
-                        // immediatement decaissee.
-                        'status' => 'payee',
-                        'is_active' => true,
-                    ]);
-                    $depense->save();
-
-                    \App\Models\TreasuryAccount::where('id', $validated['treasury_account_id'])
-                        ->decrement('balance', $validated['amount']);
-
-                    app(\App\Actions\RecordExpenseAccountingEntryAction::class)
-                        ->execute($depense->fresh());
+                // Une seule transaction par ligne : une création suivie d'un archivage refusé (exercice) n'écrit rien.
+                DB::transaction(function () use ($saisie, $validated, $existante, $archivee) {
+                    if ($existante === null) {
+                        $saisie->creer($validated, $validated['id']);
+                        if ($archivee) {
+                            $saisie->archiver($validated['id']);
+                        }
+                    } elseif ($archivee) {
+                        $saisie->archiver($validated['id']);
+                    } elseif (! $saisie->identique($existante, $validated)) {
+                        $saisie->modifier($validated['id'], $validated);
+                    }
                 });
 
                 $accepted[] = $validated['id'];
             } catch (ValidationException $e) {
                 $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\DepenseNonModifiableException $e) {
+                // Le refus du web, mot pour mot (dépense comptabilisée, ou archivée entre-temps au web).
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => $e->getMessage()];
             } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
                 // ⚠️⚠️ UN REFUS COMPTABLE NE FAIT PAS ECHOUER TOUT L'ENVOI.
                 // Aucun exercice ouvert, ou aucun qui couvre la date de la
-                // depense : l'ecriture est impossible — mais
-                // laisser remonter l'exception renverrait 500 pour la requete
-                // ENTIERE : les fiches d'elevage et les ventes du meme envoi
-                // seraient perdues avec elle, et le poste les rejouerait sans
-                // jamais savoir pourquoi. La depense est rejetee AVEC SON
-                // MOTIF, et elle seule.
+                // depense (ou du jour, pour la contre-passation d'un archivage) :
+                // l'ecriture est impossible — mais laisser remonter l'exception
+                // renverrait 500 pour la requete ENTIERE : les fiches d'elevage et
+                // les ventes du meme envoi seraient perdues avec elle, et le poste
+                // les rejouerait sans jamais savoir pourquoi. La depense est
+                // rejetee AVEC SON MOTIF, et elle seule.
                 //
-                // ⚠️ La transaction ayant ete annulee, le decaissement n'a pas
-                // eu lieu : aucune caisse fausse ne subsiste.
+                // ⚠️ La transaction de la depense ayant ete annulee, le
+                // decaissement n'a pas eu lieu : aucune caisse fausse ne subsiste.
                 $rejected[] = ['id' => $data['id'] ?? null, 'reason' => $e->getMessage()];
             }
         }

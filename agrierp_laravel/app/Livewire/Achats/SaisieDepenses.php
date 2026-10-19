@@ -2,11 +2,10 @@
 
 namespace App\Livewire\Achats;
 
-use App\Actions\RecordExpenseAccountingEntryAction;
-use App\Models\AuditLog;
+use App\Actions\SaisieDepenseAction;
+use App\Exceptions\DepenseNonModifiableException;
 use App\Models\Expense;
 use App\Models\TreasuryAccount;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -65,12 +64,6 @@ class SaisieDepenses extends Component
 
     public $receiptFile = null;
 
-    /** Ticket 14.33 — signale une dépense enregistrée sans écriture comptable. */
-    private bool $ecritureManquante = false;
-
-    /** Ticket 14.33 — modification refusée sur une dépense déjà comptabilisée. */
-    private bool $conflitEcriture = false;
-
     public function mount(): void
     {
         $this->expenseDate = now()->format('Y-m-d');
@@ -99,6 +92,9 @@ class SaisieDepenses extends Component
             ->when($this->statusFilter === 'Payée', fn ($q) => $q->where('status', 'payee'))
             ->when($this->statusFilter === 'En attente', fn ($q) => $q->where('status', 'en_attente'))
             ->orderByDesc('expense_date')
+            // 🔴→✅ Ticket U14 — deux dépenses du même jour n'avaient pas d'ordre défini (MySQL rend l'ordre qu'il
+            // veut) : l'identifiant les départage, ici et au poste (`DepensesRepository::depenses`).
+            ->orderBy('id')
             ->get();
     }
 
@@ -121,85 +117,45 @@ class SaisieDepenses extends Component
             'receiptFile' => ['nullable', 'image', 'max:5120'],
         ]);
 
-        DB::transaction(function () {
-            $receiptPath = $this->receiptFile ? $this->receiptFile->store('depenses-recus', 'local') : null;
+        $donnees = [
+            'expense_date' => $this->expenseDate,
+            'label' => $this->label,
+            'category' => $this->category,
+            'amount' => $this->amount,
+            'treasury_account_id' => $this->treasuryAccountId,
+        ];
 
-            if ($this->editingExpenseId) {
-                $expense = Expense::findOrFail($this->editingExpenseId);
+        // 🔴→✅ TICKET U14 — création, modification et archivage passent par `SaisieDepenseAction`, le point de passage
+        // que l'envoi des postes emprunte aussi (mêmes règles, mêmes effets, mêmes messages). Le justificatif n'est
+        // stocké qu'une fois la modification admise (il l'était avant le refus d'une dépense comptabilisée).
+        if ($this->editingExpenseId) {
+            try {
+                app(SaisieDepenseAction::class)->modifier(
+                    $this->editingExpenseId,
+                    $donnees,
+                    $this->receiptFile ? $this->receiptFile->store('depenses-recus', 'local') : null,
+                );
+            } catch (DepenseNonModifiableException $e) {
+                // ⚠️ UNE DÉPENSE DÉJÀ COMPTABILISÉE NE SE RÉÉCRIT PAS (14.33), une dépense archivée non plus (U14).
+                $this->addError('amount', $e->getMessage());
 
-                // ⚠️ UNE DÉPENSE DÉJÀ COMPTABILISÉE NE SE RÉÉCRIT PAS. Modifier
-                // son montant ou son compte de charge ferait diverger le
-                // registre des dépenses du grand livre, sans qu'aucun écran ne
-                // le signale. La correction passe par une écriture au Journal
-                // Comptable — même discipline que pour une immobilisation déjà
-                // capitalisée (ticket 14.26).
-                $montantChange = round((float) $this->amount, 2) !== round((float) $expense->amount, 2);
-
-                if ($expense->accounting_entry_id && ($montantChange || $this->category !== $expense->category)) {
-                    $this->conflitEcriture = true;
-
-                    return;
-                }
-
-                // Réajuste la trésorerie : annule l'ancien montant, applique le nouveau.
-                TreasuryAccount::where('id', $expense->treasury_account_id)->increment('balance', $expense->amount);
-                $expense->update([
-                    'expense_date' => $this->expenseDate,
-                    'label' => $this->label,
-                    'category' => $this->category,
-                    'amount' => $this->amount,
-                    'treasury_account_id' => $this->treasuryAccountId,
-                    'receipt_path' => $receiptPath ?: $expense->receipt_path,
-                ]);
-                AuditLog::record('expense.updated', 'achats');
-            } else {
-                $expense = Expense::create([
-                    'expense_date' => $this->expenseDate,
-                    'label' => $this->label,
-                    'category' => $this->category,
-                    'amount' => $this->amount,
-                    'treasury_account_id' => $this->treasuryAccountId,
-                    'receipt_path' => $receiptPath,
-                    'status' => 'payee',
-                    'is_active' => true,
-                ]);
-                AuditLog::record('expense.created', 'achats');
-
-                // 🔴→✅ TICKET 14.33 — ÉCRITURE COMPTABLE ENFIN GÉNÉRÉE.
-                //
-                // Le CDC §1.4 [M2] l'exige mot pour mot : « `RegisterExpense` →
-                // Débit Classe 6 / Crédit Classe 5 ». Avant ce ticket, la
-                // dépense décrémentait la trésorerie sans rien porter en
-                // charge : carburant, électricité et transport n'apparaissaient
-                // nulle part au Compte de Résultat, et le résultat net était
-                // surestimé du total des dépenses de la période.
-                $ecriture = app(RecordExpenseAccountingEntryAction::class)->execute($expense);
-
-                if ($ecriture === null) {
-                    // Jamais silencieux — même discipline que le POS (14.23),
-                    // les achats (14.24) et les avoirs (14.27).
-                    AuditLog::record('expense.accounting_entry_missing', 'comptabilite');
-                    $this->ecritureManquante = true;
-                }
+                return;
             }
+        } else {
+            [, $ecritureManquante] = app(SaisieDepenseAction::class)->creer(
+                $donnees,
+                null,
+                $this->receiptFile ? $this->receiptFile->store('depenses-recus', 'local') : null,
+            );
 
-            TreasuryAccount::where('id', $this->treasuryAccountId)->decrement('balance', $this->amount);
-        });
+            if ($ecritureManquante) {
+                // Jamais silencieux — même discipline que le POS (14.23), les achats (14.24) et les avoirs (14.27).
+                $this->dispatch('toast', message: "Dépense enregistrée — ATTENTION : écriture comptable non générée (compte de charge ou de trésorerie absent du plan comptable). À régulariser au Journal Comptable.", type: 'warning');
+                $this->reset(['editingExpenseId', 'label', 'category', 'amount', 'receiptFile']);
+                $this->expenseDate = now()->format('Y-m-d');
 
-        if ($this->conflitEcriture) {
-            $this->conflitEcriture = false;
-            $this->addError('amount', "Cette dépense est déjà comptabilisée : son montant et son compte de charge ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.");
-
-            return;
-        }
-
-        if ($this->ecritureManquante) {
-            $this->ecritureManquante = false;
-            $this->dispatch('toast', message: "Dépense enregistrée — ATTENTION : écriture comptable non générée (compte de charge ou de trésorerie absent du plan comptable). À régulariser au Journal Comptable.", type: 'warning');
-            $this->reset(['editingExpenseId', 'label', 'category', 'amount', 'receiptFile']);
-            $this->expenseDate = now()->format('Y-m-d');
-
-            return;
+                return;
+            }
         }
 
         $this->dispatch('toast', message: 'Dépense enregistrée avec succès.', type: 'success');
@@ -225,20 +181,16 @@ class SaisieDepenses extends Component
         // Archiver une depense la retire des etats : meme niveau d'exigence.
         $this->authorize('manage-achats');
 
-        $expense = Expense::findOrFail($id);
+        // 🔴→✅ TICKET 14.33 — CONTRE-PASSATION (écriture d'annulation de sens inverse, jamais suppression de
+        // l'originale) et trésorerie réintégrée : `SaisieDepenseAction::archiver()` (U14, partagé avec les postes).
+        $resultat = app(SaisieDepenseAction::class)->archiver($id);
 
-        // 🔴→✅ TICKET 14.33 — CONTRE-PASSATION. La trésorerie était réintégrée
-        // sans que la charge le soit : le Compte de Résultat gardait une
-        // dépense dont l'argent était revenu. Écriture d'annulation de sens
-        // inverse, jamais suppression de l'originale — le grand livre est
-        // immuable.
-        $annulation = app(RecordExpenseAccountingEntryAction::class)->reverse($expense);
+        // 🔴→✅ U14 — déjà archivée (double clic, page restée ouverte) : rien n'est refait, rien à annoncer.
+        if ($resultat === SaisieDepenseAction::DEJA_ARCHIVEE) {
+            return;
+        }
 
-        TreasuryAccount::where('id', $expense->treasury_account_id)->increment('balance', $expense->amount);
-        $expense->update(['is_active' => false]);
-        AuditLog::record('expense.archived', 'achats');
-
-        $message = $expense->accounting_entry_id && ! $annulation
+        $message = $resultat === SaisieDepenseAction::ARCHIVEE_SANS_ANNULATION
             ? 'Dépense archivée — ATTENTION : écriture d\'annulation non générée. À régulariser au Journal Comptable.'
             : 'Dépense archivée — trésorerie réintégrée et charge annulée.';
 

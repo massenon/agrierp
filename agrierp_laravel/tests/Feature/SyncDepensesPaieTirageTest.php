@@ -154,11 +154,13 @@ class SyncDepensesPaieTirageTest extends TestCase
         $this->assertTrue($complet[$active->id]['is_active']);
         $this->assertFalse($complet[$archivee->id]['is_active'], 'un poste en service doit apprendre l\'archivage');
         // Le JSON ne garde pas « 15000.0 » : égalité de valeur, clés dans leur ordre.
-        $this->assertSame(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active', 'updated_at'],
-            array_keys($complet[$active->id]));
+        // Ticket U14 — plus `status` (badge et filtre du Blade) et `accounting_entry_id` (règle de modification).
+        $this->assertSame(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active', 'status',
+            'accounting_entry_id', 'updated_at'], array_keys($complet[$active->id]));
         $this->assertEquals([
             'id' => $active->id, 'expense_date' => '2026-10-03', 'label' => 'Carburant groupe', 'category' => '605 - Énergie',
             'amount' => 15000.0, 'treasury_account_id' => $this->caisse->id, 'is_active' => true,
+            'status' => $active->status, 'accounting_entry_id' => $active->accounting_entry_id,
             'updated_at' => $active->updated_at->toIso8601String(),
         ], $complet[$active->id]);
 
