@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/core/widgets/rafraichissement_periodique.dart';
 import 'package:agrierp/features/notifications/notifications_repository.dart';
 import 'package:agrierp/features/notifications/notifications_screen.dart';
 import 'package:dio/dio.dart';
@@ -12,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'cartes_attendues.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.59 — CENTRE DE NOTIFICATIONS (`notifications.html`) et cloche.
 ///
@@ -296,6 +301,7 @@ void main() {
   group('« Résoudre »', () {
     LigneNotification avec(String? lien) => LigneNotification(
       id: 'x',
+      titre: 'Titre',
       message: 'm',
       categorie: 'Stocks',
       gravite: 'info',
@@ -662,6 +668,7 @@ void main() {
       int? nonLues,
       List<ApercuNotification> recentes = const [],
       VoidCallback? onNotifications,
+      Future<void> Function(String id)? onMarquerLue,
     }) async {
       tester.view.physicalSize = const Size(1600, 800);
       tester.view.devicePixelRatio = 1;
@@ -678,6 +685,7 @@ void main() {
               nonLues: nonLues,
               recentes: recentes,
               onNotifications: onNotifications,
+              onMarquerLue: onMarquerLue,
             ),
           ),
         ),
@@ -686,10 +694,10 @@ void main() {
     }
 
     ApercuNotification ap(int i, {bool lue = false}) => ApercuNotification(
-      message: 'Message $i',
-      dateTexte: '28/07/2026 - 0$i:00',
+      id: 'n$i',
+      titre: 'Titre $i',
+      dateTexte: 'il y a $i minutes',
       lue: lue,
-      critique: i == 0,
     );
 
     testWidgets('le compteur affiche les non lues', (tester) async {
@@ -769,6 +777,125 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('cloche-vide')), findsOneWidget);
+      expect(find.text('Aucune notification pour le moment.'), findsOneWidget);
+    });
+
+    // 🔴→✅ Ticket U14 — `notification-bell.blade.php` affiche `$notif->title`, en `text-error-deep` si non lue (quelle
+    // que soit la gravité), avec le bouton « Marquer comme lue » ; la ligne elle-même ne mène nulle part.
+    testWidgets('U14 — le TITRE, rouge si non lue, « Marquer comme lue » ; la ligne ne mène nulle part', (tester) async {
+      var ouvert = 0;
+      final marquees = <String>[];
+      await barre(
+        tester,
+        nonLues: 1,
+        recentes: [ap(1), ap(2, lue: true)],
+        onNotifications: () => ouvert++,
+        onMarquerLue: (id) async => marquees.add(id),
+      );
+
+      await tester.tap(find.byKey(const Key('cloche-notifications')));
+      await tester.pumpAndSettle();
+
+      final nonLue = tester.widget<Text>(find.byKey(const Key('cloche-titre-0')));
+      final lue = tester.widget<Text>(find.byKey(const Key('cloche-titre-1')));
+      expect((nonLue.data, lue.data), ('Titre 1', 'Titre 2'));
+      expect(nonLue.style!.color, AgriColors.errorDeep);
+      expect(lue.style!.color, AgriColors.onSurface);
+      expect(nonLue.style!.fontWeight, FontWeight.w600, reason: '`font-semibold` lue ou non');
+      expect(lue.style!.fontWeight, FontWeight.w600);
+      expect(find.byKey(const Key('cloche-lue-0')), findsOneWidget);
+      expect(find.byKey(const Key('cloche-lue-1')), findsNothing, reason: 'pas de bouton sur une lue');
+
+      await tester.tap(find.byKey(const Key('cloche-titre-0')));
+      await tester.pumpAndSettle();
+      expect(ouvert, 0, reason: 'au web, la ligne n a pas de lien');
+
+      await tester.tap(find.byKey(const Key('cloche-lue-0')));
+      await tester.pumpAndSettle();
+      expect(marquees, ['n1']);
+    });
+
+    // 🔴→✅ Ticket U14 — `wire:poll.30s` : la barre se relit toutes les 30 s ; un panneau OUVERT se met à jour ; la
+    // minuterie meurt avec le socle. Horloge simulée : `HeureBenin.horloge`.
+    testWidgets('U14 — « il y a … » se rafraîchit toutes les 30 s, panneau ouvert ; minuterie arrêtée au dispose', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1600, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var maintenant = DateTime.utc(2026, 10, 19, 9, 1);
+      HeureBenin.horloge = () => maintenant;
+      addTearDown(HeureBenin.reinitialiser);
+      final notif = LigneNotification(
+        id: 'n1',
+        titre: 'Stock bas : Provende ponte',
+        message: 'Le stock de provende ponte est sous le seuil.',
+        categorie: 'Stocks',
+        gravite: 'moyen',
+        lue: false,
+        date: DateTime.utc(2026, 10, 19, 9),
+        lien: null,
+      );
+      var lectures = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RafraichissementPeriodique(
+              intervalle: BarreSuperieure.rafraichissementCloche,
+              builder: (context) {
+                lectures++;
+                final instant = HeureBenin.horloge();
+                return BarreSuperieure(
+                  groupe: '',
+                  ecran: 'Tableau de bord',
+                  enAttente: 0,
+                  onBasculerMenu: () {},
+                  nonLues: 1,
+                  recentes: [
+                    ApercuNotification(
+                      id: notif.id,
+                      titre: notif.titre,
+                      dateTexte: notif.dateRelative(instant),
+                      lue: notif.lue,
+                    ),
+                  ],
+                  onNotifications: () {},
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('cloche-notifications')));
+      await tester.pumpAndSettle();
+      String date() => tester.widget<Text>(find.byKey(const Key('cloche-date-0'))).data!;
+      expect(date(), 'il y a 1 minute');
+
+      maintenant = maintenant.add(const Duration(minutes: 1));
+      await tester.pump(const Duration(seconds: 29));
+      expect(date(), 'il y a 1 minute', reason: 'pas avant 30 s');
+      await tester.pump(const Duration(seconds: 1));
+      expect(date(), 'il y a 2 minutes', reason: 'au 30e seconde, panneau toujours ouvert');
+      expect(find.byKey(const Key('cloche-panneau')), findsOneWidget);
+
+      maintenant = maintenant.add(const Duration(hours: 1));
+      await tester.pump(BarreSuperieure.rafraichissementCloche);
+      expect(date(), 'il y a 1 heure');
+
+      final avant = lectures;
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(minutes: 5));
+      expect(lectures, avant, reason: 'plus aucune relecture après le dispose');
+      // Et `flutter_test` échoue d'office si une minuterie survit au démontage.
+    });
+
+    test('U14 — 30 s, la période de `wire:poll.30s` du Blade', () {
+      final blade = File('$dossierLaravel/resources/views/livewire/shared/notification-bell.blade.php');
+      if (!blade.existsSync()) return markTestSkipped('dépôt Laravel absent ($dossierLaravel)');
+      expect(blade.readAsStringSync(), contains('wire:poll.30s'));
+      expect(blade.readAsStringSync(), contains(r'{{ $notif->title }}'));
+      expect(BarreSuperieure.rafraichissementCloche, const Duration(seconds: 30));
     });
   });
 

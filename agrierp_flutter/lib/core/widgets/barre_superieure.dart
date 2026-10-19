@@ -9,18 +9,22 @@ import '../theme/symboles_agri.dart';
 ///
 /// ⚠️ Défini ICI, pas dans `features/notifications` : `core/` ne dépend pas des
 /// écrans. L'appelant convertit ses lignes.
+///
+/// 🔴→✅ Ticket U14 — la cloche du web (`notification-bell.blade.php`) affiche le TITRE (`$notif->title`), pas le
+/// message : le poste montrait le message. La couleur suit l'état de lecture seul (`text-error-deep` non lue,
+/// `text-on-surface` lue), comme au web — le poste la réservait aux alertes critiques.
 class ApercuNotification {
   const ApercuNotification({
-    required this.message,
+    required this.id,
+    required this.titre,
     required this.dateTexte,
     required this.lue,
-    required this.critique,
   });
 
-  final String message;
+  final String id;
+  final String titre;
   final String dateTexte;
   final bool lue;
-  final bool critique;
 }
 
 /// Barre supérieure de `prototype_html` — reprise section par section.
@@ -60,8 +64,13 @@ class BarreSuperieure extends StatelessWidget {
     this.nonLues,
     this.recentes = const [],
     this.onNotifications,
+    this.onMarquerLue,
     this.avantFermeture,
   });
+
+  /// `wire:poll.30s` de la cloche du web : la barre se relit toutes les 30 secondes (non lues, quatre dernières, et
+  /// « il y a … » recalculé) — voir `RafraichissementPeriodique`, posé par le socle autour de la barre.
+  static const rafraichissementCloche = Duration(seconds: 30);
 
   /// Nombre de notifications non lues. `null` : le poste ne sait pas (aucune
   /// source branchée) — la cloche se contente alors d'expliquer où elles vivent.
@@ -72,6 +81,10 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Ouvre le Centre de Notifications. `null` : pas de source branchée.
   final VoidCallback? onNotifications;
+
+  /// Ticket U14 — le bouton `check_circle` « Marquer comme lue » d'une notification non lue (`markAsRead($id)` du
+  /// web). `null` : pas de bouton.
+  final Future<void> Function(String id)? onMarquerLue;
 
   /// Nom affiché à côté de l'icône de compte. `null` : aucune session.
   final String? nomUtilisateur;
@@ -205,9 +218,10 @@ class BarreSuperieure extends StatelessWidget {
           // « 0 » ferait croire à une boîte vide alors qu'elle est simplement
           // inaccessible. Avec une source, « 0 » est vrai et le badge disparaît.
           //
-          // ⚠️ ÉCART ASSUMÉ : les onglets « Toutes / Non lues » du menu de la
-          // maquette ne sont pas repris — le Centre de Notifications porte déjà
-          // ces filtres, à un clic.
+          // Les onglets « Toutes / Non lues » de la maquette ne sont pas repris :
+          // la cloche du web (`notification-bell.blade.php`, maître) n'en a pas.
+          // Ticket U14 : panneau du Blade, titre, « Marquer comme lue », relu
+          // toutes les 30 s.
           _cloche(context),
 
           const SizedBox(width: AgriSpacing.sm),
@@ -266,131 +280,12 @@ class BarreSuperieure extends StatelessWidget {
       );
     }
 
-    final n = nonLues ?? 0;
-
-    return PopupMenuButton<String>(
-      key: cle,
-      tooltip: 'Notifications',
-      color: Colors.white,
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-        side: const BorderSide(color: AgriColors.outlineVariant),
-      ),
-      padding: EdgeInsets.zero,
-      offset: const Offset(0, 40),
-      onSelected: (_) => onNotifications!(),
-      itemBuilder: (_) => [
-        const PopupMenuItem<String>(
-          enabled: false,
-          height: 32,
-          child: Text(
-            'Notifications',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
-              color: AgriColors.brandForest,
-            ),
-          ),
-        ),
-        if (recentes.isEmpty)
-          const PopupMenuItem<String>(
-            key: Key('cloche-vide'),
-            enabled: false,
-            child: Text(
-              'Aucune notification pour le moment.',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                color: AgriColors.outline,
-              ),
-            ),
-          ),
-        for (var i = 0; i < recentes.length && i < 4; i++)
-          PopupMenuItem<String>(
-            key: Key('cloche-notif-$i'),
-            value: 'n$i',
-            child: SizedBox(
-              width: 280,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recentes[i].message,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: AgriTypography.xs,
-                      fontWeight: recentes[i].lue
-                          ? FontWeight.normal
-                          : FontWeight.w600,
-                      color: recentes[i].critique && !recentes[i].lue
-                          ? AgriColors.errorDeep
-                          : AgriColors.onSurface,
-                    ),
-                  ),
-                  Text(
-                    recentes[i].dateTexte,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AgriColors.outline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        const PopupMenuItem<String>(
-          key: Key('cloche-voir-toutes'),
-          value: 'toutes',
-          child: Center(
-            child: Text(
-              'Voir toutes les notifications',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.bold,
-                color: AgriColors.brandEmerald,
-              ),
-            ),
-          ),
-        ),
-      ],
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(8),
-            child: Icon(
-              SymbolesAgri.notifications_none,
-              size: 22,
-              color: AgriColors.outline,
-            ),
-          ),
-          if (n > 0)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                key: const Key('cloche-compteur'),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AgriColors.errorRed,
-                  borderRadius: BorderRadius.circular(AgriRadius.full),
-                ),
-                child: Text(
-                  // Plafond du web : « 9+ » (`notification-bell.blade.php`), pas « 99+ ».
-                  n > 9 ? '9+' : '$n',
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return _Cloche(
+      cle: cle,
+      nonLues: nonLues ?? 0,
+      recentes: recentes,
+      onNotifications: onNotifications!,
+      onMarquerLue: onMarquerLue,
     );
   }
 
@@ -627,5 +522,246 @@ class BarreSuperieure extends StatelessWidget {
     );
 
     if (confirme == true) await FenetrePoste.fermer();
+  }
+}
+
+/// 🔴→✅ Ticket U14 — LA CLOCHE DU WEB (`livewire/shared/notification-bell.blade.php`), élément par élément :
+///  - le bouton `notifications` (24 px, `text-outline`) et son badge rouge de 16 px plafonné à « 9+ » ;
+///  - le panneau `w-80` aligné à droite : « Notifications » (`font-bold text-xs text-brand-forest`), les QUATRE plus
+///    récentes (`limit(4)`), chacune avec son TITRE (`text-xs font-semibold`, `text-error-deep` si non lue) et
+///    « il y a … » (`text-[10px] text-outline`), plus le bouton `check_circle` « Marquer comme lue » d'une non lue ;
+///    sans notification, « Aucune notification pour le moment. » (`text-[11px]`, centré) ; en pied « Voir toutes les
+///    notifications ».
+///  - cliquer une notification ne mène nulle part (le web n'a pas de lien sur la ligne) : seul le pied ouvre le Centre.
+///
+/// Le panneau est un `MenuAnchor` (superposition reconstruite avec la barre) : quand le socle relit la barre toutes
+/// les 30 s (`wire:poll.30s`), un panneau OUVERT se met à jour, comme au web — un menu surgissant figé à l'ouverture
+/// garderait « il y a 1 minute » indéfiniment.
+class _Cloche extends StatefulWidget {
+  const _Cloche({
+    required this.cle,
+    required this.nonLues,
+    required this.recentes,
+    required this.onNotifications,
+    required this.onMarquerLue,
+  });
+
+  final Key cle;
+  final int nonLues;
+  final List<ApercuNotification> recentes;
+  final VoidCallback onNotifications;
+  final Future<void> Function(String id)? onMarquerLue;
+
+  @override
+  State<_Cloche> createState() => _ClocheState();
+}
+
+class _ClocheState extends State<_Cloche> {
+  final _menu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.nonLues;
+    final quatre = widget.recentes.take(4).toList();
+
+    return MenuAnchor(
+      controller: _menu,
+      alignmentOffset: const Offset(0, 8),
+      style: MenuStyle(
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        backgroundColor: const WidgetStatePropertyAll(Colors.white),
+        elevation: const WidgetStatePropertyAll(4),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+            side: const BorderSide(color: AgriColors.outlineVariant),
+          ),
+        ),
+      ),
+      menuChildren: [
+        SizedBox(
+          key: const Key('cloche-panneau'),
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AgriColors.outlineVariant),
+                  ),
+                ),
+                child: const Text(
+                  'Notifications',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.bold,
+                    color: AgriColors.brandForest,
+                  ),
+                ),
+              ),
+              // `max-h-64 overflow-y-auto`.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 256),
+                // `primary: false` : le panneau de `MenuAnchor` défile déjà sur le contrôleur principal.
+                child: SingleChildScrollView(
+                  primary: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (quatre.isEmpty)
+                        const Padding(
+                          key: Key('cloche-vide'),
+                          padding: EdgeInsets.symmetric(vertical: AgriSpacing.lg),
+                          child: Text(
+                            'Aucune notification pour le moment.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AgriColors.outline,
+                            ),
+                          ),
+                        ),
+                      for (var i = 0; i < quatre.length; i++)
+                        _ligne(i, quatre[i]),
+                    ],
+                  ),
+                ),
+              ),
+              InkWell(
+                key: const Key('cloche-voir-toutes'),
+                onTap: () {
+                  _menu.close();
+                  widget.onNotifications();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: AgriColors.outlineVariant),
+                    ),
+                  ),
+                  child: const Text(
+                    'Voir toutes les notifications',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.brandEmerald,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      builder: (context, menu, _) => Tooltip(
+        message: 'Notifications',
+        child: InkWell(
+          key: widget.cle,
+          borderRadius: BorderRadius.circular(AgriRadius.full),
+          onTap: () => menu.isOpen ? menu.close() : menu.open(),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(
+                  SymbolesAgri.notifications,
+                  size: 24,
+                  color: AgriColors.outline,
+                ),
+              ),
+              if (n > 0)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    key: const Key('cloche-compteur'),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AgriColors.errorRed,
+                      borderRadius: BorderRadius.circular(AgriRadius.full),
+                    ),
+                    child: Text(
+                      // Plafond du web : « 9+ » (`notification-bell.blade.php`), pas « 99+ ».
+                      n > 9 ? '9+' : '$n',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// `notif-item px-md py-sm border-b … flex items-start justify-between gap-xs`.
+  Widget _ligne(int i, ApercuNotification a) {
+    final marquer = widget.onMarquerLue;
+    return Container(
+      key: Key('cloche-notif-$i'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AgriSpacing.md,
+        vertical: AgriSpacing.sm,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  a.titre,
+                  key: Key('cloche-titre-$i'),
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.w600,
+                    color: a.lue ? AgriColors.onSurface : AgriColors.errorDeep,
+                  ),
+                ),
+                Text(
+                  a.dateTexte,
+                  key: Key('cloche-date-$i'),
+                  style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+                ),
+              ],
+            ),
+          ),
+          if (!a.lue && marquer != null) ...[
+            const SizedBox(width: AgriSpacing.xs),
+            Tooltip(
+              message: 'Marquer comme lue',
+              child: InkWell(
+                key: Key('cloche-lue-$i'),
+                onTap: () => marquer(a.id),
+                child: const Icon(
+                  SymbolesAgri.check_circle,
+                  size: 16,
+                  color: AgriColors.brandEmerald,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

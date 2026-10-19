@@ -68,6 +68,7 @@ class ServeurNotifications {
 class LigneNotification {
   const LigneNotification({
     required this.id,
+    required this.titre,
     required this.message,
     required this.categorie,
     required this.gravite,
@@ -77,6 +78,10 @@ class LigneNotification {
   });
 
   final String id;
+
+  /// Ticket U14 — `title` : ce que la CLOCHE du web affiche (`$notif->title`) ; le Centre de notifications affiche
+  /// le message, comme sa vue web.
+  final String titre;
   final String message;
 
   /// Catégorie calculée par le serveur : Élevage, Stocks, Finance, Système…
@@ -200,6 +205,7 @@ class NotificationsRepository {
         for (final n in brutes)
           LigneNotification(
             id: n.id,
+            titre: n.title,
             message: n.message,
             categorie: n.category,
             gravite: n.severity,

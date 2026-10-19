@@ -27,6 +27,7 @@ void main() {
     () {
       final ligne = LigneNotification(
         id: 'n',
+        titre: 'Titre',
         message: 'Stock bas',
         categorie: 'Stocks',
         gravite: 'info',
@@ -41,6 +42,7 @@ void main() {
       expect(
         LigneNotification(
           id: 'n',
+          titre: 'Titre',
           message: 'Stock bas',
           categorie: 'Stocks',
           gravite: 'info',

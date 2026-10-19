@@ -25,6 +25,8 @@ import 'core/widgets/modale_agri.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
 import 'core/widgets/barre_superieure.dart';
+import 'core/widgets/rafraichissement_periodique.dart';
+import 'core/widgets/toast_agri.dart';
 import 'core/theme/agri_tokens.dart';
 import 'features/demarrage/premier_demarrage_repository.dart';
 import 'features/demarrage/premier_demarrage_screen.dart';
@@ -719,7 +721,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 // ⚠️ LE COMPTEUR EST LU EN DIRECT : figer sa valeur au
                 // montage laisserait la pastille annoncer « Sync » alors
                 // qu'une journée vient d'être saisie.
-                FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
+                // 🔴→✅ Ticket U14 — et relu toutes les 30 s, comme `wire:poll.30s` de la cloche du web : non lues,
+                // quatre dernières, « il y a … » recalculé (la minuterie s'arrête avec le socle).
+                RafraichissementPeriodique(
+                  intervalle: BarreSuperieure.rafraichissementCloche,
+                  builder: (context) => FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
                   future: _etatDeLaBarre(),
                   builder: (context, instantane) => BarreSuperieure(
                     groupe: groupe,
@@ -734,13 +740,16 @@ class _SocleAccueilState extends State<SocleAccueil> {
                         4,
                       ))
                         ApercuNotification(
-                          message: n.message,
+                          id: n.id,
+                          // Ticket U14 — le TITRE, comme la cloche du web (`$notif->title`).
+                          titre: n.titre,
                           // Ticket U13 — « il y a … » comme la cloche du web (`diffForHumans`), à l'heure du Bénin.
                           dateTexte: n.dateRelative(instantane.data!.$2.maintenant),
                           lue: n.lue,
-                          critique: n.gravite == 'critique',
                         ),
                     ],
+                    // Ticket U14 — `markAsRead($id)` de la cloche du web (réseau exigé, comme au Centre).
+                    onMarquerLue: _marquerLue,
                     onAide:
                         PermissionsPoste.autorise(
                           _role,
@@ -778,6 +787,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     ),
                     onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
                   ),
+                  ),
                 ),
                 // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
                 Expanded(
@@ -807,6 +817,17 @@ class _SocleAccueilState extends State<SocleAccueil> {
   Future<void> _deconnecter() async {
     await widget.auth.deconnecter();
     widget.onDeconnecte?.call();
+  }
+
+  /// Ticket U14 — « Marquer comme lue » de la cloche : le serveur d'abord (le dépôt ne touche la base locale qu'après
+  /// sa confirmation) ; un échec (hors ligne, session expirée) est dit en toast d'erreur, avec la phrase du dépôt.
+  Future<void> _marquerLue(String id) async {
+    try {
+      await widget.notifications.marquerLue(id);
+    } on EchecNotification catch (e) {
+      if (mounted) ToastAgri.afficher(context, e.message, type: TypeToast.erreur);
+    }
+    if (mounted) setState(() => _versionTirage++);
   }
 
   /// Ce que lit la barre supérieure : la file d'attente (à envoyer, refusés) et les notifications.
