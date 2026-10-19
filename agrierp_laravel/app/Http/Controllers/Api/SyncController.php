@@ -3645,7 +3645,25 @@ class SyncController extends Controller
                     'quantity' => ['required', 'numeric', 'min:0.01'],
                     'reference_type' => ['required', 'string'],
                     'reason' => ['nullable', 'string'],
+                    // Ticket U10 — date du mouvement, lue pour un « Ajout Manuel » seulement (voir plus bas).
+                    'movement_date' => ['nullable', 'date'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                // 🔴→✅ TICKET U10 — « AJOUTER STOCK » SAISI AU POSTE (`reference_type = manual_addition`).
+                //
+                // ⚠️⚠️ MÊMES RÈGLES QUE `GestionStocks::submitAjouterStock()` : une ENTRÉE, une quantité ENTIÈRE d'au
+                // moins 1, une date obligatoire — et c'est CETTE date qui date le mouvement (`Carbon::parse($addDate)`
+                // au web), pas l'instant de réception. Un ajout du 3 reçu le 5 compte au 3 dans la rotation et le
+                // grand livre, comme s'il avait été saisi au web. Les autres ajustements gardent leur règle (rejoués
+                // à la réception, `movement_date` ignorée) : l'inventaire du web est daté de son enregistrement.
+                $ajoutManuel = $validated['reference_type'] === 'manual_addition';
+                if ($ajoutManuel) {
+                    validator($adj, [
+                        'type' => ['required', 'in:entree'],
+                        'quantity' => ['required', 'integer', 'min:1'],
+                        'movement_date' => ['required', 'date'],
+                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                }
 
                 $clientRef = $validated['client_ref'] ?? null;
 
@@ -3683,8 +3701,18 @@ class SyncController extends Controller
                     referenceType: $validated['reference_type'],
                     // ⚠️ C'est cette trace qui rend le renvoi inoffensif.
                     referenceId: $clientRef,
+                    movementDate: $ajoutManuel ? \Carbon\Carbon::parse($validated['movement_date']) : null,
                     reason: $validated['reason'] ?? null,
                 );
+
+                // Ticket U10 — l'ajout manuel du web ne passe AUCUNE écriture (ce n'est pas un écart d'inventaire)
+                // et laisse sa trace d'audit : même chose ici.
+                if ($ajoutManuel) {
+                    AuditLog::record('stock.manual_addition', 'stocks');
+                    $accepted[] = $clientRef ?? $validated['product_id'];
+
+                    continue;
+                }
 
                 // 🔴→✅ TICKET 14.67 — LA PERTE CONSTATEE HORS LIGNE ENTRE
                 // ENFIN DANS LES LIVRES.

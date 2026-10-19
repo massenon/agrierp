@@ -100,6 +100,20 @@ class PmpService {
         : texte;
   }
 
+  /// Ticket U10 — un flottant PHP AFFICHÉ TEL QUEL (`{{ $valeur }}`, `$valeur.' %'`) : conversion en chaîne de PHP,
+  /// soit 14 chiffres significatifs (`precision` = 14), sans zéro ni point final — « 12 », « 12.5 », « -3 »,
+  /// « 0.3 » pour 0,1 + 0,2. Le point est anglais : c'est ce que le web affiche.
+  static String flottant(double valeur) {
+    if (valeur == 0) return '0';
+    final texte = valeur.toStringAsPrecision(14);
+    if (texte.contains('e')) return valeur.toString();
+    return texte.contains('.')
+        ? texte
+              .replaceFirst(RegExp(r'0+$'), '')
+              .replaceFirst(RegExp(r'\.$'), '')
+        : texte;
+  }
+
   /// `number_format($valeur, 0, ',', ' ')` de PHP : arrondi demi loin de zéro, milliers séparés par une espace,
   /// signe « - » conservé (« -1 500 »), jamais « -0 ».
   static String francs(double valeur) {

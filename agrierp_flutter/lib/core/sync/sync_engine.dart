@@ -304,6 +304,24 @@ class SyncEngine {
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
+
+  /// Ticket U10 — resynchronisation UNIQUE des fiches après le passage au schéma v45 : les fiches `synced` absorbées
+  /// avant n'ont ni `vente_sexe`, ni `vente_montant`, ni le traitement, la dose et les symptômes (Tableau 2 et « CA
+  /// Ventes du Lot » du Rapport Élevage), et le curseur est passé. Même règle que [cleFichesResyncCategories] :
+  /// écrite après tous les absorbeurs, et seulement si les fiches servies portent ces colonnes.
+  static const cleFichesResyncU10 = 'fiches_resync_u10';
+
+  /// Les cinq colonnes de la fiche reçues pour le Rapport Élevage (ticket U10).
+  static const colonnesRapportElevage = [
+    'vente_sexe',
+    'vente_montant',
+    'treatment_product_id',
+    'treatment_dose',
+    'symptomes',
+  ];
+
+  /// Vrai si le dernier tirage a servi au moins une fiche SANS [colonnesRapportElevage].
+  bool _fichesSansColonnesRapport = false;
   /// Ticket 15.50 — instant de la dernière réinitialisation du serveur que CE poste a appliquée
   /// (purge faite). Renvoyé à chaque envoi : le serveur refuse (409) celui d'un poste qui ne l'a pas.
   static const cleReinitialisation = 'donnees_reinitialisees_le';
@@ -359,6 +377,8 @@ class SyncEngine {
     final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
     final resyncMouvementsFaite =
         await _lireReglage(cleMouvementsResync) != null;
+    final resyncFichesU10Faite =
+        await _lireReglage(cleFichesResyncU10) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -368,7 +388,8 @@ class SyncEngine {
         !resyncCategoriesFaite ||
         !resyncLignesFaite ||
         !resyncRetoursFaite ||
-        !resyncMouvementsFaite;
+        !resyncMouvementsFaite ||
+        !resyncFichesU10Faite;
 
     final reponse = await _client.get<Map<String, dynamic>>(
       '/api/sync/pull',
@@ -407,6 +428,7 @@ class SyncEngine {
     _journalManquants = 0;
     _journalSansDateCreation = false;
     _fichesSansVentilation = false;
+    _fichesSansColonnesRapport = false;
 
     recus += await _absorberCategories(corps['product_categories']);
     recus += await _absorberProduits(corps['products']);
@@ -521,6 +543,10 @@ class SyncEngine {
     // F0.95 : même place, et seulement si le serveur sert la ventilation par catégorie.
     if (!resyncCategoriesFaite && !_fichesSansVentilation) {
       await _ecrireReglage(cleFichesResyncCategories, '1');
+    }
+    // U10 : même place, et seulement si les fiches servies portent les colonnes du Rapport Élevage.
+    if (!resyncFichesU10Faite && !_fichesSansColonnesRapport) {
+      await _ecrireReglage(cleFichesResyncU10, '1');
     }
     // U4 : même place, et seulement si les ventes et achats servis l'ont été avec leurs lignes.
     final lignesNonServies =
@@ -914,8 +940,10 @@ class SyncEngine {
   /// pas à jour) = valeur locale gardée ; NULL explicite = inconnu. Une fiche `synced` prend les
   /// `effectif_final` et `cat_eff_*` recalculés par la cascade du serveur.
   ///
-  /// ⚠️ COLONNES DU SERVEUR TOUJOURS NON PORTÉES : `feed_product_id`, `treatment_product_id`,
-  /// `treatment_dose`, `symptomes`, `vente_sexe`, `vente_montant`. Le poste ne les envoie pas :
+  /// Ticket U10 (schéma v45) — REÇUES, jamais envoyées : `vente_sexe`, `vente_montant`, `treatment_product_id`,
+  /// `treatment_dose`, `symptomes` (Tableau 2 et « CA Ventes du Lot » du Rapport Élevage). Même règle de clé absente.
+  ///
+  /// ⚠️ COLONNE DU SERVEUR TOUJOURS NON PORTÉE : `feed_product_id`. Le poste n'envoie aucune de ces six colonnes :
   /// `fill()` du serveur ne réécrit que les clés reçues, elles y restent intactes.
   Future<int> _absorberFichesJournalieres(Object? brut) async {
     if (brut == null) return 0;
@@ -991,6 +1019,26 @@ class SyncEngine {
         throw FormatException('Fiche $id refusée : « $cle » négatif ($v).');
       }
       return x;
+    }
+
+    /// Ticket U10 — texte reçu : clé absente = valeur locale gardée ; nul = inconnu ; sinon une CHAÎNE (et, s'il
+    /// y a lieu, une des [valeurs] permises ou de la [forme] attendue), sans quoi le lot est refusé.
+    Value<String?> texteOptionnel(
+      Map<String, dynamic> l,
+      String cle,
+      String id, {
+      Set<String>? valeurs,
+      RegExp? forme,
+    }) {
+      if (!l.containsKey(cle)) return const Value.absent();
+      final v = l[cle];
+      if (v == null) return const Value(null);
+      if (v is! String ||
+          (valeurs != null && !valeurs.contains(v)) ||
+          (forme != null && !forme.hasMatch(v))) {
+        throw FormatException('Fiche $id refusée : « $cle » illisible ($v).');
+      }
+      return Value(v);
     }
 
     // ── Validation complète AVANT toute écriture en base ────────────────────
@@ -1086,6 +1134,24 @@ class SyncEngine {
           effectifF: optionnel(l, 'effectif_f', id),
           effectifSevres: optionnel(l, 'effectif_sevres', id),
           effectifSmeres: optionnel(l, 'effectif_smeres', id),
+          // Ticket U10 — colonnes du Rapport Élevage, reçues seulement (clé absente = valeur locale gardée).
+          venteSexe: texteOptionnel(
+            l,
+            'vente_sexe',
+            id,
+            valeurs: const {'M', 'F', 'Mixte'},
+          ),
+          venteMontant: l.containsKey('vente_montant')
+              ? Value(reel(l, 'vente_montant', id))
+              : const Value.absent(),
+          treatmentProductId: texteOptionnel(
+            l,
+            'treatment_product_id',
+            id,
+            forme: formeUuid,
+          ),
+          treatmentDose: texteOptionnel(l, 'treatment_dose', id),
+          symptomes: texteOptionnel(l, 'symptomes', id),
           // Ticket 15.46 — transferts entre bandes, dérivés au serveur (NOT NULL à 0).
           transfertEntree: derive(l, 'transfert_entree', id),
           transfertSortie: derive(l, 'transfert_sortie', id),
@@ -1101,6 +1167,9 @@ class SyncEngine {
       // unique `fiches_resync_f095` ne doit alors PAS être marquée faite (voir `_tirer`).
       if (!colonnesVentilation.every(l.containsKey)) {
         _fichesSansVentilation = true;
+      }
+      if (!colonnesRapportElevage.every(l.containsKey)) {
+        _fichesSansColonnesRapport = true;
       }
     }
 
@@ -5602,6 +5671,9 @@ class SyncEngine {
     'quantity': a.quantity,
     'reference_type': a.referenceType,
     'reason': a.reason,
+    // Ticket U10 — le JOUR du mouvement (`Y-m-d`, heure murale) : le serveur date un « Ajout Manuel » de ce jour,
+    // comme le web (`Carbon::parse($addDate)`) ; il ne le lit pas pour un écart d'inventaire (rejoué à réception).
+    'movement_date': _jour(a.movementDate),
     'device_id': a.deviceId,
     'updated_at': a.updatedAt.toUtc().toIso8601String(),
   };

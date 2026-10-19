@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart' show OrderingTerm, OrderingMode;
 
 import '../../core/database/app_database.dart';
-import '../elevage/production_oeufs_service.dart';
+import '../../core/database/sync_columns.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 
@@ -54,7 +54,7 @@ class PositionTresorerie {
       connue ? (caisse ?? 0) + (banque ?? 0) + (autres ?? 0) : null;
 }
 
-/// Les quatre indicateurs zootechniques du rapport d'élevage.
+/// Les quatre indicateurs zootechniques du rapport d'élevage — `ElevageSynth::getKpisProperty()` (ticket U10).
 class IndicateursElevage {
   const IndicateursElevage({
     required this.productionTotale,
@@ -63,15 +63,22 @@ class IndicateursElevage {
     required this.chiffreAffaires,
   });
 
+  /// `(int) $entries->sum('ponte_total')`.
   final int productionTotale;
+
+  /// `round(avg(OR ÷ Effectif Final × 100), 1)` sur les fiches à effectif ET ponte > 0 ; `null` (« — ») sans elles.
   final double? tauxPonteMoyen;
+
+  /// `round(Σ morts ÷ previousEffectif(fiche la plus ancienne) × 100, 1)` ; `null` (« — ») si cet effectif est nul.
   final double? mortaliteHebdo;
 
-  /// ⚠️ `null` — ET NON ZÉRO. `vente_montant` existe au serveur mais **ne
-  /// figure pas dans la charge utile d'envoi des fiches** : le poste ne l'a
-  /// jamais eu. Afficher « 0 FCFA » dirait « rien n'a été vendu » là où il
-  /// faut lire « ce poste ne détient pas le montant ».
-  final double? chiffreAffaires;
+  /// 🔴→✅ Ticket U10 — `(float) $entries->sum('vente_montant')` : `vente_montant` descend au poste (schéma v45). Le
+  /// web affiche toujours un montant, « 0 FCFA » compris : le poste aussi.
+  final double chiffreAffaires;
+
+  /// `round(...)` puis conversion en chaîne de PHP, suivie de « % » ; « — » si `null` (Blade du web).
+  static String taux(double? valeur) =>
+      valeur == null ? '—' : '${PmpService.flottant(valeur)} %';
 }
 
 class DonneesRapports {
@@ -90,6 +97,8 @@ class DonneesRapports {
     required this.elevageT3,
     required this.indicateurs,
     required this.stocks,
+    this.bandesElevage = const [],
+    this.elevageT3Export = const [],
   });
 
   final DateTime du;
@@ -111,43 +120,36 @@ class DonneesRapports {
   final List<LigneRapport> elevageT3;
   final IndicateursElevage indicateurs;
 
+  /// Ticket U10 — options du filtre « Lot / Souche » : bandes ACTIVES triées par code (`ElevageSynth::getLotsProperty()`).
+  final List<LivestockLot> bandesElevage;
+
+  /// Ticket U10 — Tableau 3 du PDF du web (`exports/elevage-synth.blade.php`) : Jour, Lot, Œufs Récoltés, Taux Ponte
+  /// %, Cassés, Commercialisables.
+  final List<LigneRapport> elevageT3Export;
+
   final List<LigneRapport> stocks;
 }
 
 /// Lectures de `prototype_html/rapports-exports.html` et de ses six pages.
 ///
 /// ⚠️⚠️ **CES RAPPORTS NE COUVRENT QUE CE QUE LE POSTE DÉTIENT, ET LE DISENT.**
-/// Trois limites structurelles, toutes vérifiées dans le contrat de
-/// synchronisation plutôt que supposées :
 ///
-/// 1. **Les fiches d'élevage ne sont JAMAIS TIRÉES, seulement poussées.**
-///    `livestock_daily_entries` ne figure pas dans les 36 absorbeurs du
-///    tirage. Le rapport d'élevage porte donc les journées saisies **sur ce
-///    poste**, jamais celles d'un autre — même règle que l'historique des
-///    ventes, et pour la même raison.
-/// 2. **L'envoi d'une fiche ne porte que onze champs sur la vingtaine du
-///    serveur.** `effectif_m`, `effectif_f`, `effectif_sevres`,
-///    `effectif_smeres`, `cat_eff_*`, `treatment_dose`, `symptomes`,
-///    `vente_sexe` et `vente_montant` existent en base côté serveur mais
-///    **ne quittent pas le poste** — donc n'y reviennent pas. Le Tableau 1 en
-///    perd onze colonnes sur treize, le Tableau 2 cinq sur neuf. Elles restent
-///    AFFICHÉES, avec un tiret : une colonne retirée ferait croire que la
-///    maquette ne la demande pas.
+/// 1. ~~Les fiches d'élevage ne sont jamais tirées~~ — 🔴→✅ elles descendent depuis F0.94 (journées du serveur ET
+///    saisies ici).
+/// 2. ~~Onze colonnes de la fiche ne descendent pas~~ — 🔴→✅ la ventilation par sexe et par état descend depuis
+///    F0.95 ; `vente_sexe`, `vente_montant`, le traitement, la dose et les symptômes depuis U10 (schéma v45). Les
+///    Tableaux 1 et 2 et les indicateurs sont ceux du Blade (`ElevageSynth`), formule pour formule.
 /// 3. **Aucune série journalière de trésorerie** — voir [PositionTresorerie].
-///
-/// ⚠️ **LES FORMULES DE PONTE NE SONT PAS RÉÉCRITES ICI.** Elles vivent dans
-/// `ProductionOeufsService`, où elles ont déjà été alignées sur le serveur
-/// (taux divisé par l'effectif FINAL, commercialisables jamais négatifs,
-/// plateau de 30). Les redériver pour un rapport ferait deux vérités pour un
-/// même chiffre.
 class RapportsRepository {
   RapportsRepository({required this.database});
 
   final AppDatabase database;
 
+  /// [lot] : filtre « Lot / Souche » du web (`$lotFilter`, identifiant de bande ; vide = toutes).
   Future<DonneesRapports> charger({
     required DateTime du,
     required DateTime au,
+    String lot = '',
   }) async {
     // ⚠️ La borne haute est INCLUSIVE : « au 31/07 » doit contenir le 31/07
     // dans son entier, pas s'arrêter à minuit. Une vente de fin de journée
@@ -181,9 +183,22 @@ class RapportsRepository {
             ]))
             .get();
 
-    final dansLaPeriode = fiches
-        .where((f) => !f.entryDate.isBefore(debut) && !f.entryDate.isAfter(fin))
+    // 🔴→✅ Ticket U10 — `ElevageSynth::baseQuery()` : fiches de la période et de la bande filtrée. ⚠️ Une fiche
+    // REFUSÉE par le serveur (`conflict`) n'existe pas au web : elle ne compte nulle part (règle U8) ; une fiche en
+    // attente d'envoi compte, elle part vers lui.
+    final connues = [
+      for (final f in fiches)
+        if (f.syncStatus != SyncStatus.conflict) f,
+    ];
+    final dansLaPeriode = connues
+        .where(
+          (f) =>
+              !f.entryDate.isBefore(debut) &&
+              !f.entryDate.isAfter(fin) &&
+              (lot.isEmpty || f.lotId == lot),
+        )
         .toList();
+    final nomProduit = {for (final p in produits) p.id: p.name};
 
     return DonneesRapports(
       du: debut,
@@ -195,15 +210,19 @@ class RapportsRepository {
       tresorerie: _tresorerie(comptes, etat),
       creances: _creances(creances, clients),
       dettes: _dettes(dettes, fournisseurs),
-      elevageT1: _elevageRecensement(dansLaPeriode, bandes),
-      elevageT2: _elevageMouvements(dansLaPeriode, bandes),
+      elevageT1: elevageRecensement(dansLaPeriode, bandes),
+      elevageT2: elevageMouvements(dansLaPeriode, bandes, nomProduit),
       elevageT3: elevagePonte(
         dansLaPeriode,
         bandes,
         journal,
         JournalStocks.produitOeufs(produits)?.id,
       ),
-      indicateurs: _indicateurs(dansLaPeriode),
+      elevageT3Export: elevagePonteExport(dansLaPeriode, bandes),
+      indicateurs: indicateursElevage(dansLaPeriode, connues, bandes),
+      bandesElevage:
+          bandes.where((b) => b.isActive).toList()
+            ..sort((a, b) => comparerCommeLeServeur(a.code, b.code)),
       stocks: _stocks(produits, categories),
     );
   }
@@ -353,67 +372,65 @@ class RapportsRepository {
 
   // ── Onglet 5 : Rapport Élevage ────────────────────────────────────────────
 
-  /// Tableau 1 — Recensement Hebdomadaire, treize colonnes.
+  /// 🔴→✅ Ticket U10 — Tableau 1 « Recensement » du BLADE (`elevage-synth.blade.php`), dix colonnes : Date, Lot /
+  /// Souche, Effectif M, Effectif F, Sous Mères, Sevrés, Achats, Nés, Morts, Effectif Final.
   ///
-  /// ⚠️⚠️ **ONZE DE CES TREIZE COLONNES NE DESCENDENT PAS AU POSTE.** La
-  /// ventilation par sexe et par stade (`effectif_m`, `effectif_f`,
-  /// `effectif_sevres`, `effectif_smeres`, `cat_eff_*`) existe bien en base
-  /// côté serveur, mais **`_ficheEnJson` ne l'envoie pas** — le poste ne la
-  /// possède donc à aucun moment. Les colonnes restent affichées avec un
-  /// tiret : les retirer ferait croire que la maquette ne les demande pas, et
-  /// le contrôle de structure les compte.
-  List<LigneRapport> _elevageRecensement(
+  /// Le poste portait les treize colonnes de la maquette, toutes en tiret ; le web est maître (article 5) : il
+  /// affiche les colonnes que la fiche porte réellement. `{{ $e->effectif_m }}` d'une valeur absente rend une
+  /// cellule VIDE au web : le poste aussi (ni « — » ni 0).
+  static List<LigneRapport> elevageRecensement(
     List<LivestockDailyEntry> fiches,
     List<LivestockLot> bandes,
   ) {
     final codeDe = {for (final b in bandes) b.id: b.code};
+    String vide(int? v) => v == null ? '' : '$v';
 
     return [
       for (final f in fiches)
         LigneRapport([
           date(f.entryDate),
-          codeDe[f.lotId] ?? '—',
-          '—', // Mères Pondeuses
-          '—', // Mères Couveuses
-          '—', // Mères Éleveuses
-          '—', // Poussins S/Mères
-          '—', // Sevrés M
-          '—', // Sevrés F
-          '—', // Morts M
-          '—', // Morts F
-          '—', // Morts SM
-          '—', // Géniteurs
-          '—', // Effectif Malade
+          codeDe[f.lotId] ?? '',
+          vide(f.effectifM),
+          vide(f.effectifF),
+          vide(f.effectifSmeres),
+          vide(f.effectifSevres),
+          '${f.achat}',
+          '${f.ne}',
+          '${f.mort}',
+          '${f.effectifFinal}',
         ]),
     ];
   }
 
-  /// Tableau 2 — Mouvements, Traitements & Ventes, neuf colonnes.
-  ///
-  /// ⚠️ **QUATRE COLONNES SUR NEUF SONT RÉELLES.** `vente` et `effectifFinal`
-  /// font partie de l'envoi ; `vente_sexe`, `vente_montant`,
-  /// `treatment_dose` et `symptomes` n'en font pas partie. Le traitement
-  /// administré vit dans le registre `veterinary_records`, une AUTRE table,
-  /// avec sa propre date — les rapprocher ici sur la seule date produirait des
-  /// associations fausses le jour où deux soins tombent le même jour.
-  List<LigneRapport> _elevageMouvements(
+  /// 🔴→✅ Ticket U10 — Tableau 2 « Mouvements, Traitements & Ventes » du BLADE, neuf colonnes, cellules du web :
+  /// `vente_sexe ?? '—'`, `vente` (0 compris), `number_format(vente_montant, 0, ',', ' ')` (« 0 » sans montant, comme
+  /// PHP), `effectif_final`, `treatmentProduct?->name ?? '—'`, `treatment_dose ?? '—'`, `symptomes ?: 'RAS'`.
+  /// Les cinq colonnes jadis en tiret descendent au poste depuis U10 (schéma v45).
+  static List<LigneRapport> elevageMouvements(
     List<LivestockDailyEntry> fiches,
     List<LivestockLot> bandes,
+    Map<String, String> nomProduit,
   ) {
     final codeDe = {for (final b in bandes) b.id: b.code};
+    // `?:` de PHP : chaîne vide et « 0 » sont fausses.
+    String symptomes(String? s) =>
+        s == null || s.isEmpty || s == '0' ? 'RAS' : s;
 
     return [
       for (final f in fiches)
         LigneRapport([
           date(f.entryDate),
-          codeDe[f.lotId] ?? '—',
-          '—', // Sexe Vendu
-          f.vente == 0 ? '—' : '${f.vente}',
-          '—', // Montant Vente (FCFA)
+          codeDe[f.lotId] ?? '',
+          f.venteSexe ?? '—',
+          '${f.vente}',
+          PmpService.francs(f.venteMontant ?? 0),
           '${f.effectifFinal}',
-          '—', // Traitement Administré
-          '—', // Dose
-          '—', // Signes de Maladie Observés
+          (f.treatmentProductId == null
+                  ? null
+                  : nomProduit[f.treatmentProductId]) ??
+              '—',
+          f.treatmentDose ?? '—',
+          symptomes(f.symptomes),
         ]),
     ];
   }
@@ -495,39 +512,101 @@ class RapportsRepository {
     return '${jours ~/ 7}';
   }
 
-  IndicateursElevage _indicateurs(List<LivestockDailyEntry> fiches) {
-    final pondeuses = fiches.where((f) => f.ponteTotal != null).toList();
+  /// Tableau 3 du PDF du web (`exports/elevage-synth.blade.php`) : les fiches à ponte > 0, six colonnes — Jour, Lot,
+  /// Œufs Récoltés, Taux Ponte % (`number_format(…, 1)` puis « % », « — % » sans effectif), Cassés (vide si absent),
+  /// Commercialisables (`ponte_total - ponte_casses`, une casse absente valant 0).
+  static List<LigneRapport> elevagePonteExport(
+    List<LivestockDailyEntry> periode,
+    List<LivestockLot> bandes,
+  ) {
+    final codeDe = {for (final b in bandes) b.id: b.code};
+    return [
+      for (final f in periode)
+        if ((f.ponteTotal ?? 0) > 0)
+          LigneRapport([
+            date(f.entryDate),
+            codeDe[f.lotId] ?? '',
+            '${f.ponteTotal}',
+            '${f.effectifFinal > 0 ? PmpService.nombre(f.ponteTotal! / f.effectifFinal * 100, 1, virgule: '.', milliers: ',') : '—'} %',
+            f.ponteCasses == null ? '' : '${f.ponteCasses}',
+            '${f.ponteTotal! - (f.ponteCasses ?? 0)}',
+          ]),
+    ];
+  }
 
-    final production = pondeuses.fold<int>(0, (t, f) => t + (f.ponteTotal!));
+  /// 🔴→✅ Ticket U10 — `ElevageSynth::getKpisProperty()`, formule pour formule (le poste reconstituait l'effectif
+  /// de début de CHAQUE journée et moyennait autrement ; le web est maître) :
+  ///
+  ///   Production Totale = Σ ponte_total ;
+  ///   Taux de Ponte Moyen = round(moyenne des OR ÷ Effectif Final × 100, 1), fiches à effectif ET ponte > 0 ;
+  ///   Taux de Mortalité Hebdo = round(Σ morts ÷ Effectif Début × 100, 1), Effectif Début = `previousEffectif()` de
+  ///     la fiche la PLUS ANCIENNE de la sélection : effectif final de la fiche précédente de SA bande (toutes dates,
+  ///     hors période), sinon effectif initial de la bande ; « — » s'il est nul ;
+  ///   CA Ventes du Lot = Σ vente_montant.
+  ///
+  /// [periode] : les fiches affichées (période et bande), de la plus récente à la plus ancienne ; [toutes] : toutes
+  /// les fiches connues du serveur (pour la fiche précédente).
+  static IndicateursElevage indicateursElevage(
+    List<LivestockDailyEntry> periode,
+    List<LivestockDailyEntry> toutes,
+    List<LivestockLot> bandes,
+  ) {
+    final production = periode.fold<int>(0, (t, f) => t + (f.ponteTotal ?? 0));
 
-    final taux = <double>[];
-    for (final f in pondeuses) {
-      final t = ProductionOeufsService.tauxDePonte(
-        recoltes: f.ponteTotal!,
-        effectif: f.effectifFinal,
-      );
-      if (t != null) taux.add(t);
-    }
+    final taux = [
+      for (final f in periode)
+        if (f.effectifFinal > 0 && (f.ponteTotal ?? 0) > 0)
+          f.ponteTotal! / f.effectifFinal * 100,
+    ];
 
-    // ⚠️ **LA MORTALITÉ SE RAPPORTE À L'EFFECTIF DE DÉBUT DE JOURNÉE**, que le
-    // poste reconstitue : effectif final + morts + ventes + dons − achats −
-    // nés. Diviser par l'effectif FINAL surestimerait la mortalité, l'effectif
-    // final étant justement amputé des morts.
-    var morts = 0;
-    var debuts = 0;
-    for (final f in fiches) {
-      morts += f.mort;
-      debuts += f.effectifFinal + f.mort + f.vente + f.don - f.achat - f.ne;
-    }
+    final morts = periode.fold<int>(0, (t, f) => t + f.mort);
+    // `$entries->sortBy('entry_date')->first()` : tri STABLE croissant de la liste décroissante.
+    final croissant = [...periode]
+      ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
+    final premiere = croissant.isEmpty ? null : croissant.first;
+    final debut = premiere == null
+        ? 0
+        : effectifPrecedent(premiere, toutes, bandes);
 
     return IndicateursElevage(
       productionTotale: production,
       tauxPonteMoyen: taux.isEmpty
           ? null
-          : taux.reduce((a, b) => a + b) / taux.length,
-      mortaliteHebdo: debuts <= 0 ? null : (morts / debuts) * 100,
-      chiffreAffaires: null,
+          : PmpService.arrondi(taux.reduce((a, b) => a + b) / taux.length, 1),
+      mortaliteHebdo: debut > 0
+          ? PmpService.arrondi(morts / debut * 100, 1)
+          : null,
+      chiffreAffaires: periode.fold<double>(
+        0,
+        (t, f) => t + (f.venteMontant ?? 0),
+      ),
     );
+  }
+
+  /// `LivestockDailyEntry::previousEffectif()` : effectif final de la fiche de la même bande au jour STRICTEMENT
+  /// antérieur le plus récent, sinon `initial_quantity` de la bande, sinon 0.
+  static int effectifPrecedent(
+    LivestockDailyEntry fiche,
+    List<LivestockDailyEntry> toutes,
+    List<LivestockLot> bandes,
+  ) {
+    final jour = JournalStocks.jour(fiche.entryDate);
+    LivestockDailyEntry? precedente;
+    for (final f in toutes) {
+      if (f.lotId != fiche.lotId ||
+          f.id == fiche.id ||
+          !JournalStocks.jour(f.entryDate).isBefore(jour)) {
+        continue;
+      }
+      if (precedente == null || f.entryDate.isAfter(precedente.entryDate)) {
+        precedente = f;
+      }
+    }
+    if (precedente != null) return precedente.effectifFinal;
+    for (final b in bandes) {
+      if (b.id == fiche.lotId) return b.initialQuantity;
+    }
+    return 0;
   }
 
   // ── Onglet 6 : Rapport de Stocks ──────────────────────────────────────────

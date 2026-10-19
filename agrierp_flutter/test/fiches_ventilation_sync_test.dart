@@ -173,6 +173,8 @@ void main() {
       'cat_eff_jeune',
       'cat_eff_4',
       ...SyncEngine.colonnesVentilation,
+      // Ticket U10 — le serveur sert TOUTES les colonnes du modèle, celles du Rapport Élevage comprises.
+      ...SyncEngine.colonnesRapportElevage,
     ])
       c: null,
     'feed_qty_kg': null,
@@ -711,6 +713,133 @@ void main() {
         expect(fichesEnvoyees().single.keys.toSet(), {'id', 'lot_id', 'entry_date'});
       },
     );
+  });
+
+  /// Ticket U10 (schéma v45) — les cinq colonnes du Rapport Élevage (Tableau 2, « CA Ventes du Lot ») DESCENDENT,
+  /// strictement lues, clé absente = valeur locale gardée ; elles ne PARTENT jamais ; une resynchronisation unique
+  /// les rapporte aux fiches déjà absorbées.
+  group('U10 — colonnes du Rapport Élevage', () {
+    test('⚠️⚠️ sexe, montant, traitement, dose et symptômes descendent, valeur par valeur', () async {
+      serveur.tirage = {
+        'livestock_daily_entries': [
+          servie('a', '2026-10-01', {
+            'vente': 3,
+            'vente_sexe': 'Mixte',
+            'vente_montant': '36500.50',
+            'treatment_product_id': _uuid('produit'),
+            'treatment_dose': '2 ml',
+            'symptomes': 'Toux',
+          }),
+        ],
+      };
+      await moteur().synchroniser();
+
+      final f = await fiche('a');
+      expect(
+        [f.venteSexe, f.venteMontant, f.treatmentProductId, f.treatmentDose, f.symptomes],
+        ['Mixte', 36500.5, _uuid('produit'), '2 ml', 'Toux'],
+      );
+    });
+
+    test('⚠️ clé ABSENTE (serveur antérieur) : la valeur locale est gardée ; NULL servi : effacée', () async {
+      await db
+          .into(db.livestockDailyEntries)
+          .insert(
+            LivestockDailyEntriesCompanion.insert(
+              id: _uuid('a'),
+              deviceId: 'poste-test',
+              syncStatus: const Value(SyncStatus.synced),
+              updatedAt: DateTime(2026, 10, 14, 9),
+              lotId: bande,
+              entryDate: DateTime(2026, 10, 1),
+              venteSexe: const Value('F'),
+              venteMontant: const Value(1200),
+              symptomes: const Value('RAS'),
+            ),
+          );
+      final ancien = servie('a', '2026-10-01', {'vente_montant': null});
+      ancien.remove('vente_sexe');
+      ancien.remove('symptomes');
+      serveur.tirage = {
+        'livestock_daily_entries': [ancien],
+      };
+      await moteur().synchroniser();
+
+      final f = await fiche('a');
+      expect([f.venteSexe, f.venteMontant, f.symptomes], ['F', null, 'RAS']);
+    });
+
+    test('⚠️ STRICT : un sexe hors liste ou un traitement illisible refuse le lot entier', () async {
+      for (final (cle, valeur) in [('vente_sexe', 'X'), ('treatment_product_id', 'pas-un-uuid'), ('vente_montant', -5)]) {
+        serveur.tirage = {
+          'livestock_daily_entries': [
+            servie('ok', '2026-10-02'),
+            servie('a', '2026-10-01', {cle: valeur}),
+          ],
+        };
+        await expectLater(moteur().synchroniser(), throwsA(isA<FormatException>()), reason: cle);
+        expect(await db.select(db.livestockDailyEntries).get(), isEmpty, reason: cle);
+        expect((await db.etatDeSynchronisation())?.lastPulledAt, isNull, reason: cle);
+      }
+    });
+
+    test('⚠️ elles ne partent JAMAIS à l envoi (le serveur garde les siennes)', () async {
+      await db
+          .into(db.livestockDailyEntries)
+          .insert(
+            LivestockDailyEntriesCompanion.insert(
+              id: _uuid('a'),
+              deviceId: 'poste-test',
+              syncStatus: const Value(SyncStatus.pending),
+              updatedAt: DateTime(2026, 10, 14, 9),
+              lotId: bande,
+              entryDate: DateTime(2026, 10, 1),
+              venteSexe: const Value('F'),
+              venteMontant: const Value(1200),
+              treatmentDose: const Value('1 ml'),
+            ),
+          );
+      await moteur().synchroniser();
+      final envoi = fichesEnvoyees().single;
+      for (final c in SyncEngine.colonnesRapportElevage) {
+        expect(envoi.containsKey(c), isFalse, reason: c);
+      }
+    });
+
+    test('⚠️⚠️ resynchronisation unique `fiches_resync_u10` : TOUT une fois, puis l incrémental', () async {
+      await db.noterEtatDeSynchronisation(tire: DateTime.utc(2026, 10, 1));
+      await resyncDejaFaites();
+      for (final cle in [SyncEngine.cleFichesResyncCategories]) {
+        await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: cle, value: '1'));
+      }
+      serveur.tirage = {
+        'livestock_daily_entries': [servie('a', '2026-10-01', {'vente_montant': '500.00'})],
+      };
+
+      await moteur().synchroniser();
+      await moteur().synchroniser();
+
+      expect(serveur.demandes.first, isNull, reason: 'sans since, une fois');
+      expect(serveur.demandes.last, isNotNull, reason: 'puis incrémental');
+      expect((await fiche('a')).venteMontant, 500);
+    });
+
+    test('⚠️ serveur qui ne sert pas ces colonnes : la resynchronisation N EST PAS marquée faite', () async {
+      await db.noterEtatDeSynchronisation(tire: DateTime.utc(2026, 10, 1));
+      await resyncDejaFaites();
+      final ancien = servie('a', '2026-10-01');
+      for (final c in SyncEngine.colonnesRapportElevage) {
+        ancien.remove(c);
+      }
+      serveur.tirage = {
+        'livestock_daily_entries': [ancien],
+      };
+
+      await moteur().synchroniser();
+      await moteur().synchroniser();
+
+      expect(serveur.demandes, [null, null]);
+    });
   });
 
   test(

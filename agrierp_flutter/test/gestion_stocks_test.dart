@@ -456,11 +456,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(
-          of: find.byKey(const Key('adj-ecart')),
-          matching: find.text('-5'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('adj-ecart'))).data,
+        '-5',
       );
     });
 
@@ -472,11 +469,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(
-          of: find.byKey(const Key('adj-ecart')),
-          matching: find.text('+7'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('adj-ecart'))).data,
+        '+7',
       );
     });
 

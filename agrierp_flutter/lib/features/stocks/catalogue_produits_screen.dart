@@ -32,9 +32,20 @@ class CatalogueProduitsScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.produits,
+    this.ongletInitial,
+    this.produitAModifier,
   });
 
   final StocksRepository depot;
+
+  /// Ticket U10 — onglet ouvert à l'arrivée : « Seuils d'Alerte » depuis le lien « Configurer les Seuils
+  /// d'Alerte » de Gestion des Stocks (`route('stocks.seuils')` au web). `null` : « Voir le Catalogue ».
+  final String? ongletInitial;
+
+  /// Ticket U10 — produit dont l'édition s'ouvre à l'arrivée : l'icône Modifier de Gestion des Stocks
+  /// (`route('stocks.produits.modifier', $id)`). Comme au web, l'enregistrement ou l'annulation ramène au
+  /// catalogue (`redirect('/catalogue-produits')`).
+  final String? produitAModifier;
 
   /// Création / modification d'un produit (ticket F0.67). `null` : catalogue en
   /// consultation seule, boutons inertes (poste sans session ni dépôt).
@@ -52,7 +63,9 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
     ("Seuils d'Alerte", SymbolesAgri.notifications_active),
   ];
 
-  String _onglet = onglets.first.$1;
+  late String _onglet = onglets.any((o) => o.$1 == widget.ongletInitial)
+      ? widget.ongletInitial!
+      : onglets.first.$1;
   String _categorie = 'Tous';
   String _recherche = '';
   String _statut = '';
@@ -63,7 +76,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
   DonneesStocks? _donnees;
 
   /// Sous-page « Ajouter / Modifier un Produit » ouverte : `''` création, sinon l'id.
-  String? _formulaire;
+  late String? _formulaire = widget.produitAModifier;
 
   @override
   void initState() {

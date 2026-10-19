@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/export/document_officiel.dart';
 import 'journal_stocks.dart';
 import 'pmp_service.dart';
 
@@ -184,6 +185,82 @@ class StocksRepository {
     "Erreur d'inventaire antérieur",
   ];
 
+  /// `GestionStocks::getStockRowsProperty()` : recherche (`str_contains` en minuscules sur le nom OU le SKU, texte
+  /// tel que saisi) puis filtre de catégorie (identifiant). Le tableau ET l'export lisent cette liste.
+  static List<LigneStock> filtrer(
+    List<LigneStock> lignes, {
+    required String recherche,
+    required String categorie,
+  }) {
+    final terme = recherche.toLowerCase();
+    return [
+      for (final l in lignes)
+        if ((terme.isEmpty ||
+                l.produit.name.toLowerCase().contains(terme) ||
+                l.produit.sku.toLowerCase().contains(terme)) &&
+            (categorie.isEmpty || l.produit.categoryId == categorie))
+          l,
+    ];
+  }
+
+  /// Ticket U10 — `GestionStocks::getAdjDiffProperty()` : 0 sans produit ou sans stock physique saisi, sinon
+  /// `round(physique − théorique, 2)`. Jamais « — » : le web affiche « 0 ».
+  static double ecartCalcule({double? theorique, double? physique}) =>
+      theorique == null || physique == null
+      ? 0
+      : PmpService.arrondi(physique - theorique, 2);
+
+  /// `{{ $adjDiff > 0 ? '+' : '' }}{{ $adjDiff }}` : « +7 », « -5 », « 0 », « 2.5 » (flottant PHP).
+  static String ecartAffiche(double ecart) =>
+      '${ecart > 0 ? '+' : ''}${PmpService.flottant(ecart)}';
+
+  /// 🔴→✅ Ticket U10 — « Exporter » : le document de `exportStocksPdf()` (vue `exports.gestion-stocks`), lignes
+  /// FILTRÉES comme à l'écran. Titre « Gestion des Stocks — Tableau & Valorisation », sous-titre « État au
+  /// jj/mm/aaaa », sept colonnes (sans « Actions »), cellules du Blade d'export : stock `number_format(…, 2, ',', ' ')`
+  /// et unité, PMP et valeur en « … FCFA » ou « — », urgence « Oui » ou « — ».
+  static DocumentOfficiel documentTableau(
+    List<LigneStock> lignes,
+    DateTime maintenant,
+  ) {
+    String deux(int n) => n.toString().padLeft(2, '0');
+    return DocumentOfficiel(
+      titre: 'Gestion des Stocks — Tableau & Valorisation',
+      sousTitre:
+          'État au ${deux(maintenant.day)}/${deux(maintenant.month)}/${maintenant.year}',
+      entetes: const [
+        'Code',
+        'Désignation',
+        'Catégorie',
+        'Stock',
+        'PMP Unit.',
+        'Valeur',
+        'Urgence',
+      ],
+      lignes: [
+        if (lignes.isEmpty)
+          const DonneesDocument([
+            'Aucun produit ne correspond aux filtres actifs.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+          ]),
+        for (final l in lignes)
+          DonneesDocument([
+            l.produit.sku,
+            l.produit.name,
+            l.categorie.isEmpty ? '—' : l.categorie,
+            '${PmpService.nombre(l.produit.stockQty, 2)} ${l.produit.unit}',
+            l.pmp == null ? '—' : '${PmpService.francs(l.pmp!)} FCFA',
+            l.valeur == null ? '—' : '${PmpService.francs(l.valeur!)} FCFA',
+            l.urgence ? 'Oui' : '—',
+          ]),
+      ],
+    );
+  }
+
   Future<DonneesStocks> charger() async {
     final maintenant = _horloge();
     final tousProduits = await database.select(database.products).get();
@@ -235,6 +312,97 @@ class StocksRepository {
         maintenant: maintenant,
       ),
     );
+  }
+
+  /// Ticket U10 — règles de la modale « Ajouter Stock » du web (`GestionStocks::submitAjouterStock()`), messages de
+  /// `lang/fr/validation.php` avec les noms de champ du web (`addDate` → « date », `addProductId` → « produit »,
+  /// `addQty` → « quantité ») : `addDate` `required|date`, `addProductId` `required|exists`, `addQty`
+  /// `required|integer|min:1`. Rend les erreurs par champ (`date`, `produit`, `quantite`), vide si tout est valable.
+  static Map<String, String> validerAjout({
+    required DateTime? date,
+    required String? productId,
+    required String quantite,
+  }) {
+    final erreurs = <String, String>{};
+    if (date == null) erreurs['date'] = 'Le champ date est obligatoire.';
+    if (productId == null || productId.isEmpty) {
+      erreurs['produit'] = 'Le champ produit est obligatoire.';
+    }
+    final texte = quantite.trim();
+    if (texte.isEmpty) {
+      erreurs['quantite'] = 'Le champ quantité est obligatoire.';
+    } else {
+      // `integer` de Laravel : « 20 » ou « 20.0 » passent, « 2.5 » ou « abc » non.
+      final reel = double.tryParse(texte);
+      if (reel == null || !reel.isFinite || reel != reel.truncateToDouble()) {
+        erreurs['quantite'] = 'Le champ quantité doit être un nombre entier.';
+      } else if (reel < 1) {
+        erreurs['quantite'] = 'Le champ quantité doit être au moins égal à 1.';
+      }
+    }
+    return erreurs;
+  }
+
+  /// 🔴→✅ Ticket U10 — « AJOUTER STOCK » (modale du web) : une ENTRÉE manuelle, écrite au poste en attente d'envoi.
+  ///
+  /// Le web passe par `AdjustStockAction::execute($product, $qty, 'manual_addition', null, Carbon::parse($addDate))` :
+  /// le poste écrit le même FAIT dans `stock_adjustments` (`type = entree`, `reference_type = manual_addition`,
+  /// `movement_date` = le jour choisi), et le serveur le rejoue par la même action, daté du même jour
+  /// (`pushStockAdjustments`) — aucune écriture comptable, comme au web. Le stock local suit immédiatement, comme
+  /// l'inventaire. [ArgumentError] porte le premier message de [validerAjout] (le web refuse de la même façon).
+  Future<StockAdjustment> ajouterStock({
+    required DateTime? date,
+    required String? productId,
+    required String quantite,
+    DateTime? quand,
+  }) async {
+    final erreurs = validerAjout(
+      date: date,
+      productId: productId,
+      quantite: quantite,
+    );
+    if (erreurs.isNotEmpty) throw ArgumentError(erreurs.values.first);
+
+    final produit = await (database.select(
+      database.products,
+    )..where((t) => t.id.equals(productId!))).getSingleOrNull();
+    // `exists:products,id` : « La valeur sélectionnée pour le champ produit n'existe pas. »
+    if (produit == null) {
+      throw ArgumentError(
+        "La valeur sélectionnée pour le champ produit n'existe pas.",
+      );
+    }
+
+    final qte = double.parse(quantite.trim());
+    final id = _uuid.v4();
+    final jour = DateTime(date!.year, date.month, date.day);
+
+    await database.transaction(() async {
+      await database
+          .into(database.stockAdjustments)
+          .insert(
+            StockAdjustmentsCompanion.insert(
+              id: id,
+              deviceId: deviceId,
+              syncStatus: const Value(SyncStatus.pending),
+              // ⚠️ L'instant de la SAISIE (règle de `updatedAt`), pas le jour choisi.
+              updatedAt: quand ?? _horloge(),
+              productId: produit.id,
+              type: 'entree',
+              quantity: qte,
+              referenceType: 'manual_addition',
+              movementDate: jour,
+            ),
+          );
+
+      await (database.update(database.products)
+            ..where((t) => t.id.equals(produit.id)))
+          .write(ProductsCompanion(stockQty: Value(produit.stockQty + qte)));
+    });
+
+    return (await (database.select(
+      database.stockAdjustments,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
   /// Enregistre un écart d'inventaire et aligne le stock local sur le comptage.

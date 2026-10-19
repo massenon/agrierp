@@ -8,6 +8,8 @@ import 'fiche_journaliere_repository.dart';
 import 'ration_volaille.dart';
 import 'production_oeufs_service.dart';
 import 'soins_repository.dart';
+import '../stocks/journal_stocks.dart';
+import '../stocks/pmp_service.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/fiche-volailles-pondeuses.html` → Saisie Journalière Ponte
@@ -98,6 +100,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// Journées du mois pour la bande choisie — le tableau de bas de fiche.
   List<LivestockDailyEntry> _fichesDuMois = const [];
 
+  /// Ticket U10 — grand livre des stocks et produit œufs du web, relus à chaque chargement du jour.
+  JournalStocks? _journal;
+  String? _produitGrandLivre;
+
   ProtocoleDuJour? _protocole;
   final _traitementsCoches = <String>{};
   final _observations = TextEditingController();
@@ -159,12 +165,15 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     );
     final produit = await widget.production.produitOeufs();
     final mois = await widget.depot.fichesDuMois(bande.id, quand: _jour);
+    final grandLivre = await widget.production.grandLivre();
 
     if (!mounted) return;
 
     setState(() {
       _effectifPrecedent = precedent;
       _fichesDuMois = mois;
+      _journal = grandLivre.journal;
+      _produitGrandLivre = grandLivre.produit;
       _achat = fiche?.achat ?? 0;
       _ne = fiche?.ne ?? 0;
       _vente = fiche?.vente ?? 0;
@@ -224,6 +233,12 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
 
   ({int plateaux, int vrac}) get _plateaux =>
       ProductionOeufsService.enPlateaux(_commercialisables);
+
+  /// 🔴→✅ Ticket U10 — `FichePondeuses::getStockTodayProperty()` : `EggStockLedgerService::ligne($selectedDate,
+  /// $commercialisables)` — SRH = solde de FERME des œufs avant le jour choisi, TS = SRH + plateaux du formulaire,
+  /// OS = sorties de vente du jour, Stock Final = TS − OS, en plateaux. `null` tant que le grand livre n'est pas lu.
+  LigneGrandLivreOeufs? get _stockDuJour =>
+      _journal?.ligneOeufs(_produitGrandLivre, _jour, _commercialisables);
 
   double? get _tauxPonte => ProductionOeufsService.tauxDePonte(
     recoltes: _oeufsRecoltes,
@@ -329,6 +344,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                     const SizedBox(height: AgriSpacing.md),
                     _pesee(),
                     const SizedBox(height: AgriSpacing.md),
+                    _stockOeufsDuJour(),
+                    const SizedBox(height: AgriSpacing.md),
                     _traitements(),
                     const SizedBox(height: AgriSpacing.md),
                     _attributionBatiments(),
@@ -339,6 +356,18 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
               ),
             const SizedBox(height: AgriSpacing.lg),
             _tableauMensuel(),
+            // Ticket U10 — note du Blade sous le tableau du mois.
+            if (_bande != null)
+              const Padding(
+                padding: EdgeInsets.only(top: AgriSpacing.sm),
+                child: Text(
+                  'Colonnes SRH/TS/OS/Stock Final : valeurs précises uniquement pour le jour sélectionné '
+                  '(reconstruction historique jour par jour non disponible avant le Sprint 6 — grand livre de '
+                  'mouvements de stock).',
+                  key: Key('note-grand-livre'),
+                  style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                ),
+              ),
           ],
         ),
       ),
@@ -475,12 +504,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// (30)** (Stock Hier (SRH), Total Stock (TS), Sortie Vente (OS), Stock
   /// Final) · **Traitements & Rappels**.
   ///
-  /// ⚠️⚠️ **LES QUATRE COLONNES DU GRAND LIVRE D'ŒUFS AFFICHENT UN TIRET.**
-  /// SRH, TS, OS et Stock Final sont reconstruits par `EggStockLedgerService`
-  /// depuis l'historique réel de `stock_movements` — une table que le poste ne
-  /// reçoit pas. Les calculer sur le seul solde courant donnerait un stock
-  /// reporté qui ne reporte rien : c'est exactement le défaut corrigé côté
-  /// serveur au ticket 14.13. Mieux vaut la colonne vide que le chiffre faux.
+  /// 🔴→✅ **TICKET U10 — LES QUATRE COLONNES DU GRAND LIVRE D'ŒUFS SONT CELLES DU WEB.** `stock_movements`
+  /// descend au poste depuis U9 : SRH, TS, OS et Stock Final de la ligne du JOUR SÉLECTIONNÉ sont ceux de
+  /// [_stockDuJour] (`$isToday ? $this->stockToday[…] : '—'` du Blade) ; les autres lignes gardent « — », comme au
+  /// web (« valeurs précises uniquement pour le jour sélectionné »).
   Widget _tableauMensuel() {
     if (_bande == null) return const SizedBox.shrink();
 
@@ -565,29 +592,29 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
             ),
           ],
         ),
-        // ⚠️ Grand livre d'œufs : non reconstituable au poste — voir docblock.
-        const GroupeColonnes(
+        // Ticket U10 — grand livre d'œufs : le jour sélectionné seulement, comme le web (voir docblock).
+        GroupeColonnes(
           libelle: 'Stock Œufs & Plateaux (30)',
           colonnes: [
             ColonneMensuelle(
               libelle: 'SRH',
               largeur: 1.5,
-              valeur: _sansGrandLivre,
+              valeur: (i) => _celluleGrandLivre(i, (l) => l.srh),
             ),
             ColonneMensuelle(
               libelle: 'TS',
               largeur: 1.5,
-              valeur: _sansGrandLivre,
+              valeur: (i) => _celluleGrandLivre(i, (l) => l.ts),
             ),
             ColonneMensuelle(
               libelle: 'OS',
               largeur: 1.5,
-              valeur: _sansGrandLivre,
+              valeur: (i) => _celluleGrandLivre(i, (l) => l.os),
             ),
             ColonneMensuelle(
               libelle: 'Stock Final',
               largeur: 1.3,
-              valeur: _sansGrandLivre,
+              valeur: (i) => _celluleGrandLivre(i, (l) => l.stockFinal),
             ),
           ],
         ),
@@ -605,6 +632,121 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   }
 
   static String _sansGrandLivre(int _) => '—';
+
+  /// Cellule SRH / TS / OS / Stock Final de la ligne [i] : la valeur du jour sélectionné (flottant PHP affiché tel
+  /// quel, `{{ $this->stockToday['srh'] }}`), « — » sur toute autre ligne.
+  String _celluleGrandLivre(int i, double Function(LigneGrandLivreOeufs) champ) {
+    final l = _stockDuJour;
+    if (l == null || i != _indexDuJourCourant()) return '—';
+    return PmpService.flottant(champ(l));
+  }
+
+  /// 🔴→✅ Ticket U10 — bloc « Stock Œufs & Plateaux (30) — Jour Sélectionné » du Blade, entre la pesée et les
+  /// traitements : quatre encadrés « Stock Hier (SRH) », « Total Stock (TS) », « Sortie Vente (OS) », « Stock
+  /// Final » (le dernier sur fond vert pâle), valeurs de [_stockDuJour].
+  Widget _stockOeufsDuJour() {
+    final l = _stockDuJour;
+    String v(double Function(LigneGrandLivreOeufs) champ) =>
+        l == null ? '—' : PmpService.flottant(champ(l));
+
+    Widget encadre(
+      String cle,
+      String libelle,
+      String valeur, {
+      Color couleur = AgriColors.brandForest,
+      bool final_ = false,
+    }) => Container(
+      padding: const EdgeInsets.all(AgriSpacing.sm),
+      decoration: BoxDecoration(
+        color: final_
+            ? AgriColors.brandEmerald.withValues(alpha: 0.10)
+            : AgriColors.surfaceCard,
+        border: Border.all(
+          color: final_
+              ? AgriColors.brandEmerald.withValues(alpha: 0.20)
+              : AgriColors.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      child: Column(
+        children: [
+          Text(
+            libelle.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: final_ ? AgriColors.brandForest : AgriColors.outline,
+            ),
+          ),
+          Text(
+            valeur,
+            key: Key(cle),
+            style: TextStyle(
+              fontSize: AgriTypography.sm,
+              fontWeight: FontWeight.bold,
+              color: couleur,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              SymbolesAgri.inventory_2,
+              size: 16,
+              color: AgriColors.brandEmerald,
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            Text(
+              'Stock Œufs & Plateaux (30) — Jour Sélectionné'.toUpperCase(),
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: FontWeight.bold,
+                color: AgriColors.brandForest,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: encadre('stock-srh', 'Stock Hier (SRH)', v((l) => l.srh)),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            Expanded(
+              child: encadre('stock-ts', 'Total Stock (TS)', v((l) => l.ts)),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            Expanded(
+              child: encadre(
+                'stock-os',
+                'Sortie Vente (OS)',
+                v((l) => l.os),
+                couleur: AgriColors.outline,
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            Expanded(
+              child: encadre(
+                'stock-final',
+                'Stock Final',
+                v((l) => l.stockFinal),
+                couleur: AgriColors.brandEmerald,
+                final_: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   int? _indexDuJourCourant() {
     for (var i = 0; i < _fichesDuMois.length; i++) {

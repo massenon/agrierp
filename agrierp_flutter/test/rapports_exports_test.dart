@@ -115,6 +115,7 @@ void main() {
     DateTime? creee,
     String espece = 'aviculture',
     String stade = 'ponte',
+    int initial = 0,
   }) => db
       .into(db.livestockLots)
       .insert(
@@ -125,6 +126,7 @@ void main() {
           speciesCode: Value(espece),
           stage: Value(stade),
           createdDate: Value(creee),
+          initialQuantity: Value(initial),
         ),
       );
 
@@ -141,6 +143,9 @@ void main() {
     int? ponteTotal,
     int? ponteCasses,
     SyncStatus statut = SyncStatus.pending,
+    double? venteMontant,
+    String? venteSexe,
+    int? effectifM,
   }) => db
       .into(db.livestockDailyEntries)
       .insert(
@@ -159,6 +164,9 @@ void main() {
           ne: Value(ne),
           ponteTotal: Value(ponteTotal),
           ponteCasses: Value(ponteCasses),
+          venteMontant: Value(venteMontant),
+          venteSexe: Value(venteSexe),
+          effectifM: Value(effectifM),
         ),
       );
 
@@ -450,28 +458,44 @@ void main() {
 
   // ──────────────────────────────────────────────────────────────────────────
   group('rapport élevage', () {
-    /// ⚠️⚠️ **TREIZE COLONNES, ONZE TIRETS.** La ventilation par sexe et par
-    /// stade existe côté serveur mais **ne quitte pas le poste à l'envoi** :
-    /// `_ficheEnJson` ne la porte pas. Les colonnes restent AFFICHÉES — les
-    /// retirer ferait croire que la maquette ne les demande pas.
+    /// 🔴→✅ **TICKET U10 — LE TABLEAU 1 DU BLADE** : dix colonnes (Date, Lot / Souche, Effectif M, Effectif F,
+    /// Sous Mères, Sevrés, Achats, Nés, Morts, Effectif Final) ; une ventilation absente rend une cellule VIDE,
+    /// comme `{{ $e->effectif_m }}` au web — ni « — » ni 0.
     test(
-      '⚠️⚠️ le tableau 1 garde ses treize colonnes, tirets compris',
+      '⚠️⚠️ U10 — le tableau 1 a les dix colonnes du Blade, cellule vide pour une ventilation absente',
       () async {
         await bande('b1');
-        await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13));
+        await journee(
+          'j1',
+          lot: 'b1',
+          date: DateTime(2026, 7, 13),
+          effectifM: 40,
+          achat: 2,
+          ne: 3,
+          mort: 1,
+        );
 
         final d = await depot.charger(du: du, au: au);
-        final ligne = d.elevageT1.single.cellules;
 
-        expect(ligne, hasLength(13));
-        expect(ligne[0], '13/07/2026');
-        expect(ligne[1], 'Pondeuses Lot P1');
-        expect(ligne.sublist(2).where((c) => c == '—'), hasLength(11));
+        expect(d.elevageT1.single.cellules, [
+          '13/07/2026',
+          'Pondeuses Lot P1',
+          '40',
+          '',
+          '',
+          '',
+          '2',
+          '3',
+          '1',
+          '100',
+        ]);
       },
     );
 
+    /// 🔴→✅ **TICKET U10 — LE TABLEAU 2 DU BLADE**, cellules réelles : sexe vendu, montant (« 0 » sans montant,
+    /// comme `number_format(null)`), traitement « — », dose « — », symptômes « RAS ».
     test(
-      '⚠️ le tableau 2 garde ses neuf colonnes, dont quatre réelles',
+      '⚠️ U10 — le tableau 2 porte le sexe et le montant de la vente, « — » et « RAS » comme le web',
       () async {
         await bande('b1');
         await journee(
@@ -480,15 +504,25 @@ void main() {
           date: DateTime(2026, 7, 13),
           vente: 12,
           effectifFinal: 488,
+          venteSexe: 'F',
+          venteMontant: 36500,
         );
+        await journee('j2', lot: 'b1', date: DateTime(2026, 7, 12));
 
         final d = await depot.charger(du: du, au: au);
-        final ligne = d.elevageT2.single.cellules;
 
-        expect(ligne, hasLength(9));
-        expect(ligne[3], '12');
-        expect(ligne[5], '488');
-        expect(ligne.where((c) => c == '—'), hasLength(5));
+        expect(d.elevageT2.first.cellules, [
+          '13/07/2026',
+          'Pondeuses Lot P1',
+          'F',
+          '12',
+          '36 500',
+          '488',
+          '—',
+          '—',
+          'RAS',
+        ]);
+        expect(d.elevageT2.last.cellules.sublist(2, 5), ['—', '0', '0']);
       },
     );
 
@@ -648,11 +682,19 @@ void main() {
       expect(d.elevageT3.single.cellules.first, '—');
     });
 
-    /// ⚠️⚠️ **LA MORTALITÉ SE RAPPORTE À L'EFFECTIF DE DÉBUT DE JOURNÉE.**
-    /// Diviser par l'effectif FINAL la surestimerait — l'effectif final est
-    /// justement amputé des morts.
-    test('⚠️⚠️ la mortalité se calcule sur l effectif de début', () async {
+    /// 🔴→✅ **TICKET U10 — LA MORTALITÉ DU WEB** : Σ morts de la sélection ÷ `previousEffectif()` de la fiche la
+    /// PLUS ANCIENNE — l'effectif final de la fiche précédente de sa bande, même HORS période (30/06 : 500). Le
+    /// poste reconstituait l'effectif de début de chaque journée ; une fiche refusée ne compte pas.
+    test('⚠️⚠️ U10 — la mortalité se calcule sur l effectif de la veille de la première fiche', () async {
       await bande('b1');
+      await journee(
+        'j0',
+        lot: 'b1',
+        date: DateTime(2026, 6, 30),
+        effectifFinal: 500,
+        mort: 9,
+        statut: SyncStatus.synced,
+      );
       await journee(
         'j1',
         lot: 'b1',
@@ -660,22 +702,86 @@ void main() {
         effectifFinal: 494,
         mort: 6,
       );
+      await journee(
+        'j2',
+        lot: 'b1',
+        date: DateTime(2026, 7, 14),
+        effectifFinal: 491,
+        mort: 3,
+      );
+      await journee(
+        'refusee',
+        lot: 'b1',
+        date: DateTime(2026, 7, 15),
+        mort: 50,
+        statut: SyncStatus.conflict,
+      );
 
       final d = await depot.charger(du: du, au: au);
 
-      // 6 / 500 = 1,2 %, et non 6 / 494 = 1,21 %.
-      expect(d.indicateurs.mortaliteHebdo, closeTo(1.2, 0.001));
+      // (6 + 3) ÷ 500 × 100 = 1,8 — ni les 9 morts du 30/06 (hors période), ni la fiche refusée.
+      expect(d.indicateurs.mortaliteHebdo, 1.8);
+      expect(IndicateursElevage.taux(d.indicateurs.mortaliteHebdo), '1.8 %');
+      expect(d.elevageT1, hasLength(2));
     });
 
-    /// ⚠️ `vente_montant` n'est pas dans la charge utile d'envoi : le poste ne
-    /// l'a jamais eu. « 0 FCFA » dirait « rien n'a été vendu ».
-    test('⚠️ le CA du lot est inconnu, pas nul', () async {
-      await bande('b1');
-      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13), vente: 20);
+    /// Ticket U10 — sans fiche antérieure, l'effectif de début est l'effectif INITIAL de la bande
+    /// (`$this->lot?->initial_quantity`) : 6 ÷ 480 × 100 = 1,25 → 1,3 (arrondi demi loin de zéro).
+    test('U10 — sans fiche antérieure, la mortalité se rapporte à l effectif initial de la bande', () async {
+      await bande('b1', initial: 480);
+      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13), mort: 6);
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.indicateurs.chiffreAffaires, isNull);
+      expect(IndicateursElevage.taux(d.indicateurs.mortaliteHebdo), '1.3 %');
+    });
+
+    /// 🔴→✅ Ticket U10 — sans fiche antérieure ni effectif initial, l'effectif de début est nul : « — ».
+    test('U10 — sans effectif de début, la mortalité est « — »', () async {
+      await bande('b1');
+      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13), mort: 6);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(IndicateursElevage.taux(d.indicateurs.mortaliteHebdo), '—');
+    });
+
+    /// 🔴→✅ Ticket U10 — `vente_montant` descend au poste (schéma v45) : le CA est la somme des montants, « 0 »
+    /// sans montant, comme le web (`(float) $entries->sum('vente_montant')`).
+    test('⚠️ U10 — le CA du lot est la somme des montants de vente', () async {
+      await bande('b1');
+      await journee(
+        'j1',
+        lot: 'b1',
+        date: DateTime(2026, 7, 13),
+        vente: 20,
+        venteMontant: 60000,
+      );
+      await journee('j2', lot: 'b1', date: DateTime(2026, 7, 14), vente: 2);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(d.indicateurs.chiffreAffaires, 60000);
+    });
+
+    /// 🔴→✅ Ticket U10 — le filtre « Lot / Souche » restreint indicateurs et tableaux à la bande choisie ; ses
+    /// options sont les bandes ACTIVES, par code.
+    test('⚠️ U10 — le filtre Lot / Souche restreint la sélection', () async {
+      await bande('b1');
+      await bande('b2', code: 'Pondeuses Lot P0');
+      await journee('j1', lot: 'b1', date: DateTime(2026, 7, 13), ponteTotal: 300);
+      await journee('j2', lot: 'b2', date: DateTime(2026, 7, 13), ponteTotal: 200);
+
+      final toutes = await depot.charger(du: du, au: au);
+      final p1 = await depot.charger(du: du, au: au, lot: uuid('b1'));
+
+      expect(toutes.indicateurs.productionTotale, 500);
+      expect(p1.indicateurs.productionTotale, 300);
+      expect(p1.elevageT1.map((l) => l.cellules[1]), ['Pondeuses Lot P1']);
+      expect(toutes.bandesElevage.map((b) => b.code), [
+        'Pondeuses Lot P0',
+        'Pondeuses Lot P1',
+      ]);
     });
   });
 
@@ -1077,6 +1183,32 @@ void main() {
       );
     });
 
+    /// 🔴→✅ Ticket U10 — le filtre « Lot / Souche » du Blade : « Tous » puis les bandes actives ; choisir une bande
+    /// restreint indicateurs et tableaux (et le document édité).
+    testWidgets('⚠️ U10 — le filtre Lot / Souche restreint le rapport élevage', (tester) async {
+      await bande('b1');
+      await bande('b2', code: 'Pondeuses Lot P2');
+      await journee('j1', lot: 'b1', date: DateTime(maintenant.year, maintenant.month, 1), ponteTotal: 300);
+      await journee('j2', lot: 'b2', date: DateTime(maintenant.year, maintenant.month, 1), ponteTotal: 200);
+      await afficher(tester);
+      await ouvrir(tester, 'Rapport Élevage');
+
+      expect(find.text('Lot / Souche : Tous'), findsOneWidget);
+      expect(find.text('500'), findsWidgets, reason: 'Production Totale, toutes bandes');
+
+      await tester.tap(find.byKey(const Key('elevage-lot')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pondeuses Lot P2').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('200'), findsWidgets);
+      expect(find.text('500'), findsNothing);
+      await tester.tap(find.byKey(const Key('hub-export-pdf')));
+      await tester.pumpAndSettle();
+      final lignes = imprimes.single.lignes.whereType<DonneesDocument>().toList();
+      expect(lignes.every((l) => l.cellules.length < 2 || l.cellules[1] == 'Pondeuses Lot P2'), isTrue);
+    });
+
     /// ⚠️ Le document d'élevage porte les TROIS tableaux, chacun sous sa
     /// bande — l'onglet affiché n'en montre qu'un à la fois.
     testWidgets('⚠️ le document d élevage porte ses trois bandes', (
@@ -1092,9 +1224,12 @@ void main() {
           .map((b) => b.libelle)
           .toList();
 
-      expect(bandes, hasLength(3));
-      expect(bandes[0], contains('TABLEAU 1'));
-      expect(bandes[2], contains('TABLEAU 3'));
+      // Ticket U10 — les trois titres du PDF du web (`exports/elevage-synth.blade.php`).
+      expect(bandes, [
+        'Tableau 1 — Recensement',
+        'Tableau 2 — Mouvements, Traitements & Ventes',
+        'Tableau 3 — Suivi de la Ponte',
+      ]);
     });
 
     testWidgets('la modale de période exige un format', (tester) async {

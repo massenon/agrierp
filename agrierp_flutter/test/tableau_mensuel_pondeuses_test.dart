@@ -10,12 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket F0.27 — TABLEAU MENSUEL DE LA FICHE PONDEUSES.
 ///
-/// ⚠️⚠️ **LES QUATRE COLONNES DU GRAND LIVRE D'ŒUFS AFFICHENT UN TIRET.** SRH,
-/// TS, OS et Stock Final sont reconstruits par `EggStockLedgerService` depuis
-/// l'historique réel de `stock_movements` — une table que le poste ne reçoit
-/// pas. Les calculer sur le seul solde courant donnerait un « stock reporté »
-/// qui ne reporte rien : c'est exactement le défaut corrigé côté serveur au
-/// ticket 14.13. Mieux vaut la colonne vide que le chiffre faux.
+/// 🔴→✅ Ticket U10 — SRH, TS, OS et Stock Final viennent du grand livre descendu (U9), sur la ligne du JOUR
+/// SÉLECTIONNÉ seulement, comme le web (`$isToday ? $this->stockToday[…] : '—'`) : voir
+/// `fiche_pondeuses_grand_livre_test.dart`. Les autres lignes gardent « — ».
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
@@ -135,7 +132,7 @@ void main() {
   });
 
   testWidgets(
-    '⚠️⚠️ le grand livre d œufs affiche un tiret, jamais un chiffre faux',
+    '⚠️⚠️ hors du jour sélectionné, le grand livre d œufs affiche un tiret, comme le web',
     (tester) async {
       await journee(4, recoltes: 435, casses: 15);
       await afficher(tester);

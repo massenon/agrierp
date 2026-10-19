@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
+import '../stocks/journal_stocks.dart';
 
 /// Conversion des œufs récoltés en plateaux, et entrée au stock du poste.
 ///
@@ -67,6 +68,21 @@ class ProductionOeufsService {
     }
 
     return null;
+  }
+
+  /// 🔴→✅ Ticket U10 — le GRAND LIVRE des stocks au poste ([JournalStocks] : mouvements descendus et saisies en
+  /// attente projetées) et le produit œufs du web (`EggStockLedgerService::eggProduct()` : le premier produit par nom,
+  /// archivés compris, dont le libellé contient « oeufs ») — de quoi calculer SRH, TS, OS et Stock Final du jour
+  /// comme `FichePondeuses::getStockTodayProperty()`.
+  Future<({JournalStocks journal, String? produit})> grandLivre({
+    DateTime? maintenant,
+  }) async {
+    final journal = await JournalStocks.charger(
+      _db,
+      maintenant: maintenant ?? DateTime.now(),
+    );
+    final produits = await _db.select(_db.products).get();
+    return (journal: journal, produit: JournalStocks.produitOeufs(produits)?.id);
   }
 
   /// Fait entrer au stock local les plateaux nets d'une fiche de ponte.

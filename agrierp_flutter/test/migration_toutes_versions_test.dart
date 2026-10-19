@@ -188,6 +188,14 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket U3 (D-U3) — archivage logique des soins au poste comme au web.
   43: [(d.veterinaryRecords, d.veterinaryRecords.isActive)],
+  // Ticket U10 — colonnes de la fiche reçues pour le Rapport Élevage (Tableau 2, CA Ventes du Lot).
+  45: [
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteSexe),
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteMontant),
+    (d.livestockDailyEntries, d.livestockDailyEntries.treatmentProductId),
+    (d.livestockDailyEntries, d.livestockDailyEntries.treatmentDose),
+    (d.livestockDailyEntries, d.livestockDailyEntries.symptomes),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

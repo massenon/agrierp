@@ -146,11 +146,13 @@ void main() {
       ['Date', 'Lot / Espèce', "Type d'action", 'Produit', 'Dose', 'Actions', 'Statut'],
     ],
     // Ticket U9 — Tableau 3 du Blade (`elevage-synth.blade.php`) : la colonne « Lot » s'ajoute après « Jour »
-    // (le rapport couvre plusieurs bandes). Tableaux 1 et 2 : ceux de la maquette, que le poste porte encore.
+    // (le rapport couvre plusieurs bandes). Ticket U10 — Tableau 1 du Blade (dix colonnes portées par la fiche) ;
+    // Tableau 2 : celui du Blade, identique à la maquette. Les trois sont en outre LUS dans le Blade par
+    // `rapport_elevage_blade_test.dart`.
     'rapport-elevage-synth.html': [
       [
-        'Date', 'Lot / Souche', 'Mères Pondeuses', 'Mères Couveuses', 'Mères Éleveuses', 'Poussins S/Mères',
-        'Sevrés M', 'Sevrés F', 'Morts M', 'Morts F', 'Morts SM', 'Géniteurs', 'Effectif Malade',
+        'Date', 'Lot / Souche', 'Effectif M', 'Effectif F', 'Sous Mères', 'Sevrés', 'Achats', 'Nés', 'Morts',
+        'Effectif Final',
       ],
       [
         'Date', 'Lot', 'Sexe Vendu', 'Qté Vendue', 'Montant Vente (FCFA)', 'Effectif Final',

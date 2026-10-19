@@ -22996,6 +22996,61 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _venteSexeMeta = const VerificationMeta(
+    'venteSexe',
+  );
+  @override
+  late final GeneratedColumn<String> venteSexe = GeneratedColumn<String>(
+    'vente_sexe',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _venteMontantMeta = const VerificationMeta(
+    'venteMontant',
+  );
+  @override
+  late final GeneratedColumn<double> venteMontant = GeneratedColumn<double>(
+    'vente_montant',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _treatmentProductIdMeta =
+      const VerificationMeta('treatmentProductId');
+  @override
+  late final GeneratedColumn<String> treatmentProductId =
+      GeneratedColumn<String>(
+        'treatment_product_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _treatmentDoseMeta = const VerificationMeta(
+    'treatmentDose',
+  );
+  @override
+  late final GeneratedColumn<String> treatmentDose = GeneratedColumn<String>(
+    'treatment_dose',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _symptomesMeta = const VerificationMeta(
+    'symptomes',
+  );
+  @override
+  late final GeneratedColumn<String> symptomes = GeneratedColumn<String>(
+    'symptomes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _transfertEntreeMeta = const VerificationMeta(
     'transfertEntree',
   );
@@ -23122,6 +23177,11 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     effectifF,
     effectifSevres,
     effectifSmeres,
+    venteSexe,
+    venteMontant,
+    treatmentProductId,
+    treatmentDose,
+    symptomes,
     transfertEntree,
     transfertSortie,
     transfertEntreeRepro,
@@ -23381,6 +23441,45 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         ),
       );
     }
+    if (data.containsKey('vente_sexe')) {
+      context.handle(
+        _venteSexeMeta,
+        venteSexe.isAcceptableOrUnknown(data['vente_sexe']!, _venteSexeMeta),
+      );
+    }
+    if (data.containsKey('vente_montant')) {
+      context.handle(
+        _venteMontantMeta,
+        venteMontant.isAcceptableOrUnknown(
+          data['vente_montant']!,
+          _venteMontantMeta,
+        ),
+      );
+    }
+    if (data.containsKey('treatment_product_id')) {
+      context.handle(
+        _treatmentProductIdMeta,
+        treatmentProductId.isAcceptableOrUnknown(
+          data['treatment_product_id']!,
+          _treatmentProductIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('treatment_dose')) {
+      context.handle(
+        _treatmentDoseMeta,
+        treatmentDose.isAcceptableOrUnknown(
+          data['treatment_dose']!,
+          _treatmentDoseMeta,
+        ),
+      );
+    }
+    if (data.containsKey('symptomes')) {
+      context.handle(
+        _symptomesMeta,
+        symptomes.isAcceptableOrUnknown(data['symptomes']!, _symptomesMeta),
+      );
+    }
     if (data.containsKey('transfert_entree')) {
       context.handle(
         _transfertEntreeMeta,
@@ -23600,6 +23699,26 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         DriftSqlType.int,
         data['${effectivePrefix}effectif_smeres'],
       ),
+      venteSexe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vente_sexe'],
+      ),
+      venteMontant: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}vente_montant'],
+      ),
+      treatmentProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}treatment_product_id'],
+      ),
+      treatmentDose: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}treatment_dose'],
+      ),
+      symptomes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}symptomes'],
+      ),
       transfertEntree: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}transfert_entree'],
@@ -23694,6 +23813,17 @@ class LivestockDailyEntry extends DataClass
   final int? effectifF;
   final int? effectifSevres;
   final int? effectifSmeres;
+
+  /// `vente_sexe` : M, F ou Mixte.
+  final String? venteSexe;
+
+  /// `vente_montant` (FCFA), posé par la vente qui touche la fiche (`RecordSaleOnFicheElevageAction`).
+  final double? venteMontant;
+
+  /// `treatment_product_id` : produit du traitement administré (nom lu dans `products`).
+  final String? treatmentProductId;
+  final String? treatmentDose;
+  final String? symptomes;
   final int transfertEntree;
   final int transfertSortie;
   final int transfertEntreeRepro;
@@ -23737,6 +23867,11 @@ class LivestockDailyEntry extends DataClass
     this.effectifF,
     this.effectifSevres,
     this.effectifSmeres,
+    this.venteSexe,
+    this.venteMontant,
+    this.treatmentProductId,
+    this.treatmentDose,
+    this.symptomes,
     required this.transfertEntree,
     required this.transfertSortie,
     required this.transfertEntreeRepro,
@@ -23831,6 +23966,21 @@ class LivestockDailyEntry extends DataClass
     if (!nullToAbsent || effectifSmeres != null) {
       map['effectif_smeres'] = Variable<int>(effectifSmeres);
     }
+    if (!nullToAbsent || venteSexe != null) {
+      map['vente_sexe'] = Variable<String>(venteSexe);
+    }
+    if (!nullToAbsent || venteMontant != null) {
+      map['vente_montant'] = Variable<double>(venteMontant);
+    }
+    if (!nullToAbsent || treatmentProductId != null) {
+      map['treatment_product_id'] = Variable<String>(treatmentProductId);
+    }
+    if (!nullToAbsent || treatmentDose != null) {
+      map['treatment_dose'] = Variable<String>(treatmentDose);
+    }
+    if (!nullToAbsent || symptomes != null) {
+      map['symptomes'] = Variable<String>(symptomes);
+    }
     map['transfert_entree'] = Variable<int>(transfertEntree);
     map['transfert_sortie'] = Variable<int>(transfertSortie);
     map['transfert_entree_repro'] = Variable<int>(transfertEntreeRepro);
@@ -23922,6 +24072,21 @@ class LivestockDailyEntry extends DataClass
       effectifSmeres: effectifSmeres == null && nullToAbsent
           ? const Value.absent()
           : Value(effectifSmeres),
+      venteSexe: venteSexe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venteSexe),
+      venteMontant: venteMontant == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venteMontant),
+      treatmentProductId: treatmentProductId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(treatmentProductId),
+      treatmentDose: treatmentDose == null && nullToAbsent
+          ? const Value.absent()
+          : Value(treatmentDose),
+      symptomes: symptomes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(symptomes),
       transfertEntree: Value(transfertEntree),
       transfertSortie: Value(transfertSortie),
       transfertEntreeRepro: Value(transfertEntreeRepro),
@@ -23975,6 +24140,13 @@ class LivestockDailyEntry extends DataClass
       effectifF: serializer.fromJson<int?>(json['effectifF']),
       effectifSevres: serializer.fromJson<int?>(json['effectifSevres']),
       effectifSmeres: serializer.fromJson<int?>(json['effectifSmeres']),
+      venteSexe: serializer.fromJson<String?>(json['venteSexe']),
+      venteMontant: serializer.fromJson<double?>(json['venteMontant']),
+      treatmentProductId: serializer.fromJson<String?>(
+        json['treatmentProductId'],
+      ),
+      treatmentDose: serializer.fromJson<String?>(json['treatmentDose']),
+      symptomes: serializer.fromJson<String?>(json['symptomes']),
       transfertEntree: serializer.fromJson<int>(json['transfertEntree']),
       transfertSortie: serializer.fromJson<int>(json['transfertSortie']),
       transfertEntreeRepro: serializer.fromJson<int>(
@@ -24037,6 +24209,11 @@ class LivestockDailyEntry extends DataClass
       'effectifF': serializer.toJson<int?>(effectifF),
       'effectifSevres': serializer.toJson<int?>(effectifSevres),
       'effectifSmeres': serializer.toJson<int?>(effectifSmeres),
+      'venteSexe': serializer.toJson<String?>(venteSexe),
+      'venteMontant': serializer.toJson<double?>(venteMontant),
+      'treatmentProductId': serializer.toJson<String?>(treatmentProductId),
+      'treatmentDose': serializer.toJson<String?>(treatmentDose),
+      'symptomes': serializer.toJson<String?>(symptomes),
       'transfertEntree': serializer.toJson<int>(transfertEntree),
       'transfertSortie': serializer.toJson<int>(transfertSortie),
       'transfertEntreeRepro': serializer.toJson<int>(transfertEntreeRepro),
@@ -24083,6 +24260,11 @@ class LivestockDailyEntry extends DataClass
     Value<int?> effectifF = const Value.absent(),
     Value<int?> effectifSevres = const Value.absent(),
     Value<int?> effectifSmeres = const Value.absent(),
+    Value<String?> venteSexe = const Value.absent(),
+    Value<double?> venteMontant = const Value.absent(),
+    Value<String?> treatmentProductId = const Value.absent(),
+    Value<String?> treatmentDose = const Value.absent(),
+    Value<String?> symptomes = const Value.absent(),
     int? transfertEntree,
     int? transfertSortie,
     int? transfertEntreeRepro,
@@ -24140,6 +24322,15 @@ class LivestockDailyEntry extends DataClass
     effectifSmeres: effectifSmeres.present
         ? effectifSmeres.value
         : this.effectifSmeres,
+    venteSexe: venteSexe.present ? venteSexe.value : this.venteSexe,
+    venteMontant: venteMontant.present ? venteMontant.value : this.venteMontant,
+    treatmentProductId: treatmentProductId.present
+        ? treatmentProductId.value
+        : this.treatmentProductId,
+    treatmentDose: treatmentDose.present
+        ? treatmentDose.value
+        : this.treatmentDose,
+    symptomes: symptomes.present ? symptomes.value : this.symptomes,
     transfertEntree: transfertEntree ?? this.transfertEntree,
     transfertSortie: transfertSortie ?? this.transfertSortie,
     transfertEntreeRepro: transfertEntreeRepro ?? this.transfertEntreeRepro,
@@ -24213,6 +24404,17 @@ class LivestockDailyEntry extends DataClass
       effectifSmeres: data.effectifSmeres.present
           ? data.effectifSmeres.value
           : this.effectifSmeres,
+      venteSexe: data.venteSexe.present ? data.venteSexe.value : this.venteSexe,
+      venteMontant: data.venteMontant.present
+          ? data.venteMontant.value
+          : this.venteMontant,
+      treatmentProductId: data.treatmentProductId.present
+          ? data.treatmentProductId.value
+          : this.treatmentProductId,
+      treatmentDose: data.treatmentDose.present
+          ? data.treatmentDose.value
+          : this.treatmentDose,
+      symptomes: data.symptomes.present ? data.symptomes.value : this.symptomes,
       transfertEntree: data.transfertEntree.present
           ? data.transfertEntree.value
           : this.transfertEntree,
@@ -24277,6 +24479,11 @@ class LivestockDailyEntry extends DataClass
           ..write('effectifF: $effectifF, ')
           ..write('effectifSevres: $effectifSevres, ')
           ..write('effectifSmeres: $effectifSmeres, ')
+          ..write('venteSexe: $venteSexe, ')
+          ..write('venteMontant: $venteMontant, ')
+          ..write('treatmentProductId: $treatmentProductId, ')
+          ..write('treatmentDose: $treatmentDose, ')
+          ..write('symptomes: $symptomes, ')
           ..write('transfertEntree: $transfertEntree, ')
           ..write('transfertSortie: $transfertSortie, ')
           ..write('transfertEntreeRepro: $transfertEntreeRepro, ')
@@ -24325,6 +24532,11 @@ class LivestockDailyEntry extends DataClass
     effectifF,
     effectifSevres,
     effectifSmeres,
+    venteSexe,
+    venteMontant,
+    treatmentProductId,
+    treatmentDose,
+    symptomes,
     transfertEntree,
     transfertSortie,
     transfertEntreeRepro,
@@ -24372,6 +24584,11 @@ class LivestockDailyEntry extends DataClass
           other.effectifF == this.effectifF &&
           other.effectifSevres == this.effectifSevres &&
           other.effectifSmeres == this.effectifSmeres &&
+          other.venteSexe == this.venteSexe &&
+          other.venteMontant == this.venteMontant &&
+          other.treatmentProductId == this.treatmentProductId &&
+          other.treatmentDose == this.treatmentDose &&
+          other.symptomes == this.symptomes &&
           other.transfertEntree == this.transfertEntree &&
           other.transfertSortie == this.transfertSortie &&
           other.transfertEntreeRepro == this.transfertEntreeRepro &&
@@ -24418,6 +24635,11 @@ class LivestockDailyEntriesCompanion
   final Value<int?> effectifF;
   final Value<int?> effectifSevres;
   final Value<int?> effectifSmeres;
+  final Value<String?> venteSexe;
+  final Value<double?> venteMontant;
+  final Value<String?> treatmentProductId;
+  final Value<String?> treatmentDose;
+  final Value<String?> symptomes;
   final Value<int> transfertEntree;
   final Value<int> transfertSortie;
   final Value<int> transfertEntreeRepro;
@@ -24462,6 +24684,11 @@ class LivestockDailyEntriesCompanion
     this.effectifF = const Value.absent(),
     this.effectifSevres = const Value.absent(),
     this.effectifSmeres = const Value.absent(),
+    this.venteSexe = const Value.absent(),
+    this.venteMontant = const Value.absent(),
+    this.treatmentProductId = const Value.absent(),
+    this.treatmentDose = const Value.absent(),
+    this.symptomes = const Value.absent(),
     this.transfertEntree = const Value.absent(),
     this.transfertSortie = const Value.absent(),
     this.transfertEntreeRepro = const Value.absent(),
@@ -24507,6 +24734,11 @@ class LivestockDailyEntriesCompanion
     this.effectifF = const Value.absent(),
     this.effectifSevres = const Value.absent(),
     this.effectifSmeres = const Value.absent(),
+    this.venteSexe = const Value.absent(),
+    this.venteMontant = const Value.absent(),
+    this.treatmentProductId = const Value.absent(),
+    this.treatmentDose = const Value.absent(),
+    this.symptomes = const Value.absent(),
     this.transfertEntree = const Value.absent(),
     this.transfertSortie = const Value.absent(),
     this.transfertEntreeRepro = const Value.absent(),
@@ -24556,6 +24788,11 @@ class LivestockDailyEntriesCompanion
     Expression<int>? effectifF,
     Expression<int>? effectifSevres,
     Expression<int>? effectifSmeres,
+    Expression<String>? venteSexe,
+    Expression<double>? venteMontant,
+    Expression<String>? treatmentProductId,
+    Expression<String>? treatmentDose,
+    Expression<String>? symptomes,
     Expression<int>? transfertEntree,
     Expression<int>? transfertSortie,
     Expression<int>? transfertEntreeRepro,
@@ -24601,6 +24838,12 @@ class LivestockDailyEntriesCompanion
       if (effectifF != null) 'effectif_f': effectifF,
       if (effectifSevres != null) 'effectif_sevres': effectifSevres,
       if (effectifSmeres != null) 'effectif_smeres': effectifSmeres,
+      if (venteSexe != null) 'vente_sexe': venteSexe,
+      if (venteMontant != null) 'vente_montant': venteMontant,
+      if (treatmentProductId != null)
+        'treatment_product_id': treatmentProductId,
+      if (treatmentDose != null) 'treatment_dose': treatmentDose,
+      if (symptomes != null) 'symptomes': symptomes,
       if (transfertEntree != null) 'transfert_entree': transfertEntree,
       if (transfertSortie != null) 'transfert_sortie': transfertSortie,
       if (transfertEntreeRepro != null)
@@ -24654,6 +24897,11 @@ class LivestockDailyEntriesCompanion
     Value<int?>? effectifF,
     Value<int?>? effectifSevres,
     Value<int?>? effectifSmeres,
+    Value<String?>? venteSexe,
+    Value<double?>? venteMontant,
+    Value<String?>? treatmentProductId,
+    Value<String?>? treatmentDose,
+    Value<String?>? symptomes,
     Value<int>? transfertEntree,
     Value<int>? transfertSortie,
     Value<int>? transfertEntreeRepro,
@@ -24699,6 +24947,11 @@ class LivestockDailyEntriesCompanion
       effectifF: effectifF ?? this.effectifF,
       effectifSevres: effectifSevres ?? this.effectifSevres,
       effectifSmeres: effectifSmeres ?? this.effectifSmeres,
+      venteSexe: venteSexe ?? this.venteSexe,
+      venteMontant: venteMontant ?? this.venteMontant,
+      treatmentProductId: treatmentProductId ?? this.treatmentProductId,
+      treatmentDose: treatmentDose ?? this.treatmentDose,
+      symptomes: symptomes ?? this.symptomes,
       transfertEntree: transfertEntree ?? this.transfertEntree,
       transfertSortie: transfertSortie ?? this.transfertSortie,
       transfertEntreeRepro: transfertEntreeRepro ?? this.transfertEntreeRepro,
@@ -24820,6 +25073,21 @@ class LivestockDailyEntriesCompanion
     if (effectifSmeres.present) {
       map['effectif_smeres'] = Variable<int>(effectifSmeres.value);
     }
+    if (venteSexe.present) {
+      map['vente_sexe'] = Variable<String>(venteSexe.value);
+    }
+    if (venteMontant.present) {
+      map['vente_montant'] = Variable<double>(venteMontant.value);
+    }
+    if (treatmentProductId.present) {
+      map['treatment_product_id'] = Variable<String>(treatmentProductId.value);
+    }
+    if (treatmentDose.present) {
+      map['treatment_dose'] = Variable<String>(treatmentDose.value);
+    }
+    if (symptomes.present) {
+      map['symptomes'] = Variable<String>(symptomes.value);
+    }
     if (transfertEntree.present) {
       map['transfert_entree'] = Variable<int>(transfertEntree.value);
     }
@@ -24887,6 +25155,11 @@ class LivestockDailyEntriesCompanion
           ..write('effectifF: $effectifF, ')
           ..write('effectifSevres: $effectifSevres, ')
           ..write('effectifSmeres: $effectifSmeres, ')
+          ..write('venteSexe: $venteSexe, ')
+          ..write('venteMontant: $venteMontant, ')
+          ..write('treatmentProductId: $treatmentProductId, ')
+          ..write('treatmentDose: $treatmentDose, ')
+          ..write('symptomes: $symptomes, ')
           ..write('transfertEntree: $transfertEntree, ')
           ..write('transfertSortie: $transfertSortie, ')
           ..write('transfertEntreeRepro: $transfertEntreeRepro, ')
@@ -44734,6 +45007,11 @@ typedef $$LivestockDailyEntriesTableCreateCompanionBuilder =
       Value<int?> effectifF,
       Value<int?> effectifSevres,
       Value<int?> effectifSmeres,
+      Value<String?> venteSexe,
+      Value<double?> venteMontant,
+      Value<String?> treatmentProductId,
+      Value<String?> treatmentDose,
+      Value<String?> symptomes,
       Value<int> transfertEntree,
       Value<int> transfertSortie,
       Value<int> transfertEntreeRepro,
@@ -44780,6 +45058,11 @@ typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
       Value<int?> effectifF,
       Value<int?> effectifSevres,
       Value<int?> effectifSmeres,
+      Value<String?> venteSexe,
+      Value<double?> venteMontant,
+      Value<String?> treatmentProductId,
+      Value<String?> treatmentDose,
+      Value<String?> symptomes,
       Value<int> transfertEntree,
       Value<int> transfertSortie,
       Value<int> transfertEntreeRepro,
@@ -44968,6 +45251,31 @@ class $$LivestockDailyEntriesTableFilterComposer
 
   ColumnFilters<int> get effectifSmeres => $composableBuilder(
     column: $table.effectifSmeres,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get venteSexe => $composableBuilder(
+    column: $table.venteSexe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get venteMontant => $composableBuilder(
+    column: $table.venteMontant,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get treatmentProductId => $composableBuilder(
+    column: $table.treatmentProductId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get treatmentDose => $composableBuilder(
+    column: $table.treatmentDose,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get symptomes => $composableBuilder(
+    column: $table.symptomes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -45191,6 +45499,31 @@ class $$LivestockDailyEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get venteSexe => $composableBuilder(
+    column: $table.venteSexe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get venteMontant => $composableBuilder(
+    column: $table.venteMontant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get treatmentProductId => $composableBuilder(
+    column: $table.treatmentProductId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get treatmentDose => $composableBuilder(
+    column: $table.treatmentDose,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get symptomes => $composableBuilder(
+    column: $table.symptomes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get transfertEntree => $composableBuilder(
     column: $table.transfertEntree,
     builder: (column) => ColumnOrderings(column),
@@ -45372,6 +45705,27 @@ class $$LivestockDailyEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get venteSexe =>
+      $composableBuilder(column: $table.venteSexe, builder: (column) => column);
+
+  GeneratedColumn<double> get venteMontant => $composableBuilder(
+    column: $table.venteMontant,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get treatmentProductId => $composableBuilder(
+    column: $table.treatmentProductId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get treatmentDose => $composableBuilder(
+    column: $table.treatmentDose,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get symptomes =>
+      $composableBuilder(column: $table.symptomes, builder: (column) => column);
+
   GeneratedColumn<int> get transfertEntree => $composableBuilder(
     column: $table.transfertEntree,
     builder: (column) => column,
@@ -45493,6 +45847,11 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> effectifF = const Value.absent(),
                 Value<int?> effectifSevres = const Value.absent(),
                 Value<int?> effectifSmeres = const Value.absent(),
+                Value<String?> venteSexe = const Value.absent(),
+                Value<double?> venteMontant = const Value.absent(),
+                Value<String?> treatmentProductId = const Value.absent(),
+                Value<String?> treatmentDose = const Value.absent(),
+                Value<String?> symptomes = const Value.absent(),
                 Value<int> transfertEntree = const Value.absent(),
                 Value<int> transfertSortie = const Value.absent(),
                 Value<int> transfertEntreeRepro = const Value.absent(),
@@ -45537,6 +45896,11 @@ class $$LivestockDailyEntriesTableTableManager
                 effectifF: effectifF,
                 effectifSevres: effectifSevres,
                 effectifSmeres: effectifSmeres,
+                venteSexe: venteSexe,
+                venteMontant: venteMontant,
+                treatmentProductId: treatmentProductId,
+                treatmentDose: treatmentDose,
+                symptomes: symptomes,
                 transfertEntree: transfertEntree,
                 transfertSortie: transfertSortie,
                 transfertEntreeRepro: transfertEntreeRepro,
@@ -45583,6 +45947,11 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> effectifF = const Value.absent(),
                 Value<int?> effectifSevres = const Value.absent(),
                 Value<int?> effectifSmeres = const Value.absent(),
+                Value<String?> venteSexe = const Value.absent(),
+                Value<double?> venteMontant = const Value.absent(),
+                Value<String?> treatmentProductId = const Value.absent(),
+                Value<String?> treatmentDose = const Value.absent(),
+                Value<String?> symptomes = const Value.absent(),
                 Value<int> transfertEntree = const Value.absent(),
                 Value<int> transfertSortie = const Value.absent(),
                 Value<int> transfertEntreeRepro = const Value.absent(),
@@ -45627,6 +45996,11 @@ class $$LivestockDailyEntriesTableTableManager
                 effectifF: effectifF,
                 effectifSevres: effectifSevres,
                 effectifSmeres: effectifSmeres,
+                venteSexe: venteSexe,
+                venteMontant: venteMontant,
+                treatmentProductId: treatmentProductId,
+                treatmentDose: treatmentDose,
+                symptomes: symptomes,
                 transfertEntree: transfertEntree,
                 transfertSortie: transfertSortie,
                 transfertEntreeRepro: transfertEntreeRepro,

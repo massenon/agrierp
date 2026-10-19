@@ -117,6 +117,7 @@ abstract final class SymbolesAgri {
   static const IconData menu_book = IconData(0xea19, fontFamily: famille);
   static const IconData menu_open = IconData(0xe9bd, fontFamily: famille);
   static const IconData monitor_heart = IconData(0xeaa2, fontFamily: famille);
+  static const IconData notification_important = IconData(0xe004, fontFamily: famille);
   static const IconData notifications = IconData(0xe7f4, fontFamily: famille);
   static const IconData notifications_active = IconData(0xe7f7, fontFamily: famille);
   static const IconData notifications_none = IconData(0xe7f4, fontFamily: famille);
@@ -140,6 +141,7 @@ abstract final class SymbolesAgri {
   static const IconData remove = IconData(0xe15b, fontFamily: famille);
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restaurant = IconData(0xe56c, fontFamily: famille);
+  static const IconData rule = IconData(0xf1c2, fontFamily: famille);
   static const IconData save = IconData(0xe161, fontFamily: famille);
   static const IconData savings = IconData(0xe2eb, fontFamily: famille);
   static const IconData schedule = IconData(0xe192, fontFamily: famille);

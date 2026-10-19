@@ -210,6 +210,8 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
       valeur: '—',
       couleurValeur: AgriColors.outline.withValues(alpha: 0.5),
       legende: 'Disponible après Sprint 6 (Stocks)',
+      // Ticket U10 — le sablier de `x-kpi-card :pending`.
+      iconeLegende: SymbolesAgri.hourglass_empty,
     ),
     CarteKpi(
       libelle: 'Taux Mortalité (mois)',

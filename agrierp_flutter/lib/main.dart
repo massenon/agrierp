@@ -522,6 +522,26 @@ class _SocleAccueilState extends State<SocleAccueil> {
   String? _sujetId;
   EcranPoste _avantSujet = EcranPoste.suiviReproduction;
 
+  /// Ticket U10 — arrivée au Catalogue Produits DEPUIS Gestion des Stocks : onglet (« Seuils d'Alerte ») ou produit
+  /// à modifier, lus une fois par l'écran à sa création ([_versionCatalogue] le recrée), puis oubliés — une arrivée
+  /// ordinaire par la barre latérale ouvre le catalogue comme avant.
+  String? _catalogueOnglet;
+  String? _catalogueProduit;
+  int _versionCatalogue = 0;
+
+  void _ouvrirCatalogue({String? onglet, String? produit}) {
+    setState(() {
+      _catalogueOnglet = onglet;
+      _catalogueProduit = produit;
+      _versionCatalogue++;
+      _ecran = EcranPoste.catalogueProduits;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _catalogueOnglet = null;
+      _catalogueProduit = null;
+    });
+  }
+
   /// Brouillon de « Contactez l'Éditeur », possédé ICI pour survivre aux
   /// changements d'écran : un texte rédigé hors ligne ne doit pas disparaître
   /// parce qu'on est allé vérifier une information ailleurs.
@@ -821,12 +841,23 @@ class _SocleAccueilState extends State<SocleAccueil> {
           depot: widget.clients,
           imprimer: EditeursRapports.imprimer,
         ),
-        EcranPoste.gestionStocks => GestionStocksScreen(depot: widget.stocks),
+        // Ticket U10 — « Exporter », « Ajouter Stock » (`manage-stocks`), « Configurer les Seuils d'Alerte » et
+        // l'icône Modifier, comme au web.
+        EcranPoste.gestionStocks => GestionStocksScreen(
+          depot: widget.stocks,
+          imprimer: EditeursRapports.imprimer,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-stocks'),
+          onConfigurerSeuils: () => _ouvrirCatalogue(onglet: "Seuils d'Alerte"),
+          onModifierProduit: (id) => _ouvrirCatalogue(produit: id),
+        ),
         // ⚠️ MEME DEPOT que Gestion Stocks : deux lecteurs paralleles
         // des memes tables finiraient par diverger.
         EcranPoste.catalogueProduits => CatalogueProduitsScreen(
+          key: ValueKey('catalogue-$_versionCatalogue'),
           depot: widget.stocks,
           produits: widget.produits,
+          ongletInitial: _catalogueOnglet,
+          produitAModifier: _catalogueProduit,
         ),
         EcranPoste.ventesEtDevis => VentesDevisScreen(
           depot: widget.ventesDevis,

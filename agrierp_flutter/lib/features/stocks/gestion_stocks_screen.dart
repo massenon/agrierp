@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/toast_agri.dart';
+import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'journal_stocks.dart';
 import 'pmp_service.dart';
 import 'stocks_repository.dart';
@@ -28,10 +31,36 @@ import '../../core/theme/symboles_agri.dart';
 /// d'envoi y sont projetées, jamais comptées deux fois. Le tableau suit le
 /// Blade : tri par NOM, pastille « Critique » / « Normal », mention « Entrée
 /// non saisie » sous un stock négatif, colonnes alignées comme au web.
+///
+/// 🔴→✅ **TICKET U10 — LES DERNIERS GESTES DU WEB.** « Exporter » produit le PDF du web
+/// (`exportStocksPdf()`, vue `exports.gestion-stocks`) ; « Ajouter Stock » ouvre la modale du web et écrit le fait
+/// en attente d'envoi ([StocksRepository.ajouterStock], rejoué par le serveur comme `submitAjouterStock()`) ; le lien
+/// « Configurer les Seuils d'Alerte » ouvre les Seuils d'Alerte ([onConfigurerSeuils]) et l'icône Modifier
+/// l'édition du produit ([onModifierProduit]), comme les deux `route()` du Blade. Les deux gestes d'écriture sont
+/// réservés au droit `manage-stocks` ([peutGerer], `@can` du Blade).
 class GestionStocksScreen extends StatefulWidget {
-  const GestionStocksScreen({super.key, required this.depot});
+  const GestionStocksScreen({
+    super.key,
+    required this.depot,
+    this.imprimer,
+    this.peutGerer = false,
+    this.onConfigurerSeuils,
+    this.onModifierProduit,
+  });
 
   final StocksRepository depot;
+
+  /// Éditeur injecté — `EditeursRapports.imprimer` en production, un espion en test. `null` : « Exporter » inerte.
+  final Editeur? imprimer;
+
+  /// `@can('manage-stocks')` du Blade : « Ajouter Stock » et l'icône Modifier.
+  final bool peutGerer;
+
+  /// `route('stocks.seuils')` : l'écran des Seuils d'Alerte (onglet du Catalogue Produits au poste).
+  final VoidCallback? onConfigurerSeuils;
+
+  /// `route('stocks.produits.modifier', $id)` : l'édition du produit.
+  final ValueChanged<String>? onModifierProduit;
 
   /// Légende de « Rotation du Stock », construite comme dans le Blade : le périmètre du ratio se lit en même temps
   /// que le ratio. Sans rotation : la légende de `x-kpi-card :pending`.
@@ -67,6 +96,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   final _physique = TextEditingController();
   String? _erreur;
 
+  /// Quantité de la modale « Ajouter Stock » (ticket U10) : gardée par l'écran, la modale se ferme en animation.
+  final _quantiteAjout = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +108,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   @override
   void dispose() {
     _physique.dispose();
+    _quantiteAjout.dispose();
     super.dispose();
   }
 
@@ -170,6 +203,31 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             ],
           ),
         ),
+        const SizedBox(width: AgriSpacing.sm),
+        // 🔴→✅ Ticket U10 — lien du Blade (`route('stocks.seuils')`), à droite de l'en-tête.
+        InkWell(
+          key: const Key('stocks-configurer-seuils'),
+          onTap: widget.onConfigurerSeuils,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                SymbolesAgri.notification_important,
+                size: 16,
+                color: AgriColors.brandForest,
+              ),
+              SizedBox(width: AgriSpacing.xs),
+              Text(
+                "Configurer les Seuils d'Alerte",
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandForest,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     ),
   );
@@ -189,6 +247,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         'Valorisation Stocks',
         '${PmpService.francs(d.valorisation)} FCFA',
         AgriColors.brandEmerald,
+        icone: SymbolesAgri.payments,
         legende: 'Basée sur le PMP réel (achats)',
       ),
       // Ticket U9 — `$kpis['alertes'].' réf.'` : produits actifs dont le seuil
@@ -197,17 +256,22 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         'Alertes de Seuil',
         '${d.alertesDeSeuil} réf.',
         AgriColors.errorRed,
+        icone: SymbolesAgri.warning,
       ),
       // 🔴→✅ Ticket U9 — `StockRotationService::pourLeMois()` sur le grand
       // livre descendu ([JournalStocks.rotation]) ; sans stock valorisable
       // sur le mois, la carte « en attente » du web (`x-kpi-card :pending`).
+      // 🔴→✅ Ticket U10 — la carte « en attente » est celle de `x-kpi-card :pending` : tiret estompé
+      // (`text-outline/50`) et sablier `hourglass_empty` devant « Disponible après … ».
       _carteKpi(
         'Rotation du Stock',
         d.rotation.rotation == null
             ? '—'
             : '${PmpService.nombre(d.rotation.rotation!, 1)} fois/mois',
         AgriColors.infoBlue,
+        icone: SymbolesAgri.sync,
         legende: GestionStocksScreen.legendeRotation(d.rotation),
+        enAttente: d.rotation.rotation == null,
       ),
       // 🔴→✅ Ticket U9 — tous les écarts du mois de la ferme (web, ce poste,
       // autres postes), plus ceux de ce poste en attente d'envoi ; légende du
@@ -216,21 +280,34 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         "Écarts d'Inventaire",
         '${PmpService.francs(d.ecartsDuMois)} FCFA',
         AgriColors.accentYellow,
+        icone: SymbolesAgri.rule,
+        couleurIcone: AgriColors.brandForest,
         legende: 'Ajustements du mois',
       ),
     ],
   );
 
+  /// `x-kpi-card` du web : libellé, icône de la variante (couleur de la variante, `text-brand-forest` pour
+  /// `maize`), valeur, légende ; `:pending` → tiret estompé et sablier (ticket U10).
   Widget _carteKpi(
     String libelle,
     String valeur,
     Color barre, {
+    required IconData icone,
+    Color? couleurIcone,
     String legende = '',
+    bool enAttente = false,
   }) => CarteKpi(
     key: Key('kpi-$libelle'),
     libelle: libelle,
     valeur: valeur,
     legende: legende,
+    icone: icone,
+    couleurIcone: couleurIcone ?? barre,
+    couleurValeur: enAttente
+        ? AgriColors.outline.withValues(alpha: 0.5)
+        : AgriColors.onSurface,
+    iconeLegende: enAttente ? SymbolesAgri.hourglass_empty : null,
     couleurLisere: barre,
   );
 
@@ -299,16 +376,11 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
   // ── Onglet 1 : Tableau & Valorisation ─────────────────────────────────────
 
   Widget _ongletTableau(DonneesStocks d) {
-    final terme = _recherche.trim().toLowerCase();
-
-    final lignes = d.lignes.where((l) {
-      if (_categorie.isNotEmpty && l.produit.categoryId != _categorie) {
-        return false;
-      }
-      if (terme.isEmpty) return true;
-      return l.produit.name.toLowerCase().contains(terme) ||
-          l.produit.sku.toLowerCase().contains(terme);
-    }).toList();
+    final lignes = StocksRepository.filtrer(
+      d.lignes,
+      recherche: _recherche,
+      categorie: _categorie,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -370,7 +442,57 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
               // ⚠️ « Importer » n'existe pas au web (`GestionStocks` : aucun
               // import réel, « zéro placeholder ») : le poste ne l'affiche
               // plus (ticket U9, article 5 — le web est maître).
-              _boutonInerte(SymbolesAgri.picture_as_pdf, 'Exporter'),
+              // 🔴→✅ Ticket U10 — `exportStocksPdf()` : le tableau FILTRÉ (recherche + catégorie), en PDF.
+              OutlinedButton.icon(
+                key: const Key('stocks-exporter'),
+                onPressed: widget.imprimer == null
+                    ? null
+                    : () => _exporter(lignes, d),
+                icon: const Icon(SymbolesAgri.picture_as_pdf, size: 16),
+                label: const Text(
+                  'Exporter',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AgriColors.onSurface,
+                  side: const BorderSide(color: AgriColors.outlineVariant),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AgriSpacing.md,
+                    vertical: AgriSpacing.sm,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  ),
+                ),
+              ),
+              // 🔴→✅ Ticket U10 — `@can('manage-stocks')` puis `openAddStockModal()`.
+              if (widget.peutGerer)
+                ElevatedButton.icon(
+                  key: const Key('stocks-ajouter'),
+                  onPressed: () => _ouvrirAjouterStock(d),
+                  icon: const Icon(SymbolesAgri.add_circle, size: 16),
+                  label: const Text(
+                    'Ajouter Stock',
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AgriColors.brandEmerald,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AgriSpacing.md,
+                      vertical: AgriSpacing.sm,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AgriRadius.lg),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -580,21 +702,25 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             child: _pastilleUrgence(l, index),
           ),
         ),
-        // ⚠️ L'action du web ouvre l'écran d'édition du produit
-        // (`stocks.produits.modifier`) ; au poste la modification se fait au
-        // Catalogue Produits : l'icône reste inerte ici.
-        const Expanded(
+        // 🔴→✅ Ticket U10 — l'action du web : `@can('manage-stocks')`, puis l'édition du produit
+        // (`route('stocks.produits.modifier', $id)`), « Modifier le produit ».
+        Expanded(
           flex: 2,
           child: Align(
             alignment: Alignment.centerRight,
-            child: Opacity(
-              opacity: 0.4,
-              child: Icon(
-                SymbolesAgri.edit,
-                size: 16,
-                color: AgriColors.outline,
-              ),
-            ),
+            child: widget.peutGerer
+                ? IconButton(
+                    key: Key('modifier-stock-$index'),
+                    tooltip: 'Modifier le produit',
+                    onPressed: widget.onModifierProduit == null
+                        ? null
+                        : () => widget.onModifierProduit!(l.produit.id),
+                    icon: const Icon(SymbolesAgri.edit, size: 16),
+                    color: AgriColors.outline,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       ],
@@ -844,8 +970,10 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         .firstOrNull;
 
     final theorique = choisi?.stockQty ?? 0;
-    final physique = double.tryParse(_physique.text.trim());
-    final ecart = physique == null ? null : physique - theorique;
+    final ecart = StocksRepository.ecartCalcule(
+      theorique: choisi?.stockQty,
+      physique: double.tryParse(_physique.text.trim()),
+    );
 
     return Container(
       padding: const EdgeInsets.all(AgriSpacing.lg),
@@ -936,27 +1064,43 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: AgriSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _etiquette('Écart calculé'),
-                    _champLecture(
-                      key: const Key('adj-ecart'),
-                      valeur: ecart == null
-                          ? '—'
-                          : '${ecart > 0 ? '+' : ''}${PmpService.quantite(ecart)}',
-                      couleur: ecart == null || ecart == 0
-                          ? AgriColors.onSurface
-                          : ecart > 0
-                          ? AgriColors.brandEmerald
-                          : AgriColors.errorDeep,
-                    ),
-                  ],
-                ),
-              ),
             ],
+          ),
+          const SizedBox(height: AgriSpacing.md),
+          // 🔴→✅ Ticket U10 — l'encadré du Blade (`bg-surface-zebra rounded-lg p-sm text-center`) :
+          // `{{ $adjDiff > 0 ? '+' : '' }}{{ $adjDiff }}`, soit « 0 » tant que rien n'est saisi (jamais « — »),
+          // rouge si négatif, vert si positif, vert forêt à zéro.
+          Container(
+            padding: const EdgeInsets.all(AgriSpacing.sm),
+            decoration: BoxDecoration(
+              color: AgriColors.surfaceZebra,
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'Écart calculé'.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AgriColors.outline,
+                  ),
+                ),
+                Text(
+                  StocksRepository.ecartAffiche(ecart),
+                  key: const Key('adj-ecart'),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: ecart < 0
+                        ? AgriColors.errorDeep
+                        : ecart > 0
+                        ? AgriColors.brandEmerald
+                        : AgriColors.brandForest,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AgriSpacing.md),
           _etiquette("Motif de l'écart"),
@@ -1028,6 +1172,160 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
       ),
     );
   }
+
+  // ── Exporter, Ajouter Stock (ticket U10) ──────────────────────────────────
+
+  /// « Exporter » — `exportStocksPdf()` : le tableau tel qu'il est filtré à l'écran.
+  Future<void> _exporter(List<LigneStock> lignes, DonneesStocks d) async {
+    final editeur = widget.imprimer;
+    if (editeur == null) return;
+    final maintenant = d.maintenant ?? DateTime.now();
+    final message = await editeur(
+      StocksRepository.documentTableau(lignes, maintenant),
+      maintenant,
+    );
+    // Le web ne dit rien après un export réussi : seul un échec de l'éditeur s'affiche.
+    if (message != null && mounted) {
+      ToastAgri.afficher(context, message, type: TypeToast.erreur);
+    }
+  }
+
+  /// `modal-ajouter-stock` du Blade (`max-width="sm"`), champ pour champ : « Date du Nouveau Stock * » (aujourd'hui
+  /// par défaut, `mount()`), « Produit * » (produits actifs par nom), « Quantité Ajoutée * » ; erreurs sous les
+  /// champs Produit et Quantité (`@error` du Blade) ; « Annuler » / « Enregistrer » ; toast « Stock ajouté avec
+  /// succès. ».
+  Future<void> _ouvrirAjouterStock(DonneesStocks d) async {
+    // `openAddStockModal()` : produit et quantité remis à vide, date du jour.
+    var date = DateTime.now();
+    String? produit;
+    final quantite = _quantiteAjout..clear();
+    var erreurs = <String, String>{};
+
+    final enregistre = await afficherModale<bool>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, rafraichir) => ModaleAgri(
+          titre: 'Ajouter Stock',
+          largeur: LargeurModale.sm,
+          contenu: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _etiquette('Date du Nouveau Stock *'),
+              InkWell(
+                key: const Key('ajout-date'),
+                onTap: () async {
+                  final choisie = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(DateTime.now().year + 5, 12, 31),
+                  );
+                  if (choisie != null) rafraichir(() => date = choisie);
+                },
+                child: InputDecorator(
+                  decoration: _decoration(),
+                  child: Text(
+                    '${date.day.toString().padLeft(2, '0')}/'
+                    '${date.month.toString().padLeft(2, '0')}/${date.year}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              _etiquette('Produit *'),
+              DropdownButtonFormField<String>(
+                key: const Key('ajout-produit'),
+                initialValue: produit,
+                isExpanded: true,
+                decoration: _decoration(),
+                hint: const Text(
+                  '-- Sélectionner un produit --',
+                  style: TextStyle(fontSize: 14),
+                ),
+                items: [
+                  for (final l in d.lignes)
+                    DropdownMenuItem(
+                      value: l.produit.id,
+                      child: Text(
+                        l.produit.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                ],
+                onChanged: (v) => rafraichir(() => produit = v),
+              ),
+              if (erreurs['produit'] != null)
+                _erreurChamp('ajout-erreur-produit', erreurs['produit']!),
+              const SizedBox(height: AgriSpacing.md),
+              _etiquette('Quantité Ajoutée *'),
+              TextField(
+                key: const Key('ajout-quantite'),
+                controller: quantite,
+                keyboardType: TextInputType.number,
+                decoration: _decoration().copyWith(hintText: 'ex : 20'),
+                style: const TextStyle(fontSize: 14),
+              ),
+              if (erreurs['quantite'] != null)
+                _erreurChamp('ajout-erreur-quantite', erreurs['quantite']!),
+            ],
+          ),
+          actions: [
+            BoutonModaleSecondaire(
+              libelle: 'Annuler',
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            BoutonModalePrimaire(
+              key: const Key('ajout-enregistrer'),
+              libelle: 'Enregistrer',
+              onPressed: () async {
+                final refus = StocksRepository.validerAjout(
+                  date: date,
+                  productId: produit,
+                  quantite: quantite.text,
+                );
+                if (refus.isNotEmpty) {
+                  rafraichir(() => erreurs = refus);
+                  return;
+                }
+                try {
+                  await widget.depot.ajouterStock(
+                    date: date,
+                    productId: produit,
+                    quantite: quantite.text,
+                  );
+                } on ArgumentError catch (e) {
+                  rafraichir(() => erreurs = {'produit': '${e.message}'});
+                  return;
+                }
+                if (context.mounted) Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (enregistre == true) {
+      await _charger();
+      if (mounted) {
+        ToastAgri.afficher(context, 'Stock ajouté avec succès.');
+      }
+    }
+  }
+
+  /// `<p class="invalid-feedback">` du Blade.
+  Widget _erreurChamp(String cle, String texte) => Padding(
+    padding: const EdgeInsets.only(top: AgriSpacing.xs),
+    child: Text(
+      texte,
+      key: Key(cle),
+      style: const TextStyle(
+        fontSize: AgriTypography.xs,
+        color: AgriColors.errorDeep,
+      ),
+    ),
+  );
 
   Future<void> _validerAjustement() async {
     final produit = _produitChoisi;
@@ -1118,27 +1416,4 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
       borderSide: const BorderSide(color: AgriColors.outlineVariant),
     ),
   );
-
-  Widget _boutonInerte(IconData icone, String libelle) => Opacity(
-    opacity: 0.5,
-    child: OutlinedButton.icon(
-      onPressed: null,
-      icon: Icon(icone, size: 18),
-      label: Text(
-        libelle,
-        style: const TextStyle(
-          fontSize: AgriTypography.xs,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AgriColors.brandForest,
-        side: const BorderSide(color: AgriColors.outlineVariant),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AgriRadius.full),
-        ),
-      ),
-    ),
-  );
-
 }

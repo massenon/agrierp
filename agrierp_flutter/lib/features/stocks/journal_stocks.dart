@@ -75,7 +75,8 @@ class RotationStock {
 ///    recevra ([projeter]) — jamais écrite dans la table, recalculée à chaque lecture :
 ///      * ajustement d'inventaire (`stock_adjustments`) → son type, sa quantité, son motif de référence et son motif,
 ///        `reference_id` = la ligne du poste (`pushStockAdjustments`) ; DATÉ DE L'INSTANT PRÉSENT : le serveur le
-///        rejoue par `AdjustStockAction` sans date, donc à sa réception — au plus tôt maintenant ;
+///        rejoue par `AdjustStockAction` sans date, donc à sa réception — au plus tôt maintenant. Ticket U10 : un
+///        « Ajout Manuel » (`manual_addition`) est daté du JOUR CHOISI, que le serveur reprend (`movement_date`) ;
 ///      * vente → une sortie `sale` par ligne, datée de la vente (`sold_at`, ticket 15.30), `reference_id` = la vente ;
 ///      * achat → une entrée `purchase` par ligne, à l'instant présent (`RecordPurchaseAction` ne date pas le
 ///        mouvement), `reference_id` = l'achat ;
@@ -190,7 +191,11 @@ class JournalStocks {
           referenceType: a.referenceType,
           referenceId: a.id,
           reason: a.reason,
-          date: maintenant,
+          // Ticket U10 — un « Ajout Manuel » est daté par le serveur du JOUR CHOISI (`movement_date`, minuit), comme
+          // au web ; un écart d'inventaire, de sa réception.
+          date: a.referenceType == 'manual_addition'
+              ? jour(a.movementDate)
+              : maintenant,
           enAttente: true,
         ),
       );

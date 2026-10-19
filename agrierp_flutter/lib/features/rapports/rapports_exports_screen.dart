@@ -6,6 +6,7 @@ import '../../core/export/export_tableur.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../stocks/pmp_service.dart';
 import 'rapports_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -71,11 +72,13 @@ class RapportsExportsScreen extends StatefulWidget {
     ('Rapport de Stocks', SymbolesAgri.inventory_2),
   ];
 
-  /// Les trois tableaux du rapport d'élevage, dans l'ordre de ses pilules.
+  /// Les trois tableaux du rapport d'élevage, dans l'ordre de ses pilules — libellés du BLADE
+  /// (`elevage-synth.blade.php`, ticket U10), et non plus ceux de la maquette (« Recensement Hebdomadaire »,
+  /// « Suivi Intégral de la Ponte »).
   static const tableauxElevage = <String>[
-    'Tableau 1 : Recensement Hebdomadaire',
+    'Tableau 1 : Recensement',
     'Tableau 2 : Mouvements, Traitements & Ventes',
-    'Tableau 3 : Suivi Intégral de la Ponte',
+    'Tableau 3 : Suivi de la Ponte',
   ];
 
   @override
@@ -86,6 +89,10 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
   String _onglet = RapportsExportsScreen.onglets.first.$1;
   String _tableauElevage = RapportsExportsScreen.tableauxElevage.first;
   String _recherche = '';
+
+  /// Ticket U10 — filtre « Lot / Souche » du Rapport Élevage (`$lotFilter` du web) : identifiant de bande, vide =
+  /// toutes.
+  String _lotElevage = '';
 
   late DateTime _du;
   late DateTime _au;
@@ -113,7 +120,11 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
   }
 
   Future<void> _charger() async {
-    final donnees = await widget.depot.charger(du: _du, au: _au);
+    final donnees = await widget.depot.charger(
+      du: _du,
+      au: _au,
+      lot: _lotElevage,
+    );
     if (!mounted) return;
     setState(() => _donnees = donnees);
   }
@@ -598,6 +609,44 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
+      // 🔴→✅ Ticket U10 — le filtre « Lot / Souche » du Blade, au-dessus des indicateurs : « Lot / Souche : Tous »
+      // puis les bandes ACTIVES par code ; il s'applique aux indicateurs et aux trois tableaux.
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          key: const Key('elevage-lot'),
+          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: d.bandesElevage.any((b) => b.id == _lotElevage)
+                  ? _lotElevage
+                  : '',
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                color: AgriColors.onSurface,
+              ),
+              items: [
+                const DropdownMenuItem(
+                  value: '',
+                  child: Text('Lot / Souche : Tous'),
+                ),
+                for (final b in d.bandesElevage)
+                  DropdownMenuItem(value: b.id, child: Text(b.code)),
+              ],
+              onChanged: (v) {
+                setState(() => _lotElevage = v ?? '');
+                _charger();
+              },
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.md),
       _grilleKpi(
         large,
         const [
@@ -606,43 +655,54 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           ('Taux de Mortalité Hebdo', null, AgriColors.errorRed),
           ('CA Ventes du Lot', null, AgriColors.accentYellow),
         ],
+        // 🔴→✅ Ticket U10 — valeurs du Blade : `number_format(production, 0, ',', ' ')`, `taux.' %'` (flottant PHP)
+        // ou « — », `number_format(CA, 0, ',', ' ')` puis « FCFA » (toujours un montant).
         [
-          '${d.indicateurs.productionTotale} œufs',
-          d.indicateurs.tauxPonteMoyen == null
-              ? '—'
-              : '${d.indicateurs.tauxPonteMoyen!.toStringAsFixed(1)} %',
-          d.indicateurs.mortaliteHebdo == null
-              ? '—'
-              : '${d.indicateurs.mortaliteHebdo!.toStringAsFixed(1)} %',
-          d.indicateurs.chiffreAffaires == null
-              ? '—'
-              : '${RapportsRepository.montant(d.indicateurs.chiffreAffaires!)} FCFA',
+          PmpService.francs(d.indicateurs.productionTotale.toDouble()),
+          IndicateursElevage.taux(d.indicateurs.tauxPonteMoyen),
+          IndicateursElevage.taux(d.indicateurs.mortaliteHebdo),
+          '${PmpService.francs(d.indicateurs.chiffreAffaires)} FCFA',
         ],
       ),
       const SizedBox(height: AgriSpacing.lg),
       _pilulesElevage(),
       const SizedBox(height: AgriSpacing.md),
       switch (_tableauElevage) {
-        'Tableau 2 : Mouvements, Traitements & Ventes' => _tableau(
-          cle: 'tableau-elevage-t2',
-          largeur: 1400,
-          colonnes: const [
-            ('Date', 3),
-            ('Lot', 4),
-            ('Sexe Vendu', 3),
-            ('Qté Vendue', 3),
-            ('Montant Vente (FCFA)', 4),
-            ('Effectif Final', 3),
-            ('Traitement Administré', 4),
-            ('Dose', 3),
-            ('Signes de Maladie Observés', 5),
+        // 🔴→✅ Ticket U10 — le Tableau 2 du Blade : mêmes neuf colonnes, cellules réelles (sexe, montant,
+        // traitement, dose, symptômes descendent depuis U10), formule du pied.
+        'Tableau 2 : Mouvements, Traitements & Ventes' => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _tableau(
+              cle: 'tableau-elevage-t2',
+              largeur: 1400,
+              colonnes: const [
+                ('Date', 3),
+                ('Lot', 4),
+                ('Sexe Vendu', 3),
+                ('Qté Vendue', 3),
+                ('Montant Vente (FCFA)', 4),
+                ('Effectif Final', 3),
+                ('Traitement Administré', 4),
+                ('Dose', 3),
+                ('Signes de Maladie Observés', 5),
+              ],
+              vide: 'Aucune fiche journalière sur la période.',
+              lignes: d.elevageT2,
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: AgriSpacing.sm),
+              child: Text(
+                'Formules : Recette Ventes (FCFA) = Qté Vendue × Prix Unitaire — '
+                'Effectif Final = Effectif Début − (Morts + Ventes + Dons)',
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+            ),
           ],
-          vide: '— Aucune journée saisie sur la période —',
-          lignes: d.elevageT2,
         ),
         // 🔴→✅ Ticket U9 — le Tableau 3 du web (`elevage-synth.blade.php`) :
         // onze colonnes dont « Lot », soldes de FERME en plateaux.
-        'Tableau 3 : Suivi Intégral de la Ponte' => Column(
+        'Tableau 3 : Suivi de la Ponte' => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Padding(
@@ -693,44 +753,53 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
             ),
           ],
         ),
-        _ => _tableau(
-          cle: 'tableau-elevage-t1',
-          largeur: 1700,
-          colonnes: const [
-            ('Date', 3),
-            ('Lot / Souche', 4),
-            ('Mères Pondeuses', 3),
-            ('Mères Couveuses', 3),
-            ('Mères Éleveuses', 3),
-            ('Poussins S/Mères', 3),
-            ('Sevrés M', 2),
-            ('Sevrés F', 2),
-            ('Morts M', 2),
-            ('Morts F', 2),
-            ('Morts SM', 2),
-            ('Géniteurs', 2),
-            ('Effectif Malade', 3),
+        // 🔴→✅ Ticket U10 — le Tableau 1 du Blade : dix colonnes réellement portées par la fiche (la maquette en
+        // montrait treize, toutes en tiret au poste), la mention en tête et la formule au pied.
+        _ => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: AgriSpacing.sm),
+              child: Text(
+                'Colonnes réellement disponibles depuis les fiches journalières — la ventilation détaillée par '
+                'rôle de reproduction (Mères Pondeuses/Couveuses/Éleveuses, Géniteurs) n\'existe pas dans un '
+                'schéma commun à toutes les espèces et n\'est pas approximée ici.',
+                key: Key('legende-elevage-t1'),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: AgriColors.outline,
+                ),
+              ),
+            ),
+            _tableau(
+              cle: 'tableau-elevage-t1',
+              largeur: 1300,
+              colonnes: const [
+                ('Date', 3),
+                ('Lot / Souche', 4),
+                ('Effectif M', 3),
+                ('Effectif F', 3),
+                ('Sous Mères', 3),
+                ('Sevrés', 3),
+                ('Achats', 3),
+                ('Nés', 3),
+                ('Morts', 3),
+                ('Effectif Final', 3),
+              ],
+              vide: 'Aucune fiche journalière sur la période.',
+              lignes: d.elevageT1,
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: AgriSpacing.sm),
+              child: Text(
+                'Formule : Taux Mortalité Hebdo (%) = (Cumul Morts ÷ Effectif Début) × 100',
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+            ),
           ],
-          vide: '— Aucune journée saisie sur la période —',
-          lignes: d.elevageT1,
         ),
       },
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ Les deux limites du rapport d'élevage, dites à l'écran. Un
-      // rapport muet sur ce qu'il ne couvre pas se lit comme un rapport
-      // complet — et une colonne de tirets passerait pour une ferme sans
-      // mortalité.
-      _mentionPoste(
-        // Ticket U9 — phrase datée corrigée : les fiches descendent depuis F0.94.
-        "Ce rapport porte les journées connues du poste : celles du serveur "
-        "(descendues au tirage) et celles saisies ici. "
-        "⚠️ Les colonnes en tiret (ventilation par sexe et par stade, "
-        "traitement, dose, symptômes, montant de vente) ne quittent pas le "
-        "poste à l'envoi : il ne les a jamais eues. Elles restent affichées "
-        "parce que la maquette les demande — les retirer laisserait croire le "
-        "contraire. Le Tableau 3 reprend le calcul du web : soldes de ferme "
-        "en plateaux, lus dans le grand livre des stocks.",
-      ),
     ],
   );
 
@@ -872,61 +941,58 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         ],
       ),
 
+      // 🔴→✅ Ticket U10 — le PDF du WEB (`ElevageSynth::exportReport()`, vue `exports.elevage-synth`) : titre,
+      // période en sous-titre, trois tableaux et leurs colonnes, mêmes cellules qu'à l'écran (lot filtré compris).
       'Rapport Élevage' => DocumentOfficiel(
         titre: 'Rapport Élevage — Synthèse Détaillée',
-        sousTitre: 'Recensement, mouvements et suivi de ponte',
+        sousTitre:
+            '${RapportsRepository.date(d.du)} au ${RapportsRepository.date(d.au)}',
         lignes: [
-          const BandeDocument('TABLEAU 1 — RECENSEMENT HEBDOMADAIRE'),
+          const BandeDocument('Tableau 1 — Recensement'),
           const EnteteDocument([
             'Date',
             'Lot',
-            'M.Pond.',
-            'M.Couv.',
-            'M.Élev.',
-            'Pouss.SM',
-            'Sevrés M',
-            'Sevrés F',
-            'Morts M',
-            'Morts F',
-            'Morts SM',
-            'Génit.',
-            'Malades',
+            'Eff. M',
+            'Eff. F',
+            'Sous Mères',
+            'Sevrés',
+            'Achats',
+            'Nés',
+            'Morts',
+            'Eff. Final',
           ]),
+          if (d.elevageT1.isEmpty)
+            const DonneesDocument(['Aucune fiche sur la période.']),
           for (final l in d.elevageT1) DonneesDocument(l.cellules),
-          const BandeDocument('TABLEAU 2 — MOUVEMENTS, TRAITEMENTS & VENTES'),
+          const BandeDocument('Tableau 2 — Mouvements, Traitements & Ventes'),
           const EnteteDocument([
             'Date',
             'Lot',
-            'Sexe',
+            'Sexe Vendu',
             'Qté',
             'Montant',
-            'Eff.Final',
             'Traitement',
             'Dose',
-            'Signes Maladie',
+            'Signes',
           ]),
-          for (final l in d.elevageT2) DonneesDocument(l.cellules),
-          const BandeDocument(
-            "TABLEAU 3 — SUIVI INTÉGRAL DE LA PONTE & STOCK D'ŒUFS",
-          ),
+          if (d.elevageT2.isEmpty)
+            const DonneesDocument(['Aucune fiche sur la période.']),
+          // Le PDF du web n'a pas la colonne « Effectif Final » de l'écran.
+          for (final l in d.elevageT2)
+            DonneesDocument([...l.cellules.take(5), ...l.cellules.skip(6)]),
+          const BandeDocument('Tableau 3 — Suivi de la Ponte'),
           const EnteteDocument([
-            'Âge',
             'Jour',
             'Lot',
-            'OR',
-            'Ponte%',
-            'OF',
-            'Comm.',
-            'SRH',
-            'TS',
-            'OS',
-            'Stock Final',
+            'Œufs Récoltés',
+            'Taux Ponte %',
+            'Cassés',
+            'Commercialisables',
           ]),
-          for (final l in d.elevageT3) DonneesDocument(l.cellules),
+          if (d.elevageT3Export.isEmpty)
+            const DonneesDocument(['Aucune ponte sur la période.']),
+          for (final l in d.elevageT3Export) DonneesDocument(l.cellules),
         ],
-        noteDePied:
-            "Journées connues du poste. Les colonnes en tiret ne font pas "
-            "partie de la charge utile d'envoi des fiches.",
       ),
 
       'Rapport de Stocks' => DocumentOfficiel(

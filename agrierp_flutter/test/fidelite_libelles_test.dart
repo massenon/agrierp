@@ -323,7 +323,7 @@ void main() {
     //    suivant (ticket F0.39). ⚠️ Depuis F0.67, créer et modifier un produit
     //    PASSE PAR LE SERVEUR (en ligne) : « Nouveau Produit » et « Modifier le
     //    Produit » sont portés. Restent en lecture seule : archivage, seuils.
-    'Ajouter Stock': 'référentiel en lecture seule au poste',
+    // Ticket U10 — « Ajouter Stock » est porté (modale du Blade, envoi rejoué par le serveur) : exemption retirée.
     'Confirmer la Suppression ?': 'référentiel en lecture seule au poste',
     'Oui, Supprimer définitivement': 'référentiel en lecture seule au poste',
     'Configurer un Seuil': 'référentiel en lecture seule au poste',
@@ -1072,6 +1072,22 @@ void main() {
           'création à la volée non portée ici : elle se fait au Catalogue Produits',
     },
 
+    // Ticket U10 — le Blade fait foi (`elevage-synth.blade.php`) : Tableau 1 aux dix colonnes que la fiche porte
+    // (la maquette en montre treize, sans données au web comme au poste), libellés des pilules du Blade.
+    'rapport-elevage-synth.html': {
+      'Mères Couveuses': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Mères Éleveuses': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Poussins S/Mères': 'Ticket U10 : le Blade fait foi — « Sous Mères »',
+      'Sevrés M': 'Ticket U10 : le Blade fait foi — « Sevrés »',
+      'Sevrés F': 'Ticket U10 : le Blade fait foi — « Sevrés »',
+      'Morts M': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Morts F': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Morts SM': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Effectif Malade': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Tableau 1 : Recensement Hebdomadaire': 'Ticket U10 : le Blade fait foi — « Tableau 1 : Recensement »',
+      'Tableau 3 : Suivi Intégral de la Ponte': 'Ticket U10 : le Blade fait foi — « Tableau 3 : Suivi de la Ponte »',
+    },
+
     'gestion-stocks.html': {
       // « Il n'y a rien à recalculer au poste » : le PMP est tenu par le
       // serveur.
@@ -1123,7 +1139,9 @@ void main() {
   /// H8 / H8b (19/10/2026) : 239 → 237 (« Résumé sanitaire » et « Planifier une Intervention » portés).
   /// H9 / H9b (19/10/2026) : 237 → 210. Les 27 couples masqués de `parametres-elevage.html` sortent du compte
   /// avec la page (contrôlée contre le Blade).
-  const plafondManquesMasques = 210;
+  /// U10 (19/10/2026) : 210 → 207 — boutons de modale (« Annuler », « Enregistrer »…) désormais affichés par
+  /// Gestion des Stocks (modale « Ajouter Stock » du Blade).
+  const plafondManquesMasques = 207;
 
   for (final entree in portages.entries) {
     final page = entree.key;

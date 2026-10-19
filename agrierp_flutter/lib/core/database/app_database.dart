@@ -1185,6 +1185,24 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get effectifSevres => integer().nullable()();
   IntColumn get effectifSmeres => integer().nullable()();
 
+  // ── Ticket U10 (schéma v45) — colonnes du Tableau 2 et de « CA Ventes du Lot » du Rapport Élevage ──
+  //
+  // REÇUES du serveur, JAMAIS envoyées : le poste ne les saisit pas (`fill()` du serveur ne réécrit que les clés
+  // reçues, elles y restent intactes). Toutes nullables : `null` = « le serveur n'en a pas » (le web affiche alors
+  // « — », « RAS » ou « 0 », comme son Blade).
+
+  /// `vente_sexe` : M, F ou Mixte.
+  TextColumn get venteSexe => text().nullable()();
+
+  /// `vente_montant` (FCFA), posé par la vente qui touche la fiche (`RecordSaleOnFicheElevageAction`).
+  RealColumn get venteMontant => real().nullable()();
+
+  /// `treatment_product_id` : produit du traitement administré (nom lu dans `products`).
+  TextColumn get treatmentProductId => text().nullable()();
+
+  TextColumn get treatmentDose => text().nullable()();
+  TextColumn get symptomes => text().nullable()();
+
   // ── Ticket 15.46 (schéma v39) — TRANSFERTS ENTRE BANDES, DÉRIVÉS de `LivestockTransfers` ──
   //
   // Comme `effectif_final` : jamais saisis dans la fiche, jamais envoyés au serveur (il les recalcule).
@@ -1639,7 +1657,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 44;
+  int get schemaVersion => 45;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2100,6 +2118,19 @@ class AppDatabase extends _$AppDatabase {
       if (from < 44) {
         if (!await _tableExiste(m, stockMovements)) {
           await m.createTable(stockMovements);
+        }
+      }
+
+      // v45 — ticket U10 : colonnes de la fiche reçues du serveur pour le Rapport Élevage (Tableau 2, CA Ventes).
+      if (from < 45) {
+        for (final colonne in [
+          livestockDailyEntries.venteSexe,
+          livestockDailyEntries.venteMontant,
+          livestockDailyEntries.treatmentProductId,
+          livestockDailyEntries.treatmentDose,
+          livestockDailyEntries.symptomes,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
         }
       }
     },
