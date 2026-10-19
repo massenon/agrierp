@@ -135,7 +135,8 @@ void main() {
     EcranPoste.aideEtAPropos: 'aide/aide_a_propos_screen.dart',
     EcranPoste.contactEditeur: 'contact/contact_editeur_screen.dart',
     EcranPoste.synchronisation: 'sync/synchronisation_screen.dart',
-    EcranPoste.parametres: 'parametres/parametres_poste_screen.dart',
+    // CFG-2 : « Paramètres du poste » ouvre le hub Paramètres sur l'onglet Appairage.
+    EcranPoste.parametres: 'parametres/parametres_generaux_screen.dart',
     EcranPoste.transfertsBandes: 'elevage/transferts_bandes_screen.dart',
   };
 
