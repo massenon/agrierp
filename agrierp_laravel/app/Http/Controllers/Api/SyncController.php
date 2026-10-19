@@ -123,6 +123,9 @@ class SyncController extends Controller
         'growth_standards',
     ];
 
+    /** Recouvrement du curseur de tirage (voir `pull`). */
+    public const HORIZON_TIRAGE_SECONDES = 5;
+
     /**
      * GET /api/sync/pull?since=2026-08-11T00:00:00Z
      * Renvoie tout ce qui a changé côté serveur depuis `since`, groupé
@@ -134,6 +137,15 @@ class SyncController extends Controller
         $request->validate(['since' => ['nullable', 'date']]);
 
         $since = $request->filled('since') ? $request->date('since') : null;
+
+        // 🔴→✅ CURSEUR PRIS AVANT LES REQUÊTES, AVEC UN RECOUVREMENT. `server_time` était calculé APRÈS les quelque
+        // 900 lignes de requêtes ci-dessous : une ligne écrite au web PENDANT le tirage (après la lecture de sa table)
+        // portait un `updated_at` antérieur au curseur rendu — ni servie par ce tirage, ni par le suivant, perdue pour
+        // le poste sans aucune erreur. Le curseur est désormais l'instant du DÉBUT du tirage, reculé de
+        // [HORIZON_TIRAGE_SECONDES] : une écriture dont la transaction se valide juste après (ou datée à la seconde
+        // près) est resservie au tirage suivant. Resservir est sans risque : les absorbeurs du poste font des
+        // insertions-ou-mises-à-jour et ne touchent jamais une saisie locale en attente.
+        $curseur = now()->subSeconds(self::HORIZON_TIRAGE_SECONDES);
 
         $products = Product::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
         $categories = ProductCategory::query()->when($since, fn ($q) => $q->where('updated_at', '>', $since))->get();
@@ -1011,7 +1023,7 @@ class SyncController extends Controller
                 ->get();
 
         $reponse = [
-            'server_time' => now()->toIso8601String(),
+            'server_time' => $curseur->toIso8601String(),
             // Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). Un poste qui ne le
             // connaît pas purge ses données d'activité avant tout envoi.
             'data_reset_at' => $entreprise?->data_reset_at?->toIso8601String(),
