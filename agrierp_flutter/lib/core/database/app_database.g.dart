@@ -32467,6 +32467,28 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('payee'),
+  );
+  static const VerificationMeta _accountingEntryIdMeta = const VerificationMeta(
+    'accountingEntryId',
+  );
+  @override
+  late final GeneratedColumn<String> accountingEntryId =
+      GeneratedColumn<String>(
+        'accounting_entry_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -32479,6 +32501,8 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     amount,
     treasuryAccountId,
     isActive,
+    status,
+    accountingEntryId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -32565,6 +32589,21 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('accounting_entry_id')) {
+      context.handle(
+        _accountingEntryIdMeta,
+        accountingEntryId.isAcceptableOrUnknown(
+          data['accounting_entry_id']!,
+          _accountingEntryIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -32616,6 +32655,14 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      accountingEntryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accounting_entry_id'],
+      ),
     );
   }
 
@@ -32643,6 +32690,15 @@ class Expense extends DataClass implements Insertable<Expense> {
   /// contre-passée). Une dépense archivée n'est plus une dépense : aucun écran ni rapport ne la compte. Défaut `true` :
   /// toute dépense saisie ici, ou déjà présente avant U13, est active (comme au serveur à sa création).
   final bool isActive;
+
+  /// Ticket U14 — `expenses.status` du serveur (`payee` / `en_attente`) : le badge et le filtre « Statut » du Blade.
+  /// Défaut `payee` : une dépense saisie est immédiatement décaissée (le serveur la crée `payee`, toujours).
+  final String status;
+
+  /// Ticket U14 — `expenses.accounting_entry_id` du serveur : une dépense COMPTABILISÉE ne change plus de montant, de
+  /// compte de charge ni de compte de trésorerie (`SaisieDepenseAction`). Le poste refuse avant d'écrire, comme le web.
+  /// `null` : pas d'écriture connue (saisie de ce poste pas encore reçue, ou plan comptable incomplet au serveur).
+  final String? accountingEntryId;
   const Expense({
     required this.id,
     required this.deviceId,
@@ -32654,6 +32710,8 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.amount,
     required this.treasuryAccountId,
     required this.isActive,
+    required this.status,
+    this.accountingEntryId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -32672,6 +32730,10 @@ class Expense extends DataClass implements Insertable<Expense> {
     map['amount'] = Variable<double>(amount);
     map['treasury_account_id'] = Variable<String>(treasuryAccountId);
     map['is_active'] = Variable<bool>(isActive);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || accountingEntryId != null) {
+      map['accounting_entry_id'] = Variable<String>(accountingEntryId);
+    }
     return map;
   }
 
@@ -32687,6 +32749,10 @@ class Expense extends DataClass implements Insertable<Expense> {
       amount: Value(amount),
       treasuryAccountId: Value(treasuryAccountId),
       isActive: Value(isActive),
+      status: Value(status),
+      accountingEntryId: accountingEntryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountingEntryId),
     );
   }
 
@@ -32708,6 +32774,10 @@ class Expense extends DataClass implements Insertable<Expense> {
       amount: serializer.fromJson<double>(json['amount']),
       treasuryAccountId: serializer.fromJson<String>(json['treasuryAccountId']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      status: serializer.fromJson<String>(json['status']),
+      accountingEntryId: serializer.fromJson<String?>(
+        json['accountingEntryId'],
+      ),
     );
   }
   @override
@@ -32726,6 +32796,8 @@ class Expense extends DataClass implements Insertable<Expense> {
       'amount': serializer.toJson<double>(amount),
       'treasuryAccountId': serializer.toJson<String>(treasuryAccountId),
       'isActive': serializer.toJson<bool>(isActive),
+      'status': serializer.toJson<String>(status),
+      'accountingEntryId': serializer.toJson<String?>(accountingEntryId),
     };
   }
 
@@ -32740,6 +32812,8 @@ class Expense extends DataClass implements Insertable<Expense> {
     double? amount,
     String? treasuryAccountId,
     bool? isActive,
+    String? status,
+    Value<String?> accountingEntryId = const Value.absent(),
   }) => Expense(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -32751,6 +32825,10 @@ class Expense extends DataClass implements Insertable<Expense> {
     amount: amount ?? this.amount,
     treasuryAccountId: treasuryAccountId ?? this.treasuryAccountId,
     isActive: isActive ?? this.isActive,
+    status: status ?? this.status,
+    accountingEntryId: accountingEntryId.present
+        ? accountingEntryId.value
+        : this.accountingEntryId,
   );
   Expense copyWithCompanion(ExpensesCompanion data) {
     return Expense(
@@ -32770,6 +32848,10 @@ class Expense extends DataClass implements Insertable<Expense> {
           ? data.treasuryAccountId.value
           : this.treasuryAccountId,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      status: data.status.present ? data.status.value : this.status,
+      accountingEntryId: data.accountingEntryId.present
+          ? data.accountingEntryId.value
+          : this.accountingEntryId,
     );
   }
 
@@ -32785,7 +32867,9 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('category: $category, ')
           ..write('amount: $amount, ')
           ..write('treasuryAccountId: $treasuryAccountId, ')
-          ..write('isActive: $isActive')
+          ..write('isActive: $isActive, ')
+          ..write('status: $status, ')
+          ..write('accountingEntryId: $accountingEntryId')
           ..write(')'))
         .toString();
   }
@@ -32802,6 +32886,8 @@ class Expense extends DataClass implements Insertable<Expense> {
     amount,
     treasuryAccountId,
     isActive,
+    status,
+    accountingEntryId,
   );
   @override
   bool operator ==(Object other) =>
@@ -32816,7 +32902,9 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.category == this.category &&
           other.amount == this.amount &&
           other.treasuryAccountId == this.treasuryAccountId &&
-          other.isActive == this.isActive);
+          other.isActive == this.isActive &&
+          other.status == this.status &&
+          other.accountingEntryId == this.accountingEntryId);
 }
 
 class ExpensesCompanion extends UpdateCompanion<Expense> {
@@ -32830,6 +32918,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<double> amount;
   final Value<String> treasuryAccountId;
   final Value<bool> isActive;
+  final Value<String> status;
+  final Value<String?> accountingEntryId;
   final Value<int> rowid;
   const ExpensesCompanion({
     this.id = const Value.absent(),
@@ -32842,6 +32932,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.amount = const Value.absent(),
     this.treasuryAccountId = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.status = const Value.absent(),
+    this.accountingEntryId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ExpensesCompanion.insert({
@@ -32855,6 +32947,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     required double amount,
     required String treasuryAccountId,
     this.isActive = const Value.absent(),
+    this.status = const Value.absent(),
+    this.accountingEntryId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -32875,6 +32969,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<double>? amount,
     Expression<String>? treasuryAccountId,
     Expression<bool>? isActive,
+    Expression<String>? status,
+    Expression<String>? accountingEntryId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -32888,6 +32984,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (amount != null) 'amount': amount,
       if (treasuryAccountId != null) 'treasury_account_id': treasuryAccountId,
       if (isActive != null) 'is_active': isActive,
+      if (status != null) 'status': status,
+      if (accountingEntryId != null) 'accounting_entry_id': accountingEntryId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -32903,6 +33001,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<double>? amount,
     Value<String>? treasuryAccountId,
     Value<bool>? isActive,
+    Value<String>? status,
+    Value<String?>? accountingEntryId,
     Value<int>? rowid,
   }) {
     return ExpensesCompanion(
@@ -32916,6 +33016,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       amount: amount ?? this.amount,
       treasuryAccountId: treasuryAccountId ?? this.treasuryAccountId,
       isActive: isActive ?? this.isActive,
+      status: status ?? this.status,
+      accountingEntryId: accountingEntryId ?? this.accountingEntryId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -32955,6 +33057,12 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (accountingEntryId.present) {
+      map['accounting_entry_id'] = Variable<String>(accountingEntryId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -32974,6 +33082,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('amount: $amount, ')
           ..write('treasuryAccountId: $treasuryAccountId, ')
           ..write('isActive: $isActive, ')
+          ..write('status: $status, ')
+          ..write('accountingEntryId: $accountingEntryId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -50016,6 +50126,8 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       required double amount,
       required String treasuryAccountId,
       Value<bool> isActive,
+      Value<String> status,
+      Value<String?> accountingEntryId,
       Value<int> rowid,
     });
 typedef $$ExpensesTableUpdateCompanionBuilder =
@@ -50030,6 +50142,8 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<double> amount,
       Value<String> treasuryAccountId,
       Value<bool> isActive,
+      Value<String> status,
+      Value<String?> accountingEntryId,
       Value<int> rowid,
     });
 
@@ -50092,6 +50206,16 @@ class $$ExpensesTableFilterComposer
     column: $table.isActive,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$ExpensesTableOrderingComposer
@@ -50152,6 +50276,16 @@ class $$ExpensesTableOrderingComposer
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ExpensesTableAnnotationComposer
@@ -50199,6 +50333,14 @@ class $$ExpensesTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => column,
+  );
 }
 
 class $$ExpensesTableTableManager
@@ -50239,6 +50381,8 @@ class $$ExpensesTableTableManager
                 Value<double> amount = const Value.absent(),
                 Value<String> treasuryAccountId = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> accountingEntryId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion(
                 id: id,
@@ -50251,6 +50395,8 @@ class $$ExpensesTableTableManager
                 amount: amount,
                 treasuryAccountId: treasuryAccountId,
                 isActive: isActive,
+                status: status,
+                accountingEntryId: accountingEntryId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -50265,6 +50411,8 @@ class $$ExpensesTableTableManager
                 required double amount,
                 required String treasuryAccountId,
                 Value<bool> isActive = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> accountingEntryId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion.insert(
                 id: id,
@@ -50277,6 +50425,8 @@ class $$ExpensesTableTableManager
                 amount: amount,
                 treasuryAccountId: treasuryAccountId,
                 isActive: isActive,
+                status: status,
+                accountingEntryId: accountingEntryId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

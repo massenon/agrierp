@@ -1569,6 +1569,15 @@ class Expenses extends Table with SyncColumns {
   /// contre-passée). Une dépense archivée n'est plus une dépense : aucun écran ni rapport ne la compte. Défaut `true` :
   /// toute dépense saisie ici, ou déjà présente avant U13, est active (comme au serveur à sa création).
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Ticket U14 — `expenses.status` du serveur (`payee` / `en_attente`) : le badge et le filtre « Statut » du Blade.
+  /// Défaut `payee` : une dépense saisie est immédiatement décaissée (le serveur la crée `payee`, toujours).
+  TextColumn get status => text().withDefault(const Constant('payee'))();
+
+  /// Ticket U14 — `expenses.accounting_entry_id` du serveur : une dépense COMPTABILISÉE ne change plus de montant, de
+  /// compte de charge ni de compte de trésorerie (`SaisieDepenseAction`). Le poste refuse avant d'écrire, comme le web.
+  /// `null` : pas d'écriture connue (saisie de ce poste pas encore reçue, ou plan comptable incomplet au serveur).
+  TextColumn get accountingEntryId => text().nullable()();
 }
 
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
@@ -1695,7 +1704,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 47;
+  int get schemaVersion => 48;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2184,6 +2193,12 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, payslips)) {
           await m.createTable(payslips);
         }
+      }
+
+      // v48 — ticket U14 : statut (badge et filtre du Blade) et écriture comptable de la dépense (règle de modification).
+      if (from < 48) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.status);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.accountingEntryId);
       }
     },
   );

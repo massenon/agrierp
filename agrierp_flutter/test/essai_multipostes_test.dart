@@ -913,7 +913,9 @@ class _Essai {
           final pr = await p.produits.creer(FormulaireProduit(nom: 'ESSAI Miel de la ferme (pot)', categorieId: categorie, unite: 'pot', mode: 'fourchette', prixMin: 2500, prixMax: 3000, stock: 20));
           p.noter('products', pr.id);
         });
-        await _geste(p, 'dépense : carburant du groupe (15 000 F)', () => _depense(p, 'Carburant du groupe (essai)', 15000));
+        await _geste(p, 'dépense : carburant du groupe (15 000 F)', () async {
+          depenseAModifier = await _depense(p, 'Carburant du groupe (essai)', 15000);
+        });
       case 1:
         await _geste(p, 'inventaire : fumier composté, 2 sacs manquants', () async {
           final pr = await p.produit('Fumier compost');
@@ -927,7 +929,9 @@ class _Essai {
           p.noter('purchase_returns', r.id);
           retourFait = true;
         });
-        await _geste(p, 'dépense : réparation des abreuvoirs (8 000 F)', () => _depense(p, 'Réparation des abreuvoirs (essai)', 8000));
+        await _geste(p, 'dépense : réparation des abreuvoirs (8 000 F)', () async {
+          depenseAArchiverPoste = await _depense(p, 'Réparation des abreuvoirs (essai)', 8000);
+        });
       case 2:
         await _geste(p, 'achat de 2 flacons d\'antibiotique', () => _achat(p, 'Antibiotique', 2, 4500, 9000));
         await _geste(p, 'ajout de stock : 5 Lapin vivant', () async {
@@ -935,6 +939,9 @@ class _Essai {
           p.noter('stock_adjustments', a.id);
         });
         await _inventairePendantUneVente();
+        // Ticket U14 — une dépense que le web pourra archiver (U13) : celles des jours 1 et 2 sont modifiée et archivée
+        // AU POSTE, et le web ne les touche pas.
+        await _geste(p, 'dépense : eau du forage (4 000 F)', () => _depense(p, 'Eau du forage (essai)', 4000));
         // 15.16 — règlement d'une partie de la dette de l'achat à crédit (la dette doit être descendue au poste).
         final fournisseur = await _fournisseurEssai(p);
         await _jusqua(p, 'dette de Provenderie ESSAI', () async => await p.fournisseurs.du(fournisseur) > 0);
@@ -958,6 +965,24 @@ class _Essai {
           remboursementFait = true;
         });
         await _achatAvantInventaireWeb();
+        // Ticket U14 — « Saisie des Dépenses » du poste modifie et archive comme le web : le serveur rejoue les deux
+        // gestes par `SaisieDepenseAction` (libellé corrigé ; contre-passation et trésorerie réintégrée).
+        await _geste(p, 'dépense : libellé du carburant corrigé au poste (U14)', () async {
+          final d = await (p.db.select(p.db.expenses)..where((t) => t.id.equals(depenseAModifier!))).getSingle();
+          await p.depenses.enregistrer(
+            date: d.expenseDate,
+            libelle: libelleDepenseModifiee,
+            categorie: d.category,
+            montant: d.amount,
+            compteTresorerieId: d.treasuryAccountId,
+            idEnModification: d.id,
+          );
+          _saisi('expenses', d.id, {'label': libelleDepenseModifiee, 'is_active': true});
+        });
+        await _geste(p, 'dépense : réparation des abreuvoirs archivée au poste (U14)', () async {
+          await p.depenses.archiver(depenseAArchiverPoste!);
+          _saisi('expenses', depenseAArchiverPoste!, {'is_active': false});
+        });
       default:
         await _geste(p, 'dépense : électricité (6 000 F)', () => _depense(p, 'Électricité (essai)', 6000));
         final fournisseur = await _fournisseurEssai(p);
@@ -971,6 +996,10 @@ class _Essai {
     }
     if (p.alea.nextBool()) await p.synchroniser('bureau, en cours de journée ${d + 1}');
   }
+
+  /// Ticket U14 — dépenses du bureau modifiée puis archivée au poste (le web n'archive ni l'une ni l'autre).
+  String? depenseAModifier, depenseAArchiverPoste;
+  static const libelleDepenseModifiee = 'Carburant du groupe électrogène (essai)';
 
   /// Ticket S-T12 — scénarios dont l'essai vérifie qu'ils ont bien eu lieu (un geste refusé au poste les ferait taire).
   String? achatARetourner;
@@ -1344,7 +1373,12 @@ class _Essai {
     if (d == 4) {
       // Ticket U13 — une dépense saisie à un poste et déjà reçue est ARCHIVÉE au web : elle doit sortir du rapport de
       // chaque poste (le poste qui l'a saisie la croit active jusqu'au tirage suivant).
-      final candidates = [for (final p in postes) ...?p.saisies['expenses']];
+      // U14 : ni la dépense que le bureau modifie, ni celle qu'il archive (deux gestes du poste, vérifiés à part).
+      final candidates = [
+        for (final p in postes)
+          for (final id in p.saisies['expenses'] ?? const <String>[])
+            if (id != depenseAModifier && id != depenseAArchiverPoste) id,
+      ];
       final r = await _serveur(['archiver-depense', jsonEncode(candidates)]);
       depenseArchiveeWeb = r['depense'] as String?;
       evenement(depenseArchiveeWeb == null
@@ -1475,6 +1509,11 @@ class _Essai {
     if (provende != null) {
       final f = await (p.db.select(p.db.feedTypes)..where((t) => t.id.equals(provende!))).getSingleOrNull();
       lignesLocales['feed_types|$provende'] = {'name': f?.name, 'price_per_kg': f?.pricePerKg, 'is_active': f?.isActive};
+    }
+    // Ticket U14 — les dépenses modifiée et archivée au bureau.
+    for (final id in [?depenseAModifier, ?depenseAArchiverPoste]) {
+      final d = await (bureau.db.select(bureau.db.expenses)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['expenses|$id'] = {'label': d?.label, 'is_active': d?.isActive};
     }
   }
 
@@ -1715,6 +1754,8 @@ class _Essai {
       if (cycle1 == null || cycle2 == null) 'cycles de reproduction',
       if (infirmerie == null || intervention == null || soinAArchiver == null) 'infirmerie, calendrier, soin archivé',
       if (rationPoste == null || provende == null || rappelSoins == null) 'Paramètres Élevage au poste',
+      if (!saisiElevage.containsKey('expenses|$depenseAModifier') || !saisiElevage.containsKey('expenses|$depenseAArchiverPoste'))
+        'dépense modifiée et dépense archivée au poste (U14)',
       if (!sessionsRefusees.containsKey(caisse1.nom) || !sessionsRefusees.containsKey(compta.nom)) 'sessions refusées',
     ];
     expect(manquants, isEmpty, reason: 'scénarios S-T12 qui n\'ont pas eu lieu (geste refusé au poste ? voir le journal) : $manquants');

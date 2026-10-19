@@ -511,6 +511,8 @@ switch ($commande) {
             'veterinary_records' => ['is_active'],
             'feed_ration_standards' => ['ration_g_per_day', 'is_active'],
             'feed_types' => ['name', 'price_per_kg', 'is_active'],
+            // Ticket U14 — dépenses modifiée et archivée au poste.
+            'expenses' => ['label', 'is_active'],
         ];
         $lignes = [];
         foreach ($colonnes as $table => $cols) {

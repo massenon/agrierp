@@ -385,6 +385,16 @@ class SyncEngine {
   /// clé couvre le poste dont le périmètre est inconnu (dernier tirage non paginé).
   static const cleDepensesResync = 'depenses_resync_u13';
 
+  /// Ticket U14 — resynchronisation UNIQUE des dépenses après le passage au schéma v48 : les dépenses `synced` absorbées
+  /// avant n'ont ni `status` (badge et filtre « Statut » du Blade) ni `accounting_entry_id` (une dépense comptabilisée ne
+  /// change plus de montant, de compte de charge ni de compte de trésorerie), et le curseur est passé. Écrite après tous
+  /// les absorbeurs, et seulement si les dépenses servies portent ces deux clés (serveur postérieur à U14).
+  static const cleDepensesResyncU14 = 'depenses_resync_u14';
+
+  /// Vrai si le dernier tirage a servi au moins une dépense SANS `status` (serveur antérieur à U14) — renseigné par
+  /// [_absorberDepenses].
+  bool _depensesSansStatut = false;
+
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
     'mort_repro',
@@ -496,6 +506,8 @@ class SyncEngine {
         await _lireReglage(cleFichesResyncU10) != null;
     final resyncDepensesFaite =
         await _lireReglage(cleDepensesResync) != null;
+    final resyncDepensesU14Faite =
+        await _lireReglage(cleDepensesResyncU14) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -507,7 +519,8 @@ class SyncEngine {
         !resyncRetoursFaite ||
         !resyncMouvementsFaite ||
         !resyncFichesU10Faite ||
-        !resyncDepensesFaite;
+        !resyncDepensesFaite ||
+        !resyncDepensesU14Faite;
     final since = !toutRedemander && etat?.lastPulledAt != null
         ? etat!.lastPulledAt!.toUtc().toIso8601String()
         : null;
@@ -517,6 +530,7 @@ class SyncEngine {
     _journalSansDateCreation = false;
     _fichesSansVentilation = false;
     _fichesSansColonnesRapport = false;
+    _depensesSansStatut = false;
 
     // Ticket S-T4 — ce que les pages ont apporté : clés vues (contrôles « serveur antérieur à… »), périmètre (tables
     // servies à TOUTES les pages), dernière page (curseur).
@@ -629,6 +643,10 @@ class SyncEngine {
     // U10 : même place, et seulement si les fiches servies portent les colonnes du Rapport Élevage.
     if (!resyncFichesU10Faite && !_fichesSansColonnesRapport) {
       await _ecrireReglage(cleFichesResyncU10, '1');
+    }
+    // U14 : même place, et seulement si les dépenses servies portent leur statut et leur écriture.
+    if (!resyncDepensesU14Faite && !_depensesSansStatut) {
+      await _ecrireReglage(cleDepensesResyncU14, '1');
     }
     // U4, U8, U9 : « serveur antérieur » se lit à une pièce servie SANS ses lignes (ou des produits sans leur
     // grand livre). ⚠️ Ticket S-T4 — un serveur qui PAGINE est postérieur à U10 : la question ne se pose plus, et
@@ -4034,6 +4052,18 @@ class SyncEngine {
         '$quoi $id : compte de trésorerie',
       );
       final actif = _actifStrict(l, '$quoi $id');
+      // Ticket U14 — `status` (`payee` / `en_attente`) et `accounting_entry_id` (nul ou un identifiant). Absent : serveur
+      // antérieur à U14 (défauts du schéma, resynchronisation unique quand il les servira). Présent et illisible : refus.
+      final statut = l['status'];
+      if (!l.containsKey('status')) {
+        _depensesSansStatut = true;
+      } else if (statut != 'payee' && statut != 'en_attente') {
+        throw FormatException('$quoi $id refusée : statut illisible ($statut).');
+      }
+      final ecriture = l['accounting_entry_id'];
+      if (ecriture != null && (ecriture is! String || ecriture.isEmpty)) {
+        throw FormatException('$quoi $id refusée : écriture comptable illisible ($ecriture).');
+      }
       if (date == null) {
         throw FormatException(
           '$quoi $id refusée : date illisible (${l['expense_date']}).',
@@ -4062,6 +4092,10 @@ class SyncEngine {
           amount: montant,
           treasuryAccountId: compte,
           isActive: Value(actif),
+          status: statut is String ? Value(statut) : const Value.absent(),
+          accountingEntryId: l.containsKey('accounting_entry_id')
+              ? Value(ecriture as String?)
+              : const Value.absent(),
         ),
       );
     }
@@ -6138,6 +6172,9 @@ class SyncEngine {
     'category': d.category,
     'amount': d.amount,
     'treasury_account_id': d.treasuryAccountId,
+    // Ticket U14 — archivage fait au poste (`DepensesRepository.archiver`), rejoué par le serveur comme
+    // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
+    'is_active': d.isActive,
     'device_id': d.deviceId,
   };
 

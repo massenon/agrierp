@@ -194,6 +194,7 @@ void main() {
       SyncEngine.cleRetoursResync,
       SyncEngine.cleMouvementsResync,
       SyncEngine.cleDepensesResync,
+      SyncEngine.cleDepensesResyncU14,
     ]) {
       await db
           .into(db.appSettings)

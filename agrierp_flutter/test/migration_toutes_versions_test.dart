@@ -202,6 +202,11 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   46: [(d.stockAdjustments, d.stockAdjustments.countedQuantity)],
   // Ticket U13 — archivage des dépenses, descendu du serveur.
   47: [(d.expenses, d.expenses.isActive)],
+  // Ticket U14 — statut et écriture comptable des dépenses (badge, filtre, règle de modification du web).
+  48: [
+    (d.expenses, d.expenses.status),
+    (d.expenses, d.expenses.accountingEntryId),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

@@ -76,6 +76,9 @@ void main() {
     Object? montant = 42000,
     Object? compte = caisse,
     Object? actif = true,
+    Object? statut = 'payee',
+    Object? ecriture,
+    bool avantU14 = false,
   }) => {
     'id': id,
     'expense_date': date,
@@ -84,6 +87,9 @@ void main() {
     'amount': montant,
     'treasury_account_id': compte,
     'is_active': actif,
+    // Ticket U14 — statut et écriture comptable ; absents d'un serveur antérieur.
+    if (!avantU14) 'status': statut,
+    if (!avantU14) 'accounting_entry_id': ecriture,
     'updated_at': '2026-10-12T10:00:00+01:00',
   };
 
@@ -207,6 +213,11 @@ void main() {
       ('compte de trésorerie absent', depenseJson(uuid('w2'), compte: null)),
       ('compte de trésorerie vide', depenseJson(uuid('w2'), compte: '')),
       ('archivage illisible', depenseJson(uuid('w2'), actif: 'peut-être')),
+      // Ticket U14.
+      ('statut inconnu', depenseJson(uuid('w2'), statut: 'payée')),
+      ('statut nul', depenseJson(uuid('w2'), statut: null)),
+      ('écriture qui n est pas un identifiant', depenseJson(uuid('w2'), ecriture: 42)),
+      ('écriture vide', depenseJson(uuid('w2'), ecriture: '')),
     ]) {
       test('⚠️⚠️ STRICT — $cas : toute la page est refusée, rien n est écrit, le curseur ne bouge pas', () async {
         await db.noterEtatDeSynchronisation(tire: DateTime.utc(2026, 10, 1));
@@ -330,6 +341,84 @@ void main() {
       expect(serveur.demandes, [null, null]);
     });
 
+    test('U14 — statut et écriture descendent ; une dépense comptabilisée ici le sait', () async {
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'expenses': [
+          depenseJson(uuid('w1'), ecriture: uuid('e1')),
+          depenseJson(uuid('w2'), statut: 'en_attente'),
+        ],
+      };
+
+      await moteur.synchroniser();
+
+      expect((await depense(uuid('w1')))!.accountingEntryId, uuid('e1'));
+      expect((await depense(uuid('w1')))!.status, 'payee');
+      expect((await depense(uuid('w2')))!.status, 'en_attente');
+      expect((await depense(uuid('w2')))!.accountingEntryId, isNull);
+    });
+
+    test('⚠️ U14 — serveur antérieur (dépenses servies sans statut) : défauts du schéma, resynchronisation NON marquée', () async {
+      await posteEnService();
+      await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: SyncEngine.cleDepensesResync, value: '1'));
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'expenses': [depenseJson(uuid('w1'), avantU14: true)],
+      };
+
+      await moteur.synchroniser();
+      await moteur.synchroniser();
+
+      expect(serveur.demandes, [null, null], reason: 'tant que le serveur ne sert pas le statut, le tirage reste complet');
+      expect((await depense(uuid('w1')))!.status, 'payee');
+    });
+
+    test('U14 — un poste en service (v47) redemande une fois toutes les dépenses, puis l incrémental', () async {
+      await posteEnService();
+      await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: SyncEngine.cleDepensesResync, value: '1'));
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'expenses': [depenseJson(uuid('w1'), ecriture: uuid('e1'))],
+      };
+
+      await moteur.synchroniser();
+      await moteur.synchroniser();
+
+      expect(serveur.demandes.first, isNull);
+      expect(serveur.demandes.last, isNotNull);
+    });
+
+    test('U14 — une modification et un archivage faits au poste partent entiers, `is_active` compris', () async {
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'expenses': [depenseJson(uuid('w1')), depenseJson(uuid('w2'), libelle: 'Doublon')],
+      };
+      await moteur.synchroniser();
+      final depot = DepensesRepository(database: db, deviceId: 'poste-test');
+      await db.into(db.treasuryAccounts).insert(TreasuryAccountsCompanion.insert(id: caisse, label: 'Caisse'));
+      await db.into(db.expenseCategories).insert(ExpenseCategoriesCompanion.insert(label: '605 - Énergie'));
+
+      await depot.enregistrer(
+        date: DateTime(2026, 10, 12),
+        libelle: 'Électricité SBEE octobre',
+        categorie: '605 - Énergie',
+        montant: 42000,
+        compteTresorerieId: caisse,
+        idEnModification: uuid('w1'),
+      );
+      await depot.archiver(uuid('w2'));
+      serveur.tirage = {'server_time': '2026-10-19T12:05:00Z'};
+      await moteur.synchroniser();
+
+      final envoyees = {
+        for (final e in (serveur.envois.last['expenses'] as List).cast<Map<String, dynamic>>()) e['id']: e,
+      };
+      expect(envoyees[uuid('w1')]!['label'], 'Électricité SBEE octobre');
+      expect(envoyees[uuid('w1')]!['is_active'], isTrue);
+      expect(envoyees[uuid('w2')]!['is_active'], isFalse);
+      expect((await depense(uuid('w2')))!.syncStatus, SyncStatus.synced, reason: 'acquittée');
+    });
+
     test('Tableau de bord : une dépense archivée au web n est plus listée (`where(is_active, true)`)', () async {
       serveur.tirage = {
         'server_time': '2026-10-19T12:00:00Z',
@@ -343,7 +432,7 @@ void main() {
       final d = await TableauDeBordRepository(database: db, horloge: () => DateTime(2026, 10, 19, 14)).charger();
 
       expect([for (final l in d.depensesRecentes) l.libelle], ['Active']);
-      expect(await DepensesRepository(database: db, deviceId: 'poste-test').mesDepenses(), hasLength(1));
+      expect(await DepensesRepository(database: db, deviceId: 'poste-test').depenses(), hasLength(1));
     });
   });
 }
