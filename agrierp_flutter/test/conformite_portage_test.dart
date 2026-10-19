@@ -129,6 +129,9 @@ void main() {
     'attestation_templates',
     'attestation_counts',
     'sales',
+    // Ticket U4 (D-U4) — lignes des ventes et des achats servis, avec leur pièce.
+    'sale_lines',
+    'purchase_lines',
     'treasury_accounts',
     'expense_categories',
   };

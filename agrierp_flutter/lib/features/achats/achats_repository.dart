@@ -159,9 +159,8 @@ class DocumentsAchats {
   ///
   /// ⚠️ **RÉFÉRENCE, OPÉRATEUR ET TVA RÉCUPÉRABLE SONT DES TIRETS.** Aucune
   /// référence ni opérateur n'est servi par le serveur ; la TVA se ventile là-bas
-  /// ligne à ligne, selon le taux de chaque produit — les lignes d'un achat
-  /// reçu ne descendent pas. Un « 0 » imprimé sur un document qui SORT de la
-  /// ferme affirmerait qu'il n'y a aucune TVA à récupérer.
+  /// ligne à ligne, selon le taux de chaque produit. Un « 0 » imprimé sur un
+  /// document qui SORT de la ferme affirmerait qu'il n'y a aucune TVA à récupérer.
   static DocumentOfficiel bonReception(LigneAchat ligne) {
     final a = ligne.achat;
 
@@ -319,8 +318,8 @@ class DonneesAchats {
   /// Calculable depuis que `returned_at` descend et que le poste acquitte ses propres
   /// retours : un tiret n'est plus honnête, et « 0 » l'est maintenant (le poste SAIT
   /// qu'aucun achat n'est retourné). ⚠️ **L'UNITÉ DIFFÈRE DU SERVEUR** : la page web
-  /// compte les LIGNES de retour (`PurchaseReturn::count()`) ; les lignes d'un achat reçu ne
-  /// descendent pas, le poste compte donc des achats (un retour annule tout l'achat, D6).
+  /// compte les LIGNES de retour (`PurchaseReturn::count()`) ; `purchase_returns` ne descend
+  /// pas, le poste compte donc des achats (un retour annule tout l'achat, D6).
   /// Un retour en attente d'envoi n'est PAS compté : il n'est pas encore un fait pour la
   /// ferme (la légende le dit).
   int get ecartsEtRetours => achatsRetournes.length;

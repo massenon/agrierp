@@ -206,8 +206,9 @@ class DonneesTableauDeBord {
 ///
 /// ⚠️ Depuis 14.79/14.80, `sales`, `purchases`, `payables`, `receivables`, `customers` et
 /// `livestock_reproduction_events` descendent au poste : les mentions « Ce poste uniquement » et « Table non
-/// synchronisée » étaient fausses. Restent propres au poste (non servies par le tirage) : `sale_lines`,
-/// `purchase_lines` et `expenses` — voir le Top 5, « Ventes (mois) » et l'onglet Dépenses.
+/// synchronisée » étaient fausses. Depuis U4 (D-U4), `sale_lines` et `purchase_lines` descendent aussi, avec leur
+/// pièce : le Top 5 (marge comprise) et « Ventes (mois) » portent sur TOUTES les ventes de la ferme, comme au web.
+/// Reste propre au poste (non servie par le tirage) : `expenses` — voir l'onglet Dépenses.
 class TableauDeBordRepository {
   TableauDeBordRepository({required this.database, DateTime Function()? horloge})
     : _horloge = horloge ?? DateTime.now;
@@ -233,6 +234,8 @@ class TableauDeBordRepository {
     // la courbe, ni aux ventes du mois, ni au Top 5. Les LISTES (transactions récentes, factures) la montrent encore.
     final ventesValides = ventes.where((v) => v.status != 'annulee').toList();
     final lignes = await database.select(database.saleLines).get();
+    // Ticket U4 — lignes d'achat de la ferme (descendues avec leurs achats) : PMP de la marge du Top 5.
+    final lignesAchat = await database.select(database.purchaseLines).get();
     final produits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
     final achats = await database.select(database.purchases).get();
@@ -350,7 +353,13 @@ class TableauDeBordRepository {
         nomsClients,
       ),
       activitesDuJour: _activites(journal, maintenant),
-      topProduits: _topProduits(debutMois, ventesValides, lignes, produits),
+      topProduits: _topProduits(
+        debutMois,
+        ventesValides,
+        lignes,
+        produits,
+        lignesAchat,
+      ),
     );
   }
 
@@ -539,7 +548,7 @@ class TableauDeBordRepository {
 
     // « Ventes (mois) » porcs : lignes de vente dont le produit est de la catégorie « Porciculture », vendues
     // depuis le 1er du mois (`SaleLine::count()`).
-    // ⚠️ `sale_lines` NE DESCEND PAS au poste : seules les lignes des ventes saisies ICI sont comptées.
+    // Ticket U4 — `sale_lines` descend avec les ventes : toutes les ventes de la ferme sont comptées, comme au web.
     final categoriePorcs = categories
         .where((c) => c.label == 'Porciculture')
         .map((c) => c.id)
@@ -753,14 +762,15 @@ class TableauDeBordRepository {
 
   /// Lignes des ventes du mois, groupées par produit, triées par CA décroissant, cinq au plus.
   ///
-  /// ⚠️ ÉCART (donnée absente) : `sale_lines` ne descend pas, seules les ventes saisies sur ce poste ont leurs
-  /// lignes. Et la MARGE suppose le PMP (`Product::computePmp()`, sur TOUTES les lignes d'achat de la ferme) :
-  /// `purchase_lines` ne descend pas non plus, un PMP calculé ici serait faux sans le dire → « — ».
+  /// Ticket U4 (D-U4) — `sale_lines` et `purchase_lines` descendent avec leurs pièces : le Top 5 porte sur TOUTES
+  /// les ventes de la ferme, et la MARGE se calcule comme au web — `round((CA − PMP × qté) ÷ CA × 100)` si le PMP
+  /// existe et que la quantité et le CA sont strictement positifs, « — » sinon (voir [pmp]).
   List<LigneTopProduit> _topProduits(
     DateTime debutMois,
     List<Sale> ventes,
     List<SaleLine> lignes,
     List<Product> produits,
+    List<PurchaseLine> lignesAchat,
   ) {
     final idsRetenus = ventes
         .where((v) => !v.soldAt.isBefore(debutMois))
@@ -781,17 +791,57 @@ class TableauDeBordRepository {
     final top =
         parProduit.entries
             .map(
-              (e) => LigneTopProduit(
-                produit: nommes[e.key] ?? '—',
-                quantite: e.value.$1,
-                chiffreAffaires: e.value.$2,
-                margePct: null,
+              (e) => (
+                produit: e.key,
+                ligne: LigneTopProduit(
+                  produit: nommes[e.key] ?? '—',
+                  quantite: e.value.$1,
+                  chiffreAffaires: e.value.$2,
+                  margePct: null,
+                ),
               ),
             )
             .toList()
-          ..sort((a, b) => b.chiffreAffaires.compareTo(a.chiffreAffaires));
+          ..sort(
+            (a, b) =>
+                b.ligne.chiffreAffaires.compareTo(a.ligne.chiffreAffaires),
+          );
 
-    return top.take(5).toList();
+    // La marge n'est calculée que pour les cinq retenus (`->limit(5)->get()->map(…)` du web).
+    return [
+      for (final t in top.take(5))
+        LigneTopProduit(
+          produit: t.ligne.produit,
+          quantite: t.ligne.quantite,
+          chiffreAffaires: t.ligne.chiffreAffaires,
+          margePct: margePct(
+            pmp(t.produit, lignesAchat),
+            t.ligne.quantite,
+            t.ligne.chiffreAffaires,
+          ),
+        ),
+    ];
+  }
+
+  /// `Product::computePmp()` : Σ (qté × prix unitaire) ÷ Σ qté sur TOUTES les lignes d'achat du produit, arrondi
+  /// à 2 décimales ; `null` si la quantité achetée totale n'est pas strictement positive.
+  static double? pmp(String produitId, List<PurchaseLine> lignesAchat) {
+    final du = lignesAchat.where((l) => l.productId == produitId);
+    final quantite = du.fold<double>(0, (t, l) => t + l.qty);
+    if (quantite <= 0) return null;
+    final cout = du.fold<double>(0, (t, l) => t + l.qty * l.unitPrice);
+    return _arrondi(cout / quantite, 2);
+  }
+
+  /// Marge du Top 5 (`getTopProduitsProperty`) : `round((CA − PMP × qté) ÷ CA × 100)` (arrondi PHP) quand le PMP
+  /// existe, que la quantité et le CA sont strictement positifs ; `null` (« — ») sinon.
+  static int? margePct(double? pmp, double quantite, double chiffreAffaires) {
+    if (pmp == null || quantite <= 0 || chiffreAffaires <= 0) return null;
+    final cout = pmp * quantite;
+    return _arrondi(
+      (chiffreAffaires - cout) / chiffreAffaires * 100,
+      0,
+    ).toInt();
   }
 
   // ── Formats du web ──────────────────────────────────────────────────────────────────────────────────

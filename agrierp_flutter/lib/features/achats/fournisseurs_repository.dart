@@ -117,9 +117,9 @@ class ProfilFournisseur {
 
   /// Catégorie de PRODUIT de la première ligne de l'achat, comme Laravel.
   ///
-  /// ⚠️ Les lignes d'un achat ne descendent pas du serveur : seuls les achats saisis
-  /// sur CE poste en ont une. Les autres n'ont pas de catégorie ici — l'écran met un
-  /// tiret, il ne la devine pas à partir de la catégorie du fournisseur.
+  /// Ticket U4 (D-U4) — les lignes d'un achat descendent avec lui : tout achat servi a
+  /// les siennes. Un achat SANS ligne n'a pas de catégorie — l'écran met un tiret, il ne la
+  /// devine pas à partir de la catégorie du fournisseur.
   final Map<String, String> categorieParAchat;
 
   /// « Solde Global Dû » : reste dû, règlements en attente déduits.

@@ -73,6 +73,7 @@ use App\Support\MessagesErreurFr;
 use App\Support\MotifsRefusPush;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * GAP CRITIQUE COMBLÉ — `POST /api/sync/push` et `GET /api/sync/pull`,
@@ -362,8 +363,10 @@ class SyncController extends Controller
             ->filter()
             ->flip();
 
+        // Ticket U4 (D-U4) — un achat dont une LIGNE a changé depuis `since` redescend aussi : ses lignes
+        // ne voyagent qu'avec lui (voir `$lignesAchat` plus bas).
         $achats = Purchase::with('supplier')
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)))
             ->orderByDesc('purchase_date')
             ->get()
             ->map(fn (Purchase $achat) => [
@@ -380,6 +383,28 @@ class SyncController extends Controller
                 'returned_at' => $achat->returned_at?->toIso8601String(),
                 'supplier_credit' => $achat->supplier_credit,
             ]);
+
+        // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES ACHATS SERVIS DESCENDENT AVEC EUX.
+        //
+        // ⚠️⚠️ AU MÊME CURSEUR QUE LEUR PIÈCE, ET SEULEMENT POUR LES PIÈCES SERVIES : TOUTES les lignes de chaque
+        // achat de `$achats` (un achat modifié, ou dont une ligne l'est, renvoie la liste COMPLÈTE de ses lignes —
+        // le poste remplace alors celles qu'il tient, et une ligne retirée ici disparaît là-bas), JAMAIS une ligne
+        // d'un achat non servi (le poste la refuserait : pièce inconnue). Sans elles, le PMP (`computePmp()`, Σ
+        // qty × unit_price ÷ Σ qty sur TOUTES les lignes d'achat) et la marge du Top 5 étaient incalculables au
+        // poste. `unit_price` est ici un VRAI prix unitaire (contrairement aux lignes de vente).
+        $lignesAchat = $this->lignesDesPieces(
+            \App\Models\PurchaseLine::class,
+            'purchase_id',
+            $achats->pluck('id'),
+            fn ($ligne) => [
+                'id' => $ligne->id,
+                'purchase_id' => $ligne->purchase_id,
+                'product_id' => $ligne->product_id,
+                'product_name' => $ligne->product?->name,
+                'qty' => (float) $ligne->qty,
+                'unit_price' => (float) $ligne->unit_price,
+            ],
+        );
 
         // Ticket 15.20 (D8) : créance OUVERTE par fournisseur (part payée des achats retournés - remboursements déjà
         // encaissés). Servie CALCULÉE, sans filtre `since` (comme les dettes) : le poste en a besoin pour ne pas
@@ -858,8 +883,9 @@ class SyncController extends Controller
         // ⚠️ LE NOM DU CLIENT VOYAGE AVEC LA FACTURE : le poste a bien la table
         // `customers` (14.75), mais une vente au comptant n'a pas de client, et
         // une vente d'un client archive doit rester nommee.
+        // Ticket U4 (D-U4) — une vente dont une LIGNE a changé depuis `since` redescend aussi (voir `$lignesVente`).
         $factures = Sale::with('customer')
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->when($since, fn ($q) => $q->where(fn ($w) => $this->pieceOuLigneModifiee($w, $since)))
             ->orderByEffectiveDate()
             ->get()
             ->map(fn (Sale $vente) => [
@@ -873,6 +899,28 @@ class SyncController extends Controller
                 'mecef_qr_ref' => $vente->mecef_qr_ref,
                 'sold_at' => $vente->date_effective?->toIso8601String(),
             ]);
+
+        // 🔴→✅ TICKET U4 (D-U4) — LES LIGNES DES VENTES SERVIES DESCENDENT AVEC ELLES.
+        //
+        // Même règle que `$lignesAchat` : toutes les lignes de chaque vente servie, aucune d'une vente non servie.
+        // Sans elles, le Top 5 des produits et les « Ventes (mois) » porcines du Tableau de bord du poste ne
+        // comptaient que les ventes saisies SUR CE POSTE, quand le web les compte toutes.
+        // ⚠️ `manual_total_amount` EST LA SOURCE DE VÉRITÉ DU MONTANT de la ligne ; `unit_price` n'en est que
+        // l'affichage dérivé (`manual_total_amount / qty`) : les deux sont servis tels que stockés.
+        $lignesVente = $this->lignesDesPieces(
+            \App\Models\SaleLine::class,
+            'sale_id',
+            $factures->pluck('id'),
+            fn ($ligne) => [
+                'id' => $ligne->id,
+                'sale_id' => $ligne->sale_id,
+                'product_id' => $ligne->product_id,
+                'lot_id' => $ligne->lot_id,
+                'qty' => (float) $ligne->qty,
+                'unit_price' => (float) $ligne->unit_price,
+                'manual_total_amount' => (float) $ligne->manual_total_amount,
+            ],
+        );
 
         // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
         //
@@ -944,6 +992,8 @@ class SyncController extends Controller
             'elevage_numbering' => $numerotation,
             'suppliers' => $fournisseurs,
             'purchases' => $achats,
+            // Ticket U4 (D-U4) — lignes des achats servis ci-dessus, et d'eux seuls.
+            'purchase_lines' => $lignesAchat,
             'supplier_credits' => $creancesFournisseurs,
             'purchase_orders' => $bonsCommande,
             'payables' => $dettes,
@@ -970,6 +1020,8 @@ class SyncController extends Controller
             'attestation_templates' => $modelesAttestation,
             'attestation_counts' => $compteursAttestation,
             'sales' => $factures,
+            // Ticket U4 (D-U4) — lignes des ventes servies ci-dessus, et d'elles seules.
+            'sale_lines' => $lignesVente,
             // ⚠️ TICKET 14.62 — CE QU'IL FAUT POUR SAISIR UNE DEPENSE HORS
             // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
             // QUI paie ; sans la liste des comptes de charge, il devrait la
@@ -982,6 +1034,37 @@ class SyncController extends Controller
         app(JournalSynchronisationService::class)->tirage($request, $reponse);
 
         return response()->json($reponse);
+    }
+
+    /**
+     * Ticket U4 (D-U4) — une vente ou un achat « modifié depuis `since` » : la pièce elle-même, OU l'une de ses
+     * lignes. Les lignes ne voyageant qu'avec leur pièce, une ligne modifiée seule doit faire redescendre sa pièce.
+     */
+    private function pieceOuLigneModifiee($requete, $since)
+    {
+        return $requete->where('updated_at', '>', $since)
+            ->orWhereHas('lines', fn ($l) => $l->where('updated_at', '>', $since));
+    }
+
+    /**
+     * Ticket U4 (D-U4) — TOUTES les lignes des pièces servies, par paquets de 500 identifiants (borne des
+     * paramètres liés de SQLite). Lire les lignes par les identifiants DÉJÀ servis, et non par une seconde
+     * requête sur le curseur, garantit qu'aucune ligne ne descend sans sa pièce : une vente créée entre les deux
+     * requêtes ne descend, avec ses lignes, qu'au tirage suivant.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modele
+     */
+    private function lignesDesPieces(string $modele, string $cle, Collection $ids, \Closure $enJson): Collection
+    {
+        return $ids->chunk(500)
+            ->flatMap(fn ($paquet) => $modele::query()
+                ->with('product:id,name')
+                ->whereIn($cle, $paquet->values())
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get())
+            ->map($enJson)
+            ->values();
     }
 
     /**

@@ -11,13 +11,13 @@ class LigneStock {
   final Product produit;
   final String categorie;
 
-  /// ⚠️⚠️ **LE PMP N'EST CALCULABLE NULLE PART AU POSTE.** Côté serveur,
+  /// ⚠️⚠️ **LE PMP N'EST PAS ENCORE CALCULÉ SUR CET ÉCRAN.** Côté serveur,
   /// `Product::computePmp()` est une moyenne pondérée des **lignes d'achat** ;
-  /// `purchase_lines` ne descend pas, et `products` ne porte AUCUNE colonne de
-  /// coût. Le prix moyen pondéré, la valeur de la ligne et la valorisation
-  /// totale sont donc hors de portée — un tiret, jamais une estimation à
-  /// partir du prix de VENTE, qui donnerait une valorisation supérieure au
-  /// coût et gonflerait l'actif.
+  /// elles descendent au poste depuis U4 (D-U4) — le Tableau de bord s'en sert
+  /// pour la marge du Top 5 (`TableauDeBordRepository.pmp`) —, mais la
+  /// valorisation de cet écran reste à porter. D'ici là : un tiret, jamais une
+  /// estimation à partir du prix de VENTE, qui donnerait une valorisation
+  /// supérieure au coût et gonflerait l'actif.
   double? get pmp => null;
 
   bool get sousSeuil =>

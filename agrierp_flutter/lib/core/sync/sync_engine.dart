@@ -247,6 +247,15 @@ class SyncEngine {
   /// règle que [cleJournalResyncCreation]) — sinon les colonnes ne descendraient jamais.
   static const cleFichesResyncCategories = 'fiches_resync_f095';
 
+  /// Ticket U4 (D-U4) — resynchronisation UNIQUE des lignes de vente et d'achat. Avant U4 le serveur ne
+  /// servait pas `sale_lines` / `purchase_lines` ; un poste déjà en service a un curseur, et le tirage
+  /// incrémental ne resservirait JAMAIS les ventes et achats antérieurs — donc jamais leurs lignes (le Top 5
+  /// et sa marge resteraient faux pour tout l'historique). ⚠️ Écrite APRÈS tous les absorbeurs, et SEULEMENT
+  /// si le serveur sert les lignes des pièces qu'il sert : face à un serveur antérieur à U4 (ventes ou achats
+  /// servis sans leurs lignes), le tirage reste complet tant que cela dure — même règle que
+  /// [cleFichesResyncCategories].
+  static const cleLignesResync = 'lignes_resync_u4';
+
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
     'mort_repro',
@@ -315,13 +324,15 @@ class SyncEngine {
     final resyncFichesFaite = await _lireReglage(cleFichesResync) != null;
     final resyncCategoriesFaite =
         await _lireReglage(cleFichesResyncCategories) != null;
+    final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
         !resyncCreationFaite ||
         etaitIncomplet ||
         !resyncFichesFaite ||
-        !resyncCategoriesFaite;
+        !resyncCategoriesFaite ||
+        !resyncLignesFaite;
 
     final reponse = await _client.get<Map<String, dynamic>>(
       '/api/sync/pull',
@@ -394,9 +405,19 @@ class SyncEngine {
     recus += await _absorberFournisseurs(corps['suppliers']);
     recus += await _absorberBonsCommande(corps['purchase_orders']);
     recus += await _absorberAchats(corps['purchases']);
+    // Ticket U4 (D-U4) — APRÈS les achats : une ligne d'un achat non servi est refusée.
+    recus += await _absorberLignesDAchat(
+      corps['purchases'],
+      corps['purchase_lines'],
+    );
     recus += await _absorberCreancesFournisseurs(corps['supplier_credits']);
     recus += await _absorberDettes(corps['payables']);
     recus += await _absorberVentes(corps['sales']);
+    // Ticket U4 (D-U4) — APRÈS les ventes : une ligne d'une vente non servie est refusée.
+    recus += await _absorberLignesDeVente(
+      corps['sales'],
+      corps['sale_lines'],
+    );
     recus += await _absorberEmployes(corps['employees']);
     recus += await _absorberStagiaires(corps['internships']);
     recus += await _absorberPointages(corps['attendance_records']);
@@ -455,6 +476,14 @@ class SyncEngine {
     // F0.95 : même place, et seulement si le serveur sert la ventilation par catégorie.
     if (!resyncCategoriesFaite && !_fichesSansVentilation) {
       await _ecrireReglage(cleFichesResyncCategories, '1');
+    }
+    // U4 : même place, et seulement si les ventes et achats servis l'ont été avec leurs lignes.
+    final lignesNonServies =
+        (corps.containsKey('sales') && !corps.containsKey('sale_lines')) ||
+        (corps.containsKey('purchases') &&
+            !corps.containsKey('purchase_lines'));
+    if (!resyncLignesFaite && !lignesNonServies) {
+      await _ecrireReglage(cleLignesResync, '1');
     }
 
     // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
@@ -2944,6 +2973,180 @@ class SyncEngine {
     return lignes.length;
   }
 
+  /// Ticket U4 (D-U4) — LIGNES DES VENTES servies par le tirage (`sale_lines`).
+  ///
+  /// Sans elles, le Top 5 des produits et les « Ventes (mois) » porcines du Tableau de bord ne comptaient que
+  /// les ventes saisies SUR CE POSTE, quand le web les compte toutes. Règles, communes à
+  /// [_absorberLignesDAchat] (voir [_remplacerLignesDePieces]) :
+  ///  - ⚠️⚠️ une vente `pending` ou en `conflict` sur ce poste n'a JAMAIS ses lignes touchées : ce sont celles
+  ///    de la saisie, qui repartiront avec elle à l'envoi ;
+  ///  - les lignes d'une vente `synced` servie sont REMPLACÉES par celles du serveur (il sert TOUTES les lignes
+  ///    de chaque vente servie) : une ligne retirée au web disparaît ici aussi ;
+  ///  - STRICT : élément illisible, ligne d'une vente non servie par ce tirage (fuite) ou produit inconnu du
+  ///    poste → [FormatException], rien n'est écrit, le curseur n'avance pas ;
+  ///  - `manual_total_amount` est la source de vérité du montant ; `unit_price` est gardé tel que servi.
+  /// Clé absente (serveur antérieur à U4) : rien n'est touché.
+  Future<int> _absorberLignesDeVente(Object? brutPieces, Object? brut) =>
+      _remplacerLignesDePieces<SaleLinesCompanion>(
+        quoi: 'Ligne de vente',
+        brutPieces: brutPieces,
+        brut: brut,
+        cle: 'sale_id',
+        protegees: () async => {
+          for (final v in await (_db.select(
+            _db.sales,
+          )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+            v.id,
+        },
+        lire: (l, id, piece, produit) {
+          final qte = _reel(l['qty']);
+          final prix = _reel(l['unit_price']);
+          final montant = _reel(l['manual_total_amount']);
+          final lot = l['lot_id'];
+          if (qte == null ||
+              prix == null ||
+              montant == null ||
+              (lot != null && lot is! String)) {
+            return null;
+          }
+          return SaleLinesCompanion.insert(
+            id: id,
+            saleId: piece,
+            productId: produit,
+            lotId: Value(lot as String?),
+            qty: qte,
+            unitPrice: prix,
+            manualTotalAmount: montant,
+          );
+        },
+        remplacer: (pieces, lignes) async {
+          await (_db.delete(
+            _db.saleLines,
+          )..where((t) => t.saleId.isIn(pieces))).go();
+          await _db.batch((b) => b.insertAll(_db.saleLines, lignes));
+        },
+      );
+
+  /// Ticket U4 (D-U4) — LIGNES DES ACHATS servies par le tirage (`purchase_lines`). Mêmes règles que
+  /// [_absorberLignesDeVente] : un achat `pending` ou en `conflict` garde ses lignes (elles partent avec lui à
+  /// l'envoi). Elles rendent le PMP calculable au poste (`Product::computePmp()` : TOUTES les lignes d'achat).
+  Future<int> _absorberLignesDAchat(Object? brutPieces, Object? brut) =>
+      _remplacerLignesDePieces<PurchaseLinesCompanion>(
+        quoi: "Ligne d'achat",
+        brutPieces: brutPieces,
+        brut: brut,
+        cle: 'purchase_id',
+        protegees: () async => {
+          for (final a in await (_db.select(
+            _db.purchases,
+          )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+            a.id,
+        },
+        lire: (l, id, piece, produit) {
+          final qte = _reel(l['qty']);
+          final prix = _reel(l['unit_price']);
+          final nom = l['product_name'];
+          if (qte == null || prix == null || (nom != null && nom is! String)) {
+            return null;
+          }
+          return PurchaseLinesCompanion.insert(
+            id: id,
+            purchaseId: piece,
+            productId: produit,
+            productName: Value(nom as String?),
+            qty: qte,
+            unitPrice: prix,
+          );
+        },
+        remplacer: (pieces, lignes) async {
+          await (_db.delete(
+            _db.purchaseLines,
+          )..where((t) => t.purchaseId.isIn(pieces))).go();
+          await _db.batch((b) => b.insertAll(_db.purchaseLines, lignes));
+        },
+      );
+
+  /// Corps commun de [_absorberLignesDeVente] et [_absorberLignesDAchat] : valide TOUT avant d'écrire, puis
+  /// remplace, dans une transaction, les lignes des pièces servies que le poste tient `synced`.
+  Future<int> _remplacerLignesDePieces<T>({
+    required String quoi,
+    required Object? brutPieces,
+    required Object? brut,
+    required String cle,
+    required Future<Set<String>> Function() protegees,
+    required T? Function(
+      Map<String, dynamic> l,
+      String id,
+      String piece,
+      String produit,
+    )
+    lire,
+    required Future<void> Function(List<String> pieces, List<T> lignes)
+    remplacer,
+  }) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    final servies = {
+      for (final p in _lignes(brutPieces))
+        if (p['id'] is String) p['id'] as String,
+    };
+    if (servies.isEmpty && lignes.isEmpty) return 0;
+
+    final produits = {
+      for (final p in await _db.select(_db.products).get()) p.id,
+    };
+    final parPiece = <String, List<T>>{for (final p in servies) p: []};
+    final vues = <String>{};
+    for (final l in lignes) {
+      final id = l['id'];
+      final piece = l[cle];
+      final produit = l['product_id'];
+      if (id is! String ||
+          id.length != 36 ||
+          piece is! String ||
+          produit is! String) {
+        throw FormatException(
+          '$quoi $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!vues.add(id)) {
+        throw FormatException('$quoi $id refusée : servie deux fois.');
+      }
+      if (!servies.contains(piece)) {
+        throw FormatException(
+          "$quoi $id refusée : sa pièce ($piece) n'est pas servie par ce tirage.",
+        );
+      }
+      if (!produits.contains(produit)) {
+        throw FormatException(
+          '$quoi $id refusée : produit inconnu du poste ($produit).',
+        );
+      }
+      final ligne = lire(l, id, piece, produit);
+      if (ligne == null) {
+        throw FormatException(
+          '$quoi $id refusée : quantité, prix ou montant illisible.',
+        );
+      }
+      parPiece[piece]!.add(ligne);
+    }
+
+    await _db.transaction(() async {
+      // ⚠️⚠️ Une pièce `pending` ou en `conflict` sur CE poste garde ses lignes : jamais écrasées.
+      final aProteger = await protegees();
+      final remplacees = [
+        for (final p in parPiece.keys)
+          if (!aProteger.contains(p)) p,
+      ];
+      if (remplacees.isEmpty) return;
+      await remplacer(remplacees, [
+        for (final p in remplacees) ...parPiece[p]!,
+      ]);
+    });
+
+    return lignes.length;
+  }
+
   /// Dettes fournisseurs encore dues — référentiel remplacé à chaque tirage.
   ///
   /// ⚠️⚠️ **REMPLACEMENT COMPLET, ET C'EST VOULU.** Le serveur ne sert que ce
@@ -3015,8 +3218,8 @@ class SyncEngine {
   /// envoyée. L'effacer perdrait la saisie ET la marchandise entrée en stock —
   /// c'est la règle déjà posée pour les cycles de reproduction (F0.35).
   ///
-  /// ⚠️ Les lignes ne descendent pas : la liste d'achats de la maquette montre
-  /// la pièce, pas son détail. Celles d'un achat local restent intactes.
+  /// Ticket U4 (D-U4) — les lignes descendent à part, avec leur pièce : voir
+  /// [_absorberLignesDAchat]. Celles d'un achat local non acquitté restent intactes.
   Future<int> _absorberAchats(Object? brut) async {
     if (brut == null) return 0;
 

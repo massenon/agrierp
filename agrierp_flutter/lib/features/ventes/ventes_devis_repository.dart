@@ -44,11 +44,9 @@ class DonneesHistorique {
 
 /// Lectures du hub `prototype_html/ventes-devis.html`.
 ///
-/// ⚠️⚠️ **LE TIRAGE NE DESCEND PAS `sales`.** L'historique du poste ne contient
-/// donc que **ses propres** encaissements — pas ceux du comptoir web ni d'un
-/// autre poste. Le sous-titre de la maquette dit « Toutes les ventes
-/// enregistrées de l'entreprise » : au poste, c'est faux, et l'écran le
-/// corrige plutôt que de le recopier.
+/// `sales` descend au poste depuis 14.80, et ses lignes (`sale_lines`) depuis U4
+/// (D-U4) : le nombre d'articles d'une vente du web ou d'un autre poste n'est
+/// plus 0.
 ///
 /// ⚠️ **NI `quotes` NI `credit_notes` NE DESCENDENT** : les onglets « Devis
 /// Prestations » et « Retours et Avoirs » n'ont aucune donnée locale, et leurs

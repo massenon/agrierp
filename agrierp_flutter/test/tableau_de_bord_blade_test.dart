@@ -670,6 +670,42 @@ void main() {
       );
     });
 
+    test('U4 — marge du Top 5 au PMP de TOUTES les lignes d achat, « — » sans ligne d achat', () async {
+      await jeuALaMain();
+      // Lignes d'achat du porc (ventes ET achats descendent au poste depuis U4) : 2 × 9 000 + 3 × 10 000 =
+      // 48 000 pour 5 → PMP 9 600 (`Product::computePmp()`, arrondi à 2 décimales).
+      // Porc : CA 70 000, qté 3,5 → coût 9 600 × 3,5 = 33 600 → round((70 000 − 33 600) / 70 000 × 100) = 52.
+      // Œufs : aucune ligne d'achat → pas de PMP → « — » (null). La provende n'est pas au Top 5.
+      for (final (id, achat, produit, qte, prix) in [
+        (uuid('pl1'), achatP1, porcCharcutier, 2.0, 9000.0),
+        (uuid('pl2'), achatP2, porcCharcutier, 3.0, 10000.0),
+        (uuid('pl3'), achatP1, provende, 10.0, 7500.0),
+      ]) {
+        await db.into(db.purchaseLines).insert(
+          PurchaseLinesCompanion.insert(
+            id: id,
+            purchaseId: achat,
+            productId: produit,
+            qty: qte,
+            unitPrice: prix,
+          ),
+        );
+      }
+
+      final d = await depot.charger();
+
+      expect(
+        d.topProduits.map((t) => (t.produit, t.margePct)),
+        [('Œufs de table', null), ('Porc charcutier', 52)],
+      );
+      expect(TableauDeBordRepository.pmp(porcCharcutier, await db.select(db.purchaseLines).get()), 9600);
+      // Marge négative (vendu sous le coût) et cas « — » de la formule du web.
+      expect(TableauDeBordRepository.margePct(1000, 2, 1500), -33);
+      expect(TableauDeBordRepository.margePct(null, 2, 1500), isNull);
+      expect(TableauDeBordRepository.margePct(1000, 0, 1500), isNull);
+      expect(TableauDeBordRepository.margePct(1000, 2, 0), isNull);
+    });
+
     test('courbe et statistiques : six mois, achats en dépenses', () async {
       await jeuALaMain();
       final d = await depot.charger();
@@ -814,6 +850,161 @@ void main() {
     skip: sautSansPhp(),
     timeout: const Timeout(Duration(minutes: 3)),
   );
+
+  test(
+    'parité exécutée U4 : Top 5 (marge comprise) et ventes porcines du mois = Index.php',
+    () async {
+      // Ventes de septembre et d'octobre (dont des annulées), lignes sur huit produits de deux catégories,
+      // achats et lignes d'achat (PMP) sur une partie d'entre eux seulement : le web et le poste doivent rendre
+      // le même Top 5, les mêmes marges (« — » compris) et le même nombre de lignes porcines du mois.
+      var graine = 11;
+      int hasard(int n) => (graine = (graine * 1103515245 + 12345) & 0x7fffffff) % n;
+      final produits = [
+        for (var i = 0; i < 8; i++) {'nom': 'Produit $i', 'porc': i < 3},
+      ];
+      final ventes = <Map<String, Object?>>[];
+      for (var v = 0; v < 24; v++) {
+        final mois = hasard(3) == 0 ? 9 : 10;
+        final jour = mois == 10 ? 2 + hasard(17) : 1 + hasard(30);
+        ventes.add({
+          'sold_at': '2026-${mois.toString().padLeft(2, '0')}-${jour.toString().padLeft(2, '0')} '
+              '${(8 + hasard(10)).toString().padLeft(2, '0')}:00:00',
+          'status': hasard(6) == 0 ? 'annulee' : 'validee',
+          'lignes': [
+            for (var l = 0; l < 1 + hasard(3); l++)
+              {
+                'produit': hasard(8),
+                'qty': (1 + hasard(40)) / 4,
+                'montant': (1000 + hasard(90000)).toDouble(),
+              },
+          ],
+        });
+      }
+      final achats = <Map<String, Object?>>[
+        for (var a = 0; a < 6; a++)
+          {
+            'lignes': [
+              for (var l = 0; l < 1 + hasard(3); l++)
+                {
+                  // Produits 0 à 4 seulement : 5, 6 et 7 n'ont pas de PMP (marge « — »).
+                  'produit': hasard(5),
+                  'qty': (1 + hasard(20)).toDouble(),
+                  'unit_price': (500 + hasard(30000)).toDouble(),
+                },
+            ],
+          },
+      ];
+
+      final sortie =
+          executerPhp(
+                '<?php\n$amorceApplication\n$_scriptPariteTop',
+                {'produits': produits, 'ventes': ventes, 'achats': achats},
+                application: true,
+              )
+              as Map<String, dynamic>;
+
+      await db.into(db.productCategories).insert(
+        ProductCategoriesCompanion.insert(id: uuid('cat-porc'), label: 'Porciculture'),
+      );
+      await db.into(db.productCategories).insert(
+        ProductCategoriesCompanion.insert(id: uuid('cat-autre'), label: 'Aviculture'),
+      );
+      for (var i = 0; i < produits.length; i++) {
+        await db.into(db.products).insert(
+          ProductsCompanion.insert(
+            id: uuid('prod-$i-'),
+            sku: 'P$i',
+            name: produits[i]['nom']! as String,
+            unit: 'u',
+            pricingMode: 'fixe',
+            categoryId: Value(uuid(produits[i]['porc']! as bool ? 'cat-porc' : 'cat-autre')),
+          ),
+        );
+      }
+      for (var v = 0; v < ventes.length; v++) {
+        final quand = DateTime.parse(ventes[v]['sold_at']! as String);
+        final lignes = ventes[v]['lignes']! as List;
+        await db.into(db.sales).insert(
+          SalesCompanion.insert(
+            id: uuid('vente-$v-'),
+            deviceId: 'serveur',
+            updatedAt: quand,
+            paymentMode: 'especes',
+            total: lignes.fold<double>(0, (t, l) => t + ((l as Map)['montant'] as double)),
+            soldAt: quand,
+            status: Value(ventes[v]['status']! as String),
+          ),
+        );
+        for (var l = 0; l < lignes.length; l++) {
+          final ligne = lignes[l] as Map<String, Object?>;
+          await db.into(db.saleLines).insert(
+            SaleLinesCompanion.insert(
+              id: uuid('lv-$v-$l-'),
+              saleId: uuid('vente-$v-'),
+              productId: uuid('prod-${ligne['produit']}-'),
+              qty: ligne['qty']! as double,
+              unitPrice: (ligne['montant']! as double) / (ligne['qty']! as double),
+              manualTotalAmount: ligne['montant']! as double,
+            ),
+          );
+        }
+      }
+      for (var a = 0; a < achats.length; a++) {
+        final lignes = achats[a]['lignes']! as List;
+        for (var l = 0; l < lignes.length; l++) {
+          final ligne = lignes[l] as Map<String, Object?>;
+          await db.into(db.purchaseLines).insert(
+            PurchaseLinesCompanion.insert(
+              id: uuid('la-$a-$l-'),
+              purchaseId: uuid('achat-$a-'),
+              productId: uuid('prod-${ligne['produit']}-'),
+              qty: ligne['qty']! as double,
+              unitPrice: ligne['unit_price']! as double,
+            ),
+          );
+        }
+      }
+
+      final d = await depot.charger();
+
+      final top = sortie['top'] as List;
+      expect(top, hasLength(5), reason: 'la grille remplit le Top 5');
+      expect(
+        top.where((t) => (t as Map)['marge'] == null),
+        isNotEmpty,
+        reason: 'la grille couvre le cas « — » (produit sans PMP)',
+      );
+      expect(
+        top.where((t) => (t as Map)['marge'] != null),
+        isNotEmpty,
+        reason: 'la grille couvre des marges calculées',
+      );
+      expect(
+        [
+          for (final t in d.topProduits)
+            (
+              t.produit,
+              TableauDeBordRepository.quantiteTop(t.quantite),
+              TableauDeBordRepository.nombre(t.chiffreAffaires, 0),
+              t.margePct,
+            ),
+        ],
+        [
+          for (final t in top.cast<Map<String, dynamic>>())
+            (
+              t['produit'] as String,
+              TableauDeBordRepository.quantiteTop((t['qty'] as num).toDouble()),
+              TableauDeBordRepository.nombre((t['ca'] as num).toDouble(), 0),
+              (t['marge'] as num?)?.toInt(),
+            ),
+        ],
+      );
+      expect(d.especes[2].mesures.last, ('Ventes (mois)', '${sortie['ventes_porcs']}'));
+      expect(sortie['ventes_porcs'] as int, greaterThan(0));
+    },
+    skip: sautSansPhp(),
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }
 
 /// Script PHP de la parité : crée les bandes et fiches, fige l'horloge au 19/10/2026 14 h, et rend
@@ -856,4 +1047,50 @@ $alertes = array_values(array_map(fn ($a) => $a['label'], array_filter(
     $composant->alertesCritiques, fn ($a) => str_starts_with($a['label'], 'Mortalité')
 )));
 echo json_encode(['cartes' => $composant->cartesElevage, 'alertes' => $alertes, 'fiches' => $fiches]);
+''';
+
+/// Script PHP de la parité U4 : crée catégories, produits, ventes (avec leurs lignes) et achats (avec leurs
+/// lignes), fige l'horloge au 19/10/2026 14 h, et rend `Index::topProduits` et `cartesElevage['porcs']['ventes_mois']`.
+const _scriptPariteTop = r'''
+Carbon\Carbon::setTestNow('2026-10-19 14:00:00');
+$entree = json_decode(file_get_contents($argv[1]), true);
+$porc = App\Models\ProductCategory::create(['label' => 'Porciculture', 'is_active' => true]);
+$autre = App\Models\ProductCategory::create(['label' => 'Aviculture', 'is_active' => true]);
+$produits = [];
+foreach ($entree['produits'] as $i => $p) {
+    $produits[$i] = App\Models\Product::create([
+        'sku' => 'P'.$i, 'name' => $p['nom'], 'category_id' => $p['porc'] ? $porc->id : $autre->id, 'unit' => 'u',
+        'pricing_mode' => 'fourchette', 'price_min' => 1, 'price_max' => 1000000, 'stock_qty' => 0, 'is_active' => true,
+    ]);
+}
+foreach ($entree['ventes'] as $v) {
+    $total = array_sum(array_column($v['lignes'], 'montant'));
+    $vente = App\Models\Sale::create([
+        'payment_mode' => 'especes', 'subtotal' => $total, 'total' => $total,
+        'status' => $v['status'], 'sold_at' => $v['sold_at'],
+    ]);
+    foreach ($v['lignes'] as $l) {
+        App\Models\SaleLine::create([
+            'sale_id' => $vente->id, 'product_id' => $produits[$l['produit']]->id, 'qty' => $l['qty'],
+            'unit_price' => round($l['montant'] / $l['qty'], 2), 'manual_total_amount' => $l['montant'],
+        ]);
+    }
+}
+$fournisseur = App\Models\Supplier::create(['name' => 'Fournisseur', 'is_active' => true]);
+foreach ($entree['achats'] as $a) {
+    $achat = App\Models\Purchase::create([
+        'supplier_id' => $fournisseur->id, 'payment_mode' => 'especes', 'total' => 0, 'purchase_date' => '2026-10-01',
+    ]);
+    foreach ($a['lignes'] as $l) {
+        App\Models\PurchaseLine::create([
+            'purchase_id' => $achat->id, 'product_id' => $produits[$l['produit']]->id,
+            'qty' => $l['qty'], 'unit_price' => $l['unit_price'],
+        ]);
+    }
+}
+$composant = new App\Livewire\Dashboard\Index();
+$top = array_map(fn ($r) => [
+    'produit' => $r['product']?->name, 'qty' => $r['qty'], 'ca' => $r['ca'], 'marge' => $r['marge_pct'],
+], $composant->topProduits);
+echo json_encode(['top' => $top, 'ventes_porcs' => $composant->cartesElevage['porcs']['ventes_mois']]);
 ''';

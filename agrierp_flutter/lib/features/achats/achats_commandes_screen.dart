@@ -399,7 +399,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           "« — » : le poste ne détient pas cette information. Aucune "
           "référence d'achat ni opérateur ne descend du serveur ; la TVA "
           'récupérable se ventile là-bas, ligne par ligne, selon le taux de '
-          "chaque produit — les lignes d'un achat reçu ne descendent pas.",
+          'chaque produit.',
           cle: const Key('legende-detail-achat'),
         ),
       ],
@@ -936,7 +936,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           libelle: 'Écarts / Retours',
           // ⚠️ CALCULABLE DEPUIS F0.74 (`returned_at` descend, les retours du poste sont
           // acquittés) : plus de tiret. Des ACHATS retournés, pas des lignes de retour
-          // comme sur la page web — les lignes d'un achat reçu ne descendent pas.
+          // comme sur la page web — `purchase_returns` ne descend pas.
           valeur: '${d.ecartsEtRetours}',
           legende: d.retoursEnAttente > 0
               ? 'achats retournés · ${d.retoursEnAttente} demande(s) en attente '

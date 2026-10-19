@@ -434,8 +434,9 @@ void main() {
     expect(find.text('Carburant groupe électrogène'), findsWidgets);
   });
 
-  /// ⚠️ La marge suppose un prix de revient, que le poste ne reçoit pas.
-  testWidgets('le top produits affiche le CA mais pas la marge', (
+  /// Ticket U4 — la marge suppose un PMP (lignes d'achat, qui descendent au poste) : sans aucune ligne
+  /// d'achat du produit, pas de PMP, donc « — » comme au web — jamais 0 %.
+  testWidgets('le top produits affiche le CA, et « — » en marge sans ligne d achat', (
     tester,
   ) async {
     await vente(uuid('v1'), 340000, ceMois(3));

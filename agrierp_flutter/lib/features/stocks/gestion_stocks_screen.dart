@@ -11,12 +11,12 @@ import '../../core/theme/symboles_agri.dart';
 /// puis les **trois onglets** dans SON ordre : Tableau & Valorisation ·
 /// Journal des Mouvements · Ajustement / Correction.
 ///
-/// ⚠️⚠️ **TOUTE LA VALORISATION EST HORS DE PORTÉE DU POSTE.** Le PMP se
-/// calcule côté serveur par moyenne pondérée des **lignes d'achat** ;
-/// `purchase_lines` ne descend pas, et `products` ne porte aucune colonne de
-/// coût. PMP unitaire, valeur de ligne, valorisation totale et écarts en FCFA
-/// affichent donc un tiret motivé. Les estimer depuis le prix de VENTE
-/// donnerait une valorisation supérieure au coût — un actif gonflé au bilan.
+/// ⚠️⚠️ **LA VALORISATION N'EST PAS ENCORE PORTÉE.** Le PMP se calcule côté
+/// serveur par moyenne pondérée des **lignes d'achat**, qui descendent au poste
+/// depuis U4 (D-U4) ; le portage de la valorisation reste à faire. PMP
+/// unitaire, valeur de ligne, valorisation totale et écarts en FCFA affichent
+/// donc un tiret motivé. Les estimer depuis le prix de VENTE donnerait une
+/// valorisation supérieure au coût — un actif gonflé au bilan.
 class GestionStocksScreen extends StatefulWidget {
   const GestionStocksScreen({super.key, required this.depot});
 
