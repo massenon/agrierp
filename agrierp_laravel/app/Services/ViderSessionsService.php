@@ -14,11 +14,14 @@ use Illuminate\Support\Facades\Schema;
  *
  * ⚠️ La session de celui qui lance l'opération est CONSERVÉE (`$sessionAConserver`) : vider la sienne le
  * renverrait à l'écran de connexion au milieu de l'action, sans le compte rendu.
+ *
+ * Ticket R-1 — de même, le jeton du POSTE qui lance une réinitialisation (`$jetonAConserver`) : il purge ses
+ * données et tire aussitôt après, avec ce jeton.
  */
 class ViderSessionsService
 {
     /** @return array{sessions: int, jetons: int} */
-    public function vider(?string $sessionAConserver = null): array
+    public function vider(?string $sessionAConserver = null, int|string|null $jetonAConserver = null): array
     {
         $sessions = 0;
         if (Schema::hasTable('sessions')) {
@@ -28,7 +31,9 @@ class ViderSessionsService
         }
 
         $jetons = Schema::hasTable('personal_access_tokens')
-            ? DB::table('personal_access_tokens')->delete()
+            ? DB::table('personal_access_tokens')
+                ->when($jetonAConserver !== null, fn ($q) => $q->where('id', '!=', $jetonAConserver))
+                ->delete()
             : 0;
 
         return ['sessions' => $sessions, 'jetons' => $jetons];

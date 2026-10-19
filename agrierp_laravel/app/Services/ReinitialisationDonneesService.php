@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\CompanySetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -46,6 +47,68 @@ use Illuminate\Support\Facades\Schema;
  */
 class ReinitialisationDonneesService
 {
+    /**
+     * Ticket R-1 — LES VERROUS ET LES MESSAGES VIVENT ICI, UNE SEULE FOIS. L'écran web
+     * (`Livewire\Parametres\ReinitialisationDonnees`) et la route du poste
+     * (`Api\ReinitialisationDonneesController`) les lisent tous deux : un mot de confirmation ou un message
+     * changé d'un côté seulement ferait diverger les deux surfaces sans bruit.
+     */
+    public const MOT_DE_CONFIRMATION = 'REINITIALISER';
+
+    /** Refus quand la bascule est fausse (verrou 1). */
+    public const REFUS_MODE_DEMO = 'Réinitialisation refusée : le mode démonstration n\'est pas activé.';
+
+    /** Message sous le champ quand le mot n'est pas recopié (verrou 2). */
+    public static function messageConfirmation(): string
+    {
+        return 'Saisissez '.self::MOT_DE_CONFIRMATION.' pour confirmer.';
+    }
+
+    /**
+     * Le nombre réel est annoncé : « données réinitialisées » sans chiffre laisserait l'administrateur sans
+     * moyen de vérifier ce qui s'est passé.
+     */
+    public static function messageResultat(int $total): string
+    {
+        return $total > 0
+            ? "Réinitialisation effectuée — {$total} enregistrement(s) supprimé(s)."
+            : 'Aucune donnée d\'activité à supprimer.';
+    }
+
+    public static function messageBascule(bool $actif): string
+    {
+        return $actif
+            ? 'Mode démonstration activé — l\'onglet de réinitialisation est accessible.'
+            : 'Mode démonstration désactivé.';
+    }
+
+    public static function modeDemoActif(): bool
+    {
+        return (bool) (CompanySetting::first()?->demo_mode_enabled ?? false);
+    }
+
+    /**
+     * Active ou désactive le mode démonstration ; rend le nouvel état, `null` sans réglages d'entreprise.
+     *
+     * ⚠️ LA BASCULE ELLE-MÊME EST JOURNALISÉE : ouvrir l'accès à une opération destructrice est un acte
+     * administratif qui doit laisser une trace, au même titre que l'effacement.
+     */
+    public static function basculerModeDemo(): ?bool
+    {
+        $reglages = CompanySetting::first();
+
+        if ($reglages === null) {
+            return null;
+        }
+
+        $actif = ! $reglages->demo_mode_enabled;
+        $reglages->update(['demo_mode_enabled' => $actif]);
+
+        AuditLog::record($actif ? 'demo_mode.enabled' : 'demo_mode.disabled', 'parametres');
+
+        return $actif;
+    }
+
     /**
      * Tables d'activité vidées, dans un ordre sans importance : les contraintes
      * de clés étrangères sont suspendues le temps de l'opération.
@@ -143,9 +206,12 @@ class ReinitialisationDonneesService
     /**
      * Vide les données d'activité et remet les soldes dérivés à zéro.
      *
+     * Ticket R-1 — [$jetonAConserver] : jeton Sanctum du POSTE qui a lancé l'opération, gardé comme la
+     * session web de l'administrateur (même raison : il doit purger et tirer aussitôt, sans se reconnecter).
+     *
      * @return array<string, int>  nombre de lignes supprimées, par table
      */
-    public function executer(): array
+    public function executer(int|string|null $jetonAConserver = null): array
     {
         $supprimees = [];
 
@@ -180,7 +246,10 @@ class ReinitialisationDonneesService
 
         // 🔁 Ticket 15.54 — sessions vidées et jetons des postes révoqués : chaque poste se reconnecte, et son
         // premier tirage applique la réinitialisation. La session de l'administrateur qui l'a lancée est conservée.
-        app(ViderSessionsService::class)->vider(app()->runningInConsole() ? null : session()->getId());
+        app(ViderSessionsService::class)->vider(
+            app()->runningInConsole() ? null : session()->getId(),
+            $jetonAConserver,
+        );
 
         AuditLog::record('donnees.reinitialisees', 'parametres');
 

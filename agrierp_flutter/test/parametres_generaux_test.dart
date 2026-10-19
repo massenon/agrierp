@@ -284,8 +284,9 @@ void main() {
 
   group('écran', () {
     // Ticket CFG-2 — les six onglets de la maquette, plus « Email (SMTP) » et « Appairage » aux places que
-    // le web donne à « Email (SMTP) » et « Postes & Appairage » (CFG-1).
-    testWidgets('les huit onglets du hub sont présents, dans son ordre', (
+    // le web donne à « Email (SMTP) » et « Postes & Appairage » (CFG-1). Ticket R-1 : « Réinitialisation » après
+    // « Audit Logs », comme au web.
+    testWidgets('les neuf onglets du hub sont présents, dans son ordre', (
       tester,
     ) async {
       await fermeComplete();
@@ -300,6 +301,7 @@ void main() {
         'Appairage',
         'Modes de Paiement',
         'Audit Logs',
+        'Réinitialisation',
       ]);
 
       for (final (titre, _) in ParametresGenerauxScreen.onglets) {

@@ -72,6 +72,7 @@ import 'features/rh/personnel_stages_screen.dart';
 import 'features/ventes/facturation_repository.dart';
 import 'features/ventes/facturation_screen.dart';
 import 'features/parametres/appairage_poste.dart';
+import 'features/parametres/reinitialisation_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
 import 'features/stocks/produits_repository.dart';
@@ -176,6 +177,16 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final AuthService _auth = AuthService(
     client: _client,
     deviceName: widget.identifiantPoste,
+  );
+
+  /// Ticket R-1 — onglet « Réinitialisation » de Paramètres : la route du serveur (même service que le web), par
+  /// le client partagé (il porte le jeton), puis la purge immédiate de ce poste par le moteur (mécanisme 15.50)
+  /// et un tirage complet. Le droit est celui du rôle de la session ouverte.
+  late final ReinitialisationPoste _reinitialisation = ReinitialisationPoste(
+    database: _db,
+    client: _client,
+    engine: _engine,
+    role: () => _auth.utilisateur?.role ?? '',
   );
 
   /// Ticket S-T3 — point unique des gestes importants (vente, fiche journalière, soin) : les dépôts le
@@ -391,6 +402,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           database: _db,
           engine: _engine,
           auth: _auth,
+          reinitialisation: _reinitialisation,
           fiches: _fiches,
           caisse: _caisse,
           soins: _soins,
@@ -472,6 +484,7 @@ class SocleAccueil extends StatefulWidget {
     required this.sujets,
     required this.parametres,
     required this.identifiantPoste,
+    this.reinitialisation,
     this.onDeconnecte,
     this.changementsReseau,
     this.gestes,
@@ -480,6 +493,9 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
   final VoidCallback? onDeconnecte;
+
+  /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
+  final ReinitialisationPoste? reinitialisation;
 
   /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
   /// châssis, qui n'ont pas de plateforme native pour la connectivité).
@@ -605,6 +621,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     smtp: _smtp,
     envoiEmail: _envoiEmail,
     appairage: _appairage,
+    reinitialisation: widget.reinitialisation,
     ongletInitial: ongletInitial,
   );
 

@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Parametres;
 
-use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Services\ReinitialisationDonneesService;
 use Livewire\Component;
@@ -32,12 +31,17 @@ use Livewire\Component;
  * ⚠️ ET LE PLUS IMPORTANT : l'écran dit que l'opération vide **toutes** les
  * données d'activité, pas seulement celles du jeu de démonstration —
  * l'application ne sait pas les distinguer (voir `ReinitialisationDonneesService`).
+ *
+ * 🔁 Ticket R-1 (demande du client : « sur le web et le poste ») — le poste déclenche la MÊME action par
+ * `Api\ReinitialisationDonneesController` : même droit, mêmes verrous, même service. Verrous et messages vivent
+ * dans le service, lus par les deux.
  */
 class ReinitialisationDonnees extends Component
 {
     public string $confirmation = '';
 
-    public const MOT_DE_CONFIRMATION = 'REINITIALISER';
+    /** Ticket R-1 — le mot vit dans le service, partagé avec la route du poste. */
+    public const MOT_DE_CONFIRMATION = ReinitialisationDonneesService::MOT_DE_CONFIRMATION;
 
     public function getReglagesProperty(): ?CompanySetting
     {
@@ -50,37 +54,24 @@ class ReinitialisationDonnees extends Component
     }
 
     /**
-     * Active ou désactive le mode démonstration.
-     *
-     * ⚠️ LA BASCULE ELLE-MÊME EST JOURNALISÉE : ouvrir l'accès à une opération
-     * destructrice est un acte administratif qui doit laisser une trace, au
-     * même titre que l'effacement.
+     * Active ou désactive le mode démonstration (journalisé : voir
+     * `ReinitialisationDonneesService::basculerModeDemo()`, partagé avec le poste — ticket R-1).
      */
     public function basculerModeDemo(): void
     {
         $this->authorize('manage-parametres');
 
-        $reglages = $this->reglages;
+        $actif = ReinitialisationDonneesService::basculerModeDemo();
 
-        if ($reglages === null) {
+        if ($actif === null) {
             return;
         }
-
-        $actif = ! $reglages->demo_mode_enabled;
-        $reglages->update(['demo_mode_enabled' => $actif]);
-
-        AuditLog::record(
-            $actif ? 'demo_mode.enabled' : 'demo_mode.disabled',
-            'parametres',
-        );
 
         unset($this->reglages, $this->modeDemoActif);
 
         $this->dispatch(
             'toast',
-            message: $actif
-                ? 'Mode démonstration activé — l\'onglet de réinitialisation est accessible.'
-                : 'Mode démonstration désactivé.',
+            message: ReinitialisationDonneesService::messageBascule($actif),
             type: $actif ? 'warning' : 'success',
         );
     }
@@ -94,7 +85,7 @@ class ReinitialisationDonnees extends Component
         if (! $this->modeDemoActif) {
             $this->dispatch(
                 'toast',
-                message: 'Réinitialisation refusée : le mode démonstration n\'est pas activé.',
+                message: ReinitialisationDonneesService::REFUS_MODE_DEMO,
                 type: 'error',
             );
 
@@ -102,7 +93,7 @@ class ReinitialisationDonnees extends Component
         }
 
         if ($this->confirmation !== self::MOT_DE_CONFIRMATION) {
-            $this->addError('confirmation', 'Saisissez '.self::MOT_DE_CONFIRMATION.' pour confirmer.');
+            $this->addError('confirmation', ReinitialisationDonneesService::messageConfirmation());
 
             return;
         }
@@ -113,13 +104,10 @@ class ReinitialisationDonnees extends Component
         $this->confirmation = '';
         $this->dispatch('close-modal', name: 'modal-reinitialisation');
 
-        // Le nombre réel est annoncé : « données réinitialisées » sans chiffre
-        // laisserait l'administrateur sans moyen de vérifier ce qui s'est passé.
+        // Le nombre réel est annoncé (voir `ReinitialisationDonneesService::messageResultat()`).
         $this->dispatch(
             'toast',
-            message: $total > 0
-                ? "Réinitialisation effectuée — {$total} enregistrement(s) supprimé(s)."
-                : 'Aucune donnée d\'activité à supprimer.',
+            message: ReinitialisationDonneesService::messageResultat($total),
             type: 'success',
         );
     }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AnimalController;
 use App\Http\Controllers\Api\AttestationController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ReinitialisationDonneesController;
 use App\Http\Controllers\Api\SupervisionSynchronisationController;
 use App\Http\Controllers\Api\SyncController;
 use Illuminate\Support\Facades\Route;
@@ -70,4 +71,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         ->middleware('throttle:6,1,sync-demande');
     Route::get('/sync/coherence', [SupervisionSynchronisationController::class, 'coherence'])
         ->middleware('throttle:10,1,sync-coherence');
+
+    // Ticket R-1 — « Réinitialisation des données » depuis le poste : même droit (`manage-parametres`, vérifié par
+    // le contrôleur), mêmes verrous et même service que l'onglet web. Compteur de débit propre.
+    Route::get('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'etat'])
+        ->middleware('throttle:30,1,reinitialisation');
+    Route::post('/parametres/reinitialisation/mode-demo', [ReinitialisationDonneesController::class, 'basculerModeDemo'])
+        ->middleware('throttle:10,1,reinitialisation-bascule');
+    Route::post('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'reinitialiser'])
+        ->middleware('throttle:5,1,reinitialisation-execution');
 });

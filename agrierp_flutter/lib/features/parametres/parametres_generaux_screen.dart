@@ -8,7 +8,9 @@ import '../../core/widgets/carte_kpi.dart';
 import 'appairage_poste.dart';
 import 'onglet_appairage.dart';
 import 'onglet_email_smtp.dart';
+import 'onglet_reinitialisation.dart';
 import 'parametres_generaux_repository.dart';
+import 'reinitialisation_poste.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/parametres-hub.html` → Paramètres Général.
@@ -25,6 +27,10 @@ import '../../core/theme/symboles_agri.dart';
 /// [OngletAppairage]). L'onglet « Appairage » remplace l'écran isolé
 /// « Paramètres du poste » : l'entrée de la barre latérale ouvre ce hub sur lui
 /// ([ongletInitial]).
+///
+/// 🔁 Ticket R-1 (demande du client : « sur le web et le poste ») — NEUF ONGLETS.
+/// « Réinitialisation » suit « Audit Logs », comme au web (où « Restauration »,
+/// absent du poste, les sépare) : [OngletReinitialisation], en ligne seulement.
 ///
 /// ⚠️⚠️ **AUCUN SECRET NE DESCEND AU POSTE.** `company_settings` porte côté
 /// serveur les mots de passe SMTP et les jetons SMS (Twilio, Vonage), chiffrés.
@@ -44,6 +50,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.smtp,
     this.envoiEmail,
     this.appairage,
+    this.reinitialisation,
     this.ongletInitial,
   });
 
@@ -56,14 +63,19 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Ticket CFG-2 — appairage de ce poste (session, réglages du poste) ; `null` : l'onglet le dit.
   final AppairagePoste? appairage;
 
+  /// Ticket R-1 — réinitialisation des données par le serveur, puis purge de ce poste ; `null` : l'onglet le dit.
+  final ReinitialisationPoste? reinitialisation;
+
   /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
   final String? ongletInitial;
 
   static const ongletEmailSmtp = 'Email (SMTP)';
   static const ongletAppairage = 'Appairage';
+  static const ongletReinitialisation = 'Réinitialisation';
 
-  /// Les huit onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
-  /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web.
+  /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
+  /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
+  /// « Réinitialisation » (R-1) après « Audit Logs », avec l'icône du web (`restart_alt`).
   static const onglets = <(String, IconData)>[
     ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
     ("Données de l'Entreprise", SymbolesAgri.domain),
@@ -73,6 +85,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     (ongletAppairage, SymbolesAgri.settings_applications),
     ('Modes de Paiement', SymbolesAgri.account_balance_wallet),
     ('Audit Logs', SymbolesAgri.security),
+    (ongletReinitialisation, SymbolesAgri.restart_alt),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -175,6 +188,8 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                         'Gestion Utilisateurs' => _ongletUtilisateurs(d, large),
                         'Modes de Paiement' => _ongletPaiement(d, large),
                         'Audit Logs' => _ongletAudit(d, large),
+                        ParametresGenerauxScreen.ongletReinitialisation =>
+                          _ongletReinitialisation(),
                         _ => _ongletRoles(d, large),
                       },
                     ],
@@ -511,6 +526,20 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
     }
     return OngletAppairage(appairage: appairage);
+  }
+
+  // ── Onglet 9 : Réinitialisation — ticket R-1 ──────────────────────────────
+
+  Widget _ongletReinitialisation() {
+    final reinitialisation = widget.reinitialisation;
+    if (reinitialisation == null) {
+      return _mentionPoste(
+        'Réinitialisation indisponible dans cette vue : elle se fait depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'reinitialisation-indisponible',
+      );
+    }
+    return OngletReinitialisation(depot: reinitialisation);
   }
 
   // ── Onglet 4 : Modules Actifs ─────────────────────────────────────────────

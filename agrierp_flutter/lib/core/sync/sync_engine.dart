@@ -160,6 +160,48 @@ class SyncEngine {
     return reponse.data ?? const <String, dynamic>{};
   }
 
+  /// Ticket 15.50 — APPLIQUE UNE RÉINITIALISATION DU SERVEUR À CE POSTE : purge des données d'activité
+  /// ([AppDatabase.purgerDonneesDActivite] : tables d'activité, stock et trésorerie à 0, curseur effacé) puis
+  /// marque [marque] notée, celle que l'envoi renvoie et que le tirage compare. Rend le nombre de saisies
+  /// non envoyées perdues. Un seul mécanisme : le tirage qui découvre une marque inconnue (15.50) et la
+  /// réinitialisation lancée depuis ce poste (R-1, [reinitialiserDepuisCePoste]) passent par ici.
+  Future<int> appliquerReinitialisation(String marque) async {
+    final perdus = await _db.purgerDonneesDActivite();
+    await _ecrireReglage(cleReinitialisation, marque);
+    return perdus;
+  }
+
+  /// Ticket R-1 — RÉINITIALISATION LANCÉE DEPUIS CE POSTE (Paramètres > Réinitialisation).
+  ///
+  /// [reinitialiserLeServeur] appelle le serveur et rend la marque `data_reset_at` qu'il vient de poser. Après
+  /// son succès seulement, la purge est IMMÉDIATE ([appliquerReinitialisation], sans attendre le tirage suivant).
+  /// Échec : l'exception remonte et RIEN n'est purgé. Rend le nombre de saisies non envoyées perdues.
+  ///
+  /// ⚠️⚠️ AUCUNE SYNCHRONISATION NE S'INTERCALE. La tentative en cours est attendue d'abord ; pendant l'opération,
+  /// [synchroniser] (synchronisation automatique, bouton, ou l'appelant juste après) reçoit une tentative qui
+  /// attend sa fin puis tire sur la base purgée — sans `since`, le curseur ayant été effacé. Un tirage entremêlé
+  /// réabsorberait après la purge des pages servies avant la réinitialisation, et noterait leur curseur.
+  /// Si l'appel au serveur échoue alors que le serveur a pourtant réinitialisé (réponse perdue), cette tentative
+  /// découvre la nouvelle marque au tirage et purge par la règle 15.50.
+  Future<int> reinitialiserDepuisCePoste(Future<String> Function() reinitialiserLeServeur) async {
+    for (var enCours = _tentativeEnCours; enCours != null; enCours = _tentativeEnCours) {
+      try {
+        await enCours;
+      } catch (_) {
+        // L'échec de la tentative précédente a été rendu à son propre appelant.
+      }
+    }
+    final operation = (() async => appliquerReinitialisation(await reinitialiserLeServeur()))();
+    final suivante = operation
+        .then<void>((_) {}, onError: (Object _) {})
+        .then((_) => _synchroniserUneFois())
+        .whenComplete(() => _tentativeEnCours = null);
+    // Personne ne l'attend peut-être (échec de l'appel au serveur) : son échec éventuel n'est pas « non traité ».
+    suivante.ignore();
+    _tentativeEnCours = suivante;
+    return operation;
+  }
+
   /// Ticket H13 — la tentative en cours. Un second appelant (bouton « Synchroniser maintenant » pendant une
   /// synchronisation automatique) reçoit la MÊME tentative : deux tirages entremêlés écriraient deux fois le
   /// curseur, et deux envois simultanés acquitteraient deux fois les mêmes lignes.
@@ -493,8 +535,7 @@ class SyncEngine {
         final reinitialisation = corps['data_reset_at'];
         if (reinitialisation is String &&
             reinitialisation != await _lireReglage(cleReinitialisation)) {
-          final perdus = await _db.purgerDonneesDActivite();
-          await _ecrireReglage(cleReinitialisation, reinitialisation);
+          final perdus = await appliquerReinitialisation(reinitialisation);
           final le = HeureBenin.depuisInstant(DateTime.parse(reinitialisation));
           final date =
               '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
