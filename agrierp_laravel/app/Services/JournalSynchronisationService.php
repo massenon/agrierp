@@ -74,7 +74,10 @@ class JournalSynchronisationService
     /**
      * Un poste par jeton Sanctum non expiré, du plus récemment vu au plus ancien.
      *
-     * @return Collection<int, array{poste: string, utilisateur: string, dernier_contact: ?Carbon, dernier_envoi: ?Carbon, dernier_controle: ?Carbon, acceptes: ?int, refuses: ?int, etat: string, libelle_etat: string}>
+     * Ticket CFG-1 — chaque ligne porte aussi son JETON (`jeton_id`, `cree_le` = appairage, `expire_le`) : l'onglet
+     * « Postes & Appairage » de Paramètres liste ces mêmes lignes au lieu de refaire la requête.
+     *
+     * @return Collection<int, array{jeton_id: int|string, poste: string, utilisateur: string, cree_le: ?Carbon, expire_le: ?Carbon, dernier_contact: ?Carbon, dernier_envoi: ?Carbon, dernier_controle: ?Carbon, acceptes: ?int, refuses: ?int, etat: string, libelle_etat: string}>
      */
     public function etatDesPostes(?Carbon $maintenant = null): Collection
     {
@@ -103,8 +106,11 @@ class JournalSynchronisationService
                     ->value('created_at');
 
                 return [
+                    'jeton_id' => $jeton->getKey(),
                     'poste' => $jeton->name,
                     'utilisateur' => $jeton->tokenable?->name ?? '—',
+                    'cree_le' => $jeton->created_at,
+                    'expire_le' => $this->expiration($jeton),
                     'dernier_contact' => $contact,
                     'dernier_envoi' => $envoi?->created_at,
                     'dernier_controle' => $controle === null ? null : Carbon::parse($controle),
@@ -116,6 +122,23 @@ class JournalSynchronisationService
             })
             ->sortByDesc(fn ($ligne) => $ligne['dernier_contact']?->getTimestamp() ?? 0)
             ->values();
+    }
+
+    /**
+     * Ticket CFG-1 — fin de validité d'un jeton : sa date propre (`expires_at`, posée par le poste ou un test), sinon
+     * la durée globale de Sanctum (`sanctum.expiration`, en minutes) comptée depuis sa création ; `null` : sans fin.
+     */
+    private function expiration(PersonalAccessToken $jeton): ?Carbon
+    {
+        if ($jeton->expires_at !== null) {
+            return Carbon::parse($jeton->expires_at);
+        }
+
+        $minutes = config('sanctum.expiration');
+
+        return $minutes === null || $jeton->created_at === null
+            ? null
+            : Carbon::parse($jeton->created_at)->addMinutes((int) $minutes);
     }
 
     /**

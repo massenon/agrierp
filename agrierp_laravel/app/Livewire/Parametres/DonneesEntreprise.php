@@ -4,7 +4,6 @@ namespace App\Livewire\Parametres;
 
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
-use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -24,10 +23,12 @@ use Livewire\WithFileUploads;
  * Logo/Favicon : upload réel (`WithFileUploads`), même traitement que
  * partout ailleurs dans ce projet (ticket 1.6, 5.2, 5.8...).
  *
- * "Envoyer un e-mail de test" : réel — applique la config SMTP en base
- * (`CompanySetting::applyMailConfig()`, déjà existante) puis envoie
- * effectivement un e-mail à l'utilisateur SMTP configuré, jamais une
- * simulation de succès.
+ * Ticket CFG-1 (19/10/2026) — LE BLOC « Configuration Email (SMTP) » A QUITTÉ
+ * CET ÉCRAN pour l'onglet « Email (SMTP) » du hub (`EmailSmtp`), avec son
+ * « Envoyer un e-mail de test » : la même configuration se saisissait ici ET
+ * dans `/parametres-integrations`, avec deux jeux de valeurs. Le bloc renvoie
+ * désormais vers l'onglet ; l'enregistrement de cet écran ne touche plus aucun
+ * champ SMTP.
  */
 class DonneesEntreprise extends Component
 {
@@ -60,16 +61,6 @@ class DonneesEntreprise extends Component
 
     public $cnssEmployerRiskRate = 2;
 
-    public string $smtpHost = '';
-
-    public ?int $smtpPort = null;
-
-    public string $smtpSecurity = 'TLS';
-
-    public string $smtpUser = '';
-
-    public string $smtpPassword = '';
-
     public $logoFile = null;
 
     public $faviconFile = null;
@@ -85,10 +76,6 @@ class DonneesEntreprise extends Component
         $this->email = (string) $settings->email;
         $this->ifu = (string) $settings->ifu;
         $this->rccm = (string) $settings->rccm;
-        $this->smtpHost = (string) $settings->smtp_host;
-        $this->smtpPort = $settings->smtp_port;
-        $this->smtpSecurity = $settings->smtp_security ?: 'TLS';
-        $this->smtpUser = (string) $settings->smtp_user;
 
         // Ticket 14.38 — régime de TVA et taux de paie béninoise.
         $this->tvaEnabled = (bool) ($settings->tva_enabled ?? true);
@@ -164,15 +151,7 @@ class DonneesEntreprise extends Component
             'cnss_employer_pension_rate' => $this->cnssEmployerPensionRate,
             'cnss_employer_family_rate' => $this->cnssEmployerFamilyRate,
             'cnss_employer_risk_rate' => $this->cnssEmployerRiskRate,
-            'smtp_host' => $this->smtpHost ?: null,
-            'smtp_port' => $this->smtpPort,
-            'smtp_security' => $this->smtpSecurity,
-            'smtp_user' => $this->smtpUser ?: null,
         ];
-
-        if ($this->smtpPassword) {
-            $payload['smtp_password_encrypted'] = $this->smtpPassword;
-        }
 
         if ($this->logoFile) {
             $payload['logo_path'] = $this->logoFile->store('company', 'public');
@@ -190,35 +169,8 @@ class DonneesEntreprise extends Component
         }
 
         AuditLog::record('company_settings.updated', 'parametres');
-        $this->smtpPassword = '';
         $this->reset(['logoFile', 'faviconFile']);
         $this->dispatch('toast', message: 'Modifications enregistrées avec succès.', type: 'success');
-    }
-
-    public function testSmtpConnection(): void
-    {
-        $settings = CompanySetting::current();
-
-        if (! $settings->smtp_host || ! $settings->email) {
-            $this->dispatch('toast', message: "Renseignez au moins le serveur SMTP et l'email de contact avant de tester.", type: 'error');
-
-            return;
-        }
-
-        $settings->applyMailConfig();
-
-        try {
-            Mail::raw(
-                'Ceci est un e-mail de test envoyé depuis AgriERP — configuration SMTP validée avec succès.',
-                fn ($message) => $message->to($settings->email)->subject('AgriERP — Test de configuration SMTP')
-            );
-
-            AuditLog::record('company_settings.smtp_tested', 'parametres');
-            $this->dispatch('toast', message: "E-mail de test envoyé à {$settings->email}.", type: 'success');
-        } catch (\Throwable $e) {
-            $errorMessage = $e->getMessage();
-            $this->dispatch('toast', message: "Échec de l'envoi — vérifiez la configuration SMTP ({$errorMessage}).", type: 'error');
-        }
     }
 
     public function render()

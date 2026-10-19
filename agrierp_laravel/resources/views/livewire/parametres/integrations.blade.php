@@ -7,50 +7,17 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-md">
-        <div class="bg-white border border-outline-variant rounded-lg p-lg space-y-md">
+        {{-- Ticket CFG-1 — la configuration SMTP a UNE seule saisie : l'onglet « Email (SMTP) » du hub Paramètres. --}}
+        <div class="bg-white border border-outline-variant rounded-lg p-lg space-y-md self-start">
             <h3 class="text-sm font-bold text-brand-forest uppercase flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">mail</span>Email — Serveur SMTP</h3>
-            <form wire:submit="saveSmtp" class="space-y-md">
-                <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Hôte SMTP *</label>
-                    <input wire:model="smtpHost" type="text" placeholder="ex : smtp.gmail.com" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('smtpHost') ? 'is-invalid' : 'border-outline-variant' }}">
-                    @error('smtpHost') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                </div>
-                <div class="grid grid-cols-2 gap-sm">
-                    <div>
-                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Port *</label>
-                        <input wire:model="smtpPort" type="number" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('smtpPort') ? 'is-invalid' : 'border-outline-variant' }}">
-                        @error('smtpPort') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Sécurité</label>
-                        <select wire:model="smtpSecurity" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
-                            <option value="tls">TLS</option>
-                            <option value="ssl">SSL</option>
-                            <option value="">Aucune</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Identifiant SMTP</label>
-                    <input wire:model="smtpUser" type="text" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mot de Passe SMTP</label>
-                    <input wire:model="smtpPassword" type="password" placeholder="Laisser vide pour conserver le mot de passe actuel" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
-                    <p class="text-[10px] text-outline mt-xs">Chiffré en base — jamais réaffiché en clair une fois enregistré.</p>
-                </div>
-                <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Adresse d'Expédition</label>
-                    <input wire:model="fromEmail" type="email" placeholder="ex : contact@ferme-olouwachegoun.bj" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('fromEmail') ? 'is-invalid' : 'border-outline-variant' }}">
-                    @error('fromEmail') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                </div>
-                <button type="submit" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm">Enregistrer la Configuration SMTP</button>
-            </form>
-
-            <div class="border-t border-outline-variant pt-md flex items-center gap-xs">
-                <input wire:model="testEmailTo" type="email" placeholder="Envoyer un email de test à..." class="flex-1 h-10 px-md border border-outline-variant rounded-lg text-xs">
-                <button type="button" wire:click="sendTestEmail" class="px-md py-2 rounded-lg border border-outline-variant text-xs font-bold text-brand-forest hover:bg-surface-zebra whitespace-nowrap">Tester</button>
-            </div>
+            <a href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-sm p-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
+                <span class="material-symbols-outlined text-brand-emerald text-[22px]">settings_input_antenna</span>
+                <span class="flex-1">
+                    <span class="block text-xs font-bold text-brand-forest">Configurer dans Paramètres &gt; Email (SMTP)</span>
+                    <span class="block text-[11px] text-outline">Hôte, port, sécurité, identifiant, mot de passe chiffré, adresse d'expédition et e-mail de test : une seule configuration pour toute l'application.</span>
+                </span>
+                <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all">chevron_right</span>
+            </a>
         </div>
 
         <div class="bg-white border border-outline-variant rounded-lg p-lg space-y-md">

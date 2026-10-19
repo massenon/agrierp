@@ -661,11 +661,15 @@ void main() {
     //    poste volé une clé d'accès à la boîte mail de la ferme :
     //    `smtp_password_encrypted` reste sur le serveur, et le poste n'a même
     //    pas de colonne où le ranger.
-    'Serveur SMTP': "configuration technique gardée sur le serveur",
-    'Port': "configuration technique gardée sur le serveur",
-    'Utilisateur SMTP': "configuration technique gardée sur le serveur",
+    // 🔁 Tickets CFG-1 / CFG-2 : le bloc SMTP de `parametres.html` a quitté
+    //    « Données de l'Entreprise » au web comme au poste, pour l'onglet
+    //    « Email (SMTP) » — réglage LOCAL au poste, mot de passe au coffre —
+    //    contrôlé contre son Blade par `email_smtp_blade_test.dart`.
+    'Serveur SMTP': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
+    'Port': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
+    'Utilisateur SMTP': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
     'Envoyer un e-mail de test':
-        "configuration technique gardée sur le serveur",
+        "configuration SMTP déplacée dans l'onglet Email (SMTP)",
 
     // ⚠️ L'ASTÉRISQUE MARQUE UNE SAISIE OBLIGATOIRE : le poste affiche ces
     //    deux champs en lecture seule, l'identité de la ferme se modifiant sur
@@ -1100,8 +1104,9 @@ void main() {
     },
 
     'parametres.html': {
-      // « NI MOT DE PASSE NI JETON NE DESCENDENT. »
-      'Mot de Passe': 'aucun secret ne descend au poste',
+      // « NI MOT DE PASSE NI JETON NE DESCENDENT. » Le mot de passe SMTP du
+      // poste se saisit dans l'onglet Email (SMTP) (CFG-2), au coffre du système.
+      'Mot de Passe': "aucun secret ne descend au poste ; celui du poste se saisit dans l'onglet Email (SMTP)",
     },
 
     // Ticket H8b : « Planifier » est porté (bouton de la modale du Blade) — exemption de

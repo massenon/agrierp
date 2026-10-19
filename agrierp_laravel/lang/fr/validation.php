@@ -256,6 +256,8 @@ return [
         'firstName' => 'prénom',
         'forgotEmail' => 'adresse e-mail',
         'fromEmail' => 'adresse d\'expédition',
+        // Ticket CFG-1 — onglet « Email (SMTP) » de Paramètres.
+        'fromAddress' => 'adresse d\'expédition',
         'hireDate' => 'date d\'embauche',
         'iban' => 'IBAN',
         'identifiant' => 'nom d\'utilisateur ou adresse e-mail',
@@ -375,7 +377,9 @@ return [
         'sireRef' => 'référence du mâle',
         'smsProvider' => 'fournisseur SMS',
         'smtpHost' => 'serveur SMTP',
+        'smtpPassword' => 'mot de passe SMTP',
         'smtpPort' => 'port SMTP',
+        'smtpSecurity' => 'sécurité SMTP',
         'smtpUser' => 'utilisateur SMTP',
         'soinDate' => 'date du soin',
         'soinLotId' => 'bande',

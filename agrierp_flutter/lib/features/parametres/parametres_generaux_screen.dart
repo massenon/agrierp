@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/envoi_email_test.dart';
+import '../../core/config/parametres_smtp.dart';
 import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import 'appairage_poste.dart';
+import 'onglet_appairage.dart';
+import 'onglet_email_smtp.dart';
 import 'parametres_generaux_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -14,27 +19,58 @@ import '../../core/theme/symboles_agri.dart';
 /// (`gestion-utilisateurs.html`) · Modes de Paiement (`modes-paiement.html`) ·
 /// Audit Logs (`audit-logs.html`).
 ///
+/// 🔁 Ticket CFG-2 (décision client du 19/10/2026) — HUIT ONGLETS. Comme au web
+/// (ticket CFG-1), « Email (SMTP) » suit « Données de l'Entreprise » et
+/// l'appairage suit « Gestion Utilisateurs » ([OngletEmailSmtp],
+/// [OngletAppairage]). L'onglet « Appairage » remplace l'écran isolé
+/// « Paramètres du poste » : l'entrée de la barre latérale ouvre ce hub sur lui
+/// ([ongletInitial]).
+///
 /// ⚠️⚠️ **AUCUN SECRET NE DESCEND AU POSTE.** `company_settings` porte côté
 /// serveur les mots de passe SMTP et les jetons SMS (Twilio, Vonage), chiffrés.
 /// Un poste volé donnerait accès au compte SMS et à la boîte mail de la ferme :
 /// seuls l'identité et les taux sont servis, et le poste n'a **pas de colonne**
-/// où ranger un secret. Le bloc « Configuration Email (SMTP) » de
-/// `parametres.html` n'est donc pas porté — pas « plus tard », jamais.
+/// où ranger un secret. Le SMTP DU POSTE est un réglage LOCAL (onglet
+/// « Email (SMTP) ») : son mot de passe va au coffre du système, jamais en base
+/// (`ParametresSmtp`).
 ///
 /// ⚠️ **CONSULTATION PURE.** Modifier un rôle, une permission, un utilisateur
 /// ou un compte de trésorerie depuis un poste changerait les règles de toute la
 /// ferme depuis une machine qui n'a pas les derniers mouvements.
 class ParametresGenerauxScreen extends StatefulWidget {
-  const ParametresGenerauxScreen({super.key, required this.depot});
+  const ParametresGenerauxScreen({
+    super.key,
+    required this.depot,
+    this.smtp,
+    this.envoiEmail,
+    this.appairage,
+    this.ongletInitial,
+  });
 
   final ParametresGenerauxRepository depot;
 
-  /// Les six onglets du hub, dans son ordre.
+  /// Ticket CFG-2 — réglages SMTP de ce poste et e-mail de test ; `null` : l'onglet le dit.
+  final ParametresSmtp? smtp;
+  final EnvoiEmailTest? envoiEmail;
+
+  /// Ticket CFG-2 — appairage de ce poste (session, réglages du poste) ; `null` : l'onglet le dit.
+  final AppairagePoste? appairage;
+
+  /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
+  final String? ongletInitial;
+
+  static const ongletEmailSmtp = 'Email (SMTP)';
+  static const ongletAppairage = 'Appairage';
+
+  /// Les huit onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
+  /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web.
   static const onglets = <(String, IconData)>[
     ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
     ("Données de l'Entreprise", SymbolesAgri.domain),
+    (ongletEmailSmtp, SymbolesAgri.mail),
     ('Modules Actifs', SymbolesAgri.tune),
     ('Gestion Utilisateurs', SymbolesAgri.manage_accounts),
+    (ongletAppairage, SymbolesAgri.settings_applications),
     ('Modes de Paiement', SymbolesAgri.account_balance_wallet),
     ('Audit Logs', SymbolesAgri.security),
   ];
@@ -85,7 +121,12 @@ class ParametresGenerauxScreen extends StatefulWidget {
 }
 
 class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
-  String _onglet = ParametresGenerauxScreen.onglets.first.$1;
+  late String _onglet = ParametresGenerauxScreen.onglets
+      .map((o) => o.$1)
+      .firstWhere(
+        (o) => o == widget.ongletInitial,
+        orElse: () => ParametresGenerauxScreen.onglets.first.$1,
+      );
   DonneesParametresGeneraux? _donnees;
 
   @override
@@ -126,7 +167,11 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                           d,
                           large,
                         ),
+                        ParametresGenerauxScreen.ongletEmailSmtp =>
+                          _ongletEmailSmtp(),
                         'Modules Actifs' => _ongletModules(d, large),
+                        ParametresGenerauxScreen.ongletAppairage =>
+                          _ongletAppairage(),
                         'Gestion Utilisateurs' => _ongletUtilisateurs(d, large),
                         'Modes de Paiement' => _ongletPaiement(d, large),
                         'Audit Logs' => _ongletAudit(d, large),
@@ -361,15 +406,18 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ),
         ],
         const SizedBox(height: AgriSpacing.md),
-        // ⚠️⚠️ LA CONFIGURATION TECHNIQUE N'EST PAS « À FAIRE PLUS TARD ».
-        // SMTP porte un mot de passe : le descendre ferait d'un poste volé une
-        // clé d'accès à la messagerie de la ferme. Le logo et le favicon, eux,
-        // se téléversent — le poste n'a pas de canal pour remonter un fichier.
+        // ⚠️⚠️ LE SMTP DU SITE NE DESCEND PAS : il porte un mot de passe, et le
+        // descendre ferait d'un poste volé une clé d'accès à la messagerie de la
+        // ferme. Comme au web depuis CFG-1, la configuration SMTP a son onglet ;
+        // celle du poste est LOCALE, mot de passe au coffre du système (CFG-2).
+        // Le logo et le favicon se téléversent — le poste n'a pas de canal pour
+        // remonter un fichier.
         _mentionPoste(
-          "Serveur d'envoi (SMTP), logo et favicon ne descendent pas au "
-          'poste : le premier porte un mot de passe, les deux autres se '
-          "téléversent. Un poste perdu ne doit pas ouvrir la boîte mail de la "
-          'ferme. Ces réglages se font sur la surface web.',
+          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email "
+          '(SMTP) ; son mot de passe reste dans le coffre du système. Celui du '
+          'site, le logo et le favicon ne descendent pas au poste : le premier '
+          'porte un mot de passe, les deux autres se téléversent. Ils se règlent '
+          'sur la surface web.',
           cle: 'entreprise-technique',
         ),
       ],
@@ -436,7 +484,36 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     ),
   );
 
-  // ── Onglet 3 : Modules Actifs ─────────────────────────────────────────────
+  // ── Onglet 3 : Email (SMTP) — ticket CFG-2 ───────────────────────────────
+
+  Widget _ongletEmailSmtp() {
+    final smtp = widget.smtp;
+    final envoi = widget.envoiEmail;
+    if (smtp == null || envoi == null) {
+      return _mentionPoste(
+        'Réglage SMTP indisponible dans cette vue : il se fait depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'smtp-indisponible',
+      );
+    }
+    return OngletEmailSmtp(parametres: smtp, envoi: envoi);
+  }
+
+  // ── Onglet 6 : Appairage — ticket CFG-2 ──────────────────────────────────
+
+  Widget _ongletAppairage() {
+    final appairage = widget.appairage;
+    if (appairage == null) {
+      return _mentionPoste(
+        'Appairage indisponible dans cette vue : il se consulte depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'appairage-indisponible',
+      );
+    }
+    return OngletAppairage(appairage: appairage);
+  }
+
+  // ── Onglet 4 : Modules Actifs ─────────────────────────────────────────────
 
   /// Le sous-titre de chaque module, mot pour mot comme la maquette.
   static const _descriptionsModules = <ModuleEspece, String>{

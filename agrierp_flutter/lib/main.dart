@@ -9,7 +9,9 @@ import 'package:intl/intl.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
+import 'core/config/envoi_email_test.dart';
 import 'core/config/parametres_poste.dart';
+import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
@@ -69,7 +71,7 @@ import 'features/rh/personnel_repository.dart';
 import 'features/rh/personnel_stages_screen.dart';
 import 'features/ventes/facturation_repository.dart';
 import 'features/ventes/facturation_screen.dart';
-import 'features/parametres/parametres_poste_screen.dart';
+import 'features/parametres/appairage_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
 import 'features/stocks/produits_repository.dart';
@@ -581,6 +583,31 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   late final _recherche = RechercheGlobaleRepository(database: widget.database);
 
+  /// Ticket CFG-2 — réglages SMTP de ce poste (mot de passe au coffre du système, jamais en base) et e-mail de test.
+  late final _smtp = ParametresSmtp(database: widget.database);
+  late final _envoiEmail = EnvoiEmailTest(parametres: _smtp);
+
+  /// Ticket CFG-2 — onglet « Appairage » : réglages du poste, session, état du jeton (S-T1 : synchronisation
+  /// automatique suspendue sur 401 / 403) et réappairage (= la « Déconnexion » du menu du compte).
+  AppairagePoste get _appairage => AppairagePoste(
+    parametres: widget.parametres,
+    identifiant: widget.identifiantPoste,
+    auth: widget.auth,
+    sessionSuspendue: () => _automatique?.suspendue ?? false,
+    reappairer: widget.onDeconnecte == null ? null : _deconnecter,
+  );
+
+  /// Ticket CFG-2 — hub Paramètres, ouvert sur [ongletInitial] (« Appairage » depuis « Paramètres du poste »).
+  Widget _parametresGeneraux({String? ongletInitial}) => ParametresGenerauxScreen(
+    // Une clé par point d'entrée : passer de « Paramètres du poste » à « Paramètres » rouvre le bon onglet.
+    key: ValueKey('parametres-${ongletInitial ?? 'hub'}'),
+    depot: widget.parametresGeneraux,
+    smtp: _smtp,
+    envoiEmail: _envoiEmail,
+    appairage: _appairage,
+    ongletInitial: ongletInitial,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -903,9 +930,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           database: widget.database,
           engine: widget.engine,
         ),
-        EcranPoste.parametres => ParametresPosteScreen(
-          parametres: widget.parametres,
-          identifiantActuel: widget.identifiantPoste,
+        // 🔁 Ticket CFG-2 — l'écran isolé « Paramètres du poste » est devenu l'onglet « Appairage » du hub.
+        EcranPoste.parametres => _parametresGeneraux(
+          ongletInitial: ParametresGenerauxScreen.ongletAppairage,
         ),
         EcranPoste.ficheElevage => FicheLapinsScreen(
           depot: widget.fiches,
@@ -919,9 +946,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
           depot: widget.comptabilite,
           imprimer: EditeursRapports.imprimer,
         ),
-        EcranPoste.parametresGeneraux => ParametresGenerauxScreen(
-          depot: widget.parametresGeneraux,
-        ),
+        EcranPoste.parametresGeneraux => _parametresGeneraux(),
         EcranPoste.rapportsEtExports => RapportsExportsScreen(
           depot: widget.rapports,
           imprimer: EditeursRapports.imprimer,

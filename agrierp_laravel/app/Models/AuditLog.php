@@ -98,6 +98,8 @@ class AuditLog extends Model
         'company_settings.updated' => "Données de l'entreprise modifiées",
         'company_settings.smtp_updated' => 'Configuration SMTP modifiée',
         'company_settings.smtp_tested' => 'Test SMTP envoyé',
+        // Ticket CFG-1 — effacement explicite du mot de passe SMTP (onglet Email (SMTP)).
+        'company_settings.smtp_password_cleared' => 'Mot de passe SMTP effacé',
         'company_settings.sms_updated' => 'Configuration SMS modifiée',
         'database.backup_generated' => 'Sauvegarde générée',
         'database.backup_downloaded' => 'Sauvegarde téléchargée',
@@ -190,6 +192,8 @@ class AuditLog extends Model
         'api.login' => 'Connexion API (appareil Flutter)',
         'api.logout' => 'Déconnexion API (appareil Flutter)',
         'api.sync_push' => 'Synchronisation — données envoyées par un appareil',
+        // Ticket CFG-1 — onglet Postes & Appairage : jetons d'un poste supprimés.
+        'sync.appairage_revoque' => "Appairage d'un poste révoqué",
         'sale.negative_stock_received' => 'Vente reçue d\'un poste : stock passé sous zéro',
         'reproduction_event.updated_from_device' => 'Cycle de reproduction mis à jour depuis un poste',
         'attestation.generated.employe' => 'Attestation de travail générée',

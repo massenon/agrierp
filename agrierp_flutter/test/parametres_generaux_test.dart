@@ -283,7 +283,9 @@ void main() {
   });
 
   group('écran', () {
-    testWidgets('les six onglets du hub sont présents, dans son ordre', (
+    // Ticket CFG-2 — les six onglets de la maquette, plus « Email (SMTP) » et « Appairage » aux places que
+    // le web donne à « Email (SMTP) » et « Postes & Appairage » (CFG-1).
+    testWidgets('les huit onglets du hub sont présents, dans son ordre', (
       tester,
     ) async {
       await fermeComplete();
@@ -292,8 +294,10 @@ void main() {
       expect(ParametresGenerauxScreen.onglets.map((o) => o.$1).toList(), [
         'Rôles & Permissions',
         "Données de l'Entreprise",
+        'Email (SMTP)',
         'Modules Actifs',
         'Gestion Utilisateurs',
+        'Appairage',
         'Modes de Paiement',
         'Audit Logs',
       ]);

@@ -60,6 +60,8 @@ dependencies:
   # ⚠️ Le QR de la fiche sujet encode l'IDENTIFIANT lisible, comme le web.
   qr_flutter: ^4.1.0
   excel: ^4.0.6
+  # Ticket CFG-2 — « Envoyer un e-mail de test » RÉEL depuis l'onglet Email (SMTP) du poste.
+  mailer: ^7.2.0
 
 dev_dependencies:
   flutter_test:
