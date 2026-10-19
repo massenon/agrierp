@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 130 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 132 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -34,6 +34,7 @@ class LibellesAudit {
     'company_settings.updated': 'Données de l\'entreprise modifiées',
     'company_settings.smtp_updated': 'Configuration SMTP modifiée',
     'company_settings.smtp_tested': 'Test SMTP envoyé',
+    'company_settings.smtp_password_cleared': 'Mot de passe SMTP effacé',
     'company_settings.sms_updated': 'Configuration SMS modifiée',
     'database.backup_generated': 'Sauvegarde générée',
     'database.backup_downloaded': 'Sauvegarde téléchargée',
@@ -123,6 +124,7 @@ class LibellesAudit {
     'api.login': 'Connexion API (appareil Flutter)',
     'api.logout': 'Déconnexion API (appareil Flutter)',
     'api.sync_push': 'Synchronisation — données envoyées par un appareil',
+    'sync.appairage_revoque': 'Appairage d\'un poste révoqué',
     'sale.negative_stock_received': 'Vente reçue d\'un poste : stock passé sous zéro',
     'reproduction_event.updated_from_device': 'Cycle de reproduction mis à jour depuis un poste',
     'attestation.generated.employe': 'Attestation de travail générée',
