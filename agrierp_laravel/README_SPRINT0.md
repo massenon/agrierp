@@ -22063,3 +22063,10 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 ### Non fait / réserves
 - Le bilan web calcule le prix moyen de provende sur TOUS les types, archivés compris ; le poste sur les actifs.
 - Tri de la prophylaxie : le web trie sur `created_at` seul (ordre non garanti à égalité) ; le poste départage par jour de cycle puis libellé.
+
+## Ticket H13b — envoi par lots de 50 (décision D-SYNC-2, 19/10/2026)
+
+- `SyncEngine.decouperEnLots` : au plus 50 lignes par requête, dans l'ordre de traitement de `SyncController::push` (`ordreDuServeur`) — ce qu'une table attend d'une autre est déjà écrit quand elle arrive. Un envoi de 50 lignes au plus part TEL QUEL (aucun changement pour le cas courant).
+- ⚠️⚠️ Fiches, transferts et ventes partent par **journées entières**, au rang des ventes : le serveur exempte une vente de son incrément seulement si la fiche (bande, jour) est acceptée dans la MÊME requête (15.30). Une fiche partie dans un lot antérieur à sa vente la ferait compter deux fois, sans erreur. Une journée de plus de 50 lignes part seule.
+- Réponses fusionnées table par table avant l'acquittement habituel. Un lot en échec après d'autres : les accusés reçus sont acquittés, puis l'échec remonte (réessai réseau de H13) ; ce que le serveur a déjà écrit ne repart pas.
+- Tests : `envoi_par_lots_test.dart` (9), dont un qui lit `_pousser` pour vérifier que chaque table envoyée a son rang dans `ordreDuServeur`. Mutation : sans le regroupement par journée, deux tests rougissent.

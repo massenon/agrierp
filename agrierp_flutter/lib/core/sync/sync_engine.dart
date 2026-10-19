@@ -1,6 +1,9 @@
+import 'dart:collection';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
@@ -3429,9 +3432,7 @@ class SyncEngine {
       if (tete != null) tetes.add(tete.id);
     }
 
-    final reponse = await _client.post<Map<String, dynamic>>(
-      '/api/sync/push',
-      data: {
+    final (corps, echecDeLot, pileDeLot) = await _envoyerParLots({
         'device_id': _deviceId,
         // Ticket 15.50 — la réinitialisation que ce poste a appliquée (absente : aucune).
         'data_reset_at': ?await _lireReglage(cleReinitialisation),
@@ -3495,10 +3496,8 @@ class SyncEngine {
         // les deux voyagent ensemble dans le même paquet, jamais séparés.
         'customer_advances': avances.map(_avanceEnJson).toList(),
         'advance_imputations': imputations.map(_imputationEnJson).toList(),
-      },
-    );
+      });
 
-    final corps = reponse.data ?? const <String, dynamic>{};
     var accepte = 0;
     var rejete = 0;
     final motifs = <String>[];
@@ -3884,9 +3883,165 @@ class SyncEngine {
         retoursAcceptes +
         remboursementsAcceptes;
 
+    // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
+    // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
+    if (echecDeLot != null) Error.throwWithStackTrace(echecDeLot, pileDeLot!);
+
     await _db.noterEtatDeSynchronisation(envoye: DateTime.now());
 
     return (accepte, rejete, motifs);
+  }
+
+  /// Ticket H13b (D-SYNC-2) — au plus [tailleLot] enregistrements par requête.
+  static const tailleLot = 50;
+
+  /// Ordre de traitement de `SyncController::push`, table par table. Les lots partent dans cet ordre : ce
+  /// qu'une table attend d'une autre (un fournisseur avant son achat, un achat avant son retour, une vente
+  /// avant son imputation) est déjà écrit sur le serveur quand elle arrive.
+  static const ordreDuServeur = [
+    'feed_ration_standards',
+    'prophylaxis_schedule_standards',
+    'feed_types',
+    'elevage_numbering',
+    'company_settings',
+    'suppliers',
+    'customers',
+    'mails',
+    'archived_documents',
+    'administrative_documents',
+    'customer_advances',
+    'products',
+    'livestock_daily_entries',
+    'livestock_transfers',
+    'expenses',
+    'purchases',
+    'supplier_payments',
+    'purchase_returns',
+    'supplier_refunds',
+    'attendance_records',
+    'sales',
+    'advance_imputations',
+    'livestock_reproduction_events',
+    'infirmary_records',
+    'veterinary_calendar_events',
+    'stock_adjustments',
+    'veterinary_records',
+  ];
+
+  /// ⚠️⚠️ **TABLES COUPLÉES DANS UN MÊME ENVOI, JAMAIS SÉPARÉES PAR JOUR.** Le serveur passe aux ventes les
+  /// fiches (bande, jour) ACCEPTÉES dans la même requête (15.30) : la fiche du poste porte déjà la vente, il
+  /// ne l'y rajoute pas. Une fiche partie dans un lot ANTÉRIEUR à sa vente ferait compter la vente deux fois
+  /// (2N, effectif de la bande faux de N) — sans aucune erreur. Les transferts du jour suivent ses fiches
+  /// (15.46). Ces trois tables partent donc par JOURNÉES ENTIÈRES (fiches, transferts, ventes du jour), au
+  /// rang des ventes ; une journée de plus de [tailleLot] lignes part seule.
+  static const _couplees = [
+    ('livestock_daily_entries', 'entry_date'),
+    ('livestock_transfers', 'transfer_date'),
+    ('sales', 'sold_at'),
+  ];
+
+  /// Découpe [envoi] en lots ordonnés (voir [ordreDuServeur], [_couplees]). Un envoi de [tailleLot] lignes
+  /// au plus part TEL QUEL, en une requête : rien ne change pour le cas courant.
+  @visibleForTesting
+  static List<Map<String, dynamic>> decouperEnLots(Map<String, dynamic> envoi) {
+    final entete = {
+      for (final e in envoi.entries)
+        if (e.value is! List) e.key: e.value,
+    };
+    final lignes = envoi.values.whereType<List>().fold<int>(0, (n, l) => n + l.length);
+    if (lignes <= tailleLot) return [envoi];
+
+    final unites = <List<(String, Object?)>>[];
+    final couplees = {for (final (t, _) in _couplees) t};
+    final tables = [
+      ...ordreDuServeur,
+      // Une table que cette liste ne connaît pas encore part en dernier plutôt que de se perdre.
+      for (final k in envoi.keys)
+        if (envoi[k] is List && !ordreDuServeur.contains(k)) k,
+    ];
+    for (final table in tables) {
+      if (table == 'sales') {
+        final parJour = SplayTreeMap<String, List<(String, Object?)>>();
+        for (final (t, cle) in _couplees) {
+          for (final ligne in (envoi[t] as List?) ?? const []) {
+            final date = ligne is Map ? ligne[cle]?.toString() ?? '' : '';
+            parJour
+                .putIfAbsent(date.length >= 10 ? date.substring(0, 10) : date, () => [])
+                .add((t, ligne));
+          }
+        }
+        unites.addAll(parJour.values);
+        continue;
+      }
+      if (couplees.contains(table)) continue;
+      for (final ligne in (envoi[table] as List?) ?? const []) {
+        unites.add([(table, ligne)]);
+      }
+    }
+
+    final lots = <Map<String, dynamic>>[];
+    var courant = <(String, Object?)>[];
+    void fermer() {
+      if (courant.isEmpty) return;
+      final lot = Map<String, dynamic>.of(entete);
+      for (final (t, ligne) in courant) {
+        (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
+      }
+      lots.add(lot);
+      courant = [];
+    }
+
+    for (final unite in unites) {
+      if (courant.isNotEmpty && courant.length + unite.length > tailleLot) fermer();
+      courant.addAll(unite);
+    }
+    fermer();
+    return lots;
+  }
+
+  /// Réponses des lots fusionnées table par table (acceptés et refusés mis bout à bout, compteurs additionnés),
+  /// pour l'acquittement habituel. ⚠️ Un lot en échec n'efface pas les précédents : leurs accusés sont rendus
+  /// avec l'erreur, pour être acquittés AVANT qu'elle remonte — sinon le poste renverrait ce que le serveur a
+  /// déjà écrit.
+  Future<(Map<String, dynamic>, Object?, StackTrace?)> _envoyerParLots(
+    Map<String, dynamic> envoi,
+  ) async {
+    final fusion = <String, dynamic>{};
+    final lots = decouperEnLots(envoi);
+    for (var i = 0; i < lots.length; i++) {
+      try {
+        final reponse = await _client.post<Map<String, dynamic>>(
+          '/api/sync/push',
+          data: lots[i],
+        );
+        fusionnerReponse(fusion, reponse.data ?? const {});
+      } catch (e, pile) {
+        if (i == 0) rethrow;
+        return (fusion, e, pile);
+      }
+    }
+    return (fusion, null, null);
+  }
+
+  @visibleForTesting
+  static void fusionnerReponse(Map<String, dynamic> fusion, Map<String, dynamic> reponse) {
+    for (final MapEntry(:key, :value) in reponse.entries) {
+      final deja = fusion[key];
+      if (value is Map && (value.containsKey('accepted') || value.containsKey('rejected'))) {
+        final cible = deja is Map
+            ? deja
+            : fusion[key] = <String, dynamic>{'accepted': <Object?>[], 'rejected': <Object?>[]};
+        for (final cote in const ['accepted', 'rejected']) {
+          (cible[cote] as List).addAll((value[cote] as List?) ?? const []);
+        }
+      } else if (value is num && deja is num) {
+        fusion[key] = deja + value;
+      } else if (value is List && deja is List) {
+        fusion[key] = [...deja, ...value];
+      } else {
+        fusion[key] = value;
+      }
+    }
   }
 
   /// Ticket H8b — acquitte ou refuse des lignes dont seul le STATUT MÉTIER change après création (infirmerie :
