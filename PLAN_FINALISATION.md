@@ -1,6 +1,6 @@
 # PLAN DE FINALISATION — AgriERP
 
-**Ferme École OLOUWACHEGOUN · état au 17/10/2026 · monorepo `massenon/agrierp`**
+**Ferme École OLOUWACHEGOUN · état au 19/10/2026 · monorepo `massenon/agrierp`**
 
 Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % autonome hors ligne**, fidèle à l'application web. Il s'appuie sur :
 - les règles de [`DOCTRINE_PORTAGE.md`](DOCTRINE_PORTAGE.md) ;
@@ -158,7 +158,7 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 | B1 | Écran **Synchronisation** (`lib/features/sync/synchronisation_screen.dart`) | ✅ existe : en attente, conflits avec motif, dernier état, bouton « Synchroniser ». |
 | B2 | Synchronisation **déclenchée automatiquement** : au retour du réseau, à intervalle (15 min, configurable dans Paramètres du poste) et à la fermeture de l'application. Jamais bloquante ; hors ligne = état normal, pas une erreur rouge. | 🔧 |
 | B3 | Écran Synchronisation : historique des dernières tentatives (date, poussés / tirés / refusés), filtre des conflits par table, relance d'un conflit après correction, export du journal pour le support. | 🔧 |
-| B4 | Indicateur permanent dans `BarreSuperieure` : nombre d'enregistrements en attente et âge de la dernière synchronisation réussie. | 🔧 |
+| B4 | Indicateur permanent dans `BarreSuperieure` : nombre d'enregistrements en attente et âge de la dernière synchronisation réussie. | 🔧 absorbé par **H2** |
 | B5 | Sauvegarde locale de la base Drift (copie datée dans `Documents\AgriERP\sauvegardes`, rotation 7 jours) avant toute migration de schéma et chaque jour. | 🔧 |
 | B6 | Couches DDD : migrer progressivement les repositories qui renvoient des lignes Drift vers des entités de domaine (Doctrine §1.3), écran par écran et jamais en lot. | 🔧 continu |
 
@@ -224,6 +224,39 @@ Les deux côtés migrent **ensemble**, module par module, sinon la parité est p
 
 ---
 
+## Sprint H — Fidélité des écrans clés (audit du 19/10/2026)
+
+Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives d'ergonomie du client servent de liste de contrôle ; toutes les valeurs viennent du Blade. Un ticket = un écran, garde-fou compris. Le poste s'aligne sur le **Blade**, pas sur la maquette : chaque ticket remplace les comparaisons à la maquette qui ne tiennent plus par une comparaison au Blade.
+
+| # | Ticket | Statut |
+|---|---|---|
+| H1 | **Châssis du poste** : bouton flottant et panneau « Accès Rapide » (13 entrées, 3 groupes, valeurs de `app.blade.php:219-247`) ; barre latérale qui défile ; valeurs de la barre latérale (288 px, dégradé, « ERP » jaune, sous-titre, séparateur, entrée active jaune, icône 20 / libellé 13) ; menu du compte complet (Paramètres, séparateur, Déconnexion) ; badge de la cloche « 9+ » ; composant toast unique `ToastAgri` (haut droite, 3,5 s, succès / erreur / avertissement) | 🔧 |
+| H2 | **Bouton « Synchroniser » dans la barre supérieure + modale, poste** (PRD [`synchronisation-barre-superieure`](docs/prd/synchronisation-barre-superieure.md), absorbe B4) ; `pendingCount()` aligné sur les tables réellement envoyées (8 tables oubliées) ; « dernière synchronisation réussie » | 🔧 |
+| H3 | **Même bouton + modale « État de synchronisation des postes », web** (admin) ; table serveur `journal_synchronisation` (tirages et envois, par poste, compteurs) | 🔧 — **web d'abord**, avant H2 |
+| H4 | **Gestion Élevage** du poste : repository, 4 KPI, intertitres « Registres par Espèce » et « Accès Rapides — Élevage & Soins », 3 accès rapides manquants, libellés et icônes des cartes, grille, Escargots grisé (et non masqué) | 🔧 |
+| H5 | **Tableau de bord** du poste : Dettes (`payables`), Gestantes (`livestock_reproduction_events`), Résultat Net et Dépenses sur les **achats** comme le web, sous-textes « Mois précédent », alerte « Créance en retard », onglets Achat et Factures, lignes Vente, Activités du jour (`audit_logs`), filtre `status = 'actif'`, mentions périmées retirées | 🔧 |
+| H6 | **Dashboard Élevage** du poste : formule du GMQ cumulé et KPI mortalité 7 j en parité exécutée PHP ↔ Dart, filtre `status = 'actif'` et espèces `enabled()`, onglets GMQ et Prévision ramenés aux tableaux du Blade, résumé GMQ par bande, rappels VMS du web | 🔧 |
+| H7 | **Suivi Reproduction** du poste : colonnes et cellules du Blade, statuts, rappel du cycle à 4 étapes, actions Palpation / Mise bas / Clôture (écritures `livestock_reproduction_events` déjà poussées), lien « Saisir le Couvoir du Jour → », modale (mâle facultatif) | 🔧 |
+| H8 | **Soins et vaccins** du poste : registre (6 colonnes, « CODE (Espèce) », archivage), modale Nouveau Soin, messages ; puis infirmerie et calendrier planifié, qui demandent `infirmary_records` et `veterinary_calendar_events` au poste (tables synchronisables, schéma partagé) | 🔧 / ❓ D-H8 |
+| H9 | **Paramètres Élevage** du poste : libellés, formats, tris ; bloc « Rappel des soins planifiés » (valeur servie au tirage) | 🔧 / ❓ D-H9 |
+| H10 | Garde-fou : un test par écran H4–H9 qui lit les libellés et colonnes **dans le Blade** (et non plus dans la maquette) et les cherche dans l'écran Flutter | 🔧 |
+
+**Décisions client du Sprint H :**
+
+| Réf. | Question | Recommandation |
+|---|---|---|
+| D-SYNC-1 | Route unique `/api/v1/sync` + table outbox + déduplication 30 j ? | Non : l'idempotence par UUID existe ; la réécriture ferait courir un risque à 20 tables sans corriger de défaut constaté |
+| D-SYNC-2 | Envoi par lots de 50 ? | Oui, après B2 |
+| D-SYNC-3 | Synchronisation automatique et réessais exponentiels ? | Oui (B2), pour les échecs réseau seulement |
+| D-SYNC-4 | Vente reçue en rupture de stock | Accepter et **signaler** (aujourd'hui acceptée en silence, stock négatif possible) |
+| D-SYNC-5 | Appairage du poste par l'admin | Non : le jeton par utilisateur porte ses droits, contrôlés table par table |
+| D-SYNC-6 | Seuil « Inactif depuis N jours » de la modale web | 3 jours |
+| D-H8 | Infirmerie et calendrier planifié saisis au poste (deux nouvelles tables synchronisables) ? | Oui, en ticket séparé : sans elles, l'onglet Suivi Sanitaire reste vide hors ligne |
+| D-H9 | Paramètres Élevage modifiables au poste ? Aujourd'hui lecture seule (référentiels : le serveur gagne) | Non : garder la lecture seule, documentée comme écart assumé ; seul l'administrateur règle les barèmes, sur le web |
+| D-H-maquette | Ajouts du poste absents du Blade (courbes GMQ, filtres du registre, bandeaux de cycle Volailles / Escargots, horizons de prévision, « Bandes suivies »…) : retirer, ou construire d'abord au web ? | Retirer du poste, sauf ceux que le client veut voir aussi au web |
+
+---
+
 ## Sprint G — Production web
 
 | # | Ticket |
@@ -245,6 +278,7 @@ Les deux côtés migrent **ensemble**, module par module, sinon la parité est p
 | C | Périmètre exact de la clôture de caisse (absente du prototype). |
 | E3 | En-têtes de tableau sombres ou charte actuelle du web. |
 | RBAC | 7 rôles (CDC) contre 4 implémentés. |
+| D-SYNC-1 à 6, D-H8, D-H9, D-H-maquette | Voir Sprint H. |
 
 ---
 
@@ -254,6 +288,6 @@ Les deux côtés migrent **ensemble**, module par module, sinon la parité est p
 2. Décisions A2, A3 et 3.F7 avec l'exploitant.
 3. F0.96 et F0.97, puis mise en service simultanée (3.F4).
 4. D2 : premier installateur réel.
-5. B2 à B4 : synchronisation automatique et visibilité.
+5. H3 puis H2 (synchronisation visible, web d'abord), H1 (châssis), puis H4 à H10 écran par écran ; B2 et B3.
 6. C : clôture de caisse, une fois validée.
 7. E, F et G en continu.
