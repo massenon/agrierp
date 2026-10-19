@@ -25,6 +25,14 @@ class ParametresPoste {
   static const cleIdentifiant = 'poste.identifiant';
   static const cleAdresseServeur = 'poste.adresse_serveur';
 
+  /// Ticket H13 (B2) — intervalle de la synchronisation automatique, en minutes.
+  static const cleIntervalleSynchronisation =
+      'poste.intervalle_synchronisation_minutes';
+
+  /// Choix proposés à l'écran ; 15 min par défaut (décision D-SYNC-3).
+  static const intervallesProposes = [5, 15, 30, 60];
+  static const intervalleParDefaut = 15;
+
   /// Valeur de départ : le serveur de production de la ferme.
   ///
   /// 🔁 Décision client du 17/10/2026 — « le serveur est hébergé à
@@ -76,6 +84,22 @@ class ParametresPoste {
     }
 
     await _ecrire(cleAdresseServeur, propre);
+  }
+
+  /// ⚠️ Une valeur absente, illisible ou hors des choix proposés retombe sur 15 min : un intervalle nul ou
+  /// négatif lancerait une synchronisation en boucle.
+  Future<Duration> intervalleSynchronisation() async {
+    final minutes = int.tryParse(await _lire(cleIntervalleSynchronisation) ?? '');
+    return Duration(
+      minutes: intervallesProposes.contains(minutes)
+          ? minutes!
+          : intervalleParDefaut,
+    );
+  }
+
+  Future<void> definirIntervalleSynchronisation(int minutes) async {
+    if (!intervallesProposes.contains(minutes)) return;
+    await _ecrire(cleIntervalleSynchronisation, '$minutes');
   }
 
   Future<String?> _lire(String cle) async {

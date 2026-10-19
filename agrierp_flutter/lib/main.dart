@@ -1,3 +1,6 @@
+import 'dart:ui' show AppExitResponse;
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -8,6 +11,7 @@ import 'core/config/parametres_poste.dart';
 import 'core/database/app_database.dart';
 import 'core/export/pdf_recu.dart';
 import 'core/sync/modale_synchronisation.dart';
+import 'core/sync/synchronisation_automatique.dart';
 import 'core/widgets/acces_rapide.dart';
 import 'features/recherche/recherche_globale_champ.dart';
 import 'features/recherche/recherche_globale_repository.dart';
@@ -383,6 +387,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           parametres: widget.parametres,
           identifiantPoste: widget.identifiantPoste,
           onDeconnecte: () => setState(() => _sessionOuverte = false),
+          changementsReseau: Connectivity().onConnectivityChanged,
         ),
       },
     );
@@ -432,10 +437,15 @@ class SocleAccueil extends StatefulWidget {
     required this.parametres,
     required this.identifiantPoste,
     this.onDeconnecte,
+    this.changementsReseau,
   });
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
   final VoidCallback? onDeconnecte;
+
+  /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
+  /// châssis, qui n'ont pas de plateforme native pour la connectivité).
+  final Stream<List<ConnectivityResult>>? changementsReseau;
 
   final AppDatabase database;
   final SyncEngine engine;
@@ -518,6 +528,49 @@ class _SocleAccueilState extends State<SocleAccueil> {
     _ecran = accessibles.isEmpty
         ? EcranPoste.synchronisation
         : accessibles.first;
+
+    _demarrerSynchronisationAutomatique();
+  }
+
+  /// Ticket H13 (B2) — synchronisation automatique de la session : retour du réseau, intervalle réglé dans
+  /// Paramètres du poste, réessais après un échec réseau. Arrêtée à la déconnexion (le socle est démonté).
+  SynchronisationAutomatique? _automatique;
+
+  /// Ticket H13 — la fermeture par le système (Alt+F4) envoie aussi ce qui attend.
+  AppLifecycleListener? _cycleDeVie;
+
+  Future<void> _demarrerSynchronisationAutomatique() async {
+    final reseau = widget.changementsReseau;
+    if (reseau == null) return;
+    final intervalle = await widget.parametres.intervalleSynchronisation();
+    if (!mounted) return;
+    _automatique = SynchronisationAutomatique(
+      synchroniser: widget.engine.synchroniser,
+      changementsReseau: reseau,
+      intervalle: intervalle,
+      // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
+      onTermine: () {
+        if (mounted) setState(() => _versionTirage++);
+      },
+    )..demarrer();
+    _cycleDeVie = AppLifecycleListener(
+      onExitRequested: () async {
+        if ((await _restantsAEnvoyer()) > 0) await _automatique?.avantFermeture();
+        return AppExitResponse.exit;
+      },
+    );
+  }
+
+  Future<int> _restantsAEnvoyer() async {
+    final c = await widget.database.compteursSynchronisation();
+    return c.aEnvoyer + c.refuses;
+  }
+
+  /// Ticket H13 — synchronisation de fermeture (bouton ✕) : rend ce qui reste à envoyer ensuite.
+  Future<int> _avantFermeture() async {
+    await _automatique?.avantFermeture();
+    if (mounted) setState(() => _versionTirage++);
+    return _restantsAEnvoyer();
   }
 
   /// Titre de la barre supérieure (groupe vide : `BarreSuperieure` affiche alors le seul titre).
@@ -525,6 +578,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   @override
   void dispose() {
+    _automatique?.arreter();
+    _cycleDeVie?.dispose();
     _brouillonContact.dispose();
     super.dispose();
   }
@@ -559,6 +614,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     enAttente: (instantane.data?.$1.aEnvoyer ?? 0) + (instantane.data?.$1.refuses ?? 0),
                     refuses: instantane.data?.$1.refuses ?? 0,
                     onSynchroniser: _ouvrirSynchronisation,
+                    avantFermeture: widget.changementsReseau == null ? null : _avantFermeture,
                     nonLues: instantane.data?.$2.nonLues,
                     recentes: [
                       for (final n in (instantane.data?.$2.lignes ?? []).take(

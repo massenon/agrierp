@@ -119,7 +119,15 @@ class SyncEngine {
     return etats.any((e) => e != ConnectivityResult.none);
   }
 
-  Future<SyncOutcome> synchroniser() async {
+  /// Ticket H13 — la tentative en cours. Un second appelant (bouton « Synchroniser maintenant » pendant une
+  /// synchronisation automatique) reçoit la MÊME tentative : deux tirages entremêlés écriraient deux fois le
+  /// curseur, et deux envois simultanés acquitteraient deux fois les mêmes lignes.
+  Future<SyncOutcome>? _tentativeEnCours;
+
+  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
+      _synchroniserUneFois().whenComplete(() => _tentativeEnCours = null);
+
+  Future<SyncOutcome> _synchroniserUneFois() async {
     if (!await estEnLigne()) {
       // ⚠️ HORS LIGNE N'EST PAS UNE ERREUR. C'est le mode de fonctionnement
       // NORMAL de cette ferme : le réseau est intermittent à Ikpinlè. Un

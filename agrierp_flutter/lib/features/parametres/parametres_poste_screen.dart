@@ -27,6 +27,9 @@ class _ParametresPosteScreenState extends State<ParametresPosteScreen> {
   final _adresse = TextEditingController();
   String _enregistree = '';
 
+  /// Ticket H13 — intervalle de la synchronisation automatique, en minutes.
+  int? _intervalle;
+
   @override
   void initState() {
     super.initState();
@@ -41,12 +44,33 @@ class _ParametresPosteScreenState extends State<ParametresPosteScreen> {
 
   Future<void> _charger() async {
     final actuelle = await widget.parametres.adresseServeur();
+    final intervalle = await widget.parametres.intervalleSynchronisation();
     if (mounted) {
       setState(() {
         _enregistree = actuelle;
         _adresse.text = actuelle;
+        _intervalle = intervalle.inMinutes;
       });
     }
+  }
+
+  Future<void> _changerIntervalle(int? minutes) async {
+    if (minutes == null) return;
+    await widget.parametres.definirIntervalleSynchronisation(minutes);
+    await _charger();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: AgriColors.brandEmerald,
+        // L'intervalle est lu à l'ouverture de la session, comme l'adresse au démarrage : le dire.
+        content: Text(
+          'Intervalle enregistré. Il prend effet à la prochaine ouverture '
+          'de session.',
+        ),
+      ),
+    );
   }
 
   Future<void> _enregistrer() async {
@@ -176,6 +200,49 @@ class _ParametresPosteScreenState extends State<ParametresPosteScreen> {
                         child: const Text('Enregistrer'),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AgriSpacing.md),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SYNCHRONISATION AUTOMATIQUE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.brandForest,
+                    ),
+                  ),
+                  const SizedBox(height: AgriSpacing.xs),
+                  DropdownButton<int>(
+                    key: const Key('intervalle-synchronisation'),
+                    value: _intervalle,
+                    style: const TextStyle(
+                      fontSize: AgriTypography.xs,
+                      color: AgriColors.onSurface,
+                    ),
+                    items: [
+                      for (final m in ParametresPoste.intervallesProposes)
+                        DropdownMenuItem(
+                          value: m,
+                          child: Text('Toutes les $m minutes'),
+                        ),
+                    ],
+                    onChanged: _changerIntervalle,
+                  ),
+                  const SizedBox(height: AgriSpacing.xs),
+                  const Text(
+                    'Le poste se synchronise aussi au retour du réseau et à '
+                    'la fermeture. Après un échec réseau, il réessaie après '
+                    '30 s, 2 min, 5 min, 15 min, puis toutes les heures.',
+                    style: TextStyle(fontSize: 11, color: AgriColors.outline),
                   ),
                 ],
               ),

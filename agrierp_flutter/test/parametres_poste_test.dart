@@ -116,4 +116,33 @@ void main() {
     // faut relancer, sinon on croit à une panne réseau.
     expect(find.textContaining('Redémarrez'), findsOneWidget);
   });
+
+  // Ticket H13 (B2) — l'intervalle de la synchronisation automatique se règle ici.
+  testWidgets('l écran règle l intervalle de la synchronisation automatique', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ParametresPosteScreen(
+          parametres: parametres,
+          identifiantActuel: 'poste-a1b2c3d4',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('SYNCHRONISATION AUTOMATIQUE'), findsOneWidget);
+    expect(find.text('Toutes les 15 minutes'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('intervalle-synchronisation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Toutes les 30 minutes').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      await parametres.intervalleSynchronisation(),
+      const Duration(minutes: 30),
+    );
+    expect(find.textContaining('prochaine ouverture de session'), findsOneWidget);
+  });
 }

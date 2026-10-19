@@ -59,6 +59,7 @@ class BarreSuperieure extends StatelessWidget {
     this.nonLues,
     this.recentes = const [],
     this.onNotifications,
+    this.avantFermeture,
   });
 
   /// Nombre de notifications non lues. `null` : le poste ne sait pas (aucune
@@ -108,6 +109,10 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Ouvre la modale « Synchronisation » (ticket H2). `null` : bouton inerte (aucun moteur branché).
   final VoidCallback? onSynchroniser;
+
+  /// Ticket H13 (B2) — synchronisation de fermeture : envoie ce qui attend encore et rend le nombre
+  /// d'enregistrements restés à envoyer. `null` = aucune tentative (la confirmation suit [enAttente]).
+  final Future<int> Function()? avantFermeture;
 
   final VoidCallback onBasculerMenu;
   final bool menuOuvert;
@@ -538,11 +543,54 @@ class BarreSuperieure extends StatelessWidget {
     );
   }
 
+  /// Ticket H13 — pendant l'envoi de fermeture (borné à 15 s), une modale dit ce qui se passe : sans elle,
+  /// le clic sur ✕ semblerait sans effet.
+  Future<int> _synchroniserAvantFermeture(BuildContext context) async {
+    final navigateur = Navigator.of(context);
+    var ouverte = true;
+    afficherModale<void>(
+      context: context,
+      fermableParVoile: false,
+      constructeur: (_) => const ModaleAgri(
+        key: Key('modale-envoi-fermeture'),
+        titre: 'Synchronisation avant fermeture',
+        largeur: LargeurModale.sm,
+        contenu: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: AgriSpacing.sm),
+            Expanded(
+              child: Text(
+                'Envoi des enregistrements en attente…',
+                style: TextStyle(fontSize: AgriTypography.xs),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() => ouverte = false);
+    try {
+      return await avantFermeture!();
+    } finally {
+      if (ouverte) navigateur.pop();
+    }
+  }
+
   /// ⚠️ FERMER SE CONFIRME QUAND UNE SAISIE ATTEND ENCORE. Quitter avec des
   /// journées non transmises ne les perd pas — elles restent en base locale —
   /// mais l'animalier doit le savoir, sans quoi il croira son travail parti.
   Future<void> _confirmerFermeture(BuildContext context) async {
-    if (enAttente == 0) {
+    var restants = enAttente;
+    if (restants > 0 && avantFermeture != null) {
+      restants = await _synchroniserAvantFermeture(context);
+      if (!context.mounted) return;
+    }
+
+    if (restants == 0) {
       await FenetrePoste.fermer();
       return;
     }
@@ -559,7 +607,7 @@ class BarreSuperieure extends StatelessWidget {
         titre: 'Quitter AgriERP ?',
         largeur: LargeurModale.sm,
         contenu: Text(
-          '$enAttente enregistrement(s) attendent encore d\'être transmis. '
+          '$restants enregistrement(s) attendent encore d\'être transmis. '
           'Ils restent enregistrés sur ce poste et partiront à la prochaine '
           'synchronisation.',
           style: const TextStyle(fontSize: AgriTypography.xs),
