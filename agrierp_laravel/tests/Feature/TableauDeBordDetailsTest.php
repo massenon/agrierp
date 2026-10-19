@@ -52,4 +52,23 @@ class TableauDeBordDetailsTest extends TestCase
     {
         Livewire::test(Index::class)->assertSee('Aucun exercice ouvert')->assertSee('Aucun produit sous son seuil');
     }
+
+    /**
+     * Ticket H5 — deux défauts du web relevés en alignant le poste : une vente ANNULÉE gonflait le chiffre
+     * d'affaires, et le retard d'une créance s'affichait négatif (« (-10 jours) »). Calcul à la main : 15 000 vendus,
+     * 9 000 annulés → CA 15 000 ; échéance il y a 10 jours → « (10 jours) ».
+     */
+    public function test_ca_sans_ventes_annulees_et_retard_positif(): void
+    {
+        $vente = \App\Models\Sale::create(['payment_mode' => 'especes', 'subtotal' => 15000, 'total' => 15000]);
+        $annulee = \App\Models\Sale::create(['payment_mode' => 'especes', 'subtotal' => 9000, 'total' => 9000]);
+        $annulee->forceFill(['status' => 'annulee'])->save();
+        $client = \App\Models\Customer::create(['name' => 'Maman Afi', 'is_active' => true]);
+        \App\Models\Receivable::create(['customer_id' => $client->id, 'sale_id' => $vente->id, 'amount' => 5000, 'amount_paid' => 0,
+            'due_date' => now()->subDays(10)->toDateString(), 'status' => 'en_cours']);
+
+        $page = Livewire::test(Index::class);
+        $this->assertSame(15000.0, $page->instance()->kpis['ca']['value']);
+        $page->assertSee('Créance en retard — Maman Afi (10 jours)')->assertDontSee('-10 jours');
+    }
 }

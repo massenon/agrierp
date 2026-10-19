@@ -135,6 +135,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   // ── 1. En-tête ────────────────────────────────────────────────────────────
 
   Widget _entete(bool large) {
+    final exercice = _donnees?.exerciceOuvert;
     final titre = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -149,7 +150,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         const SizedBox(height: AgriSpacing.xs),
         Text(
           'Rapport généré le ${_dateCourte(DateTime.now())} '
-          'à ${_heure(DateTime.now())} · Exercice ${DateTime.now().year} actif',
+          'à ${_heure(DateTime.now())} · '
+          '${exercice == null ? 'Aucun exercice ouvert' : 'Exercice $exercice actif'}',
           style: const TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,

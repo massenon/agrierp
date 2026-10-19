@@ -539,6 +539,23 @@ void main() {
   // ── 2. Jeu de données fait à la main ──────────────────────────────────────────────────────────────────
 
   group('jeu de données fait à la main', () {
+    // Ticket H5 — défauts corrigés AU WEB d'abord (`Sale::nonAnnulees()`, retard positif, exercice ouvert), puis ici.
+    test('une vente ANNULÉE ne compte pas au CA ; l en-tête lit l exercice ouvert', () async {
+      await jeuALaMain();
+      final avant = (await depot.charger()).chiffreAffaires.valeur;
+      final maintenant = DateTime.now();
+      await db.into(db.sales).insert(SalesCompanion.insert(
+        id: 'cccccccc-0000-4000-8000-0000000000aa', deviceId: 'poste-test', updatedAt: maintenant,
+        paymentMode: 'especes', total: 77777, soldAt: maintenant, status: const Value('annulee'),
+      ));
+      final d = await depot.charger();
+      expect(d.chiffreAffaires.valeur, avant);
+      expect(d.exerciceOuvert, isNull);
+
+      await db.into(db.fiscalYears).insert(FiscalYearsCompanion.insert(id: 'cccccccc-0000-4000-8000-0000000000fa', year: 2026, status: const Value('ouvert')));
+      expect((await depot.charger()).exerciceOuvert, 2026);
+    });
+
     test('KPI : CA, Dépenses sur les ACHATS, Résultat Net, Dettes, Créances, Effectif', () async {
       await jeuALaMain();
       final d = await depot.charger();
@@ -588,7 +605,7 @@ void main() {
       expect(d.alertes.map((a) => a.message), [
         'Stock critique — Provende ponte (5.00 sac restant(s))',
         'Mortalité anormale — Lot POR-2026-01 (15,0%)',
-        'Créance en retard — KPOSSOU Éléonore (-10 jours)',
+        'Créance en retard — KPOSSOU Éléonore (10 jours)',
       ]);
       expect(d.alertes.map((a) => a.grave), [true, true, false]);
       expect(d.alertes.map((a) => a.lien), ['/gestion-stocks', '/gestion-bandes', '/creances-clients']);
@@ -688,7 +705,7 @@ void main() {
       await tester.ensureVisible(find.text('Stock critique — Provende ponte (5.00 sac restant(s))'));
       await tester.tap(find.text('Stock critique — Provende ponte (5.00 sac restant(s))'));
       await tester.tap(find.text('Mortalité anormale — Lot POR-2026-01 (15,0%)'));
-      await tester.tap(find.text('Créance en retard — KPOSSOU Éléonore (-10 jours)'));
+      await tester.tap(find.text('Créance en retard — KPOSSOU Éléonore (10 jours)'));
       await tester.pumpAndSettle();
       // `/gestion-bandes` n'a pas d'écran au poste : pas de flèche qui ne mène nulle part.
       expect(ouverts, [EcranPoste.gestionStocks, EcranPoste.clientsEtCreances]);

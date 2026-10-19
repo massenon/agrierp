@@ -82,6 +82,15 @@ class Sale extends Model
             ->whereRaw('DATE('.self::DATE_EFFECTIVE_SQL.') <= ?', [Carbon::parse($au)->toDateString()]);
     }
 
+    /**
+     * Ticket H5 — ventes NON ANNULÉES. 🔴 Le tableau de bord comptait les ventes annulées (`status = 'annulee'`) dans
+     * le chiffre d'affaires, la courbe, les ventes porcines et le Top 5 : une vente annulée gonflait la recette.
+     */
+    public function scopeNonAnnulees(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'annulee'));
+    }
+
     /** Ventes dont la date effective est posterieure ou egale a l'instant donne. */
     public function scopeSoldSince(Builder $query, \DateTimeInterface $depuis): Builder
     {

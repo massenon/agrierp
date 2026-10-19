@@ -79,7 +79,7 @@ void main() {
   late AppDatabase db;
   late DashboardElevageRepository depot;
 
-  /// Instant de référence : lundi 19/10/2026, 10 h 15 (l'heure compte pour la fenêtre de 7 jours).
+  /// Instant de référence : lundi 19/10/2026, 10 h 15 (depuis le ticket H6, l'heure ne compte plus pour la fenêtre).
   final maintenant = DateTime(2026, 10, 19, 10, 15);
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
@@ -563,13 +563,12 @@ void main() {
   group('mortalité', () {
     /// Bande A (cuniculture, effectif initial 100) — fiches :
     ///   11/10 : 2 morts, effectif final 98   (hors fenêtre 7 j)
-    ///   13/10 : 3 morts, effectif final 95   (J-6 : HORS fenêtre à 10 h 15, voir plus bas)
+    ///   13/10 : 3 morts, effectif final 95   (J-6 : DANS la fenêtre, voir plus bas)
     ///   14/10 : 1 mort,  effectif final 94
     ///   19/10 : 2 morts, effectif final 92
-    /// ⚠️ `whereBetween('entry_date', [now()->subDays(6), now()])` compare une DATE (minuit) au
-    /// 13/10 10 h 15 : le 13/10 est exclu (vérifié en PHP réel). Fenêtre : 14/10 et 19/10.
-    ///   morts = 1 + 2 = 3 ; départ = previousEffectif(14/10) 95 + previousEffectif(19/10) 94 = 189
-    ///   3 ÷ 189 = 1,587 % → « 1,6 % ».
+    /// Ticket H6 — le web comparait à `now()->subDays(6)` AVEC l'heure et perdait le 13/10 ; corrigé au web
+    /// (bornes en dates), la fenêtre couvre 13/10, 14/10 et 19/10 :
+    ///   morts = 3 + 1 + 2 = 6 ; départ = previousEffectif 98 + 95 + 94 = 287 ; 6 ÷ 287 = 2,091 % → « 2,1 % ».
     /// Mois d'octobre : départs 100 (initial) + 98 + 95 + 94 = 387, morts 8 → 2,067 % → « 2,1 % ».
     Future<void> jeu() async {
       final a = await bande('CUN-1', 'cuniculture', courant: 92);
@@ -592,7 +591,7 @@ void main() {
       await jeu();
       final d = await depot.charger(quand: maintenant);
 
-      expect(d.mortalite7j, 1.6);
+      expect(d.mortalite7j, 2.1);
       final cartes = {for (final c in d.especes) c.code: c};
       expect(cartes['cuniculture']!.lignes[1], ('Taux mortalité (mois)', '2,1 %', false));
       expect(cartes['porciculture']!.lignes[1], ('Taux mortalité (mois)', '10,0 %', true));
@@ -606,8 +605,8 @@ void main() {
       await afficher(tester);
 
       expect(find.text('MORTALITÉ CUMULÉE (7J)'), findsOneWidget);
-      expect(find.text('1,6 %'), findsOneWidget);
-      expect(find.text('2,1 %'), findsOneWidget);
+      // 7 jours ET mois de la carte cuniculture : tous deux « 2,1 % ».
+      expect(find.text('2,1 %'), findsNWidgets(2));
       final critique = tester.widget<Text>(find.text('10,0 %'));
       expect(critique.style!.color, AgriColors.errorDeep);
       final limite = tester.widget<Text>(find.text('5,0 %'));

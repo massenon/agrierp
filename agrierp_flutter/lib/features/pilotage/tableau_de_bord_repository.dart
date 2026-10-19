@@ -154,7 +154,13 @@ class DonneesTableauDeBord {
     required this.facturesRecentes,
     required this.activitesDuJour,
     required this.topProduits,
+    this.exerciceOuvert,
   });
+
+  /// Ticket H5 — année de l'exercice OUVERT (`FiscalYear::current()` : statut `ouvert`, le plus récent), affichée
+  /// « · Exercice {année} actif » comme au web ; `null` : « · Aucun exercice ouvert ». 🔴 Le poste affichait l'année
+  /// du CALENDRIER, même sans exercice ouvert.
+  final int? exerciceOuvert;
 
   /// Période AFFICHÉE (champs désactivés du Blade) : 1er du mois → aujourd'hui.
   final DateTime debutPeriode;
@@ -223,6 +229,9 @@ class TableauDeBordRepository {
     final finPrecedent = debutMois.subtract(const Duration(microseconds: 1));
 
     final ventes = await database.select(database.sales).get();
+    // Ticket H5 — `Sale::nonAnnulees()` du web (corrigé au web d'abord) : une vente annulée ne compte ni au CA, ni à
+    // la courbe, ni aux ventes du mois, ni au Top 5. Les LISTES (transactions récentes, factures) la montrent encore.
+    final ventesValides = ventes.where((v) => v.status != 'annulee').toList();
     final lignes = await database.select(database.saleLines).get();
     final produits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
@@ -240,9 +249,7 @@ class TableauDeBordRepository {
     final journal = await database.select(database.auditLogs).get();
 
     // ── KPI (`getKpisProperty`) ─────────────────────────────────────────────────────────────────────────
-    // ⚠️ `Sale::soldSince` / `soldBetweenInstants` ne filtrent PAS le statut : une vente annulée reste dans le
-    // CA du web. Reproduit tel quel (article 0) ; signalé au web, qui corrige d'abord.
-    double caEntre(DateTime du, DateTime? au) => ventes
+    double caEntre(DateTime du, DateTime? au) => ventesValides
         .where((v) => !v.soldAt.isBefore(du) && (au == null || !v.soldAt.isAfter(au)))
         .fold<double>(0, (t, v) => t + v.total);
     double achatsEntre(DateTime du, DateTime? au) => achats
@@ -283,7 +290,11 @@ class TableauDeBordRepository {
 
     final nomsClients = {for (final c in clients) c.id: c.name};
 
+    final exercices = await (database.select(database.fiscalYears)..where((e) => e.status.equals('ouvert'))).get();
+    final exerciceOuvert = exercices.isEmpty ? null : exercices.map((e) => e.year).reduce((a, b) => a > b ? a : b);
+
     return DonneesTableauDeBord(
+      exerciceOuvert: exerciceOuvert,
       debutPeriode: debutMois,
       finPeriode: maintenant,
       chiffreAffaires: Mesure.chiffre(ca),
@@ -324,12 +335,12 @@ class TableauDeBordRepository {
         toutesBandes,
         fiches,
         cycles,
-        ventes,
+        ventesValides,
         lignes,
         produits,
         categories,
       ),
-      serie: _serie(ventes, achats, maintenant),
+      serie: _serie(ventesValides, achats, maintenant),
       ventesRecentes: _ventes(ventes, nomsClients),
       achatsRecents: _achats(achats),
       depensesRecentes: _depenses(depenses),
@@ -339,7 +350,7 @@ class TableauDeBordRepository {
         nomsClients,
       ),
       activitesDuJour: _activites(journal, maintenant),
-      topProduits: _topProduits(debutMois, ventes, lignes, produits),
+      topProduits: _topProduits(debutMois, ventesValides, lignes, produits),
     );
   }
 
@@ -398,8 +409,8 @@ class TableauDeBordRepository {
     }
 
     // 3. Créances en retard : solde non nul, échéance dépassée, `->limit(3)`.
-    //    ⚠️ `(int) now()->diffInDays($receivable->due_date)` : Carbon 3 rend un écart SIGNÉ (échéance passée →
-    //    négatif) et `(int)` tronque vers zéro. Le web affiche donc « (-10 jours) » ; reproduit, signalé au web.
+    //    Ticket H5 — le retard se compte de l'échéance à aujourd'hui, en jours calendaires (le web affichait
+    //    « (-10 jours) », corrigé au web d'abord).
     for (final c
         in creances
             .where(
@@ -409,7 +420,8 @@ class TableauDeBordRepository {
                   c.dueDate!.isBefore(maintenant),
             )
             .take(3)) {
-      final jours = c.dueDate!.difference(maintenant).inDays;
+      final echeance = DateTime(c.dueDate!.year, c.dueDate!.month, c.dueDate!.day);
+      final jours = DateTime(maintenant.year, maintenant.month, maintenant.day).difference(echeance).inDays;
       alertes.add(
         AlerteCritique(
           message:

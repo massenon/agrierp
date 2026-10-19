@@ -49,8 +49,8 @@ class Index extends Component
         $prevMonthEnd = now()->subMonthNoOverflow()->endOfMonth();
 
         $ca = $this->realOrPendingKpi('sales', 'Sprint 4 (Ventes Ferme)', function () use ($monthStart, $prevMonthStart, $prevMonthEnd) {
-            $current = (float) \App\Models\Sale::soldSince($monthStart)->sum('total');
-            $previous = (float) \App\Models\Sale::soldBetweenInstants($prevMonthStart, $prevMonthEnd)->sum('total');
+            $current = (float) \App\Models\Sale::nonAnnulees()->soldSince($monthStart)->sum('total');
+            $previous = (float) \App\Models\Sale::nonAnnulees()->soldBetweenInstants($prevMonthStart, $prevMonthEnd)->sum('total');
 
             return ['value' => $current, 'previous' => $previous];
         });
@@ -119,7 +119,7 @@ class Index extends Component
         for ($i = 5; $i >= 0; $i--) {
             $monthDate = now()->subMonthsNoOverflow($i);
             $labels[] = $monthDate->translatedFormat('M');
-            $ca[] = (float) \App\Models\Sale::soldBetweenInstants($monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth())->sum('total');
+            $ca[] = (float) \App\Models\Sale::nonAnnulees()->soldBetweenInstants($monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth())->sum('total');
             $depenses[] = (float) \App\Models\Purchase::whereBetween('purchase_date', [$monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth()])->sum('total');
         }
 
@@ -198,7 +198,9 @@ class Index extends Component
                 ->where('due_date', '<', now())
                 ->limit(3)
                 ->get() as $receivable) {
-                $days = (int) now()->diffInDays($receivable->due_date);
+                // Ticket H5 — 🔴 Carbon 3 renvoie un écart SIGNÉ : `now()->diffInDays($echeance)` donnait « (-10 jours) ».
+                // Le retard se compte de l'échéance à aujourd'hui.
+                $days = (int) $receivable->due_date->copy()->startOfDay()->diffInDays(now()->startOfDay());
                 $alerts[] = [
                     'label' => "Créance en retard — {$receivable->customer?->name} ({$days} jours)",
                     'severity' => 'moyen',
@@ -266,7 +268,7 @@ class Index extends Component
                 // filtre par espèce individuelle sur chaque sujet vendu
                 // (aucun lien direct vente↔lot n'existe dans le schéma).
                 'ventes_mois' => (int) \App\Models\SaleLine::whereHas('product', fn ($q) => $q->whereHas('category', fn ($q2) => $q2->where('label', 'Porciculture')))
-                    ->whereHas('sale', fn ($q) => $q->soldSince(now()->startOfMonth()))->count(),
+                    ->whereHas('sale', fn ($q) => $q->nonAnnulees()->soldSince(now()->startOfMonth()))->count(),
                 'mortalite' => $mortaliteMois('porciculture'),
             ],
         ];
@@ -299,7 +301,7 @@ class Index extends Component
         }
 
         return \App\Models\SaleLine::selectRaw('product_id, SUM(qty) as total_qty, SUM(manual_total_amount) as total_ca')
-            ->whereHas('sale', fn ($q) => $q->soldSince(now()->startOfMonth()))
+            ->whereHas('sale', fn ($q) => $q->nonAnnulees()->soldSince(now()->startOfMonth()))
             ->groupBy('product_id')
             ->orderByDesc('total_ca')
             ->with('product')

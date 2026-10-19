@@ -57,7 +57,9 @@ class DashboardElevage extends Component
         $lotIds = $lots->pluck('id');
 
         $last7Days = LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->subDays(6), now()])
+            // Ticket H6 — 🔴 `now()->subDays(6)` portait l'HEURE courante : la fiche de J-6 (minuit) sortait de la
+            // fenêtre, et « Mortalité Cumulée (7j) » ne comptait que 6 jours. Bornes en DATES (Y-m-d) : J-6 à aujourd'hui, juste en MySQL comme en SQLite.
+            ->whereBetween('entry_date', [now()->subDays(6)->toDateString(), now()->toDateString()])
             ->get();
 
         $totalMorts = $last7Days->sum('mort');

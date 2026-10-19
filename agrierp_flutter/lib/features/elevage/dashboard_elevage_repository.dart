@@ -397,9 +397,8 @@ class DashboardElevageRepository {
       mortalite7j: _mortalite(
         bandes,
         parLot,
-        (d) =>
-            !d.isBefore(maintenant.subtract(const Duration(days: 6))) &&
-            !d.isAfter(maintenant),
+        // Ticket H6 — sept jours CALENDAIRES (J-6 à aujourd'hui), comme le web corrigé : la borne n'a plus d'heure.
+        (d) => !d.isBefore(jour.subtract(const Duration(days: 6))) && !d.isAfter(jour),
       ),
       especes: _cartes(bandes, parLot, especes, jour),
       gmqParEspeceParSemaine: {
@@ -579,9 +578,8 @@ class DashboardElevageRepository {
 
   /// Σ morts ÷ Σ previousEffectif × 100, 1 décimale ; 0,0 si le dénominateur est nul.
   ///
-  /// ⚠️ [dansFenetre] reçoit la date de la fiche À MINUIT, comme MySQL promeut une DATE en
-  /// DATETIME pour la comparer à `now()->subDays(6)` : à 10 h 15, la fiche de J-6 (minuit) est
-  /// AVANT la borne et sort de la fenêtre « 7j ». Comportement réel du web, vérifié en PHP.
+  /// [dansFenetre] reçoit la date de la fiche à minuit. Ticket H6 : le web comparait à `now()->subDays(6)` (avec
+  /// l'heure) et perdait la fiche de J-6 ; corrigé au web (`startOfDay()`), le poste compte sept jours calendaires.
   double _mortalite(
     List<LivestockLot> bandes,
     Map<String, List<LivestockDailyEntry>> parLot,

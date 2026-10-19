@@ -21965,3 +21965,41 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - `test/coque_poste.dart` : coque complète partagée (tests du châssis, captures).
 - Suite : 2 062 verts, 16 sautés, 0 rouge ; `flutter analyze` propre.
 - Reste de H1 (non fait) : menu du compte (Paramètres, Déconnexion), titre de la barre supérieure, recherche globale, ruban replié, migration des SnackBar vers `ToastAgri`, icônes Material Symbols « Outlined ».
+
+---
+
+## Décisions du client du 19/10/2026 (Sprint H)
+
+- D-SYNC-1 non (pas de route unique ni d'outbox), D-SYNC-2 oui (lots de 50, après B2), D-SYNC-3 oui (synchronisation automatique, réessais réseau), D-SYNC-4 accepter et signaler, D-SYNC-5 non (pas d'appairage), D-SYNC-6 3 jours.
+- D-H8 oui : infirmerie et calendrier planifié saisis au poste.
+- D-H9 **oui, au poste et au web** : Paramètres Élevage modifiables (le client a écarté la recommandation « lecture seule »).
+- D-H-maquette : les ajouts du poste absents du Blade sont **gardés au poste** et **construits au web** (H11).
+
+---
+
+## Tickets H1 (fin), H1b, H4, H5, H6, H7, H14 et parties serveur de H7, H8b, H9b (19/10/2026)
+
+### Poste
+- **H1 (fin)** : menu du compte complet (Paramètres, séparateur, Déconnexion qui ferme la session sans toucher aux saisies en attente) ; titre de la barre supérieure repris du `$title` de chaque composant web ; barre de 64 px ; ruban de la barre repliée (six raccourcis et « Réafficher le menu »).
+- **H1b** : recherche globale du web transposée sur la base locale (5 domaines, droits filtrés en amont, comparaison sans accents ni ligatures, Ctrl+K, clavier).
+- **H4 Gestion Élevage** : dépôt et 4 KPI du web (`vivantes()`, mortalité du mois sur `previousEffectif()`), intertitres, cartes du Blade, 3 accès rapides manquants, Escargots grisé.
+- **H5 Tableau de bord** : Dettes, Dépenses sur les achats, Résultat Net, « Mois précédent », Gestantes, mortalité, alertes du web (dont « Créance en retard »), onglets Achat et Factures, activités du jour depuis `audit_logs`, mentions périmées retirées ; parité exécutée avec le PHP. L'en-tête lit l'exercice OUVERT (il affichait l'année du calendrier).
+- **H6 Dashboard Élevage** : GMQ cumulé et mortalité en parité exécutée avec le PHP, périmètre `status = 'actif'`, espèces activées, résumé GMQ par bande, rappels VMS du web, tableaux GMQ et Prévision du Blade ; ajouts du poste gardés.
+- **H7 Suivi Reproduction** : colonnes, cellules, statuts, rappel du cycle et KPI du Blade, modale de mise bas, lien « Saisir le Couvoir du Jour → », mâle facultatif. Les actions de cycle restent **grisées** au poste jusqu'à l'ouverture du moteur (ticket suivant).
+
+### Web et serveur
+- **H14 (D-SYNC-4)** : une vente reçue d'un poste qui rend un stock négatif est acceptée et signalée à l'administrateur.
+- **H7 serveur** : les étapes du cycle envoyées par le poste (palpation, mise bas, clôture) sont appliquées ; elles étaient acquittées sans effet.
+- **H8b serveur** : infirmerie et calendrier vétérinaire tirés et envoyés (`manage-elevage`).
+- **H9b serveur** : rations, prophylaxie, provendes, numérotation et délai de rappel envoyables par le poste (`manage-elevage`, validations et archivage du web).
+- **H11 (Tableau de bord)** : Caisse / Banque sous la Trésorerie, trois produits sous la carte Stock Critique, exercice ouvert dans l'en-tête.
+
+### Défauts du web trouvés en alignant le poste, corrigés au web PUIS au poste
+- 🔴 Le chiffre d'affaires comptait les ventes **annulées** (`Sale::nonAnnulees()`).
+- 🔴 Le retard d'une créance s'affichait **négatif** (« (-10 jours) » : écart signé de Carbon 3).
+- 🔴 « Mortalité Cumulée (7j) » ne couvrait que **6 jours** (borne `now()->subDays(6)` avec l'heure : la fiche de J-6 sortait).
+
+### Non fait / réserves
+- Marge du Top 5 « — » au poste et Top 5 / ventes porcines limités aux lignes saisies sur le poste : `sale_lines` et `purchase_lines` ne descendent pas.
+- Colonne « Morts S/Mère » (ajout du poste, Suivi Reproduction) : elle affiche `nes_morts` ; à confirmer avec le client.
+- Icônes : Material Icons pleines au poste, Material Symbols Outlined au web (reste de H1).
