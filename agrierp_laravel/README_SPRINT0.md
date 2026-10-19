@@ -22185,3 +22185,9 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Fiche Pondeuses : mise en page du Blade, tous les jours du mois, « Traitements & Rappels », taux divisés par l'effectif de la VEILLE (le poste divisait par l'effectif final) ; parité PHP sur deux bandes. 🔴 Web : `loadDay()` affichait à vide la fiche d'une date hors du mois courant et « Enregistrer ce Jour » l'écrasait avec des zéros — corrigé (`FichePondeusesJourHorsMoisTest`). Texte d'aide des stocks : l'écriture de perte est active depuis 14.41.
 - Mesures (branche, avec S-T10/S-T11 et R-1) : Laravel 1 865 verts ; poste 2 570 verts, 17 sautés.
 - Reste : ticket U12.
+
+### U12b — hub Rapports sur le Blade, dates affichées à l'heure du Bénin
+- Les cinq autres onglets du hub suivent leur Blade (parité exécutée avec le PHP) ; export réservé à `export-rapports` comme au web ; noms et contenus des PDF du web ; Excel `.xlsx` avec les lignes du CSV du web. 🔴 Poste : ventes à crédit comptées comme recettes, achats payés absents des dépenses, trésorerie réduite au dernier solde, créances et dettes hors période, stocks valorisés au prix de vente minimal au lieu du PMP — corrigés. 🔴 Web : dépense ARCHIVÉE encore dans Recettes et Dépenses ; ordre non déterministe de deux pièces du même jour ; zébrage décalé du Rapport de Stocks — corrigés (`RapportsHubPosteTest`).
+- Dates d'Audit Logs, de Mon Profil et des notifications à l'heure du Bénin (`HeureBenin.depuisInstant`) ; suite du poste verte sous `TZ=America/New_York` et `TZ=Asia/Tokyo`.
+- Mesures (branche) : Laravel 1 869 verts ; poste 2 589 verts, 17 sautés ; 35 mutants tués.
+- Reste (ticket U13) : `expenses` et `payslips` ne descendent pas au poste ; « Échecs (mois) » du web compte le même mois des années passées ; libellé « Paie — … » ; cloche relative (« il y a … ») au web, date au poste.
