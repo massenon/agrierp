@@ -281,10 +281,14 @@ class FicheReproducteurs extends Component
      * **85 %** tant qu'aucun oeuf n'etait mis en incubation : un chiffre invente,
      * presente comme calcule, sur l'indicateur qui decide de la conduite du
      * couvoir.
+     *
+     * 🔴→✅ TICKET U14 — SANS ŒUF COUVÉ, LE TAUX DU JOUR EST INCONNU : `null`, affiché « — » (règle « inconnu = — »,
+     * comme le taux du mois depuis U12a). « 0,0 % » se lisait « aucune éclosion » alors que rien n'était en incubation ;
+     * une couvée entièrement perdue (œufs couvés, aucun né) affiche bien « 0,0 % ».
      */
-    public function getEclosionRateCalcProperty(): float
+    public function getEclosionRateCalcProperty(): ?float
     {
-        return $this->oeufsCouves > 0 ? round(($this->poussinsNes / $this->oeufsCouves) * 100, 1) : 0.0;
+        return $this->oeufsCouves > 0 ? round(($this->poussinsNes / $this->oeufsCouves) * 100, 1) : null;
     }
 
     public function updatedSelectedLotId(): void

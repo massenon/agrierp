@@ -334,15 +334,18 @@ void main() {
     expect(find.text('Saisir le Couvoir du Jour →'), findsOneWidget);
   });
 
-  /// Ticket H7 : le Blade fait foi — sans œuf couvé, le web affiche « 0,0 % »
-  /// (`$couves > 0 ? … : 0.0`), et le poste le suit.
-  testWidgets("sans œuf couvé, le taux d'éclosion est « 0,0 % » comme au web", (
+  /// Ticket H7 : le Blade fait foi. 🔴→✅ Ticket U14 — sans œuf couvé le taux est INCONNU : « — » au web (qui
+  /// affichait « 0,0 % ») puis au poste.
+  testWidgets("U14 — sans œuf couvé, le taux d'éclosion est « — » comme au web", (
     tester,
   ) async {
     await afficher(tester);
     await ouvrir(tester, 'Volailles');
 
-    expect(find.text('0,0 %'), findsOneWidget);
+    expect(find.text('0,0 %'), findsNothing);
+    expect(const ResumeCouvoir(couves: 0, nes: 0, lots: 1).libelleTaux, '—');
+    expect(const ResumeCouvoir(couves: 40, nes: 0, lots: 1).libelleTaux, '0,0 %', reason: 'couvée perdue');
+    expect(const ResumeCouvoir(couves: 3, nes: 2, lots: 1).libelleTaux, '66,7 %');
   });
 
   /// ⚠️ La saillie se déclare au poste ; palpation, mise bas et sevrage

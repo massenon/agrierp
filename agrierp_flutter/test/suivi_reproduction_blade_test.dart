@@ -574,8 +574,12 @@ void main() {
         );
         expect(cartes.skip(7).map((c) => c.libelle), ['Bandes suivies']);
 
-        // ⚠️ Rien de couvé : le Blade affiche « 0,0 % » (`number_format(0, 1, ',', ' ')`).
-        expect(find.text('0,0 %'), findsOneWidget);
+        // 🔴→✅ U14 — rien de couvé : « — » (le Blade affichait « 0,0 % » ; corrigé au web d'abord).
+        expect(
+          find.descendant(of: find.byWidget(cartes[6]), matching: find.text('—')),
+          findsOneWidget,
+        );
+        expect(find.text('0,0 %'), findsNothing);
 
         final lien = find.byKey(const Key('lien-couvoir'));
         expect(

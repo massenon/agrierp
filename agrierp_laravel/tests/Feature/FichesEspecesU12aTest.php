@@ -151,6 +151,69 @@ class FichesEspecesU12aTest extends TestCase
         $this->assertSame(50.0, Livewire::test(FicheReproducteurs::class)->instance()->kpis['taux_eclosion']);
     }
 
+    /**
+     * 🔴→✅ Ticket U14 — le taux d'éclosion DU JOUR (champ calculé du formulaire) sans œuf : « — », jamais « 0,0 % »,
+     * sur les fiches Reproducteurs et Escargots ; une couvée perdue (œufs, aucun né) reste « 0,0 % ».
+     */
+    public function test_taux_d_eclosion_du_jour_sans_oeuf_est_un_tiret(): void
+    {
+        ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => true]);
+        $this->bande('aviculture', 'REP-A', 'reproduction');
+        $this->bande('helico', 'ESC-A', 'engraissement');
+
+        foreach ([[FicheReproducteurs::class, 'oeufsCouves', 'poussinsNes'], [FicheEscargots::class, 'oeufsTerre', 'naissainsNes']] as [$classe, $oeufs, $nes]) {
+            $c = Livewire::test($classe)->set($oeufs, 0)->set($nes, 0);
+            $this->assertNull($c->instance()->eclosionRateCalc, $classe);
+            $this->assertSame('—', $this->tauxDuJour($c->html()), $classe);
+
+            $c->set($oeufs, 40)->set($nes, 0);
+            $this->assertSame('0,0 %', $this->tauxDuJour($c->html()), $classe.' : couvée perdue');
+            $c->set($nes, 34);
+            $this->assertSame('85,0 %', $this->tauxDuJour($c->html()), $classe);
+        }
+    }
+
+    /**
+     * 🔴→✅ Ticket U14 — Suivi Reproduction, carte « Taux d'Éclosion » des onglets Volailles et Escargots : sans un œuf
+     * couvé dans le mois, « — » (elle affichait « 0,0 % »).
+     */
+    public function test_suivi_reproduction_taux_d_eclosion_sans_oeuf_est_un_tiret(): void
+    {
+        $bande = $this->bande('aviculture', 'REP-A', 'reproduction');
+        $c = Livewire::test(\App\Livewire\Elevage\SuiviReproduction::class)->set('tab', 'volailles');
+        $this->assertNull($c->instance()->incubationSummary['taux_eclosion']);
+        $this->assertSame('—', $this->carteNommee($c->html(), "Taux d'Éclosion"));
+
+        $this->fiche($bande, '2026-10-05', ['ne' => 3, 'ponte_total' => 4]);
+        $c = Livewire::test(\App\Livewire\Elevage\SuiviReproduction::class)->set('tab', 'volailles');
+        $this->assertSame('75,0 %', $this->carteNommee($c->html(), "Taux d'Éclosion"));
+    }
+
+    /** Le champ « Taux d'Éclosion Calculé (%) » / « Taux d'Éclosion Naissains (%) » du formulaire du jour. */
+    private function tauxDuJour(string $html): string
+    {
+        $this->assertSame(1, preg_match('/Taux d(?:\x27|&#039;)Éclosion (?:Calculé|Naissains) \(%\)<\/label>\s*<div[^>]*>\s*([^<]*?)\s*<\/div>/u', $html, $m), 'champ du taux du jour introuvable');
+
+        return html_entity_decode($m[1]);
+    }
+
+    /** Valeur d'une `x-kpi-card` par son libellé. */
+    private function carteNommee(string $html, string $libelle): string
+    {
+        $doc = new \DOMDocument();
+        @$doc->loadHTML('<?xml encoding="utf-8"?>'.$html);
+        $x = new \DOMXPath($doc);
+        foreach ($x->query("//span[contains(@class, 'uppercase')]") as $span) {
+            if (trim($span->textContent) === $libelle) {
+                $carte = $span->parentNode->parentNode;
+                foreach ($x->query(".//span[contains(@class, 'md:text-2xl')]", $carte) as $valeur) {
+                    return trim(preg_replace('/\s+/u', ' ', $valeur->textContent));
+                }
+            }
+        }
+        $this->fail("carte « $libelle » introuvable");
+    }
+
     public function test_porcs_poids_moyen_sans_pesee_est_un_tiret_jamais_0_kg(): void
     {
         $this->bande('porciculture', 'POR-A', 'engraissement');

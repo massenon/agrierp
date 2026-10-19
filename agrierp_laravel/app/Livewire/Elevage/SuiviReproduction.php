@@ -163,7 +163,8 @@ class SuiviReproduction extends Component
         return [
             'couves' => (int) $couves,
             'nes' => (int) $nes,
-            'taux_eclosion' => $couves > 0 ? round(($nes / $couves) * 100, 1) : 0.0,
+            // 🔴→✅ Ticket U14 — sans un œuf couvé dans le mois, le taux est INCONNU (« — »), jamais « 0,0 % ».
+            'taux_eclosion' => $couves > 0 ? round(($nes / $couves) * 100, 1) : null,
             // Ticket H11 — carte « Bandes suivies » du poste : les bandes NON ARCHIVÉES de l'espèce (`ResumeCouvoir.lots`).
             'lots' => $lots->count(),
         ];

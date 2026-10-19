@@ -61,15 +61,15 @@ class FicheReproducteursEclosionTest extends TestCase
     }
 
     /**
-     * ⚠️ SANS ŒUF COUVÉ, LE TAUX EST 0, PAS 85. Un taux inventé se lit comme
-     * un couvoir qui fonctionne.
+     * ⚠️ SANS ŒUF COUVÉ, LE TAUX N'EST NI 85 (14.61) NI 0 : il est INCONNU (U14, règle « inconnu = — »). Un taux
+     * inventé se lit comme un couvoir qui fonctionne ; un zéro, comme une couvée perdue.
      */
-    public function test_without_incubated_eggs_the_rate_is_zero_not_eighty_five(): void
+    public function test_sans_oeuf_couve_le_taux_du_jour_est_inconnu_ni_85_ni_0(): void
     {
         Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
             ->set('oeufsCouves', 0)
             ->set('poussinsNes', 0)
-            ->assertSet('eclosionRateCalc', 0.0);
+            ->assertSet('eclosionRateCalc', null);
     }
 
     /** Le calcul réel : 34 poussins nés de 40 œufs couvés = 85 %. */

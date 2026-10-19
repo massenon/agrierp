@@ -181,8 +181,9 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
 
   double get _tauxMortalite => _precedent > 0 ? PmpService.arrondi(_totalMorts / _precedent * 100, 1) : 0;
 
-  /// `getEclosionRateCalcProperty()` (14.61) : 0,0 % sans œuf couvé, jamais 85 %.
-  double get _tauxEclosion => _oeufsCouves > 0 ? PmpService.arrondi(_poussinsNes / _oeufsCouves * 100, 1) : 0;
+  /// `getEclosionRateCalcProperty()` : jamais 85 % (14.61) ; 🔴→✅ U14 — sans œuf couvé, INCONNU (`null`, « — »), comme
+  /// le web désormais (il affichait « 0,0 % »).
+  double? get _tauxEclosion => _oeufsCouves > 0 ? PmpService.arrondi(_poussinsNes / _oeufsCouves * 100, 1) : null;
 
   static String _pourcent(double x) => '${PmpService.nombre(x, 1)} %';
 
@@ -438,7 +439,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
             ),
             ChampLectureFiche(
               libelle: "Taux d'Éclosion Calculé (%)",
-              valeur: _pourcent(_tauxEclosion),
+              valeur: _tauxEclosion == null ? '—' : _pourcent(_tauxEclosion!),
               cle: 'champ-taux-eclosion',
               couleur: AgriColors.brandEmerald,
               gras: true,

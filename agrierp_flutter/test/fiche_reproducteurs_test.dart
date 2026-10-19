@@ -138,15 +138,16 @@ void main() {
 
   // ── Le taux d'éclosion ─────────────────────────────────────────────────
 
-  testWidgets("⚠️⚠️ sans œuf couvé, le taux d'éclosion du jour vaut « 0,0 % » comme au web, jamais 85 %", (
+  // 🔴→✅ Ticket U14 — règle « inconnu = — » : le web affichait « 0,0 % » ; corrigé au web d'abord (`FichesEspecesU12aTest`).
+  testWidgets("⚠️⚠️ U14 — sans œuf couvé, le taux d'éclosion du jour est « — » comme au web, jamais 85 % ni 0 %", (
     tester,
   ) async {
     await afficher(tester);
 
     expect(
       lecture(tester, 'taux-eclosion'),
-      '0,0 %',
-      reason: 'la règle du web (14.61), surtout pas les 85 % de démonstration',
+      '—',
+      reason: 'rien en incubation : inconnu, surtout pas les 85 % de démonstration (14.61) ni 0 %',
     );
     // Le taux du MOIS, lui, est inconnu sans œuf couvé : « — » (🔴→✅ U12a, le web affichait 85,0 %).
     expect(

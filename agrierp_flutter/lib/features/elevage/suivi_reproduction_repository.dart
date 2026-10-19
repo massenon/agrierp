@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
+import '../stocks/pmp_service.dart';
 
 /// Un cycle de reproduction, tel que l'écran l'affiche.
 class CycleReproduction {
@@ -132,22 +133,15 @@ class ResumeCouvoir {
   final int nes;
   final int lots;
 
-  /// Ticket H7 : le Blade fait foi — `round(($nes / $couves) * 100, 1)`, et `0.0` quand rien
-  /// n'a été couvé (le web affiche alors « 0,0 % »).
-  double get tauxEclosion =>
-      couves > 0 ? ((nes / couves) * 100 * 10).roundToDouble() / 10 : 0.0;
+  /// Ticket H7 : le Blade fait foi — `round(($nes / $couves) * 100, 1)` (arrondi de PHP, [PmpService.arrondi]).
+  /// 🔴→✅ Ticket U14 — rien de couvé dans le mois : INCONNU (`null`), comme le web désormais (il affichait « 0,0 % »).
+  double? get tauxEclosion =>
+      couves > 0 ? PmpService.arrondi(nes / couves * 100, 1) : null;
 
-  /// `number_format($taux, 1, ',', ' ') . ' %'` du Blade.
+  /// `number_format($taux, 1, ',', ' ') . ' %'` du Blade, « — » quand le taux est inconnu.
   String get libelleTaux {
-    final fixe = tauxEclosion.toStringAsFixed(1);
-    final point = fixe.indexOf('.');
-    final entier = fixe.substring(0, point);
-    final groupes = StringBuffer();
-    for (var i = 0; i < entier.length; i++) {
-      if (i > 0 && (entier.length - i) % 3 == 0) groupes.write(' ');
-      groupes.write(entier[i]);
-    }
-    return '$groupes,${fixe.substring(point + 1)} %';
+    final taux = tauxEclosion;
+    return taux == null ? '—' : '${PmpService.nombre(taux, 1)} %';
   }
 }
 

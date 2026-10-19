@@ -80,7 +80,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taux d'Éclosion Naissains (%)</label>
-                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ number_format($this->eclosionRateCalc, 1, ',', ' ') }} %</div>
+                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ $this->eclosionRateCalc === null ? '—' : number_format($this->eclosionRateCalc, 1, ',', ' ').' %' }}</div>
                     </div>
                 </div>
             </div>

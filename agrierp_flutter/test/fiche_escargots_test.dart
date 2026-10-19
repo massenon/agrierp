@@ -187,10 +187,11 @@ void main() {
 
   // ── Le taux d'éclosion ─────────────────────────────────────────────────
 
-  testWidgets("sans œuf pondu, le taux d'éclosion du jour vaut « 0,0 % », comme au web", (tester) async {
+  // 🔴→✅ Ticket U14 — règle « inconnu = — » : le web affichait « 0,0 % » ; corrigé au web d'abord (`FichesEspecesU12aTest`).
+  testWidgets("⚠️ U14 — sans œuf pondu, le taux d'éclosion du jour est « — », comme au web", (tester) async {
     await afficher(tester);
 
-    expect(lecture(tester, 'taux-eclosion'), '0,0 %');
+    expect(lecture(tester, 'taux-eclosion'), '—');
   });
 
   testWidgets('150 naissains de 200 œufs pondus font 75,0 %', (tester) async {

@@ -196,8 +196,9 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
 
   double get _tauxMortalite => _precedent > 0 ? PmpService.arrondi(_totalMorts / _precedent * 100, 1) : 0;
 
-  /// `getEclosionRateCalcProperty()` : 0,0 % sans œuf pondu (règle du taux DU JOUR, 14.61).
-  double get _tauxEclosion => _oeufsTerre > 0 ? PmpService.arrondi(_naissainsNes / _oeufsTerre * 100, 1) : 0;
+  /// `getEclosionRateCalcProperty()` : 🔴→✅ U14 — sans œuf pondu, INCONNU (`null`, « — »), comme le web désormais (il
+  /// affichait « 0,0 % »).
+  double? get _tauxEclosion => _oeufsTerre > 0 ? PmpService.arrondi(_naissainsNes / _oeufsTerre * 100, 1) : null;
 
   static String _pourcent(double x) => '${PmpService.nombre(x, 1)} %';
 
@@ -477,7 +478,7 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
             ),
             ChampLectureFiche(
               libelle: "Taux d'Éclosion Naissains (%)",
-              valeur: _pourcent(_tauxEclosion),
+              valeur: _tauxEclosion == null ? '—' : _pourcent(_tauxEclosion!),
               cle: 'champ-taux-eclosion',
               couleur: AgriColors.brandEmerald,
               gras: true,

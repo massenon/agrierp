@@ -297,9 +297,13 @@ class FicheEscargots extends Component
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
 
-    public function getEclosionRateCalcProperty(): float
+    /**
+     * 🔴→✅ TICKET U14 — sans un œuf mis en terre, le taux d'éclosion du jour est INCONNU : `null`, affiché « — »
+     * (règle « inconnu = — », comme le taux du mois depuis U12a), jamais « 0,0 % ».
+     */
+    public function getEclosionRateCalcProperty(): ?float
     {
-        return $this->oeufsTerre > 0 ? round(($this->naissainsNes / $this->oeufsTerre) * 100, 1) : 0.0;
+        return $this->oeufsTerre > 0 ? round(($this->naissainsNes / $this->oeufsTerre) * 100, 1) : null;
     }
 
     public function loadDay(string $date): void

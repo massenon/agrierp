@@ -200,7 +200,7 @@
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
                     <x-kpi-card label="Œufs Couvés (mois)" icon="egg" color="blue" :value="$this->incubationSummary['couves'] ?? 0" />
                     <x-kpi-card label="Naissains Nés (mois)" icon="child_care" color="emerald" :value="$this->incubationSummary['nes'] ?? 0" />
-                    <x-kpi-card label="Taux d'Éclosion" icon="egg_alt" color="maize" :value="number_format($this->incubationSummary['taux_eclosion'] ?? 0, 1, ',', ' ').' %'" />
+                    <x-kpi-card label="Taux d'Éclosion" icon="egg_alt" color="maize" :value="($this->incubationSummary['taux_eclosion'] ?? null) === null ? '—' : number_format($this->incubationSummary['taux_eclosion'], 1, ',', ' ').' %'" />
                     @include('livewire.elevage.ajouts-poste.suivi-couvoir-carte', ['lots' => $this->incubationSummary['lots'] ?? 0])
                 </div>
                 <a href="{{ $tab === 'volailles' ? route('elevage.fiche-reproducteurs') : route('elevage.fiche-escargots') }}" class="inline-flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
