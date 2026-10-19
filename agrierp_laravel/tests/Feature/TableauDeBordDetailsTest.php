@@ -34,6 +34,7 @@ class TableauDeBordDetailsTest extends TestCase
     {
         TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse', 'account_code' => '571', 'balance' => 40000, 'is_active' => true]);
         TreasuryAccount::create(['type' => 'banque', 'label' => 'Banque', 'account_code' => '521', 'balance' => 125000, 'is_active' => true]);
+        TreasuryAccount::create(['type' => 'mobile_money', 'label' => 'MTN MoMo', 'account_code' => '5212', 'balance' => 18500, 'is_active' => true]);
         TreasuryAccount::create(['type' => 'caisse', 'label' => 'Ancienne caisse', 'account_code' => '5711', 'balance' => 999, 'is_active' => false]);
         $cat = ProductCategory::create(['label' => 'Intrants', 'is_active' => true]);
         foreach (['Vermifuge', 'Anti-coccidien', 'Aliment lapin', 'Vitamines'] as $i => $nom) {
@@ -43,7 +44,7 @@ class TableauDeBordDetailsTest extends TestCase
         FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);
 
         Livewire::test(Index::class)
-            ->assertSee('Caisse : 40 000 F · Banque : 125 000 F')
+            ->assertSee('Caisse : 40 000 F · Banque : 125 000 F · Mobile Money : 18 500 F')
             ->assertSee('Aliment lapin, Anti-coccidien, Vermifuge')
             ->assertSee('Exercice 2026 actif');
     }

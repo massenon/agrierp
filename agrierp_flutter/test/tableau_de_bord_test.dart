@@ -306,7 +306,25 @@ void main() {
     await afficher(tester);
 
     expect(find.text('1 600 000'), findsOneWidget);
-    expect(find.text('Caisse : 420 000 · Banque : 1 180 000'), findsOneWidget);
+    // Décision D-U8 : Mobile Money en troisième ligne ; même texte que la légende du web, « F » compris.
+    expect(find.text('Caisse : 420 000 F · Banque : 1 180 000 F · Mobile Money : 0 F'), findsOneWidget);
+  });
+
+  testWidgets('D-U8 : le Mobile Money a sa ligne, comme au web', (tester) async {
+    await db
+        .into(db.treasuryAccounts)
+        .insert(
+          TreasuryAccountsCompanion.insert(
+            id: uuid('momo'),
+            label: 'MTN MoMo',
+            type: const Value('mobile_money'),
+            balance: const Value(18500),
+          ),
+        );
+    await afficher(tester);
+
+    expect(find.text('1 618 500'), findsOneWidget);
+    expect(find.text('Caisse : 420 000 F · Banque : 1 180 000 F · Mobile Money : 18 500 F'), findsOneWidget);
   });
 
   testWidgets('le stock critique compte et nomme les produits sous seuil', (

@@ -258,7 +258,7 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | D-U5 | **Tous les messages d'erreur en français**, au web (validation, authentification) et au poste | U5 |
 | D-U6 | Infirmerie : **le poste accepte une date future, comme le web** (le serveur l'accepte aussi à l'envoi) | U6 |
 | D-U7 | Prix moyen de la provende (bilan) : **même règle au web et au poste** — types ACTIFS seulement (un type archivé n'est plus acheté) | U7 |
-| D-U8 | Mobile money dans la répartition Caisse / Banque : **question encore ouverte** | — |
+| D-U8 | Mobile money dans la répartition Caisse / Banque : **oui, troisième ligne au web et au poste** | ✅ 19/10/2026 |
 
 | # | Ticket | Statut |
 |---|---|---|

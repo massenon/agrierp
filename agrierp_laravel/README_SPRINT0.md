@@ -22100,3 +22100,6 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - **Tableau de bord** : règle écrite — compte ce que le web compte (`synced`) plus ce qui part (`pending`) ; une pièce refusée (`conflict`) ne compte nulle part (CA, Dépenses, Résultat, courbe, ventes porcines, Top 5, PMP).
 - Mesures (branche fusionnée) : Laravel 1 754 verts ; poste 2 308 verts, 16 sautés ; 17 mutants tués.
 - Reste : « Rotation du Stock » « — » et écarts d'inventaire saisis ailleurs absents du poste (`stock_movements` ne descend pas) ; Tableau 3 du web en plateaux à l'échelle de la ferme, celui du poste par bande en œufs ; tri et pastilles du tableau des stocks du poste.
+
+### D-U8 — Mobile Money dans la Trésorerie du Tableau de bord
+- Légende de la carte Trésorerie : « Caisse : X F · Banque : Y F · Mobile Money : Z F », au web et au poste (comptes actifs ; le poste ne reçoit que ceux-là). Le poste écrivait les montants sans « F » : aligné sur le web.

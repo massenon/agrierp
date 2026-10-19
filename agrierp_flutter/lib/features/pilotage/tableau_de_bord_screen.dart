@@ -350,6 +350,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final d = _donnees!;
     final caisse = d.tresorerieParType['caisse'] ?? 0;
     final banque = d.tresorerieParType['banque'] ?? 0;
+    final mobileMoney = d.tresorerieParType['mobile_money'] ?? 0;
 
     final cartes = <Widget>[
       _carteKpi(
@@ -364,8 +365,10 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         libelle: 'Trésorerie',
         mesure: d.tresorerie,
         unite: 'FCFA',
-        // Ajout du poste, gardé (décision client du 19/10/2026).
-        detail: 'Caisse : ${_nombre(caisse)} · Banque : ${_nombre(banque)}',
+        // Ajout du poste, construit au web (H11) ; Mobile Money en troisième ligne (D-U8). Même texte que la
+        // légende du web (`dashboard/index.blade.php`), « F » compris.
+        detail: 'Caisse : ${_nombre(caisse)} F · Banque : ${_nombre(banque)} F · '
+            'Mobile Money : ${_nombre(mobileMoney)} F',
         icone: SymbolesAgri.account_balance_wallet,
         barre: AgriColors.infoBlue,
         couleurIcone: AgriColors.infoBlue,

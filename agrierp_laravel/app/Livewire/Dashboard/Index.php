@@ -339,7 +339,9 @@ class Index extends Component
      * construits ici pour que les deux côtés soient identiques : soldes Caisse / Banque sous la Trésorerie, trois
      * premiers produits sous leur seuil sous « Stock Critique », exercice ouvert dans l'en-tête.
      *
-     * @return array{caisse: float, banque: float, produits_critiques: array<int, string>, exercice: ?int}
+     * Décision D-U8 (19/10/2026) : Mobile Money en troisième ligne, au web comme au poste.
+     *
+     * @return array{caisse: float, banque: float, mobile_money: float, produits_critiques: array<int, string>, exercice: ?int}
      */
     public function getDetailsProperty(): array
     {
@@ -349,6 +351,7 @@ class Index extends Component
         return [
             'caisse' => (float) ($soldes['caisse'] ?? 0),
             'banque' => (float) ($soldes['banque'] ?? 0),
+            'mobile_money' => (float) ($soldes['mobile_money'] ?? 0),
             'produits_critiques' => \App\Models\Product::where('is_active', true)
                 ->whereColumn('stock_qty', '<=', 'alert_threshold')
                 ->orderBy('name')->limit(3)->pluck('name')->all(),

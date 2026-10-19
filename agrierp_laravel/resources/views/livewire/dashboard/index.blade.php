@@ -60,7 +60,7 @@
         <x-kpi-card label="Trésorerie" icon="account_balance_wallet" color="blue" unit="FCFA"
             :pending="$this->kpis['tresorerie']['pending']" :pending-since="$this->kpis['tresorerie']['since'] ?? null"
             :value="isset($this->kpis['tresorerie']['value']) ? number_format($this->kpis['tresorerie']['value'], 0, ',', ' ') : null"
-            :caption="isset($this->kpis['tresorerie']['value']) ? 'Caisse : '.number_format($this->details['caisse'], 0, ',', ' ').' F · Banque : '.number_format($this->details['banque'], 0, ',', ' ').' F' : null" />
+            :caption="isset($this->kpis['tresorerie']['value']) ? 'Caisse : '.number_format($this->details['caisse'], 0, ',', ' ').' F · Banque : '.number_format($this->details['banque'], 0, ',', ' ').' F · Mobile Money : '.number_format($this->details['mobile_money'], 0, ',', ' ').' F' : null" />
         <x-kpi-card label="Dépenses" icon="shopping_cart" color="maize" unit="FCFA"
             :pending="$this->kpis['depenses']['pending']" :pending-since="$this->kpis['depenses']['since'] ?? null"
             :value="isset($this->kpis['depenses']['value']) ? number_format($this->kpis['depenses']['value'], 0, ',', ' ') : null"
