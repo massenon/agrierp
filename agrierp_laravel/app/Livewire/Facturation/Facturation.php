@@ -4,7 +4,7 @@ namespace App\Livewire\Facturation;
 
 use App\Models\AuditLog;
 use App\Models\Sale;
-use App\Services\Mecef\MecefGatewayInterface;
+use App\Services\Mecef\FacturationMecefService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -100,15 +100,19 @@ class Facturation extends Component
         $this->authorize('manage-facturation');
 
         $sale = Sale::findOrFail($id);
-        $result = app(MecefGatewayInterface::class)->transmit($sale);
 
-        $sale->update([
-            'mecef_qr_ref' => $result['qr_ref'],
-            'mecef_status' => $result['success'] ? 'transmise' : 'erreur',
-        ]);
+        // Ticket S-T13 — par le MÊME point que la caisse et l'envoi des postes : une vente déjà transmise (double
+        // clic, page restée ouverte, deux retransmissions simultanées) ne l'est jamais une seconde fois.
+        $result = app(FacturationMecefService::class)->facturer($sale);
+
+        if ($result['deja']) {
+            $this->dispatch('toast', message: $result['message'], type: 'warning');
+
+            return;
+        }
 
         AuditLog::record('sale.mecef_retried', 'facturation');
-        $this->dispatch('toast', message: $result['message'], type: $result['success'] ? 'success' : 'error');
+        $this->dispatch('toast', message: $result['message'], type: $result['transmise'] ? 'success' : 'error');
     }
 
     public function render()

@@ -503,7 +503,7 @@ class _Essai {
   }
 
   // ── Côté serveur (le « web » et l'état final) ─────────────────────────────────────────────────────────────────
-  /// Ticket S-T12 — interblocages subis par la caisse du web (défaut décrit dans `essai_multipostes_serveur.php`).
+  /// Ticket S-T13 — interblocages de la caisse du web, rejoués par le serveur (`TransactionRejouable`).
   final interblocagesWeb = <String>[];
 
   Future<Map<String, dynamic>> _serveur(List<String> arguments) async {
@@ -519,7 +519,7 @@ class _Essai {
       final corps = jsonDecode(r.stdout as String) as Map<String, dynamic>;
       for (final i in (corps['interblocages'] as List?) ?? const []) {
         interblocagesWeb.add('$i');
-        evenement('Web : vente rejouée après un interblocage MariaDB (défaut connu de la caisse web) — $i');
+        evenement('Web : essai de vente rejoué par le serveur après un interblocage MariaDB (S-T13) — $i');
       }
       return corps;
     } on FormatException {
@@ -1771,7 +1771,7 @@ class _Essai {
     }
     final c2 = _postesOuVide().isEmpty ? null : caisse2.perturbateur;
     b
-      ..writeln('INTERBLOCAGES DE LA CAISSE WEB (défaut connu, non corrigé) : ${interblocagesWeb.length} $interblocagesWeb')
+      ..writeln('INTERBLOCAGES DE LA CAISSE WEB REJOUÉS PAR LE SERVEUR (S-T13) : ${interblocagesWeb.length} $interblocagesWeb')
       ..writeln('SESSIONS REFUSÉES (S-T1) : $sessionsRefusees')
       ..writeln('RETOUR DE poste-caisse-2 : pages au plus ${c2?.pagesMax}, lignes par envoi ${c2?.lignesParEnvoi}')
       ..writeln('DEMANDE DU WEB (S-T6) : délai $delaiDemande, servie $demandeServie, $tentativesDemande synchronisation(s)')

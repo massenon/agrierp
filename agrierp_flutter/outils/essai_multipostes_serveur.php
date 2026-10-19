@@ -235,36 +235,29 @@ switch ($commande) {
         $p = json_decode($arguments[0] ?? '{}', true);
         $avant = Sale::pluck('id')->all();
 
-        // ⚠️ Ticket S-T12 — DÉFAUT DÉCRIT, NON CORRIGÉ ICI : la caisse du web (`PosInterface::validateSale`) n'est pas
-        // rejouée sur un interblocage MariaDB, contrairement à l'envoi des postes (S-T9, `DB::transaction(…, 3)`) — elle
-        // verrouille le stock du produit puis la fiche, un envoi la fiche puis le stock. Sous les envois simultanés de
-        // l'essai, la vente web a échoué deux fois (graine 314, `QueryException` venue de `Connection.php`). La rejouer
-        // au serveur exige d'abord de sortir l'appel MeCeF de la transaction (il serait transmis deux fois). La
-        // caissière revaliderait : l'aide fait de même pour un interblocage ou un délai de verrou (jamais pour une autre
-        // erreur, rendue entière), au plus trois fois, et le dit (`interblocages`) — la transaction annulée n'a rien laissé.
+        // Ticket S-T13 — la caisse du web est rejouée AU SERVEUR sur un interblocage MariaDB ou un délai de verrou
+        // (`TransactionRejouable`, comme l'envoi des postes) : l'aide ne revalide plus rien elle-même (S-T12 le faisait,
+        // jusqu'à trois fois). Elle relève seulement les essais que le serveur a rejoués (son journal : « Interblocage
+        // rejoué … »), pour que le rapport montre que le cas a été éprouvé. Trois échecs de suite : la caisse affiche
+        // « Vente NON enregistrée » et l'essai échoue plus bas (aucune vente nouvelle du web), toasts à l'appui.
         $interblocages = [];
-        for ($essai = 1; ; $essai++) {
-            try {
-                $caisse = Livewire::actingAs(administrateur())->test(App\Livewire\Ventes\PosInterface::class);
-                if (! empty($p['jour'])) {
-                    $caisse->set('dateVente', $p['jour']);
-                }
-                $caisse->call('selectProduct', $p['produit'])
-                    ->set('weightQty', (int) $p['quantite'])
-                    ->set('weightPrice', (float) $p['montant'])
-                    ->set('weightLotId', $p['lot'] ?? '')
-                    ->call('confirmWeightAdd')
-                    ->set('paymentMode', 'especes')
-                    ->set('cashReceived', (float) $p['montant'])
-                    ->call('validateSale');
-                break;
-            } catch (Illuminate\Database\QueryException $e) {
-                $interblocages[] = mb_substr($e->getMessage(), 0, 200);
-                if ($essai >= 3 || ! preg_match('/1213|40001|Deadlock|1205/i', $e->getMessage())) {
-                    echec('Vente web en échec : '.$e->getMessage());
-                }
+        Illuminate\Support\Facades\Event::listen(Illuminate\Log\Events\MessageLogged::class, function ($e) use (&$interblocages) {
+            if (str_starts_with($e->message, 'Interblocage')) {
+                $interblocages[] = mb_substr($e->message.' — '.($e->context['erreur'] ?? ''), 0, 200);
             }
+        });
+        $caisse = Livewire::actingAs(administrateur())->test(App\Livewire\Ventes\PosInterface::class);
+        if (! empty($p['jour'])) {
+            $caisse->set('dateVente', $p['jour']);
         }
+        $caisse->call('selectProduct', $p['produit'])
+            ->set('weightQty', (int) $p['quantite'])
+            ->set('weightPrice', (float) $p['montant'])
+            ->set('weightLotId', $p['lot'] ?? '')
+            ->call('confirmWeightAdd')
+            ->set('paymentMode', 'especes')
+            ->set('cashReceived', (float) $p['montant'])
+            ->call('validateSale');
 
         // Ticket S-T12 — les postes envoient PENDANT la vente du web : une vente nouvelle n'est pas forcément la sienne.
         // Celle du web porte un identifiant du serveur (UUID ordonné, `HasUuids`), jamais un UUID v4 de poste, et une

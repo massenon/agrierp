@@ -8,6 +8,7 @@ use App\Actions\RecordSaleAccountingEntryAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\VerifySaleDateAction;
 use App\Exceptions\SaleDateRefusedException;
+use App\Exceptions\TransactionInterbloqueeException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FiscalYear;
@@ -18,8 +19,8 @@ use App\Models\Receivable;
 use App\Models\Sale;
 use App\Models\SaleLine;
 use App\Models\VeterinaryWithdrawalPeriod;
-use App\Services\Mecef\MecefGatewayInterface;
-use Illuminate\Support\Facades\DB;
+use App\Services\Mecef\FacturationMecefService;
+use App\Services\TransactionRejouable;
 use Livewire\Component;
 
 /**
@@ -59,7 +60,9 @@ use Livewire\Component;
  *
  * ⚠️ MISE À JOUR TICKET 7.1 : la transmission MeCeF (`mecef_qr_ref`,
  * `mecef_status`) est désormais réelle — voir
- * `App\Services\Mecef\MecefGatewayInterface`.
+ * `App\Services\Mecef\MecefGatewayInterface`. TICKET S-T13 : la vente est une
+ * transaction rejouée sur interblocage (`TransactionRejouable`) et la facture
+ * part APRÈS elle, une seule fois (`FacturationMecefService`).
  *
  * 🔴→✅ EXTENSION DU PATTERN RBAC CRUD AU NIVEAU ACTION (référence
  * initiale : `PlanComptable`) — `$this->authorize('manage-ventes')` sur
@@ -497,163 +500,199 @@ class PosInterface extends Component
             return;
         }
 
-        DB::transaction(function () use ($soldAt) {
-            $sale = Sale::create([
-                'customer_id' => $this->customerId ?: null,
-                'payment_mode' => $this->paymentMode,
-                'subtotal' => $this->subtotal,
-                'discount' => $this->discount,
-                'total' => $this->total,
-                'cash_received' => $this->paymentMode === 'especes' ? $this->cashReceived : null,
-                'change_due' => $this->paymentMode === 'especes' ? $this->changeDue : null,
-                'status' => 'validee',
-                // TICKET 14.71 — au comptoir, date de vente = maintenant. La
-                // colonne est renseignee ici AUSSI pour qu'elle soit toujours
-                // exploitable : un rapport qui ferait `sold_at ?? created_at`
-                // par endroits et `sold_at` ailleurs divergerait de lui-meme.
-                'sold_at' => $soldAt ?? now(),
-                'delivery_mode' => $this->deliveryConcerned ? $this->deliveryMode : null,
-                // 🔴→✅ TICKET 14.2 — BUG BLOQUANT TROUVÉ EN EXÉCUTANT RÉELLEMENT
-                // UNE VENTE : `sales.delivery_fee` est `decimal(14,2) NOT NULL
-                // DEFAULT 0` (migration 2026_02_16_000002). Écrire `null`
-                // explicitement écrase le DEFAULT et viole la contrainte —
-                // vérifié sur le MySQL réel du projet, en `STRICT_TRANS_TABLES` :
-                // « Column 'delivery_fee' cannot be null ». La condition n'étant
-                // vraie QUE pour une livraison facturée, **toute vente ordinaire
-                // échouait à l'enregistrement**. Jamais détecté jusqu'ici :
-                // aucune vente n'avait encore été passée sur une base réelle
-                // (table `sales` vide) et la suite de tests était elle-même
-                // inexécutable avant le ticket 14.1.
-                // 0 plutôt que `null` : c'est la valeur que le schéma prévoit
-                // pour « aucun frais de livraison ».
-                'delivery_fee' => $this->deliveryConcerned && $this->deliveryMode === 'facturee' ? ($this->deliveryFrais ?? 0) : 0,
-                'delivery_address' => $this->deliveryConcerned ? ($this->deliveryAdresse ?: null) : null,
-                'delivery_contact' => $this->deliveryConcerned ? ($this->deliveryContact ?: null) : null,
+        // 🔴→✅ TICKET S-T13 — LA VENTE EST REJOUÉE SUR UN INTERBLOCAGE, COMME L'ENVOI DES POSTES (S-T9).
+        //
+        // Sur MariaDB, quand des postes envoient au même instant des ventes de la même bande, la caisse du web et leur
+        // envoi s'interbloquent (fiche du jour, bande, stock du produit) : la vente du web était annulée et PERDUE
+        // (graine 314 de l'essai à plusieurs postes). Toute la vente — pièce, lignes, stock, fiche, créance, écriture,
+        // encaissement — est une transaction rejouée jusqu'à 3 fois par `TransactionRejouable`, le même point que
+        // l'envoi des postes. Chaque essai annulé n'a rien laissé ; le suivant repart du panier, intact.
+        //
+        // ⚠️ RIEN DANS L'ESSAI QUI NE S'ANNULE PAS AVEC LUI : ni l'appel MeCeF (une facture partirait deux fois), ni
+        // les toasts, ni la remise à zéro du panier (l'essai suivant vendrait un panier vide). Tout cela suit la
+        // validation de la transaction, ci-dessous.
+        try {
+            [$sale, $ecriture, $bandesSignalees] = app(TransactionRejouable::class)->executer(
+                fn () => $this->enregistrerVente($soldAt),
+                'vente de la caisse web',
+            );
+        } catch (TransactionInterbloqueeException $e) {
+            // Trois interblocages de suite : rien n'est écrit, le panier est gardé tel quel pour revalider.
+            $this->dispatch('toast', message: 'Vente NON enregistrée — '.$e->getMessage().' Le panier est conservé : validez à nouveau.', type: 'error');
+
+            return;
+        }
+
+        // 🔴→✅ TICKET S-T13 — LA FACTURE NORMALISÉE, APRÈS LA VENTE VALIDÉE, UNE SEULE FOIS (Document 06 §7, ticket
+        // 7.1 : jamais un appel direct à FakeMecefGateway). Un échec ne défait pas la vente : elle passe en « Erreur
+        // MeCeF », à retransmettre depuis Facturation & MeCeF (règle du projet depuis le ticket 7.1).
+        $facture = app(FacturationMecefService::class)->facturer($sale);
+
+        if ($ecriture === null) {
+            // Jamais silencieux : mode de règlement non mappé (« avance »)
+            // ou plan comptable incomplet. La vente reste enregistrée — le
+            // fait commercial prime — mais l'écart est signalé pour
+            // régularisation au Journal, pas dissimulé.
+            $this->dispatch('toast', message: 'Vente enregistree - ATTENTION : ecriture comptable non generee (mode de reglement ou compte manquant). A regulariser au Journal Comptable.', type: 'warning');
+        } else {
+            $this->dispatch('toast', message: 'Vente enregistree avec succes - total '.number_format($this->total, 0, ',', ' ').' FCFA.', type: 'success');
+        }
+
+        if (! $facture['transmise']) {
+            $this->dispatch('toast', message: 'Vente enregistrée — ATTENTION : facture normalisée MeCeF non transmise ('.$facture['message'].'). La vente reste à facturer : retransmettez-la depuis Facturation & MeCeF.', type: 'warning');
+        }
+
+        if ($bandesSignalees !== []) {
+            $this->dispatch('toast', message: 'Vente antérieure enregistrée — ATTENTION : bande(s) '.implode(', ', $bandesSignalees)." sous délai d'attente vétérinaire à cette date. Signalée à l'administrateur.", type: 'warning');
+        }
+
+        $this->cart = [];
+        $this->dateVente = now()->format('Y-m-d');
+        $this->customerId = '';
+        $this->discount = 0;
+        $this->cashReceived = null;
+        $this->deliveryConcerned = false;
+        $this->deliveryMode = 'gratuite';
+        $this->deliveryFrais = null;
+        $this->deliveryAdresse = '';
+        $this->deliveryContact = '';
+
+        // 🔴→✅ TICKET 14.2 — MÊME DÉFAUT QUE `ClotureExercice`, trouvé par
+        // recherche systématique du motif et non par hasard : `subtotal`,
+        // `total` et `changeDue` sont des propriétés calculées, mémoïsées
+        // par Livewire pour la durée de la requête (elles viennent d'être
+        // lues plus haut pour construire la vente). Le panier étant vidé
+        // juste au-dessus, le rendu qui suit réaffichait le total de la
+        // vente DÉJÀ ENCAISSÉE au-dessus d'un panier vide — la caissière
+        // voyait un montant ne correspondant plus à rien.
+        unset($this->subtotal, $this->total, $this->changeDue);
+    }
+
+    /**
+     * Ticket S-T13 — UN ESSAI de la transaction de vente (rejoué sur interblocage par `validateSale`) : uniquement des
+     * écritures en base, qui s'annulent avec lui. Rend la vente, son écriture (nulle si non générée) et les bandes
+     * signalées sous délai d'attente.
+     *
+     * @return array{0: Sale, 1: ?\App\Models\AccountingEntry, 2: array<int, string>}
+     */
+    private function enregistrerVente(?\Carbon\Carbon $soldAt): array
+    {
+        $sale = Sale::create([
+            'customer_id' => $this->customerId ?: null,
+            'payment_mode' => $this->paymentMode,
+            'subtotal' => $this->subtotal,
+            'discount' => $this->discount,
+            'total' => $this->total,
+            'cash_received' => $this->paymentMode === 'especes' ? $this->cashReceived : null,
+            'change_due' => $this->paymentMode === 'especes' ? $this->changeDue : null,
+            'status' => 'validee',
+            // TICKET 14.71 — au comptoir, date de vente = maintenant. La
+            // colonne est renseignee ici AUSSI pour qu'elle soit toujours
+            // exploitable : un rapport qui ferait `sold_at ?? created_at`
+            // par endroits et `sold_at` ailleurs divergerait de lui-meme.
+            'sold_at' => $soldAt ?? now(),
+            'delivery_mode' => $this->deliveryConcerned ? $this->deliveryMode : null,
+            // 🔴→✅ TICKET 14.2 — BUG BLOQUANT TROUVÉ EN EXÉCUTANT RÉELLEMENT
+            // UNE VENTE : `sales.delivery_fee` est `decimal(14,2) NOT NULL
+            // DEFAULT 0` (migration 2026_02_16_000002). Écrire `null`
+            // explicitement écrase le DEFAULT et viole la contrainte —
+            // vérifié sur le MySQL réel du projet, en `STRICT_TRANS_TABLES` :
+            // « Column 'delivery_fee' cannot be null ». La condition n'étant
+            // vraie QUE pour une livraison facturée, **toute vente ordinaire
+            // échouait à l'enregistrement**. Jamais détecté jusqu'ici :
+            // aucune vente n'avait encore été passée sur une base réelle
+            // (table `sales` vide) et la suite de tests était elle-même
+            // inexécutable avant le ticket 14.1.
+            // 0 plutôt que `null` : c'est la valeur que le schéma prévoit
+            // pour « aucun frais de livraison ».
+            'delivery_fee' => $this->deliveryConcerned && $this->deliveryMode === 'facturee' ? ($this->deliveryFrais ?? 0) : 0,
+            'delivery_address' => $this->deliveryConcerned ? ($this->deliveryAdresse ?: null) : null,
+            'delivery_contact' => $this->deliveryConcerned ? ($this->deliveryContact ?: null) : null,
+        ]);
+
+        foreach ($this->cart as $item) {
+            SaleLine::create([
+                'sale_id' => $sale->id,
+                'product_id' => $item['product_id'],
+                // Ticket 14.44 — la bande vendue était connue du panier
+                // (exigée par le contrôle de rémanence) mais n'était
+                // jamais conservée : aucun revenu par bande n'était donc
+                // chiffrable au Bilan Technico-Économique.
+                'lot_id' => $item['lot_id'] ?? null,
+                'qty' => $item['qty'],
+                'unit_price' => $item['qty'] > 0 ? round($item['montant'] / $item['qty'], 2) : 0,
+                'manual_total_amount' => $item['montant'],
+                'is_manual_price' => true,
             ]);
 
-            foreach ($this->cart as $item) {
-                SaleLine::create([
-                    'sale_id' => $sale->id,
-                    'product_id' => $item['product_id'],
-                    // Ticket 14.44 — la bande vendue était connue du panier
-                    // (exigée par le contrôle de rémanence) mais n'était
-                    // jamais conservée : aucun revenu par bande n'était donc
-                    // chiffrable au Bilan Technico-Économique.
-                    'lot_id' => $item['lot_id'] ?? null,
-                    'qty' => $item['qty'],
-                    'unit_price' => $item['qty'] > 0 ? round($item['montant'] / $item['qty'], 2) : 0,
-                    'manual_total_amount' => $item['montant'],
-                    'is_manual_price' => true,
-                ]);
-
-                $product = Product::find($item['product_id']);
-                if ($product) {
-                    app(AdjustStockAction::class)->execute($product, -$item['qty'], 'sale', $sale->id, $soldAt);
-                }
+            $product = Product::find($item['product_id']);
+            if ($product) {
+                app(AdjustStockAction::class)->execute($product, -$item['qty'], 'sale', $sale->id, $soldAt);
             }
+        }
 
-            // Ticket 14.4 — répercussion réelle sur les fiches d'élevage.
-            $this->recordFicheVente($soldAt);
+        // Ticket 14.4 — répercussion réelle sur les fiches d'élevage.
+        $this->recordFicheVente($soldAt);
 
-            // 15.32 — rémanence d'une vente ANTÉRIEURE : enregistrée ET signalée (notification admin + audit).
-            $bandesSignalees = $soldAt !== null
-                ? app(FlagSaleUnderWithdrawalAction::class)->execute($sale->fresh('lines'))
-                : [];
+        // 15.32 — rémanence d'une vente ANTÉRIEURE : enregistrée ET signalée (notification admin + audit).
+        $bandesSignalees = $soldAt !== null
+            ? app(FlagSaleUnderWithdrawalAction::class)->execute($sale->fresh('lines'))
+            : [];
 
-            // Correction rétroactive (ticket 4.7) : une vente à crédit crée
-            // réellement une créance — plus jamais un solde dérivé approximativement.
-            if ($this->paymentMode === 'credit' && $sale->customer_id) {
-                Receivable::create([
-                    'customer_id' => $sale->customer_id,
-                    'sale_id' => $sale->id,
-                    'amount' => $sale->total,
-                    'amount_paid' => 0,
-                    'due_date' => ($soldAt ?? now())->copy()->addDays(30),
-                    'status' => 'en_cours',
-                ]);
-            }
-
-            // Transmission MeCeF réelle via l'interface (Document 06 §7,
-            // ticket 7.1) — jamais un appel direct à FakeMecefGateway, le
-            // reste de l'application ne connaît que le contrat.
-            $mecefResult = app(MecefGatewayInterface::class)->transmit($sale);
-            $sale->update([
-                'mecef_qr_ref' => $mecefResult['qr_ref'],
-                'mecef_status' => $mecefResult['success'] ? 'transmise' : 'erreur',
+        // Correction rétroactive (ticket 4.7) : une vente à crédit crée
+        // réellement une créance — plus jamais un solde dérivé approximativement.
+        if ($this->paymentMode === 'credit' && $sale->customer_id) {
+            Receivable::create([
+                'customer_id' => $sale->customer_id,
+                'sale_id' => $sale->id,
+                'amount' => $sale->total,
+                'amount_paid' => 0,
+                'due_date' => ($soldAt ?? now())->copy()->addDays(30),
+                'status' => 'en_cours',
             ]);
+        }
 
-            // 🔴→✅ TICKET 14.23 — ÉCRITURE COMPTABLE ENFIN GÉNÉRÉE.
-            //
-            // Jusqu'ici AUCUNE vente ne produisait d'écriture : Bilan, Balance,
-            // Grand Livre, Compte de Résultat et Rapport Mensuel affichaient
-            // zéro produit quel que soit le chiffre d'affaires réel. Le CDC
-            // l'exige pourtant ("toute opération financière déclenche la
-            // génération automatique de l'écriture correspondante"), et le
-            // rétro-câblage était annoncé comme différé au ticket 10.2 —
-            // jamais réalisé.
-            //
-            // Dans la transaction : une vente enregistrée sans son écriture
-            // laisserait la comptabilité en retard sur l'exploitation, ce que
-            // ce ticket corrige précisément.
-            $ecriture = app(RecordSaleAccountingEntryAction::class)->execute($sale);
+        // 🔴→✅ TICKET 14.23 — ÉCRITURE COMPTABLE ENFIN GÉNÉRÉE.
+        //
+        // Jusqu'ici AUCUNE vente ne produisait d'écriture : Bilan, Balance,
+        // Grand Livre, Compte de Résultat et Rapport Mensuel affichaient
+        // zéro produit quel que soit le chiffre d'affaires réel. Le CDC
+        // l'exige pourtant ("toute opération financière déclenche la
+        // génération automatique de l'écriture correspondante"), et le
+        // rétro-câblage était annoncé comme différé au ticket 10.2 —
+        // jamais réalisé.
+        //
+        // Dans la transaction : une vente enregistrée sans son écriture
+        // laisserait la comptabilité en retard sur l'exploitation, ce que
+        // ce ticket corrige précisément.
+        $ecriture = app(RecordSaleAccountingEntryAction::class)->execute($sale);
 
-            // 🔴→✅ TICKET 14.32 — ENCAISSEMENT RÉEL. Avant ce ticket, une vente
-            // au comptant n'augmentait jamais la caisse : l'écriture débitait
-            // bien 531 au grand livre, mais `treasury_accounts.balance` ne
-            // bougeait pas. Les deux livres de trésorerie divergeaient dès la
-            // première vente, et seuls les décaissements faisaient bouger le
-            // solde affiché — qui dérivait donc vers le négatif.
-            app(\App\Actions\CreditTreasuryForSaleAction::class)->execute($sale);
+        // 🔴→✅ TICKET 14.32 — ENCAISSEMENT RÉEL. Avant ce ticket, une vente
+        // au comptant n'augmentait jamais la caisse : l'écriture débitait
+        // bien 531 au grand livre, mais `treasury_accounts.balance` ne
+        // bougeait pas. Les deux livres de trésorerie divergeaient dès la
+        // première vente, et seuls les décaissements faisaient bouger le
+        // solde affiché — qui dérivait donc vers le négatif.
+        app(\App\Actions\CreditTreasuryForSaleAction::class)->execute($sale);
 
-            AuditLog::record('sale.validated', 'ventes');
+        AuditLog::record('sale.validated', 'ventes');
 
-            // Ticket 14.30 : le negatif se produit ICI, a la decrementation
-            // reelle. Journalise nommement pour qu'une anomalie de stock reste
-            // investigable meme si le vendeur a ignore l'alerte au panier.
-            foreach ($this->cart as $item) {
-                $produitVendu = Product::find($item['product_id']);
+        // Ticket 14.30 : le negatif se produit ICI, a la decrementation
+        // reelle. Journalise nommement pour qu'une anomalie de stock reste
+        // investigable meme si le vendeur a ignore l'alerte au panier.
+        foreach ($this->cart as $item) {
+            $produitVendu = Product::find($item['product_id']);
 
-                if ($produitVendu && $produitVendu->stockEstNegatif()) {
-                    AuditLog::record('stock.negatif_apres_vente', 'stocks');
-                }
+            if ($produitVendu && $produitVendu->stockEstNegatif()) {
+                AuditLog::record('stock.negatif_apres_vente', 'stocks');
             }
+        }
 
-            if ($ecriture === null) {
-                // Jamais silencieux : mode de règlement non mappé (« avance »)
-                // ou plan comptable incomplet. La vente reste enregistrée — le
-                // fait commercial prime — mais l'écart est signalé pour
-                // régularisation au Journal, pas dissimulé.
-                AuditLog::record('sale.accounting_entry_missing', 'comptabilite');
-                $this->dispatch('toast', message: 'Vente enregistree - ATTENTION : ecriture comptable non generee (mode de reglement ou compte manquant). A regulariser au Journal Comptable.', type: 'warning');
-            } else {
-                $this->dispatch('toast', message: 'Vente enregistree avec succes - total '.number_format($this->total, 0, ',', ' ').' FCFA.', type: 'success');
-            }
+        if ($ecriture === null) {
+            AuditLog::record('sale.accounting_entry_missing', 'comptabilite');
+        }
 
-            if ($bandesSignalees !== []) {
-                $this->dispatch('toast', message: 'Vente antérieure enregistrée — ATTENTION : bande(s) '.implode(', ', $bandesSignalees)." sous délai d'attente vétérinaire à cette date. Signalée à l'administrateur.", type: 'warning');
-            }
-
-            $this->cart = [];
-            $this->dateVente = now()->format('Y-m-d');
-            $this->customerId = '';
-            $this->discount = 0;
-            $this->cashReceived = null;
-            $this->deliveryConcerned = false;
-            $this->deliveryMode = 'gratuite';
-            $this->deliveryFrais = null;
-            $this->deliveryAdresse = '';
-            $this->deliveryContact = '';
-
-            // 🔴→✅ TICKET 14.2 — MÊME DÉFAUT QUE `ClotureExercice`, trouvé par
-            // recherche systématique du motif et non par hasard : `subtotal`,
-            // `total` et `changeDue` sont des propriétés calculées, mémoïsées
-            // par Livewire pour la durée de la requête (elles viennent d'être
-            // lues plus haut pour construire la vente). Le panier étant vidé
-            // juste au-dessus, le rendu qui suit réaffichait le total de la
-            // vente DÉJÀ ENCAISSÉE au-dessus d'un panier vide — la caissière
-            // voyait un montant ne correspondant plus à rien.
-            unset($this->subtotal, $this->total, $this->changeDue);
-        });
+        return [$sale, $ecriture, $bandesSignalees];
     }
 
     /**

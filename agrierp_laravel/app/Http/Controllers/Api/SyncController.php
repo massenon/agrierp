@@ -27,6 +27,8 @@ use App\Services\AttestationService;
 use App\Services\EffectifParCategorieService;
 use App\Services\FusionReferentielsService;
 use App\Services\JournalSynchronisationService;
+use App\Services\Mecef\FacturationMecefService;
+use App\Services\TransactionRejouable;
 use App\Services\LotRevenueService;
 use App\Services\ProductCatalogService;
 use Illuminate\Support\Arr;
@@ -1706,8 +1708,20 @@ class SyncController extends Controller
         // étaient déjà enregistrées, ses ventes non. Le poste renvoyait (S-T1) ; la fiche, désormais connue, ne portait
         // plus les ventes du même envoi (15.30) et chaque vente y comptait ses sujets UNE SECONDE FOIS. Tout l'envoi
         // passe maintenant dans UNE transaction : un échec n'écrit rien, le renvoi retrouve le serveur tel qu'il était.
-        // Un interblocage est rejoué jusqu'à trois fois par Laravel (`DB::transaction(…, 3)`) avant de remonter en 500.
-        $result = DB::transaction(fn () => $this->traiterEnvoi($request, $clesInvalides), 3);
+        // Un interblocage est rejoué jusqu'à trois fois avant de remonter en 500. Ticket S-T13 : par `TransactionRejouable`,
+        // le même point que la caisse du web (il remplaçait `DB::transaction(…, 3)`, mêmes règles).
+        $result = app(TransactionRejouable::class)->executer(
+            fn () => $this->traiterEnvoi($request, $clesInvalides),
+            'envoi du poste',
+        );
+
+        // 🔴→✅ TICKET S-T13 — LES FACTURES NORMALISÉES DES VENTES REÇUES, APRÈS LA TRANSACTION. L'appel MeCeF était
+        // fait DANS la transaction de l'envoi : un envoi rejoué sur interblocage (S-T9) retransmettait au dispositif
+        // les ventes de son essai annulé — deux factures pour une vente. Et son `catch (\Throwable)` pouvait avaler un
+        // interblocage survenu en écrivant le statut. Une vente reçue est désormais facturée une fois, l'envoi validé.
+        foreach ($this->ventesAFacturer as $venteRecue) {
+            app(FacturationMecefService::class)->facturer($venteRecue);
+        }
 
         foreach ($refusParRole as $table => $refus) {
             $result[$table]['rejected'] = array_merge($result[$table]['rejected'], $refus);
@@ -1730,6 +1744,7 @@ class SyncController extends Controller
     private function traiterEnvoi(Request $request, array $clesInvalides): array
     {
         $this->fichesPortantLesVentes = [];
+        $this->ventesAFacturer = [];
 
         $result = [
             'cles_invalides' => $clesInvalides,
@@ -2644,6 +2659,14 @@ class SyncController extends Controller
      * @var array<string, true>
      */
     private array $fichesPortantLesVentes = [];
+
+    /**
+     * Ticket S-T13 — ventes INSÉRÉES par l'envoi, facturées au MeCeF une fois sa transaction validée (`push`). Vidée
+     * au début de chaque essai : celles d'un essai annulé n'existent plus.
+     *
+     * @var array<int, string>
+     */
+    private array $ventesAFacturer = [];
 
     /**
      * Ticket S-T9 — FUSION de la fiche d'un poste dans [occupante], la fiche que le serveur tient déjà pour la même
@@ -4265,39 +4288,14 @@ class SyncController extends Controller
                     // l'administrateur, jamais refusée ni passée sous silence.
                     app(\App\Actions\FlagNegativeStockFromSyncAction::class)->execute($sale->fresh('lines'));
 
-                    // 🔴→✅ TICKET 14.80 — LA NORMALISATION FISCALE MANQUAIT.
-                    //
-                    // ⚠️⚠️ CE CANAL APPLIQUAIT LES QUATRE EFFETS ET OUBLIAIT LE
-                    // CINQUIEME. La caisse WEB transmet chaque vente au
-                    // dispositif MeCeF (`PosInterface::validateSale()`, ticket
-                    // 7.1) ; l'envoi hors ligne, lui, ne le faisait pas. Une
-                    // vente encaissee au comptoir sans reseau arrivait donc en
-                    // base avec `mecef_status` NUL : jamais declaree a la DGI,
-                    // sans QR, invisible de l'ecran Facturation. Le poste etant
-                    // fait POUR travailler hors ligne, le trou fiscal grandit
-                    // avec l'usage — et rien ne le signale.
-                    //
-                    // ⚠️ UN ECHEC DE TRANSMISSION NE PERD PAS LA VENTE : elle
-                    // est marquee `erreur`, l'ecran Facturation la montre comme
-                    // telle, et la retransmission depuis le web la rattrape.
-                    // Lever l'exception ferait perdre les quatre autres effets
-                    // deja appliques dans cette transaction.
-                    try {
-                        $mecef = app(\App\Services\Mecef\MecefGatewayInterface::class)
-                            ->transmit($sale->fresh('lines'));
-
-                        $sale->update([
-                            'mecef_qr_ref' => $mecef['qr_ref'],
-                            'mecef_status' => $mecef['success'] ? 'transmise' : 'erreur',
-                        ]);
-                    } catch (\Throwable $e) {
-                        $sale->update(['mecef_status' => 'erreur']);
-                        AuditLog::record('sale.mecef_failed_on_sync', 'facturation');
-                    }
-
+                    // 🔴→✅ TICKET 14.80 — LA NORMALISATION FISCALE MANQUAIT : une vente encaissée hors ligne arrivait
+                    // en base avec `mecef_status` NUL, jamais déclarée à la DGI. ⚠️ TICKET S-T13 : elle est facturée
+                    // APRÈS la transaction de l'envoi (`push`, `ventesAFacturer`), jamais dans un essai qui peut être
+                    // annulé puis rejoué. Un échec ne perd pas la vente : `erreur`, retransmise depuis l'écran Facturation.
                 });
 
                 $accepted[] = $validated['id'];
+                $this->ventesAFacturer[] = $validated['id'];
             } catch (ValidationException $e) {
                 // 'unique:sales,id' échoue si cette vente a déjà été
                 // synchronisée précédemment — traité comme un succès
