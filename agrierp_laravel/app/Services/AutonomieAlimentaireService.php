@@ -21,11 +21,19 @@ class AutonomieAlimentaireService
     /** En dessous de ce nombre de jours, l'autonomie est critique (même seuil que RaiseFeedAutonomyAlertAction). */
     public const SEUIL_CRITIQUE_JOURS = 3.0;
 
-    /** Produit de provende suivi en stock pour une filière (repéré par l'espèce et « provende » / « aliment » dans le nom). */
+    /**
+     * Produit de provende suivi en stock pour une filière (repéré par l'espèce et « provende » / « aliment » dans le nom).
+     *
+     * 🔴→✅ Ticket U14 — PLUSIEURS CANDIDATS : le premier PAR IDENTIFIANT. Sans `orderBy`, `first()` rendait celui que
+     * MySQL voulait (l'ordre d'un plan d'exécution, pas une règle) : la fiche pouvait lire une provende un jour, une autre
+     * le lendemain, et le poste ne pouvait que deviner (U12a l'avait noté « approximé »). Il suit désormais la même règle
+     * (`AutonomieAlimentaire.produitProvende`, parité exécutée).
+     */
     public function produitProvende(string $speciesCode): ?Product
     {
         return Product::whereHas('species', fn ($q) => $q->where('code', $speciesCode))
             ->where(fn ($q) => $q->where('name', 'like', '%provende%')->orWhere('name', 'like', '%aliment%'))
+            ->orderBy('id')
             ->first();
     }
 

@@ -224,26 +224,33 @@ class AutonomieAlimentaire {
   final bool rupture;
 
   /// `produitProvende($code)` : un produit rattaché à l'espèce de la filière dont le nom contient « provende » ou
-  /// « aliment » (`LIKE` insensible à la casse du serveur) ; le premier par identifiant (ordre de la clé primaire, que
-  /// MySQL suit sans `ORDER BY`).
+  /// « aliment », le premier par identifiant (`orderBy('id')->first()`).
+  ///
+  /// 🔴→✅ Ticket U14 — PLUS D'APPROXIMATION (U12a) : le web n'avait pas d'ordre (`first()` seul), il a désormais
+  /// `orderBy('id')`, la règle que le poste supposait ; et `LIKE` se compare sous la collation du serveur
+  /// (`utf8mb4_unicode_ci` : ni casse NI ACCENTS — « ALIMÉNT lapin » est un aliment) par [cleCommeLeServeur], là où le
+  /// poste ne retirait que la casse. Parité exécutée : `test/provende_autonomie_parite_test.dart`.
   static Product? produitProvende(
     String codeEspece,
     List<Product> produits,
     List<EspeceElevage> especes,
   ) {
     final ids = {for (final e in especes) if (e.code == codeEspece) e.id};
+    bool provende(String nom) {
+      final cle = cleCommeLeServeur(nom);
+      return cle.contains('provende') || cle.contains('aliment');
+    }
+
     final candidats = [
       for (final p in produits)
-        if (p.speciesId != null &&
-            ids.contains(p.speciesId) &&
-            (p.name.toLowerCase().contains('provende') || p.name.toLowerCase().contains('aliment')))
-          p,
+        if (p.speciesId != null && ids.contains(p.speciesId) && provende(p.name)) p,
     ]..sort((a, b) => a.id.compareTo(b.id));
     return candidats.isEmpty ? null : candidats.first;
   }
 
   /// `Product::stockEnKg()` : un produit vendu au SAC est converti au poids du sac (`feed_types`, premier par
-  /// identifiant ; 25 Kg à défaut), arrondi au centième ; sinon la quantité telle quelle.
+  /// identifiant — `orderBy('id')` au web depuis U14 ; 25 Kg à défaut), arrondi au centième ; sinon la quantité telle
+  /// quelle.
   static double stockEnKg(Product produit, List<FeedType> typesAliment) {
     if (produit.unit != 'sac') return produit.stockQty;
     final tries = [...typesAliment]..sort((a, b) => a.id.compareTo(b.id));
