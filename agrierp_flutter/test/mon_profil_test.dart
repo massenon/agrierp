@@ -2,6 +2,7 @@ import 'package:agrierp/core/audit/libelles_audit.dart';
 import 'package:agrierp/core/auth/auth_service.dart';
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/profil/mon_profil_repository.dart';
@@ -66,7 +67,8 @@ void main() {
           action: action,
           module: Value(module),
           ipAddress: Value(ip),
-          createdAt: Value(quand),
+          // Ticket U12b — [quand] est l'heure du BÉNIN de l'action ; `created_at` est l'INSTANT qui y correspond.
+          createdAt: Value(HeureBenin.versInstant(quand)),
         ),
       );
 

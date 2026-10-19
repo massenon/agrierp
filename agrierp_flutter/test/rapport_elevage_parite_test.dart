@@ -347,6 +347,12 @@ void main() {
           lignes(web['t3']),
           reason: '$cas — Tableau 3',
         );
+        // Ticket U12b — l'export « Excel » : les lignes du CSV du web, en-tête compris.
+        expect(
+          [RapportsRepository.enteteClasseurElevage, ...d.elevageClasseur],
+          lignes(web['csv']),
+          reason: '$cas — classeur',
+        );
         expect(
           [
             PmpService.francs(d.indicateurs.productionTotale.toDouble()),
@@ -470,7 +476,15 @@ foreach (['toutes' => '', 'PON-A' => $bandes[0]->id] as $cas => $lot) {
     $t1 = $composant->set('activeTable', 't1')->html();
     $t2 = $composant->set('activeTable', 't2')->html();
     $t3 = $composant->set('activeTable', 't3')->html();
-    $sortie[$cas] = ['t1' => cellules($t1, 10), 't2' => cellules($t2, 9), 't3' => cellules($t3, 11), 'kpis' => indicateurs($t1)];
+    // Ticket U12b — le CSV de l'export « Excel » (`exportReport('csv')`), même sélection.
+    Illuminate\Support\Facades\Gate::before(fn ($utilisateur = null) => true);
+    $instance = new App\Livewire\Rapports\ElevageSynth();
+    $instance->mount('2026-07-01', '2026-07-31');
+    $instance->lotFilter = $lot;
+    ob_start();
+    $instance->exportReport('csv', '2026-07-01', '2026-07-31')->sendContent();
+    $csv = array_map(fn ($l) => str_getcsv($l, ',', '"', ''), explode("\n", rtrim(ob_get_clean(), "\n")));
+    $sortie[$cas] = ['t1' => cellules($t1, 10), 't2' => cellules($t2, 9), 't3' => cellules($t3, 11), 'kpis' => indicateurs($t1), 'csv' => $csv];
 }
 echo json_encode($sortie, JSON_UNESCAPED_UNICODE);
 ''';

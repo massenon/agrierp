@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/core/export/export_tableur.dart';
 import 'package:agrierp/features/rapports/rapports_exports_screen.dart';
@@ -52,12 +53,14 @@ void main() {
     String statut = 'validee',
     String mode = 'especes',
     String? client,
+    SyncStatus envoi = SyncStatus.pending,
   }) => db
       .into(db.sales)
       .insert(
         SalesCompanion.insert(
           id: uuid(cle),
           deviceId: 'poste-test',
+          syncStatus: Value(envoi),
           updatedAt: date,
           paymentMode: mode,
           total: total,
@@ -86,27 +89,6 @@ void main() {
           amount: montant,
           treasuryAccountId: uuid('tc'),
         ),
-      );
-
-  Future<void> compteTresorerie(
-    String cle, {
-    required String type,
-    required double solde,
-  }) => db
-      .into(db.treasuryAccounts)
-      .insert(
-        TreasuryAccountsCompanion.insert(
-          id: uuid(cle),
-          label: type,
-          type: Value(type),
-          balance: Value(solde),
-        ),
-      );
-
-  Future<void> tirageLe(DateTime quand) => db
-      .into(db.syncState)
-      .insertOnConflictUpdate(
-        SyncStateCompanion.insert(lastPulledAt: Value(quand)),
       );
 
   Future<void> bande(
@@ -220,10 +202,88 @@ void main() {
       .into(db.productCategories)
       .insert(ProductCategoriesCompanion.insert(id: uuid(cle), label: libelle));
 
+  /// Ticket U12b — un achat (descendu du serveur, ou refusé par lui avec [statut]).
+  Future<void> achat(
+    String cle, {
+    required DateTime date,
+    required double total,
+    String mode = 'especes',
+    String? fournisseur,
+    SyncStatus statut = SyncStatus.synced,
+  }) => db
+      .into(db.purchases)
+      .insert(
+        PurchasesCompanion.insert(
+          id: uuid(cle),
+          deviceId: 'serveur',
+          syncStatus: Value(statut),
+          updatedAt: date,
+          supplierId: uuid('fournisseur'),
+          supplierName: Value(fournisseur),
+          paymentMode: mode,
+          total: total,
+          purchaseDate: date,
+        ),
+      );
+
+  Future<void> ligneAchat(
+    String cle,
+    String achatCle,
+    String produitCle,
+    double quantite,
+    double prix,
+  ) => db
+      .into(db.purchaseLines)
+      .insert(
+        PurchaseLinesCompanion.insert(
+          id: uuid(cle),
+          purchaseId: uuid(achatCle),
+          productId: uuid(produitCle),
+          qty: quantite,
+          unitPrice: prix,
+        ),
+      );
+
+  /// Ticket U12b — un compte du plan comptable et une écriture du grand livre (descendus du serveur).
+  Future<void> compte(String cle, String code, int classe) => db
+      .into(db.chartOfAccounts)
+      .insert(
+        ChartOfAccountsCompanion.insert(
+          id: uuid(cle),
+          code: code,
+          label: 'Compte $code',
+          accountClass: Value(classe),
+        ),
+      );
+
+  Future<void> ecriture(
+    String cle,
+    DateTime date,
+    List<(String, double, double)> lignes,
+  ) async {
+    await db
+        .into(db.accountingEntries)
+        .insert(AccountingEntriesCompanion.insert(id: uuid(cle), entryDate: date));
+    for (var i = 0; i < lignes.length; i++) {
+      final (compteCle, debit, credit) = lignes[i];
+      await db
+          .into(db.accountingEntryLines)
+          .insert(
+            AccountingEntryLinesCompanion.insert(
+              id: uuid('$cle-l$i'),
+              entryId: uuid(cle),
+              accountId: uuid(compteCle),
+              debit: Value(debit),
+              credit: Value(credit),
+            ),
+          );
+    }
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   group('recettes et dépenses', () {
     test(
-      '⚠️ une vente annulée figure sans compter au chiffre d affaires',
+      '⚠️ une vente annulée ne compte pas au chiffre d affaires',
       () async {
         await vente('v1', date: DateTime(2026, 7, 10), total: 45000);
         await vente(
@@ -241,6 +301,32 @@ void main() {
         expect(d.recettes, hasLength(1));
       },
     );
+
+    /// 🔴→✅ Ticket U12b — `payment_mode != 'credit'` : une vente à crédit n'a rien encaissé, elle est une créance.
+    test(
+      '⚠️⚠️ U12b — une vente à crédit n est pas une recette, une vente sur avance l est',
+      () async {
+        await vente('v1', date: DateTime(2026, 7, 10), total: 45000, mode: 'credit');
+        await vente('v2', date: DateTime(2026, 7, 10), total: 12000, mode: 'avance');
+
+        final d = await depot.charger(du: du, au: au);
+
+        expect(d.totalRecettes, 12000);
+        expect(d.recettes.single.montant, 12000);
+      },
+    );
+
+    /// Règle U8 : une vente REFUSÉE par le serveur (`conflict`) n'existe pas au web ; une vente en attente d'envoi
+    /// compte, elle part vers lui.
+    test('⚠️ U12b — une vente refusée par le serveur n est pas une recette', () async {
+      await vente('v1', date: DateTime(2026, 7, 10), total: 1000);
+      await vente('v2', date: DateTime(2026, 7, 10), total: 2000, envoi: SyncStatus.synced);
+      await vente('v3', date: DateTime(2026, 7, 10), total: 4000, envoi: SyncStatus.conflict);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(d.totalRecettes, 3000);
+    });
 
     /// ⚠️⚠️ **LA BORNE HAUTE EST INCLUSIVE.** « au 31/07 » compris comme
     /// « jusqu'au 31/07 à 00:00 » perdrait toute la journée de clôture — et
@@ -275,56 +361,85 @@ void main() {
       expect(d.soldeNet, -74000);
     });
 
-    test('les montants portent leur signe, comme la maquette', () async {
-      await vente('v1', date: DateTime(2026, 7, 10), total: 45000);
+    /// 🔴→✅ Ticket U12b — libellés et cellules du Blade : « Vente — client » (« Client comptant »), le seul libellé de
+    /// la dépense, montants signés suivis de « FCFA ».
+    test('U12b — les cellules sont celles du Blade', () async {
+      await vente('v1', date: DateTime(2026, 7, 10), total: 45000, client: 'Bar Le Palmier');
+      await vente('v2', date: DateTime(2026, 7, 9), total: 1500.5);
       await depense('d1', date: DateTime(2026, 7, 12), montant: 185000);
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.recettes.single.cellules.last, '+45 000 FCFA');
-      expect(d.depenses.single.cellules.last, '-185 000 FCFA');
+      expect([for (final r in d.recettes) RapportsRepository.celluleRecette(r)], [
+        ['10/07/2026', 'Vente — Bar Le Palmier', '+45 000 FCFA'],
+        ['09/07/2026', 'Vente — Client comptant', '+1 501 FCFA'],
+      ]);
+      expect(RapportsRepository.celluleDepense(d.depenses.single), [
+        '12/07/2026',
+        'Achat provende',
+        '-185 000 FCFA',
+      ]);
+    });
+
+    /// 🔴→✅ Ticket U12b — `depensesRows()` : les ACHATS non à crédit sont des dépenses (« Achat — fournisseur »), et
+    /// passent avant une dépense du même jour (tri stable) ; un achat à crédit ou refusé par le serveur n'y est pas.
+    test('⚠️⚠️ U12b — les achats payés sont des dépenses, avant celles du même jour', () async {
+      await depense('d1', date: DateTime(2026, 7, 12), montant: 5000, libelle: 'Carburant');
+      await achat('a1', date: DateTime(2026, 7, 12), total: 70000, fournisseur: 'Provenderie du Plateau');
+      await achat('a2', date: DateTime(2026, 7, 12), total: 90000, mode: 'credit');
+      await achat('a3', date: DateTime(2026, 7, 13), total: 1000, statut: SyncStatus.conflict);
+      await achat('a4', date: DateTime(2026, 7, 11), total: 2000);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect([for (final m in d.depenses) m.libelle], [
+        'Achat — Provenderie du Plateau',
+        'Carburant',
+        'Achat — Fournisseur',
+      ]);
+      expect(d.totalDepenses, 77000);
     });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   group('trésorerie', () {
-    /// ⚠️⚠️ **LE PIÈGE PRINCIPAL DE CET ONGLET.** La maquette n'a que deux
-    /// colonnes de solde, et son jeu de démonstration porte un Mobile Money à
-    /// zéro : le total y semble valoir Caisse + Banque. Sur cette ferme, où le
-    /// Mobile Money encaisse réellement, s'en tenir à deux colonnes sur trois
-    /// donnerait un total AMPUTÉ — sans que rien ne le dise.
-    test('⚠️⚠️ le solde total inclut le mobile money', () async {
-      await compteTresorerie('t1', type: 'caisse', solde: 420000);
-      await compteTresorerie('t2', type: 'banque', solde: 1180000);
-      await compteTresorerie('t3', type: 'mobile_money', solde: 95000);
-      await tirageLe(DateTime(2026, 7, 15));
+    /// 🔴→✅ Ticket U12b — `Tresorerie::getRowsProperty()` : une ligne par JOUR de la période où la trésorerie a bougé,
+    /// soldes CUMULÉS depuis l'origine (les écritures d'avant la période comptent), comptes 531… en caisse, AUTRES
+    /// comptes de classe 5 (banque, Mobile Money) en banque.
+    test('⚠️⚠️ U12b — soldes cumulés du grand livre, du plus récent au plus ancien', () async {
+      await compte('c531', '531', 5);
+      await compte('c5312', '5312', 5);
+      await compte('c521', '521', 5);
+      await compte('c552', '552', 5);
+      // `str_starts_with($b->code, '531')` : un autre compte 53… n'est PAS la caisse.
+      await compte('c532', '532', 5);
+      await compte('c701', '701', 7);
+      // Avant la période : 100 000 en caisse.
+      await ecriture('e0', DateTime(2026, 6, 20), [('c531', 100000, 0), ('c701', 0, 100000)]);
+      // 03/07 : 20 000 de la caisse à la banque.
+      await ecriture('e1', DateTime(2026, 7, 3), [('c521', 20000, 0), ('c531', 0, 20000)]);
+      // 10/07 : 5 000 en Mobile Money, 2 500 en caisse annexe.
+      await ecriture('e2', DateTime(2026, 7, 10), [('c552', 5000, 0), ('c5312', 2500, 0), ('c701', 0, 7500)]);
+      // 12/07 : 1 000 sur un compte 532 — côté banque.
+      await ecriture('e5', DateTime(2026, 7, 12), [('c532', 1000, 0), ('c701', 0, 1000)]);
+      // 15/07 : aucune ligne de classe 5 — pas de ligne au rapport.
+      await ecriture('e3', DateTime(2026, 7, 15), [('c701', 100, 0), ('c701', 0, 100)]);
+      // Après la période.
+      await ecriture('e4', DateTime(2026, 8, 2), [('c531', 1, 0), ('c701', 0, 1)]);
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.tresorerie.caisse, 420000);
-      expect(d.tresorerie.banque, 1180000);
-      expect(d.tresorerie.total, 1695000);
-      // Et surtout : PAS la somme des deux colonnes affichées.
-      expect(d.tresorerie.total, isNot(1600000));
+      expect([for (final s in d.tresorerie) RapportsRepository.celluleTresorerie(s)], [
+        ['12/07/2026', '82 500', '26 000', '108 500'],
+        ['10/07/2026', '82 500', '25 000', '107 500'],
+        ['03/07/2026', '80 000', '20 000', '100 000'],
+      ]);
     });
 
-    /// ⚠️ Sans tirage, aucune valeur n'est signable : c'est un tiret, jamais
-    /// un zéro qui se lirait « la caisse est vide ».
-    test('⚠️ sans tirage, la position est inconnue et non nulle', () async {
+    test('U12b — sans écriture de trésorerie, aucune ligne', () async {
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.tresorerie.connue, isFalse);
-      expect(d.tresorerie.caisse, isNull);
-      expect(d.tresorerie.total, isNull);
-    });
-
-    test('la date affichée est celle du dernier tirage', () async {
-      await compteTresorerie('t1', type: 'caisse', solde: 1000);
-      await tirageLe(DateTime(2026, 7, 15, 8, 30));
-
-      final d = await depot.charger(du: du, au: au);
-
-      expect(d.tresorerie.releveLe, DateTime(2026, 7, 15, 8, 30));
+      expect(d.tresorerie, isEmpty);
     });
   });
 
@@ -353,7 +468,7 @@ void main() {
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.creances.single.cellules, [
+      expect(RapportsRepository.celluleEcheance(d.creances.single), [
         'AMOUSSOU Régis',
         '45 000',
         '01/07/2026',
@@ -372,12 +487,42 @@ void main() {
               customerId: uuid('cl'),
               amount: 20000,
               amountPaid: const Value(20000),
+              dueDate: Value(DateTime(2026, 7, 5)),
             ),
           );
 
       final d = await depot.charger(du: du, au: au);
 
       expect(d.creances, isEmpty);
+    });
+
+    /// 🔴→✅ Ticket U12b — la période du hub s'applique à l'ÉCHÉANCE (`whereDate('due_date', …)`) : une échéance hors
+    /// période, ou absente, ne figure pas.
+    test('⚠️ U12b — seules les échéances de la période figurent', () async {
+      await db
+          .into(db.customers)
+          .insert(CustomersCompanion.insert(id: uuid('cl'), name: 'Client'));
+      for (final (cle, echeance) in [
+        ('c1', DateTime(2026, 6, 30)),
+        ('c2', DateTime(2026, 7, 31)),
+        ('c3', null),
+        ('c4', DateTime(2026, 8, 1)),
+      ]) {
+        await db
+            .into(db.receivables)
+            .insert(
+              ReceivablesCompanion.insert(
+                id: uuid(cle),
+                customerId: uuid('cl'),
+                amount: 1000,
+                dueDate: Value(echeance),
+              ),
+            );
+      }
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(d.creances.single.id, uuid('c2'));
     });
 
     /// ⚠️ Un fournisseur archivé doit rester NOMMÉ sur l'ardoise qu'il a
@@ -397,63 +542,84 @@ void main() {
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.dettes.single.cellules.first, 'Provenderie du Plateau');
+      expect(d.dettes.single.nom, 'Provenderie du Plateau');
+    });
+
+    /// La recherche des Dettes suit `LIKE` sous la collation du serveur (`utf8mb4_unicode_ci`) : ni casse ni accents ;
+    /// « 0 » est faux en PHP (`->when('0')`) : il ne filtre rien.
+    test('U12b — la recherche des dettes ignore casse et accents', () {
+      final jour = DateTime(2026, 7, 10);
+      final dettes = [
+        EcheanceRapport(id: 'a', nom: 'Pharmacie Vétérinaire Ézéchiel', reste: 1, echeance: jour),
+        EcheanceRapport(id: 'b', nom: 'Provenderie du Plateau', reste: 1, echeance: jour),
+        EcheanceRapport(id: 'c', nom: null, reste: 1, echeance: jour),
+      ];
+
+      expect(RapportsRepository.filtrerDettes(dettes, 'ezechiel').map((e) => e.id), ['a']);
+      expect(RapportsRepository.filtrerDettes(dettes, 'PLATEAU').map((e) => e.id), ['b']);
+      expect(RapportsRepository.filtrerDettes(dettes, '0'), hasLength(3));
+      expect(RapportsRepository.filtrerDettes(dettes, ''), hasLength(3));
     });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   group('stocks', () {
     /// ⚠️⚠️ **UN STOCK NÉGATIF N'EST PAS UNE DETTE DE MARCHANDISE**, c'est une
-    /// entrée non saisie. Le valoriser en négatif retrancherait de la valeur du
-    /// magasin de l'argent qui n'a jamais quitté la ferme.
-    test('⚠️⚠️ une quantité négative ne diminue pas la valeur', () async {
+    /// entrée non saisie (`Product::valeurStock()` : plancher à zéro). 🔴→✅ Ticket U12b — la valeur est celle du PMP
+    /// des achats (`computePmp()`), et non plus le prix de vente minimal.
+    test('⚠️⚠️ une quantité négative ne diminue pas la valeur, valorisée au PMP', () async {
       await categorie('ca', 'Aliments & Provendes');
-      await produit(
-        'p1',
-        nom: 'Maïs',
-        categorie: uuid('ca'),
-        stock: 10,
-        prix: 500,
-      );
-      await produit(
-        'p2',
-        nom: 'Son',
-        categorie: uuid('ca'),
-        stock: -4,
-        prix: 500,
-      );
+      await produit('p1', nom: 'Maïs', categorie: uuid('ca'), stock: 10, prix: 999);
+      await produit('p2', nom: 'Son', categorie: uuid('ca'), stock: -4, prix: 999);
+      await achat('a1', date: DateTime(2026, 7, 1), total: 0);
+      await ligneAchat('l1', 'a1', 'p1', 4, 400);
+      await ligneAchat('l2', 'a1', 'p1', 6, 600);
+      await ligneAchat('l3', 'a1', 'p2', 1, 300);
 
       final d = await depot.charger(du: du, au: au);
 
-      expect(d.stocks.single.cellules, ['Aliments & Provendes', '5 000', '0']);
+      // PMP du maïs = (4 × 400 + 6 × 600) ÷ 10 = 520 ; 10 × 520 = 5 200 ; le son (−4) vaut 0.
+      final l = d.stocks.single;
+      expect(l.valeur, 5200);
+      expect(l.negatifs, 1);
+      expect(RapportsRepository.texteValeurStock(l),
+          '5 200 FCFA (1 produit(s) en stock négatif, retenus à zéro)');
     });
 
     test(
       'le compte sous seuil est celui des produits sous leur alerte',
       () async {
         await categorie('ca', 'Produits vétérinaires');
-        await produit(
-          'p1',
-          nom: 'Vaccin',
-          categorie: uuid('ca'),
-          stock: 2,
-          prix: 1000,
-          seuil: 5,
-        );
-        await produit(
-          'p2',
-          nom: 'Antibiotique',
-          categorie: uuid('ca'),
-          stock: 30,
-          prix: 1000,
-          seuil: 5,
-        );
+        await produit('p1', nom: 'Vaccin', categorie: uuid('ca'), stock: 2, seuil: 5);
+        await produit('p2', nom: 'Antibiotique', categorie: uuid('ca'), stock: 30, seuil: 5);
+        // Seuil nul et stock nul : `0 <= 0`, sous seuil au web.
+        await produit('p3', nom: 'Seringue', categorie: uuid('ca'), stock: 0, seuil: 0);
 
         final d = await depot.charger(du: du, au: au);
 
-        expect(d.stocks.single.cellules[2], '1');
+        expect(d.stocks.single.sousSeuil, 2);
+        // Aucun n'a été acheté ; deux sont en stock, donc non valorisés.
+        expect(d.stocks.single.nonValorises, 2);
+        expect(d.stocks.single.valeur, 0);
       },
     );
+
+    /// 🔴→✅ Ticket U12b — `ProductCategory::where('is_active', true)` puis le filtre « au moins un produit actif » :
+    /// ni catégorie archivée, ni catégorie vide, ni « Sans catégorie ».
+    test('U12b — seules les catégories actives ayant un produit actif figurent', () async {
+      await categorie('c1', 'Œufs');
+      await categorie('c2', 'Matériel');
+      await db
+          .into(db.productCategories)
+          .insert(ProductCategoriesCompanion.insert(id: uuid('c3'), label: 'Ancienne', isActive: const Value(false)));
+      await produit('p1', nom: 'Plateau', categorie: uuid('c1'), stock: 3);
+      await produit('p2', nom: 'Vieux', categorie: uuid('c3'), stock: 3);
+      await produit('p3', nom: 'Orphelin', stock: 3);
+
+      final d = await depot.charger(du: du, au: au);
+
+      expect(d.stocks.map((l) => l.categorie), ['Œufs']);
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -931,20 +1097,48 @@ void main() {
 
       expect(nom, 'État-de-Trésorerie-20260825-1430.xlsx');
     });
+
+    /// Ticket U12b — le classeur du hub porte les lignes du CSV du web, sans titre ajouté, sous le nom du web.
+    test('U12b — classeur du hub : lignes du CSV, nom du web, jamais d écrasement', () {
+      const classeur = ClasseurRapport(
+        fichier: 'dettes-{jour}.xlsx',
+        onglet: 'État des Dettes Fournisseurs',
+        lignes: [
+          ['Fournisseur', 'Montant Dû', 'Échéance'],
+          ['Provenderie du Plateau', '185000', '25/07/2026'],
+        ],
+      );
+
+      final octets = ExportTableur.construireTableau(classeur);
+      expect(octets.sublist(0, 4), [0x50, 0x4B, 0x03, 0x04]);
+      expect(ExportTableur.nomClasseur(classeur, maintenant), 'dettes-2026-08-25.xlsx');
+
+      // Deux éditions le même jour : « nom (1).xlsx », comme un second téléchargement du navigateur.
+      final pris = {'/d/dettes-2026-08-25.xlsx', '/d/dettes-2026-08-25 (1).xlsx'};
+      expect(
+        ExportTableur.cheminLibre('/d', 'dettes-2026-08-25.xlsx', pris.contains),
+        '/d/dettes-2026-08-25 (2).xlsx',
+      );
+      expect(
+        ExportTableur.cheminLibre('/d', 'creances-2026-08-25.xlsx', pris.contains),
+        '/d/creances-2026-08-25.xlsx',
+      );
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   group('écran', () {
     /// Éditeurs de test : ils retiennent le document sans rien imprimer.
     late List<DocumentOfficiel> imprimes;
-    late List<DocumentOfficiel> enregistres;
+    late List<ClasseurRapport> enregistres;
 
     setUp(() {
       imprimes = [];
       enregistres = [];
     });
 
-    Future<void> afficher(WidgetTester tester) async {
+    Future<void> afficher(WidgetTester tester, {bool peutExporter = true}) async {
+      addTearDown(ToastAgri.toutRetirer);
       tester.view.physicalSize = const Size(1900, 2400);
       tester.view.devicePixelRatio = 1;
       // ⚠️ La taille de vue SURVIT au test qui l'a posée : sans remise à zéro,
@@ -956,13 +1150,14 @@ void main() {
         MaterialApp(
           home: RapportsExportsScreen(
             depot: depot,
+            peutExporter: peutExporter,
             maintenant: () => maintenant,
             imprimer: (doc, _) async {
               imprimes.add(doc);
               return null;
             },
-            enregistrer: (doc, _) async {
-              enregistres.add(doc);
+            enregistrer: (classeur, _) async {
+              enregistres.add(classeur);
               return r'C:\Documents\AgriERP\rapport.xlsx';
             },
           ),
@@ -1045,7 +1240,8 @@ void main() {
     testWidgets('le hub ouvre sur les recettes et dépenses', (tester) async {
       await afficher(tester);
 
-      expect(find.text('État des Recettes et Dépenses'), findsOneWidget);
+      expect(find.byKey(const Key('tableau-recettes')), findsOneWidget);
+      expect(find.byKey(const Key('tableau-depenses')), findsOneWidget);
     });
 
     /// ⚠️⚠️ **CHAQUE ONGLET ÉDITE SON PROPRE DOCUMENT.** Un titre générique
@@ -1060,11 +1256,9 @@ void main() {
       await ouvrir(tester, 'Créances Clients');
       await tester.tap(find.byKey(const Key('hub-export-pdf')));
       await tester.pumpAndSettle();
-      expect(imprimes.last.titre, 'Rapport des Créances Clients');
-      expect(
-        imprimes.last.sousTitre,
-        'Synthèse des sommes dues par les clients',
-      );
+      // Ticket U12b — titre et sous-titre du PDF du WEB : `'État des Créances Clients'`, la période du hub.
+      expect(imprimes.last.titre, 'État des Créances Clients');
+      expect(imprimes.last.sousTitre, '01/08/2026 au 31/08/2026');
     });
 
     /// ⚠️⚠️ **« Lecture seule » NE S'IMPRIME PAS.** La maquette exclut la
@@ -1083,6 +1277,7 @@ void main() {
               id: uuid('cr'),
               customerId: uuid('cl'),
               amount: 5000,
+              dueDate: Value(DateTime(2026, 8, 10)),
             ),
           );
 
@@ -1096,18 +1291,126 @@ void main() {
       expect(doc.entetes, isNot(contains('Actions')));
 
       final ligne = doc.lignes.single as DonneesDocument;
-      expect(ligne.cellules, hasLength(3));
+      // `exports/creances.blade.php` : le reste dû suivi de « FCFA ».
+      expect(ligne.cellules, ['Client X', '5 000 FCFA', '10/08/2026']);
       expect(ligne.cellules.join(), isNot(contains('Lecture seule')));
     });
 
-    testWidgets('la barre du rapport porte sa propre paire de boutons', (
+    /// 🔴→✅ Ticket U12b — comme au web, seul le HUB porte la période et l'export : aucun onglet ne garde l'en-tête de la
+    /// maquette (titre, légende, paire « PDF » / « Excel »).
+    testWidgets('⚠️ U12b — aucun onglet ne porte l en-tête ni les boutons de la maquette', (
       tester,
     ) async {
       await afficher(tester);
 
-      expect(find.byKey(const Key('hub-export-pdf')), findsOneWidget);
-      expect(find.byKey(const Key('rapport-export-pdf')), findsOneWidget);
-      expect(find.byKey(const Key('rapport-export-excel')), findsOneWidget);
+      for (final (onglet, titreMaquette) in const [
+        ('Recettes et Dépenses', 'État des Recettes et Dépenses'),
+        ('État de Trésorerie', 'Position de trésorerie consolidée.'),
+        ('Créances Clients', 'État des Créances Clients'),
+        ('Dettes Fournisseurs', 'État des Dettes Fournisseurs'),
+        ('Rapport de Stocks', 'Rapport de Stocks — Synthèse'),
+      ]) {
+        await ouvrir(tester, onglet);
+        expect(find.byKey(const Key('hub-export-pdf')), findsOneWidget, reason: onglet);
+        expect(find.byKey(const Key('rapport-export-pdf')), findsNothing, reason: onglet);
+        expect(find.byKey(const Key('rapport-export-excel')), findsNothing, reason: onglet);
+        expect(find.text(titreMaquette), findsNothing, reason: onglet);
+        expect(find.text('PDF'), findsNothing, reason: onglet);
+      }
+    });
+
+    /// 🔴→✅ Ticket U12b — `@can('export-rapports')` : sans le droit, ni « Exporter PDF » ni « Exporter Excel ».
+    testWidgets('⚠️⚠️ U12b — sans export-rapports, aucun bouton d export', (tester) async {
+      await afficher(tester, peutExporter: false);
+
+      expect(find.byKey(const Key('hub-export-pdf')), findsNothing);
+      expect(find.byKey(const Key('hub-export-excel')), findsNothing);
+      expect(find.text('Exporter PDF'), findsNothing);
+      // La période reste, comme au web.
+      expect(find.byKey(const Key('hub-filter-du')), findsOneWidget);
+    });
+
+    /// 🔴→✅ Ticket U12b — le CSV du web en classeur : mêmes lignes (en-tête compris), nom du web en `.xlsx`.
+    testWidgets('⚠️⚠️ U12b — le classeur porte les lignes du CSV et le nom du web', (tester) async {
+      await vente('v1', date: DateTime(2026, 8, 3), total: 12000.5, client: 'Bar Le Palmier');
+      await depense('d1', date: DateTime(2026, 8, 4), montant: 3000, libelle: 'Carburant, groupe');
+
+      await afficher(tester);
+      await tester.tap(find.byKey(const Key('hub-export-excel')));
+      await tester.pumpAndSettle();
+
+      final c = enregistres.single;
+      expect(ExportTableur.nomClasseur(c, maintenant), 'recettes-depenses-2026-08-25.xlsx');
+      expect(c.lignes, [
+        ['Type', 'Date', 'Libellé', 'Montant'],
+        ['Recette', '03/08/2026', 'Vente — Bar Le Palmier', '12000.5'],
+        ['Dépense', '04/08/2026', 'Carburant, groupe', '-3000'],
+      ]);
+
+      await ouvrir(tester, 'Rapport de Stocks');
+      await tester.tap(find.byKey(const Key('hub-export-excel')));
+      await tester.pumpAndSettle();
+      expect(ExportTableur.nomClasseur(enregistres.last, maintenant), 'rapport-stocks-2026-08-25.xlsx');
+      expect(enregistres.last.lignes.first, ['Catégorie', 'Valeur Stock', 'Sous Seuil']);
+      // Les toasts du chemin se retirent d'eux-mêmes (3,5 s, comme au web).
+      await tester.pump(ToastAgri.duree);
+    });
+
+    /// 🔴→✅ Ticket U12b — le PDF de chaque onglet est celui du web (`exports/<rapport>.blade.php`).
+    testWidgets('⚠️ U12b — titre, sous-titre et colonnes des PDF sont ceux du web', (tester) async {
+      await afficher(tester);
+
+      final attendus = <String, (String, String, List<String>, String)>{
+        'Recettes et Dépenses': (
+          'État des Recettes et Dépenses',
+          '01/08/2026 au 31/08/2026',
+          [],
+          'recettes-depenses-2026-08-25.pdf',
+        ),
+        'État de Trésorerie': (
+          'État de Trésorerie',
+          '01/08/2026 au 31/08/2026',
+          ['Date', 'Solde Caisse', 'Solde Banque', 'Solde Total'],
+          'tresorerie-2026-08-25.pdf',
+        ),
+        'Créances Clients': (
+          'État des Créances Clients',
+          '01/08/2026 au 31/08/2026',
+          ['Client', 'Montant Dû', 'Échéance'],
+          'creances-2026-08-25.pdf',
+        ),
+        'Dettes Fournisseurs': (
+          'État des Dettes Fournisseurs',
+          '01/08/2026 au 31/08/2026',
+          ['Fournisseur', 'Montant Dû', 'Échéance'],
+          'dettes-2026-08-25.pdf',
+        ),
+        'Rapport de Stocks': (
+          'Rapport de Stocks — Synthèse',
+          'État au 25/08/2026',
+          ['Catégorie', 'Valeur Stock', 'Sous Seuil'],
+          'rapport-stocks-2026-08-25.pdf',
+        ),
+      };
+      for (final MapEntry(key: onglet, value: (titre, sousTitre, entetes, fichier)) in attendus.entries) {
+        await ouvrir(tester, onglet);
+        await tester.tap(find.byKey(const Key('hub-export-pdf')));
+        await tester.pumpAndSettle();
+        final doc = imprimes.last;
+        expect(doc.titre, titre, reason: onglet);
+        expect(doc.sousTitre, sousTitre, reason: onglet);
+        expect(doc.entetes, entetes, reason: onglet);
+        expect(DocumentOfficiel.nomPdf(doc, maintenant), fichier, reason: onglet);
+      }
+      // Recettes et Dépenses : les trois totaux en tête, puis les deux sections, chacune avec sa ligne vide.
+      final rd = imprimes.first.lignes;
+      expect((rd[0] as EnteteDocument).cellules, ['Total Recettes', 'Total Dépenses', 'Solde Net']);
+      expect((rd[1] as DonneesDocument).cellules, ['0 FCFA', '0 FCFA', '0 FCFA']);
+      expect([for (final l in rd.whereType<BandeDocument>()) l.libelle], ['Recettes', 'Dépenses']);
+      expect(
+        [for (final l in rd.whereType<DonneesDocument>().skip(1)) l.cellules.single],
+        ['Aucune recette sur la période.', 'Aucune dépense sur la période.'],
+      );
     });
 
     testWidgets('le classeur annonce son chemin', (tester) async {
@@ -1120,34 +1423,72 @@ void main() {
       expect(
         find.textContaining(r'C:\Documents\AgriERP\rapport.xlsx'),
         findsOneWidget,
-      );
+      );      await tester.pump(ToastAgri.duree);
     });
 
-    /// ⚠️ La série journalière n'existe pas au poste : l'écran le DIT, avec sa
-    /// date, au lieu de laisser croire à un tableau complet.
-    testWidgets('⚠️ la trésorerie dit ce qu elle ne couvre pas', (
-      tester,
-    ) async {
-      await compteTresorerie('t1', type: 'caisse', solde: 420000);
-      await tirageLe(DateTime(2026, 7, 15));
+    /// 🔴→✅ Ticket U12b — la Trésorerie du Blade : une ligne par jour, « Solde Total » en gras, « Lecture seule » avec
+    /// son info-bulle ; plus de mention « dernier tirage ».
+    testWidgets('⚠️ U12b — la trésorerie montre la série du grand livre', (tester) async {
+      await compte('c531', '531', 5);
+      await compte('c701', '701', 7);
+      await ecriture('e1', DateTime(2026, 8, 3), [('c531', 420000, 0), ('c701', 0, 420000)]);
+      await ecriture('e2', DateTime(2026, 8, 5), [('c531', 0, 20000), ('c701', 20000, 0)]);
 
       await afficher(tester);
       await ouvrir(tester, 'État de Trésorerie');
 
-      expect(
-        find.textContaining('ne tient PAS la série journalière'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('15/07/2026'), findsWidgets);
+      expect(find.byKey(const Key('tableau-tresorerie-ligne-0')), findsOneWidget);
+      expect(find.byKey(const Key('tableau-tresorerie-ligne-1')), findsOneWidget);
+      expect(find.text('05/08/2026'), findsOneWidget);
+      expect(find.text('400 000'), findsNWidgets(2), reason: 'caisse et total');
+      expect(find.text('Lecture seule'), findsNWidgets(2));
+      expect(find.byTooltip(RapportsExportsScreen.bulleEcritures), findsNWidgets(2));
+      expect(find.textContaining('dernier tirage'), findsNothing);
+      expect(find.byKey(const Key('mention-poste')), findsNothing);
+      // Ni recherche ni carte, comme le Blade.
+      expect(find.byKey(const Key('recherche-tresorerie')), findsNothing);
     });
 
-    testWidgets('⚠️ sans tirage, la trésorerie invite à synchroniser', (
-      tester,
-    ) async {
+    testWidgets('U12b — sans écriture, la trésorerie le dit comme le web', (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'État de Trésorerie');
 
-      expect(find.textContaining('Synchronisez'), findsOneWidget);
+      expect(find.text('Aucun mouvement de trésorerie sur la période.'), findsOneWidget);
+    });
+
+    /// 🔴→✅ Ticket U12b — `stocks-synth.blade.php` : pastille rouge « Sous Seuil », mentions sous la valeur.
+    testWidgets('U12b — stocks : pastille sous seuil et mentions du Blade', (tester) async {
+      await categorie('c1', 'Aliments & Provendes');
+      await produit('p1', nom: 'Maïs', categorie: uuid('c1'), stock: -2, seuil: 5);
+      await produit('p2', nom: 'Son', categorie: uuid('c1'), stock: 8, seuil: 5);
+
+      await afficher(tester);
+      await ouvrir(tester, 'Rapport de Stocks');
+
+      expect(find.byKey(const Key('sous-seuil-Aliments & Provendes')), findsOneWidget);
+      expect(find.text('(1 produit(s) en stock négatif, retenus à zéro)'), findsOneWidget);
+      expect(find.text('(1 produit(s) jamais achetés, non valorisés)'), findsOneWidget);
+      expect(find.text('0 FCFA'), findsOneWidget);
+    });
+
+    /// 🔴→✅ Ticket U12b — changer d'onglet monte un autre composant au web : la recherche part vide.
+    testWidgets('U12b — changer d onglet vide la recherche, comme au web', (tester) async {
+      await categorie('c1', 'Aliments & Provendes');
+      await categorie('c2', 'Produits vétérinaires');
+      await produit('p1', nom: 'Maïs', categorie: uuid('c1'), stock: 5);
+      await produit('p2', nom: 'Vaccin', categorie: uuid('c2'), stock: 5);
+
+      await afficher(tester);
+      await ouvrir(tester, 'Rapport de Stocks');
+      await tester.enterText(find.byKey(const Key('recherche-stocks')), 'aliments');
+      await tester.pumpAndSettle();
+      expect(find.text('Produits vétérinaires'), findsNothing);
+
+      await ouvrir(tester, 'Dettes Fournisseurs');
+      await ouvrir(tester, 'Rapport de Stocks');
+      expect(find.text('Produits vétérinaires'), findsOneWidget);
+      final champ = tester.widget<TextField>(find.byKey(const Key('recherche-stocks')));
+      expect(champ.controller!.text, isEmpty);
     });
 
     testWidgets('les trois tableaux d élevage ont leurs pilules', (
@@ -1319,7 +1660,14 @@ void main() {
       await afficher(tester);
       await ouvrir(tester, 'Dettes Fournisseurs');
 
-      expect(find.text('— Aucune dette ouverte —'), findsOneWidget);
+      expect(find.text('Aucune dette sur la période.'), findsOneWidget);
+      await ouvrir(tester, 'Créances Clients');
+      expect(find.text('Aucune créance sur la période.'), findsOneWidget);
+      await ouvrir(tester, 'Rapport de Stocks');
+      expect(find.text('Aucune catégorie active.'), findsOneWidget);
+      await ouvrir(tester, 'Recettes et Dépenses');
+      expect(find.text('Aucune recette sur la période.'), findsOneWidget);
+      expect(find.text('Aucune dépense sur la période.'), findsOneWidget);
     });
   });
 }

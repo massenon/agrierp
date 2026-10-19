@@ -127,24 +127,29 @@ class PmpService {
   }
 }
 
+/// Clé de comparaison de la collation du serveur (`utf8mb4_unicode_ci`) : minuscules, sans accents, ligatures
+/// développées (« Œufs » → « oeufs »).
+///
+/// Ticket U12b — partagée avec les recherches `LIKE '%…%'` du hub Rapports (Dettes, Stocks), insensibles à la casse
+/// et aux accents sous cette collation.
+String cleCommeLeServeur(String t) {
+  const accents = {
+    'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ç': 'c', 'é': 'e', 'è': 'e', //
+    'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'í': 'i', 'ô': 'o', 'ö': 'o', //
+    'ó': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ÿ': 'y', 'œ': 'oe', //
+    'æ': 'ae',
+  };
+  final minuscules = t.toLowerCase();
+  final sortie = StringBuffer();
+  for (final c in minuscules.split('')) {
+    sortie.write(accents[c] ?? c);
+  }
+  return sortie.toString();
+}
+
 /// Clé de tri de `orderBy('name')` sous la collation du serveur (`utf8mb4_unicode_ci`) : insensible à la casse et
 /// aux accents ; égalité départagée par le texte brut, pour un ordre stable.
 int comparerCommeLeServeur(String a, String b) {
-  String cle(String t) {
-    const accents = {
-      'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ç': 'c', 'é': 'e', 'è': 'e', //
-      'ê': 'e', 'ë': 'e', 'î': 'i', 'ï': 'i', 'í': 'i', 'ô': 'o', 'ö': 'o', //
-      'ó': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ÿ': 'y', 'œ': 'oe', //
-      'æ': 'ae',
-    };
-    final minuscules = t.toLowerCase();
-    final sortie = StringBuffer();
-    for (final c in minuscules.split('')) {
-      sortie.write(accents[c] ?? c);
-    }
-    return sortie.toString();
-  }
-
-  final parCle = cle(a).compareTo(cle(b));
+  final parCle = cleCommeLeServeur(a).compareTo(cleCommeLeServeur(b));
   return parCle != 0 ? parCle : a.compareTo(b);
 }

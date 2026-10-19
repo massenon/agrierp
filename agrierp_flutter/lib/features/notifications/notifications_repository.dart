@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Échec d'une action sur une notification, porteur d'une phrase lisible.
 class EchecNotification implements Exception {
@@ -109,10 +110,14 @@ class LigneNotification {
     return null;
   }
 
-  /// « 28/07/2026 - 06:12 », avec le tiret de la maquette ; « — » sans date.
+  /// « 28/07/2026 - 06:12 » (`$notif->created_at->format('d/m/Y - H:i')` du web) ; « — » sans date.
+  ///
+  /// 🔴→✅ Ticket U12b (reste de S-T11) — `created_at` est un INSTANT : il s'affiche à l'heure du Bénin, celle du
+  /// serveur (`Africa/Porto-Novo`), et non à celle de Windows. La cloche et le Centre de notifications lisent ce texte.
   String get dateTexte {
-    final d = date;
-    if (d == null) return '—';
+    final instant = date;
+    if (instant == null) return '—';
+    final d = HeureBenin.depuisInstant(instant);
     String deux(int n) => n.toString().padLeft(2, '0');
     return '${deux(d.day)}/${deux(d.month)}/${d.year} - '
         '${deux(d.hour)}:${deux(d.minute)}';

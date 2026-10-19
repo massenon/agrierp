@@ -966,6 +966,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.parametresGeneraux => _parametresGeneraux(),
         EcranPoste.rapportsEtExports => RapportsExportsScreen(
           depot: widget.rapports,
+          // Ticket U12b — `@can('export-rapports')` du hub web (seeder : admin et comptable).
+          peutExporter: PermissionsPoste.peut(_role, 'export-rapports'),
           imprimer: EditeursRapports.imprimer,
           enregistrer: EditeursRapports.enregistrer,
         ),

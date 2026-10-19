@@ -283,7 +283,9 @@ class SuiviReproductionRepository {
         return d != null && d.year == jour.year && d.month == jour.month;
       }).length,
       echecs: evenements.where((e) {
-        final d = e.updatedAt;
+        // Ticket U12b (reste de S-T11) — `whereMonth('updated_at', now()->month)` du web : le mois d'un INSTANT, à
+        // l'heure du Bénin (serveur en `Africa/Porto-Novo`), jamais à celle de Windows.
+        final d = HeureBenin.depuisInstant(e.updatedAt);
         return e.status == 'echec' &&
             d.year == jour.year &&
             d.month == jour.month;

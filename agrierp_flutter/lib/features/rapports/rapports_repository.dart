@@ -5,53 +5,95 @@ import '../elevage/effectif_precedent.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 
-/// Une ligne de rapport : ses cellules, dans l'ordre des colonnes de la
-/// maquette. Le tiret y est une VALEUR, pas une absence de cellule — c'est ce
-/// qui garantit que le tableau garde toutes ses colonnes.
+/// Une ligne de rapport : ses cellules, dans l'ordre des colonnes du tableau. Le tiret y est une VALEUR, pas une
+/// absence de cellule — c'est ce qui garantit que le tableau garde toutes ses colonnes.
 class LigneRapport {
   const LigneRapport(this.cellules);
 
   final List<String> cellules;
 }
 
-/// Position de trésorerie telle que le poste peut honnêtement la connaître.
-///
-/// ⚠️⚠️ **LE POSTE NE TIENT PAS DE SÉRIE JOURNALIÈRE, ET N'EN TIENDRA PAS.**
-/// `treasury_accounts` ne porte qu'un **solde courant**, figé au dernier
-/// tirage ; et `Expenses` le dit déjà en toutes lettres : « le poste ne tient
-/// NI comptabilité NI solde de trésorerie faisant foi ».
-///
-/// Reconstituer la série depuis les lignes d'écriture de classe 5 serait pire
-/// que de ne rien afficher : le poste ne détient que les écritures descendues
-/// **depuis son dernier tirage**, et un cumul partiel donnerait un solde FAUX
-/// sans rien signaler — en cassant au passage la règle « deux livres qui
-/// doivent s'accorder ».
-class PositionTresorerie {
-  const PositionTresorerie({
-    required this.caisse,
-    required this.banque,
-    required this.autres,
-    required this.releveLe,
+/// Ticket U12b — une ligne de l'état des Recettes et Dépenses, telle que `RecettesDepenses` (web) la construit :
+/// `['date' => …, 'label' => …, 'amount' => …]`.
+class MouvementRapport {
+  const MouvementRapport({
+    required this.date,
+    required this.libelle,
+    required this.montant,
   });
 
-  final double? caisse;
-  final double? banque;
+  /// Le JOUR du mouvement (heure murale du Bénin, minuit).
+  final DateTime date;
+  final String libelle;
+  final double montant;
+}
 
-  /// ⚠️⚠️ **LE MOBILE MONEY N'EST PAS LA BANQUE.** Le serveur connaît trois
-  /// types (`caisse`, `banque`, `mobile_money`). La maquette n'affiche que
-  /// deux colonnes, et ses données de démonstration ont un Mobile Money à
-  /// zéro — d'où un total qui semble valoir caisse + banque. Sur cette ferme,
-  /// où le Mobile Money encaisse réellement, additionner deux colonnes sur
-  /// trois donnerait un total qui MANQUE de l'argent sans le dire.
-  final double? autres;
+/// Ticket U12b — une ligne de l'État de Trésorerie du web (`Tresorerie::getRowsProperty()`) : les soldes CUMULÉS
+/// des comptes de classe 5 à une date où une écriture a touché la trésorerie.
+class SoldeTresorerie {
+  const SoldeTresorerie({
+    required this.date,
+    required this.caisse,
+    required this.banque,
+    required this.total,
+  });
 
-  /// Instant du dernier tirage. `null` : le poste n'a jamais reçu de solde.
-  final DateTime? releveLe;
+  final DateTime date;
 
-  bool get connue => releveLe != null && (caisse != null || banque != null);
+  /// `round(Σ débit − Σ crédit des comptes 531…, 2)`.
+  final double caisse;
 
-  double? get total =>
-      connue ? (caisse ?? 0) + (banque ?? 0) + (autres ?? 0) : null;
+  /// `round(Σ débit − Σ crédit des AUTRES comptes de classe 5, 2)` (521, 5212, Mobile Money…).
+  final double banque;
+
+  /// `round(caisse + banque, 2)`, sur les sommes NON arrondies, comme le web.
+  final double total;
+}
+
+/// Ticket U12b — une créance ou une dette ouverte des rapports du web (`Creances`, `Dettes`).
+class EcheanceRapport {
+  const EcheanceRapport({
+    required this.id,
+    required this.nom,
+    required this.reste,
+    required this.echeance,
+  });
+
+  final String id;
+
+  /// `$r->customer?->name` / `$p->supplier?->name` ; `null` : « — » à l'écran, vide au classeur.
+  final String? nom;
+
+  /// `Receivable::getBalanceAttribute()` / `Payable::getBalanceAttribute()` : `round(amount − amount_paid, 2)`.
+  final double reste;
+
+  /// Le jour de l'échéance (jamais nul : le web filtre `whereDate('due_date', …)`, qui écarte une échéance absente).
+  final DateTime echeance;
+}
+
+/// Ticket U12b — une ligne du Rapport de Stocks du web (`StocksSynth::getRowsProperty()`).
+class StockCategorie {
+  const StockCategorie({
+    required this.categorie,
+    required this.valeur,
+    required this.sousSeuil,
+    required this.nonValorises,
+    required this.negatifs,
+  });
+
+  final String categorie;
+
+  /// `round(Σ (Product::valeurStock() ?? 0), 2)` — stock négatif retenu à zéro, produit sans PMP compté à zéro.
+  final double valeur;
+
+  /// Produits dont `alert_threshold !== null && stock_qty <= alert_threshold`.
+  final int sousSeuil;
+
+  /// Produits jamais achetés (PMP nul) ET en stock (`stock_qty > 0`) : non valorisés.
+  final int nonValorises;
+
+  /// Produits en stock négatif (`Product::stockEstNegatif()`).
+  final int negatifs;
 }
 
 /// Les quatre indicateurs zootechniques du rapport d'élevage — `ElevageSynth::getKpisProperty()` (ticket U10).
@@ -99,21 +141,23 @@ class DonneesRapports {
     required this.stocks,
     this.bandesElevage = const [],
     this.elevageT3Export = const [],
+    this.elevageClasseur = const [],
   });
 
   final DateTime du;
   final DateTime au;
 
-  final List<LigneRapport> recettes;
-  final List<LigneRapport> depenses;
+  final List<MouvementRapport> recettes;
+  final List<MouvementRapport> depenses;
   final double totalRecettes;
   final double totalDepenses;
 
+  /// `'solde' => (float) $totalRecettes - $totalDepenses`.
   double get soldeNet => totalRecettes - totalDepenses;
 
-  final PositionTresorerie tresorerie;
-  final List<LigneRapport> creances;
-  final List<LigneRapport> dettes;
+  final List<SoldeTresorerie> tresorerie;
+  final List<EcheanceRapport> creances;
+  final List<EcheanceRapport> dettes;
 
   final List<LigneRapport> elevageT1;
   final List<LigneRapport> elevageT2;
@@ -127,19 +171,25 @@ class DonneesRapports {
   /// %, Cassés, Commercialisables.
   final List<LigneRapport> elevageT3Export;
 
-  final List<LigneRapport> stocks;
+  /// Ticket U12b — lignes de l'export « Excel » du Rapport Élevage (le CSV de `ElevageSynth::exportReport()`), sans
+  /// l'en-tête : une par fiche de la sélection, dans l'ordre des tableaux.
+  final List<List<String>> elevageClasseur;
+
+  /// Catégories du Rapport de Stocks, AVANT la recherche (voir [RapportsRepository.filtrerStocks]).
+  final List<StockCategorie> stocks;
 }
 
-/// Lectures de `prototype_html/rapports-exports.html` et de ses six pages.
+/// Lectures du hub « Rapports & Exports » — les six composants Livewire de `app/Livewire/Rapports/` et leurs vues.
 ///
-/// ⚠️⚠️ **CES RAPPORTS NE COUVRENT QUE CE QUE LE POSTE DÉTIENT, ET LE DISENT.**
+/// 🔴→✅ **Ticket U12b — LE WEB EST MAÎTRE POUR LES SIX ONGLETS** (doctrine, article 5). Les cinq onglets autres que
+/// le Rapport Élevage (U10 / U11) gardaient la maquette : en-tête et boutons par onglet, recherche partout, trésorerie
+/// réduite au solde du dernier tirage, créances et dettes sans période, stocks valorisés au prix de vente minimal.
+/// Ils suivent désormais leur composant, règle pour règle, prouvé par `test/rapports_parite_test.dart` (parité
+/// exécutée : le VRAI composant rend ses tableaux et son CSV sur le même jeu).
 ///
-/// 1. ~~Les fiches d'élevage ne sont jamais tirées~~ — 🔴→✅ elles descendent depuis F0.94 (journées du serveur ET
-///    saisies ici).
-/// 2. ~~Onze colonnes de la fiche ne descendent pas~~ — 🔴→✅ la ventilation par sexe et par état descend depuis
-///    F0.95 ; `vente_sexe`, `vente_montant`, le traitement, la dose et les symptômes depuis U10 (schéma v45). Les
-///    Tableaux 1 et 2 et les indicateurs sont ceux du Blade (`ElevageSynth`), formule pour formule.
-/// 3. **Aucune série journalière de trésorerie** — voir [PositionTresorerie].
+/// ⚠️ **ÉCART RESTANT, DIT À L'ÉCRAN** : les dépenses du web portent aussi la PAIE (`payslips`, absente du poste) et
+/// les dépenses saisies sur le web ou un autre poste (`expenses` est au poste une table de saisie, jamais tirée).
+/// Le calcul est celui du web ; sa matière, au poste, n'est que celle qu'il détient.
 class RapportsRepository {
   RapportsRepository({required this.database});
 
@@ -158,9 +208,9 @@ class RapportsRepository {
     final fin = DateTime(au.year, au.month, au.day, 23, 59, 59, 999);
 
     final ventes = await database.select(database.sales).get();
+    final achats = await database.select(database.purchases).get();
+    final lignesAchat = await database.select(database.purchaseLines).get();
     final depenses = await database.select(database.expenses).get();
-    final comptes = await database.select(database.treasuryAccounts).get();
-    final etat = await database.etatDeSynchronisation();
     final clients = await database.select(database.customers).get();
     final creances = await database.select(database.receivables).get();
     final dettes = await database.select(database.payables).get();
@@ -168,6 +218,11 @@ class RapportsRepository {
     final produits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
     final bandes = await database.select(database.livestockLots).get();
+    final ecritures = await database.select(database.accountingEntries).get();
+    final lignesEcriture = await database
+        .select(database.accountingEntryLines)
+        .get();
+    final planComptable = await database.select(database.chartOfAccounts).get();
     // Ticket U9 — grand livre des stocks (descendu + saisies en attente) : Tableau 3 de la ponte.
     final journal = await JournalStocks.charger(
       database,
@@ -194,17 +249,33 @@ class RapportsRepository {
         )
         .toList();
     final nomProduit = {for (final p in produits) p.id: p.name};
+    final nomFournisseur = {for (final f in fournisseurs) f.id: f.name};
+
+    final recettes = recettesDe(ventes, clients, debut, fin);
+    final sorties = depensesDe(
+      achats: achats,
+      nomFournisseur: nomFournisseur,
+      depenses: depenses,
+      du: debut,
+      au: fin,
+    );
 
     return DonneesRapports(
       du: debut,
       au: au,
-      recettes: _recettes(ventes, debut, fin),
-      depenses: _depenses(depenses, debut, fin),
-      totalRecettes: _totalRecettes(ventes, debut, fin),
-      totalDepenses: _totalDepenses(depenses, debut, fin),
-      tresorerie: _tresorerie(comptes, etat),
-      creances: _creances(creances, clients),
-      dettes: _dettes(dettes, fournisseurs),
+      recettes: recettes,
+      depenses: sorties,
+      totalRecettes: recettes.fold<double>(0, (t, m) => t + m.montant),
+      totalDepenses: sorties.fold<double>(0, (t, m) => t + m.montant),
+      tresorerie: soldesTresorerie(
+        ecritures: ecritures,
+        lignes: lignesEcriture,
+        comptes: planComptable,
+        du: debut,
+        au: fin,
+      ),
+      creances: creancesDe(creances, clients, debut, fin),
+      dettes: dettesDe(dettes, nomFournisseur, debut, fin),
       elevageT1: elevageRecensement(dansLaPeriode, bandes),
       elevageT2: elevageMouvements(dansLaPeriode, bandes, nomProduit),
       elevageT3: elevagePonte(
@@ -214,156 +285,282 @@ class RapportsRepository {
         JournalStocks.produitOeufs(produits)?.id,
       ),
       elevageT3Export: elevagePonteExport(dansLaPeriode, bandes),
+      elevageClasseur: elevageClasseurDe(dansLaPeriode, bandes),
       indicateurs: indicateursElevage(dansLaPeriode, connues, bandes),
       bandesElevage:
           bandes.where((b) => b.isActive).toList()
             ..sort((a, b) => comparerCommeLeServeur(a.code, b.code)),
-      stocks: _stocks(produits, categories),
+      stocks: stocksDe(
+        produits,
+        categories,
+        PmpService.parProduit(PmpService.lignesRetenues(achats, lignesAchat)),
+      ),
     );
+  }
+
+  /// `whereDate(…, '>=', du)->whereDate(…, '<=', au)` : le JOUR de [d] est dans la période.
+  static bool _dansLaPeriode(DateTime d, DateTime du, DateTime au) =>
+      !_jour(d).isBefore(_jour(du)) && !_jour(d).isAfter(_jour(au));
+
+  static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Tri STABLE (celui de PHP 8, `arsort` de `sortByDesc`) : à clé égale, l'ordre d'entrée est gardé.
+  static List<T> _trierStable<T>(List<T> liste, int Function(T, T) comparer) {
+    final indices = [for (var i = 0; i < liste.length; i++) i]
+      ..sort((a, b) {
+        final c = comparer(liste[a], liste[b]);
+        return c != 0 ? c : a.compareTo(b);
+      });
+    return [for (final i in indices) liste[i]];
   }
 
   // ── Onglet 1 : Recettes et Dépenses ───────────────────────────────────────
 
-  /// ⚠️ **UNE VENTE ANNULÉE N'EST PAS UNE RECETTE.** Elle reste visible dans
-  /// l'historique des ventes — c'est une trace — mais elle n'a rien encaissé.
-  /// La compter gonflerait le chiffre d'affaires de tout ce qui a été repris.
-  static bool _encaissee(Sale v) => v.status != 'annulee';
-
-  List<LigneRapport> _recettes(List<Sale> ventes, DateTime du, DateTime au) {
-    final retenues =
-        ventes
-            .where(
-              (v) =>
-                  _encaissee(v) &&
-                  !v.soldAt.isBefore(du) &&
-                  !v.soldAt.isAfter(au),
-            )
-            .toList()
-          ..sort((a, b) => b.soldAt.compareTo(a.soldAt));
-
-    return [
-      for (final v in retenues)
-        LigneRapport([
-          date(v.soldAt),
-          'Vente ${v.paymentMode} — ${v.customerName ?? 'client comptant'}',
-          '+${montant(v.total)} FCFA',
-        ]),
-    ];
-  }
-
-  List<LigneRapport> _depenses(
-    List<Expense> depenses,
+  /// 🔴→✅ Ticket U12b — `RecettesDepenses::recettesQuery()` puis `getRecettesProperty()` :
+  ///
+  ///   ventes `status = 'validee'` ET `payment_mode != 'credit'` (une vente à crédit n'est pas un encaissement
+  ///   immédiat) dont la date effective tombe dans la période (`soldBetween`, journées entières) ; de la plus récente
+  ///   à la plus ancienne (`orderByEffectiveDate()`, puis l'identifiant) ; libellé « Vente — {client} », « Client
+  ///   comptant » sans client.
+  ///
+  /// Le poste comptait aussi les ventes à CRÉDIT et nommait le mode de paiement ; il ne gardait que le statut
+  /// « non annulée ». ⚠️ Une vente REFUSÉE par le serveur (`conflict`) n'existe pas au web : elle ne compte pas
+  /// (règle U8) ; une vente en attente d'envoi compte, elle part vers lui.
+  static List<MouvementRapport> recettesDe(
+    List<Sale> ventes,
+    List<Customer> clients,
     DateTime du,
     DateTime au,
   ) {
-    final retenues =
-        depenses
-            .where(
-              (d) => !d.expenseDate.isBefore(du) && !d.expenseDate.isAfter(au),
-            )
-            .toList()
-          ..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+    final nomClient = {for (final c in clients) c.id: c.name};
+    final retenues = [
+      for (final v in ventes)
+        if (v.syncStatus != SyncStatus.conflict &&
+            v.status == 'validee' &&
+            v.paymentMode != 'credit' &&
+            _dansLaPeriode(v.soldAt, du, au))
+          v,
+    ]..sort((a, b) {
+        final parDate = b.soldAt.compareTo(a.soldAt);
+        return parDate != 0 ? parDate : a.id.compareTo(b.id);
+      });
 
     return [
-      for (final d in retenues)
-        LigneRapport([
-          date(d.expenseDate),
-          '${d.label} (${d.category})',
-          '-${montant(d.amount)} FCFA',
-        ]),
+      for (final v in retenues)
+        MouvementRapport(
+          date: _jour(v.soldAt),
+          // `$s->customer?->name` : le nom servi avec la vente, sinon celui du client du poste (vente saisie ici).
+          libelle:
+              'Vente — ${v.customerName ?? nomClient[v.customerId] ?? 'Client comptant'}',
+          montant: v.total,
+        ),
     ];
   }
 
-  double _totalRecettes(List<Sale> ventes, DateTime du, DateTime au) => ventes
-      .where(
-        (v) => _encaissee(v) && !v.soldAt.isBefore(du) && !v.soldAt.isAfter(au),
-      )
-      .fold<double>(0, (t, v) => t + v.total);
+  /// 🔴→✅ Ticket U12b — `RecettesDepenses::depensesRows()` : les achats NON à crédit de la période (« Achat —
+  /// {fournisseur} », « Fournisseur » sans nom), PUIS les dépenses de la période (leur seul libellé), PUIS la paie,
+  /// triés par date décroissante d'un tri STABLE (`sortByDesc('date')`) : à date égale, achats avant dépenses, et dans
+  /// chaque source l'identifiant croissant (`orderBy('id')`, ticket U12b au web).
+  ///
+  /// Le poste ne comptait que ses dépenses, libellées « {libellé} ({catégorie}) » : ni achats ni paie.
+  ///
+  /// ⚠️ ÉCART RESTANT (dit à l'écran) : la PAIE (`payslips`) n'existe pas au poste, et les dépenses saisies sur le web
+  /// ou un autre poste n'y descendent pas (`expenses` n'est pas tirée). Achat ou dépense REFUSÉ (`conflict`) : exclu.
+  static List<MouvementRapport> depensesDe({
+    required List<Purchase> achats,
+    required Map<String, String> nomFournisseur,
+    required List<Expense> depenses,
+    required DateTime du,
+    required DateTime au,
+  }) {
+    final lignes = <MouvementRapport>[
+      for (final a in [...achats]..sort((x, y) => x.id.compareTo(y.id)))
+        if (a.syncStatus != SyncStatus.conflict &&
+            a.paymentMode != 'credit' &&
+            _dansLaPeriode(a.purchaseDate, du, au))
+          MouvementRapport(
+            date: _jour(a.purchaseDate),
+            libelle:
+                'Achat — ${a.supplierName ?? nomFournisseur[a.supplierId] ?? 'Fournisseur'}',
+            montant: a.total,
+          ),
+      for (final e in [...depenses]..sort((x, y) => x.id.compareTo(y.id)))
+        if (e.syncStatus != SyncStatus.conflict &&
+            _dansLaPeriode(e.expenseDate, du, au))
+          MouvementRapport(
+            date: _jour(e.expenseDate),
+            libelle: e.label,
+            montant: e.amount,
+          ),
+    ];
+    return _trierStable(lignes, (a, b) => b.date.compareTo(a.date));
+  }
 
-  double _totalDepenses(List<Expense> depenses, DateTime du, DateTime au) =>
-      depenses
-          .where(
-            (d) => !d.expenseDate.isBefore(du) && !d.expenseDate.isAfter(au),
-          )
-          .fold<double>(0, (t, d) => t + d.amount);
+  /// Cellules d'une recette à l'écran et au PDF : « dd/mm/AAAA », libellé, « +N FCFA ».
+  static List<String> celluleRecette(MouvementRapport m) => [
+    date(m.date),
+    m.libelle,
+    '+${PmpService.francs(m.montant)} FCFA',
+  ];
+
+  /// Cellules d'une dépense : « -N FCFA ».
+  static List<String> celluleDepense(MouvementRapport m) => [
+    date(m.date),
+    m.libelle,
+    '-${PmpService.francs(m.montant)} FCFA',
+  ];
 
   // ── Onglet 2 : État de Trésorerie ─────────────────────────────────────────
 
-  PositionTresorerie _tresorerie(
-    List<TreasuryAccount> comptes,
-    SyncStateData? etat,
-  ) {
-    if (comptes.isEmpty) {
-      return PositionTresorerie(
-        caisse: null,
-        banque: null,
-        autres: null,
-        releveLe: etat?.lastPulledAt,
-      );
+  /// 🔴→✅ Ticket U12b — `Tresorerie::getRowsProperty()`, DEPUIS LE GRAND LIVRE comme au web (le poste n'affichait
+  /// que le solde de `treasury_accounts` au dernier tirage, sur une seule ligne) :
+  ///
+  ///   une ligne par JOUR de la période où une écriture ACTIVE a touché un compte de classe 5, du plus récent au plus
+  ///   ancien ; pour chaque jour, le solde CUMULÉ (Σ débit − Σ crédit de TOUTES les écritures jusqu'à ce jour inclus)
+  ///   des comptes 531… (« Solde Caisse ») et des autres comptes de classe 5 (« Solde Banque ») ; chacun arrondi à
+  ///   deux décimales, et leur total arrondi sur les sommes brutes.
+  ///
+  /// Le journal descend entier au poste depuis 14.83 / F0.84 (écritures actives, avec leurs lignes, liste des
+  /// écritures actives pour les retraits) pour les rôles qui ouvrent ce hub (`view-comptabilite`). Un compte mouvementé
+  /// ne peut pas être archivé au web (`PlanComptable::archiveAccount`) : le plan servi (comptes actifs) les contient
+  /// tous.
+  static List<SoldeTresorerie> soldesTresorerie({
+    required List<AccountingEntry> ecritures,
+    required List<AccountingEntryLine> lignes,
+    required List<ChartOfAccount> comptes,
+    required DateTime du,
+    required DateTime au,
+  }) {
+    final codeClasse5 = {
+      for (final c in comptes)
+        if (c.accountClass == 5) c.id: c.code,
+    };
+    final jourDe = {for (final e in ecritures) e.id: _jour(e.entryDate)};
+
+    final caisseDuJour = <DateTime, double>{};
+    final banqueDuJour = <DateTime, double>{};
+    final jours = <DateTime>{};
+    for (final l in lignes) {
+      final code = codeClasse5[l.accountId];
+      final jour = jourDe[l.entryId];
+      if (code == null || jour == null) continue;
+      jours.add(jour);
+      final mouvement = l.debit - l.credit;
+      if (code.startsWith('531')) {
+        caisseDuJour[jour] = (caisseDuJour[jour] ?? 0) + mouvement;
+      } else {
+        banqueDuJour[jour] = (banqueDuJour[jour] ?? 0) + mouvement;
+      }
     }
 
-    double sommeDe(String type) => comptes
-        .where((c) => c.type == type)
-        .fold<double>(0, (t, c) => t + c.balance);
-
-    final connus = {'caisse', 'banque'};
-
-    return PositionTresorerie(
-      caisse: comptes.any((c) => c.type == 'caisse') ? sommeDe('caisse') : null,
-      banque: comptes.any((c) => c.type == 'banque') ? sommeDe('banque') : null,
-      autres: comptes
-          .where((c) => !connus.contains(c.type))
-          .fold<double>(0, (t, c) => t + c.balance),
-      releveLe: etat?.lastPulledAt,
-    );
+    final croissants = jours.toList()..sort();
+    var caisse = 0.0;
+    var banque = 0.0;
+    final soldes = <SoldeTresorerie>[];
+    for (final jour in croissants) {
+      caisse += caisseDuJour[jour] ?? 0;
+      banque += banqueDuJour[jour] ?? 0;
+      if (_dansLaPeriode(jour, du, au)) {
+        soldes.add(
+          SoldeTresorerie(
+            date: jour,
+            caisse: PmpService.arrondi(caisse, 2),
+            banque: PmpService.arrondi(banque, 2),
+            total: PmpService.arrondi(caisse + banque, 2),
+          ),
+        );
+      }
+    }
+    return soldes.reversed.toList();
   }
+
+  /// Cellules d'une ligne de trésorerie (`number_format(…, 0, ',', ' ')`, sans unité, comme le Blade).
+  static List<String> celluleTresorerie(SoldeTresorerie s) => [
+    date(s.date),
+    PmpService.francs(s.caisse),
+    PmpService.francs(s.banque),
+    PmpService.francs(s.total),
+  ];
 
   // ── Onglets 3 et 4 : Créances et Dettes ───────────────────────────────────
 
-  /// ⚠️⚠️ **LE RESTE DÛ SE CALCULE : `amount - amountPaid`.** Afficher
-  /// `amount` compterait une seconde fois ce qui a déjà été réglé — c'est le
-  /// défaut que la balance âgée du serveur a dû corriger.
-  List<LigneRapport> _creances(
+  /// 🔴→✅ Ticket U12b — `Creances::getReceivablesProperty()` : créances OUVERTES (`amount_paid < amount`) dont
+  /// l'ÉCHÉANCE tombe dans la période du hub (une échéance absente n'y tombe pas), par échéance croissante puis
+  /// identifiant (`orderBy('id')`, ticket U12b au web). Le poste ignorait la période et listait les échéances absentes.
+  static List<EcheanceRapport> creancesDe(
     List<Receivable> creances,
     List<Customer> clients,
+    DateTime du,
+    DateTime au,
   ) {
     final nomDe = {for (final c in clients) c.id: c.name};
-
-    final ouvertes = creances.where((c) => c.amount - c.amountPaid > 0).toList()
-      ..sort((a, b) => _echeance(a.dueDate).compareTo(_echeance(b.dueDate)));
-
-    return [
-      for (final c in ouvertes)
-        LigneRapport([
-          nomDe[c.customerId] ?? '—',
-          montant(c.amount - c.amountPaid),
-          c.dueDate == null ? '—' : date(c.dueDate!),
-        ]),
-    ];
+    return _echeances([
+      for (final c in creances)
+        if (c.amountPaid < c.amount &&
+            c.dueDate != null &&
+            _dansLaPeriode(c.dueDate!, du, au))
+          EcheanceRapport(
+            id: c.id,
+            nom: nomDe[c.customerId],
+            reste: PmpService.arrondi(c.amount - c.amountPaid, 2),
+            echeance: _jour(c.dueDate!),
+          ),
+    ]);
   }
 
-  List<LigneRapport> _dettes(
+  /// 🔴→✅ Ticket U12b — `Dettes::getPayablesProperty()` : la règle de [creancesDe] côté fournisseurs. Le nom est celui
+  /// du fournisseur de la dette (`$p->supplier?->name`, servi avec elle : un fournisseur archivé reste nommé).
+  static List<EcheanceRapport> dettesDe(
     List<Payable> dettes,
-    List<Supplier> fournisseurs,
+    Map<String, String> nomFournisseur,
+    DateTime du,
+    DateTime au,
+  ) => _echeances([
+    for (final d in dettes)
+      if (d.amountPaid < d.amount &&
+          d.dueDate != null &&
+          _dansLaPeriode(d.dueDate!, du, au))
+        EcheanceRapport(
+          id: d.id,
+          nom: d.supplierName ?? nomFournisseur[d.supplierId],
+          reste: PmpService.arrondi(d.amount - d.amountPaid, 2),
+          echeance: _jour(d.dueDate!),
+        ),
+  ]);
+
+  static List<EcheanceRapport> _echeances(List<EcheanceRapport> lignes) =>
+      lignes..sort((a, b) {
+        final parEcheance = a.echeance.compareTo(b.echeance);
+        return parEcheance != 0 ? parEcheance : a.id.compareTo(b.id);
+      });
+
+  /// Cellules d'une créance ou d'une dette à l'écran : nom (« — »), reste dû (`number_format`), échéance.
+  static List<String> celluleEcheance(EcheanceRapport e) => [
+    e.nom ?? '—',
+    PmpService.francs(e.reste),
+    date(e.echeance),
+  ];
+
+  /// `->when($this->search, fn ($q) => $q->whereHas('supplier', fn ($q2) => $q2->where('name', 'like',
+  /// '%'.$this->search.'%')))` : recherche dans le NOM du fournisseur, sans casse ni accents (collation
+  /// `utf8mb4_unicode_ci`) ; une dette sans fournisseur connu ne répond à aucune recherche.
+  static List<EcheanceRapport> filtrerDettes(
+    List<EcheanceRapport> dettes,
+    String recherche,
   ) {
-    final nomDe = {for (final f in fournisseurs) f.id: f.name};
-
-    final ouvertes = dettes.where((d) => d.amount - d.amountPaid > 0).toList()
-      ..sort((a, b) => _echeance(a.dueDate).compareTo(_echeance(b.dueDate)));
-
+    if (!_rechercheActive(recherche)) return dettes;
+    final terme = cleCommeLeServeur(recherche);
     return [
-      for (final d in ouvertes)
-        LigneRapport([
-          // ⚠️ Le nom porté par la dette prime le référentiel : un fournisseur
-          // archivé doit rester nommé sur l'ardoise qu'il a laissée.
-          d.supplierName ?? nomDe[d.supplierId] ?? '—',
-          montant(d.amount - d.amountPaid),
-          d.dueDate == null ? '—' : date(d.dueDate!),
-        ]),
+      for (final d in dettes)
+        if (d.nom case final nom?
+            when cleCommeLeServeur(nom).contains(terme))
+          d,
     ];
   }
 
-  static DateTime _echeance(DateTime? d) => d ?? DateTime(9999);
+  /// `->when($this->search, …)` de PHP : une chaîne vide ET « 0 » sont fausses — aucune recherche alors.
+  static bool _rechercheActive(String recherche) =>
+      recherche.isNotEmpty && recherche != '0';
 
   // ── Onglet 5 : Rapport Élevage ────────────────────────────────────────────
 
@@ -612,52 +809,183 @@ class RapportsRepository {
 
   // ── Onglet 6 : Rapport de Stocks ──────────────────────────────────────────
 
-  /// ⚠️⚠️ **LA VALORISATION NE COMPTE PAS LES QUANTITÉS NÉGATIVES.** Un stock
-  /// négatif signale une ENTRÉE NON SAISIE, pas une dette de marchandise :
-  /// le valoriser en négatif retrancherait de la valeur du magasin de l'argent
-  /// qui n'a jamais quitté la ferme.
+  /// 🔴→✅ Ticket U12b — `StocksSynth::getRowsProperty()`, règle pour règle (le poste valorisait au PRIX DE VENTE
+  /// minimal et rangeait les produits sans catégorie dans « Sans catégorie ») :
   ///
-  /// ⚠️ **LE PRIX RETENU EST `priceMin`.** C'est le seul prix dont dispose le
-  /// poste pour un produit en fourchette ; le maximum donnerait la valeur la
-  /// plus flatteuse, ce qui n'est pas la prudence attendue d'un état de stock.
-  List<LigneRapport> _stocks(
+  ///   catégories ACTIVES ayant au moins un produit actif, par libellé (`orderBy('label')`, collation du serveur) ;
+  ///   Valeur Stock = `round(Σ Product::valeurStock() ?? 0, 2)`, soit `round(max(0, stock) × PMP, 2)` par produit
+  ///   actif, 0 pour un produit sans PMP (jamais acheté) — le PMP est celui de [PmpService] (`computePmp()`) ;
+  ///   Sous Seuil = produits dont le seuil existe et `stock <= seuil` ; plus les deux comptes que la cellule
+  ///   mentionne : produits en stock négatif, produits jamais achetés mais en stock.
+  ///
+  /// La recherche (sur le libellé) est appliquée à l'affichage par [filtrerStocks].
+  static List<StockCategorie> stocksDe(
     List<Product> produits,
     List<ProductCategory> categories,
+    Map<String, double> pmpDe,
   ) {
-    final actifs = produits.where((p) => p.isActive).toList();
-    final nomDe = {for (final c in categories) c.id: c.label};
-
-    final valeur = <String, double>{};
-    final sousSeuil = <String, int>{};
-
-    for (final p in actifs) {
-      final cle = p.categoryId ?? '';
-      final quantite = p.stockQty < 0 ? 0.0 : p.stockQty;
-
-      valeur[cle] = (valeur[cle] ?? 0) + quantite * (p.priceMin ?? 0);
-
-      final seuil = p.alertThreshold;
-      if (seuil != null && p.stockQty <= seuil) {
-        sousSeuil[cle] = (sousSeuil[cle] ?? 0) + 1;
-      } else {
-        sousSeuil[cle] ??= 0;
-      }
-    }
-
-    final cles = valeur.keys.toList()
-      ..sort(
-        (a, b) => (nomDe[a] ?? 'Sans catégorie').compareTo(
-          nomDe[b] ?? 'Sans catégorie',
-        ),
-      );
-
+    final actives = categories.where((c) => c.isActive).toList()
+      ..sort((a, b) => comparerCommeLeServeur(a.label, b.label));
     return [
-      for (final cle in cles)
-        LigneRapport([
-          nomDe[cle] ?? 'Sans catégorie',
-          montant(valeur[cle] ?? 0),
-          '${sousSeuil[cle] ?? 0}',
-        ]),
+      for (final c in actives)
+        if (produits.any((p) => p.isActive && p.categoryId == c.id))
+          () {
+            final duRayon = [
+              for (final p in produits)
+                if (p.isActive && p.categoryId == c.id) p,
+            ];
+            double? valeurStock(Product p) {
+              final pmp = pmpDe[p.id];
+              return pmp == null
+                  ? null
+                  : PmpService.arrondi(
+                      (p.stockQty < 0 ? 0.0 : p.stockQty) * pmp,
+                      2,
+                    );
+            }
+
+            return StockCategorie(
+              categorie: c.label,
+              valeur: PmpService.arrondi(
+                duRayon.fold<double>(0, (t, p) => t + (valeurStock(p) ?? 0)),
+                2,
+              ),
+              sousSeuil: duRayon
+                  .where(
+                    (p) =>
+                        p.alertThreshold != null &&
+                        p.stockQty <= p.alertThreshold!,
+                  )
+                  .length,
+              nonValorises: duRayon
+                  .where((p) => pmpDe[p.id] == null && p.stockQty > 0)
+                  .length,
+              negatifs: duRayon.where((p) => p.stockQty < 0).length,
+            );
+          }(),
+    ];
+  }
+
+  /// Mention de la cellule « Valeur Stock » du Blade pour les produits en stock négatif.
+  static String mentionNegatifs(int n) =>
+      '($n produit(s) en stock négatif, retenus à zéro)';
+
+  /// Mention de la cellule « Valeur Stock » du Blade pour les produits jamais achetés mais en stock.
+  static String mentionNonValorises(int n) =>
+      '($n produit(s) jamais achetés, non valorisés)';
+
+  /// Texte complet de la cellule « Valeur Stock » (« N FCFA », puis les mentions utiles), espaces normalisés.
+  static String texteValeurStock(StockCategorie l) => [
+    '${PmpService.francs(l.valeur)} FCFA',
+    if (l.negatifs > 0) mentionNegatifs(l.negatifs),
+    if (l.nonValorises > 0) mentionNonValorises(l.nonValorises),
+  ].join(' ');
+
+  /// `->when($this->search, fn ($q) => $q->where('label', 'like', '%'.$this->search.'%'))` : sans casse ni accents.
+  static List<StockCategorie> filtrerStocks(
+    List<StockCategorie> lignes,
+    String recherche,
+  ) {
+    if (!_rechercheActive(recherche)) return lignes;
+    final terme = cleCommeLeServeur(recherche);
+    return [
+      for (final l in lignes)
+        if (cleCommeLeServeur(l.categorie).contains(terme))
+          l,
+    ];
+  }
+
+  // ── Exports « Excel » : le CSV du web, en classeur ────────────────────────
+  //
+  // Ticket U12b — chaque `exportReport('csv')` du web écrit un CSV ; le poste écrit un classeur `.xlsx` (ajout validé
+  // par le client, voir `ExportTableur`) aux MÊMES lignes : même en-tête, mêmes colonnes, mêmes valeurs brutes (un
+  // flottant PHP tel qu'il s'écrit, une date `d/m/Y`, un nom absent vide). Seuls les guillemets du CSV disparaissent :
+  // une cellule de classeur n'en a pas besoin.
+
+  /// `RecettesDepenses::exportReport('csv')` : « Type,Date,Libellé,Montant », recettes puis dépenses (montant négatif).
+  static List<List<String>> classeurRecettesDepenses(DonneesRapports d) => [
+    const ['Type', 'Date', 'Libellé', 'Montant'],
+    for (final r in d.recettes)
+      ['Recette', date(r.date), r.libelle, PmpService.flottant(r.montant)],
+    for (final m in d.depenses)
+      ['Dépense', date(m.date), m.libelle, '-${PmpService.flottant(m.montant)}'],
+  ];
+
+  /// `Tresorerie::exportReport('csv')`.
+  static List<List<String>> classeurTresorerie(DonneesRapports d) => [
+    const ['Date', 'Solde Caisse', 'Solde Banque', 'Solde Total'],
+    for (final s in d.tresorerie)
+      [
+        date(s.date),
+        PmpService.flottant(s.caisse),
+        PmpService.flottant(s.banque),
+        PmpService.flottant(s.total),
+      ],
+  ];
+
+  /// `Creances::exportReport('csv')` / `Dettes::exportReport('csv')` ([entete] : « Client » ou « Fournisseur »).
+  static List<List<String>> classeurEcheances(
+    String entete,
+    List<EcheanceRapport> lignes,
+  ) => [
+    [entete, 'Montant Dû', 'Échéance'],
+    for (final e in lignes)
+      [e.nom ?? '', PmpService.flottant(e.reste), date(e.echeance)],
+  ];
+
+  /// `StocksSynth::exportReport('csv')`.
+  static List<List<String>> classeurStocks(List<StockCategorie> lignes) => [
+    const ['Catégorie', 'Valeur Stock', 'Sous Seuil'],
+    for (final l in lignes)
+      [l.categorie, PmpService.flottant(l.valeur), '${l.sousSeuil}'],
+  ];
+
+  /// `ElevageSynth::exportReport('csv')` : en-tête du web.
+  static const enteteClasseurElevage = [
+    'Date',
+    'Lot',
+    'Effectif M',
+    'Effectif F',
+    'Sous Mères',
+    'Sevrés',
+    'Morts',
+    'Achats',
+    'Nés',
+    'Effectif Final',
+    'Vente Qté',
+    'Vente Montant',
+    'Ponte Totale',
+    'Ponte Cassés',
+  ];
+
+  /// Une ligne par fiche, dans l'ordre des tableaux : une valeur absente s'écrit vide (`implode` de PHP), le montant
+  /// de vente avec deux décimales (`vente_montant` est un `decimal:2` au web).
+  static List<List<String>> elevageClasseurDe(
+    List<LivestockDailyEntry> fiches,
+    List<LivestockLot> bandes,
+  ) {
+    final codeDe = {for (final b in bandes) b.id: b.code};
+    String vide(int? v) => v == null ? '' : '$v';
+    return [
+      for (final f in fiches)
+        [
+          date(f.entryDate),
+          codeDe[f.lotId] ?? '',
+          vide(f.effectifM),
+          vide(f.effectifF),
+          vide(f.effectifSmeres),
+          vide(f.effectifSevres),
+          '${f.mort}',
+          '${f.achat}',
+          '${f.ne}',
+          '${f.effectifFinal}',
+          '${f.vente}',
+          f.venteMontant == null
+              ? ''
+              : PmpService.nombre(f.venteMontant!, 2, virgule: '.', milliers: ''),
+          vide(f.ponteTotal),
+          vide(f.ponteCasses),
+        ],
     ];
   }
 

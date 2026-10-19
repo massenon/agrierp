@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'mon_profil_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -43,6 +44,17 @@ class MonProfilScreen extends StatefulWidget {
 
   /// Session ouverte, `null` si aucun utilisateur n'est connecté.
   final SessionUtilisateur? session;
+
+  /// `->created_at->format('d/m/Y H:i')` du web (« Dernière connexion », « Date / Heure » du journal). 🔴→✅ Ticket
+  /// U12b (reste de S-T11) — un instant du journal d'audit, affiché à l'heure du Bénin quel que soit le réglage de
+  /// Windows.
+  static String dateHeure(DateTime d) {
+    final l = HeureBenin.depuisInstant(d);
+    return '${l.day.toString().padLeft(2, '0')}/'
+        '${l.month.toString().padLeft(2, '0')}/${l.year} '
+        '${l.hour.toString().padLeft(2, '0')}:'
+        '${l.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   State<MonProfilScreen> createState() => _MonProfilScreenState();
@@ -751,9 +763,5 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     color: AgriColors.onSurface,
   );
 
-  static String _dateHeure(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year} '
-      '${d.hour.toString().padLeft(2, '0')}:'
-      '${d.minute.toString().padLeft(2, '0')}';
+  static String _dateHeure(DateTime d) => MonProfilScreen.dateHeure(d);
 }

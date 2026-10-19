@@ -1,5 +1,6 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/notifications/notifications_repository.dart';
@@ -56,6 +57,9 @@ class _ServeurFeint extends Interceptor {
 
 void main() {
   late AppDatabase db;
+  /// Heure du BÉNIN. Ticket U12b (reste de S-T11) — `created_at` d'une notification est un INSTANT : le jeu l'écrit
+  /// par [HeureBenin.versInstant] (une alerte levée à 06 h 12 au Bénin), et l'écran l'affiche à l'heure du Bénin quel
+  /// que soit le fuseau de Windows (`TZ=America/New_York flutter test …`).
   final maintenant = DateTime(2026, 7, 28, 12);
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
@@ -84,7 +88,9 @@ void main() {
           message: message,
           linkUrl: Value(lien),
           isRead: Value(lue),
-          createdAt: Value(sansDate ? null : (date ?? maintenant)),
+          createdAt: Value(
+            sansDate ? null : HeureBenin.versInstant(date ?? maintenant),
+          ),
         ),
       );
 
@@ -171,7 +177,7 @@ void main() {
         date: DateTime(2026, 5, 1),
       );
 
-      final d = await depot().charger(maintenant: maintenant);
+      final d = await depot().charger(maintenant: HeureBenin.versInstant(maintenant));
 
       // Recalcul indépendant, ligne par ligne de la maquette.
       expect(d.nonLues, 3);
@@ -185,7 +191,7 @@ void main() {
       await notif('b', 'sans date', sansDate: true);
       await notif('c', 'récente', date: DateTime(2026, 7, 28));
 
-      final d = await depot().charger(maintenant: maintenant);
+      final d = await depot().charger(maintenant: HeureBenin.versInstant(maintenant));
 
       expect(d.lignes.map((l) => l.message), [
         'récente',
@@ -199,7 +205,7 @@ void main() {
       () async {
         await notif('a', 'sans date', sansDate: true);
 
-        final d = await depot().charger(maintenant: maintenant);
+        final d = await depot().charger(maintenant: HeureBenin.versInstant(maintenant));
 
         expect(d.total30Jours, 0);
         expect(d.lignes.single.dateTexte, '—');
@@ -209,7 +215,7 @@ void main() {
     test(
       'base vide : des zéros VRAIS, car le poste sait qu\'il n\'a rien',
       () async {
-        final d = await depot().charger(maintenant: maintenant);
+        final d = await depot().charger(maintenant: HeureBenin.versInstant(maintenant));
 
         expect(d.nonLues, 0);
         expect(d.critiques, 0);
@@ -221,7 +227,7 @@ void main() {
   group('filtres', () {
     Future<List<LigneNotification>> toutes() async {
       await jeuDeLaMaquette();
-      return (await depot().charger(maintenant: maintenant)).lignes;
+      return (await depot().charger(maintenant: HeureBenin.versInstant(maintenant))).lignes;
     }
 
     test('catégorie', () async {

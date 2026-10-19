@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/envoi_email_test.dart';
 import '../../core/config/parametres_smtp.dart';
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'appairage_poste.dart';
@@ -1218,10 +1219,16 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     return '${valeur.round() < 0 ? '-' : ''}${morceaux.join(' ')}';
   }
 
-  static String _dateHeure(DateTime? d) => d == null
-      ? '—'
-      : '${d.day.toString().padLeft(2, '0')}/'
-            '${d.month.toString().padLeft(2, '0')}/${d.year} '
-            '${d.hour.toString().padLeft(2, '0')}:'
-            '${d.minute.toString().padLeft(2, '0')}';
+  /// « Horodatage » du journal d'audit : `$log->created_at->format('d/m/Y H:i')` du web, serveur en
+  /// `Africa/Porto-Novo`. 🔴→✅ Ticket U12b (reste de S-T11) — `created_at` est un INSTANT : il s'affiche à l'heure du
+  /// Bénin ([HeureBenin.depuisInstant]), jamais à celle de Windows (un poste réglé à New York montrait 18:30 la veille
+  /// d'une action faite à 00:30).
+  static String _dateHeure(DateTime? d) {
+    if (d == null) return '—';
+    final l = HeureBenin.depuisInstant(d);
+    return '${l.day.toString().padLeft(2, '0')}/'
+        '${l.month.toString().padLeft(2, '0')}/${l.year} '
+        '${l.hour.toString().padLeft(2, '0')}:'
+        '${l.minute.toString().padLeft(2, '0')}';
+  }
 }
