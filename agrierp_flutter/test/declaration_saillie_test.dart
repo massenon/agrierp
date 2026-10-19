@@ -1,5 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/widgets/modale_agri.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/features/elevage/suivi_reproduction_repository.dart';
 import 'package:agrierp/features/elevage/suivi_reproduction_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -31,6 +33,8 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     depot = SuiviReproductionRepository(database: db, deviceId: 'poste-test');
 
+    // Ticket H7 : le Blade fait foi — la modale ne propose que les bandes `status = 'actif'`
+    // ET `is_active` (`getLotsForTabProperty`).
     Future<void> bande(String id, String code, String espece) => db
         .into(db.livestockLots)
         .insert(
@@ -40,6 +44,7 @@ void main() {
             speciesId: 'esp-$espece',
             speciesCode: Value(espece),
             currentQuantity: const Value(50),
+            status: const Value('actif'),
           ),
         );
 
@@ -187,6 +192,23 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    // Ticket H7 : le Blade fait foi — la liste s'ouvre sur « -- Sélectionner -- » : la bande
+    // se choisit.
+    Future<void> choisirBande(WidgetTester tester, String code) async {
+      await tester.tap(find.byKey(const Key('saillie-bande')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(code).last);
+      await tester.pumpAndSettle();
+    }
+
+    // Les étiquettes de la modale, sans l'en-tête du tableau qu'elle recouvre.
+    Finder dansModale(String texte) => find.descendant(
+      of: find.byType(ModaleAgri),
+      matching: find.text(texte),
+    );
+
+    tearDown(ToastAgri.toutRetirer);
+
     testWidgets('le bouton de déclaration est là sur lapins et porcs', (
       tester,
     ) async {
@@ -202,7 +224,9 @@ void main() {
       expect(find.text('Déclarer une Saillie Porc'), findsOneWidget);
     });
 
-    testWidgets('⚠️ la modale reprend les champs de la maquette', (
+    // Ticket H7 : le Blade fait foi — « N° Lapine * », « Mâle Saillisseur N° » (facultatif).
+    // « Cages Occupées » et l'aperçu sont des ajouts du poste, gardés.
+    testWidgets('⚠️ la modale reprend les champs du Blade, puis les ajouts du poste', (
       tester,
     ) async {
       await afficher(tester);
@@ -210,10 +234,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Déclarer une Saillie (Cuniculture)'), findsOneWidget);
-      expect(find.text('BANDE *'), findsOneWidget);
-      expect(find.text('N° LAPINE (R1..RN) *'), findsOneWidget);
-      expect(find.text('MÂLE SAILLISSEUR N° *'), findsOneWidget);
-      expect(find.text('DATE DE SAILLIE *'), findsOneWidget);
+      expect(dansModale('BANDE *'), findsOneWidget);
+      expect(dansModale('N° LAPINE *'), findsOneWidget);
+      expect(dansModale('MÂLE SAILLISSEUR N°'), findsOneWidget);
+      expect(dansModale('DATE DE SAILLIE *'), findsOneWidget);
       expect(find.text('CAGES OCCUPÉES'), findsOneWidget);
       expect(find.byKey(const Key('apercu-echeances')), findsOneWidget);
     });
@@ -244,6 +268,7 @@ void main() {
       await tester.tap(find.byKey(const Key('declarer-saillie-lapins')));
       await tester.pumpAndSettle();
 
+      await choisirBande(tester, 'LOT-LAP-2026-06');
       await tester.enterText(find.byKey(const Key('saillie-femelle')), 'R8');
       await tester.enterText(find.byKey(const Key('saillie-male')), 'M2');
       await tester.tap(find.byKey(const Key('saillie-enregistrer')));
@@ -252,6 +277,9 @@ void main() {
       expect(await cycles(), hasLength(1));
       expect(find.text('R8'), findsOneWidget);
       expect(find.text('M2'), findsOneWidget);
+      // Ticket H7 : le Blade fait foi — le toast de `saveDeclaration()`.
+      expect(find.text('Saillie enregistrée avec succès.'), findsOneWidget);
+      ToastAgri.toutRetirer();
     });
 
     testWidgets(
@@ -268,6 +296,7 @@ void main() {
         await tester.tap(find.byKey(const Key('declarer-saillie-lapins')));
         await tester.pumpAndSettle();
 
+        await choisirBande(tester, 'LOT-LAP-2026-06');
         await tester.enterText(find.byKey(const Key('saillie-femelle')), 'R8');
         await tester.enterText(find.byKey(const Key('saillie-male')), 'M5');
         await tester.tap(find.byKey(const Key('saillie-enregistrer')));
@@ -279,11 +308,15 @@ void main() {
       },
     );
 
-    testWidgets('les deux numéros sont requis', (tester) async {
+    // Ticket H7 : le Blade fait foi — seul le numéro de la FEMELLE est requis (`motherRef`
+    // required, `sireRef` nullable). Le mâle seul ne suffit pas.
+    testWidgets('le numéro de la femelle est requis', (tester) async {
       await afficher(tester);
       await tester.tap(find.byKey(const Key('declarer-saillie-lapins')));
       await tester.pumpAndSettle();
 
+      await choisirBande(tester, 'LOT-LAP-2026-06');
+      await tester.enterText(find.byKey(const Key('saillie-male')), 'M2');
       await tester.tap(find.byKey(const Key('saillie-enregistrer')));
       await tester.pumpAndSettle();
 
@@ -300,8 +333,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Déclarer une Saillie (Porciculture)'), findsOneWidget);
-      expect(find.text('N° TRUIE (T1..TN) *'), findsOneWidget);
-      expect(find.text('VERRAT N° *'), findsOneWidget);
+      // Ticket H7 : le Blade fait foi — « N° Truie * », « Verrat N° » (facultatif).
+      expect(dansModale('N° TRUIE *'), findsOneWidget);
+      expect(dansModale('VERRAT N°'), findsOneWidget);
       expect(find.byKey(const Key('saillie-cages')), findsNothing);
       expect(find.byKey(const Key('apercu-echeances')), findsNothing);
     });

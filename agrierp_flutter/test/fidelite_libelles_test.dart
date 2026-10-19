@@ -164,9 +164,9 @@ void main() {
       'lib/features/stocks/catalogue_produits_screen.dart',
     ],
     'historique-ventes.html': ['lib/features/ventes/ventes_devis_screen.dart'],
-    'suivi-reproduction.html': [
-      'lib/features/elevage/suivi_reproduction_screen.dart',
-    ],
+    // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
+    // maquette : titres, colonnes, statuts, KPI, modales et messages sont lus dans
+    // `suivi-reproduction.blade.php` par `suivi_reproduction_blade_test.dart`.
     'vms-registre.html': ['lib/features/elevage/soins_vaccins_screen.dart'],
     'vms-calendrier.html': ['lib/features/elevage/soins_vaccins_screen.dart'],
     'elevage-dashboard.html': [
@@ -335,49 +335,15 @@ void main() {
     'Importer des Soins (CSV/Excel)': 'import de fichier non embarqué',
     'Télécharger PDF': "chaîne d'édition non embarquée",
 
-    // ── Correction d'un cycle de reproduction : le poste ne DÉCLARE que la
-    //    saillie ; palpation, mise bas et sevrage corrigent un cycle que le
-    //    serveur a pu faire évoluer (ticket F0.35).
-    'Modifier la Fiche Lapine': 'correction de cycle réservée au web',
-    'Modifier la Fiche Truie': 'correction de cycle réservée au web',
-    "Modifier le Lot d'Incubation": 'correction de cycle réservée au web',
-    'Modifier le Bac de Ponte': 'correction de cycle réservée au web',
-    'Saisir Sevrage': 'correction de cycle réservée au web',
-    'Saisir Mise Bas': 'correction de cycle réservée au web',
-    'Enregistrer le Résultat': 'correction de cycle réservée au web',
-    'Enregistrer la Mise Bas': 'correction de cycle réservée au web',
-    'Enregistrer le Sevrage': 'correction de cycle réservée au web',
+    // ── Ticket H7 : le Blade fait foi. Suivi Reproduction ne se compare plus à la maquette :
+    //    les 28 exemptions qui ne concernaient que `suivi-reproduction.html` (corrections de
+    //    cycle, panneaux Volailles / Escargots, accordéon des KPI) sont retirées avec la page.
+    //    « Enregistrer les Modifications » reste : d'autres pages portées la contiennent.
     'Enregistrer les Modifications': 'correction de cycle réservée au web',
-    // ⚠️ Le titre porte un emplacement de nom de truie (« — ») que la
-    //    maquette remplit en JavaScript.
-    'Enregistrer la Mise Bas — —': 'correction de cycle réservée au web',
-
-    // ── Panneaux Volailles et Escargots : rendus en RÉSUMÉ, jamais en second
-    //    formulaire — la donnée se saisit sur la fiche d'espèce (F0.34).
-    "Lancer un Lot d'Incubation": 'saisie faite sur la fiche espèce',
-    "Lancer un Lot d'Incubation (Couvoir)": 'saisie faite sur la fiche espèce',
-    "Lancer l'Incubation": 'saisie faite sur la fiche espèce',
-    'Déclarer un Bac de Ponte': 'saisie faite sur la fiche espèce',
-    'Placer un Bac de Ponte (Héliciculture)':
-        'saisie faite sur la fiche espèce',
-    'Enregistrer le Bac de Ponte': 'saisie faite sur la fiche espèce',
-    'Code Incubation': 'onglet rendu en résumé',
-    'Bande Reproducteurs': 'onglet rendu en résumé',
-    'Date Incubation (J0)': 'onglet rendu en résumé',
-    'Éclosion Attendue (J+21)': 'onglet rendu en résumé',
-    'Taux Éclosion (%)': 'onglet rendu en résumé',
-    'Code Bac Ponte': 'onglet rendu en résumé',
-    'Date Placement': 'onglet rendu en résumé',
-    'Œufs Pondus (terre)': 'onglet rendu en résumé',
-    'Éclosion Attendue (J+25)': 'onglet rendu en résumé',
-    'Parc / Bâtiment': 'référentiel des emplacements absent du schéma',
-    'Parc / Fosse': 'référentiel des emplacements absent du schéma',
 
     // ── Accordéon des KPI : repli propre au mobile ; le poste est un écran de
     //    bureau, où le panneau est toujours déplié.
     'Indicateurs de performance': 'accordéon mobile sans objet au poste',
-    'Indicateurs de Reproduction & Éclosion (Replier / Déplier)':
-        'accordéon mobile sans objet au poste',
     'Résumé sanitaire': 'accordéon mobile sans objet au poste',
 
     // ── Modules non embarqués, déjà annoncés à l'écran (tickets F0.33, F0.37).
@@ -1142,7 +1108,10 @@ void main() {
   };
 
   /// Dette chiffrée : voir le test « ne monte pas ». Valeur cible après F0.81.
-  const plafondManquesMasques = 268;
+  ///
+  /// Ticket H7 : le Blade fait foi — 268 → 239. Les 29 couples masqués de
+  /// `suivi-reproduction.html` sortent du compte avec la page (contrôlée contre le Blade).
+  const plafondManquesMasques = 239;
 
   for (final entree in portages.entries) {
     final page = entree.key;

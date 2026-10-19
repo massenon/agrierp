@@ -717,6 +717,12 @@ class _SocleAccueilState extends State<SocleAccueil> {
             _avantSujet = EcranPoste.suiviReproduction;
             _ecran = EcranPoste.ficheSujet;
           }),
+          // Ticket H7 — « Saisir le Couvoir du Jour → » : les deux `route()` du Blade.
+          onSaisirCouvoir: (espece) => setState(
+            () => _ecran = espece == 'aviculture'
+                ? EcranPoste.ficheReproducteurs
+                : EcranPoste.ficheEscargots,
+          ),
         ),
         EcranPoste.ficheSujet => FicheSujetScreen(
           // ⚠️ Une clé PAR SUJET : sans elle, passer d'une fiche à une autre

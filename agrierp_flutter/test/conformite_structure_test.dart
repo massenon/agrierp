@@ -38,8 +38,9 @@ void main() {
     'catalogue-view.html': 'lib/features/stocks/catalogue_produits_screen.dart',
     'seuils-alerte.html': 'lib/features/stocks/catalogue_produits_screen.dart',
     'historique-ventes.html': 'lib/features/ventes/ventes_devis_screen.dart',
-    'suivi-reproduction.html':
-        'lib/features/elevage/suivi_reproduction_screen.dart',
+    // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
+    // maquette : ses colonnes sont celles de `suivi-reproduction.blade.php` (neuf, puis les
+    // ajouts du poste), vérifiées dans cet ordre par `suivi_reproduction_blade_test.dart`.
     'vms-registre.html': 'lib/features/elevage/soins_vaccins_screen.dart',
     'vms-calendrier.html': 'lib/features/elevage/soins_vaccins_screen.dart',
     'elevage-dashboard.html':
@@ -106,12 +107,8 @@ void main() {
     // vérifier. C'est le garde-fou des exemptions orphelines, en bas de ce
     // fichier, qui les a signalées.
 
-    // ⚠️ LES DEUX PANNEAUX VOLAILLES ET ESCARGOTS de Suivi Reproduction sont
-    //    rendus EN RÉSUMÉ, pas en second formulaire : la donnée se saisit sur
-    //    la fiche d'espèce (exemption déjà posée au ticket F0.42, ici pour la
-    //    structure).
-    'Code Incubation': 'onglet rendu en résumé, pas en tableau',
-    'Parc / Fosse': 'onglet rendu en résumé, pas en tableau',
+    // Ticket H7 : le Blade fait foi — les exemptions « Code Incubation » et « Parc / Fosse »
+    //    (panneaux Volailles et Escargots de Suivi Reproduction) sont retirées avec la page.
 
     // ⚠️ LE GANTT DU CALENDRIER VÉTÉRINAIRE porte une colonne par jour de la
     //    semaine de démonstration : ce sont des DONNÉES figées, pas une
