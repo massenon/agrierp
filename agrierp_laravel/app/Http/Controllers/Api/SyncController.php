@@ -25,6 +25,7 @@ use App\Models\LivestockSpecies;
 use App\Models\Notification;
 use App\Services\AttestationService;
 use App\Services\EffectifParCategorieService;
+use App\Services\JournalSynchronisationService;
 use App\Services\LotRevenueService;
 use App\Services\ProductCatalogService;
 use Illuminate\Support\Arr;
@@ -902,7 +903,7 @@ class SyncController extends Controller
                 ->orderByDesc('saillie_date')
                 ->get();
 
-        return response()->json([
+        $reponse = [
             'server_time' => now()->toIso8601String(),
             // Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). Un poste qui ne le
             // connaît pas purge ses données d'activité avant tout envoi.
@@ -957,7 +958,12 @@ class SyncController extends Controller
             // recopier et les deux listes divergeraient au premier ajout.
             'treasury_accounts' => $comptesTresorerie,
             'expense_categories' => \App\Models\Expense::CATEGORIES,
-        ]);
+        ];
+
+        // Ticket H3 — chaque tirage est journalisé par poste (modale « Synchronisation » du web).
+        app(JournalSynchronisationService::class)->tirage($request, $reponse);
+
+        return response()->json($reponse);
     }
 
     /**
@@ -1220,6 +1226,8 @@ class SyncController extends Controller
         }
 
         AuditLog::record('api.sync_push', 'sync', $request->user()->id);
+        // Ticket H3 — l'envoi est journalisé par poste, avec ses compteurs acceptés / refusés.
+        app(JournalSynchronisationService::class)->envoi($request, $result);
 
         return response()->json($result);
     }

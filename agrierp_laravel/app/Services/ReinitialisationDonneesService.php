@@ -89,6 +89,9 @@ class ReinitialisationDonneesService
             // 🔴 Ticket 15.50 : les notifications PRÉSERVÉES pointaient vers des bandes, produits et soins
             // effacés (« Stock sous le seuil », « Mortalité anormale » d'une bande qui n'existe plus).
             'notifications',
+            // Ticket H3 — journal des tirages et envois des postes : après une réinitialisation, chaque poste purge
+            // ses données et repart de zéro ; ses compteurs d'avant ne décrivent plus rien.
+            'journal_synchronisation',
         ];
     }
 
