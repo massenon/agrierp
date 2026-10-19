@@ -91,14 +91,54 @@ class FusionReferentiels {
         for (final (idPoste, idServeur) in fusionsDe(corps[table]))
           (table, idPoste, idServeur),
     ];
-    if (aFaire.isEmpty) return 0;
+    final fiches = fusionsDe(corps['livestock_daily_entries']);
+    if (aFaire.isEmpty && fiches.isEmpty) return 0;
 
     await _db.transaction(() async {
       for (final (table, idPoste, idServeur) in aFaire) {
         await appliquer(table, idPoste, idServeur);
       }
+      for (final (idPoste, idServeur) in fiches) {
+        await appliquerFiche(idPoste, idServeur);
+      }
     });
-    return aFaire.length;
+    return aFaire.length + fiches.length;
+  }
+
+  /// Ticket S-T9 — FICHE DU JOUR FUSIONNÉE : le serveur tenait déjà une fiche pour la même (bande, jour), sous un
+  /// autre identifiant (créée par la vente d'un autre poste, ou par son animalier), et y a réuni celle du poste. La
+  /// fiche locale prend l'identifiant du serveur, SUR PLACE : `UNIQUE (lot_id, entry_date)` interdit d'en avoir deux le
+  /// temps d'une copie, et aucune table du poste ne référence une fiche. Son statut ne change pas (l'acquittement
+  /// vient de le poser) ; le tirage suivant y écrit la version du serveur, datée par la fusion. Un refus encore ouvert
+  /// sous l'ancien identifiant est retiré. Idempotent : un second passage ne trouve plus l'identifiant du poste.
+  Future<void> appliquerFiche(String idPoste, String idServeur) async {
+    if (idPoste == idServeur) return;
+    final info = _table('livestock_daily_entries');
+    final serveurPresent = (await _db
+            .customSelect(
+              'SELECT 1 FROM livestock_daily_entries WHERE id = ?',
+              variables: [Variable.withString(idServeur)],
+            )
+            .get())
+        .isNotEmpty;
+    await _db.customUpdate(
+      serveurPresent
+          ? 'DELETE FROM livestock_daily_entries WHERE id = ?'
+          : 'UPDATE livestock_daily_entries SET id = ? WHERE id = ?',
+      variables: [
+        if (!serveurPresent) Variable.withString(idServeur),
+        Variable.withString(idPoste),
+      ],
+      updates: {info},
+      updateKind: serveurPresent ? UpdateKind.delete : UpdateKind.update,
+    );
+    await (_db.delete(_db.syncConflicts)..where(
+          (c) => Expression.and([
+            c.sourceTable.equals('livestock_daily_entries'),
+            c.recordId.equals(idPoste),
+          ]),
+        ))
+        .go();
   }
 
   /// Remplace partout [idPoste] par [idServeur] pour le référentiel [table], dans une transaction.

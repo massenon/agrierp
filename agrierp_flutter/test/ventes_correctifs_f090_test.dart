@@ -41,8 +41,9 @@ class _ConnectiviteFeinte implements Connectivity {
 ///    une seconde fiche (bande, jour) sous un autre `id` est refusée (contrainte unique) ;
 ///  - vente reçue : refusée si son `id` est dans [ventesRefusees] (motif tel quel) ; déjà connue =
 ///    succès silencieux sans effet ; sinon `vente += qty` sur la fiche (bande, jour de `sold_at`)
-///    — créée au besoin (`firstOrCreate`) — SAUF si une fiche (bande, jour) a été ACCEPTÉE dans le
-///    MÊME envoi (15.30).
+///    — créée au besoin (`firstOrCreate`) — SAUF si une fiche (bande, jour) a été CRÉÉE par le
+///    MÊME envoi (15.30, restreint par S-T9) ; refusée, elle est retirée de cette fiche créée ;
+///  - S-T9 : la `vente` d'une fiche DÉJÀ connue (même `id`) n'est jamais reprise du poste.
 class _ServeurModele extends Interceptor {
   _ServeurModele({this.tirage = const {}});
 
@@ -135,11 +136,14 @@ class _ServeurModele extends Interceptor {
         continue;
       }
       for (final cle in e.keys) {
-        if (_remplissables.contains(cle)) cible[cle as String] = e[cle];
+        if (!_remplissables.contains(cle)) continue;
+        // S-T9 : la vente d'une fiche connue appartient au serveur.
+        if (cle == 'vente' && existante != null) continue;
+        cible[cle as String] = e[cle];
       }
       fiches[id] = cible;
       fichesAcceptees.add(id);
-      recues.add('${cible['lot_id']}|${cible['entry_date']}');
+      if (existante == null) recues.add('${cible['lot_id']}|${cible['entry_date']}');
     }
 
     final ventesAcceptees = <String>[];
@@ -155,6 +159,16 @@ class _ServeurModele extends Interceptor {
       final motif = ventesRefusees[id];
       if (motif != null) {
         ventesRejetees.add({'id': id, 'reason': motif});
+        // S-T9 : la vente refusée est retirée de la fiche CRÉÉE par le même envoi.
+        final jourRefuse = (v['sold_at'] as String).substring(0, 10);
+        for (final l in v['lines'] as List) {
+          final lot = (l as Map)['lot_id'] as String?;
+          final fiche = lot == null ? null : ficheDe(lot, jourRefuse);
+          if (fiche != null && recues.contains('$lot|$jourRefuse')) {
+            final reste = (fiche['vente'] as int) - (l['qty'] as num).toInt();
+            fiche['vente'] = reste < 0 ? 0 : reste;
+          }
+        }
         continue;
       }
       final jour = (v['sold_at'] as String).substring(0, 10);
@@ -375,12 +389,13 @@ void main() {
         final serveur = await troisFichesSynchronisees();
         final (vente, sync) = await venteRefuseePuisRelancee(serveur);
 
-        // 1er envoi : la fiche du 12 (vente 6) est acceptée, la vente refusée.
-        expect(serveur.fiches[f12]!['vente'], 6);
+        // 1er envoi : la vente est refusée. S-T9 : la fiche du 12, déjà synchronisée, n'est partie que
+        // réduite à son identité — elle ne porte pas une vente qui n'existe pas au serveur (avant S-T9 :
+        // 6 sujets « vendus » sur la fiche pour une vente refusée).
+        expect(serveur.fiches[f12]!['vente'], 0);
         expect(serveur.fiches[f12]!['mort'], 1);
 
-        // Entre-temps, sur le web : l'animalier corrige la fiche du 12 à 2 morts. La fiche web
-        // reprend `vente` stocké (`getVenteDuJourProperty`) : 6 reste.
+        // Entre-temps, sur le web : l'animalier corrige la fiche du 12 à 2 morts.
         serveur.fiches[f12]!['mort'] = 2;
 
         await sync.relancer(await db.select(db.syncConflicts).getSingle());
@@ -513,7 +528,8 @@ void main() {
         final (_, sync) = await venteRefuseePuisRelancee(serveur);
         await sync.relancer(await db.select(db.syncConflicts).getSingle());
 
-        // Nouvelle vente du jour : la fiche du 14 repart COMPLÈTE (modifiée au poste).
+        // Nouvelle vente du jour : S-T9 — la fiche du 14, déjà synchronisée, part elle aussi réduite à son identité ;
+        // c'est la vente qui y inscrit ses 2 sujets au serveur.
         await caisse.enregistrerVente(
           panier: [
             LignePanier(
@@ -538,21 +554,20 @@ void main() {
         );
         expect(fiches.first.containsKey('mort'), isFalse);
         expect(fiches.last['id'], f14);
-        expect(fiches.last['vente'], 2);
+        expect(fiches.last.containsKey('vente'), isFalse);
         expect(
           fiches.where((f) => f['id'] == f12),
           hasLength(1),
           reason: 'jamais deux fois le même identifiant dans un envoi',
         );
-        // Fiche du 12 : 6 (relance, comptée une fois) ; fiche du 14 : 2 (portée par la fiche
-        // complète du même envoi, pas rajoutée).
+        // Fiche du 12 : 6 (relance, comptée une fois) ; fiche du 14 : 2 (inscrits par la vente, une fois).
         expect(serveur.fiches[f12]!['vente'], 6);
         expect(serveur.fiches[f14]!['vente'], 2);
       },
     );
 
     test(
-      '🔴 une vente fraîche part avec sa fiche COMPLÈTE, une vente déjà acquittée ne fait rien repartir',
+      '🔴 une vente fraîche part avec la fiche RÉDUITE de son jour (S-T9), une vente déjà acquittée ne fait rien repartir',
       () async {
         final serveur = await troisFichesSynchronisees();
         await caisse.enregistrerVente(
@@ -565,10 +580,12 @@ void main() {
 
         final premiers =
             serveur.corpsRecus.single['livestock_daily_entries'] as List;
+        // S-T9 : la fiche du 12 est déjà synchronisée ; renvoyée complète, elle porterait les morts TELS QUE LE
+        // COMPTOIR LES A TIRÉS (une correction de l'animalier écrasée). Seule son identité part ; la vente compte.
         expect(premiers, hasLength(1));
-        expect((premiers.single as Map)['vente'], 6);
-        expect((premiers.single as Map)['mort'], 1);
+        expect((premiers.single as Map).keys, unorderedEquals(['id', 'lot_id', 'entry_date']));
         expect(serveur.fiches[f12]!['vente'], 6);
+        expect(serveur.fiches[f12]!['mort'], 1);
 
         // Synchronisation suivante : rien en file, aucune fiche ne repart.
         await sync.synchroniser();

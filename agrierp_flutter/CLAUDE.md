@@ -60,6 +60,21 @@ flutter build windows --release    # → build\windows\x64\runner\Release\agrier
 
 `dart_test.yaml` declares an `integration` tag. Those tests (`test/sync_reel_test.dart`) require `php artisan serve --port=8002` in `C:\laragon\www\agrierp`; **without it they mark themselves SKIPPED, never failed** — a permanent red offline ends up ignored for good.
 
+#### Essai à plusieurs postes (ticket S-T9, méthode TATACORA)
+
+```bash
+agrierp_flutter/outils/essai_multipostes.sh 42 7 2026     # une graine par essai ; sans argument, une graine au hasard
+ESSAI_BASE=sqlite agrierp_flutter/outils/essai_multipostes.sh 42   # sans MariaDB (le script le dit)
+```
+
+Le script fait tout, sans jamais lire ni modifier un `.env` ni ouvrir une base existante : MariaDB/MySQL privé dans un dossier temporaire (port et socket propres, base `agrierp_essai` en `utf8mb4_unicode_ci`), `migrate:fresh --seed` puis `DemoDataSeeder` (cinq mois d'activité : de vraies pages de tirage), `php artisan serve --no-reload` avec 4 processus (`PHP_CLI_SERVER_WORKERS`), le test `test/essai_multipostes_test.dart` à l'heure du Bénin (`TZ`), puis l'arrêt du **groupe** de processus du serveur (tuer `artisan serve` seul laisse `php -S` tenir le port) et de MariaDB. Rapports (`rapport-<graine>.txt` : journal des coupures et des envois, compteurs, invariants, état du serveur) et journaux dans un dossier temporaire hors dépôt, affiché à la fin.
+
+- Cinq postes réels (bases Drift en mémoire, `SyncEngine` et `SynchronisationAutomatique` réels, connexion `POST /api/auth/login` avec jeton nommé d'après le poste) : bureau (admin), deux comptoirs (caisse), élevage (animalier), comptabilité (comptable). Quatre journées de gestes par les VRAIS dépôts ; la deuxième caisse est hors ligne une journée. Au web, pendant ce temps, par les vrais composants Livewire (`outils/essai_multipostes_serveur.php`) : deux bandes, une vente à la caisse web, une ration modifiée.
+- Coupures (`_Perturbateur`, une suite aléatoire par poste, graine journalisée) : requête perdue, **réponse perdue après traitement**, délai dépassé, 500, 413 d'un mandataire au-delà de 6 000 octets. Puis réseau parfait jusqu'à ce que plus rien ne soit `pending`.
+- ⚠️ **Le test écrit sur le serveur** : il exige `AGRIERP_ESSAI_URL` (posée par le script) et se marque SAUTÉ sinon — jamais contre le serveur de développement par accident.
+- ⚠️ Le rejeu d'une graine est fidèle pour les coupures de chaque poste ; l'entrelacement des cinq postes au serveur dépend de l'horloge (c'est ce qui a fait sortir les interblocages MariaDB).
+- Défauts trouvés et corrigés (S-T9) : voir `test/synchronisation_multipostes_test.dart` et `agrierp_laravel/tests/Feature/SyncEssaiMultipostesTest.php`.
+
 ### Regenerating the prototype fixtures
 
 `test/inventaire_maquette.g.dart` and `test/structure_maquette.g.dart` are **generated from the prototype**, not hand-written. To add the pages a new screen ports:

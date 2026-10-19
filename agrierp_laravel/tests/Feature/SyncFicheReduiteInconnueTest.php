@@ -216,12 +216,20 @@ class SyncFicheReduiteInconnueTest extends TestCase
         $this->assertSame(1, LivestockDailyEntry::count());
     }
 
-    /** Id connu + vente du même envoi : la fiche porte déjà ses 6, la vente ne s'y rajoute pas (15.30 intact). */
+    /**
+     * Id connu + vente du même envoi : la vente est comptée UNE fois, et son renvoi ne double rien.
+     *
+     * Ticket S-T9 : une fiche réduite ne dispense plus la vente de son incrément. Le cas que F0.90 protégeait — une
+     * fiche créée avec la vente d'une vente REFUSÉE du même envoi, puis relancée — n'existe plus : la vente refusée est
+     * retirée de la fiche créée (`SyncEssaiMultipostesTest`). Depuis S-T9 le comptoir n'envoie d'ailleurs plus que la
+     * fiche réduite d'une fiche déjà synchronisée : l'exempter, c'était ne jamais compter ses ventes.
+     */
     public function test_fiche_reduite_connue_avec_vente_ne_double_pas_le_comptage(): void
     {
-        $this->creerFiche(['vente' => 6, 'effectif_final' => 44]);
+        $this->creerFiche(['vente' => 0, 'effectif_final' => 50]);
 
         $reponse = $this->pousser([$this->ficheReduite()], [$this->vente()])->assertOk();
+        $this->pousser([$this->ficheReduite()], [$this->vente()])->assertOk();
 
         $this->assertSame([self::FICHE], $reponse->json('livestock_daily_entries.accepted'));
         $this->assertSame(6, (int) LivestockDailyEntry::find(self::FICHE)->vente);

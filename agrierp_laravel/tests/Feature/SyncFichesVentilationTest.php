@@ -214,7 +214,8 @@ class SyncFichesVentilationTest extends TestCase
     {
         $reponse = $this->pousser([$this->fiche('2026-10-14', ['mort_repro' => -1], null, 1)])->assertOk();
 
-        $this->assertSame(['accepted', 'rejected'], array_keys($reponse->json('livestock_daily_entries')));
+        // Ticket S-T9 : `merged` s'ajoute (fiche du poste réunie à celle que le serveur tient pour la même (bande, jour)).
+        $this->assertSame(['accepted', 'rejected', 'merged'], array_keys($reponse->json('livestock_daily_entries')));
         $this->assertSame(['id', 'reason'], array_keys($reponse->json('livestock_daily_entries.rejected.0')));
     }
 

@@ -1682,9 +1682,43 @@ class SyncController extends Controller
         // motif, et rejoignent la réponse de leur table après traitement des autres.
         $refusParRole = $this->retirerLesEnvoisSansDroit($request);
 
+        // 🔴→✅ TICKET S-T9 — L'ENVOI EST ATOMIQUE, ET REJOUÉ SUR UN INTERBLOCAGE.
+        //
+        // Mesuré par l'essai à plusieurs postes, sur MariaDB (jamais vu sur SQLite, qui sérialise tout) : deux comptoirs
+        // qui envoient en même temps des ventes de la même bande s'interbloquent (`1213 Deadlock found`, sur la fiche
+        // du jour, la bande ou le stock du produit). L'envoi partait en 500 À MOITIÉ ÉCRIT : les fiches de la requête
+        // étaient déjà enregistrées, ses ventes non. Le poste renvoyait (S-T1) ; la fiche, désormais connue, ne portait
+        // plus les ventes du même envoi (15.30) et chaque vente y comptait ses sujets UNE SECONDE FOIS. Tout l'envoi
+        // passe maintenant dans UNE transaction : un échec n'écrit rien, le renvoi retrouve le serveur tel qu'il était.
+        // Un interblocage est rejoué jusqu'à trois fois par Laravel (`DB::transaction(…, 3)`) avant de remonter en 500.
+        $result = DB::transaction(fn () => $this->traiterEnvoi($request, $clesInvalides), 3);
+
+        foreach ($refusParRole as $table => $refus) {
+            $result[$table]['rejected'] = array_merge($result[$table]['rejected'], $refus);
+        }
+
+        AuditLog::record('api.sync_push', 'sync', $request->user()->id);
+        // Ticket H3 — l'envoi est journalisé par poste, avec ses compteurs acceptés / refusés.
+        app(JournalSynchronisationService::class)->envoi($request, $result);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Ticket S-T9 — le traitement d'un envoi, table par table, dans l'ordre que le poste suppose (voir `push`, qui
+     * l'exécute dans une transaction). Rend la réponse, refus par rôle exceptés.
+     *
+     * @param  array<string, string>  $clesInvalides
+     * @return array<string, mixed>
+     */
+    private function traiterEnvoi(Request $request, array $clesInvalides): array
+    {
+        $this->fichesPortantLesVentes = [];
+
         $result = [
             'cles_invalides' => $clesInvalides,
-            'livestock_daily_entries' => ['accepted' => [], 'rejected' => []],
+            // Ticket S-T9 — `merged` : fiche du poste fusionnée dans celle que le serveur tient pour la même (bande, jour).
+            'livestock_daily_entries' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'sales' => ['accepted' => [], 'rejected' => []],
             'stock_adjustments' => ['accepted' => [], 'rejected' => []],
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
@@ -1885,7 +1919,7 @@ class SyncController extends Controller
             // la vente ne rajoute pas sur une fiche ce que cette fiche porte déjà (double comptage).
             $result['sales'] = $this->pushSales(
                 $this->envoiTraduit($request, 'sales'),
-                $this->fichesAcceptees($result['livestock_daily_entries']['accepted'] ?? []),
+                $this->fichesPortantLesVentes,
             );
         }
 
@@ -1924,15 +1958,7 @@ class SyncController extends Controller
             $result['veterinary_records'] = $this->pushVeterinaryRecords($request->input('veterinary_records'));
         }
 
-        foreach ($refusParRole as $table => $refus) {
-            $result[$table]['rejected'] = array_merge($result[$table]['rejected'], $refus);
-        }
-
-        AuditLog::record('api.sync_push', 'sync', $request->user()->id);
-        // Ticket H3 — l'envoi est journalisé par poste, avec ses compteurs acceptés / refusés.
-        app(JournalSynchronisationService::class)->envoi($request, $result);
-
-        return response()->json($result);
+        return $result;
     }
 
     /**
@@ -2096,6 +2122,13 @@ class SyncController extends Controller
 
     /** Ticket 15.40 — effectifs par catégorie DÉRIVÉS (comme `effectif_final`) : jamais saisis sur une bande à chaîne. */
     private const FICHE_CATEGORIES_DERIVEES = ['cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune'];
+
+    /** Ticket S-T9 — colonnes de saisie qui ne font pas bouger l'effectif (ponte, aliment, pesée, effectifs saisis, soin). */
+    private const FICHE_COLONNES_SAISIE_LIBRES = [
+        'ponte_total', 'ponte_casses', 'feed_qty_kg', 'weight_sample_avg_g', 'effectif_m', 'effectif_f',
+        'effectif_sevres', 'effectif_smeres', 'cat_eff_4', 'feed_product_id', 'treatment_product_id', 'treatment_dose',
+        'symptomes',
+    ];
 
     /** Ticket 15.40 — colonnes qui font bouger l'effectif : leur présence déclenche le contrôle du passage (D3). */
     private const FICHE_COLONNES_MOUVEMENT = [
@@ -2399,7 +2432,64 @@ class SyncController extends Controller
                 // est refusée avec son motif : elle reste sur le poste, sans perte, jusqu'à son envoi par un
                 // compte autorisé.
                 if ($venteSeulement && $this->modifieAutreChoseQueLaVente($validated, $existant)) {
+                    // 🔴→✅ TICKET S-T9 — la fiche NÉE D'UNE VENTE au comptoir (aucune saisie d'élevage : valeurs par
+                    // défaut) renvoyée après un accusé perdu, alors que l'animalier y a réuni sa saisie entre-temps :
+                    // elle différait du serveur par les morts de l'animalier, et le caissier était refusé pour une
+                    // saisie qu'il n'a jamais faite (mesuré par l'essai à plusieurs postes). Rien à y écrire : la vente
+                    // appartient au serveur (voir plus bas), la saisie d'élevage à l'animalier.
+                    if ($existant !== null && ! $this->modifieAutreChoseQueLaVente($validated, null)) {
+                        $issues[$rang] = ['ok' => $validated['id']];
+
+                        continue;
+                    }
+
                     $issues[$rang] = ['ko' => ['id' => $validated['id'], 'reason' => MotifsRefusPush::ficheEleveurRequise()]];
+
+                    continue;
+                }
+
+                // 🔴→✅ TICKET S-T9 — (BANDE, JOUR) DÉJÀ TENUE PAR LA FICHE D'UN AUTRE POSTE : FUSION PRUDENTE.
+                //
+                // Mesuré par l'essai à plusieurs postes : la caisse crée la fiche du jour SOUS SON IDENTIFIANT dès
+                // qu'elle vend un sujet (`repercuterVente`), l'animalier crée la sienne pour ses morts et son aliment.
+                // Le second arrivé était refusé (« Une fiche existe déjà… ») : sur une journée de vente, TOUTES les
+                // fiches de l'animalier restaient au poste, morts et aliment jamais connus du serveur. La fiche est
+                // maintenant FUSIONNÉE dans celle du serveur (clé naturelle (bande, jour), comme les référentiels de
+                // S-T5 ; réponse `merged`, le poste reprend l'identifiant du serveur) quand l'une des deux ne porte
+                // QUE la vente, ou quand elles portent la même saisie (renvoi après un accusé perdu). Deux saisies
+                // d'élevage DIFFÉRENTES restent refusées avec leur motif : le choix appartient à l'éleveur.
+                $fusionnee = null;
+                if ($existant === null) {
+                    $occupante = LivestockDailyEntry::where('lot_id', $validated['lot_id'])
+                        ->whereDate('entry_date', $validated['entry_date'])->first();
+                    if ($occupante !== null) {
+                        if (! $this->ficheFusionnable($validated, $occupante)) {
+                            $issues[$rang] = ['ko' => ['id' => $validated['id'], 'reason' => MotifsRefusPush::ficheEnDouble()]];
+
+                            continue;
+                        }
+                        $fusionnee = $occupante;
+                    }
+                }
+
+                // 🔴→✅ TICKET S-T9 — LA VENTE D'UNE FICHE DÉJÀ CONNUE DU SERVEUR N'EST JAMAIS REPRISE DU POSTE.
+                //
+                // Mesuré par l'essai : deux caisses vendent chacune un lapin de la même bande le même jour, sur la
+                // fiche qu'elles ont toutes deux tirée (vente = v). Chacune renvoie la fiche avec v + 1 ; le serveur
+                // écrivait v + 1 deux fois, et exemptait chaque vente de son incrément (15.30) : v + 1 au lieu de v + 2,
+                // UN SUJET VENDU JAMAIS SORTI DE LA BANDE. Même perte quand l'animalier renvoie la fiche (vente
+                // périmée) après une vente d'un autre poste. La vente d'une fiche existante appartient donc au
+                // serveur : chaque vente l'incrémente une fois (idempotence par l'identifiant de la vente), et la fiche
+                // du poste ne la remplace plus. Seule une fiche CRÉÉE par cet envoi garde la règle 15.30 (elle porte
+                // les ventes du même envoi) ; une vente refusée du même envoi en est alors retirée (`pushSales`), si
+                // bien qu'une fiche réduite (F0.90) n'a plus de vente « déjà portée » à protéger.
+                $porteLesVentes = $existant === null && $fusionnee === null;
+                if ($existant !== null || $fusionnee !== null) {
+                    unset($entry['vente'], $validated['vente']);
+                }
+
+                if ($fusionnee !== null) {
+                    $issues[$rang] = $this->fusionnerFiche($entry, $validated, $fusionnee, $cascades);
 
                     continue;
                 }
@@ -2459,6 +2549,9 @@ class SyncController extends Controller
                 app(SyncLotProductionStockAction::class)->execute($record->fresh(), $etatAvant);
 
                 $issues[$rang] = ['ok' => $validated['id']];
+                if ($porteLesVentes) {
+                    $this->fichesPortantLesVentes[$record->lot_id.'|'.$record->entry_date->format('Y-m-d')] = true;
+                }
 
                 // Cascade de fin de lot : le plus ancien jour accepté de chaque bande.
                 $jour = $record->entry_date->format('Y-m-d');
@@ -2478,11 +2571,21 @@ class SyncController extends Controller
                 // ⚠️ REFUS CIBLE AVEC SON MOTIF : le poste enregistre alors un
                 // CONFLIT (`sync_conflicts`) et cesse de rejouer indefiniment.
                 // C'est exactement l'usage de ce mecanisme.
-                $issues[$rang] = ['ko' => [
-                    'id' => $entry['id'] ?? null,
-                    'reason' => "Une fiche existe deja pour cette bande a cette date, "
-                        ."saisie depuis un autre poste. Comparez les deux avant de trancher.",
-                ]];
+                //
+                // 🔴→✅ Ticket S-T9 — DEUX ENVOIS SIMULTANÉS de la même (bande, jour) (mesuré par l'essai à plusieurs
+                // postes : deux comptoirs qui vendent dans la même bande et envoient à la même seconde) : le second ne
+                // voyait pas encore la fiche du premier à sa lecture et butait sur la contrainte. La fiche est relue,
+                // et la fusion prudente s'applique comme si elle avait été vue ; sinon, refus motivé.
+                $occupante = isset($validated)
+                    ? LivestockDailyEntry::where('lot_id', $validated['lot_id'])->whereDate('entry_date', $validated['entry_date'])->first()
+                    : null;
+                try {
+                    $issues[$rang] = $occupante !== null && $this->ficheFusionnable($validated, $occupante)
+                        ? $this->fusionnerFiche($entry, $validated, $occupante, $cascades)
+                        : ['ko' => ['id' => $entry['id'] ?? null, 'reason' => MotifsRefusPush::ficheEnDouble()]];
+                } catch (ValidationException $e) {
+                    $issues[$rang] = ['ko' => ['id' => $entry['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)]];
+                }
             }
         }
 
@@ -2496,15 +2599,98 @@ class SyncController extends Controller
         ksort($issues);
         $accepted = [];
         $rejected = [];
+        $merged = [];
         foreach ($issues as $issue) {
             if (isset($issue['ok'])) {
                 $accepted[] = $issue['ok'];
+                if (isset($issue['fusion'])) {
+                    $merged[] = ['id' => $issue['ok'], 'id_serveur' => $issue['fusion'], 'motif' => MotifsRefusPush::ficheFusionnee()];
+                }
             } else {
                 $rejected[] = $issue['ko'];
             }
         }
 
-        return ['accepted' => $accepted, 'rejected' => $rejected];
+        return ['accepted' => $accepted, 'rejected' => $rejected, 'merged' => $merged];
+    }
+
+    /**
+     * Ticket S-T9 — (bande, jour) des fiches de CET envoi qui portent déjà les ventes du même envoi (règle 15.30) :
+     * fiches CRÉÉES par l'envoi, et fiches réduites (sans `vente`, F0.90). Une fiche existante renvoyée avec sa
+     * vente, ou fusionnée, n'en fait pas partie : sa vente appartient au serveur, chaque vente l'incrémente.
+     *
+     * @var array<string, true>
+     */
+    private array $fichesPortantLesVentes = [];
+
+    /**
+     * Ticket S-T9 — FUSION de la fiche d'un poste dans [occupante], la fiche que le serveur tient déjà pour la même
+     * (bande, jour) ([ficheFusionnable] a dit oui). La saisie d'élevage n'est reprise que si l'occupante n'en porte pas
+     * (sinon les deux sont identiques, ou l'envoi n'en porte pas) ; la vente ne l'est jamais. L'occupante est toujours
+     * redatée : le poste ne la connaît pas encore, le tirage suivant doit la lui servir.
+     *
+     * @param  array<string, mixed>  $entry  envoi (sans `vente`)
+     * @param  array<string, mixed>  $validated  champs validés (sans `vente`)
+     * @param  array<string, string>  $cascades
+     * @return array{ok: string, fusion: string}
+     */
+    private function fusionnerFiche(array $entry, array $validated, LivestockDailyEntry $occupante, array &$cascades): array
+    {
+        unset($entry['vente'], $validated['vente']);
+        $sansSaisie = ! $this->modifieAutreChoseQueLaVente($validated, null)
+            || ! $this->modifieAutreChoseQueLaVente($validated, $occupante);
+        $etatAvant = ['ne' => (int) $occupante->ne, 'mort' => (int) $occupante->mort, 'don' => (int) ($occupante->don ?? 0)];
+
+        if (! $sansSaisie) {
+            $occupante->fill(Arr::only($entry, array_diff(array_keys($validated), ['id', 'lot_id', 'entry_date', 'effectif_final'])));
+            $this->verifierVentilation($entry, $occupante, $occupante);
+            $occupante->effectif_final = $occupante->effectifFinalDepuis($occupante->previousEffectif());
+        }
+        $occupante->updated_at = now();
+        $occupante->save();
+
+        if (! $sansSaisie) {
+            if (! \App\Models\StockMovement::where('reference_type', 'daily_entry')->where('reference_id', $occupante->id)->exists()) {
+                app(RecordEggProductionStockAction::class)->execute($occupante->fresh());
+            }
+            app(SyncLotProductionStockAction::class)->execute($occupante->fresh(), $etatAvant);
+        }
+
+        $jour = $occupante->entry_date->format('Y-m-d');
+        if (! isset($cascades[$occupante->lot_id]) || $jour < $cascades[$occupante->lot_id]) {
+            $cascades[$occupante->lot_id] = $jour;
+        }
+
+        return ['ok' => $validated['id'], 'fusion' => $occupante->id];
+    }
+
+    /**
+     * Ticket S-T9 — la fiche d'un poste peut-elle être FUSIONNÉE dans [occupante], la fiche que le serveur tient
+     * déjà pour la même (bande, jour) sous un autre identifiant ? Oui si l'envoi ne porte que la vente (fiche née
+     * d'une vente au comptoir), s'il porte exactement la saisie de l'occupante (renvoi après un accusé perdu), ou si
+     * l'occupante ne porte que la vente (sa saisie d'élevage vient alors de ce poste). Non quand les deux portent
+     * une saisie d'élevage différente : refus motivé, l'éleveur compare.
+     *
+     * @param  array<string, mixed>  $fiche  champs validés
+     */
+    private function ficheFusionnable(array $fiche, LivestockDailyEntry $occupante): bool
+    {
+        if (! $this->modifieAutreChoseQueLaVente($fiche, null) || ! $this->modifieAutreChoseQueLaVente($fiche, $occupante)) {
+            return true;
+        }
+
+        $colonnes = array_diff(
+            array_unique(array_merge(array_keys($fiche), self::FICHE_COLONNES_MOUVEMENT, self::FICHE_COLONNES_SAISIE_LIBRES)),
+            self::FICHE_CATEGORIES_DERIVEES,
+        );
+        // `null` = inconnu, jamais saisi (ventilation d'une bande sans chaîne, ponte d'une bande de chair) : comme dans
+        // l'envoi (15.38, 15.40), ce n'est pas une saisie.
+        $saisieDeLOccupante = array_filter(
+            Arr::only($occupante->getAttributes(), $colonnes),
+            fn ($valeur) => $valeur !== null,
+        );
+
+        return ! $this->modifieAutreChoseQueLaVente($saisieDeLOccupante, null);
     }
 
     /**
@@ -3758,29 +3944,9 @@ class SyncController extends Controller
      * validée ne devrait jamais être modifiée après coup, cohérent avec
      * le reste du projet).
      */
-    /**
-     * Ticket 15.30 — (bande, jour) des fiches journalières ACCEPTÉES dans cet envoi.
-     *
-     * @param  array<int, string>  $idsAcceptes
-     * @return array<string, true>  clés `lot_id|AAAA-MM-JJ`
-     */
-    private function fichesAcceptees(array $idsAcceptes): array
-    {
-        if ($idsAcceptes === []) {
-            return [];
-        }
-
-        $cles = [];
-
-        foreach (LivestockDailyEntry::whereIn('id', $idsAcceptes)->get(['lot_id', 'entry_date']) as $fiche) {
-            $cles[$fiche->lot_id.'|'.$fiche->entry_date->format('Y-m-d')] = true;
-        }
-
-        return $cles;
-    }
 
     /**
-     * @param  array<string, true>  $fichesRecues  fiches acceptées dans le MÊME envoi (ticket 15.30)
+     * @param  array<string, true>  $fichesRecues  fiches du MÊME envoi qui portent déjà ses ventes (15.30 ; S-T9 : créées par l'envoi ou réduites)
      */
     /**
      * Ticket 15.46 — transferts entre bandes créés ou annulés au poste. Jamais fusionnés : un transfert nouveau
@@ -4070,11 +4236,13 @@ class SyncController extends Controller
                     $accepted[] = $saleData['id'];
                 } else {
                     $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+                    $this->retirerDesFichesPorteuses($saleData, $fichesRecues);
                 }
             } catch (SaleDateRefusedException $e) {
                 // 🔴→✅ TICKET 15.30 — date refusée par `VerifySaleDateAction` : rejet MOTIVÉ de cette
                 // vente seule. Le poste la passe en `conflict` avec ce motif, au lieu de la rejouer.
                 $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => $e->getMessage()];
+                $this->retirerDesFichesPorteuses($saleData, $fichesRecues);
             } catch (NoOpenFiscalYearException|ClosedFiscalYearException $e) {
                 // 🔴→✅ TICKET 15.30 — ANCIEN DÉFAUT : seule `ValidationException` était rattrapée ; un
                 // exercice absent ou clos levé par `AccountingEntryService::record` (via
@@ -4083,10 +4251,50 @@ class SyncController extends Controller
                 // avances et retours. La transaction ayant été annulée, ni stock, ni fiche, ni caisse
                 // n'ont bougé.
                 $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => 'Vente refusée : '.$e->getMessage()];
+                $this->retirerDesFichesPorteuses($saleData, $fichesRecues);
             }
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T9 — UNE VENTE REFUSÉE N'EST PAS PORTÉE PAR LA FICHE CRÉÉE DANS LE MÊME ENVOI.
+     *
+     * Le poste répercute chaque vente sur la fiche du jour AVANT d'envoyer : une fiche créée par cet envoi arrive avec
+     * la vente de ses sujets (règle 15.30 : la vente n'est alors pas comptée une seconde fois). Si la vente est
+     * refusée (mois clôturé, exercice clos, total incohérent…), la fiche gardait ces sujets « vendus » alors qu'aucune
+     * vente n'existe : effectif faux, et la vente relancée plus tard les recomptait. Ils en sont retirés ici, dans la
+     * même requête, et la cascade suit.
+     *
+     * @param  array<string, true>  $fichesRecues
+     */
+    private function retirerDesFichesPorteuses(mixed $saleData, array $fichesRecues): void
+    {
+        if (! is_array($saleData) || $fichesRecues === [] || ! is_array($saleData['lines'] ?? null)) {
+            return;
+        }
+
+        $jour = rescue(fn () => Carbon::parse($saleData['sold_at'] ?? 'now')->format('Y-m-d'), null, false);
+        if ($jour === null) {
+            return;
+        }
+
+        foreach ($saleData['lines'] as $ligne) {
+            $lot = is_array($ligne) ? ($ligne['lot_id'] ?? null) : null;
+            $qte = is_array($ligne) && is_numeric($ligne['qty'] ?? null) ? (int) $ligne['qty'] : 0;
+            if (! is_string($lot) || $qte <= 0 || ! isset($fichesRecues[$lot.'|'.$jour])) {
+                continue;
+            }
+            $fiche = LivestockDailyEntry::where('lot_id', $lot)->whereDate('entry_date', $jour)->first();
+            if ($fiche === null) {
+                continue;
+            }
+            $fiche->vente = max(0, (int) $fiche->vente - $qte);
+            $fiche->effectif_final = $fiche->effectifFinalDepuis($fiche->previousEffectif());
+            $fiche->save();
+            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot, $jour);
+        }
     }
 
     /**

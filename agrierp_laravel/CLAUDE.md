@@ -123,8 +123,9 @@ Only 5 routes are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-
 | Data | Rule |
 |---|---|
 | Reference data (products, categories, ration standards) | Server always wins — pull only; pushes silently ignored but logged |
-| Daily élevage sheets | Last writer wins (upsert by id) |
+| Daily élevage sheets | Last writer wins (upsert by id) on the breeder columns. S-T9: the `vente` column of a sheet the server already knows is **never** taken from the device — each sale increments it once (15.30 exemption only for a sheet created by the same request, from which a rejected sale is removed); a device sheet on a (lot, day) already held under another id is **merged** (`merged`) when one of the two carries only the sale or both carry the same entry, refused otherwise |
 | POS sales | Never merged — each offline sale is inserted as an independent transaction |
+| The whole push | S-T9: one DB transaction (`traiterEnvoi`), retried 3 times on a deadlock — a request that fails writes nothing (MariaDB deadlocks between two counters used to leave the sheet written without its sales) |
 | Stock movements | Never accepted as-is — replayed through `AdjustStockAction` for full server recomputation |
 | Fiscal year closure | Never synced — the API refuses it in any form |
 

@@ -85,16 +85,22 @@ class _ModeleServeurVentes {
   /// `lot|AAAA-MM-JJ` → vente inscrite sur la fiche du serveur.
   final Map<String, int> venteParFiche = {};
 
+  /// Identifiants des fiches que le serveur connaît (S-T9).
+  final Set<String> fichesConnues = {};
+
   void appliquer(
     Map<String, dynamic> corps, {
     required Set<String> fichesAcceptees,
     required Set<String> ventesAcceptees,
   }) {
+    // S-T9 : seule une fiche CRÉÉE par l'envoi (inconnue du serveur) porte sa vente et dispense les ventes du même
+    // envoi ; la vente d'une fiche connue n'est jamais reprise du poste.
     final recues = <String>{};
     for (final f in (corps['livestock_daily_entries'] as List? ?? const [])) {
       final fiche = f as Map;
       if (!fichesAcceptees.contains(fiche['id'])) continue;
       final cle = '${fiche['lot_id']}|${fiche['entry_date']}';
+      if (!fichesConnues.add(fiche['id'] as String)) continue;
       if (fiche.containsKey('vente')) {
         venteParFiche[cle] = fiche['vente'] as int;
       }
@@ -601,11 +607,13 @@ void main() {
 
         final duJour = fiches.first;
         expect(duJour.id, 'f1200000-0000-4000-8000-000000000000');
-        expect(duJour.syncStatus, SyncStatus.pending);
+        // S-T9 : la fiche du 12 était synchronisée — la vente s'y affiche, la fiche ne repart pas et garde son
+        // horodatage (la vente l'inscrit elle-même au serveur ; renvoyée, elle porterait des morts périmés).
+        expect(duJour.syncStatus, SyncStatus.synced);
         expect(
-          duJour.updatedAt,
-          maintenant,
-          reason: 'la fiche est horodatée à la SAISIE, pas au jour de la vente',
+          duJour.updatedAt.isBefore(maintenant),
+          isTrue,
+          reason: 'une fiche qui ne repart pas garde l\'horodatage de la saisie qui l\'a produite',
         );
         // Les fiches postérieures : seul l'effectif DÉRIVÉ change ; le serveur recalcule le sien
         // par sa propre cascade (15.31) et n'accepte jamais l'effectif du poste.
@@ -742,9 +750,12 @@ void main() {
           reason: 'seule la fiche du jour de la vente',
         );
         expect((fiches.single as Map)['entry_date'], '2026-10-12');
-        expect((fiches.single as Map)['vente'], 6);
+        // S-T9 : fiche déjà synchronisée — elle part réduite à son identité, la vente compte ses 6 sujets.
+        expect((fiches.single as Map).keys, unorderedEquals(['id', 'lot_id', 'entry_date']));
 
-        final modele = _ModeleServeurVentes();
+        // La fiche du 12 est déjà synchronisée : le serveur la connaît (S-T9).
+        final modele = _ModeleServeurVentes()
+          ..fichesConnues.add('f1200000-0000-4000-8000-000000000000');
         modele.appliquer(
           corps,
           fichesAcceptees: {'f1200000-0000-4000-8000-000000000000'},
@@ -821,7 +832,9 @@ void main() {
         );
 
         // 1er envoi : la fiche est ACCEPTÉE, la vente REFUSÉE (mois clôturé).
-        final modele = _ModeleServeurVentes();
+        // La fiche du 12 est déjà synchronisée : le serveur la connaît (S-T9).
+        final modele = _ModeleServeurVentes()
+          ..fichesConnues.add('f1200000-0000-4000-8000-000000000000');
         final premier = _ServeurFeint(
           push: {
             'livestock_daily_entries': {

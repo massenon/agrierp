@@ -164,6 +164,22 @@ class MotifsRefusPush
     }
 
     /**
+     * Ticket S-T9 : deux saisies d'élevage DIFFÉRENTES pour la même (bande, jour), venues de deux postes (texte
+     * d'origine, inchangé : le poste le montre tel quel).
+     */
+    public static function ficheEnDouble(): string
+    {
+        return 'Une fiche existe deja pour cette bande a cette date, '
+            .'saisie depuis un autre poste. Comparez les deux avant de trancher.';
+    }
+
+    /** Ticket S-T9 : motif d'une fiche du poste fusionnée dans celle que le serveur tient pour la même (bande, jour). */
+    public static function ficheFusionnee(): string
+    {
+        return 'Fiche du jour réunie avec celle que le serveur tient déjà pour cette bande et ce jour.';
+    }
+
+    /**
      * Ticket 15.50 : le poste n'a pas encore tiré la réinitialisation des données — ses saisies en attente datent
      * d'une base effacée depuis.
      */

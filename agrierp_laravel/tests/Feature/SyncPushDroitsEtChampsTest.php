@@ -177,7 +177,13 @@ class SyncPushDroitsEtChampsTest extends TestCase
         $reponse->assertJsonPath('livestock_daily_entries.accepted', [$existante->id]);
     }
 
-    /** Le poste inscrit la vente de la caisse dans la fiche du jour et la renvoie : c'est le travail du caissier. */
+    /**
+     * Le poste inscrit la vente de la caisse dans la fiche du jour et la renvoie : c'est le travail du caissier.
+     *
+     * Ticket S-T9 : sur une fiche que le serveur connaît déjà, c'est la VENTE envoyée avec elle qui inscrit ses sujets
+     * (la vente de la fiche du poste n'est plus reprise : deux comptoirs l'écrasaient l'un l'autre). Une fiche créée par
+     * l'envoi garde la vente qu'elle porte.
+     */
     public function test_le_caissier_inscrit_sa_vente_dans_la_fiche_du_jour(): void
     {
         $existante = LivestockDailyEntry::create([
@@ -193,6 +199,10 @@ class SyncPushDroitsEtChampsTest extends TestCase
                     'entry_date' => now()->subDay()->toDateString(), 'mort' => 0, 'vente' => 2,
                 ]),
             ],
+            'sales' => [$this->vente(['lines' => [[
+                'product_id' => $this->produit->id, 'lot_id' => $this->bande->id,
+                'qty' => 4, 'unit_price' => 4500, 'manual_total_amount' => 18000,
+            ]]])],
         ]);
 
         $reponse->assertJsonPath('livestock_daily_entries.rejected', []);

@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -217,6 +218,7 @@ class SyncEngine {
     // tirage son mouvement manquerait aux « Écarts d'Inventaire » jusqu'à la synchronisation suivante. (Ventes,
     // achats et fiches : leur mouvement descend au tirage suivant ; voir `JournalStocks`.)
     if (_financiersAcquittes > 0 ||
+        _ventesDeBetailAcquittees > 0 ||
         _courriersAcquittes > 0 ||
         _archivesAcquittees > 0 ||
         _documentsAcquittes > 0 ||
@@ -259,6 +261,11 @@ class SyncEngine {
   /// envoi (voir [synchroniser]) : tous modifient, côté serveur, un état que le poste affiche
   /// (`amount_used`, `returned_at`, créance ouverte) et que seul un second tirage rapporte.
   int _financiersAcquittes = 0;
+
+  /// Ticket S-T9 — ventes de bétail (une ligne au moins porte une bande) acceptées par le dernier envoi : le serveur
+  /// les a inscrites sur la fiche du jour, que le poste n'a pas renvoyée si elle était déjà synchronisée
+  /// (`FicheJournaliereRepository.repercuterVente`). Le tirage de confirmation rapporte la fiche du serveur.
+  int _ventesDeBetailAcquittees = 0;
 
   /// Courriers acceptés par le dernier envoi : la référence `CR-AAAA-NNN` que le serveur
   /// vient d'attribuer ne descend qu'au tirage suivant (F0.78).
@@ -4103,6 +4110,7 @@ class SyncEngine {
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
     _financiersAcquittes = 0;
+    _ventesDeBetailAcquittees = 0;
     _courriersAcquittes = 0;
     _archivesAcquittees = 0;
     _documentsAcquittes = 0;
@@ -4256,12 +4264,37 @@ class SyncEngine {
     var rejete = 0;
     final motifs = <String>[];
 
+    // 🔴→✅ TICKET S-T9 — N'ACQUITTE QUE LA VERSION PARTIE (même règle que les courriers, l'infirmerie et les
+    // barèmes). Mesuré par l'essai à plusieurs postes : l'animalier corrige sa fiche (un mort de plus) PENDANT
+    // l'envoi de la version précédente ; l'accusé de cette version marquait la fiche `synced`, et la correction
+    // ne partait jamais — sans erreur, le serveur gardait un mort de moins. La fiche est comparée telle qu'elle est
+    // partie (sa SAISIE, pas `updated_at`, stocké à la seconde) : changée entre-temps, elle reste `pending` et
+    // repart. Une vente répercutée entre-temps ne compte pas : le serveur ne reprend plus la vente d'une fiche qu'il
+    // connaît, la vente l'y inscrit elle-même (sinon la fiche du comptoir repartirait avec des morts périmés). Les
+    // fiches d'identité (F0.90) sont déjà `synced` : rien à marquer.
+    final fichesParties = {
+      for (final (f, identite) in fichesEnvoyees)
+        if (!identite) f.id: _saisieDeFiche(f, tete: tetes.contains(f.id)),
+    };
     accepte += await _acquitter(
       'livestock_daily_entries',
       corps['livestock_daily_entries'],
-      (ids, statut) =>
-          (_db.update(_db.livestockDailyEntries)..where((t) => t.id.isIn(ids)))
-              .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut))),
+      (ids, statut) async {
+        for (final id in ids) {
+          final partie = fichesParties[id];
+          if (partie == null) continue;
+          final actuelle = await (_db.select(
+            _db.livestockDailyEntries,
+          )..where((t) => t.id.equals(id))).getSingleOrNull();
+          if (actuelle == null ||
+              actuelle.syncStatus != SyncStatus.pending ||
+              _saisieDeFiche(actuelle, tete: tetes.contains(id)) != partie) {
+            continue;
+          }
+          await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(id)))
+              .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut)));
+        }
+      },
       motifs,
       (n) => rejete += n,
     );
@@ -4444,8 +4477,15 @@ class SyncEngine {
     accepte += await _acquitter(
       'sales',
       corps['sales'],
-      (ids, statut) => (_db.update(_db.sales)..where((t) => t.id.isIn(ids)))
-          .write(SalesCompanion(syncStatus: Value(statut))),
+      (ids, statut) async {
+        await (_db.update(_db.sales)..where((t) => t.id.isIn(ids)))
+            .write(SalesCompanion(syncStatus: Value(statut)));
+        if (statut == SyncStatus.synced) {
+          _ventesDeBetailAcquittees += ids
+              .where((id) => (lignesDeVente[id] ?? const <SaleLine>[]).any((l) => l.lotId != null))
+              .length;
+        }
+      },
       motifs,
       (n) => rejete += n,
     );
@@ -5655,6 +5695,12 @@ class SyncEngine {
       'updated_at': f.updatedAt.toUtc().toIso8601String(),
     };
   }
+
+  /// Ticket S-T9 — la SAISIE d'une fiche telle qu'elle part, sans la vente (que les ventes inscrivent au serveur) ni
+  /// l'horodatage et le poste : deux versions de même saisie ont la même empreinte.
+  String _saisieDeFiche(LivestockDailyEntry f, {required bool tete}) => jsonEncode(
+    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'updated_at', 'device_id'}.contains(cle)),
+  );
 
   /// F0.90 — fiche réduite à son IDENTITÉ (voir [_fichesDIdentite]). `lot_id` et `entry_date`
   /// sont exigés par le validateur du serveur ; AUCUNE autre clé : chacune écraserait la valeur

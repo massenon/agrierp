@@ -712,9 +712,24 @@ class FicheJournaliereRepository {
           LivestockDailyEntriesCompanion(
             id: Value(existante?.id ?? _uuid.v4()),
             deviceId: Value(_deviceId),
-            // La fiche repart en file : son effectif vient de changer.
-            syncStatus: const Value(SyncStatus.pending),
-            updatedAt: Value(saisie),
+            // 🔴→✅ TICKET S-T9 — UNE FICHE DÉJÀ SYNCHRONISÉE NE REPART PAS POUR UNE VENTE. Le serveur ne reprend
+            // plus la vente d'une fiche qu'il connaît (chaque vente l'incrémente elle-même, une fois) ; renvoyer la
+            // fiche ne servait qu'à envoyer, avec elle, les morts, naissances et aliment TELS QUE LE COMPTOIR LES
+            // AVAIT TIRÉS. Mesuré par l'essai à plusieurs postes : l'animalier corrige ses morts, la caisse vend
+            // ensuite sur sa copie périmée — refus « saisies d'élevage » pour le caissier, et pour un compte
+            // administrateur (qui a les deux droits) les morts de l'animalier ÉCRASÉS en silence. La fiche locale
+            // affiche la vente tout de suite et reste `synced` ; le tirage de confirmation qui suit l'envoi de la
+            // vente y écrit le chiffre du serveur. Fiche créée ici ou encore en attente : elle part, comme avant.
+            syncStatus: Value(
+              existante?.syncStatus == SyncStatus.synced
+                  ? SyncStatus.synced
+                  : SyncStatus.pending,
+            ),
+            updatedAt: Value(
+              existante?.syncStatus == SyncStatus.synced
+                  ? existante!.updatedAt
+                  : saisie,
+            ),
             lotId: Value(lotId),
             entryDate: Value(jour),
             achat: Value(existante?.achat ?? 0),

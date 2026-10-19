@@ -78,7 +78,7 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 | Table de liaison qui ne touche pas `updated_at` (matrice des droits) | S-T7 : le tirage sert `roles` en entier (le piège était masqué) ; toute écriture de `role_has_permissions` date désormais le rôle (`App\Models\Role`, `App\Models\Permission`) |
 | Horizon et horloges dans les tests | 🔴 corrigé (curseur) ; les tests de synchronisation automatique utilisent une horloge simulée unique |
 | Un seul écrivain par table au poste | S-T7 : `test/ecrivain_unique_test.dart` ; fiches (caisse, transferts) et archivage des soins ramenés à leur dépôt ; exception justifiée : `products.stock_qty` (miroir local du grand livre) |
-| Tests contre le vrai serveur | `sync_reel_test` (sauté sans serveur) + parités exécutées PHP ↔ Dart ; pas d'essai à plusieurs postes avec coupures |
+| Tests contre le vrai serveur | `sync_reel_test` (sauté sans serveur) + parités exécutées PHP ↔ Dart ; S-T9 : essai à cinq postes contre le vrai serveur sur MariaDB, coupures au hasard (`agrierp_flutter/outils/essai_multipostes.sh`). 🔴 Cinq défauts trouvés et corrigés : vente d'une fiche écrasée entre postes (vente comptée zéro fois), fiches de l'animalier refusées dès qu'un comptoir avait vendu (fusion par (bande, jour)), fiche corrigée pendant l'envoi acquittée sur l'ancienne version, fiche tirée renvoyée par le comptoir (morts périmés), envoi interbloqué à moitié écrit (vente comptée deux fois) |
 
 ## 7. Ce que je propose (tickets S-T, dans l'ordre de la note)
 
