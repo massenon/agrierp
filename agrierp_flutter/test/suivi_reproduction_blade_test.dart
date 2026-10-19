@@ -855,9 +855,11 @@ void main() {
       expect(e.updatedAt, saisie);
     });
 
-    /// ⚠️⚠️ Le verrou par défaut : le serveur acquitterait sans appliquer.
+    /// ⚠️⚠️ Verrou de sécurité, OUVERT par défaut depuis que le serveur applique les étapes (ticket H7) : fermé, rien
+    /// n'est écrit.
     test('⚠️⚠️ verrou fermé : rien n est écrit, et la raison est donnée', () async {
       final id = await cycle('v', bandeLapins, 'R1');
+      depot = SuiviReproductionRepository(database: db, deviceId: 'poste-test', miseAJourCycleAccepteeParServeur: false);
 
       for (final action in <Future<void> Function()>[
         () => depot.enregistrerPalpation(id, positive: true),
@@ -889,6 +891,7 @@ void main() {
       tester,
     ) async {
       final id = await cycle('f', bandeLapins, 'R1', saillieIlYA: 5);
+      depot = SuiviReproductionRepository(database: db, deviceId: 'poste-test', miseAJourCycleAccepteeParServeur: false);
 
       await afficher(tester);
 

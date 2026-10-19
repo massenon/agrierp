@@ -352,8 +352,8 @@ void main() {
   ) async {
     await afficher(tester);
 
-    expect(find.byKey(const Key('mention-lecture-seule')), findsOneWidget);
-    expect(find.textContaining('La saillie se déclare ici'), findsOneWidget);
+    // Ticket H7 : actions de cycle ouvertes — le bandeau de restriction n'a plus lieu d'être.
+    expect(find.byKey(const Key('mention-lecture-seule')), findsNothing);
   });
 
   // Ticket H7 : le Blade fait foi — l'état vide du web.

@@ -4290,6 +4290,13 @@ class SyncEngine {
     'mother_ref': e.motherRef,
     'sire_ref': e.sireRef,
     'saillie_date': e.saillieDate == null ? null : _jour(e.saillieDate!),
+    // Ticket H7 — étapes du cycle saisies au poste, appliquées par le serveur à un cycle déjà connu (seules les
+    // valeurs renseignées : un `null` n'efface rien côté serveur).
+    'palpation_date': e.palpationDate == null ? null : _jour(e.palpationDate!),
+    'mise_bas_date_actual': e.miseBasDateActual == null ? null : _jour(e.miseBasDateActual!),
+    'nes_vivants': e.nesVivants,
+    'nes_morts': e.nesMorts,
+    'status': e.status,
     'device_id': e.deviceId,
   };
 

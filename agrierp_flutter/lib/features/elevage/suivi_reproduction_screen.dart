@@ -1108,15 +1108,15 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       ),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
-        SizedBox(width: AgriSpacing.sm),
+        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(
             'La saillie se déclare ici, hors ligne : elle part au prochain '
-            'tirage. ${SuiviReproductionRepository.motifActionsCycleFermees}',
+            'tirage.${widget.depot.miseAJourCycleAccepteeParServeur ? ' Palpation, mise bas et clôture aussi.' : ' ${SuiviReproductionRepository.motifActionsCycleFermees}'}',
             style: TextStyle(
               fontSize: AgriTypography.xs,
               color: AgriColors.brandForest,

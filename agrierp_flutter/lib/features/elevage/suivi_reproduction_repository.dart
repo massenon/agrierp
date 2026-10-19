@@ -185,27 +185,25 @@ class DonneesSuiviReproduction {
 /// ⚠️⚠️ **LE POSTE DÉCLARE LA SAILLIE** (ticket F0.35). C'est l'acte qui se fait au clapier,
 /// hors ligne, et qui se perdait jusqu'ici sur un bout de papier.
 ///
-/// ⚠️⚠️ **PALPATION, MISE BAS ET CLÔTURE SONT PORTÉES (ticket H7) MAIS FERMÉES.** Le dépôt sait
-/// écrire la ligne comme `SuiviReproduction::recordPalpation` / `saveMiseBas` / `closeCycle`
-/// (même UUID, `pending`, `updated_at` = instant de saisie). Mais `SyncController::
-/// pushReproductionEvents` est « CRÉATION SEULE, JAMAIS MISE À JOUR » : un id déjà connu est
-/// acquitté SANS RIEN REJOUER, et le moteur n'envoie que les cinq champs de la déclaration.
-/// Ouvertes, ces actions seraient acquittées, marquées `synced`, puis écrasées au tirage suivant
-/// — une saisie perdue sans un mot. [miseAJourCycleAccepteeParServeur] reste donc `false` tant que
-/// le serveur (et `_saillieEnJson` du moteur) n'acceptent pas ces champs en mise à jour.
+/// ⚠️⚠️ **PALPATION, MISE BAS ET CLÔTURE SE SAISISSENT AU POSTE (ticket H7).** Le dépôt écrit la ligne comme
+/// `SuiviReproduction::recordPalpation` / `saveMiseBas` / `closeCycle` (même UUID, `pending`, `updated_at` = instant
+/// de saisie) ; le moteur envoie ces étapes (`_saillieEnJson`) et le serveur les applique depuis le ticket H7
+/// (`pushReproductionEvents` : avant, un id connu était acquitté sans rien appliquer — la saisie se serait perdue).
+/// [miseAJourCycleAccepteeParServeur] reste un verrou de sécurité, ouvert par défaut.
 class SuiviReproductionRepository {
   SuiviReproductionRepository({
     required this.database,
     this.deviceId = 'poste',
     Uuid? uuid,
-    this.miseAJourCycleAccepteeParServeur = false,
+    this.miseAJourCycleAccepteeParServeur = true,
   }) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
   final String deviceId;
   final Uuid _uuid;
 
-  /// Verrou des actions de cycle — voir la documentation de la classe. Seuls les tests l'ouvrent.
+  /// Verrou des actions de cycle — voir la documentation de la classe. Ouvert depuis que le serveur applique les
+  /// étapes du cycle (ticket H7) ; un test le ferme pour vérifier qu'alors rien n'est écrit.
   final bool miseAJourCycleAccepteeParServeur;
 
   /// Pourquoi les actions de cycle sont grisées au poste (info-bulle, toast, bandeau).
