@@ -379,6 +379,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           sujets: _sujets,
           parametres: widget.parametres,
           identifiantPoste: widget.identifiantPoste,
+          onDeconnecte: () => setState(() => _sessionOuverte = false),
         ),
       },
     );
@@ -427,7 +428,11 @@ class SocleAccueil extends StatefulWidget {
     required this.sujets,
     required this.parametres,
     required this.identifiantPoste,
+    this.onDeconnecte,
   });
+
+  /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
+  final VoidCallback? onDeconnecte;
 
   final AppDatabase database;
   final SyncEngine engine;
@@ -510,47 +515,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         : accessibles.first;
   }
 
-  /// Groupe et libellé de l'écran courant, pour le fil d'Ariane.
-  ///
-  /// ⚠️ LUS DANS L'ARBORESCENCE DE LA BARRE, jamais recopiés : deux libellés
-  /// séparés divergeraient au premier renommage, et le fil d'Ariane
-  /// annoncerait un écran qui ne porte plus ce nom.
-  (String, String) get _situation {
-    // ⚠️ « Mon Profil » s'ouvre depuis le menu du compte, pas depuis la barre
-    // latérale : la maquette n'y met aucun groupe, son fil d'Ariane se réduit à
-    // l'écran. Un groupe vide le dit à `BarreSuperieure`.
-    if (_ecran == EcranPoste.monProfil) return ('', 'Mon Profil');
-    // ⚠️ Le fil d'Ariane de la maquette dit « Notifications », pas le titre de
-    // la page (« Centre de Notifications »).
-    if (_ecran == EcranPoste.notifications) return ('', 'Notifications');
-    if (_ecran == EcranPoste.aideEtAPropos) return ('', 'Aide & À Propos');
-    if (_ecran == EcranPoste.ficheSujet) return ('Élevage', 'Fiche Sujet');
-    if (_ecran == EcranPoste.transfertsBandes) {
-      return ('PRODUCTION ÉLEVAGE & SOINS', 'Transferts entre Bandes');
-    }
-    if (_ecran == EcranPoste.contactEditeur) {
-      return ('', "Contactez l'Éditeur");
-    }
-
-    for (final (titre, entrees) in _BarreLaterale.arborescence) {
-      for (final (_, libelle, ecran) in entrees) {
-        if (ecran == _ecran) return (titre, libelle);
-      }
-    }
-
-    // ⚠️ Les fiches d'espèce ne figurent pas dans la barre — la maquette non
-    // plus ne les y met pas : elles s'ouvrent depuis « Gestion Élevage ».
-    return ('PRODUCTION ÉLEVAGE & SOINS', _libelleFiche(_ecran));
-  }
-
-  static String _libelleFiche(EcranPoste e) => switch (e) {
-    EcranPoste.ficheElevage => 'Fiches Lapins',
-    EcranPoste.fichePondeuses => 'Fiches Pondeuses',
-    EcranPoste.ficheReproducteurs => 'Fiches Reproducteurs',
-    EcranPoste.fichePorcs => 'Fiches Porcs',
-    EcranPoste.ficheEscargots => 'Fiches Escargots',
-    _ => e.name,
-  };
+  /// Titre de la barre supérieure (groupe vide : `BarreSuperieure` affiche alors le seul titre).
+  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran));
 
   @override
   void dispose() {
@@ -626,6 +592,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
                         : null,
                     onBasculerMenu: () =>
                         setState(() => _menuOuvert = !_menuOuvert),
+                    // Ticket H1 — comme au web, « Paramètres » mène à Paramètres Général : l'écran se garde
+                    // lui-même (`GardeEcran`) si le rôle n'y a pas droit, comme la route web refuse.
+                    onParametres: () => setState(() => _ecran = EcranPoste.parametresGeneraux),
+                    onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
                   ),
                 ),
                 // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
@@ -640,9 +610,22 @@ class _SocleAccueilState extends State<SocleAccueil> {
               ],
             ),
           ),
+          // Ticket H1 — RUBAN DE LA BARRE REPLIÉE (`app.blade.php:149-160`) : à droite, 64 px, fond
+          // `rgba(5,46,22,0.95)`, six raccourcis puis « Réafficher le menu ».
+          if (!_menuOuvert) _RubanReplie(
+            onNaviguer: (e) => setState(() => _ecran = e),
+            onReafficher: () => setState(() => _menuOuvert = true),
+          ),
         ],
       ),
     );
+  }
+
+  /// Ticket H1 — « Déconnexion » du menu du compte. Les saisies en attente RESTENT sur le poste (elles partiront
+  /// à la prochaine session) : la session se ferme, la base locale ne bouge pas.
+  Future<void> _deconnecter() async {
+    await widget.auth.deconnecter();
+    widget.onDeconnecte?.call();
   }
 
   /// Ce que lit la barre supérieure : la file d'attente (à envoyer, refusés) et les notifications.
@@ -1222,4 +1205,101 @@ class _BarreLaterale extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Ticket H1 — ruban affiché à droite quand la barre latérale est masquée (`app.blade.php:149-160`).
+class _RubanReplie extends StatelessWidget {
+  const _RubanReplie({required this.onNaviguer, required this.onReafficher});
+
+  final void Function(EcranPoste) onNaviguer;
+  final VoidCallback onReafficher;
+
+  /// Les six liens du web, dans l'ordre, avec leur `title` exact.
+  static const liens = <(IconData, String, EcranPoste)>[
+    (Icons.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
+    (Icons.point_of_sale, 'Caisse POS', EcranPoste.ventesEtDevis),
+    (Icons.pets, 'Élevage', EcranPoste.gestionElevage),
+    (Icons.inventory_2, 'Stocks', EcranPoste.gestionStocks),
+    (Icons.badge, 'Ressources Humaines', EcranPoste.personnelEtStages),
+    (Icons.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('ruban-replie'),
+      width: 64,
+      padding: const EdgeInsets.symmetric(vertical: AgriSpacing.md),
+      color: const Color(0xF2052E16),
+      child: Column(
+        children: [
+          for (final (icone, titre, ecran) in liens)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
+              child: IconButton(
+                key: Key('ruban-${ecran.name}'),
+                tooltip: titre,
+                icon: Icon(icone, color: Colors.white.withValues(alpha: 0.80)),
+                hoverColor: Colors.white.withValues(alpha: 0.10),
+                onPressed: () => onNaviguer(ecran),
+              ),
+            ),
+          const Spacer(),
+          IconButton(
+            key: const Key('ruban-reafficher'),
+            tooltip: 'Réafficher le menu',
+            icon: const Icon(Icons.menu_open, color: AgriColors.accentYellow),
+            hoverColor: Colors.white.withValues(alpha: 0.10),
+            onPressed: onReafficher,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Titres de la barre supérieure du poste, alignés sur le web.
+class SocleAccueilTitres {
+  SocleAccueilTitres._();
+
+  /// Ticket H1 — TITRE DE LA BARRE SUPÉRIEURE, celui que le web affiche (`$title` de chaque composant Livewire,
+  /// relevé le 19/10/2026), et non plus « GROUPE > écran » reconstitué depuis la barre latérale. Les écrans propres
+  /// au poste (Synchronisation, Paramètres du poste) portent leur nom.
+  static const titresDuWeb = <EcranPoste, String>{
+    EcranPoste.tableauDeBord: 'Tableau de Bord',
+    EcranPoste.gestionElevage: 'Gestion Élevage',
+    EcranPoste.dashboardElevage: 'Élevage > Dashboard Élevage',
+    EcranPoste.suiviReproduction: 'Élevage > Suivi Reproduction',
+    EcranPoste.soinsEtVaccins: 'Élevage > Soins et Vaccins',
+    EcranPoste.parametresElevage: 'Paramètres Élevage',
+    EcranPoste.ficheElevage: 'Élevage > Fiches Lapins',
+    EcranPoste.fichePondeuses: 'Élevage > Fiches Pondeuses',
+    EcranPoste.ficheReproducteurs: 'Élevage > Fiches Volailles Reproducteurs',
+    EcranPoste.fichePorcs: 'Élevage > Fiches Porcs',
+    EcranPoste.ficheEscargots: 'Élevage > Fiches Escargots',
+    EcranPoste.ficheSujet: 'Élevage > Fiche Sujet',
+    EcranPoste.transfertsBandes: 'Élevage > Transferts entre Bandes',
+    EcranPoste.ventesEtDevis: 'Ventes & Devis',
+    EcranPoste.clientsEtCreances: 'Créances Clients',
+    EcranPoste.achatsEtCommandes: 'Achats & Commandes',
+    EcranPoste.fournisseurs: 'Fournisseurs',
+    EcranPoste.saisieDepenses: 'Achats > Saisie des Dépenses',
+    EcranPoste.gestionStocks: 'Gestion des Stocks',
+    EcranPoste.catalogueProduits: 'Stocks & Produits > Catalogue Produits',
+    EcranPoste.facturation: 'Facturation & MeCeF',
+    EcranPoste.personnelEtStages: 'Personnel & Stages',
+    EcranPoste.administrationEtDocument: 'Administration & Documents',
+    EcranPoste.comptabilite: 'Comptabilité',
+    EcranPoste.parametresGeneraux: 'Paramètres',
+    EcranPoste.rapportsEtExports: 'Rapports & Exports',
+    EcranPoste.monProfil: 'Mon Profil',
+    EcranPoste.notifications: 'Centre de Notifications',
+    EcranPoste.aideEtAPropos: 'Aide & À Propos',
+    EcranPoste.contactEditeur: 'Ferme École Olouwachegoun',
+    EcranPoste.synchronisation: 'Synchronisation',
+    EcranPoste.parametres: 'Paramètres du poste',
+  };
+
+  /// Titre affiché pour [ecran] ; le défaut du web (`$title ?? 'Ferme École Olouwachegoun'`) sinon.
+  static String titre(EcranPoste ecran) => titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
 }

@@ -181,6 +181,8 @@ class AuditLog extends Model
         'api.login' => 'Connexion API (appareil Flutter)',
         'api.logout' => 'Déconnexion API (appareil Flutter)',
         'api.sync_push' => 'Synchronisation — données envoyées par un appareil',
+        'sale.negative_stock_received' => 'Vente reçue d\'un poste : stock passé sous zéro',
+        'reproduction_event.updated_from_device' => 'Cycle de reproduction mis à jour depuis un poste',
         'attestation.generated.employe' => 'Attestation de travail générée',
         'attestation.generated.stagiaire' => 'Attestation de stage générée',
         'attestation_template.updated' => "Modèle d'attestation modifié",

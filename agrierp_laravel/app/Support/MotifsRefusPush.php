@@ -182,6 +182,8 @@ class MotifsRefusPush
             'livestock_transfers' => 'transférer des sujets entre bandes',
             'livestock_reproduction_events' => 'enregistrer un événement de reproduction',
             'veterinary_records' => 'enregistrer un soin vétérinaire',
+            'infirmary_records' => 'enregistrer une entrée d\'infirmerie',
+            'veterinary_calendar_events' => 'planifier une intervention vétérinaire',
             'expenses' => 'enregistrer une dépense',
             'purchases' => 'enregistrer un achat',
             'attendance_records' => 'enregistrer un pointage',

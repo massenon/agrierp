@@ -53,6 +53,8 @@ class BarreSuperieure extends StatelessWidget {
     this.onMonProfil,
     this.onAide,
     this.onContact,
+    this.onParametres,
+    this.onDeconnexion,
     this.nonLues,
     this.recentes = const [],
     this.onNotifications,
@@ -81,6 +83,12 @@ class BarreSuperieure extends StatelessWidget {
   /// Ouvre « Contactez l'Éditeur ». `null` : entrée non proposée.
   final VoidCallback? onContact;
 
+  /// Ticket H1 — « Paramètres » du menu du compte (`/parametres-hub` au web). `null` : entrée non proposée.
+  final VoidCallback? onParametres;
+
+  /// Ticket H1 — « Déconnexion », sous un séparateur, en `text-error-deep` comme au web. `null` : non proposée.
+  final VoidCallback? onDeconnexion;
+
   /// Groupe de la barre latérale — première partie du fil d'Ariane.
   final String groupe;
 
@@ -102,8 +110,9 @@ class BarreSuperieure extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+      // Ticket H1 — `h-16 … px-md lg:px-lg` du web : 64 px de haut, 24 px de marge sur un poste de bureau.
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.lg),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
@@ -114,10 +123,12 @@ class BarreSuperieure extends StatelessWidget {
           IconButton(
             key: const Key('bascule-menu'),
             onPressed: onBasculerMenu,
-            iconSize: 20,
-            color: AgriColors.brandForest,
-            icon: Icon(menuOuvert ? Icons.menu_open : Icons.menu),
-            tooltip: menuOuvert ? 'Replier le menu' : 'Déplier le menu',
+            // Web : icône `menu_open` 22 px `text-outline`, TOUJOURS la même, title « Afficher/Masquer la barre
+            // latérale ».
+            iconSize: 22,
+            color: AgriColors.outline,
+            icon: const Icon(Icons.menu_open),
+            tooltip: 'Afficher/Masquer la barre latérale',
           ),
           const SizedBox(width: AgriSpacing.xs),
 
@@ -129,10 +140,11 @@ class BarreSuperieure extends StatelessWidget {
               groupe.isEmpty ? ecran : '$groupe > $ecran',
               key: const Key('fil-ariane'),
               overflow: TextOverflow.ellipsis,
+              // Web : `text-brand-emerald font-bold text-xs truncate`.
               style: const TextStyle(
                 fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.w600,
-                color: AgriColors.brandForest,
+                fontWeight: FontWeight.bold,
+                color: AgriColors.brandEmerald,
               ),
             ),
           ),
@@ -191,11 +203,8 @@ class BarreSuperieure extends StatelessWidget {
 
           // 5 bis. Menu du compte (`dd-profile` de la maquette).
           //
-          // ⚠️ SEULE « MON PROFIL » Y FIGURE POUR L'INSTANT : « Aide & À Propos »
-          // et « Contactez l'Éditeur » arrivent avec leurs écrans, « Paramètres »
-          // et « Déconnexion » avec leur propre ticket (aucune déconnexion n'est
-          // câblée au poste — voir RAPPORT_CHROME.md). Une entrée vers un écran
-          // qui n'existe pas serait un lien mort.
+          // Ticket H1 — menu du compte complet, dans l'ordre du web (`app.blade.php`) : Mon Profil, Aide & À
+          // Propos, Contactez l'Éditeur, Paramètres, séparateur, Déconnexion.
           _compte(),
           const SizedBox(width: AgriSpacing.sm),
           const VerticalDivider(indent: 14, endIndent: 14, width: 1),
@@ -421,13 +430,15 @@ class BarreSuperieure extends StatelessWidget {
       padding: EdgeInsets.zero,
       onSelected: (valeur) => entrees.firstWhere((e) => e.$1 == valeur).$5(),
       itemBuilder: (_) => [
-        for (final (valeur, cle, icone, libelle, _) in entrees)
+        for (final (valeur, cle, icone, libelle, _) in entrees) ...[
+          // Web : `<div class="border-t border-outline-variant">` avant « Déconnexion ».
+          if (valeur == 'deconnexion') const PopupMenuDivider(height: 1),
           PopupMenuItem<String>(
             key: Key(cle),
             value: valeur,
             child: Row(
               children: [
-                Icon(icone, size: 16),
+                Icon(icone, size: 16, color: valeur == 'deconnexion' ? AgriColors.errorDeep : null),
                 const SizedBox(width: AgriSpacing.xs),
                 // ⚠️ `Flexible` : le menu est borné à 280 px, un libellé plus long
                 // que la police de test ne doit pas déborder.
@@ -435,12 +446,16 @@ class BarreSuperieure extends StatelessWidget {
                   child: Text(
                     libelle,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: AgriTypography.xs),
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      color: valeur == 'deconnexion' ? AgriColors.errorDeep : null,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+        ],
       ],
       child: contenu,
     );
@@ -469,6 +484,10 @@ class BarreSuperieure extends StatelessWidget {
         "Contactez l'Éditeur",
         onContact!,
       ),
+    if (onParametres != null)
+      ('parametres', 'menu-compte-parametres', Icons.settings, 'Paramètres', onParametres!),
+    if (onDeconnexion != null)
+      ('deconnexion', 'menu-compte-deconnexion', Icons.logout, 'Déconnexion', onDeconnexion!),
   ];
 
   /// Badge sur le modèle de celui de la cloche (`notification-bell.blade.php`) : 16 px, 9 px gras, plafonné à

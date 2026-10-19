@@ -113,6 +113,8 @@ class SyncController extends Controller
         'accounting_entries', 'accounting_entry_lines', 'company_settings', 'modules_config', 'roles',
         'users', 'audit_logs', 'notifications', 'lot_revenues', 'animals', 'livestock_species',
         'attestation_templates', 'attestation_counts', 'livestock_transfers',
+        // Ticket H8b — infirmerie et calendrier vétérinaire saisis au poste.
+        'infirmary_records', 'veterinary_calendar_events',
     ];
 
     /**
@@ -214,6 +216,15 @@ class SyncController extends Controller
         $remanences = VeterinaryWithdrawalPeriod::query()
             ->whereDate('end_date', '>=', now()->toDateString())
             ->orderBy('end_date')
+            ->get();
+
+        // Ticket H8b (décision D-H8 du 19/10/2026) — l'infirmerie et le calendrier vétérinaire PLANIFIÉ descendent au
+        // poste : sans eux, l'onglet « Suivi Sanitaire » et le calendrier restaient vides hors ligne.
+        $infirmerie = \App\Models\InfirmaryRecord::query()
+            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->get();
+        $calendrierVeterinaire = \App\Models\VeterinaryCalendarEvent::query()
+            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
             ->get();
 
         // 🔴→✅ TICKET 14.72 — LE CYCLE DE REPRODUCTION DESCEND AU POSTE.
@@ -917,6 +928,8 @@ class SyncController extends Controller
             'veterinary_withdrawal_periods' => $remanences,
             'prophylaxis_schedule_standards' => $prophylaxie,
             'veterinary_records' => $soins,
+            'infirmary_records' => $infirmerie,
+            'veterinary_calendar_events' => $calendrierVeterinaire,
             'livestock_reproduction_events' => $reproduction,
             'customers' => $clients,
             'receivables' => $creances,
@@ -1021,6 +1034,8 @@ class SyncController extends Controller
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
             'expenses' => ['accepted' => [], 'rejected' => []],
             'livestock_reproduction_events' => ['accepted' => [], 'rejected' => []],
+            'infirmary_records' => ['accepted' => [], 'rejected' => []],
+            'veterinary_calendar_events' => ['accepted' => [], 'rejected' => []],
             'purchases' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             'products' => ['accepted' => [], 'rejected' => []],
@@ -1210,6 +1225,15 @@ class SyncController extends Controller
                 $this->pushReproductionEvents($request->input('livestock_reproduction_events'));
         }
 
+        if ($request->has('infirmary_records')) {
+            $result['infirmary_records'] = $this->pushInfirmerie($request->input('infirmary_records'));
+        }
+
+        if ($request->has('veterinary_calendar_events')) {
+            $result['veterinary_calendar_events'] =
+                $this->pushCalendrierVeterinaire($request->input('veterinary_calendar_events'));
+        }
+
         if ($request->has('stock_adjustments')) {
             $result['stock_adjustments'] = $this->pushStockAdjustments(
                 $request->input('stock_adjustments'),
@@ -1241,6 +1265,8 @@ class SyncController extends Controller
         'livestock_daily_entries' => 'manage-elevage',
         'livestock_transfers' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
+        'infirmary_records' => 'manage-elevage',
+        'veterinary_calendar_events' => 'manage-elevage',
         'veterinary_records' => 'manage-elevage',
         'expenses' => 'manage-achats',
         'purchases' => 'manage-achats',
@@ -1804,6 +1830,125 @@ class SyncController extends Controller
      * animal. L'ecran les afficherait toutes deux, le KPI « gestantes »
      * compterait double, et rien ne signalerait laquelle est la bonne.
      */
+    /**
+     * Ticket H8b — ENTRÉES D'INFIRMERIE saisies au poste. Mêmes règles que `SoinsVaccinsHub::saveInfirmaryEntry()`
+     * (création, statut initial `en_cours`), `reintegrer()` et `declarerDeces()` (changement de statut d'une entrée
+     * connue). Dernier écrivain gagne sur le statut ; la bande, le motif et la date d'entrée ne changent pas après
+     * création.
+     */
+    private function pushInfirmerie(array $entrees): array
+    {
+        $accepted = [];
+        $rejected = [];
+
+        foreach ($entrees as $data) {
+            try {
+                $existant = isset($data['id']) && is_string($data['id']) ? \App\Models\InfirmaryRecord::find($data['id']) : null;
+
+                if ($existant !== null) {
+                    $v = validator($data, [
+                        'id' => ['required', 'uuid'],
+                        'status' => ['required', 'in:en_cours,reintegre,deces'],
+                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                    if ($existant->status !== $v['status']) {
+                        $existant->update(['status' => $v['status']]);
+                        AuditLog::record(match ($v['status']) {
+                            'reintegre' => 'infirmary_record.reintegrated',
+                            'deces' => 'infirmary_record.death_declared',
+                            default => 'infirmary_record.created',
+                        }, 'elevage');
+                    }
+                    $accepted[] = $v['id'];
+
+                    continue;
+                }
+
+                $v = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
+                    'sujet_ref' => ['nullable', 'string', 'max:50'],
+                    'motif' => ['required', 'string', 'max:255'],
+                    'isolation_level' => ['required', 'in:Quarantaine stricte,Infirmerie,Simple surveillance'],
+                    'entry_date' => ['required', 'date', 'before_or_equal:today'],
+                    'status' => ['nullable', 'in:en_cours,reintegre,deces'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $entree = new \App\Models\InfirmaryRecord();
+                $entree->id = $v['id'];
+                $entree->fill([
+                    'lot_id' => $v['lot_id'],
+                    'sujet_ref' => ($v['sujet_ref'] ?? null) ?: null,
+                    'motif' => $v['motif'],
+                    'isolation_level' => $v['isolation_level'],
+                    'entry_date' => $v['entry_date'],
+                    'status' => $v['status'] ?? 'en_cours',
+                ]);
+                $entree->save();
+                AuditLog::record('infirmary_record.created', 'elevage');
+                $accepted[] = $v['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket H8b — INTERVENTIONS PLANIFIÉES au poste (`SoinsVaccinsHub::savePlan()`, statut `planned`) et leur
+     * confirmation (`confirmAdministration()`, statut `done`). « En retard » n'est jamais stocké : c'est un affichage
+     * (`VeterinaryCalendarEvent::display_status`), il est donc refusé à l'envoi.
+     */
+    private function pushCalendrierVeterinaire(array $evenements): array
+    {
+        $accepted = [];
+        $rejected = [];
+
+        foreach ($evenements as $data) {
+            try {
+                $existant = isset($data['id']) && is_string($data['id']) ? \App\Models\VeterinaryCalendarEvent::find($data['id']) : null;
+
+                if ($existant !== null) {
+                    $v = validator($data, [
+                        'id' => ['required', 'uuid'],
+                        'status' => ['required', 'in:planned,done'],
+                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                    if ($existant->status !== $v['status']) {
+                        $existant->update(['status' => $v['status']]);
+                        AuditLog::record('veterinary_calendar_event.confirmed', 'elevage');
+                    }
+                    $accepted[] = $v['id'];
+
+                    continue;
+                }
+
+                $v = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
+                    'task_type' => ['required', 'string', 'max:100'],
+                    'scheduled_date' => ['required', 'date'],
+                    'status' => ['nullable', 'in:planned,done'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $evenement = new \App\Models\VeterinaryCalendarEvent();
+                $evenement->id = $v['id'];
+                $evenement->fill([
+                    'lot_id' => $v['lot_id'],
+                    'task_type' => $v['task_type'],
+                    'scheduled_date' => $v['scheduled_date'],
+                    'status' => $v['status'] ?? 'planned',
+                ]);
+                $evenement->save();
+                AuditLog::record('veterinary_calendar_event.created', 'elevage');
+                $accepted[] = $v['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     private function pushReproductionEvents(array $evenements): array
     {
         $accepted = [];
@@ -1820,8 +1965,26 @@ class SyncController extends Controller
                     'saillie_date' => ['required', 'date', 'before_or_equal:today'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
-                // ⚠️ IDEMPOTENCE : deja recue, on acquitte sans rien rejouer.
-                if (LivestockReproductionEvent::find($validated['id']) !== null) {
+                // ⚠️ IDEMPOTENCE : deja recue, on acquitte. Ticket H7 — et on applique les ETAPES DU CYCLE saisies au
+                // poste (palpation, mise bas, cloture), avec les memes valeurs que les actions de l'ecran web
+                // (`SuiviReproduction::recordPalpation`, `saveMiseBas`, `closeCycle`). 🔴 Avant, elles etaient
+                // ignorees en silence : le poste croyait sa palpation envoyee, le serveur n'en savait rien.
+                $existant = LivestockReproductionEvent::find($validated['id']);
+                if ($existant !== null) {
+                    $etapes = validator($data, [
+                        'palpation_date' => ['nullable', 'date', 'before_or_equal:today'],
+                        'mise_bas_date_actual' => ['nullable', 'date', 'before_or_equal:today'],
+                        'nes_vivants' => ['nullable', 'integer', 'min:0'],
+                        'nes_morts' => ['nullable', 'integer', 'min:0'],
+                        'status' => ['nullable', 'in:en_cours,echec,termine'],
+                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                    // Seules les valeurs RENSEIGNEES s'appliquent : un poste qui ne connait pas une etape ne l'efface pas.
+                    $maj = array_filter($etapes, fn ($v) => $v !== null);
+                    if ($maj !== []) {
+                        $existant->update($maj);
+                        AuditLog::record('reproduction_event.updated_from_device', 'elevage');
+                    }
                     $accepted[] = $validated['id'];
 
                     continue;
@@ -3058,6 +3221,10 @@ class SyncController extends Controller
                     // encaissee ET ferait perdre la tracabilite de l'acheteur,
                     // seule base d'un rappel sanitaire.
                     app(FlagSaleUnderWithdrawalAction::class)->execute($sale->fresh('lines'));
+
+                    // Ticket H14 (D-SYNC-4) — une vente qui fait passer un stock sous zéro est ACCEPTÉE et SIGNALÉE à
+                    // l'administrateur, jamais refusée ni passée sous silence.
+                    app(\App\Actions\FlagNegativeStockFromSyncAction::class)->execute($sale->fresh('lines'));
 
                     // 🔴→✅ TICKET 14.80 — LA NORMALISATION FISCALE MANQUAIT.
                     //

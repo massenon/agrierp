@@ -67,14 +67,13 @@ void main() {
     expect(find.byKey(const Key('cloche-notifications')), findsOneWidget);
   });
 
-  testWidgets('la bascule du menu change d icône selon son état', (
-    tester,
-  ) async {
+  // Ticket H1 — comme au web, la bascule garde TOUJOURS l'icône `menu_open`.
+  testWidgets('la bascule du menu garde l icône du web', (tester) async {
     await afficher(tester);
     expect(find.byIcon(Icons.menu_open), findsOneWidget);
 
     await afficher(tester, menuOuvert: false);
-    expect(find.byIcon(Icons.menu), findsOneWidget);
+    expect(find.byIcon(Icons.menu_open), findsOneWidget);
   });
 
   testWidgets('la bascule prévient le socle', (tester) async {
