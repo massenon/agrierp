@@ -3,7 +3,7 @@ import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_screen.dart';
-import 'package:agrierp/features/parametres/parametres_generaux_repository.dart';
+import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
 import 'package:agrierp/features/elevage/transferts_bandes_screen.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -262,7 +262,8 @@ void main() {
       MaterialApp(
         home: GestionElevageScreen(
           onOuvrir: (e) => ouvert = e,
-          modules: ParametresGenerauxRepository(database: db),
+          // Ticket H4 : le Blade fait foi — l'écran lit ses indicateurs dans son propre dépôt.
+          depot: GestionElevageRepository(database: db),
         ),
       ),
     );

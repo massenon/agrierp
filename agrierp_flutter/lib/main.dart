@@ -37,6 +37,7 @@ import 'features/elevage/fiche_sujet_screen.dart';
 import 'features/elevage/sujets_repository.dart';
 import 'features/elevage/suivi_reproduction_repository.dart';
 import 'features/elevage/suivi_reproduction_screen.dart';
+import 'features/elevage/gestion_elevage_repository.dart';
 import 'features/elevage/gestion_elevage_screen.dart';
 import 'features/elevage/fiche_pondeuses_screen.dart';
 import 'features/elevage/fiche_porcs_screen.dart';
@@ -755,7 +756,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.gestionElevage => GestionElevageScreen(
           onOuvrir: (e) => setState(() => _ecran = e),
-          modules: widget.parametresGeneraux,
+          depot: GestionElevageRepository(database: widget.database),
         ),
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,

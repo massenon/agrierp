@@ -1,6 +1,7 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_screen.dart';
 import 'package:agrierp/features/parametres/parametres_generaux_repository.dart';
 import 'package:agrierp/features/parametres/parametres_generaux_screen.dart';
@@ -468,7 +469,11 @@ void main() {
     /// ⚠️⚠️ LE DÉFAUT QUE CE TICKET CORRIGE : le poste proposait « Fiches
     /// Escargots » à une ferme dont l'héliciculture est éteinte. La carte
     /// menait à une fiche vide, sans dire pourquoi.
-    testWidgets('⚠️⚠️ Gestion Élevage masque une espèce désactivée', (
+    ///
+    /// Ticket H4 : le Blade fait foi — `gestion-elevage.blade.php` GRISE la
+    /// carte (« Héliciculture — module désactivé ») au lieu de la masquer, et
+    /// ne conditionne que l'héliciculture : la carte dit désormais pourquoi.
+    testWidgets('⚠️⚠️ Gestion Élevage grise une espèce désactivée (Blade)', (
       tester,
     ) async {
       await fermeComplete();
@@ -479,20 +484,32 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: GestionElevageScreen(onOuvrir: (_) {}, modules: depot),
+          home: GestionElevageScreen(
+            onOuvrir: (_) {},
+            depot: GestionElevageRepository(database: db),
+          ),
         ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Fiches Escargots'), findsNothing);
+      final escargots = find.byKey(
+        Key('carte-${EcranPoste.ficheEscargots.name}'),
+      );
+      expect(escargots, findsOne);
       expect(
-        find.byKey(Key('carte-${EcranPoste.ficheEscargots.name}')),
-        findsNothing,
+        find.descendant(
+          of: escargots,
+          matching: find.text('Héliciculture — module désactivé'),
+        ),
+        findsOne,
       );
       // Les trois espèces exploitées restent, dont les DEUX fiches avicoles.
       expect(find.text('Fiches Lapins'), findsOne);
       expect(find.text('Fiches Pondeuses'), findsOne);
-      expect(find.text('Fiches Reproducteurs'), findsOne);
+      expect(find.text('Fiches Volailles'), findsOne);
       expect(find.text('Fiches Porcs'), findsOne);
     });
   });
