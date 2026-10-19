@@ -16,6 +16,8 @@ use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\EggStockLedgerService;
+use App\Support\OrdreDesVerrous;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -400,49 +402,58 @@ class FichePondeuses extends Component
             ? ['ne' => (int) $ficheAvant->ne, 'mort' => (int) $ficheAvant->mort, 'don' => (int) ($ficheAvant->don ?? 0)]
             : [];
 
-        $dailyEntry = LivestockDailyEntry::updateOrCreate(
-            ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
-            [
-                'achat' => $this->achat,
-                'ne' => $this->ne,
-                'mort' => $mort,
-                'vente' => $this->venteDuJour,
-                'don' => $this->donDuJour(),
-                'effectif_final' => $effectifFinal,
-                'ponte_total' => $this->oeufsRecoltes,
-                'ponte_casses' => $this->oeufsCasses,
-                // Ticket 15.57 — moyenne par sujet (g), comme les fiches Reproducteurs et Escargots.
-                'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
-                    ? (int) round($this->peseeTotal / $effectifFinal)
-                    : null,
-            ]
-        );
+        $dailyEntry = DB::transaction(function () use ($effectifFinal, $etatAvant, $lot, $mort) {
+            // 🔴→✅ Ticket U14 — UNE TRANSACTION, ET LE STOCK AVANT LA FICHE (`OrdreDesVerrous`), comme les fiches Porcs et
+            // Lapins, la caisse et l'envoi des postes. Ces écritures (fiche, production au stock, cascade) partaient une par
+            // une : une erreur au milieu laissait la fiche sans son mouvement de stock.
+            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$lot->id]));
 
-        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
-        // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
-        // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
-        // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
-        // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
-        // recalculés, bande = DERNIÈRE fiche.
-        app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
+            $dailyEntry = LivestockDailyEntry::updateOrCreate(
+                ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
+                [
+                    'achat' => $this->achat,
+                    'ne' => $this->ne,
+                    'mort' => $mort,
+                    'vente' => $this->venteDuJour,
+                    'don' => $this->donDuJour(),
+                    'effectif_final' => $effectifFinal,
+                    'ponte_total' => $this->oeufsRecoltes,
+                    'ponte_casses' => $this->oeufsCasses,
+                    // Ticket 15.57 — moyenne par sujet (g), comme les fiches Reproducteurs et Escargots.
+                    'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
+                        ? (int) round($this->peseeTotal / $effectifFinal)
+                        : null,
+                ]
+            );
 
-        // ⚠️ Ajustement de stock appliqué uniquement à la création de la fiche
-        // du jour, jamais à sa modification — bug préexistant découvert
-        // pendant le rétro-câblage (ticket 6.1) : incrémenter le stock à
-        // chaque sauvegarde, y compris une simple correction du même jour,
-        // aurait compté les œufs plusieurs fois. Modifier une fiche déjà
-        // enregistrée ne réajuste donc pas le stock — limitation connue,
-        // à traiter par un recalcul différentiel si un besoin réel émerge.
-        // ⚠️ TICKET 14.59 — RÈGLE EXTRAITE DANS
-        // `RecordEggProductionStockAction`. Elle vivait ici, donc la
-        // synchronisation ne pouvait pas l'atteindre : une ponte saisie hors
-        // ligne arrivait au serveur sans entrer un seul œuf au stock.
-        if ($dailyEntry->wasRecentlyCreated) {
-            app(RecordEggProductionStockAction::class)->execute($dailyEntry);
-        }
+            // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+            // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
+            // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
+            // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
+            // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
+            // recalculés, bande = DERNIÈRE fiche.
+            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
 
-        // Ticket 15.56 — la bande rattachée à un produit voit ses naissances, morts et DONS répercutés au stock.
-        app(SyncLotProductionStockAction::class)->execute($dailyEntry, $etatAvant);
+            // ⚠️ Ajustement de stock appliqué uniquement à la création de la fiche
+            // du jour, jamais à sa modification — bug préexistant découvert
+            // pendant le rétro-câblage (ticket 6.1) : incrémenter le stock à
+            // chaque sauvegarde, y compris une simple correction du même jour,
+            // aurait compté les œufs plusieurs fois. Modifier une fiche déjà
+            // enregistrée ne réajuste donc pas le stock — limitation connue,
+            // à traiter par un recalcul différentiel si un besoin réel émerge.
+            // ⚠️ TICKET 14.59 — RÈGLE EXTRAITE DANS
+            // `RecordEggProductionStockAction`. Elle vivait ici, donc la
+            // synchronisation ne pouvait pas l'atteindre : une ponte saisie hors
+            // ligne arrivait au serveur sans entrer un seul œuf au stock.
+            if ($dailyEntry->wasRecentlyCreated) {
+                app(RecordEggProductionStockAction::class)->execute($dailyEntry);
+            }
+
+            // Ticket 15.56 — la bande rattachée à un produit voit ses naissances, morts et DONS répercutés au stock.
+            app(SyncLotProductionStockAction::class)->execute($dailyEntry, $etatAvant);
+
+            return $dailyEntry;
+        });
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');

@@ -74,6 +74,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\MessagesErreurFr;
 use App\Support\MotifsRefusPush;
+use App\Support\OrdreDesVerrous;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
@@ -1988,6 +1989,13 @@ class SyncController extends Controller
             $result['products'] = $this->pushProducts($request->input('products'), $request->user(), $this->nomDuPoste($request));
         }
 
+        // 🔴→✅ TICKET U14 — ORDRE DES VERROUS (`OrdreDesVerrous`) : TOUT le stock que l'envoi va mouvementer est verrouillé
+        // ICI, par identifiant croissant, AVANT la première fiche. Avant, les fiches (et leur production) passaient
+        // d'abord, puis les ventes décrémentaient le stock : l'ordre inverse de la caisse du web (stock, puis fiche),
+        // d'où un interblocage croisé possible entre un poste qui envoie et la caisse qui vend dans la même bande. Placé
+        // APRÈS les produits du même envoi (créés, ou fusionnés : les références sont déjà traduites).
+        OrdreDesVerrous::stock($this->produitsDeLEnvoi($request));
+
         if ($request->has('livestock_daily_entries')) {
             $result['livestock_daily_entries'] = $this->pushDailyEntries(
                 $this->envoiTraduit($request, 'livestock_daily_entries'),
@@ -2092,6 +2100,46 @@ class SyncController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * Ticket U14 — les produits dont l'envoi peut mouvementer le stock : lignes des ventes et des achats, ajustements,
+     * lignes des achats retournés, et ce que les fiches, les ventes et les transferts de bandes font bouger
+     * (`OrdreDesVerrous::produitsDesFiches`). Un sur-ensemble ne coûte qu'un verrou de plus ; un oubli rouvrirait
+     * l'interblocage croisé.
+     *
+     * @return array<int, string>
+     */
+    private function produitsDeLEnvoi(Request $request): array
+    {
+        $liste = fn (mixed $v): array => is_array($v) ? array_values(array_filter($v, 'is_array')) : [];
+        $produits = [];
+        $bandes = [];
+
+        foreach (['sales', 'purchases'] as $table) {
+            foreach ($liste($this->envoiTraduit($request, $table)) as $piece) {
+                foreach ($liste($piece['lines'] ?? null) as $ligne) {
+                    $produits[] = $ligne['product_id'] ?? null;
+                    $bandes[] = $ligne['lot_id'] ?? null;
+                }
+            }
+        }
+        foreach ($liste($this->envoiTraduit($request, 'stock_adjustments')) as $ajustement) {
+            $produits[] = $ajustement['product_id'] ?? null;
+        }
+        $achatsRetournes = array_filter(array_map(fn ($r) => $r['purchase_id'] ?? null, $liste($request->input('purchase_returns'))), 'is_string');
+        if ($achatsRetournes !== []) {
+            array_push($produits, ...\App\Models\PurchaseLine::whereIn('purchase_id', $achatsRetournes)->pluck('product_id')->all());
+        }
+        foreach ($liste($this->envoiTraduit($request, 'livestock_daily_entries')) as $fiche) {
+            $bandes[] = $fiche['lot_id'] ?? null;
+        }
+        foreach ($liste($request->input('livestock_transfers')) as $transfert) {
+            $bandes[] = $transfert['source_lot_id'] ?? null;
+            $bandes[] = $transfert['target_lot_id'] ?? null;
+        }
+
+        return [...$produits, ...OrdreDesVerrous::produitsDesFiches($bandes)];
     }
 
     /**

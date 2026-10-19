@@ -10,6 +10,8 @@ use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\ModuleConfig;
+use App\Support\OrdreDesVerrous;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -363,46 +365,55 @@ class FicheEscargots extends Component
 
 
 
-        $entree = LivestockDailyEntry::updateOrCreate(
-            ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
-            [
-                'achat' => $this->achat,
-                'ne' => $this->naissainsNes,
-                'mort' => $mort,
-                'vente' => $this->venteDuJour,
-                'don' => $this->donDuJour(),
-                'effectif_final' => $effectifFinal,
-                'ponte_total' => $this->oeufsTerre,
-                'effectif_m' => $this->effectifNaissains,
-                'effectif_f' => $this->effectifEngraissement,
-                'effectif_sevres' => $this->effectifBordes,
-                // 🔴→✅ TICKET 14.63 — LA COLONNE PORTE LE POIDS **MOYEN PAR
-                // SUJET**, en grammes. Cette fiche y deposait le TOTAL pese :
-                // `GrowthAnalysisService` en tire le GMQ en la traitant comme
-                // une moyenne, si bien qu'une bande qui perd des animaux voyait
-                // son « poids » BAISSER et son GMQ devenir negatif — un
-                // indicateur de croissance qui lit un amaigrissement.
-                //
-                // ⚠️ ARRONDI, PAS TRONCATURE : la maquette calcule
-                // `Math.round(poidsG / effectifFinal)`.
-                'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
-                    ? (int) round($this->peseeTotal / $effectifFinal)
-                    : null,
-            ]
-        );
+        $entree = DB::transaction(function () use ($effectifFinal, $etatAvant, $lot, $mort) {
+            // 🔴→✅ Ticket U14 — UNE TRANSACTION, ET LE STOCK AVANT LA FICHE (`OrdreDesVerrous`), comme les fiches Porcs et
+            // Lapins, la caisse et l'envoi des postes. Ces écritures (fiche, production au stock, cascade) partaient une par
+            // une : une erreur au milieu laissait la fiche sans son mouvement de stock.
+            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$lot->id]));
 
-        // La production du cheptel entre réellement en stock — naissances
-        // portées au crédit, mortalité et dons au débit. Sans bande
-        // rattachée à un produit, l'Action ne fait rien.
-        app(SyncLotProductionStockAction::class)->execute($entree, $etatAvant);
+            $entree = LivestockDailyEntry::updateOrCreate(
+                ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
+                [
+                    'achat' => $this->achat,
+                    'ne' => $this->naissainsNes,
+                    'mort' => $mort,
+                    'vente' => $this->venteDuJour,
+                    'don' => $this->donDuJour(),
+                    'effectif_final' => $effectifFinal,
+                    'ponte_total' => $this->oeufsTerre,
+                    'effectif_m' => $this->effectifNaissains,
+                    'effectif_f' => $this->effectifEngraissement,
+                    'effectif_sevres' => $this->effectifBordes,
+                    // 🔴→✅ TICKET 14.63 — LA COLONNE PORTE LE POIDS **MOYEN PAR
+                    // SUJET**, en grammes. Cette fiche y deposait le TOTAL pese :
+                    // `GrowthAnalysisService` en tire le GMQ en la traitant comme
+                    // une moyenne, si bien qu'une bande qui perd des animaux voyait
+                    // son « poids » BAISSER et son GMQ devenir negatif — un
+                    // indicateur de croissance qui lit un amaigrissement.
+                    //
+                    // ⚠️ ARRONDI, PAS TRONCATURE : la maquette calcule
+                    // `Math.round(poidsG / effectifFinal)`.
+                    'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
+                        ? (int) round($this->peseeTotal / $effectifFinal)
+                        : null,
+                ]
+            );
 
-        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
-        // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
-        // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
-        // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
-        // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
-        // recalculés, bande = DERNIÈRE fiche.
-        app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
+            // La production du cheptel entre réellement en stock — naissances
+            // portées au crédit, mortalité et dons au débit. Sans bande
+            // rattachée à un produit, l'Action ne fait rien.
+            app(SyncLotProductionStockAction::class)->execute($entree, $etatAvant);
+
+            // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+            // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
+            // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
+            // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
+            // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
+            // recalculés, bande = DERNIÈRE fiche.
+            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
+
+            return $entree;
+        });
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');

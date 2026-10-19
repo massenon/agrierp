@@ -9,6 +9,7 @@ use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\Transformation;
 use Illuminate\Support\Facades\Auth;
+use App\Support\OrdreDesVerrous;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -126,6 +127,10 @@ class TransformationForm extends Component
         // une VENTE de sujets vifs. Elle passe donc par le même point d'entrée que la caisse : « Vente » de la
         // fiche du jour de transformation, cascade des jours suivants, bande = dernière fiche.
         DB::transaction(function () use ($lot, $product) {
+            // 🔴→✅ Ticket U14 — ORDRE DES VERROUS : le stock (produit fini, et ce que la fiche de la bande mouvemente)
+            // AVANT la fiche du jour, comme la caisse et l'envoi des postes (`OrdreDesVerrous`).
+            OrdreDesVerrous::stock([$product->id, ...OrdreDesVerrous::produitsDesFiches([$lot->id])]);
+
             $transformation = Transformation::create([
                 'lot_id' => $this->lotId,
                 'product_id' => $this->productId,

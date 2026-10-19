@@ -17,6 +17,7 @@ use App\Services\AutonomieAlimentaireService;
 use App\Services\EffectifParCategorieService;
 use App\Support\CategorieRationPorc;
 use Carbon\Carbon;
+use App\Support\OrdreDesVerrous;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -682,6 +683,9 @@ class FichePorcs extends Component
         }
 
         DB::transaction(function () use ($lot, $donnees, $etatAvant) {
+            // 🔴→✅ Ticket U14 — ORDRE DES VERROUS : le stock que la fiche mouvemente AVANT la fiche (`OrdreDesVerrous`).
+            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$lot->id]));
+
             $entree = LivestockDailyEntry::updateOrCreate(
                 ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
                 $donnees

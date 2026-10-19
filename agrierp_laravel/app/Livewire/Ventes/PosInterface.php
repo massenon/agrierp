@@ -21,6 +21,7 @@ use App\Models\SaleLine;
 use App\Models\VeterinaryWithdrawalPeriod;
 use App\Services\Mecef\FacturationMecefService;
 use App\Services\TransactionRejouable;
+use App\Support\OrdreDesVerrous;
 use Livewire\Component;
 
 /**
@@ -577,6 +578,14 @@ class PosInterface extends Component
      */
     private function enregistrerVente(?\Carbon\Carbon $soldAt): array
     {
+        // 🔴→✅ Ticket U14 — ORDRE DES VERROUS (`OrdreDesVerrous`) : le stock du panier, par identifiant croissant, AVANT la
+        // fiche du jour — le même ordre que l'envoi des postes et que les fiches. Le tri évite aussi l'interblocage entre
+        // deux paniers aux mêmes produits saisis dans un ordre différent.
+        OrdreDesVerrous::stock([
+            ...array_column($this->cart, 'product_id'),
+            ...OrdreDesVerrous::produitsDesFiches(array_column($this->cart, 'lot_id')),
+        ]);
+
         $sale = Sale::create([
             'customer_id' => $this->customerId ?: null,
             'payment_mode' => $this->paymentMode,
