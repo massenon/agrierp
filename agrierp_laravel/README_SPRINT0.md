@@ -22191,3 +22191,9 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Dates d'Audit Logs, de Mon Profil et des notifications à l'heure du Bénin (`HeureBenin.depuisInstant`) ; suite du poste verte sous `TZ=America/New_York` et `TZ=Asia/Tokyo`.
 - Mesures (branche) : Laravel 1 869 verts ; poste 2 589 verts, 17 sautés ; 35 mutants tués.
 - Reste (ticket U13) : `expenses` et `payslips` ne descendent pas au poste ; « Échecs (mois) » du web compte le même mois des années passées ; libellé « Paie — … » ; cloche relative (« il y a … ») au web, date au poste.
+
+### U12a — fiches Lapins, Porcs, Reproducteurs et Escargots sur le Blade
+- Poste : les quatre fiches suivent leur Blade (`mois_fiche.dart`, `jour_categories.dart`, `elements_fiche.dart`, vue partagée Lapins / Porcs) : tableau du mois sur tous les jours (taux sur `previousEffectif()`, poids reconstitué, Traitements & Prophylaxie), cartes `getKpisProperty()`, catégories du jour, provende et autonomie, PDF du web. Tests Blade + parité exécutée avec le vrai composant Livewire, formulaire du jour comparé au rendu web.
+- 🔴 Web corrigés (`FichesEspecesU12aTest`) : `loadDay()` hors du mois courant qui écrasait la fiche par des zéros (Escargots, Reproducteurs) ; Reproducteurs ne chargeait jamais le jour (ouverture ni changement de date) ; taux d'éclosion du mois sans œuf à 85,0 % (valeur de démonstration) ou 0,0 % → « — » ; « Poids Moyen Constaté » des porcs à « 0 Kg » sans pesée → « — » ; formule affichée qui oubliait les ventes.
+- Mesures (branche, avec U12b) : Laravel 1 876 verts ; poste 2 609 verts, 17 sautés ; 17 mutants tués au poste, 5 au web.
+- Reste : taux d'éclosion du JOUR sans œuf « 0,0 % » (règle du web 14.61, question posée au client) ; alerte d'autonomie de la cloche non levée pour une fiche reçue d'un poste (U13) ; choix du produit de provende sans ordre au web (approximé, documenté).
