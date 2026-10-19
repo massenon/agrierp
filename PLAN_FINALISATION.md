@@ -271,9 +271,9 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | S-T3 | Déclencheurs : au démarrage de la session, après un geste important, intervalle par défaut 5 min | ✅ 19/10/2026 (vente, fiche, soin ; agrégation 5 s) |
 | S-T4 | Tirage paginé (curseur `updated_at` + `id`) et limité aux tables que le rôle lit | 🔧 |
 | S-T5 | Fusion par clé naturelle des référentiels saisis au poste (clients, fournisseurs, produits) + table de correspondances | 🔧 |
-| S-T6 | Bouton « Synchroniser les postes » au web (demande lue par les postes toutes les 30 s) ; contrôle de cohérence (nombre et total par table et par jour) au web et au poste | 🔧 |
-| S-T7 | Garde-fou « un seul écrivain par table » au poste ; `roles` daté quand ses droits changent | 🔧 |
-| S-T8 | Installateur : refus de la version démo, adresses par environnement | 🔧 |
+| S-T6 | Bouton « Synchroniser les postes » au web (demande lue par les postes toutes les 30 s) ; contrôle de cohérence (nombre et total par table et par jour) au web et au poste | ✅ 19/10/2026 (demande expirant après 60 min ; dépenses hors du contrôle : elles ne descendent pas au poste) |
+| S-T7 | Garde-fou « un seul écrivain par table » au poste ; `roles` daté quand ses droits changent | ✅ 19/10/2026 (3 écritures parasites corrigées ; exception documentée : `products.stock_qty`) |
+| S-T8 | Installateur : refus de la version démo, adresses par environnement | ✅ 19/10/2026 (`.bat` et `.iss` non exécutés ici ; adresse de recette à confirmer) |
 | S-T9 | Essai à plusieurs postes contre le vrai serveur, avec coupures au hasard | 🔧 |
 
 ### Décision du client du 19/10/2026 (nuit) — configurations dans Paramètres, au poste et au web
