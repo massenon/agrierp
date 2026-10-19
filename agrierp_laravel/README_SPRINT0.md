@@ -22070,3 +22070,13 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - ⚠️⚠️ Fiches, transferts et ventes partent par **journées entières**, au rang des ventes : le serveur exempte une vente de son incrément seulement si la fiche (bande, jour) est acceptée dans la MÊME requête (15.30). Une fiche partie dans un lot antérieur à sa vente la ferait compter deux fois, sans erreur. Une journée de plus de 50 lignes part seule.
 - Réponses fusionnées table par table avant l'acquittement habituel. Un lot en échec après d'autres : les accusés reçus sont acquittés, puis l'échec remonte (réessai réseau de H13) ; ce que le serveur a déjà écrit ne repart pas.
 - Tests : `envoi_par_lots_test.dart` (9), dont un qui lit `_pousser` pour vérifier que chaque table envoyée a son rang dans `ordreDuServeur`. Mutation : sans le regroupement par journée, deux tests rougissent.
+
+## Décisions du client « uniformiser web et poste » (19/10/2026, soir) — tickets U2 à U7
+
+### U7 — prix moyen de la provende (D-U7)
+- Le Bilan du web moyennait TOUS les types de provende de l'espèce, archivés compris, et valorisait à 0 sans prix ; le poste prenait les seuls actifs et affichait « — ». Une règle : types actifs ; sans prix, « — » et le même motif. `BilanPrixProvendeTest`.
+
+### U5 — tous les messages d'erreur en français (D-U5)
+- Web : `lang/fr` (validation complète de Laravel 12, auth, passwords, pagination, `fr.json`), libellés français des 225 champs validés (un test casse si un champ validé n'en a pas), `:date` rendu « aujourd'hui » / jj/mm/aaaa (`DatesValidationFr`), pages d'erreur 401–503 en français et autonomes, messages JSON de l'API traduits (`MessagesErreurFr`), boîte « page expirée » de Livewire remplacée par une confirmation française (`resources/js/app.js` — `npm run build` au déploiement). Locale `fr` par défaut. `MessagesErreurFrancaisTest` (11).
+- Poste : `flutter_localizations` (SDK) et locale `fr` sur le `MaterialApp` ; intl passe à `^0.20.2` (imposé par flutter_localizations ; intl n'était importé nulle part). Les échecs techniques ne s'affichent plus bruts (« Synchronisation impossible — DioException… ») : `messageErreur()` ; les refus du serveur restent mot pour mot. `localisation_francaise_test.dart` (6), dont un garde-fou contre les mots d'erreur anglais dans les littéraux de `lib/`.
+- Non vérifié : la boîte 419 dans un navigateur, les pages d'erreur avec `APP_DEBUG=false` en production, le poste sous Windows. Le message du test SMTP garde le détail technique du serveur de courriel (écran de diagnostic administrateur).
