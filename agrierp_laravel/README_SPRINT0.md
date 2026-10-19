@@ -22211,3 +22211,9 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - Échec MeCeF : règle existante (7.1, 14.80) — la vente n'est jamais défaite, elle passe en `erreur` avec le bouton de retransmission ; avertissement à la caisse.
 - Mesures : Laravel 1 908 verts ; poste 2 610 verts, 17 sautés ; essai 314, 42, 7, 5 verts (graine 314 : un vrai interblocage sur la vente du web, rejoué) ; 17 mutants tués.
 - À trancher (D-MECEF-1) : double déclaration possible si le dispositif accepte et que la réponse se perd (passerelle réelle) ; bouton de retransmission pour une vente « En attente ».
+
+### U13 — dépenses et paie au poste, cloche, alerte d'autonomie, correctifs web
+- `expenses` (servie à tout compte, archivées comprises avec `is_active`, absorbeur strict qui n'écrase jamais une dépense `pending`/`conflict`) et `payslips` (servie à `view-rapports` seulement : `id`, nom de l'employé, `net_salary`, `created_at` — jamais le brut, les retenues ni les charges, test à l'appui) tirées au poste (Drift v47, resynchronisation unique `depenses_resync_u13`, purge 15.50). Recettes et Dépenses du poste = celui du web (parité exécutée, paie comprise ; vérifié aussi dans l'essai multipostes) ; contrôle de cohérence S-T6 étendu aux dépenses.
+- 🔴 Web : « Échecs (mois) » comptait le même mois des années passées (`whereYear`) ; libellé « Paie — Employé » jamais appliqué (priorité de `??`). Cloche du poste : « il y a … » comme `diffForHumans` en français (parité sur 492 écarts). Alerte d'autonomie alimentaire levée aussi pour une fiche reçue d'un poste (`AlerteAutonomieFicheService`, mêmes règles et dédoublonnage que `saveDay()`).
+- Mesures (branche entière, avec S-T13) : Laravel 1 926 verts ; poste 2 648 verts, 17 sautés ; essai graines 42 et 314 verts ; 33 mutants tués.
+- Reste : ticket U14.
