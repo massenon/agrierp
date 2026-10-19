@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'attestations_repository.dart';
@@ -240,7 +241,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
       if (!mounted) return;
       setState(() {
         _enCours = false;
-        _retour = (false, "Impossible d'écrire le fichier : $e");
+        _retour = (false, messageEcritureFichier(e)); // U5 : pas d'exception brute
       });
     }
   }

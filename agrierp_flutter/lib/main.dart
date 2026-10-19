@@ -3,12 +3,15 @@ import 'dart:ui' show AppExitResponse;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 import 'core/auth/auth_service.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
 import 'core/config/parametres_poste.dart';
 import 'core/database/app_database.dart';
+import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
@@ -97,6 +100,11 @@ import 'core/theme/symboles_agri.dart';
 /// envoi parti entre-temps porterait l'ancienne valeur.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Ticket U5 (D-U5) : dates d'`intl` en français (données embarquées, aucun
+  // accès réseau) — tout `DateFormat` sans locale explicite écrit « octobre ».
+  Intl.defaultLocale = 'fr_FR';
+  await initializeDateFormatting('fr_FR');
 
   final db = AppDatabase();
   final parametres = ParametresPoste(database: db);
@@ -338,6 +346,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
       title: 'AgriERP — Ferme École OLOUWACHEGOUN',
       debugShowCheckedModeBanner: false,
       theme: AgriTheme.light,
+      // Ticket U5 (D-U5) : composants Material en français (sélecteurs de date,
+      // « ANNULER » / « OK », infobulles). Voir `LocalisationPoste`.
+      locale: LocalisationPoste.locale,
+      supportedLocales: LocalisationPoste.locales,
+      localizationsDelegates: LocalisationPoste.delegues,
       home: switch (_sessionOuverte) {
         null => const Scaffold(
           backgroundColor: AgriColors.surfaceBg,

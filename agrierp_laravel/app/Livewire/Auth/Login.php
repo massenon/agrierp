@@ -170,7 +170,7 @@ class Login extends Component
     {
         $this->validate([
             'forgotEmail' => ['required', 'email'],
-        ], [], ['forgotEmail' => "l'adresse e-mail"]);
+        ], [], ['forgotEmail' => 'adresse e-mail']); // U5 : « Le champ adresse e-mail… », pas « Le champ l'adresse… »
 
         // Le statut réel n'est jamais exposé à l'utilisateur (prévention
         // d'énumération de comptes, Document 06 §12) — même message de

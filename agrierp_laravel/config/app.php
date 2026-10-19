@@ -83,13 +83,18 @@ return [
     | by Laravel's translation / localization methods. This option can be
     | set to any locale for which you plan to have translation strings.
     |
+    | Ticket U5 (D-U5) : français PAR DÉFAUT, y compris en repli. Les messages
+    | vivent dans `lang/fr/` et `lang/fr.json` ; une installation sans
+    | `APP_LOCALE` dans son `.env` (ou une suite de tests sans `.env`) ne doit
+    | plus jamais retomber sur les messages anglais du framework.
+    |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'fr'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'fr'),
 
-    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+    'faker_locale' => env('APP_FAKER_LOCALE', 'fr_FR'),
 
     /*
     |--------------------------------------------------------------------------

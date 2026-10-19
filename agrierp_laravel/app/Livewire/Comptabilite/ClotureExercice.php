@@ -389,7 +389,8 @@ class ClotureExercice extends Component
 
             $this->dispatch('toast', message: 'Comptes de charges et produits soldés — résultat net calculé : '.number_format($resultat, 0, ',', ' ').' FCFA.', type: 'success');
         } catch (\Throwable $e) {
-            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+            // Ticket U5 : le motif d'une exception du framework (SQL…) n'est pas montré en anglais.
+            $this->dispatch('toast', message: \App\Support\MessagesErreurFr::pourUtilisateur($e), type: 'error');
         }
     }
 

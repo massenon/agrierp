@@ -69,6 +69,7 @@ use App\Models\VeterinaryWithdrawalPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\MessagesErreurFr;
 use App\Support\MotifsRefusPush;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Carbon;
@@ -3489,7 +3490,8 @@ class SyncController extends Controller
             } catch (ValidationException $e) {
                 $rejected[] = ['client_ref' => $adj['client_ref'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
             } catch (\Throwable $e) {
-                $rejected[] = ['client_ref' => $adj['client_ref'] ?? null, 'reason' => $e->getMessage()];
+                // Ticket U5 : un motif technique du framework (anglais) devient une phrase française.
+                $rejected[] = ['client_ref' => $adj['client_ref'] ?? null, 'reason' => MessagesErreurFr::pourUtilisateur($e)];
             }
         }
 

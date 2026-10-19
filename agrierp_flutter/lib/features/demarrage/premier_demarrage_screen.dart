@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'premier_demarrage_repository.dart';
@@ -74,7 +75,10 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
         }
       });
     } catch (e) {
-      if (mounted) setState(() => _echec = 'Synchronisation impossible — $e');
+      // Ticket U5 : jamais l'exception brute (anglaise) à l'écran.
+      if (mounted) {
+        setState(() => _echec = 'Synchronisation impossible — ${messageErreur(e)}');
+      }
     } finally {
       if (mounted) setState(() => _enCours = false);
     }

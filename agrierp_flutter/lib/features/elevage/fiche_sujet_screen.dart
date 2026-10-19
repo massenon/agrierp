@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'sujets_repository.dart';
@@ -148,7 +149,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
       if (!mounted) return;
       setState(() {
         _enCours = false;
-        _retour = (false, "Impossible d'écrire le fichier : $e");
+        _retour = (false, messageEcritureFichier(e)); // U5 : pas d'exception brute
       });
     }
   }

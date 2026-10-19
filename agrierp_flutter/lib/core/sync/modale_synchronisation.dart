@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../database/app_database.dart';
+import '../erreurs/message_erreur.dart';
 import '../theme/agri_tokens.dart';
 import '../widgets/carte_kpi.dart';
 import '../widgets/modale_agri.dart';
@@ -81,7 +82,8 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
     } catch (e) {
       // ⚠️ L'ÉCHEC EST DIT, JAMAIS AVALÉ : c'est le seul moment où l'utilisateur peut encore agir.
       if (!mounted) return;
-      final message = e is EchecSynchronisation ? e.message : 'Synchronisation impossible — $e';
+      // Ticket U5 : jamais l'exception brute (anglaise) à l'écran.
+      final message = e is EchecSynchronisation ? e.message : 'Synchronisation impossible — ${messageErreur(e)}';
       setState(() => _erreur = message);
       ToastAgri.afficher(context, message, type: TypeToast.erreur, duree: const Duration(seconds: 8));
     } finally {

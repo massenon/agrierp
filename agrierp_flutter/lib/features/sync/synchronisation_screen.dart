@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -84,7 +85,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AgriColors.errorDeep,
-            content: Text('Synchronisation impossible — $e'),
+            // Ticket U5 : jamais l'exception brute (anglaise) à l'écran.
+            content: Text('Synchronisation impossible — ${messageErreur(e)}'),
           ),
         );
       }
