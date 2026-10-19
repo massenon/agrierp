@@ -678,6 +678,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
               widget.auth.utilisateur?.nom ?? 'Manager Olouwachegoun',
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),
           onElevage: () => setState(() => _ecran = EcranPoste.gestionElevage),
+          onOuvrir: (e) => setState(() => _ecran = e),
         ),
         EcranPoste.monProfil => MonProfilScreen(
           depot: MonProfilRepository(database: widget.database),

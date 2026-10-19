@@ -8,16 +8,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket F0.32 — TABLEAU DE BORD DU POSTE (`prototype_html/dashboard.html`).
 ///
-/// ⚠️⚠️ **LE TIRAGE NE DESCEND NI `sales` NI `expenses`** — vérifié dans
-/// `SyncController::pull()`. Le chiffre d'affaires, les dépenses, les deux
-/// courbes, les transactions et le top produits ne portent donc QUE ce que ce
-/// poste a saisi. L'écran doit le dire, et c'est testé ici : un gérant qui
-/// compare deux postes ne doit pas avoir à le deviner.
+/// Ticket H5 : le Blade fait foi. Les tests qui vérifiaient l'ancien comportement du poste (mentions « Ce poste
+/// uniquement », « Table non synchronisée », onglets « non embarqués », activités reconstituées, libellés et
+/// formule de mortalité de la maquette) sont adaptés à `livewire/dashboard/index.blade.php` et à
+/// `Dashboard/Index.php`. Les libellés lus dans le Blade et le jeu de données calculé à la main vivent dans
+/// `tableau_de_bord_blade_test.dart`.
 ///
-/// ⚠️ **SEUIL DE MORTALITÉ 5 %**, repris de `gestion-elevage.html` (« Seuil
-/// normal < 5% »). La maquette du tableau de bord colore 3,2 % en rouge — une
-/// valeur de démonstration codée en dur, incohérente avec sa page sœur. C'est
-/// la RÈGLE qui est reprise, pas la couleur d'un exemple.
+/// ⚠️ Depuis 14.79/14.80, `sales`, `purchases` et `payables` descendent au poste : ces blocs portent la ferme.
+///
+/// ⚠️ **MORTALITÉ** : la couleur des cartes bascule STRICTEMENT au-dessus de 5 (`> 5` du Blade) ; l'alerte
+/// « Mortalité anormale » suit `AlertesElevageService` (pire jour des 7 derniers, `>= 5`).
 void main() {
   late AppDatabase db;
   late TableauDeBordRepository depot;
@@ -51,6 +51,8 @@ void main() {
             stage: const Value('engraissement'),
             initialQuantity: const Value(100),
             currentQuantity: const Value(94),
+            // Ticket H5 : le Blade fait foi — `is_active` ET `status = 'actif'`.
+            status: const Value('actif'),
           ),
         );
 
@@ -65,6 +67,7 @@ void main() {
             stage: const Value('ponte'),
             initialQuantity: const Value(200),
             currentQuantity: const Value(198),
+            status: const Value('actif'),
           ),
         );
 
@@ -79,6 +82,7 @@ void main() {
             stage: const Value('engraissement'),
             initialQuantity: const Value(20),
             currentQuantity: const Value(18),
+            status: const Value('actif'),
           ),
         );
 
@@ -196,7 +200,7 @@ void main() {
   Future<void> fiche(
     String id,
     String lot,
-    int jour, {
+    DateTime jour, {
     int mort = 0,
     int vente = 0,
     int ponte = 0,
@@ -208,9 +212,9 @@ void main() {
           LivestockDailyEntriesCompanion.insert(
             id: id,
             deviceId: 'poste-test',
-            updatedAt: ceMois(jour, 8),
+            updatedAt: jour,
             lotId: lot,
-            entryDate: ceMois(jour),
+            entryDate: jour,
             mort: Value(mort),
             vente: Value(vente),
             effectifFinal: Value(effectif),
@@ -271,30 +275,31 @@ void main() {
     }
   });
 
-  /// ⚠️⚠️ DEUX CARTES NE PEUVENT PAS ÊTRE CALCULÉES AU POSTE, et disent
-  /// pourquoi au lieu d'afficher zéro.
-  ///
-  /// ⚠️ « Créances Clients » a quitté cette liste au ticket F0.43 :
-  /// `receivables` descend désormais au poste. Son tiret ne venait pas d'une
-  /// impossibilité de calcul mais d'une table qui n'arrivait pas — la
-  /// distinction compte, parce qu'elle dit lequel des deux se corrige.
-  testWidgets('résultat net et dettes affichent un tiret motivé', (
+  /// Ticket H5 : le Blade fait foi. Résultat Net = CA − achats du mois (`Index.php`), Dettes depuis
+  /// `payables` (descendue depuis 14.79) : plus de tiret motivé, des chiffres.
+  testWidgets('résultat net et dettes sont calculés comme au web', (
     tester,
   ) async {
     await afficher(tester);
 
-    expect(find.text('Sans comptabilité au poste'), findsOneWidget);
-    expect(find.text('Table non synchronisée'), findsOneWidget);
+    expect(find.text('Sans comptabilité au poste'), findsNothing);
+    expect(find.text('Table non synchronisée'), findsNothing);
+    expect(find.text('RÉSULTAT NET'), findsOneWidget);
+    expect(find.text('DETTES FOURNISSEURS'), findsOneWidget);
   });
 
-  testWidgets('⚠️ le CA dit qu il ne vaut que pour ce poste', (tester) async {
+  /// Ticket H5 : le Blade fait foi — les ventes de toute la ferme descendent, la mention « Ce poste
+  /// uniquement » était périmée.
+  testWidgets('⚠️ le CA ne porte plus la mention périmée du poste', (
+    tester,
+  ) async {
     await vente(uuid('v1'), 32000, ceMois(3));
     await vente(uuid('v2'), 45000, ceMois(4));
 
     await afficher(tester);
 
-    expect(find.text('77 000'), findsOneWidget);
-    expect(find.textContaining('Ce poste uniquement'), findsWidgets);
+    expect(find.text('77 000'), findsWidgets);
+    expect(find.textContaining('Ce poste uniquement'), findsNothing);
   });
 
   testWidgets('la trésorerie ventile caisse et banque', (tester) async {
@@ -310,7 +315,11 @@ void main() {
     await afficher(tester);
 
     expect(find.text('Provende ponte'), findsWidgets);
-    expect(find.text('Provende ponte sous le seuil critique'), findsOneWidget);
+    // Ticket H5 : le Blade fait foi — libellé de `Index::getAlertesCritiquesProperty()`.
+    expect(
+      find.text('Stock critique — Provende ponte (5.00 sac restant(s))'),
+      findsOneWidget,
+    );
   });
 
   testWidgets("l'effectif additionne les bandes actives", (tester) async {
@@ -333,9 +342,9 @@ void main() {
     expect(find.text('Ventes (mois)'), findsOneWidget);
   });
 
-  /// ⚠️ « Gestantes » n'existe nulle part : la fiche la collecte, la base ne
-  /// la stocke pas, le tirage ne la descend pas. Deux tirets, pas deux zéros.
-  testWidgets('⚠️⚠️ les gestantes affichent un tiret sur lapins et porcs', (
+  /// Ticket H5 : le Blade fait foi — « Gestantes » se compte sur `livestock_reproduction_events`
+  /// (cycles `en_cours`), descendue au poste ; le calcul est vérifié dans `tableau_de_bord_blade_test.dart`.
+  testWidgets('⚠️⚠️ les gestantes figurent sur lapins et porcs', (
     tester,
   ) async {
     await afficher(tester);
@@ -343,30 +352,41 @@ void main() {
     expect(find.text('Gestantes'), findsNWidgets(2));
   });
 
-  /// 6 morts sur 100 sujets initiaux = 6 %, au-dessus du seuil de 5 %.
+  /// Ticket H5 : le Blade fait foi. Carte : 6 morts / (94 + 6) = 6,0 % (virgule décimale). Alerte : fiche
+  /// d'aujourd'hui (fenêtre de 7 jours), 6 / 100 (effectif initial, aucune fiche avant) = 6 % ≥ 5.
   testWidgets('⚠️ la mortalité au-dessus de 5 % lève une alerte', (
     tester,
   ) async {
-    await fiche(uuid('f1'), bandeLapins, 5, mort: 6, effectif: 94);
+    final aujourdhui = DateTime(
+      maintenant.year,
+      maintenant.month,
+      maintenant.day,
+    );
+    await fiche(uuid('f1'), bandeLapins, aujourdhui, mort: 6, effectif: 94);
 
     await afficher(tester);
 
-    expect(find.text('6.0%'), findsOneWidget);
+    expect(find.text('6,0%'), findsOneWidget);
     expect(
       find.textContaining('Mortalité anormale — Lot CUN-2026-01'),
       findsOneWidget,
     );
   });
 
-  /// 2 morts sur 200 = 1 %, sous le seuil : aucune alerte.
+  /// 2 morts sur 198 + 2 = 1 %, sous le seuil : aucune alerte. Ticket H5 : virgule décimale du Blade.
   testWidgets('la mortalité sous le seuil ne lève aucune alerte', (
     tester,
   ) async {
-    await fiche(uuid('f2'), bandePondeuses, 5, mort: 2, effectif: 198);
+    final aujourdhui = DateTime(
+      maintenant.year,
+      maintenant.month,
+      maintenant.day,
+    );
+    await fiche(uuid('f2'), bandePondeuses, aujourdhui, mort: 2, effectif: 198);
 
     await afficher(tester);
 
-    expect(find.text('1.0%'), findsOneWidget);
+    expect(find.text('1,0%'), findsOneWidget);
     expect(find.textContaining('Mortalité anormale'), findsNothing);
   });
 
@@ -378,30 +398,28 @@ void main() {
     }
   });
 
-  /// ⚠️ Trois onglets n'ont aucun module embarqué : ils le disent au lieu de
-  /// disparaître, sans quoi la structure divergerait de la maquette selon ce
-  /// qui est construit.
-  testWidgets('un onglet non embarqué le dit', (tester) async {
+  /// Ticket H5 : le Blade fait foi — `purchases` est au poste, l'onglet Achat est alimenté ; vide, il
+  /// affiche le message du web.
+  testWidgets('un onglet vide affiche le message du web', (tester) async {
     await afficher(tester);
 
     await tester.tap(find.byKey(const Key('onglet-tx-Achat')));
     await tester.pumpAndSettle();
 
-    expect(find.text('— Module non embarqué au poste —'), findsOneWidget);
+    expect(find.text('Aucun achat récent.'), findsOneWidget);
+    expect(find.textContaining('non embarqué'), findsNothing);
   });
 
-  /// ⚠️⚠️ NI NUMÉRO NI NOM DE CLIENT : aucune colonne de référence n'existe
-  /// nulle part (ticket 14.71), et la table des clients ne descend pas. La
-  /// vente est identifiée par son heure et son mode de règlement, qui sont
-  /// réels.
-  testWidgets('une vente est identifiée par son heure et son règlement', (
+  /// Ticket H5 : le Blade fait foi — « ID8 · client », « Client Anonyme » sans client
+  /// (`strtoupper(substr($sale->id, 0, 8))`).
+  testWidgets('une vente est identifiée par son ID8 et son client', (
     tester,
   ) async {
     await vente(uuid('v1'), 32000, ceMois(3, 9));
 
     await afficher(tester);
 
-    expect(find.text('09:00 · especes'), findsOneWidget);
+    expect(find.text('V1000000 · Client Anonyme'), findsOneWidget);
     expect(find.text('32 000 F'), findsWidgets);
   });
 
@@ -430,26 +448,45 @@ void main() {
     expect(find.text('Marge'), findsOneWidget);
   });
 
-  testWidgets('les activités du jour reprennent les écritures du poste', (
+  /// Ticket H5 : le Blade fait foi — les activités viennent du journal d'audit (`audit_logs`), libellés
+  /// de `AuditLog`, auteur, module.
+  testWidgets('les activités du jour viennent du journal d audit', (
     tester,
   ) async {
-    await vente(uuid('v-aujourdhui'), 12000, DateTime.now());
+    await db
+        .into(db.auditLogs)
+        .insert(
+          AuditLogsCompanion.insert(
+            id: uuid('audit'),
+            action: 'sale.created',
+            userName: const Value('KPOSSOU Éléonore'),
+            module: const Value('ventes'),
+            createdAt: Value(DateTime.now()),
+          ),
+        );
 
     await afficher(tester);
 
-    expect(find.textContaining('Vente encaissée'), findsOneWidget);
-  });
-
-  testWidgets('sans écriture du jour, la section le dit', (tester) async {
-    await afficher(tester);
-
+    expect(find.text('Vente enregistrée'), findsOneWidget);
     expect(
-      find.text('— Aucune écriture aujourd\'hui sur ce poste —'),
+      find.textContaining('— KPOSSOU Éléonore · Ventes & Devis'),
       findsOneWidget,
     );
   });
 
-  /// ⚠️ Le filtre de dates de la maquette pilote réellement les agrégats.
+  testWidgets('sans activité du jour, la section le dit comme le web', (
+    tester,
+  ) async {
+    await afficher(tester);
+
+    expect(
+      find.text("Aucune activité enregistrée aujourd'hui pour le moment."),
+      findsOneWidget,
+    );
+  });
+
+  /// Ticket H5 : le Blade fait foi — la période est le mois courant (champs désactivés) ; une vente du mois
+  /// précédent ne compte que dans le sous-texte « Mois précédent ».
   testWidgets('une vente hors période ne compte pas dans le CA', (
     tester,
   ) async {
