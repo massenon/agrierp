@@ -240,54 +240,8 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | H8 | **Soins et vaccins** du poste : registre (6 colonnes, « CODE (Espèce) », archivage), modale Nouveau Soin, messages ; puis infirmerie et calendrier planifié, qui demandent `infirmary_records` et `veterinary_calendar_events` au poste (tables synchronisables, schéma partagé) | 🔧 / ❓ D-H8 |
 | H9 | **Paramètres Élevage** du poste : libellés, formats, tris ; bloc « Rappel des soins planifiés » (valeur servie au tirage) | 🔧 / ❓ D-H9 |
 | H10 | Garde-fou : un test par écran H4–H9 qui lit les libellés et colonnes **dans le Blade** (et non plus dans la maquette) et les cherche dans l'écran Flutter | 🔧 |
-
-**Décisions client du Sprint H :**
-
-| Réf. | Question | Recommandation |
-|---|---|---|
-| D-SYNC-1 | Route unique `/api/v1/sync` + table outbox + déduplication 30 j ? | Non : l'idempotence par UUID existe ; la réécriture ferait courir un risque à 20 tables sans corriger de défaut constaté |
-| D-SYNC-2 | Envoi par lots de 50 ? | Oui, après B2 |
-| D-SYNC-3 | Synchronisation automatique et réessais exponentiels ? | Oui (B2), pour les échecs réseau seulement |
-| D-SYNC-4 | Vente reçue en rupture de stock | Accepter et **signaler** (aujourd'hui acceptée en silence, stock négatif possible) |
-| D-SYNC-5 | Appairage du poste par l'admin | Non : le jeton par utilisateur porte ses droits, contrôlés table par table |
-| D-SYNC-6 | Seuil « Inactif depuis N jours » de la modale web | 3 jours |
-| D-H8 | Infirmerie et calendrier planifié saisis au poste (deux nouvelles tables synchronisables) ? | Oui, en ticket séparé : sans elles, l'onglet Suivi Sanitaire reste vide hors ligne |
-| D-H9 | Paramètres Élevage modifiables au poste ? Aujourd'hui lecture seule (référentiels : le serveur gagne) | Non : garder la lecture seule, documentée comme écart assumé ; seul l'administrateur règle les barèmes, sur le web |
-| D-H-maquette | Ajouts du poste absents du Blade (courbes GMQ, filtres du registre, bandeaux de cycle Volailles / Escargots, horizons de prévision, « Bandes suivies »…) : retirer, ou construire d'abord au web ? | Retirer du poste, sauf ceux que le client veut voir aussi au web |
-
----
-
-## Sprint G — Production web
-
-| # | Ticket |
-|---|---|
-| G1 | Pointer la racine documentaire de l'hébergement sur `public/` (aujourd'hui la racine du projet, protégée seulement par le `.htaccess` racine). |
-| G2 | Déployer les tickets 15.5 à 15.42 (la production tourne avec le build du ticket 15.4). |
-| G3 | Vérifier **sur le disque** du serveur que `agrierp.zip` (qui contient `.env`) est supprimé, puis régénérer les clés exposées (`APP_KEY`). Les archives et `.env.dusk.local` ont été retirés du dépôt Git le 17/10/2026, mais restent dans l'historique. |
-
----
-
-## Décisions client en attente (récapitulatif)
-
-| Ref. | Question |
-|---|---|
-| A2 | Transfert entre bandes (portées, sevrés) : colonne de la fiche ou écran dédié ? |
-| A11 | Sélecteur de bande sur les fiches Pondeuses et Escargots. |
-| 3.F7 | La mise-bas alimente-t-elle automatiquement la fiche du jour ? |
-| D5, D15, D2/D8/D9/D12 | Voir ticket F0.95 dans `README_SPRINT0.md`. |
-| C | Périmètre exact de la clôture de caisse (absente du prototype). |
-| E3 | En-têtes de tableau sombres ou charte actuelle du web. |
-| RBAC | 7 rôles (CDC) contre 4 implémentés. |
-| D-SYNC-1 à 6, D-H8, D-H9, D-H-maquette | Voir Sprint H. |
-
----
-
-## Ordre recommandé
-
-1. A1 ✅, A6 ✅ et A9 ✅, puis A5 et A7.
-2. Décisions A2, A3 et 3.F7 avec l'exploitant.
-3. F0.96 et F0.97, puis mise en service simultanée (3.F4).
-4. D2 : premier installateur réel.
-5. H3 puis H2 (synchronisation visible, web d'abord), H1 (châssis), puis H4 à H10 écran par écran ; B2 et B3.
-6. C : clôture de caisse, une fois validée.
-7. E, F et G en continu.
+| H8b | **D-H8** : infirmerie (`infirmary_records`) et calendrier planifié (`veterinary_calendar_events`) saisis au poste : tables Drift (UUID), tirage et envoi (`manage-elevage`), onglet Suivi Sanitaire complet et « Planifier une Intervention » | 🔧 |
+| H9b | **D-H9** : Paramètres Élevage modifiables au poste comme au web — rations, prophylaxie, provendes, numérotation, rappel des soins : envoi accepté pour `manage-elevage`, dernier écrivain gagne, archivage logique | 🔧 |
+| H11 | **D-H-maquette** : construire au web les ajouts du poste (courbe et cartes GMQ, filtre d'espèce, horizons de prévision et cartes, filtres et recherche du registre des soins, bandeaux de cycle Volailles / Escargots, « Bandes suivies »…) | 🔧 |
+| H13 | **D-SYNC-2/3** (B2) : synchronisation automatique du poste (retour du réseau, toutes les 15 min, fermeture), réessais 30 s / 2 min / 5 min / 15 min / 1 h pour les échecs réseau, envoi par lots de 50 | 🔧 |
+| H14 | **D-SYNC-4** : vente reçue du poste qui rend un stock négatif → acceptée et signalée (notification à l'administrateur, compteur dans le journal) | 🔧 |
