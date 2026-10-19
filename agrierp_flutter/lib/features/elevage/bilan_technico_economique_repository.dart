@@ -191,12 +191,12 @@ class BilanTechnicoEconomiqueRepository {
         ? null
         : prix.fold<double>(0, (t, p) => t + p) / prix.length;
 
-    // ⚠️ Le web ne somme que les soins ACTIFS (`is_active = true`, soin archivé = supprimé). Le
-    // poste n'a pas cette colonne (schéma inchangé, ticket H6) : le tirage ne sert que les soins
-    // actifs, mais un soin archivé APRÈS avoir été tiré reste compté ici.
-    final soins = await (database.select(
-      database.veterinaryRecords,
-    )..where((s) => s.lotId.equals(lotId))).get();
+    // Le web ne somme que les soins ACTIFS (`is_active = true`, soin archivé = supprimé). Ticket U3 : le poste
+    // porte `is_active` (tiré, et archivé ici comme au web) — même filtre.
+    final soins = await (database.select(database.veterinaryRecords)..where(
+          (s) => Expression.and([s.lotId.equals(lotId), s.isActive.equals(true)]),
+        ))
+        .get();
     final coutVeterinaire = soins.fold<double>(0, (t, s) => t + (s.cost ?? 0));
 
     final couts = [

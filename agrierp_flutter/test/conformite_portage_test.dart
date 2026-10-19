@@ -89,6 +89,8 @@ void main() {
     'livestock_daily_entries',
     'livestock_transfers',
     'feed_ration_standards',
+    // Ticket U2 (D-U2) — objectifs de GMQ.
+    'growth_standards',
     'veterinary_withdrawal_periods',
     'prophylaxis_schedule_standards',
     'veterinary_records',

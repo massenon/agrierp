@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Models\GrowthStandard;
 use App\Models\InfirmaryRecord;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -75,12 +76,14 @@ class DashboardElevage extends Component
     /** Horizons proposés par le poste (`horizons`), en jours. */
     public const HORIZONS = [7, 14, 30, 60];
 
-    /** Objectifs de GMQ des cartes de l'onglet GMQ, en g/jour — constantes du poste (`DashboardElevageRepository.objectifs`). */
-    public const OBJECTIFS_GMQ = [
-        'cuniculture' => [15, 20],
-        'aviculture' => [20, 55],
-        'porciculture' => [400, 650],
-    ];
+    /**
+     * Espèces des trois cartes « GMQ Moyen … » de l'onglet GMQ, dans leur ordre.
+     *
+     * Ticket U2 (décision client D-U2 du 19/10/2026) — les OBJECTIFS ne sont plus des constantes (ils recopiaient
+     * `DashboardElevageRepository.objectifs` du poste, lui-même en dur) : ils viennent de `growth_standards`, par
+     * `GrowthAnalysisService::objectifPour()` (voir `getGmqCartesProperty`).
+     */
+    public const ESPECES_CARTES_GMQ = ['cuniculture', 'aviculture', 'porciculture'];
 
     /** Horizon des rappels VMS, en jours (`horizonRappels` du poste). */
     public const HORIZON_RAPPELS = 7;
@@ -316,18 +319,26 @@ class DashboardElevage extends Component
     /**
      * Ticket H11 — cartes de l'onglet GMQ : moyenne NON arrondie des GMQ cumulés des bandes de l'espèce (affichée sans
      * décimale), `null` si aucune n'a deux pesées ; et « Lots Suivis (Pesées ≥ 2) ».
+     *
+     * Ticket U2 (D-U2) — `objectifs` : l'objectif de chaque carte, lu dans `growth_standards` pour les stades des
+     * bandes MOYENNÉES par la carte (`GrowthAnalysisService::objectifPour` : barème du stade de chaque bande, comme
+     * Analyse des Croissances, puis enveloppe min des minima / max des maxima) ; `null` sans barème (« — »).
      */
     public function getGmqCartesProperty(): array
     {
         $avecGmq = $this->gmqTable->filter(fn ($row) => $row['gmq'] !== null);
+        $standards = GrowthStandard::all();
         $parEspece = [];
+        $objectifs = [];
 
-        foreach (array_keys(self::OBJECTIFS_GMQ) as $code) {
-            $valeurs = $avecGmq->filter(fn ($row) => $row['lot']->species?->code === $code)->pluck('gmq');
+        foreach (self::ESPECES_CARTES_GMQ as $code) {
+            $lignes = $avecGmq->filter(fn ($row) => $row['lot']->species?->code === $code);
+            $valeurs = $lignes->pluck('gmq');
             $parEspece[$code] = $valeurs->isEmpty() ? null : (float) $valeurs->avg();
+            $objectifs[$code] = GrowthAnalysisService::objectifPour($standards, $code, $lignes->map(fn ($row) => $row['lot']->stage));
         }
 
-        return ['par_espece' => $parEspece, 'lots_suivis' => $avecGmq->count()];
+        return ['par_espece' => $parEspece, 'objectifs' => $objectifs, 'lots_suivis' => $avecGmq->count()];
     }
 
     /** Ticket H11 — bande de la courbe « Évolution du GMQ » : la dernière pesée la plus récente (à égalité, le code). */

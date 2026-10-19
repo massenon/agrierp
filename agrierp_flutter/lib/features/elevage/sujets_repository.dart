@@ -236,8 +236,14 @@ class SujetsRepository {
     final lotId = sujet.lotId;
     final soinsBruts = lotId == null
         ? <VeterinaryRecord>[]
+        // Ticket U3 — soins ACTIFS de la bande (`Animal::lotVeterinaryRecords`, `where('is_active', true)`).
         : await (database.select(database.veterinaryRecords)
-                ..where((v) => v.lotId.equals(lotId))
+                ..where(
+                  (v) => Expression.and([
+                    v.lotId.equals(lotId),
+                    v.isActive.equals(true),
+                  ]),
+                )
                 ..orderBy([
                   (v) => OrderingTerm(
                     expression: v.recordDate,

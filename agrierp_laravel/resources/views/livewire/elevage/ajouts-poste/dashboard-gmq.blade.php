@@ -1,16 +1,18 @@
 {{--
     Ticket H11 — cartes et courbe de l'onglet GMQ (ajouts du poste), sur le MÊME GMQ cumulé que le tableau du Blade.
     Reçoit : $cartes (DashboardElevage::getGmqCartesProperty), $suivie (?LivestockLot), $evolution (8 points).
-    Valeur écrite sans décimale (`toStringAsFixed(0)` du poste) ; objectifs = constantes du poste (OBJECTIFS_GMQ).
+    Valeur écrite sans décimale (`toStringAsFixed(0)` du poste).
+    Ticket U2 (D-U2) — objectifs lus dans `growth_standards` (`$cartes['objectifs']`, GrowthAnalysisService::objectifPour) ;
+    sans barème pour les stades des bandes moyennées : « Objectif : — », jamais 0.
 --}}
 @php
     $carteGmq = function (string $code) use ($cartes) {
         $v = $cartes['par_espece'][$code];
-        [$min, $max] = \App\Livewire\Elevage\DashboardElevage::OBJECTIFS_GMQ[$code];
+        $objectif = $cartes['objectifs'][$code];
 
         return $v === null
             ? ['—', 'Moins de 2 pesées enregistrées']
-            : [number_format($v, 0, '.', '').' g/j', 'Objectif : '.$min.'-'.$max.' g/j'];
+            : [number_format($v, 0, '.', '').' g/j', $objectif === null ? 'Objectif : —' : 'Objectif : '.$objectif[0].'-'.$objectif[1].' g/j'];
     };
     [$lapV, $lapC] = $carteGmq('cuniculture');
     [$aviV, $aviC] = $carteGmq('aviculture');

@@ -189,11 +189,18 @@ class DashboardElevageAjoutsPosteTest extends TestCase
      */
     public function test_onglet_gmq_cartes_filtre_et_courbe(): void
     {
+        // Ticket U2 — objectifs lus dans `growth_standards` (barème du stade des bandes moyennées) : les stades
+        // « croissance » et « reproduction » n'ont aucune bande et ne comptent pas.
+        $this->bareme('cuniculture', 'engraissement', 15, 20);
+        $this->bareme('cuniculture', 'croissance', 10, 30);
+        $this->bareme('porciculture', 'engraissement', 500, 650);
+        $this->bareme('porciculture', 'reproduction', 40, 80);
+
         $page = Livewire::test(DashboardElevage::class)->set('tab', 'gmq');
 
         $page->assertSeeHtmlInOrder(['GMQ Moyen Lapins', '18 g/j', 'Objectif : 15-20 g/j',
             'GMQ Moyen Volailles Chair', '—', 'Moins de 2 pesées enregistrées',
-            'GMQ Moyen Porcs', '300 g/j', 'Objectif : 400-650 g/j',
+            'GMQ Moyen Porcs', '300 g/j', 'Objectif : 500-650 g/j',
             'Lots Suivis (Pesées ≥ 2)', '4'])
             ->assertSee('Évolution du GMQ — LAP-01 (8 dernières semaines)')
             ->assertSeeHtmlInOrder(['Toutes les Espèces', 'Cuniculture (Lapins)', 'Aviculture (Volailles)', 'Porciculture (Porcs)']);
@@ -205,6 +212,46 @@ class DashboardElevageAjoutsPosteTest extends TestCase
         $this->assertSame(['POR-01', 'POR-02'], $page->instance()->gmqTableFiltree->map(fn ($r) => $r['lot']->code)->sort()->values()->all());
         // Les cartes ne suivent pas le filtre (poste : seul le tableau est filtré).
         $page->assertSee('18 g/j');
+    }
+
+    private function bareme(string $espece, string $stade, int $min, int $max): void
+    {
+        \App\Models\GrowthStandard::create(['species_code' => $espece, 'stage_label' => $stade,
+            'gmq_min_g_per_day' => $min, 'gmq_max_g_per_day' => $max]);
+    }
+
+    /**
+     * 🔴→✅ Ticket U2 (D-U2) — les objectifs des cartes GMQ étaient des CONSTANTES (15-20, 20-55, 400-650) recopiées du
+     * poste. Sans aucun barème : « Objectif : — », jamais un objectif inventé ni 0.
+     */
+    public function test_sans_bareme_l_objectif_est_un_tiret(): void
+    {
+        $page = Livewire::test(DashboardElevage::class)->set('tab', 'gmq');
+
+        $page->assertSeeHtmlInOrder(['GMQ Moyen Lapins', '18 g/j', 'Objectif : —', 'GMQ Moyen Porcs', '300 g/j', 'Objectif : —'])
+            ->assertDontSee('Objectif : 15-20 g/j')
+            ->assertDontSee('Objectif : 400-650 g/j');
+        $this->assertSame(['cuniculture' => null, 'aviculture' => null, 'porciculture' => null], $page->instance()->gmqCartes['objectifs']);
+    }
+
+    /**
+     * Ticket U2 — deux stades moyennés dans une carte : ENVELOPPE de leurs barèmes. POR-02 passe en croissance :
+     * engraissement 500-650 et croissance 300-550 → « Objectif : 300-650 g/j ». Le barème « reproduction » (aucune
+     * bande à ce stade) n'entre pas, et un barème modifié se lit au chargement suivant.
+     */
+    public function test_l_objectif_est_l_enveloppe_des_baremes_des_stades_moyennes(): void
+    {
+        $this->bandes['POR-02']->update(['stage' => 'croissance']);
+        $this->bareme('porciculture', 'engraissement', 500, 650);
+        $this->bareme('porciculture', 'croissance', 300, 550);
+        $this->bareme('porciculture', 'reproduction', 40, 80);
+
+        $page = Livewire::test(DashboardElevage::class)->set('tab', 'gmq');
+        $page->assertSeeHtmlInOrder(['GMQ Moyen Porcs', '300 g/j', 'Objectif : 300-650 g/j']);
+        $this->assertSame([300, 650], $page->instance()->gmqCartes['objectifs']['porciculture']);
+
+        \App\Models\GrowthStandard::where('stage_label', 'croissance')->update(['gmq_min_g_per_day' => 450]);
+        $this->assertSame([450, 650], Livewire::test(DashboardElevage::class)->instance()->gmqCartes['objectifs']['porciculture']);
     }
 
     /**

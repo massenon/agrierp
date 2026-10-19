@@ -139,8 +139,9 @@ class RechercheGlobaleRepository {
     if (!peut(role, 'view-elevage')) return const [];
 
     return [
+      // Ticket U3 — soins ACTIFS seulement (`GlobalSearch::searchSante`, critères groupés au web).
       for (final v in await database.select(database.veterinaryRecords).get())
-        if (_contient(v.productUsed, q) || _contient(v.vetName, q))
+        if (v.isActive && (_contient(v.productUsed, q) || _contient(v.vetName, q)))
           ResultatRecherche(
             libelle: v.productUsed ?? v.actionType,
             sousLibelle: '${_date(v.recordDate)} — ${v.vetName ?? ''}',

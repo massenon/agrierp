@@ -234,6 +234,29 @@ class FeedRationStandards extends Table with BaremeElevageSynchronisable {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket U2 (décision client D-U2 du 19/10/2026 : « objectifs de GMQ, une seule source ») — barème des
+/// OBJECTIFS DE CROISSANCE par espèce et par stade (`growth_standards` du serveur, modèle `GrowthStandard`).
+///
+/// ⚠️⚠️ **RÉFÉRENTIEL EN LECTURE SEULE** : le poste ne l'écrit jamais (pas de [SyncColumns], le serveur ignore
+/// tout envoi et le compte dans `referentiels_ignored`). Servi COMPLET à chaque tirage et remplacé tel quel :
+/// c'est la seule source des objectifs du Dashboard Élevage, qui portait jusqu'ici des constantes (15-20,
+/// 20-55, 400-650 g/j) recopiées ensuite au web. Règle d'agrégation par espèce :
+/// `DashboardElevageRepository.objectifPour` (= `GrowthAnalysisService::objectifPour` du serveur).
+class GrowthStandards extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get speciesCode => text()();
+  TextColumn get stageLabel => text()();
+
+  /// Objectif minimal, en g/jour (`unsignedInteger` au serveur).
+  IntColumn get gmqMinGPerDay => integer()();
+
+  /// Objectif maximal, en g/jour.
+  IntColumn get gmqMaxGPerDay => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Type de provende servi en ferme — catalogue des aliments.
 ///
 /// ⚠️⚠️ **C'EST ICI QUE VIT LE POIDS DU SAC.** Le stock compte les aliments
@@ -1330,6 +1353,12 @@ class VeterinaryRecords extends Table with SyncColumns {
   RealColumn get cost => real().nullable()();
   DateTimeColumn get recordDate => dateTime()();
   IntColumn get withdrawalDays => integer().withDefault(const Constant(0))();
+
+  /// Ticket U3 (décision client D-U3 du 19/10/2026) — ARCHIVAGE LOGIQUE, au poste comme au web
+  /// (`SoinsVaccinsHub::archiveSoin()`). Un soin archivé (`false`) quitte le registre et tout calcul (KPI,
+  /// Dashboard Élevage, Bilan, protocole du jour, recherche) ; la ligne reste, et la rémanence qu'il a créée
+  /// reste en vigueur, exactement comme au web. Servi au tirage, envoyé (`pending`) à l'archivage.
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Ticket H8b (décision client D-H8 du 19/10/2026) — ENTRÉE D'INFIRMERIE (`infirmary_records` du serveur),
@@ -1337,7 +1366,8 @@ class VeterinaryRecords extends Table with SyncColumns {
 ///
 /// ⚠️ Reçue ET envoyée. Le serveur (`SyncController::pushInfirmerie`) crée l'entrée inconnue, puis ne change
 /// plus que le `status` d'une entrée connue (dernier écrivain gagne) : bande, motif et date d'entrée sont figés.
-/// ⚠️ `entry_date` ne peut pas être postérieure à aujourd'hui (`before_or_equal:today` à l'envoi).
+/// Ticket U6 (décision client D-U6 du 19/10/2026) — `entry_date` peut être FUTURE, comme au web
+/// (`saveInfirmaryEntry()` : `required|date`) ; l'envoi l'accepte aussi.
 class InfirmaryRecords extends Table with SyncColumns {
   TextColumn get lotId => text().withLength(min: 36, max: 36)();
 
@@ -1503,6 +1533,7 @@ class SyncState extends Table {
     Products,
     LivestockLots,
     FeedRationStandards,
+    GrowthStandards,
     VeterinaryWithdrawalPeriods,
     LivestockReproductionEvents,
     Customers,
@@ -1570,7 +1601,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 42;
+  int get schemaVersion => 43;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2012,6 +2043,20 @@ class AppDatabase extends _$AppDatabase {
           }
         }
       }
+
+      // v43 — tickets U2 et U3 (décisions client du 19/10/2026, « uniformiser web et poste ») : barème des
+      // objectifs de GMQ tiré du serveur ; archivage logique des soins (défaut `true` : tout soin existant est
+      // actif, comme au serveur où la colonne existe depuis l'origine).
+      if (from < 43) {
+        if (!await _tableExiste(m, growthStandards)) {
+          await m.createTable(growthStandards);
+        }
+        await _ajouterColonneSiAbsente(
+          m,
+          veterinaryRecords,
+          veterinaryRecords.isActive,
+        );
+      }
     },
   );
 
@@ -2175,7 +2220,7 @@ class AppDatabase extends _$AppDatabase {
   /// Référentiels et réglages CONSERVÉS (préservés au serveur ; les comptes restent pour que la
   /// connexion hors ligne survive à une purge suivie d'un tirage interrompu).
   static const tablesConservees = [
-    'product_categories', 'products', 'feed_ration_standards', 'feed_types',
+    'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
     'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
     'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories',
     'company_settings', 'modules_config', 'attestation_templates',

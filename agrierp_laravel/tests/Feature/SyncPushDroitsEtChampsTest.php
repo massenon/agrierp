@@ -292,7 +292,11 @@ class SyncPushDroitsEtChampsTest extends TestCase
         $reponse->assertJsonPath('livestock_daily_entries.accepted', []);
     }
 
-    public function test_un_soin_ne_reprend_ni_l_archivage_ni_une_gravite_hors_liste(): void
+    /**
+     * Ticket U3 (décision client D-U3 du 19/10/2026) — l'archivage d'un soin est désormais ACCEPTÉ du poste (S1 l'ignorait) :
+     * un soin saisi puis archivé hors ligne arrive archivé. Une gravité hors liste reste refusée.
+     */
+    public function test_un_soin_reprend_l_archivage_mais_pas_une_gravite_hors_liste(): void
     {
         $compte = $this->compte('animalier');
 
@@ -304,7 +308,7 @@ class SyncPushDroitsEtChampsTest extends TestCase
             ]],
         ])->assertJsonPath('veterinary_records.accepted', ['44444444-4444-4444-8444-444444444444']);
 
-        $this->assertTrue((bool) VeterinaryRecord::find('44444444-4444-4444-8444-444444444444')->is_active);
+        $this->assertFalse((bool) VeterinaryRecord::find('44444444-4444-4444-8444-444444444444')->is_active);
 
         $this->actingAs($compte, 'sanctum')->postJson('/api/sync/push', [
             'veterinary_records' => [[

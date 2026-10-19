@@ -2598,6 +2598,394 @@ class FeedRationStandardsCompanion extends UpdateCompanion<FeedRationStandard> {
   }
 }
 
+class $GrowthStandardsTable extends GrowthStandards
+    with TableInfo<$GrowthStandardsTable, GrowthStandard> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GrowthStandardsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _speciesCodeMeta = const VerificationMeta(
+    'speciesCode',
+  );
+  @override
+  late final GeneratedColumn<String> speciesCode = GeneratedColumn<String>(
+    'species_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stageLabelMeta = const VerificationMeta(
+    'stageLabel',
+  );
+  @override
+  late final GeneratedColumn<String> stageLabel = GeneratedColumn<String>(
+    'stage_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gmqMinGPerDayMeta = const VerificationMeta(
+    'gmqMinGPerDay',
+  );
+  @override
+  late final GeneratedColumn<int> gmqMinGPerDay = GeneratedColumn<int>(
+    'gmq_min_g_per_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gmqMaxGPerDayMeta = const VerificationMeta(
+    'gmqMaxGPerDay',
+  );
+  @override
+  late final GeneratedColumn<int> gmqMaxGPerDay = GeneratedColumn<int>(
+    'gmq_max_g_per_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    speciesCode,
+    stageLabel,
+    gmqMinGPerDay,
+    gmqMaxGPerDay,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'growth_standards';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GrowthStandard> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('species_code')) {
+      context.handle(
+        _speciesCodeMeta,
+        speciesCode.isAcceptableOrUnknown(
+          data['species_code']!,
+          _speciesCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_speciesCodeMeta);
+    }
+    if (data.containsKey('stage_label')) {
+      context.handle(
+        _stageLabelMeta,
+        stageLabel.isAcceptableOrUnknown(data['stage_label']!, _stageLabelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stageLabelMeta);
+    }
+    if (data.containsKey('gmq_min_g_per_day')) {
+      context.handle(
+        _gmqMinGPerDayMeta,
+        gmqMinGPerDay.isAcceptableOrUnknown(
+          data['gmq_min_g_per_day']!,
+          _gmqMinGPerDayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_gmqMinGPerDayMeta);
+    }
+    if (data.containsKey('gmq_max_g_per_day')) {
+      context.handle(
+        _gmqMaxGPerDayMeta,
+        gmqMaxGPerDay.isAcceptableOrUnknown(
+          data['gmq_max_g_per_day']!,
+          _gmqMaxGPerDayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_gmqMaxGPerDayMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GrowthStandard map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GrowthStandard(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      speciesCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}species_code'],
+      )!,
+      stageLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stage_label'],
+      )!,
+      gmqMinGPerDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}gmq_min_g_per_day'],
+      )!,
+      gmqMaxGPerDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}gmq_max_g_per_day'],
+      )!,
+    );
+  }
+
+  @override
+  $GrowthStandardsTable createAlias(String alias) {
+    return $GrowthStandardsTable(attachedDatabase, alias);
+  }
+}
+
+class GrowthStandard extends DataClass implements Insertable<GrowthStandard> {
+  final String id;
+  final String speciesCode;
+  final String stageLabel;
+
+  /// Objectif minimal, en g/jour (`unsignedInteger` au serveur).
+  final int gmqMinGPerDay;
+
+  /// Objectif maximal, en g/jour.
+  final int gmqMaxGPerDay;
+  const GrowthStandard({
+    required this.id,
+    required this.speciesCode,
+    required this.stageLabel,
+    required this.gmqMinGPerDay,
+    required this.gmqMaxGPerDay,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['species_code'] = Variable<String>(speciesCode);
+    map['stage_label'] = Variable<String>(stageLabel);
+    map['gmq_min_g_per_day'] = Variable<int>(gmqMinGPerDay);
+    map['gmq_max_g_per_day'] = Variable<int>(gmqMaxGPerDay);
+    return map;
+  }
+
+  GrowthStandardsCompanion toCompanion(bool nullToAbsent) {
+    return GrowthStandardsCompanion(
+      id: Value(id),
+      speciesCode: Value(speciesCode),
+      stageLabel: Value(stageLabel),
+      gmqMinGPerDay: Value(gmqMinGPerDay),
+      gmqMaxGPerDay: Value(gmqMaxGPerDay),
+    );
+  }
+
+  factory GrowthStandard.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GrowthStandard(
+      id: serializer.fromJson<String>(json['id']),
+      speciesCode: serializer.fromJson<String>(json['speciesCode']),
+      stageLabel: serializer.fromJson<String>(json['stageLabel']),
+      gmqMinGPerDay: serializer.fromJson<int>(json['gmqMinGPerDay']),
+      gmqMaxGPerDay: serializer.fromJson<int>(json['gmqMaxGPerDay']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'speciesCode': serializer.toJson<String>(speciesCode),
+      'stageLabel': serializer.toJson<String>(stageLabel),
+      'gmqMinGPerDay': serializer.toJson<int>(gmqMinGPerDay),
+      'gmqMaxGPerDay': serializer.toJson<int>(gmqMaxGPerDay),
+    };
+  }
+
+  GrowthStandard copyWith({
+    String? id,
+    String? speciesCode,
+    String? stageLabel,
+    int? gmqMinGPerDay,
+    int? gmqMaxGPerDay,
+  }) => GrowthStandard(
+    id: id ?? this.id,
+    speciesCode: speciesCode ?? this.speciesCode,
+    stageLabel: stageLabel ?? this.stageLabel,
+    gmqMinGPerDay: gmqMinGPerDay ?? this.gmqMinGPerDay,
+    gmqMaxGPerDay: gmqMaxGPerDay ?? this.gmqMaxGPerDay,
+  );
+  GrowthStandard copyWithCompanion(GrowthStandardsCompanion data) {
+    return GrowthStandard(
+      id: data.id.present ? data.id.value : this.id,
+      speciesCode: data.speciesCode.present
+          ? data.speciesCode.value
+          : this.speciesCode,
+      stageLabel: data.stageLabel.present
+          ? data.stageLabel.value
+          : this.stageLabel,
+      gmqMinGPerDay: data.gmqMinGPerDay.present
+          ? data.gmqMinGPerDay.value
+          : this.gmqMinGPerDay,
+      gmqMaxGPerDay: data.gmqMaxGPerDay.present
+          ? data.gmqMaxGPerDay.value
+          : this.gmqMaxGPerDay,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GrowthStandard(')
+          ..write('id: $id, ')
+          ..write('speciesCode: $speciesCode, ')
+          ..write('stageLabel: $stageLabel, ')
+          ..write('gmqMinGPerDay: $gmqMinGPerDay, ')
+          ..write('gmqMaxGPerDay: $gmqMaxGPerDay')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, speciesCode, stageLabel, gmqMinGPerDay, gmqMaxGPerDay);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GrowthStandard &&
+          other.id == this.id &&
+          other.speciesCode == this.speciesCode &&
+          other.stageLabel == this.stageLabel &&
+          other.gmqMinGPerDay == this.gmqMinGPerDay &&
+          other.gmqMaxGPerDay == this.gmqMaxGPerDay);
+}
+
+class GrowthStandardsCompanion extends UpdateCompanion<GrowthStandard> {
+  final Value<String> id;
+  final Value<String> speciesCode;
+  final Value<String> stageLabel;
+  final Value<int> gmqMinGPerDay;
+  final Value<int> gmqMaxGPerDay;
+  final Value<int> rowid;
+  const GrowthStandardsCompanion({
+    this.id = const Value.absent(),
+    this.speciesCode = const Value.absent(),
+    this.stageLabel = const Value.absent(),
+    this.gmqMinGPerDay = const Value.absent(),
+    this.gmqMaxGPerDay = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GrowthStandardsCompanion.insert({
+    required String id,
+    required String speciesCode,
+    required String stageLabel,
+    required int gmqMinGPerDay,
+    required int gmqMaxGPerDay,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       speciesCode = Value(speciesCode),
+       stageLabel = Value(stageLabel),
+       gmqMinGPerDay = Value(gmqMinGPerDay),
+       gmqMaxGPerDay = Value(gmqMaxGPerDay);
+  static Insertable<GrowthStandard> custom({
+    Expression<String>? id,
+    Expression<String>? speciesCode,
+    Expression<String>? stageLabel,
+    Expression<int>? gmqMinGPerDay,
+    Expression<int>? gmqMaxGPerDay,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (speciesCode != null) 'species_code': speciesCode,
+      if (stageLabel != null) 'stage_label': stageLabel,
+      if (gmqMinGPerDay != null) 'gmq_min_g_per_day': gmqMinGPerDay,
+      if (gmqMaxGPerDay != null) 'gmq_max_g_per_day': gmqMaxGPerDay,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GrowthStandardsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? speciesCode,
+    Value<String>? stageLabel,
+    Value<int>? gmqMinGPerDay,
+    Value<int>? gmqMaxGPerDay,
+    Value<int>? rowid,
+  }) {
+    return GrowthStandardsCompanion(
+      id: id ?? this.id,
+      speciesCode: speciesCode ?? this.speciesCode,
+      stageLabel: stageLabel ?? this.stageLabel,
+      gmqMinGPerDay: gmqMinGPerDay ?? this.gmqMinGPerDay,
+      gmqMaxGPerDay: gmqMaxGPerDay ?? this.gmqMaxGPerDay,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (speciesCode.present) {
+      map['species_code'] = Variable<String>(speciesCode.value);
+    }
+    if (stageLabel.present) {
+      map['stage_label'] = Variable<String>(stageLabel.value);
+    }
+    if (gmqMinGPerDay.present) {
+      map['gmq_min_g_per_day'] = Variable<int>(gmqMinGPerDay.value);
+    }
+    if (gmqMaxGPerDay.present) {
+      map['gmq_max_g_per_day'] = Variable<int>(gmqMaxGPerDay.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GrowthStandardsCompanion(')
+          ..write('id: $id, ')
+          ..write('speciesCode: $speciesCode, ')
+          ..write('stageLabel: $stageLabel, ')
+          ..write('gmqMinGPerDay: $gmqMinGPerDay, ')
+          ..write('gmqMaxGPerDay: $gmqMaxGPerDay, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $VeterinaryWithdrawalPeriodsTable extends VeterinaryWithdrawalPeriods
     with
         TableInfo<
@@ -26260,6 +26648,21 @@ class $VeterinaryRecordsTable extends VeterinaryRecords
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -26275,6 +26678,7 @@ class $VeterinaryRecordsTable extends VeterinaryRecords
     cost,
     recordDate,
     withdrawalDays,
+    isActive,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -26375,6 +26779,12 @@ class $VeterinaryRecordsTable extends VeterinaryRecords
         ),
       );
     }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     return context;
   }
 
@@ -26438,6 +26848,10 @@ class $VeterinaryRecordsTable extends VeterinaryRecords
         DriftSqlType.int,
         data['${effectivePrefix}withdrawal_days'],
       )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
     );
   }
 
@@ -26465,6 +26879,12 @@ class VeterinaryRecord extends DataClass
   final double? cost;
   final DateTime recordDate;
   final int withdrawalDays;
+
+  /// Ticket U3 (décision client D-U3 du 19/10/2026) — ARCHIVAGE LOGIQUE, au poste comme au web
+  /// (`SoinsVaccinsHub::archiveSoin()`). Un soin archivé (`false`) quitte le registre et tout calcul (KPI,
+  /// Dashboard Élevage, Bilan, protocole du jour, recherche) ; la ligne reste, et la rémanence qu'il a créée
+  /// reste en vigueur, exactement comme au web. Servi au tirage, envoyé (`pending`) à l'archivage.
+  final bool isActive;
   const VeterinaryRecord({
     required this.id,
     required this.deviceId,
@@ -26479,6 +26899,7 @@ class VeterinaryRecord extends DataClass
     this.cost,
     required this.recordDate,
     required this.withdrawalDays,
+    required this.isActive,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -26510,6 +26931,7 @@ class VeterinaryRecord extends DataClass
     }
     map['record_date'] = Variable<DateTime>(recordDate);
     map['withdrawal_days'] = Variable<int>(withdrawalDays);
+    map['is_active'] = Variable<bool>(isActive);
     return map;
   }
 
@@ -26534,6 +26956,7 @@ class VeterinaryRecord extends DataClass
       cost: cost == null && nullToAbsent ? const Value.absent() : Value(cost),
       recordDate: Value(recordDate),
       withdrawalDays: Value(withdrawalDays),
+      isActive: Value(isActive),
     );
   }
 
@@ -26558,6 +26981,7 @@ class VeterinaryRecord extends DataClass
       cost: serializer.fromJson<double?>(json['cost']),
       recordDate: serializer.fromJson<DateTime>(json['recordDate']),
       withdrawalDays: serializer.fromJson<int>(json['withdrawalDays']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
   @override
@@ -26579,6 +27003,7 @@ class VeterinaryRecord extends DataClass
       'cost': serializer.toJson<double?>(cost),
       'recordDate': serializer.toJson<DateTime>(recordDate),
       'withdrawalDays': serializer.toJson<int>(withdrawalDays),
+      'isActive': serializer.toJson<bool>(isActive),
     };
   }
 
@@ -26596,6 +27021,7 @@ class VeterinaryRecord extends DataClass
     Value<double?> cost = const Value.absent(),
     DateTime? recordDate,
     int? withdrawalDays,
+    bool? isActive,
   }) => VeterinaryRecord(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -26610,6 +27036,7 @@ class VeterinaryRecord extends DataClass
     cost: cost.present ? cost.value : this.cost,
     recordDate: recordDate ?? this.recordDate,
     withdrawalDays: withdrawalDays ?? this.withdrawalDays,
+    isActive: isActive ?? this.isActive,
   );
   VeterinaryRecord copyWithCompanion(VeterinaryRecordsCompanion data) {
     return VeterinaryRecord(
@@ -26636,6 +27063,7 @@ class VeterinaryRecord extends DataClass
       withdrawalDays: data.withdrawalDays.present
           ? data.withdrawalDays.value
           : this.withdrawalDays,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
 
@@ -26654,7 +27082,8 @@ class VeterinaryRecord extends DataClass
           ..write('symptomes: $symptomes, ')
           ..write('cost: $cost, ')
           ..write('recordDate: $recordDate, ')
-          ..write('withdrawalDays: $withdrawalDays')
+          ..write('withdrawalDays: $withdrawalDays, ')
+          ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
@@ -26674,6 +27103,7 @@ class VeterinaryRecord extends DataClass
     cost,
     recordDate,
     withdrawalDays,
+    isActive,
   );
   @override
   bool operator ==(Object other) =>
@@ -26691,7 +27121,8 @@ class VeterinaryRecord extends DataClass
           other.symptomes == this.symptomes &&
           other.cost == this.cost &&
           other.recordDate == this.recordDate &&
-          other.withdrawalDays == this.withdrawalDays);
+          other.withdrawalDays == this.withdrawalDays &&
+          other.isActive == this.isActive);
 }
 
 class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
@@ -26708,6 +27139,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
   final Value<double?> cost;
   final Value<DateTime> recordDate;
   final Value<int> withdrawalDays;
+  final Value<bool> isActive;
   final Value<int> rowid;
   const VeterinaryRecordsCompanion({
     this.id = const Value.absent(),
@@ -26723,6 +27155,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
     this.cost = const Value.absent(),
     this.recordDate = const Value.absent(),
     this.withdrawalDays = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   VeterinaryRecordsCompanion.insert({
@@ -26739,6 +27172,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
     this.cost = const Value.absent(),
     required DateTime recordDate,
     this.withdrawalDays = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -26760,6 +27194,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
     Expression<double>? cost,
     Expression<DateTime>? recordDate,
     Expression<int>? withdrawalDays,
+    Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -26776,6 +27211,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
       if (cost != null) 'cost': cost,
       if (recordDate != null) 'record_date': recordDate,
       if (withdrawalDays != null) 'withdrawal_days': withdrawalDays,
+      if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -26794,6 +27230,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
     Value<double?>? cost,
     Value<DateTime>? recordDate,
     Value<int>? withdrawalDays,
+    Value<bool>? isActive,
     Value<int>? rowid,
   }) {
     return VeterinaryRecordsCompanion(
@@ -26810,6 +27247,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
       cost: cost ?? this.cost,
       recordDate: recordDate ?? this.recordDate,
       withdrawalDays: withdrawalDays ?? this.withdrawalDays,
+      isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -26858,6 +27296,9 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
     if (withdrawalDays.present) {
       map['withdrawal_days'] = Variable<int>(withdrawalDays.value);
     }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -26880,6 +27321,7 @@ class VeterinaryRecordsCompanion extends UpdateCompanion<VeterinaryRecord> {
           ..write('cost: $cost, ')
           ..write('recordDate: $recordDate, ')
           ..write('withdrawalDays: $withdrawalDays, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -32154,6 +32596,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LivestockLotsTable livestockLots = $LivestockLotsTable(this);
   late final $FeedRationStandardsTable feedRationStandards =
       $FeedRationStandardsTable(this);
+  late final $GrowthStandardsTable growthStandards = $GrowthStandardsTable(
+    this,
+  );
   late final $VeterinaryWithdrawalPeriodsTable veterinaryWithdrawalPeriods =
       $VeterinaryWithdrawalPeriodsTable(this);
   late final $LivestockReproductionEventsTable livestockReproductionEvents =
@@ -32257,6 +32702,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     products,
     livestockLots,
     feedRationStandards,
+    growthStandards,
     veterinaryWithdrawalPeriods,
     livestockReproductionEvents,
     customers,
@@ -33563,6 +34009,220 @@ typedef $$FeedRationStandardsTableProcessedTableManager =
         >,
       ),
       FeedRationStandard,
+      PrefetchHooks Function()
+    >;
+typedef $$GrowthStandardsTableCreateCompanionBuilder =
+    GrowthStandardsCompanion Function({
+      required String id,
+      required String speciesCode,
+      required String stageLabel,
+      required int gmqMinGPerDay,
+      required int gmqMaxGPerDay,
+      Value<int> rowid,
+    });
+typedef $$GrowthStandardsTableUpdateCompanionBuilder =
+    GrowthStandardsCompanion Function({
+      Value<String> id,
+      Value<String> speciesCode,
+      Value<String> stageLabel,
+      Value<int> gmqMinGPerDay,
+      Value<int> gmqMaxGPerDay,
+      Value<int> rowid,
+    });
+
+class $$GrowthStandardsTableFilterComposer
+    extends Composer<_$AppDatabase, $GrowthStandardsTable> {
+  $$GrowthStandardsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stageLabel => $composableBuilder(
+    column: $table.stageLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get gmqMinGPerDay => $composableBuilder(
+    column: $table.gmqMinGPerDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get gmqMaxGPerDay => $composableBuilder(
+    column: $table.gmqMaxGPerDay,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$GrowthStandardsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GrowthStandardsTable> {
+  $$GrowthStandardsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stageLabel => $composableBuilder(
+    column: $table.stageLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get gmqMinGPerDay => $composableBuilder(
+    column: $table.gmqMinGPerDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get gmqMaxGPerDay => $composableBuilder(
+    column: $table.gmqMaxGPerDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$GrowthStandardsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GrowthStandardsTable> {
+  $$GrowthStandardsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stageLabel => $composableBuilder(
+    column: $table.stageLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get gmqMinGPerDay => $composableBuilder(
+    column: $table.gmqMinGPerDay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get gmqMaxGPerDay => $composableBuilder(
+    column: $table.gmqMaxGPerDay,
+    builder: (column) => column,
+  );
+}
+
+class $$GrowthStandardsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GrowthStandardsTable,
+          GrowthStandard,
+          $$GrowthStandardsTableFilterComposer,
+          $$GrowthStandardsTableOrderingComposer,
+          $$GrowthStandardsTableAnnotationComposer,
+          $$GrowthStandardsTableCreateCompanionBuilder,
+          $$GrowthStandardsTableUpdateCompanionBuilder,
+          (
+            GrowthStandard,
+            BaseReferences<
+              _$AppDatabase,
+              $GrowthStandardsTable,
+              GrowthStandard
+            >,
+          ),
+          GrowthStandard,
+          PrefetchHooks Function()
+        > {
+  $$GrowthStandardsTableTableManager(
+    _$AppDatabase db,
+    $GrowthStandardsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GrowthStandardsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GrowthStandardsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GrowthStandardsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> speciesCode = const Value.absent(),
+                Value<String> stageLabel = const Value.absent(),
+                Value<int> gmqMinGPerDay = const Value.absent(),
+                Value<int> gmqMaxGPerDay = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GrowthStandardsCompanion(
+                id: id,
+                speciesCode: speciesCode,
+                stageLabel: stageLabel,
+                gmqMinGPerDay: gmqMinGPerDay,
+                gmqMaxGPerDay: gmqMaxGPerDay,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String speciesCode,
+                required String stageLabel,
+                required int gmqMinGPerDay,
+                required int gmqMaxGPerDay,
+                Value<int> rowid = const Value.absent(),
+              }) => GrowthStandardsCompanion.insert(
+                id: id,
+                speciesCode: speciesCode,
+                stageLabel: stageLabel,
+                gmqMinGPerDay: gmqMinGPerDay,
+                gmqMaxGPerDay: gmqMaxGPerDay,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$GrowthStandardsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GrowthStandardsTable,
+      GrowthStandard,
+      $$GrowthStandardsTableFilterComposer,
+      $$GrowthStandardsTableOrderingComposer,
+      $$GrowthStandardsTableAnnotationComposer,
+      $$GrowthStandardsTableCreateCompanionBuilder,
+      $$GrowthStandardsTableUpdateCompanionBuilder,
+      (
+        GrowthStandard,
+        BaseReferences<_$AppDatabase, $GrowthStandardsTable, GrowthStandard>,
+      ),
+      GrowthStandard,
       PrefetchHooks Function()
     >;
 typedef $$VeterinaryWithdrawalPeriodsTableCreateCompanionBuilder =
@@ -45223,6 +45883,7 @@ typedef $$VeterinaryRecordsTableCreateCompanionBuilder =
       Value<double?> cost,
       required DateTime recordDate,
       Value<int> withdrawalDays,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 typedef $$VeterinaryRecordsTableUpdateCompanionBuilder =
@@ -45240,6 +45901,7 @@ typedef $$VeterinaryRecordsTableUpdateCompanionBuilder =
       Value<double?> cost,
       Value<DateTime> recordDate,
       Value<int> withdrawalDays,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 
@@ -45317,6 +45979,11 @@ class $$VeterinaryRecordsTableFilterComposer
     column: $table.withdrawalDays,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$VeterinaryRecordsTableOrderingComposer
@@ -45392,6 +46059,11 @@ class $$VeterinaryRecordsTableOrderingComposer
     column: $table.withdrawalDays,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$VeterinaryRecordsTableAnnotationComposer
@@ -45452,6 +46124,9 @@ class $$VeterinaryRecordsTableAnnotationComposer
     column: $table.withdrawalDays,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
 }
 
 class $$VeterinaryRecordsTableTableManager
@@ -45507,6 +46182,7 @@ class $$VeterinaryRecordsTableTableManager
                 Value<double?> cost = const Value.absent(),
                 Value<DateTime> recordDate = const Value.absent(),
                 Value<int> withdrawalDays = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VeterinaryRecordsCompanion(
                 id: id,
@@ -45522,6 +46198,7 @@ class $$VeterinaryRecordsTableTableManager
                 cost: cost,
                 recordDate: recordDate,
                 withdrawalDays: withdrawalDays,
+                isActive: isActive,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -45539,6 +46216,7 @@ class $$VeterinaryRecordsTableTableManager
                 Value<double?> cost = const Value.absent(),
                 required DateTime recordDate,
                 Value<int> withdrawalDays = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VeterinaryRecordsCompanion.insert(
                 id: id,
@@ -45554,6 +46232,7 @@ class $$VeterinaryRecordsTableTableManager
                 cost: cost,
                 recordDate: recordDate,
                 withdrawalDays: withdrawalDays,
+                isActive: isActive,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -48285,6 +48964,8 @@ class $AppDatabaseManager {
       $$LivestockLotsTableTableManager(_db, _db.livestockLots);
   $$FeedRationStandardsTableTableManager get feedRationStandards =>
       $$FeedRationStandardsTableTableManager(_db, _db.feedRationStandards);
+  $$GrowthStandardsTableTableManager get growthStandards =>
+      $$GrowthStandardsTableTableManager(_db, _db.growthStandards);
   $$VeterinaryWithdrawalPeriodsTableTableManager
   get veterinaryWithdrawalPeriods =>
       $$VeterinaryWithdrawalPeriodsTableTableManager(

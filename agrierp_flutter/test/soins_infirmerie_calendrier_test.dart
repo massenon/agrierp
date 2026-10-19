@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
 import 'package:agrierp/core/widgets/toast_agri.dart';
@@ -66,6 +67,8 @@ class _Serveur extends Interceptor {
           data: {
             'infirmary_records': reponse('infirmary_records'),
             'veterinary_calendar_events': reponse('veterinary_calendar_events'),
+            // Ticket U3 — archivage d'un soin.
+            'veterinary_records': reponse('veterinary_records'),
           },
         ),
       );
@@ -84,6 +87,10 @@ String? _lireLaravel(String relatif) {
 
 final String? _blade = _lireLaravel('resources/views/livewire/elevage/soins-vaccins-hub.blade.php');
 final String? _livewire = _lireLaravel('app/Livewire/Elevage/SoinsVaccinsHub.php');
+/// Ticket U3 — modale de confirmation d'archivage du web (`<x-modal-confirm-delete>` du registre).
+final String? _modaleArchivage = _lireLaravel('resources/views/components/modal-confirm-delete.blade.php');
+/// Ticket U6 — règles de l'envoi (`SyncController::pushInfirmerie`).
+final String? _controleur = _lireLaravel('app/Http/Controllers/Api/SyncController.php');
 /// Sans `agrierp_laravel/`, le Blade maître ne peut pas être lu : les tests qui le lisent se sautent.
 final bool _sautWeb = _blade == null || _livewire == null;
 
@@ -822,6 +829,251 @@ void main() {
       );
       expect(carte.valeur, '2');
       await nettoyer(tester);
+    });
+  });
+
+  // ══ 4. Ticket U3 (décision client D-U3 du 19/10/2026) — archivage d'un soin au poste comme au web ══════════
+
+  /// Soin écrit directement (tiré du serveur : `synced`, ou saisi ici : `pending`).
+  Future<void> soinEnBase(
+    String id,
+    String lot,
+    String type, {
+    double? cout,
+    DateTime? jour,
+    bool actif = true,
+    SyncStatus sync = SyncStatus.synced,
+  }) => db
+      .into(db.veterinaryRecords)
+      .insert(
+        VeterinaryRecordsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: Value(sync),
+          updatedAt: jourDe(-1),
+          lotId: lot,
+          actionType: type,
+          cost: Value(cout),
+          recordDate: jour ?? aujourdhui,
+          isActive: Value(actif),
+        ),
+      );
+
+  group('U3 — archivage d un soin', () {
+    testWidgets('bouton « Archiver », modale et toast du web ; la ligne quitte le registre, la rémanence reste', (
+      tester,
+    ) async {
+      // Lus dans le web : bouton (`title`, icône), modale (titre, texte, boutons), message du PHP.
+      final registre = _section('registre');
+      expect(registre, contains('title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span>'));
+      expect(registre, contains(":item-label=\"\$rec->action_type.' — '.\$rec->lot?->code\""));
+      final modale = _modaleArchivage!;
+      final titre = _tous(modale, r'<h3[^>]*>([^<]*)</h3>').single;
+      expect(modale, contains('text-error-deep text-[44px]">archive</span>'));
+      final fin = _decoder(RegExp(r'\s+(Aucune suppression[^<]+)\s*</p>').firstMatch(modale)!.group(1)!);
+      final suite = _decoder(RegExp(r'</strong>([^@<]+)').firstMatch(modale)!.group(1)!);
+      final boutons = _tous(modale, r'<button[^>]*>([^<]+)</button>');
+      expect(boutons, ['Annuler', 'Archiver']);
+      final toast = RegExp(
+        r"archiveSoin\(string \$id\)[\s\S]*?message: '([^']+)', type: 'warning'",
+      ).firstMatch(_livewire!)!.group(1)!;
+
+      final soin = await soins.enregistrer(
+        lotId: lapins,
+        typeAction: 'Traitement curatif',
+        produit: 'Oxytétracycline',
+        cout: 2500,
+        delaiAttenteJours: 7,
+      );
+      await afficher(tester);
+      expect(find.text('LOT-LAP-01 (Lapins)'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(Key('archiver-soin-${soin.id}')),
+          matching: find.byIcon(SymbolesAgri.delete),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Archiver'), findsOneWidget);
+
+      // Annuler : rien ne change.
+      await tester.tap(find.byKey(Key('archiver-soin-${soin.id}')));
+      await tester.pumpAndSettle();
+      final confirmation = find.byType(ModaleConfirmation);
+      expect(tester.widget<ModaleConfirmation>(confirmation).titre, titre);
+      expect(tester.widget<ModaleConfirmation>(confirmation).icone, SymbolesAgri.archive);
+      expect(
+        tester.widget<ModaleConfirmation>(confirmation).message,
+        'Traitement curatif — LOT-LAP-01 $suite $fin',
+      );
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
+      expect((await db.select(db.veterinaryRecords).getSingle()).isActive, isTrue);
+
+      // Archiver.
+      await tester.tap(find.byKey(Key('archiver-soin-${soin.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('archivage-soin-confirmer')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(toast), findsOneWidget);
+      expect(find.byKey(const Key('toast-avertissement')), findsOneWidget);
+      expect(find.text('LOT-LAP-01 (Lapins)'), findsNothing, reason: 'le registre ne liste que les soins actifs');
+      expect(find.text('Aucun soin enregistré pour le moment.'), findsOneWidget);
+      final archive = await db.select(db.veterinaryRecords).getSingle();
+      expect([archive.isActive, archive.syncStatus], [false, SyncStatus.pending]);
+      // Archivage logique : la rémanence créée par le soin reste (comme `archiveSoin()` au web).
+      expect(await db.select(db.veterinaryWithdrawalPeriods).get(), hasLength(1));
+      await nettoyer(tester);
+    }, skip: _sautWeb || _modaleArchivage == null);
+
+    test('l archivage part à l envoi avec is_active = false, puis est acquitté', () async {
+      await soinEnBase(uuid(90), lapins, 'Vaccination');
+      await depot.archiverSoin(uuid(90));
+      expect(await db.pendingCount(), 1);
+
+      await moteur.synchroniser();
+
+      final parti = (serveur.envois.single['veterinary_records'] as List).single as Map;
+      expect(parti, containsPair('id', uuid(90)));
+      expect(parti, containsPair('is_active', false));
+      final s = await db.select(db.veterinaryRecords).getSingle();
+      expect([s.isActive, s.syncStatus], [false, SyncStatus.synced]);
+    });
+
+    test('un soin créé puis archivé hors ligne part complet, archivé', () async {
+      final soin = await soins.enregistrer(lotId: volailles, typeAction: 'Vitamines');
+      await depot.archiverSoin(soin.id);
+
+      await moteur.synchroniser();
+
+      final parti = (serveur.envois.single['veterinary_records'] as List).single as Map;
+      expect(parti, containsPair('lot_id', volailles));
+      expect(parti, containsPair('action_type', 'Vitamines'));
+      expect(parti, containsPair('is_active', false));
+    });
+
+    test('le tirage archive un soin archivé au web, sans écraser un archivage local en attente', () async {
+      await soinEnBase(uuid(91), lapins, 'Vaccination');
+      await soinEnBase(uuid(92), lapins, 'Vermifuge', actif: false, sync: SyncStatus.pending);
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'veterinary_records': [
+          {
+            'id': uuid(91), 'lot_id': lapins, 'action_type': 'Vaccination', 'record_date': '2026-10-18',
+            'is_active': false, 'updated_at': '2026-10-19T08:00:00Z',
+          },
+          // Version du serveur encore active : le poste l'a archivée hors ligne, son envoi part ensuite.
+          {
+            'id': uuid(92), 'lot_id': lapins, 'action_type': 'Vermifuge', 'record_date': '2026-10-18',
+            'is_active': true, 'updated_at': '2026-10-18T08:00:00Z',
+          },
+          {
+            'id': uuid(93), 'lot_id': volailles, 'action_type': 'Vitamines', 'record_date': '2026-10-18',
+            'updated_at': '2026-10-18T08:00:00Z',
+          },
+        ],
+      };
+
+      await moteur.synchroniser();
+
+      final lignes = {for (final s in await db.select(db.veterinaryRecords).get()) s.id: s};
+      expect(lignes[uuid(91)]!.isActive, isFalse, reason: 'archivé au web : archivé au poste');
+      expect(lignes[uuid(92)]!.isActive, isFalse, reason: 'l archivage local en attente n est pas écrasé');
+      expect(lignes[uuid(93)]!.isActive, isTrue, reason: 'is_active absent (serveur ancien) : actif');
+      // Puis l'archivage local est parti.
+      final parti = (serveur.envois.single['veterinary_records'] as List).single as Map;
+      expect(parti, containsPair('id', uuid(92)));
+      expect(parti, containsPair('is_active', false));
+    });
+
+    test('⚠️ un is_active illisible refuse le tirage des soins', () async {
+      serveur.tirage = {
+        'server_time': '2026-10-19T12:00:00Z',
+        'veterinary_records': [
+          {'id': uuid(94), 'lot_id': lapins, 'action_type': 'X', 'record_date': '2026-10-18', 'is_active': 'peut-être'},
+        ],
+      };
+      await expectLater(moteur.synchroniser(), throwsA(isA<FormatException>()));
+      expect(await db.select(db.veterinaryRecords).get(), isEmpty);
+    });
+
+    test('KPI du mois, protocole du jour et historique : soins actifs seulement, comme au web', () async {
+      // Registre : 1 000 actif, 4 000 archivé → 1 intervention, 1 000 FCFA.
+      await soinEnBase(uuid(95), lapins, 'Vaccination', cout: 1000);
+      await soinEnBase(uuid(96), lapins, 'Vermifuge X', cout: 4000, actif: false);
+      final d = await depot.charger();
+      expect(d.interventionsDuMois, 1);
+      expect(d.coutDuMois, 1000);
+      expect(d.registre.map((l) => l.soin.id), [uuid(95)]);
+      expect((await soins.historique(lapins)).map((s) => s.id), [uuid(95)]);
+
+      // Protocole : la bande est à J11 (mise en lot J-10) ; « Vermifuge X » est dû ce jour. Le soin ARCHIVÉ du
+      // même libellé ne vaut pas administration (`ProtocoleDuJourService::soinsDuJour`, `is_active`).
+      await db
+          .into(db.prophylaxisScheduleStandards)
+          .insert(
+            ProphylaxisScheduleStandardsCompanion.insert(
+              id: uuid(97),
+              speciesCode: 'cuniculture',
+              periodLabel: 'J11',
+              cycleDayStart: const Value(11),
+              cycleDayEnd: const Value(11),
+              treatment: 'Vermifuge X',
+            ),
+          );
+      final bande = await (db.select(db.livestockLots)..where((t) => t.id.equals(lapins))).getSingle();
+      final protocole = await soins.protocoleDuJour(bande: bande, codeEspece: 'cuniculture');
+      expect(protocole.traitements.single.dejaAdministre, isFalse);
+    });
+  });
+
+  // ══ 5. Ticket U6 (décision client D-U6 du 19/10/2026) — date d'entrée à l'infirmerie : règles du web ═════════
+
+  group('U6 — date d entrée future', () {
+    test('le web, l envoi et le poste ont la même règle : aucune borne haute sur la date', () {
+      final regle = RegExp(r"'infDate' => \[([^\]]*)\]").firstMatch(_livewire!)!.group(1)!;
+      expect(regle, "'required', 'date'", reason: 'règle du web (maître)');
+      final push = _controleur!.substring(_controleur!.indexOf('private function pushInfirmerie('));
+      final envoi = RegExp(r"'entry_date' => \[([^\]]*)\]").firstMatch(push)!.group(1)!;
+      expect(envoi, regle, reason: 'l envoi applique la règle du web');
+    }, skip: _sautWeb || _controleur == null);
+
+    testWidgets('la modale propose une date future, comme le web', (tester) async {
+      await afficher(tester);
+      await onglet(tester, 'Suivi Sanitaire');
+      await tester.tap(find.byKey(const Key('nouvelle-entree-infirmerie')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('infirmerie-date')));
+      await tester.pumpAndSettle();
+
+      final selecteur = tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
+      expect(selecteur.lastDate.isAfter(aujourdhui.add(const Duration(days: 365))), isTrue,
+          reason: 'le poste refusait toute date postérieure à aujourd hui');
+      Navigator.of(tester.element(find.byType(DatePickerDialog))).pop();
+      await tester.pumpAndSettle();
+      await nettoyer(tester);
+    });
+
+    test('une entrée datée dans le futur s enregistre et part telle quelle', () async {
+      final demain = jourDe(3);
+      final id = await depot.enregistrerEntreeInfirmerie(
+        lotId: lapins,
+        motif: 'Isolement préventif',
+        niveauIsolement: 'Simple surveillance',
+        dateEntree: demain,
+      );
+      await moteur.synchroniser();
+      final parti = (serveur.envois.single['infirmary_records'] as List).single as Map;
+      expect(parti, containsPair('id', id));
+      expect(
+        parti,
+        containsPair(
+          'entry_date',
+          '${demain.year}-${demain.month.toString().padLeft(2, '0')}-${demain.day.toString().padLeft(2, '0')}',
+        ),
+      );
+      expect((await db.select(db.infirmaryRecords).getSingle()).syncStatus, SyncStatus.synced);
     });
   });
 }

@@ -120,7 +120,11 @@ class SoinsVaccinsHub extends Component
     // ===================== REGISTRE =====================
     public function getKpisRegistreProperty(): array
     {
-        $monthRecords = VeterinaryRecord::whereMonth('record_date', now()->month)->whereYear('record_date', now()->year);
+        // 🔴→✅ Ticket U3 — soins ACTIFS seulement : un soin archivé (`archiveSoin`) quittait le registre mais restait
+        // compté dans « Interventions (mois) » et « Coût sanitaire (mois) », alors que le Dashboard Élevage, le Bilan
+        // et le protocole du jour l'écartent (« soin archivé = supprimé »). Même règle au poste.
+        $monthRecords = VeterinaryRecord::where('is_active', true)
+            ->whereMonth('record_date', now()->month)->whereYear('record_date', now()->year);
 
         return [
             'interventions_mois' => (clone $monthRecords)->count(),

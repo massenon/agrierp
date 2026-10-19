@@ -90,6 +90,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       'Entrée infirmerie enregistrée avec succès.';
   static const _sujetReintegre = 'Sujet réintégré avec succès.';
   static const _decesDeclare = 'Décès déclaré.';
+  static const _ficheArchivee = 'Fiche archivée avec succès.';
 
   static const _selectionner = '-- Sélectionner --';
 
@@ -575,7 +576,8 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                       flex: flex,
                       child: Text(
                         libelle.toUpperCase(),
-                        textAlign: libelle == 'Actions' && colonnes.last.$1 == 'Actions'
+                        // `<th class="… text-right …">Actions</th>` dans les deux tableaux du Blade.
+                        textAlign: libelle == 'Actions'
                             ? TextAlign.right
                             : TextAlign.left,
                         style: _enteteColonne,
@@ -644,19 +646,23 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             Text(l.soin.actionType, style: _cellule),
             Text(l.soin.productUsed ?? '—', style: _cellule),
             Text(l.soin.dose ?? '—', style: _cellule),
-            // ⚠️ ÉCART : le web archive un soin (`archiveSoin`, `is_active = false`). Le registre du poste ne
-            // porte pas `is_active` et le serveur n'accepte pas l'archivage à l'envoi : l'icône est présente
-            // et INERTE, avec sa raison, plutôt qu'un geste qui ne partirait jamais.
-            const Align(
-              alignment: Alignment.centerLeft,
+            // 🔴→✅ Ticket U3 (décision client D-U3 du 19/10/2026) — l'archivage se fait au poste comme au web :
+            // bouton `title="Archiver"` (icône `delete`, 18 px, `text-outline`, `text-right`) puis la modale
+            // `x-modal-confirm-delete`. L'icône était inerte : le poste ne pouvait pas archiver.
+            Align(
+              alignment: Alignment.centerRight,
               child: Tooltip(
-                message: 'Archiver — réservé au web',
-                child: Opacity(
-                  opacity: 0.4,
-                  child: Icon(
-                    SymbolesAgri.delete,
-                    size: 18,
-                    color: AgriColors.outline,
+                message: 'Archiver',
+                child: InkWell(
+                  key: Key('archiver-soin-${l.soin.id}'),
+                  onTap: () => _archiverSoin(l),
+                  child: const Padding(
+                    padding: EdgeInsets.all(AgriSpacing.xs),
+                    child: Icon(
+                      SymbolesAgri.delete,
+                      size: 18,
+                      color: AgriColors.outline,
+                    ),
                   ),
                 ),
               ),
@@ -665,6 +671,45 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           ],
       ],
     );
+  }
+
+  /// Ticket U3 — `archiveSoin($id)` du web, derrière sa modale `x-modal-confirm-delete` (titre « Confirmer
+  /// l'archivage », icône `archive` `text-error-deep`, libellé `action_type — code de bande`, « Annuler » puis
+  /// « Archiver » `bg-error-red`), toast `warning` « Fiche archivée avec succès. ».
+  ///
+  /// ⚠️ ARCHIVER N'EFFACE RIEN : `is_active = false`, la ligne part à l'envoi (`pending`). La rémanence créée par
+  /// le soin reste en vigueur, comme au web.
+  Future<void> _archiverSoin(LigneRegistre l) async {
+    final libelle = '${l.soin.actionType} — ${l.codeBande}';
+    final confirme = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (contexte) => ModaleConfirmation(
+        icone: SymbolesAgri.archive,
+        couleurIcone: AgriColors.errorDeep,
+        titre: "Confirmer l'archivage",
+        message:
+            '$libelle sera marqué(e) comme archivé(e) (statut inactif). '
+            "Aucune suppression définitive n'est effectuée.",
+        actions: [
+          BoutonModaleSecondaire(
+            libelle: 'Annuler',
+            onPressed: () => Navigator.of(contexte).pop(false),
+          ),
+          BoutonModalePrimaire(
+            key: const Key('archivage-soin-confirmer'),
+            libelle: 'Archiver',
+            couleur: AgriColors.errorRed,
+            onPressed: () => Navigator.of(contexte).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+
+    await widget.depot.archiverSoin(l.soin.id);
+    await _charger();
+    _toast(_ficheArchivee, type: TypeToast.avertissement);
   }
 
   /// ➕ Colonne « Statut » (ajout du poste, gardé) : un seul statut, « Effectué » — `veterinary_records` ne
@@ -1455,9 +1500,10 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
               _champDate(
                 cle: 'infirmerie-date',
                 date: date,
-                // ⚠️ Le serveur refuse une date d'entrée future (`before_or_equal:today` de `pushInfirmerie`) :
-                // la proposer ferait passer l'entrée en conflit à l'envoi.
-                dernier: DateTime.now(),
+                // Ticket U6 (décision client D-U6 du 19/10/2026) — mêmes règles que le web (`'infDate' =>
+                // ['required', 'date']`) : une date FUTURE est acceptée, et l'envoi l'accepte aussi. Borne du
+                // sélecteur seulement, comme « Planifier une Intervention ».
+                dernier: DateTime(DateTime.now().year + 5, 12, 31),
                 surChoix: (d) => rafraichir(() => date = d),
               ),
               if (erreur != null) _erreur('infirmerie-erreur', erreur!),

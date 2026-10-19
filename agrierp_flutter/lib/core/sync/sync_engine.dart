@@ -388,6 +388,8 @@ class SyncEngine {
       corps['veterinary_calendar_events'],
     );
     recus += await _absorberRations(corps['feed_ration_standards']);
+    // Ticket U2 (D-U2) — objectifs de GMQ, seule source des cartes du Dashboard Élevage.
+    recus += await _absorberObjectifsCroissance(corps['growth_standards']);
     recus += await _absorberRemanences(corps['veterinary_withdrawal_periods']);
     recus += await _absorberProphylaxie(
       corps['prophylaxis_schedule_standards'],
@@ -1390,6 +1392,78 @@ class SyncEngine {
     );
 
     return recues.length;
+  }
+
+  /// Ticket U2 (décision client D-U2 du 19/10/2026) — OBJECTIFS DE GMQ (`growth_standards`) : référentiel en
+  /// LECTURE SEULE, servi complet à chaque tirage, dont l'ENSEMBLE est remplacé (le poste ne l'écrit jamais : rien
+  /// de local à protéger).
+  ///
+  /// ⚠️⚠️ **STRICT**, comme les barèmes de H9b : identifiant invalide ou servi deux fois, espèce ou stade absents,
+  /// objectif absent, illisible, fractionnaire ou négatif (`unsignedInteger` au serveur) → [FormatException] : RIEN
+  /// n'est écrit (le barème précédent reste), le curseur n'avance pas. Lisser — un objectif illisible devenu 0 —
+  /// afficherait « Objectif : 0-20 g/j » sur le Dashboard Élevage sans que rien ne le signale.
+  ///
+  /// Une réponse SANS la clé (serveur antérieur à U2) ne touche à rien ; une liste VIDE est une réponse : aucun
+  /// barème, les cartes disent « Objectif : — ».
+  Future<int> _absorberObjectifsCroissance(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Objectif de croissance';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final recus = <GrowthStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final espece = _texteStrict(l['species_code'], '$quoi $id : espèce');
+      final stade = _texteStrict(l['stage_label'], '$quoi $id : stade');
+      final minimum = _entierPositifStrict(
+        l['gmq_min_g_per_day'],
+        '$quoi $id : minimum',
+      );
+      final maximum = _entierPositifStrict(
+        l['gmq_max_g_per_day'],
+        '$quoi $id : maximum',
+      );
+      if (espece == null ||
+          espece.isEmpty ||
+          stade == null ||
+          stade.isEmpty ||
+          minimum == null ||
+          maximum == null) {
+        throw FormatException(
+          '$quoi $id refusé : élément incomplet ou illisible.',
+        );
+      }
+      recus.add(
+        GrowthStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          stageLabel: stade,
+          gmqMinGPerDay: minimum,
+          gmqMaxGPerDay: maximum,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.growthStandards).go();
+      for (final r in recus) {
+        await _db.into(_db.growthStandards).insert(r);
+      }
+    });
+
+    return recus.length;
+  }
+
+  /// Entier positif strict (Ticket U2) : absent → `null` ; illisible, fractionnaire ou négatif →
+  /// [FormatException].
+  static int? _entierPositifStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    final n = v is num ? v : num.tryParse(v.toString());
+    if (n == null || n != n.truncate() || n < 0) {
+      throw FormatException('$quoi illisible ($v).');
+    }
+    return n.toInt();
   }
 
   /// Calendrier prophylactique — ensemble actif complet, FUSIONNÉ (ticket H9b).
@@ -3397,13 +3471,30 @@ class SyncEngine {
   /// ⚠️ `withdrawalDays` RESTE À ZÉRO pour un soin reçu : le délai a déjà été
   /// consommé par le serveur au moment de sa création, il n'est pas une donnée
   /// du registre.
+  ///
+  /// Ticket U3 (décision client D-U3 du 19/10/2026) — `is_active` DESCEND : un soin archivé au web (ou sur un
+  /// autre poste) est servi au tirage incrémental avec `is_active = false` et quitte ici le registre et les
+  /// calculs. Absent (serveur antérieur à U3) : actif ; illisible : [FormatException], rien n'est écrit.
+  /// ⚠️⚠️ **UNE LIGNE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (soin saisi ou archivé ici, pas encore
+  /// acquitté) : l'upsert aveugle d'avant aurait annulé un archivage fait hors ligne — le tirage précède toujours
+  /// l'envoi.
   Future<int> _absorberSoins(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    final actifs = [
+      for (final l in lignes) _actifStrict(l, 'Soin ${l['id']}'),
+    ];
+    final protegees = {
+      for (final s in await (_db.select(
+        _db.veterinaryRecords,
+      )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+        s.id,
+    };
 
     await _db.batch((b) {
-      for (final l in lignes) {
+      for (final (i, l) in lignes.indexed) {
+        if (protegees.contains(l['id'])) continue;
         final ligne = VeterinaryRecordsCompanion.insert(
           id: l['id'] as String,
           deviceId: (l['device_id'] ?? 'serveur') as String,
@@ -3417,6 +3508,7 @@ class SyncEngine {
           symptomes: Value(l['symptomes'] as String?),
           cost: Value(_reel(l['cost'])),
           recordDate: _date(l['record_date']) ?? DateTime.now(),
+          isActive: Value(actifs[i]),
         );
         b.insert(
           _db.veterinaryRecords,
@@ -3950,12 +4042,24 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket U3 — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un
+    // soin archivé PENDANT l'envoi de sa création reste `pending`, et son archivage part au prochain envoi.
     accepte += await _acquitter(
       'veterinary_records',
       corps['veterinary_records'],
-      (ids, statut) =>
-          (_db.update(_db.veterinaryRecords)..where((t) => t.id.isIn(ids)))
-              .write(VeterinaryRecordsCompanion(syncStatus: Value(statut))),
+      (ids, statut) => _marquerSiInchangee(
+        [for (final s in soins) (s.id, s.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.veterinaryRecords)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.updatedAt.equals(saisie!),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(VeterinaryRecordsCompanion(syncStatus: Value(statut))),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -5214,6 +5318,9 @@ class SyncEngine {
     // de la période de rémanence côté serveur. L'omettre laisserait la
     // bande vendable malgré le traitement.
     'withdrawal_days': s.withdrawalDays,
+    // Ticket U3 — archivage au poste : le serveur archive un soin connu, ou crée archivé un soin saisi puis
+    // archivé hors ligne (`pushVeterinaryRecords`).
+    'is_active': s.isActive,
     'device_id': s.deviceId,
     'updated_at': s.updatedAt.toUtc().toIso8601String(),
   };

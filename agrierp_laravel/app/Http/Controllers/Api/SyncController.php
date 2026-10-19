@@ -119,6 +119,8 @@ class SyncController extends Controller
         'infirmary_records', 'veterinary_calendar_events',
         // Ticket H9b — barèmes d'élevage modifiables au poste.
         'feed_ration_standards', 'prophylaxis_schedule_standards',
+        // Ticket U2 — objectifs de GMQ : référentiel en lecture seule au poste.
+        'growth_standards',
     ];
 
     /**
@@ -212,10 +214,25 @@ class SyncController extends Controller
             ->orderBy('label')
             ->get(['id', 'label', 'account_code', 'type', 'balance']);
 
+        // Ticket U3 (décision D-U3 du 19/10/2026 : archivage d'un soin au poste comme au web) — `is_active` est servi.
+        // Tirage complet : les soins ACTIFS seuls (un poste neuf n'a que faire des archivés). Tirage incrémental : tout
+        // soin modifié depuis `since`, ARCHIVÉS COMPRIS — sans eux, un poste ne saurait jamais qu'un soin a été
+        // archivé au web et le compterait encore (registre, coût sanitaire, protocole du jour).
         $soins = VeterinaryRecord::query()
-            ->where('is_active', true)
-            ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+            ->when(
+                $since,
+                fn ($q) => $q->where('updated_at', '>', $since),
+                fn ($q) => $q->where('is_active', true),
+            )
             ->get();
+
+        // Ticket U2 (décision D-U2 du 19/10/2026) — OBJECTIFS DE GMQ : une seule source, `growth_standards`, au web ET
+        // au poste (le poste et le Dashboard Élevage web portaient des constantes). Référentiel en lecture seule,
+        // servi COMPLET à chaque tirage (une dizaine de lignes) : comme les rations, un poste resté hors ligne ne doit
+        // pas garder un objectif périmé. Le poste remplace l'ensemble.
+        $objectifsCroissance = \App\Models\GrowthStandard::query()
+            ->orderBy('species_code')->orderBy('stage_label')
+            ->get(['id', 'species_code', 'stage_label', 'gmq_min_g_per_day', 'gmq_max_g_per_day']);
 
         $remanences = VeterinaryWithdrawalPeriod::query()
             ->whereDate('end_date', '>=', now()->toDateString())
@@ -978,6 +995,7 @@ class SyncController extends Controller
             'livestock_daily_entries' => $dailyEntries,
             'livestock_transfers' => $transferts,
             'feed_ration_standards' => $rations,
+            'growth_standards' => $objectifsCroissance,
             'veterinary_withdrawal_periods' => $remanences,
             'prophylaxis_schedule_standards' => $prophylaxie,
             'veterinary_records' => $soins,
@@ -1172,6 +1190,8 @@ class SyncController extends Controller
             'livestock_species',
             'attestation_templates',
             'attestation_counts',
+            // Ticket U2 — servie au tirage depuis D-U2, en lecture seule : le poste ne l'écrit jamais.
+            'growth_standards',
         ] as $referentialTable) {
             if ($request->has($referentialTable)) {
                 $result['referentiels_ignored'] += count($request->input($referentialTable));
@@ -1974,7 +1994,10 @@ class SyncController extends Controller
                     'sujet_ref' => ['nullable', 'string', 'max:50'],
                     'motif' => ['required', 'string', 'max:255'],
                     'isolation_level' => ['required', 'in:Quarantaine stricte,Infirmerie,Simple surveillance'],
-                    'entry_date' => ['required', 'date', 'before_or_equal:today'],
+                    // Ticket U6 (décision client D-U6 du 19/10/2026) — mêmes règles que `saveInfirmaryEntry()` du web
+                    // (`required|date`) : une date FUTURE est acceptée, comme au web. `before_or_equal:today` refusait
+                    // ici ce que le web enregistre.
+                    'entry_date' => ['required', 'date'],
                     'status' => ['nullable', 'in:en_cours,reintegre,deces'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
@@ -3411,6 +3434,30 @@ class SyncController extends Controller
 
         foreach ($soins as $soin) {
             try {
+                // 🔴→✅ TICKET U3 (décision client D-U3 du 19/10/2026) — L'ARCHIVAGE D'UN SOIN SE FAIT AU POSTE COMME AU
+                // WEB (`SoinsVaccinsHub::archiveSoin()` : `is_active = false` + `veterinary_record.archived`). Un soin
+                // CONNU n'accepte que cela : `{id, is_active: false}` ou la ligne complète, le reste est ignoré (un soin
+                // n'est jamais modifié, comme au web). ARCHIVAGE LOGIQUE SEULEMENT : `is_active: true` sur un soin
+                // archivé ne le restaure pas (la restauration passe par la Corbeille du web), et la rémanence créée
+                // par le soin reste en vigueur, exactement comme après `archiveSoin()`. Droit `manage-elevage`
+                // (`PERMISSION_PAR_TABLE`), celui du web.
+                $existant = isset($soin['id']) && is_string($soin['id']) ? VeterinaryRecord::find($soin['id']) : null;
+
+                if ($existant !== null) {
+                    $v = validator($soin, [
+                        'id' => ['required', 'uuid'],
+                        'is_active' => ['sometimes', 'boolean'],
+                    ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                    if (array_key_exists('is_active', $v) && ! filter_var($v['is_active'], FILTER_VALIDATE_BOOLEAN) && $existant->is_active) {
+                        $existant->update(['is_active' => false]);
+                        AuditLog::record('veterinary_record.archived', 'elevage');
+                    }
+                    $accepted[] = $v['id'];
+
+                    continue;
+                }
+
                 $validated = validator($soin, [
                     'id' => ['required', 'uuid'],
                     'lot_id' => ['required', 'uuid', 'exists:livestock_lots,id'],
@@ -3424,19 +3471,22 @@ class SyncController extends Controller
                     'symptomes' => ['nullable', 'string', 'max:5000'],
                     'gravite' => ['nullable', 'in:legere,moderee,severe'],
                     'cost' => ['nullable', 'numeric', 'min:0'],
+                    // Ticket U3 — un soin saisi PUIS archivé hors ligne arrive archivé.
+                    'is_active' => ['sometimes', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
-                if (VeterinaryRecord::where('id', $validated['id'])->exists()) {
-                    $accepted[] = $validated['id'];
+                $archive = array_key_exists('is_active', $validated) && ! filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
 
-                    continue;
-                }
-
-                // Ticket S1 — seuls les champs validés partent : ni `is_active` ni `daily_entry_id` venus du poste.
-                app(RecordVeterinaryCareAction::class)->execute(
-                    Arr::except($validated, 'withdrawal_days'),
+                // Ticket S1 — seuls les champs validés partent : ni `daily_entry_id` venu du poste. Ticket U3 : le soin
+                // est CRÉÉ (avec sa rémanence, comme `saveSoin()`), puis archivé comme par `archiveSoin()`.
+                $cree = app(RecordVeterinaryCareAction::class)->execute(
+                    Arr::except($validated, ['withdrawal_days', 'is_active']),
                     (int) ($soin['withdrawal_days'] ?? 0),
                 );
+                if ($archive) {
+                    $cree->update(['is_active' => false]);
+                    AuditLog::record('veterinary_record.archived', 'elevage');
+                }
 
                 $accepted[] = $validated['id'];
             } catch (ValidationException $e) {

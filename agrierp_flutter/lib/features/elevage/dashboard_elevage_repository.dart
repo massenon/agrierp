@@ -166,6 +166,7 @@ class DonneesDashboardElevage {
     required this.rappels,
     required this.lignesGmq,
     required this.gmqParEspece,
+    required this.objectifsGmq,
     required this.lotsSuivis,
     required this.bandeSuivie,
     required this.evolutionGmq,
@@ -198,6 +199,11 @@ class DonneesDashboardElevage {
 
   /// AJOUTS du poste (cartes de l'onglet GMQ).
   final Map<String, double?> gmqParEspece;
+
+  /// Ticket U2 (D-U2) — objectif (minimum, maximum) en g/jour de chaque carte, lu dans `growth_standards`
+  /// ([DashboardElevageRepository.objectifPour]) ; `null` : aucun barème pour les stades des bandes moyennées
+  /// (« Objectif : — »).
+  final Map<String, (int, int)?> objectifsGmq;
   final int lotsSuivis;
 
   /// AJOUT du poste — bande retenue pour la courbe « Évolution du GMQ ».
@@ -249,12 +255,38 @@ class DashboardElevageRepository {
   final AppDatabase database;
   final SoinsRepository soins;
 
-  /// Objectifs de GMQ des cartes de l'onglet GMQ (AJOUT du poste), en g/jour.
-  static const objectifs = <String, (double, double)>{
-    'cuniculture': (15, 20),
-    'aviculture': (20, 55),
-    'porciculture': (400, 650),
-  };
+  /// Espèces des trois cartes « GMQ Moyen … » de l'onglet GMQ, dans leur ordre (`ESPECES_CARTES_GMQ` du web).
+  ///
+  /// 🔴→✅ Ticket U2 (décision client D-U2 du 19/10/2026) — les OBJECTIFS de ces cartes étaient des constantes
+  /// (`objectifs` : 15-20, 20-55, 400-650 g/j), recopiées ensuite au web. Ils viennent désormais de
+  /// `growth_standards`, tirée du serveur, par [objectifPour] — la règle de `GrowthAnalysisService::objectifPour`.
+  static const especesCartesGmq = ['cuniculture', 'aviculture', 'porciculture'];
+
+  /// `GrowthAnalysisService::objectifPour` (Ticket U2) — objectif d'une ESPÈCE pour les bandes que la carte
+  /// moyenne : chaque bande prend le barème de SON stade (égalité stricte de `species_code` et `stage_label`,
+  /// comme `GrowthAnalysisService::rows()`), puis l'ENVELOPPE des barèmes trouvés (plus petit des minima, plus
+  /// grand des maxima). Aucun barème → `null` (« — »), jamais 0 ni le barème d'un autre stade.
+  static (int, int)? objectifPour(
+    Iterable<GrowthStandard> baremes,
+    String codeEspece,
+    Iterable<String?> stades,
+  ) {
+    final retenus = stades.whereType<String>().toSet();
+    int? minimum;
+    int? maximum;
+    for (final b in baremes) {
+      if (b.speciesCode != codeEspece || !retenus.contains(b.stageLabel)) {
+        continue;
+      }
+      minimum = minimum == null
+          ? b.gmqMinGPerDay
+          : math.min(minimum, b.gmqMinGPerDay);
+      maximum = maximum == null
+          ? b.gmqMaxGPerDay
+          : math.max(maximum, b.gmqMaxGPerDay);
+    }
+    return minimum == null ? null : (minimum, maximum!);
+  }
 
   /// Libellés de repli, quand la table des espèces n'a pas encore été tirée.
   static const libellesEspeces = <String, String>{
@@ -343,9 +375,11 @@ class DashboardElevageRepository {
     final bandes = toutes.where((b) => b.status == 'actif').toList()
       ..sort((a, b) => a.code.compareTo(b.code));
     final fiches = await database.select(database.livestockDailyEntries).get();
-    final soinsRegistre = await database
-        .select(database.veterinaryRecords)
-        .get();
+    // Ticket U3 — soins ACTIFS seulement (`where('is_active', true)` des deux requêtes sanitaires du web).
+    final soinsRegistre = await (database.select(
+      database.veterinaryRecords,
+    )..where((t) => t.isActive.equals(true))).get();
+    final baremes = await database.select(database.growthStandards).get();
     final remanences = await database
         .select(database.veterinaryWithdrawalPeriods)
         .get();
@@ -362,6 +396,7 @@ class DashboardElevageRepository {
     final lignes = [
       for (final b in bandes) _ligneGmq(b, parLot[b.id] ?? const [], especes),
     ];
+    final stadeDe = {for (final b in bandes) b.code: b.stage};
     final avecGmq = lignes.where((l) => l.gmq != null).toList();
     final suivie = avecGmq.isEmpty
         ? null
@@ -413,7 +448,7 @@ class DashboardElevageRepository {
       rappels: await _rappels(bandes, remanences, jour),
       lignesGmq: lignes,
       gmqParEspece: {
-        for (final code in objectifs.keys)
+        for (final code in especesCartesGmq)
           code: () {
             final v = avecGmq
                 .where((l) => l.codeEspece == code)
@@ -421,6 +456,14 @@ class DashboardElevageRepository {
                 .toList();
             return v.isEmpty ? null : v.reduce((a, b) => a + b) / v.length;
           }(),
+      },
+      // Ticket U2 — stades des bandes MOYENNÉES par chaque carte (celles qui ont un GMQ).
+      objectifsGmq: {
+        for (final code in especesCartesGmq)
+          code: objectifPour(baremes, code, [
+            for (final l in avecGmq.where((l) => l.codeEspece == code))
+              stadeDe[l.code],
+          ]),
       },
       lotsSuivis: avecGmq.length,
       bandeSuivie: suivie?.code,

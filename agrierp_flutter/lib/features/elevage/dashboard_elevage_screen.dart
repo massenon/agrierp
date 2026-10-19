@@ -788,11 +788,11 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   );
 
   Widget _carteGmq(String libelle, double? valeur, String code, Color barre) {
-    final objectif = DashboardElevageRepository.objectifs[code];
+    // Ticket U2 (D-U2) — objectif lu dans `growth_standards` (même règle que le web) ; sans barème : « — ».
+    final objectif = _donnees!.objectifsGmq[code];
     final legende = objectif == null
-        ? ''
-        : 'Objectif : ${objectif.$1.toStringAsFixed(0)}-'
-              '${objectif.$2.toStringAsFixed(0)} g/j';
+        ? 'Objectif : —'
+        : 'Objectif : ${objectif.$1}-${objectif.$2} g/j';
 
     return _carteKpi(
       libelle: libelle,

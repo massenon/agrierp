@@ -368,17 +368,22 @@ class BoutonModalePrimaire extends StatelessWidget {
     super.key,
     required this.libelle,
     required this.onPressed,
+    this.couleur = AgriColors.brandEmerald,
   });
 
   final String libelle;
   final VoidCallback? onPressed;
+
+  /// Fond du bouton : `bg-brand-emerald` par défaut ; `bg-error-red` pour le « Archiver » de
+  /// `modal-confirm-delete.blade.php` (ticket U3).
+  final Color couleur;
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AgriColors.brandEmerald,
+        backgroundColor: couleur,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(

@@ -192,10 +192,12 @@ class SoinsRepository {
     // l'égalité d'instant : un soin daté avec une heure (10 h 15) est bien du
     // jour, et l'égalité stricte le faisait proposer une seconde fois.
     final lendemain = DateTime(jour.year, jour.month, jour.day + 1);
+    // Ticket U3 — « Un soin archivé ne compte pas » (`ProtocoleDuJourService::soinsDuJour`, `is_active`).
     final soinsDuJour =
         await (_db.select(_db.veterinaryRecords)..where(
               (t) => Expression.and([
                 t.lotId.equals(bande.id),
+                t.isActive.equals(true),
                 t.recordDate.isBiggerOrEqualValue(jour),
                 t.recordDate.isSmallerThanValue(lendemain),
               ]),
@@ -258,10 +260,12 @@ class SoinsRepository {
     a.day,
   ).difference(DateTime.utc(de.year, de.month, de.day)).inDays;
 
-  /// Soins déjà administrés à une bande, le plus récent d'abord.
+  /// Soins déjà administrés à une bande, le plus récent d'abord — ACTIFS seulement (ticket U3, comme au web).
   Future<List<VeterinaryRecord>> historique(String lotId) {
     return (_db.select(_db.veterinaryRecords)
-          ..where((t) => t.lotId.equals(lotId))
+          ..where(
+            (t) => Expression.and([t.lotId.equals(lotId), t.isActive.equals(true)]),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.recordDate, mode: OrderingMode.desc),

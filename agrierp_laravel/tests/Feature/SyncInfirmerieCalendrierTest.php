@@ -77,6 +77,43 @@ class SyncInfirmerieCalendrierTest extends TestCase
         $this->assertSame('reintegre', InfirmaryRecord::findOrFail($id)->status);
     }
 
+    /**
+     * 🔴→✅ Ticket U6 (décision client D-U6 du 19/10/2026) — LE WEB ACCEPTE UNE DATE D'ENTRÉE FUTURE
+     * (`saveInfirmaryEntry()` : `required|date`) ; l'envoi la refusait (`before_or_equal:today`). Mêmes règles partout.
+     */
+    public function test_une_entree_d_infirmerie_datee_dans_le_futur_est_acceptee_comme_au_web(): void
+    {
+        $u = $this->compte('animalier');
+        $id = '99999999-9999-4999-8999-999999999990';
+        $demain = now()->addDays(3)->toDateString();
+
+        $this->postJson('/api/sync/push', ['infirmary_records' => [[
+            'id' => $id, 'lot_id' => $this->bande->id, 'motif' => 'Isolement préventif',
+            'isolation_level' => 'Simple surveillance', 'entry_date' => $demain,
+        ]]])->assertOk()->assertJsonPath('infirmary_records.accepted.0', $id)
+            ->assertJsonCount(0, 'infirmary_records.rejected');
+        $this->assertSame($demain, InfirmaryRecord::findOrFail($id)->entry_date->toDateString());
+
+        // Le web, maître : la même date future passe la validation de la modale.
+        $this->actingAs($u);
+        \Livewire\Livewire::test(\App\Livewire\Elevage\SoinsVaccinsHub::class)
+            ->set('infLotId', $this->bande->id)->set('infMotif', 'Isolement préventif')
+            ->set('infIsolation', 'Simple surveillance')->set('infDate', $demain)
+            ->call('saveInfirmaryEntry')->assertHasNoErrors();
+        $this->assertSame(2, InfirmaryRecord::whereDate('entry_date', $demain)->count());
+    }
+
+    /** Ticket U6 — les autres règles du web restent : date obligatoire et lisible. */
+    public function test_une_entree_sans_date_lisible_reste_refusee(): void
+    {
+        $this->compte('animalier');
+        $this->postJson('/api/sync/push', ['infirmary_records' => [[
+            'id' => '99999999-9999-4999-8999-999999999991', 'lot_id' => $this->bande->id, 'motif' => 'Toux',
+            'isolation_level' => 'Infirmerie', 'entry_date' => 'demain',
+        ]]])->assertOk()->assertJsonCount(1, 'infirmary_records.rejected');
+        $this->assertSame(0, InfirmaryRecord::count());
+    }
+
     public function test_un_niveau_d_isolement_inconnu_est_refuse(): void
     {
         $this->compte('animalier');

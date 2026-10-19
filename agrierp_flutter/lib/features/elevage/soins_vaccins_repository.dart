@@ -234,7 +234,11 @@ class SoinsVaccinsRepository {
       for (final e in await database.select(database.livestockSpecies).get())
         e.id: e.label,
     };
-    final registre = await database.select(database.veterinaryRecords).get();
+    // Ticket U3 — soins ACTIFS seulement : le registre (`where('is_active', true)`) et les KPI du mois (même
+    // filtre, posé au web au même ticket) ; un soin archivé reste en base, sa rémanence aussi.
+    final registre = await (database.select(
+      database.veterinaryRecords,
+    )..where((t) => t.isActive.equals(true))).get();
     final remanences = await database
         .select(database.veterinaryWithdrawalPeriods)
         .get();
@@ -447,6 +451,23 @@ class SoinsVaccinsRepository {
         ),
     ];
   }
+
+  // ── Archivage d'un soin (U3) ────────────────────────────────────────────────────────────────────────────
+
+  /// `archiveSoin()` du web (ticket U3, décision client D-U3 du 19/10/2026) : `is_active = false`, la ligne
+  /// RESTE (archivage logique) et repart à l'envoi (`pending`), où le serveur l'archive et journalise
+  /// `veterinary_record.archived`. ⚠️ La période de rémanence créée par le soin n'est PAS touchée : au web non
+  /// plus, archiver un soin ne rend pas la bande vendable.
+  Future<void> archiverSoin(String id, {DateTime? quand}) =>
+      (database.update(
+        database.veterinaryRecords,
+      )..where((t) => t.id.equals(id))).write(
+        VeterinaryRecordsCompanion(
+          isActive: const Value(false),
+          syncStatus: const Value(SyncStatus.pending),
+          updatedAt: Value(quand ?? DateTime.now()),
+        ),
+      );
 
   // ── Infirmerie (H8b) ────────────────────────────────────────────────────────────────────────────────────
 

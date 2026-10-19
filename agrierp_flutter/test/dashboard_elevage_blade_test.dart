@@ -103,6 +103,7 @@ void main() {
     int initial = 100,
     int courant = 100,
     double? acquisition,
+    String stade = 'engraissement',
   }) async {
     final id = uuid('${code.toLowerCase()}-lot');
     await db
@@ -113,7 +114,7 @@ void main() {
             code: code,
             speciesId: uuid('esp-$espece'),
             speciesCode: Value(espece),
-            stage: const Value('engraissement'),
+            stage: Value(stade),
             initialQuantity: Value(initial),
             currentQuantity: Value(courant),
             status: Value(statut),
@@ -744,6 +745,27 @@ void main() {
         ('helico', 'Héliciculture (Escargots)', false),
       ];
       const types = ['Vaccination', 'Vaccination', 'Déparasitage', 'Vitamines'];
+      // Ticket U2 — stades des bandes (enum du serveur) et barème `growth_standards` partiel : un stade sans barème
+      // (« ponte »), deux stades d'une même espèce (enveloppe), une espèce sans aucun barème (helico).
+      const stades = ['reproduction', 'croissance', 'ponte', 'engraissement'];
+      final baremes = <Map<String, Object>>[
+        for (final (espece, stade, min, max) in const [
+          ('cuniculture', 'engraissement', 15, 20),
+          ('cuniculture', 'croissance', 12, 25),
+          ('aviculture', 'croissance', 20, 30),
+          ('aviculture', 'engraissement', 45, 55),
+          ('porciculture', 'croissance', 500, 650),
+          ('porciculture', 'engraissement', 500, 650),
+          ('porciculture', 'reproduction', 40, 80),
+        ])
+          {
+            'id': uuid('gs-$espece-$stade'),
+            'espece': espece,
+            'stade': stade,
+            'min': min,
+            'max': max,
+          },
+      ];
 
       // ⚠️ Aucune fiche le 1er du mois : SQLite (base du test PHP) compare `entry_date` en chaîne
       // et exclut « 2026-10-01 » de `[startOfMonth 00:00:00, …]`, là où MySQL (production) l'inclut.
@@ -764,6 +786,7 @@ void main() {
           'is_active': hasard.nextInt(8) != 0,
           'initial': initial,
           'courant': hasard.nextInt(initial + 1),
+          'stade': stades[hasard.nextInt(stades.length)],
         });
         final retenus = ([...jours]..shuffle(hasard)).take(hasard.nextInt(12));
         for (final d in retenus) {
@@ -787,6 +810,8 @@ void main() {
           'type': types[hasard.nextInt(types.length)],
           'cout': hasard.nextInt(5) == 0 ? null : 500 * hasard.nextInt(40),
           'date': _iso(jours[hasard.nextInt(jours.length)]),
+          // Ticket U3 — un soin sur quatre archivé : il sort des KPI et du tableau sanitaires des deux côtés.
+          'actif': hasard.nextInt(4) != 0,
         });
       }
 
@@ -823,7 +848,21 @@ void main() {
           active: l['is_active'] as bool,
           initial: l['initial'] as int,
           courant: l['courant'] as int,
+          stade: l['stade'] as String,
         );
+      }
+      for (final b in baremes) {
+        await db
+            .into(db.growthStandards)
+            .insert(
+              GrowthStandardsCompanion.insert(
+                id: b['id'] as String,
+                speciesCode: b['espece'] as String,
+                stageLabel: b['stade'] as String,
+                gmqMinGPerDay: b['min'] as int,
+                gmqMaxGPerDay: b['max'] as int,
+              ),
+            );
       }
       for (final f in fiches) {
         await fiche(
@@ -846,6 +885,7 @@ void main() {
                 actionType: s['type'] as String,
                 cost: Value((s['cout'] as int?)?.toDouble()),
                 recordDate: DateTime.parse(s['date'] as String),
+                isActive: Value(s['actif'] as bool),
               ),
             );
       }
@@ -864,6 +904,7 @@ void main() {
                   'lots': lots,
                   'fiches': fiches,
                   'soins': soins,
+                  'baremes': baremes,
                 },
                 application: true,
               )
@@ -941,6 +982,23 @@ void main() {
         );
       }
 
+      // Ticket U2 — objectifs des cartes GMQ : même barème, même règle (`objectifPour`) des deux côtés.
+      final objectifs = php['objectifs'] as Map<String, dynamic>;
+      expect(d.objectifsGmq.keys.toSet(), objectifs.keys.toSet());
+      for (final code in objectifs.keys) {
+        final attendu = objectifs[code] as List?;
+        expect(
+          d.objectifsGmq[code],
+          attendu == null ? isNull : (attendu[0] as int, attendu[1] as int),
+          reason: 'objectif $code',
+        );
+      }
+      expect(
+        d.objectifsGmq.values.where((o) => o != null),
+        isNotEmpty,
+        reason: 'le jeu exerce au moins un objectif',
+      );
+
       final sanitaire = php['sanitaire'] as Map<String, dynamic>;
       expect(d.traitementsDuMois, sanitaire['nb']);
       expect(d.coutSanitaireDuMois, n(sanitaire['cout']));
@@ -976,7 +1034,7 @@ foreach ($entree['especes'] as $e) {
 $lots = [];
 foreach ($entree['lots'] as $l) {
     $lots[$l['code']] = App\Models\LivestockLot::create([
-        'code' => $l['code'], 'species_id' => $especes[$l['espece']]->id, 'stage' => 'croissance',
+        'code' => $l['code'], 'species_id' => $especes[$l['espece']]->id, 'stage' => $l['stade'],
         'initial_quantity' => $l['initial'], 'current_quantity' => $l['courant'],
         'created_date' => '2026-08-01', 'status' => $l['status'], 'is_active' => $l['is_active'],
     ]);
@@ -991,8 +1049,12 @@ foreach ($entree['fiches'] as $f) {
 foreach ($entree['soins'] as $s) {
     App\Models\VeterinaryRecord::create([
         'lot_id' => $lots[$s['lot']]->id, 'action_type' => $s['type'], 'cost' => $s['cout'],
-        'record_date' => $s['date'], 'is_active' => true,
+        'record_date' => $s['date'], 'is_active' => $s['actif'],
     ]);
+}
+foreach ($entree['baremes'] as $b) {
+    App\Models\GrowthStandard::create(['species_code' => $b['espece'], 'stage_label' => $b['stade'],
+        'gmq_min_g_per_day' => $b['min'], 'gmq_max_g_per_day' => $b['max']]);
 }
 $c = new App\Livewire\Elevage\DashboardElevage();
 $service = app(App\Services\GrowthAnalysisService::class);
@@ -1012,6 +1074,7 @@ echo json_encode([
     'previsions' => $c->previsions->map(fn ($r) => [$r['lot']->code, $r['insufficient'], $r['poids_actuel'] ?? null, $r['tendance_g_par_jour'] ?? null, $r['projection_30j'] ?? null])->values(),
     'sanitaire' => ['nb' => $kpis['nb_traitements_mois'], 'cout' => $kpis['cout_sanitaire_mois'], 'frequent' => $kpis['traitement_frequent'],
         'unique' => count($comptes) < 2 || $comptes[0] > $comptes[1]],
+    'objectifs' => $c->gmqCartes['objectifs'],
     'sanitaire_especes' => $c->sanitaireBySpecies->map(fn ($r) => [$r['species']->code, $r['nb_traitements'], $r['cout_total']])->values(),
 ]);
 ''';

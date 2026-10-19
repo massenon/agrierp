@@ -128,6 +128,19 @@ void main() {
         );
   }
 
+  /// Ticket U2 — une ligne du barème `growth_standards` (tiré du serveur au poste réel).
+  Future<void> bareme(String espece, String stade, int min, int max) => db
+      .into(db.growthStandards)
+      .insert(
+        GrowthStandardsCompanion.insert(
+          id: uuid('gs-$espece-$stade'),
+          speciesCode: espece,
+          stageLabel: stade,
+          gmqMinGPerDay: min,
+          gmqMaxGPerDay: max,
+        ),
+      );
+
   Future<void> afficher(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1600, 2600);
     tester.view.devicePixelRatio = 1;
@@ -304,6 +317,8 @@ void main() {
     await pesee(lapins, 0, 900);
     await pesee(escargots, 7, 10, effectif: 1250);
     await pesee(escargots, 0, 12, effectif: 1250);
+    // Ticket U2 : l'objectif vient du barème `growth_standards`, plus d'une constante.
+    await bareme('cuniculture', 'engraissement', 15, 20);
 
     await afficher(tester);
     await ouvrir(tester, 'GMQ & Croissance');
@@ -312,6 +327,84 @@ void main() {
     expect(find.text('Sous objectif'), findsNothing);
     expect(find.text('Dans la cible'), findsNothing);
     expect(find.text('Objectif : 15-20 g/j'), findsOneWidget);
+  });
+
+  /// 🔴→✅ Ticket U2 (décision client D-U2 du 19/10/2026) — UNE SEULE SOURCE, `growth_standards`. Les cartes
+  /// portaient des constantes (15-20, 20-55, 400-650 g/j). Règle (`GrowthAnalysisService::objectifPour`) : barème
+  /// du STADE de chaque bande moyennée, puis enveloppe. Ici : lapins engraissement (15-20) — le barème
+  /// « reproduction » (40-80) ne compte pas, aucune bande à ce stade ; porcs : AUCUN barème → « Objectif : — ».
+  testWidgets('U2 — les objectifs des cartes viennent de growth_standards ; sans barème, un tiret', (
+    tester,
+  ) async {
+    await pesee(lapins, 7, 800);
+    await pesee(lapins, 0, 900);
+    await pesee(porcs, 7, 24000, effectif: 54);
+    await pesee(porcs, 0, 26800, effectif: 54);
+    await bareme('cuniculture', 'engraissement', 15, 20);
+    await bareme('cuniculture', 'reproduction', 40, 80);
+    await bareme('aviculture', 'engraissement', 45, 55);
+
+    final d = await depot.charger();
+    expect(d.objectifsGmq, {
+      'cuniculture': (15, 20),
+      'aviculture': null,
+      'porciculture': null,
+    });
+
+    await afficher(tester);
+    await ouvrir(tester, 'GMQ & Croissance');
+
+    expect(find.text('Objectif : 15-20 g/j'), findsOneWidget);
+    expect(find.text('Objectif : —'), findsOneWidget, reason: 'porcs sans barème');
+    expect(find.text('Objectif : 400-650 g/j'), findsNothing);
+    expect(find.text('Objectif : 40-80 g/j'), findsNothing);
+  });
+
+  /// Ticket U2 — calculé à la main : stades engraissement (500-650) et croissance (300-550) → 300-650 ; un stade
+  /// sans barème n'apporte rien ; une autre espèce ne compte jamais ; aucun stade retenu → `null`.
+  test('U2 — objectifPour : enveloppe des barèmes des stades moyennés', () {
+    GrowthStandard b(String espece, String stade, int min, int max) => GrowthStandard(
+      id: uuid('gs-$espece-$stade'),
+      speciesCode: espece,
+      stageLabel: stade,
+      gmqMinGPerDay: min,
+      gmqMaxGPerDay: max,
+    );
+    final baremes = [
+      b('porciculture', 'engraissement', 500, 650),
+      b('porciculture', 'croissance', 300, 550),
+      b('porciculture', 'reproduction', 40, 80),
+      b('aviculture', 'engraissement', 45, 55),
+    ];
+    expect(
+      DashboardElevageRepository.objectifPour(baremes, 'porciculture', [
+        'engraissement',
+        'engraissement',
+      ]),
+      (500, 650),
+    );
+    expect(
+      DashboardElevageRepository.objectifPour(baremes, 'porciculture', [
+        'croissance',
+        'engraissement',
+        null,
+      ]),
+      (300, 650),
+    );
+    expect(
+      DashboardElevageRepository.objectifPour(baremes, 'porciculture', ['ponte']),
+      isNull,
+    );
+    expect(
+      DashboardElevageRepository.objectifPour(baremes, 'cuniculture', [
+        'engraissement',
+      ]),
+      isNull,
+    );
+    expect(
+      DashboardElevageRepository.objectifPour(baremes, 'porciculture', const []),
+      isNull,
+    );
   });
 
   testWidgets('le filtre d espèce restreint le tableau', (tester) async {
@@ -346,6 +439,40 @@ void main() {
 
     expect(find.text('2'), findsWidgets);
     // Ticket H6 : le Blade fait foi — `number_format(…, 0, ',', ' ').' FCFA'`.
+    expect(find.text('15 000 FCFA'), findsWidgets);
+  });
+
+  /// Ticket U3 — un soin ARCHIVÉ (`is_active = false`) ne compte plus, comme au web (`where('is_active', true)`
+  /// des KPI et du tableau sanitaires) : 12 000 + 3 000 actifs, 50 000 archivé → 2 soins, 15 000 FCFA.
+  testWidgets('U3 — un soin archivé sort de l analyse sanitaire', (tester) async {
+    await soin(lapins, 'Vaccination', 12000);
+    await soin(lapins, 'Déparasitage', 3000);
+    await db
+        .into(db.veterinaryRecords)
+        .insert(
+          VeterinaryRecordsCompanion.insert(
+            id: uuid('archive-s-$lapins'),
+            deviceId: 'poste-test',
+            updatedAt: aujourdhui,
+            lotId: lapins,
+            actionType: 'Antibiotique',
+            cost: const Value(50000),
+            recordDate: aujourdhui,
+            isActive: const Value(false),
+          ),
+        );
+
+    final d = await depot.charger();
+    expect(d.traitementsDuMois, 2);
+    expect(d.coutSanitaireDuMois, 15000);
+    expect(
+      d.sanitaire.firstWhere((s) => s.code == 'cuniculture').coutTotal,
+      15000,
+    );
+
+    await afficher(tester);
+    await ouvrir(tester, 'Analyse Sanitaire');
+    expect(find.text('65 000 FCFA'), findsNothing);
     expect(find.text('15 000 FCFA'), findsWidgets);
   });
 

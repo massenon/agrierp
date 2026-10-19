@@ -61,6 +61,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   39: [d.livestockTransfers],
   // Ticket H8b (D-H8) — infirmerie et calendrier vétérinaire planifié.
   41: [d.infirmaryRecords, d.veterinaryCalendarEvents],
+  // Ticket U2 (D-U2) — objectifs de GMQ tirés du serveur.
+  43: [d.growthStandards],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -182,6 +184,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.companySettings, d.companySettings.syncStatus),
     (d.companySettings, d.companySettings.updatedAt),
   ],
+  // Ticket U3 (D-U3) — archivage logique des soins au poste comme au web.
+  43: [(d.veterinaryRecords, d.veterinaryRecords.isActive)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
