@@ -7,6 +7,7 @@ import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/widgets/rafraichissement_periodique.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/features/notifications/notifications_repository.dart';
 import 'package:agrierp/features/notifications/notifications_screen.dart';
 import 'package:dio/dio.dart';
@@ -81,6 +82,7 @@ void main() {
     DateTime? date,
     String? lien,
     bool sansDate = false,
+    String? titre,
   }) => db
       .into(db.notifications)
       .insert(
@@ -89,7 +91,7 @@ void main() {
           type: 'stock_low',
           category: Value(categorie),
           severity: Value(gravite),
-          title: message,
+          title: titre ?? message,
           message: message,
           linkUrl: Value(lien),
           isRead: Value(lue),
@@ -264,28 +266,31 @@ void main() {
     });
 
     test(
-      '⚠️ la recherche ignore la casse ET les accents de majuscule',
+      '⚠️ la recherche ignore la casse ET les accents, comme la collation du serveur',
       () async {
-        // `LIKE` de SQLite échouerait sur « élevage » contre « Élevage ».
+        // `LIKE` de SQLite échouerait sur « RECEPTION » contre « Réception ».
         final l = NotificationsRepository.filtrer(
           await toutes(),
-          recherche: 'élevage',
+          recherche: 'RECEPTION validee',
         );
-        expect(l, hasLength(2));
+        expect(l.single.message, startsWith('Réception validée'));
       },
     );
 
-    test('la recherche porte sur toute la ligne affichée', () async {
+    // 🔴→✅ Ticket U14 — `message LIKE … OR title LIKE …` du web, plus « toute la ligne affichée » du prototype.
+    test('U14 — la recherche porte sur le message OU le titre, comme le web, jamais sur la catégorie ni le statut', () async {
+      await notif('t', 'Le stock passe sous le seuil.', titre: 'Stock bas : Piment');
       final tout = await toutes();
       expect(
-        NotificationsRepository.filtrer(tout, recherche: 'critique'),
-        hasLength(2),
-        reason: 'gravité « Critique » + message « critique »',
+        [for (final l in NotificationsRepository.filtrer(tout, recherche: 'critique')) l.message]..sort(),
+        ['Autonomie alimentaire critique — Provende Lapins', 'Seuil critique atteint — Vaccin Newcastle'],
       );
-      expect(
-        NotificationsRepository.filtrer(tout, recherche: 'non lue'),
-        hasLength(3),
-      );
+      expect(NotificationsRepository.filtrer(tout, recherche: 'élevage'), isEmpty, reason: 'la catégorie n est pas cherchée');
+      expect(NotificationsRepository.filtrer(tout, recherche: 'non lue'), isEmpty, reason: 'le statut non plus');
+      expect(NotificationsRepository.filtrer(tout, recherche: 'piment').single.message, 'Le stock passe sous le seuil.',
+          reason: 'le TITRE est cherché');
+      expect(NotificationsRepository.filtrer(tout, recherche: 'BC-2026-06-000_'), hasLength(1), reason: '`_` joker');
+      expect(NotificationsRepository.filtrer(tout, recherche: '0'), hasLength(tout.length), reason: '« 0 » ne filtre pas');
     });
 
     test('les filtres se combinent', () async {
@@ -553,19 +558,24 @@ void main() {
         find.byKey(const Key('notif-recherche')),
         'vaccin',
       );
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(const Key('ligne-notif-1')), findsOneWidget, reason: 'U14 : pas avant 300 ms');
+      await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('ligne-notif-0')), findsOneWidget);
       expect(find.byKey(const Key('ligne-notif-1')), findsNothing);
     });
 
-    testWidgets('aucun résultat : le tableau le dit', (tester) async {
+    testWidgets('aucun résultat : la phrase du Blade, sans tableau', (tester) async {
       await jeuDeLaMaquette();
       await afficher(tester);
 
       await tester.enterText(find.byKey(const Key('notif-recherche')), 'zzz');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('notif-vide')), findsOneWidget);
+      expect(find.text('Aucune notification pour le moment.'), findsOneWidget);
+      expect(find.text('MESSAGE'), findsNothing, reason: 'au web, la phrase remplace le tableau');
     });
 
     testWidgets('marquer lue : la ligne passe « Lue », la carte baisse', (
@@ -586,21 +596,37 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('statut-notif-0'))).data,
         'Lue',
       );
-      expect(find.byKey(const Key('notif-reussi')), findsOneWidget);
+      // Ticket U14 — le toast de succès du web, et plus de bouton « Marquer comme lue » sur la ligne désormais lue.
+      expect(find.text('Notification marquée comme lue.'), findsOneWidget);
+      expect(find.byKey(const Key('lue-0')), findsNothing);
+      expect(find.byKey(const Key('lue-3')), findsNothing, reason: 'la 4e ligne était déjà lue');
       expect(valeurDe(tester, 'Non Lues'), '2');
       expect(modifie, 1, reason: 'la cloche doit être rafraîchie');
+      await tester.pump(ToastAgri.duree);
+      await tester.pumpAndSettle();
     });
 
-    testWidgets('supprimer retire la ligne', (tester) async {
+    testWidgets('U14 — supprimer demande « Supprimer cette notification ? », puis retire la ligne', (tester) async {
       await jeuDeLaMaquette();
       await afficher(tester);
 
       await tester.tap(find.byKey(const Key('suppr-0')));
       await tester.pumpAndSettle();
+      expect(find.text('Supprimer cette notification ?'), findsOneWidget, reason: '`wire:confirm` du web');
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
+      expect(await db.select(db.notifications).get(), hasLength(6), reason: 'annuler ne supprime rien');
+
+      await tester.tap(find.byKey(const Key('suppr-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('suppr-confirmer')));
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('ligne-notif-5')), findsNothing);
       expect(find.text('Notification supprimée.'), findsOneWidget);
       expect(await db.select(db.notifications).get(), hasLength(5));
+      await tester.pump(ToastAgri.duree);
+      await tester.pumpAndSettle();
     });
 
     testWidgets(
@@ -615,9 +641,11 @@ void main() {
         await tester.tap(find.byKey(const Key('lue-0')));
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('notif-echec')), findsOneWidget);
-        expect(find.byKey(const Key('notif-reussi')), findsNothing);
+        // Ticket U14 — l'échec en toast d'erreur (le web n'a pas d'échec réseau : il est en ligne).
+        expect(find.text('Notification marquée comme lue.'), findsNothing);
         expect(find.textContaining('nécessite le réseau'), findsOneWidget);
+        await tester.pump(ToastAgri.duree);
+        await tester.pumpAndSettle();
         expect(
           tester.widget<Text>(find.byKey(const Key('statut-notif-0'))).data,
           'Non lue',

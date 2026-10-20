@@ -5,6 +5,7 @@ import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/duree_relative.dart';
 import '../../core/temps/heure_benin.dart';
+import '../stocks/pmp_service.dart';
 
 /// Échec d'une action sur une notification, porteur d'une phrase lisible.
 class EchecNotification implements Exception {
@@ -217,27 +218,38 @@ class NotificationsRepository {
     );
   }
 
-  /// Filtres de l'écran, comme `renderNotifFilters` du prototype.
+  /// Filtres de l'écran, comme `Notifications\Index::getNotificationsProperty()` du web.
   ///
-  /// ⚠️ **COMPARAISON FAITE EN DART, PAS EN SQL** : `LIKE` de SQLite ne ramène
-  /// la casse que pour l'ASCII — « élevage » ne retrouverait pas « Élevage ».
-  /// La recherche porte sur toute la ligne affichée (message, catégorie,
-  /// gravité, statut), comme le `textContent` du prototype.
+  /// 🔴→✅ Ticket U14 — LA RECHERCHE DU WEB : `message LIKE '%…%' OR title LIKE '%…%'`, sous la collation du serveur
+  /// (ni casse ni accents ; `%` et `_` sont des jokers) ; « 0 » ne filtre pas (`when()` le lit faux). Le poste cherchait
+  /// dans toute la ligne affichée (catégorie, gravité, statut compris), comme le `textContent` du prototype : « critique »
+  /// trouvait une notification d'information au message anodin, que le web ne montrait pas.
+  ///
+  /// ⚠️ **COMPARAISON FAITE EN DART, PAS EN SQL** : `LIKE` de SQLite ne ramène la casse que pour l'ASCII.
   static List<LigneNotification> filtrer(
     List<LigneNotification> lignes, {
     String recherche = '',
     String categorie = '',
     String statut = '',
   }) {
-    final terme = recherche.toLowerCase().trim();
+    RegExp? like;
+    if (recherche.isNotEmpty && recherche != '0') {
+      final motif = StringBuffer();
+      for (final c in cleCommeLeServeur(recherche).split('')) {
+        motif.write(switch (c) {
+          '%' => '.*',
+          '_' => '.',
+          _ => RegExp.escape(c),
+        });
+      }
+      like = RegExp(motif.toString(), dotAll: true);
+    }
 
     return [
       for (final l in lignes)
-        if ((terme.isEmpty ||
-                '${l.message} ${l.categorie} ${l.graviteLibelle} '
-                        '${l.lue ? 'Lue' : 'Non lue'}'
-                    .toLowerCase()
-                    .contains(terme)) &&
+        if ((like == null ||
+                like.hasMatch(cleCommeLeServeur(l.message)) ||
+                like.hasMatch(cleCommeLeServeur(l.titre))) &&
             (categorie.isEmpty || l.categorie == categorie) &&
             (statut.isEmpty || (l.lue ? 'Lue' : 'Non lue') == statut))
           l,
