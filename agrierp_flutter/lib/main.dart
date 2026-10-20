@@ -1029,6 +1029,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
           imprimer: EditeursRapports.imprimer,
+          // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.
+          exercice: _exercice.etat?.annee,
         ),
         EcranPoste.parametresGeneraux => _parametresGeneraux(),
         EcranPoste.rapportsEtExports => RapportsExportsScreen(

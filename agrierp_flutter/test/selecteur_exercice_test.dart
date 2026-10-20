@@ -13,6 +13,8 @@ import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/features/achats/depenses_repository.dart';
 import 'package:agrierp/features/achats/saisie_depenses_screen.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/comptabilite/etats_comparatifs.dart';
+import 'package:agrierp/features/elevage/elements_fiche.dart' show LectureSeuleDuJour;
 import 'package:agrierp/features/elevage/transferts_bandes_screen.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -96,6 +98,8 @@ void main() {
     ];
     const aujourdhuis = ['2026-03-15', '2026-12-31', '2027-01-01', '2027-02-10', '2028-06-01'];
     const choix = [null, 2026, 2025, 2019];
+    const annees = [2019, 2024, 2025, 2026, 2027, 2028];
+    const jours = ['2024-06-30', '2025-12-10', '2026-06-30', '2026-12-31', '2027-01-15'];
 
     final cas = <Map<String, Object?>>[
       for (var d = 0; d < decors.length; d++)
@@ -133,12 +137,26 @@ foreach ($entree['cas'] as $cas) {
         'balance' => $balance->getLibellesPeriodeProperty(),
         'balance_mois' => $moisBalance,
         'balance_exercice' => $balance->periodBounds(),
+        // Fusion EX7 + EX8 : la date d'arrêté de chaque année (une seule règle : `arreteDe` = `arreteDeLExercice`).
+        'arretes' => array_map(fn ($a) => [ExerciceChoisi::arreteDe($a), app(App\Services\FinancialReportService::class)->arreteDeLExercice($a)], $entree['annees']),
+        // Fusion EX7 + EX8 : la lecture seule d'un jour de fiche (`AvecMoisDeFiche`) — exercice du jour, motif, bandeau
+        // d'EX7, jour de « Passer à … », bandeau masqué quand l'exercice du jour est l'exercice affiché.
+        'fiches' => array_map(function ($jour) {
+            $e = ExerciceChoisi::exerciceDuJour($jour);
+            $bandeau = ExerciceChoisi::bandeauDe($e);
+            $cible = $bandeau['cible'] ?? null;
+            return [
+                'annee' => $e?->year, 'motif' => ExerciceChoisi::motifLectureSeuleDe($e), 'bandeau' => $bandeau,
+                'passer' => $cible === null ? null : min(ExerciceChoisi::arreteDe($cible), ExerciceChoisi::aujourdhui()->format('Y-m-d')),
+                'visible' => $e !== null && ! ExerciceChoisi::exercice()?->is($e),
+            ];
+        }, $entree['jours']),
     ];
     Illuminate\Support\Facades\DB::rollBack();
 }
 echo json_encode($sortie);
 ''',
-              {'decors': decors, 'cas': cas},
+              {'decors': decors, 'cas': cas, 'annees': annees, 'jours': jours},
               application: true,
             )!
             as List;
@@ -178,6 +196,27 @@ echo json_encode($sortie);
       expect([_iso(mois.debut), _iso(mois.fin)], p['balance_mois'], reason: 'Balance « mois » — $contexte');
       final exo = DonneesComptabilite.bornesBalance(PeriodeBalance.exercice, etat);
       expect([_iso(exo.debut), _iso(exo.fin)], p['balance_exercice'], reason: 'Balance « exercice » — $contexte');
+      // Fusion EX7 + EX8 — date d'arrêté de chaque année, au poste par les deux entrées (`EtatExercice.arreteDe`,
+      // `EtatsComparatifs.arreteDeLExercice`, colonne N des États Financiers).
+      for (final (k, a) in annees.indexed) {
+        final attendu = (p['arretes'] as List)[k] as List;
+        expect(attendu[0], attendu[1], reason: 'web : arreteDe = arreteDeLExercice ($a) — $contexte');
+        expect(_iso(EtatExercice.arreteDe(exercices, a, auj)), attendu[0], reason: 'arrêté $a — $contexte');
+        expect(_iso(EtatsComparatifs.arreteDeLExercice(exercices, a, auj)), attendu[0], reason: 'arrêté EX8 $a — $contexte');
+      }
+      // Fusion EX7 + EX8 — la lecture seule d'un jour de fiche (`LectureSeuleDuJour`, `AvecMoisDeFiche`).
+      for (final (k, j) in jours.indexed) {
+        final attendu = (p['fiches'] as List)[k] as Map;
+        final ls = LectureSeuleDuJour.juger(exercices, DateTime.parse(j), auj);
+        final raison = 'fiche du $j — $contexte';
+        expect(etat.exerciceDuJour(DateTime.parse(j))?.year, attendu['annee'], reason: raison);
+        expect(ls?.motif, attendu['motif'], reason: raison);
+        expect(ls == null ? null : {'texte': ls.texte, 'cible': ls.cible}, attendu['bandeau'], reason: raison);
+        expect(ls?.jourDeSaisie == null ? null : _iso(ls!.jourDeSaisie!), attendu['passer'], reason: raison);
+        if (ls != null) {
+          expect(etat.exercice?.year != ls.annee, attendu['visible'], reason: 'bandeau de la fiche visible — $raison');
+        }
+      }
       compares++;
     }
     expect(compares, 7 * 5 * 4);
@@ -485,7 +524,9 @@ echo json_encode($sortie);
 
     String blade(String f) => File('$dossierLaravel/resources/views/$f').readAsStringSync();
     final selecteur = blade('livewire/shared/selecteur-exercice.blade.php');
-    final bandeau = blade('livewire/shared/bandeau-exercice.blade.php');
+    // Fusion EX7 + EX8 : le bandeau du haut du contenu et celui des fiches sont UN composant (`x-bandeau-lecture-seule`).
+    final bandeau = blade('components/bandeau-lecture-seule.blade.php');
+    expect(blade('livewire/shared/bandeau-exercice.blade.php'), contains('<x-bandeau-lecture-seule'));
     final pagination = blade('components/pagination.blade.php');
 
     final posteSelecteur = _litteraux('lib/core/widgets/selecteur_exercice.dart');

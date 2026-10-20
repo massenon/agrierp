@@ -105,16 +105,29 @@ class EtatExercice {
   }
 
   /// `ExerciceChoisi::motifLectureSeule()` — info-bulle des boutons grisés ; `null` : exercice ouvert.
-  String? get motifLectureSeule {
-    final e = exercice;
-    return e?.status == 'cloture'
-        ? 'Exercice ${e!.year} clôturé — lecture seule'
-        : null;
+  String? get motifLectureSeule => motifLectureSeuleDe(exercice);
+
+  /// `ExerciceChoisi::motifLectureSeuleDe()` — le motif d'un exercice DONNÉ : l'exercice affiché, ou celui du jour
+  /// choisi d'une fiche d'élevage (EF12, fusion EX7 + EX8).
+  static String? motifLectureSeuleDe(FiscalYear? e) =>
+      e?.status == 'cloture' ? 'Exercice ${e!.year} clôturé — lecture seule' : null;
+
+  /// `ExerciceChoisi::exerciceDuJour()` — l'exercice qui contient [jour] (le premier par date de début) ; `null` si
+  /// aucun ne le couvre.
+  FiscalYear? exerciceDuJour(DateTime jour) {
+    final j = _jour(jour);
+    final couvrants = exercices.where((e) => _couvre(e, j)).toList()
+      ..sort((a, b) => a.startDate!.compareTo(b.startDate!));
+    return couvrants.firstOrNull;
   }
 
   /// `ExerciceChoisi::bandeau()` — texte du bandeau et année du lien « Passer à … » ; `null` : pas de bandeau.
-  ({String texte, int? cible})? get bandeau {
-    final motif = motifLectureSeule;
+  ({String texte, int? cible})? get bandeau => bandeauDe(exercice);
+
+  /// `ExerciceChoisi::bandeauDe()` — le bandeau d'un exercice DONNÉ, même texte et même lien en haut du contenu
+  /// ([BandeauExercice]) et en tête d'une fiche d'élevage (`BandeauLectureSeule`, fusion EX7 + EX8).
+  ({String texte, int? cible})? bandeauDe(FiscalYear? e) {
+    final motif = motifLectureSeuleDe(e);
     if (motif == null) return null;
     final saisie = exerciceDeSaisie;
     return (
@@ -143,8 +156,20 @@ class EtatExercice {
     return f.isBefore(d) ? (debut: d, fin: d) : (debut: d, fin: f);
   }
 
-  /// `ExerciceChoisi::dateArrete()` — aujourd'hui ramené dans l'exercice affiché.
-  DateTime get dateArrete => borner(aujourdhui);
+  /// `ExerciceChoisi::dateArrete()` — aujourd'hui ramené dans l'exercice affiché : la date d'arrêté du Bilan et du
+  /// Compte de résultat N / N-1 (`EtatsComparatifs`, fusion EX7 + EX8), `arreteDe(annee)`.
+  DateTime get dateArrete => arreteDe(exercices, annee, aujourdhui);
+
+  /// `ExerciceChoisi::arreteDe()` — LA RÈGLE de la date d'arrêté des états d'un exercice [annee] : aujourd'hui s'il
+  /// est en cours, sa clôture s'il est passé, son premier jour s'il est à venir ; l'année civile s'il n'est pas connu.
+  /// `EtatsComparatifs.arreteDeLExercice` (EX8) y renvoie.
+  static DateTime arreteDe(List<FiscalYear> exercices, int annee, DateTime aujourdhui) {
+    final e = exercices.where((x) => x.year == annee && x.startDate != null && x.endDate != null).firstOrNull;
+    final debut = e == null ? DateTime(annee) : _jour(e.startDate!);
+    final fin = e == null ? DateTime(annee, 12, 31) : _jour(e.endDate!);
+    final jour = _jour(aujourdhui);
+    return jour.isBefore(debut) ? debut : (jour.isAfter(fin) ? fin : jour);
+  }
 
   /// `ExerciceChoisi::moisDeReference()` — premier jour du mois du jour, ou du dernier mois de l'exercice affiché.
   DateTime get moisDeReference => DateTime(dateArrete.year, dateArrete.month);

@@ -67,6 +67,9 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   late DateTime _jour;
   bool _chargement = true;
   DonneesMoisFiche? _mois;
+
+  /// Ticket EX8 (EF12) — motif R4 de la lecture seule (exercice clos), `null` quand le jour se saisit.
+  LectureSeuleDuJour? _lectureSeule;
   List<FeedRationStandard> _rations = const [];
 
   int _precedent = 0;
@@ -118,13 +121,16 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   /// changement de date ou de bande (🔴→✅ U12a, corrigé aussi au web) ; morts et dons enregistrés gardés en total.
   Future<void> _chargerJour() async {
     final bande = _bande;
+    // Ticket EX8 (EF12) : le mois AFFICHÉ est celui du jour choisi (`AvecMoisDeFiche` du web).
     final mois = await MoisFiche.charger(
       widget.depot.database,
       espece: EspeceFiche.reproducteurs,
       bandes: _bandes,
       bande: bande,
-      maintenant: _maintenant,
+      maintenant: _jour,
     );
+    // Ticket EX8 (EF12) : un jour d'un exercice CLOS se consulte en lecture seule ; fusion EX7 + EX8 : bandeau d'EX7.
+    final lectureSeule = await LectureSeuleDuJour.charger(widget.depot.database, _jour, maintenant: _maintenant);
     final precedent = bande == null ? 0 : await widget.depot.effectifPrecedent(bande.id, _jour);
     final fiche = bande == null ? null : await widget.depot.chargerJour(bande.id, _jour);
     final protocole = bande == null
@@ -133,6 +139,7 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
     if (!mounted) return;
     setState(() {
       _mois = mois;
+      _lectureSeule = lectureSeule;
       _precedent = precedent;
       _fiche = fiche;
       _protocole = protocole;
@@ -276,8 +283,17 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   Widget _carteSaisie() {
     final moyen = _pesee == null || _pesee == 0 || _effectifFinal <= 0 ? '—' : '${(_pesee! / _effectifFinal).round()} g';
     return CarteSaisieFiche(
+      lectureSeule: _lectureSeule,
+      onJour: _ouvrirJour,
       // Le Blade n'a que « Date : » dans l'en-tête : la bande se choisit dans le formulaire.
-      enTete: EnTeteSaisieFiche(titre: 'Saisie Journalière Couvoir & Suivi Chair', jour: _jour, onJour: _ouvrirJour),
+      enTete: EnTeteSaisieFiche(
+        titre: 'Saisie Journalière Couvoir & Suivi Chair',
+        jour: _jour,
+        onJour: _ouvrirJour,
+        maintenant: _maintenant,
+        onMoisPrecedent: _moisPrecedent,
+        onMoisSuivant: _moisSuivant,
+      ),
       blocs: [
         if ((_fiche?.transfertEntree ?? 0) > 0 || (_fiche?.transfertSortie ?? 0) > 0)
           TransfertsDuJourFiche(
@@ -591,5 +607,14 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
   Future<void> _ouvrirJour(DateTime jour) async {
     setState(() => _jour = DateTime(jour.year, jour.month, jour.day));
     await _chargerJour();
+  }
+
+  /// Ticket EX8 (EF12) — « ‹ » : le premier jour du mois précédent (`moisPrecedent()` du web).
+  Future<void> _moisPrecedent() => _ouvrirJour(MoisDeFiche.precedent(_jour));
+
+  /// Ticket EX8 (EF12) — « › » : le mois suivant, jamais au-delà du mois en cours (`moisSuivant()` du web).
+  Future<void> _moisSuivant() async {
+    final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+    if (suivant != null) await _ouvrirJour(suivant);
   }
 }

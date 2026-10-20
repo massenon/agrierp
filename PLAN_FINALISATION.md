@@ -354,10 +354,18 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **EX-Q8** : un exercice clos grise les saisies des écrans PILOTÉS (EF9 : Journal, Achats, Dépenses, Stocks, Soins, Transferts, Rapprochement, Historique des ventes) ; la **caisse**, les **fiches d'élevage**, la **paie** et les écrans clients ne lisent pas l'exercice affiché (une vente se date du jour). Faut-il les griser aussi quand 2026 clos est affiché ?
 - **EX-Q9** : les indicateurs « du mois » des écrans pilotés suivent le mois de référence de l'exercice affiché (le mois du jour, ou décembre 2026 lu en 2027) ; ceux qui ne sont pas « du mois » (Liste d'Achats, Historique des ventes au poste, totaux du Journal au poste) restent sur toute la ferme, comme avant. À confirmer.
 - **EX-Q10** : la Déclaration TVA et le Rapport mensuel ne proposent plus que les mois de l'exercice affiché (avant : les 12 derniers mois glissants, à cheval sur deux exercices). À confirmer.
+- **EX-Q11** (suite d'EX-Q5) : la date d'une dépense comptabilisée est grisée en modification ; son **montant** ne l'est pas (refus à l'enregistrement, sous « Montant »). Faut-il le griser aussi, d'abord au web ?
+
+**Questions nées d'EX8 (non tranchées)** — détail dans `README_SPRINT0.md` (numérotées EX-Q8 à EX-Q11 sur la branche d'EX8, renumérotées EX-Q12 à EX-Q15 à la fusion avec EX7, dont les EX-Q8 à EX-Q10 gardent leur numéro) :
+- **EX-Q12** : le Bilan et le Compte de résultat écartent l'écriture de solde des comptes de gestion (étape 2, `closing`) et sa contrepartie 131/139 : le résultat d'un exercice dont l'étape 2 est passée reste sur la ligne « Résultat de l'exercice » (avant : au 131, résultat 0) — mêmes totaux. Présentation « avant affectation » à confirmer par le cabinet FAGUEZ.
+- **EX-Q13** : la colonne N-1 présente l'exercice précédent À SA CLÔTURE (Bilan au 31/12/N-1, Compte de résultat de l'année entière), quelle que soit la date d'arrêté de N. Un comparatif « à date égale » (N au 31/01 contre N-1 au 31/01) n'est pas fait. À confirmer.
+- **EX-Q14** : le « Rapport mensuel » et la carte « Recettes du Mois » du hub (`produitsPeriode` / `chargesPeriode`) comptent encore l'écriture de solde : décembre d'un exercice dont l'étape 2 est passée affiche un chiffre d'affaires NÉGATIF (ventes de décembre − ventes de l'année). Relevé, non corrigé (hors du périmètre d'EX8). À corriger comme le Compte de résultat ?
+- **EX-Q15** : au poste, l'onglet « Flux de Trésorerie » et les « Notes Annexes » des États financiers restent sur le web (la décision Q5 ne vise que le Bilan et le Compte de résultat ; les Notes lisent le registre des immobilisations, qui ne descend pas). Les porter aussi ?
 
 ### Lot 2 — avant la clôture de 2026 (mars 2027)
 | EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | ✅ 20/10/2026 (+ EX-Q5 : date d'une dépense comptabilisée grisée ; voir README_SPRINT0) |
-| EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | 🔧 |
+| EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | ✅ 20/10/2026 (`README_SPRINT0.md` ; parité exécutée au poste) |
+| EX7 + EX8 | Fusion et branchement : le sélecteur d'EX7 pilote les colonnes N / N-1 (web : écran Bilan, onglets et PDF des États financiers ; poste : `etats_comparatifs.dart`) ; bandeau des fiches = celui d'EX7 | ✅ 20/10/2026 (README_SPRINT0, « EX7 + EX8 — fusion et branchement ») |
 
 ### Lot 3 — avec la clôture de 2026
 | EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |

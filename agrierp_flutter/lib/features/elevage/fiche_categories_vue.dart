@@ -166,6 +166,9 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
   bool _chargement = true;
 
   DonneesMoisFiche? _mois;
+
+  /// Ticket EX8 (EF12) — motif R4 de la lecture seule (exercice clos), `null` quand le jour se saisit.
+  LectureSeuleDuJour? _lectureSeule;
   List<FeedRationStandard> _rations = const [];
   Product? _produitProvende;
   double? _stockProvendeKg;
@@ -235,17 +238,21 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
   /// chaîne, pesée totale reconstituée, cases de prophylaxie décochées.
   Future<void> _chargerJour() async {
     final bande = _bande;
+    // Ticket EX8 (EF12) : le mois AFFICHÉ est celui du jour choisi (`AvecMoisDeFiche` du web).
     final mois = await MoisFiche.charger(
       widget.depot.database,
       espece: _c.espece,
       bandes: _bandes,
       bande: bande,
-      maintenant: _maintenant,
+      maintenant: _jour,
     );
+    // Ticket EX8 (EF12) : un jour d'un exercice CLOS se consulte en lecture seule ; fusion EX7 + EX8 : bandeau d'EX7.
+    final lectureSeule = await LectureSeuleDuJour.charger(widget.depot.database, _jour, maintenant: _maintenant);
     if (bande == null) {
       if (!mounted) return;
       setState(() {
         _mois = mois;
+        _lectureSeule = lectureSeule;
         _chargement = false;
       });
       return;
@@ -262,6 +269,7 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
 
     setState(() {
       _mois = mois;
+      _lectureSeule = lectureSeule;
       _precedent = precedent;
       _etat = etat;
       _fiche = fiche;
@@ -447,6 +455,8 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
     final cat = _categories;
     final provende = Provende.calculer(espece: _c.especeChaine, rations: _rations, categories: cat);
     return CarteSaisieFiche(
+      lectureSeule: _lectureSeule,
+      onJour: _ouvrirJour,
       enTete: EnTeteSaisieFiche(
         titre: _c.titreSaisie,
         jour: _jour,
@@ -457,6 +467,9 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
           setState(() => _bande = _bandes.firstWhere((b) => b.id == id));
           await _chargerJour();
         },
+        maintenant: _maintenant,
+        onMoisPrecedent: _moisPrecedent,
+        onMoisSuivant: _moisSuivant,
       ),
       blocs: [
         if ((_fiche?.transfertEntree ?? 0) > 0 || (_fiche?.transfertSortie ?? 0) > 0)
@@ -1220,5 +1233,14 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
   Future<void> _ouvrirJour(DateTime jour) async {
     setState(() => _jour = DateTime(jour.year, jour.month, jour.day));
     await _chargerJour();
+  }
+
+  /// Ticket EX8 (EF12) — « ‹ » : le premier jour du mois précédent (`moisPrecedent()` du web).
+  Future<void> _moisPrecedent() => _ouvrirJour(MoisDeFiche.precedent(_jour));
+
+  /// Ticket EX8 (EF12) — « › » : le mois suivant, jamais au-delà du mois en cours (`moisSuivant()` du web).
+  Future<void> _moisSuivant() async {
+    final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+    if (suivant != null) await _ouvrirJour(suivant);
   }
 }

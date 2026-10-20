@@ -1,5 +1,6 @@
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
+import 'etats_comparatifs.dart';
 import 'nature_compte.dart';
 import 'soldes_exercice.dart';
 
@@ -308,6 +309,23 @@ class DonneesComptabilite {
 
   FiscalYear? get exerciceOuvert =>
       exercices.where((e) => e.status == 'ouvert').firstOrNull;
+
+  // ── États Financiers N / N-1 (ticket EX8, EF11, décision Q5) ─────────────
+
+  /// Date d'arrêté des États Financiers — `EtatsFinanciers::asOfDate()` du web. Fusion EX7 + EX8 : la date d'arrêté
+  /// de l'exercice AFFICHÉ ([etat], `ExerciceChoisi::dateArrete()`) — colonne N = cet exercice, N-1 = son précédent.
+  /// Avant la fusion : l'exercice ouvert le plus récent (EX8, sans paramètre).
+  DateTime arreteEtatsFinanciers(EtatExercice etat) => etat.dateArrete;
+
+  /// Année de « Situation au … — Exercice AAAA » (`getSituationLabelProperty()` : `ExerciceChoisi::annee()`).
+  int anneeEtatsFinanciers(EtatExercice etat) => etat.annee;
+
+  /// Bilan N / N-1 à [arrete] (`FinancialReportService::bilanComparatif`, parité exécutée).
+  BilanComparatif bilanComparatif(DateTime arrete) => EtatsComparatifs.bilanComparatif(soldesExercice, arrete);
+
+  /// Compte de résultat N / N-1 à [arrete] (`compteResultatComparatif`, parité exécutée).
+  CompteResultatComparatif compteResultatComparatif(DateTime arrete) =>
+      EtatsComparatifs.compteResultatComparatif(soldesExercice, arrete);
 
   /// Écritures dont les lignes ne s'équilibrent pas — donc dont le tirage est
   /// incomplet.

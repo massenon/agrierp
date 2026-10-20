@@ -7,6 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\FixedAsset;
 use App\Models\Product;
 use App\Services\FinancialReportService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -52,32 +53,80 @@ class EtatsFinanciers extends Component
     #[Url]
     public string $tab = 'bilan';
 
-    /** Ticket EX7 (EF9) — l'exercice AFFICHÉ (`ExerciceChoisi`), et non plus le plus récent ouvert. */
+    /**
+     * Ticket EX8 (EF11) + EX7 (EF8) — L'EXERCICE AFFICHÉ, lu au point de passage unique `App\Support\ExerciceChoisi`
+     * (sélecteur de la barre supérieure, session) : onglets Bilan et Compte de Résultat (colonne N = l'exercice choisi,
+     * N-1 = son précédent à sa clôture), Flux de Trésorerie, Notes et PDF. Le paramètre `exercice` (d'EX8) n'est pas
+     * une seconde vérité : une année donnée à la page est CHOISIE (`ExerciceChoisi::choisir()`), une année sans
+     * exercice enregistré est refusée et la page reste sur l'exercice affiché. `FiscalYear::current()` ne sert plus ici.
+     */
+    public ?int $exercice = null;
+
+    public function mount(?int $exercice = null): void
+    {
+        if ($exercice !== null) {
+            ExerciceChoisi::choisir($exercice);
+        }
+
+        $this->exercice = ExerciceChoisi::annee();
+    }
+
+    /** Ticket EX8 — l'exercice changé en cours de route est CHOISI (un seul exercice affiché). */
+    public function updatedExercice(): void
+    {
+        if ($this->exercice !== null) {
+            ExerciceChoisi::choisir($this->exercice);
+        }
+
+        $this->exercice = ExerciceChoisi::annee();
+    }
+
     public function getFiscalYearProperty(): ?FiscalYear
     {
-        return \App\Support\ExerciceChoisi::exercice();
+        return ExerciceChoisi::exercice();
     }
 
     private function asOfDate(): string
     {
-        // Arrêté à aujourd'hui, ramené dans l'exercice affiché (sa fin quand on consulte 2026 en 2027).
-        return \App\Support\ExerciceChoisi::dateArrete();
+        // Arrêté à aujourd'hui, ramené dans l'exercice affiché (sa clôture quand on consulte 2026 en 2027).
+        return ExerciceChoisi::dateArrete();
     }
 
+    /** Premier jour de l'exercice affiché (l'année civile du jour si aucun exercice n'existe) : `ExerciceChoisi::bornes()`. */
     private function startDate(): string
     {
-        return $this->fiscalYear?->start_date->format('Y-m-d')
-            ?? now()->startOfYear()->format('Y-m-d');
+        return ExerciceChoisi::bornes()[0];
     }
 
+    /** @var array<string, array> calculs de la requête en cours, par date d'arrêté (jamais conservés d'une requête à l'autre) */
+    private array $calculs = [];
+
+    /** Ticket EX8 (EF11) — Bilan N / N-1 (`FinancialReportService::bilanComparatif`), un seul point de calcul. */
+    public function getBilanComparatifProperty(): array
+    {
+        $date = $this->asOfDate();
+
+        return $this->calculs['bilan|'.$date] ??= app(FinancialReportService::class)->bilanComparatif($date);
+    }
+
+    /** Ticket EX8 (EF11) — Compte de résultat N / N-1 (`compteResultatComparatif`). */
+    public function getResultatComparatifProperty(): array
+    {
+        $date = $this->asOfDate();
+
+        return $this->calculs['resultat|'.$date] ??= app(FinancialReportService::class)->compteResultatComparatif($date);
+    }
+
+    /** Le Bilan de l'exercice affiché — la colonne N du comparatif. */
     public function getBilanProperty(): array
     {
-        return app(FinancialReportService::class)->bilan($this->asOfDate());
+        return $this->bilanComparatif['n'];
     }
 
+    /** Le Compte de résultat de l'exercice affiché — la colonne N du comparatif. */
     public function getResultatProperty(): array
     {
-        return app(FinancialReportService::class)->compteResultat($this->asOfDate());
+        return $this->resultatComparatif['n'];
     }
 
     public function getTafireProperty(): array
@@ -88,7 +137,7 @@ class EtatsFinanciers extends Component
     public function getSituationLabelProperty(): string
     {
         return 'Situation au '.\Carbon\Carbon::parse($this->asOfDate())->format('d/m/Y')
-            .' — Exercice '.($this->fiscalYear?->year ?? now()->year);
+            .' — Exercice '.ExerciceChoisi::annee();
     }
 
     /**
@@ -152,6 +201,9 @@ class EtatsFinanciers extends Component
                 'tab' => $this->tab,
                 'bilan' => $this->bilan,
                 'resultat' => $this->resultat,
+                // Ticket EX8 (EF11) — les deux colonnes N / N-1, au PDF comme à l'écran.
+                'bilanComparatif' => $this->bilanComparatif,
+                'resultatComparatif' => $this->resultatComparatif,
                 'tafire' => $this->tafire,
                 'stockValuation' => $this->stockValuation,
             ],

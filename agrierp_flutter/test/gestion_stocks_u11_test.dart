@@ -234,10 +234,19 @@ void main() {
           File('lib/features/comptabilite/documents_comptabilite.dart').readAsStringSync(),
           contains(r"fichier: 'grand-livre-${c?.code ?? 'compte'}-{jour}.pdf'"),
         );
-        // La fiche Pondeuses : `'fiche-'.now()->format('Y-m').'.pdf'`.
+        // La fiche Pondeuses : ticket EX8 (EF12), le mois AFFICHÉ — `fichierDuPdf()` d'`AvecMoisDeFiche`,
+        // `'fiche-'.$this->debutMoisFiche()->format('Y-m').'.pdf'` (avant : le mois de `now()`).
         expect(
           File('$dossierLaravel/app/Livewire/Elevage/FichePondeuses.php').readAsStringSync(),
-          contains("'fiche-'.now()->format('Y-m').'.pdf'"),
+          contains(r'$this->fichierDuPdf()'),
+        );
+        expect(
+          File('$dossierLaravel/app/Livewire/Elevage/Concerns/AvecMoisDeFiche.php').readAsStringSync(),
+          contains(r"'fiche-'.$this->debutMoisFiche()->format('Y-m').'.pdf'"),
+        );
+        expect(
+          File('lib/features/elevage/mois_pondeuses.dart').readAsStringSync(),
+          contains(r"fichier: 'fiche-${maintenant.year}-${deux(maintenant.month)}.pdf'"),
         );
       },
       skip: sautSansWeb,

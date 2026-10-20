@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
+import '../../core/database/app_database.dart' show AppDatabase, FiscalYear;
+import '../../core/widgets/bandeau_exercice.dart';
+
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -220,14 +224,29 @@ class AucuneBandeFiche extends StatelessWidget {
 
 /// La carte de saisie du Blade (`bg-white rounded-lg border shadow-sm p-md lg:p-lg`), ses blocs espacés de `space-y-md`.
 class CarteSaisieFiche extends StatelessWidget {
-  const CarteSaisieFiche({super.key, required this.enTete, required this.blocs});
+  const CarteSaisieFiche({
+    super.key,
+    required this.enTete,
+    required this.blocs,
+    this.lectureSeule,
+    this.onJour,
+  });
 
   final Widget enTete;
   final List<Widget> blocs;
 
+  /// Ticket EX8 (EF12) — le jour choisi est dans un exercice CLOS : bandeau de lecture seule en tête du formulaire
+  /// (celui d'EX7, fusion EX7 + EX8), formulaire grisé et inerte (`<fieldset disabled>` du Blade) ; l'en-tête (bande,
+  /// date, mois) reste utilisable pour consulter. `null` : le jour se saisit.
+  final LectureSeuleDuJour? lectureSeule;
+
+  /// « Passer à … » du bandeau : ouvre ce jour (`passerALExerciceDeSaisie()` du web).
+  final ValueChanged<DateTime>? onJour;
+
   @override
   Widget build(BuildContext context) {
     final large = AgriBreakpoints.large(context);
+    final ls = lectureSeule;
     return Container(
       padding: EdgeInsets.all(large ? AgriSpacing.lg : AgriSpacing.md),
       decoration: BoxDecoration(
@@ -240,9 +259,214 @@ class CarteSaisieFiche extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           enTete,
-          for (final b in blocs) ...[const SizedBox(height: AgriSpacing.md), b],
+          if (ls != null && ls.bandeauVisible(context)) ...[
+            const SizedBox(height: AgriSpacing.md),
+            ls.bandeau(onJour),
+          ],
+          FormulaireFiche(
+            lectureSeule: ls != null,
+            enfant: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final b in blocs) ...[const SizedBox(height: AgriSpacing.md), b],
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Ticket EX8 (EF12) — `<fieldset @disabled(...)>` du Blade : en lecture seule, le formulaire est grisé et ne reçoit
+/// plus aucun geste (compteurs, champs, « Enregistrer ce Jour », validation des traitements).
+class FormulaireFiche extends StatelessWidget {
+  const FormulaireFiche({super.key, required this.lectureSeule, required this.enfant});
+
+  final bool lectureSeule;
+  final Widget enfant;
+
+  @override
+  Widget build(BuildContext context) => lectureSeule
+      ? AbsorbPointer(
+          key: const Key('formulaire-lecture-seule'),
+          child: Opacity(opacity: 0.6, child: enfant),
+        )
+      : enfant;
+}
+
+/// Fusion EX7 + EX8 (EF12) — LA LECTURE SEULE D'UN JOUR DE FICHE : copie de `Concerns\AvecMoisDeFiche` du web
+/// (`motifLectureSeule`, `bandeauLectureSeule`, `passerALExerciceDeSaisie`). Jugée sur l'exercice du JOUR CHOISI
+/// (`ExerciceChoisi::exerciceDuJour`), jamais sur l'exercice affiché (EX-Q8) ; dite avec LE bandeau d'EX7
+/// ([BandeauLectureSeule], texte `ExerciceChoisi::bandeauDe` mot pour mot). Le refus d'enregistrer reste celui du
+/// poste et du serveur (message R4, EX5 / EX6).
+class LectureSeuleDuJour {
+  const LectureSeuleDuJour({
+    required this.annee,
+    required this.motif,
+    required this.texte,
+    required this.cible,
+    required this.jourDeSaisie,
+  });
+
+  /// L'exercice (clos) du jour choisi.
+  final int annee;
+
+  /// « Exercice 2025 clôturé — lecture seule » (`ExerciceChoisi::motifLectureSeuleDe`).
+  final String motif;
+
+  /// Texte et lien du bandeau (`ExerciceChoisi::bandeauDe`).
+  final String texte;
+  final int? cible;
+
+  /// Le jour qu'ouvre « Passer à … » : celui de l'exercice cible le plus proche d'aujourd'hui (`arreteDe`), jamais
+  /// au-delà d'aujourd'hui (pas de mois à venir, comme « › »). `null` sans cible.
+  final DateTime? jourDeSaisie;
+
+  /// La règle, sans base : `null` quand le jour se saisit (exercice ouvert, ou aucun exercice ne le couvre).
+  static LectureSeuleDuJour? juger(List<FiscalYear> exercices, DateTime jour, DateTime maintenant) {
+    final etat = EtatExercice(exercices: exercices, memorise: null, aujourdhui: maintenant);
+    final e = etat.exerciceDuJour(jour);
+    final motif = EtatExercice.motifLectureSeuleDe(e);
+    final bandeau = etat.bandeauDe(e);
+    if (e == null || motif == null || bandeau == null) return null;
+    final cible = bandeau.cible;
+    DateTime? jourDeSaisie;
+    if (cible != null) {
+      final arrete = EtatExercice.arreteDe(etat.exercices, cible, etat.aujourdhui);
+      jourDeSaisie = arrete.isAfter(etat.aujourdhui) ? etat.aujourdhui : arrete;
+    }
+    return LectureSeuleDuJour(annee: e.year, motif: motif, texte: bandeau.texte, cible: cible, jourDeSaisie: jourDeSaisie);
+  }
+
+  /// [juger] sur les exercices connus du poste.
+  static Future<LectureSeuleDuJour?> charger(AppDatabase db, DateTime jour, {required DateTime maintenant}) async =>
+      juger(await db.select(db.fiscalYears).get(), jour, maintenant);
+
+  /// `bandeauLectureSeule` du web : pas de bandeau dans la fiche quand l'exercice du jour EST l'exercice affiché — le
+  /// bandeau du haut du contenu ([BandeauExercice]) dit déjà la même chose. Le formulaire reste inerte.
+  bool bandeauVisible(BuildContext context) => PorteeExerciceChoisi.lire(context)?.exercice?.year != annee;
+
+  /// `<x-bandeau-lecture-seule :bandeau="$this->bandeauLectureSeule" action="passerALExerciceDeSaisie" />`.
+  Widget bandeau(ValueChanged<DateTime>? onJour) {
+    final jour = jourDeSaisie;
+    return BandeauLectureSeule(
+      key: const Key('lecture-seule'),
+      texte: texte,
+      cible: cible,
+      onPasser: jour == null || onJour == null ? null : () => onJour(jour),
+      clePasser: const Key('lecture-seule-passer'),
+    );
+  }
+}
+
+/// Ticket EX8 (EF12) — `components/mois-de-fiche.blade.php` : « Mois : » puis « ‹ » (mois précédent), le mois
+/// affiché, « › » (mois suivant, grisé sur le mois en cours). Le mois affiché est celui du jour choisi (`selectedDate`
+/// au web) : tableau du mois, cartes du mois, soins du mois et PDF le suivent.
+class MoisDeFiche extends StatelessWidget {
+  const MoisDeFiche({
+    super.key,
+    required this.jour,
+    required this.maintenant,
+    required this.onPrecedent,
+    required this.onSuivant,
+  });
+
+  /// Le jour choisi (son mois est le mois affiché).
+  final DateTime jour;
+  final DateTime maintenant;
+  final VoidCallback onPrecedent;
+  final VoidCallback onSuivant;
+
+  static const etiquette = 'Mois :';
+  static const infoPrecedent = 'Mois précédent';
+  static const infoSuivant = 'Mois suivant';
+
+  static const _mois = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre',
+    'Décembre',
+  ];
+
+  /// `ucfirst(translatedFormat('F Y'))` du web : « Septembre 2026 ».
+  static String libelle(DateTime jour) => '${_mois[jour.month - 1]} ${jour.year}';
+
+  /// Le mois de [jour] est-il celui de [maintenant] (ou à venir) ? « › » est alors grisé (`estMoisCourant`).
+  static bool estMoisCourant(DateTime jour, DateTime maintenant) =>
+      jour.year * 12 + jour.month >= maintenant.year * 12 + maintenant.month;
+
+  /// `moisPrecedent()` : le premier jour du mois précédent.
+  static DateTime precedent(DateTime jour) => DateTime(jour.year, jour.month - 1, 1);
+
+  /// `moisSuivant()` : le premier jour du mois suivant — le jour même quand c'est le mois en cours ; `null` depuis le
+  /// mois en cours (jamais de mois à venir).
+  static DateTime? suivant(DateTime jour, DateTime maintenant) {
+    if (estMoisCourant(jour, maintenant)) return null;
+    final s = DateTime(jour.year, jour.month + 1, 1);
+    return s.year == maintenant.year && s.month == maintenant.month
+        ? DateTime(maintenant.year, maintenant.month, maintenant.day)
+        : s;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final courant = estMoisCourant(jour, maintenant);
+    Widget fleche(String cle, IconData icone, String info, VoidCallback? onTap) => Tooltip(
+      message: info,
+      child: InkWell(
+        key: Key(cle),
+        onTap: onTap,
+        child: SizedBox(
+          width: 32,
+          height: 36,
+          child: Icon(
+            icone,
+            size: 18,
+            color: onTap == null ? AgriColors.brandForest.withValues(alpha: 0.4) : AgriColors.brandForest,
+          ),
+        ),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          etiquette,
+          style: TextStyle(
+            fontSize: AgriTypography.xs,
+            fontWeight: AgriTypography.demiGras,
+            color: AgriColors.outline,
+          ),
+        ),
+        const SizedBox(width: AgriSpacing.xs),
+        Container(
+          key: const Key('mois-de-fiche'),
+          height: 36,
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceZebra,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              fleche('mois-precedent', SymbolesAgri.chevron_left, infoPrecedent, onPrecedent),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+                child: Text(
+                  libelle(jour),
+                  key: const Key('mois-affiche'),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: AgriTypography.gras,
+                    color: AgriColors.brandForest,
+                  ),
+                ),
+              ),
+              fleche('mois-suivant', SymbolesAgri.chevron_right, infoSuivant, courant ? null : onSuivant),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -258,11 +482,20 @@ class EnTeteSaisieFiche extends StatelessWidget {
     this.bandes = const [],
     this.bandeId,
     this.onBande,
+    this.maintenant,
+    this.onMoisPrecedent,
+    this.onMoisSuivant,
   });
 
   final String titre;
   final DateTime jour;
   final ValueChanged<DateTime> onJour;
+
+  /// Ticket EX8 (EF12) — la navigation de mois ([MoisDeFiche]) après « Date : », comme `<x-mois-de-fiche>` du Blade ;
+  /// absente sans [onMoisPrecedent].
+  final DateTime? maintenant;
+  final VoidCallback? onMoisPrecedent;
+  final VoidCallback? onMoisSuivant;
 
   /// `(identifiant, code)` des bandes ; le sélecteur n'apparaît qu'à partir de deux bandes, comme au web.
   final List<(String, String)> bandes;
@@ -366,6 +599,13 @@ class EnTeteSaisieFiche extends StatelessWidget {
                   child: Text(dateLongue(jour), key: const Key('date-choisie'), style: style),
                 ),
               ),
+              if (onMoisPrecedent != null && onMoisSuivant != null)
+                MoisDeFiche(
+                  jour: jour,
+                  maintenant: maintenant ?? jour,
+                  onPrecedent: onMoisPrecedent!,
+                  onSuivant: onMoisSuivant!,
+                ),
             ],
           ),
         ],

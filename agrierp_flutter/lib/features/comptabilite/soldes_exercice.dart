@@ -35,12 +35,17 @@ class SoldesExercice {
            (
              jour: jour(e.entryDate),
              aNouveau: sourcesANouveau.contains(e.sourceType),
+             soldeGestion: sourcesSoldeGestion.contains(e.sourceType),
              lignes: lignesParEcriture[e.id] ?? const <AccountingEntryLine>[],
            ),
        ];
 
   /// `FinancialReportService::SOURCES_A_NOUVEAU`.
   static const sourcesANouveau = {'ran', 'ran_reversal'};
+
+  /// Ticket EX8 — `FinancialReportService::SOURCES_SOLDE_GESTION` : l'écriture de solde des comptes de gestion (étape 2
+  /// de la clôture, au 31/12) que le Bilan et le Compte de résultat écartent, ses deux côtés ensemble.
+  static const sourcesSoldeGestion = {'closing'};
 
   /// `FinancialReportService::libelleResultatProvisoire`.
   static String libelleResultatProvisoire(int annee) =>
@@ -49,7 +54,9 @@ class SoldesExercice {
   final List<FiscalYear> _exercices;
   final Map<String, ChartOfAccount> _plan;
   final Map<String, String> _codeVersId;
-  final List<({int jour, bool aNouveau, List<AccountingEntryLine> lignes})>
+  final List<
+    ({int jour, bool aNouveau, bool soldeGestion, List<AccountingEntryLine> lignes})
+  >
   _ecritures;
   final Map<int, OuvertureExercice> _ouvertures = {};
 
@@ -232,21 +239,25 @@ class SoldesExercice {
   }
 
   /// Cumuls débit / crédit par compte, jours [du] (inclus, `null` = depuis l'origine) à [au] (inclus) ;
-  /// [aNouveau] vrai : les seuls à-nouveaux, faux : tout le reste.
+  /// [aNouveau] vrai : les seuls à-nouveaux, faux : tout le reste ; [horsSoldeGestion] vrai (ticket EX8) : sans
+  /// l'écriture de solde des comptes de gestion.
   Map<String, ({double debit, double credit})> cumuls(
     int? du,
     int au, {
     required bool aNouveau,
-  }) => _cumuls(du, au, aNouveau: aNouveau);
+    bool horsSoldeGestion = false,
+  }) => _cumuls(du, au, aNouveau: aNouveau, horsSoldeGestion: horsSoldeGestion);
 
   Map<String, ({double debit, double credit})> _cumuls(
     int? du,
     int au, {
     required bool aNouveau,
+    bool horsSoldeGestion = false,
   }) {
     final cumuls = <String, ({double debit, double credit})>{};
     for (final e in _ecritures) {
       if (e.aNouveau != aNouveau) continue;
+      if (horsSoldeGestion && e.soldeGestion) continue;
       if (e.jour > au || (du != null && e.jour < du)) continue;
       for (final l in e.lignes) {
         final avant = cumuls[l.accountId];
@@ -259,8 +270,14 @@ class SoldesExercice {
     return cumuls;
   }
 
-  /// `soldes($date, $inclus)` : soldes R1 à [date] ; [inclus] faux = à l'ouverture de la journée.
-  SoldesR1 soldes(DateTime date, {bool inclus = true}) {
+  /// `soldes($date, $inclus, $horsSoldeGestion)` : soldes R1 à [date] ; [inclus] faux = à l'ouverture de la journée ;
+  /// [horsSoldeGestion] vrai (ticket EX8 : Bilan et Compte de résultat) : sans l'écriture de solde des comptes de
+  /// gestion de l'exercice.
+  SoldesR1 soldes(
+    DateTime date, {
+    bool inclus = true,
+    bool horsSoldeGestion = false,
+  }) {
     final j = jour(date);
     final exercice = exerciceDe(j);
     final ouverture = _ouverture(exercice);
@@ -268,7 +285,12 @@ class SoldesExercice {
 
     final comptes = Map<String, SoldeCompte>.of(ouverture.comptes);
     if (fin >= exercice.debut) {
-      for (final e in _cumuls(exercice.debut, fin, aNouveau: false).entries) {
+      for (final e in _cumuls(
+        exercice.debut,
+        fin,
+        aNouveau: false,
+        horsSoldeGestion: horsSoldeGestion,
+      ).entries) {
         final avant = comptes[e.key] ?? _meta(e.key);
         comptes[e.key] = avant.avecNet(
           arrondi(avant.net + e.value.debit - e.value.credit),

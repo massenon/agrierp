@@ -174,9 +174,27 @@ final class ExerciceChoisi
     /** Motif des boutons grisés (info-bulle) : « Exercice 2026 clôturé — lecture seule » ; `null` : exercice ouvert. */
     public static function motifLectureSeule(): ?string
     {
-        $exercice = self::exercice();
+        return self::motifLectureSeuleDe(self::exercice());
+    }
 
+    /**
+     * Le motif de lecture seule d'un exercice DONNÉ : celui de l'exercice affiché (`motifLectureSeule`), ou, pour une
+     * fiche d'élevage (EF12, ticket EX8), celui de l'exercice qui contient le jour choisi (`exerciceDuJour`).
+     */
+    public static function motifLectureSeuleDe(?FiscalYear $exercice): ?string
+    {
         return $exercice?->status === 'cloture' ? "Exercice {$exercice->year} clôturé — lecture seule" : null;
+    }
+
+    /**
+     * L'exercice qui contient [$date] (le premier par date de début, comme `AccountingEntryService::exerciceQuiCouvre`) ;
+     * `null` si aucun ne la couvre — rien n'est alors en lecture seule (le refus du serveur, R4, ne joue pas non plus).
+     */
+    public static function exerciceDuJour(string $date): ?FiscalYear
+    {
+        $jour = substr($date, 0, 10);
+
+        return FiscalYear::whereDate('start_date', '<=', $jour)->whereDate('end_date', '>=', $jour)->orderBy('start_date')->first();
     }
 
     /**
@@ -187,7 +205,18 @@ final class ExerciceChoisi
      */
     public static function bandeau(): ?array
     {
-        $motif = self::motifLectureSeule();
+        return self::bandeauDe(self::exercice());
+    }
+
+    /**
+     * Le bandeau de lecture seule d'un exercice DONNÉ — même texte, même lien, que ce soit l'exercice affiché (en haut
+     * du contenu) ou celui du jour d'une fiche d'élevage (EF12). `null` : exercice ouvert (ou inconnu).
+     *
+     * @return array{texte: string, cible: ?int}|null
+     */
+    public static function bandeauDe(?FiscalYear $exercice): ?array
+    {
+        $motif = self::motifLectureSeuleDe($exercice);
         if ($motif === null) {
             return null;
         }
@@ -243,10 +272,28 @@ final class ExerciceChoisi
         return $debut <= $fin ? [$debut, $fin] : [$debut, $debut];
     }
 
-    /** Date d'arrêté par défaut d'un état : aujourd'hui si l'exercice le contient, sinon sa fin (ou son début). */
+    /**
+     * Date d'arrêté par défaut d'un état de l'exercice affiché (Bilan, États financiers et leurs colonnes N / N-1,
+     * Balance « mois ») : aujourd'hui s'il le contient, sinon sa fin (ou son début) — `arreteDe(annee())`.
+     */
     public static function dateArrete(): string
     {
-        return self::borner(self::aujourdhui()->format('Y-m-d'));
+        return self::arreteDe(self::annee());
+    }
+
+    /**
+     * Tickets EX7 + EX8 — LA RÈGLE de la date d'arrêté des états d'un exercice [$annee] : aujourd'hui (heure du Bénin)
+     * s'il est en cours, sa clôture s'il est passé, son premier jour s'il est à venir ; l'année civile s'il n'est pas
+     * enregistré. `FinancialReportService::arreteDeLExercice()` (EX8) y renvoie : une seule règle, un seul fuseau.
+     */
+    public static function arreteDe(int $annee): string
+    {
+        $exercice = FiscalYear::where('year', $annee)->first();
+        $debut = $exercice?->start_date->format('Y-m-d') ?? "{$annee}-01-01";
+        $fin = $exercice?->end_date->format('Y-m-d') ?? "{$annee}-12-31";
+        $jour = self::aujourdhui()->format('Y-m-d');
+
+        return $jour < $debut ? $debut : ($jour > $fin ? $fin : $jour);
     }
 
     /** Premier jour du mois de référence : le mois du jour s'il est dans l'exercice affiché, sinon son dernier mois. */

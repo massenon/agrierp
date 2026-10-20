@@ -584,11 +584,24 @@ void main() {
       );
     });
 
-    /// ⚠️⚠️ CINQ PAGES RESTENT SUR LE WEB, chacune avec SA raison.
+    /// ⚠️⚠️ QUATRE PAGES RESTENT SUR LE WEB, chacune avec SA raison (cinq avant EX8 : les États Financiers sont
+    /// embarqués).
     testWidgets('⚠️⚠️ chaque page non embarquée porte son propre motif', (
       tester,
     ) async {
       await afficher(tester);
+      // Sur le hub, seules ces pages disent « Consultation sur la surface web » (plus les États Financiers).
+      expect(
+        find.text('Consultation sur la surface web'),
+        findsNWidgets(_ComptabiliteMotifs.attendus.length),
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('carte-etatsFinanciers')),
+          matching: find.text('Consultation sur la surface web'),
+        ),
+        findsNothing,
+      );
 
       for (final entree in _ComptabiliteMotifs.attendus.entries) {
         await ouvrir(tester, entree.key);
@@ -611,10 +624,10 @@ void main() {
   });
 }
 
-/// Les cinq motifs attendus, un par page non embarquée — chacun DIFFÉRENT.
+/// Les quatre motifs attendus, un par page non embarquée — chacun DIFFÉRENT. Ticket EX8 (décision Q5) : les États
+/// Financiers sont embarqués (`comparatif_n_moins_un_parite_test.dart`).
 class _ComptabiliteMotifs {
   static const attendus = <PageComptable, String>{
-    PageComptable.etatsFinanciers: 'rubrique SYSCOHADA',
     PageComptable.cloture: "hors du contrat de synchronisation",
     PageComptable.analytique: 'centres de coût',
     PageComptable.tva: 'pièce fiscale',
