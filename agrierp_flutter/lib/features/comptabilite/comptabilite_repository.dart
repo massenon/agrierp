@@ -1,5 +1,6 @@
 import '../../core/database/app_database.dart';
 import 'nature_compte.dart';
+import 'soldes_exercice.dart';
 
 /// Référence découpée comme le serveur (`explode('—', $reference, 2)`, chaque morceau rogné) :
 /// « N° Pièce » avant le premier « — » (toute la référence s'il n'y en a pas), « Libellé » après
@@ -107,6 +108,7 @@ class GrandLivreCompte {
     required this.totalDebit,
     required this.totalCredit,
     required this.soldeFinal,
+    this.ouverture,
   });
 
   final ChartOfAccount? compte;
@@ -118,6 +120,10 @@ class GrandLivreCompte {
   final double totalDebit;
   final double totalCredit;
   final double? soldeFinal;
+
+  /// Tickets EX1 / EX2 — ouverture de l'exercice de la période (`ouverture` du serveur) : « À-nouveaux
+  /// provisoires » quand l'exercice précédent est encore ouvert. `null` : aucun compte choisi.
+  final OuvertureExercice? ouverture;
 }
 
 /// Les deux périodes du sélecteur de `balance-generale.html` (`bal-periode-select`) — mêmes valeurs
@@ -139,6 +145,8 @@ class LigneBalance {
     required this.mouvementsCredit,
     required this.finalDebit,
     required this.finalCredit,
+    this.resultatProvisoire,
+    this.resultatHorsPlan,
   });
 
   final String compteId;
@@ -155,10 +163,25 @@ class LigneBalance {
   final double finalDebit;
   final double finalCredit;
 
-  /// Numéro du compte, « — » si le poste ne le connaît pas.
-  String get code => compte?.code ?? '—';
+  /// Ticket EX2 — ligne « Résultat de l'exercice N (provisoire) » (R3) : une ligne à part, au 131 ou au 139,
+  /// comme la balance du serveur (`provisoire` vrai). `null` pour une ligne de compte.
+  final LigneResultat? resultatProvisoire;
 
-  String get libelle => compte?.label ?? 'Compte absent du plan reçu au poste';
+  bool get provisoire => resultatProvisoire != null;
+
+  /// Résultat reporté sur un 131 / 139 ABSENT du plan (clé `resultat-131` du serveur) : le serveur connaît son
+  /// numéro et son libellé (`ligneResultat`), le poste aussi.
+  final SoldeCompte? resultatHorsPlan;
+
+  /// Numéro du compte, « — » si le poste ne le connaît pas.
+  String get code =>
+      resultatProvisoire?.code ?? compte?.code ?? resultatHorsPlan?.code ?? '—';
+
+  String get libelle =>
+      resultatProvisoire?.libelle ??
+      compte?.label ??
+      resultatHorsPlan?.libelle ??
+      'Compte absent du plan reçu au poste';
 }
 
 /// La Balance Générale d'une période — l'équivalent poste du tableau que renvoie
@@ -182,6 +205,7 @@ class BalanceGenerale {
     required this.ecart,
     required this.journalVide,
     required this.journalIncomplet,
+    this.ouverture,
   });
 
   final List<LigneBalance> lignes;
@@ -198,6 +222,9 @@ class BalanceGenerale {
   final bool journalVide;
   final bool journalIncomplet;
 
+  /// Tickets EX1 / EX2 — ouverture de l'exercice du début de période (« À-nouveaux provisoires »).
+  final OuvertureExercice? ouverture;
+
   /// `is_balanced` du serveur : `abs($ecart) < 0.01`. ⚠️ La maquette tolérait `< 1` (un franc) ;
   /// Laravel fait foi sur la règle : un centime d'écart est un déséquilibre.
   bool get equilibree => ecart.abs() < 0.01;
@@ -206,12 +233,20 @@ class BalanceGenerale {
 }
 
 class DonneesComptabilite {
-  const DonneesComptabilite({
+  DonneesComptabilite({
     required this.comptes,
     required this.exercices,
     required this.journal,
     required this.lignesParEcriture,
   });
+
+  /// Tickets EX1 / EX2 — règles R1 et R3 (`FinancialReportService` du serveur), sur le journal reçu.
+  late final SoldesExercice soldesExercice = SoldesExercice(
+    exercices: exercices,
+    ecritures: [for (final e in journal) e.ecriture],
+    lignesParEcriture: lignesParEcriture,
+    plan: comptes,
+  );
 
   final List<ChartOfAccount> comptes;
   final List<FiscalYear> exercices;
@@ -340,40 +375,18 @@ class DonneesComptabilite {
       )
       .length;
 
-  /// Cumuls BRUTS débit / crédit par compte des lignes dont le jour calendaire satisfait [retenir].
-  ///
-  /// Base commune du solde d'ouverture du Grand Livre et de la Balance (`accountLinesQuery` /
-  /// `sumsByAccount` du serveur) : un seul endroit décide ce qui est « avant le début ».
-  Map<String, ({double debit, double credit})> _cumulsParCompte(
-    bool Function(int jour) retenir,
-  ) {
-    final cumuls = <String, ({double debit, double credit})>{};
-    for (final entree in journal) {
-      final jour = _jour(entree.ecriture.entryDate);
-      if (!retenir(jour)) continue;
-      for (final ligne in entree.lignes) {
-        final avant = cumuls[ligne.accountId];
-        cumuls[ligne.accountId] = (
-          debit: (avant?.debit ?? 0) + ligne.debit,
-          credit: (avant?.credit ?? 0) + ligne.credit,
-        );
-      }
-    }
-    return cumuls;
-  }
-
-  /// Ouverture : tout ce qui précède STRICTEMENT [jourDebut] (`whereDate(entry_date, '<', $start)`).
-  /// Sans borne de début, rien n'est « avant ».
-  Map<String, ({double debit, double credit})> _cumulsAvant(int? jourDebut) =>
-      jourDebut == null
-      ? const {}
-      : _cumulsParCompte((jour) => jour < jourDebut);
-
   /// Balance Générale d'une période — reproduction de `FinancialReportService::balanceGenerale`.
   ///
   /// Règles du serveur reproduites (bornes en JOURS CALENDAIRES) :
-  ///  - ouverture = cumul STRICTEMENT avant [debut], présentée NETTE dans une seule colonne ;
-  ///  - mouvements = cumuls BRUTS de [debut] à [fin] inclus (un compte peut l'être dans les deux sens) ;
+  ///  - 🔴→✅ ticket EX1 (défaut C1) : ouverture = soldes R1 à l'ouverture de la journée [debut]
+  ///    ([SoldesExercice.soldes] : à-nouveau, ou calcul R3 tant que l'exercice précédent est ouvert, + mouvements de
+  ///    l'exercice avant [debut] ; classes 6-7 depuis le premier jour de l'exercice) — et non plus tout l'historique,
+  ///    auquel l'à-nouveau du 01/01 s'ajoutait : chaque solde de bilan comptait deux fois après une clôture ;
+  ///    présentée NETTE dans une seule colonne ;
+  ///  - ticket EX2 : la ligne « Résultat de l'exercice N (provisoire) » est une ligne À PART (après le compte réel du
+  ///    même numéro quand il a une ouverture ou un mouvement antérieur, avant lui sinon — l'ordre du serveur) ;
+  ///  - mouvements = cumuls BRUTS de [debut] à [fin] inclus, à-nouveaux exclus (un compte peut l'être dans les deux
+  ///    sens) ;
   ///  - final = (ouverture + mouvements) net, placé selon le SIGNE réel, JAMAIS selon la nature du
   ///    compte (`natureDebitrice` n'est volontairement PAS utilisée : la balance doit révéler un compte
   ///    en anomalie, pas le faire disparaître des deux colonnes) ;
@@ -389,17 +402,42 @@ class DonneesComptabilite {
   }) {
     final jourDebut = _jour(debut);
     final jourFin = _jour(fin);
-    final ouverture = _cumulsAvant(jourDebut);
-    final periode = _cumulsParCompte(
-      (jour) => jour >= jourDebut && jour <= jourFin,
+    final soldes = soldesExercice.soldes(debut, inclus: false);
+    final periode = soldesExercice.cumuls(
+      jourDebut,
+      jourFin,
+      aNouveau: false,
     );
     final parId = {for (final c in comptes) c.id: c};
+    final provisoire = soldes.resultatProvisoire;
+    const idProvisoire = 'resultat-provisoire';
 
-    final ids = {...ouverture.keys, ...periode.keys}.toList()
+    // Union du serveur (`$opening + $period`) : soldes d'ouverture, puis la ligne provisoire, puis les comptes
+    // mouvementés dans la période seulement ; puis tri STABLE par code (`uasort`).
+    final union = [
+      ...soldes.comptes.keys,
+      if (provisoire != null) idProvisoire,
+      for (final id in periode.keys)
+        if (!soldes.comptes.containsKey(id)) id,
+    ];
+    final rang = {for (var i = 0; i < union.length; i++) union[i]: i};
+    // Un résultat porté sur un 131 / 139 absent du plan garde le numéro que le serveur lui donne.
+    SoldeCompte? horsPlan(String id) =>
+        id.startsWith('resultat-') && !parId.containsKey(id)
+        ? soldes.comptes[id]
+        : null;
+    String? codeDe(String id) => id == idProvisoire
+        ? provisoire!.code
+        : parId[id]?.code ?? horsPlan(id)?.code;
+    final ids = union.toList()
       ..sort((a, b) {
-        final ca = parId[a];
-        final cb = parId[b];
-        if (ca != null && cb != null) return ca.code.compareTo(cb.code);
+        final ca = codeDe(a);
+        final cb = codeDe(b);
+        if (ca != null && cb != null) {
+          final parCode = ca.compareTo(cb);
+          if (parCode != 0) return parCode;
+          return rang[a]!.compareTo(rang[b]!);
+        }
         if (ca != null) return -1;
         if (cb != null) return 1;
         return a.compareTo(b);
@@ -410,9 +448,10 @@ class DonneesComptabilite {
     var tFinD = 0.0, tFinC = 0.0;
 
     for (final id in ids) {
-      final o = ouverture[id];
       final p = periode[id];
-      final ouvertureNette = _arrondi((o?.debit ?? 0) - (o?.credit ?? 0));
+      final ouvertureNette = _arrondi(
+        id == idProvisoire ? provisoire!.net : soldes.comptes[id]?.net ?? 0,
+      );
       final ouvD = ouvertureNette > 0 ? ouvertureNette : 0.0;
       final ouvC = ouvertureNette < 0 ? -ouvertureNette : 0.0;
       final mvtD = _arrondi(p?.debit ?? 0);
@@ -433,6 +472,8 @@ class DonneesComptabilite {
           mouvementsCredit: mvtC,
           finalDebit: finD,
           finalCredit: finC,
+          resultatProvisoire: id == idProvisoire ? provisoire : null,
+          resultatHorsPlan: horsPlan(id),
         ),
       );
       tOuvD += ouvD;
@@ -454,6 +495,7 @@ class DonneesComptabilite {
       ecart: _arrondi(tFinD - tFinC),
       journalVide: journal.isEmpty,
       journalIncomplet: ecrituresIncompletes > 0,
+      ouverture: soldes.ouverture,
     );
   }
 
@@ -466,6 +508,10 @@ class DonneesComptabilite {
   /// de la casse ni des accents.
   ///
   /// Règles du serveur reproduites :
+  ///  - 🔴→✅ ticket EX1 (défaut C1) : ouverture = solde R1 du compte à l'ouverture de la journée [debut]
+  ///    ([SoldesExercice.soldes], ligne de résultat provisoire comprise si c'est la sienne) ; les écritures
+  ///    d'à-nouveau ne sont JAMAIS des lignes de la période (elles sont l'ouverture). Sans [debut], l'ouverture vaut 0
+  ///    et toutes les lignes hors à-nouveau sont montrées (le serveur n'a pas ce cas : sa période est toujours bornée) ;
   ///  - solde selon la NATURE du compte ([natureDebitrice]) ;
   ///  - le solde progressif part de l'ouverture et ne cumule QUE les lignes affichées (donc filtrées) ;
   ///  - tri : date, puis création, puis (ajout du poste, voir ci-dessous) identifiants ;
@@ -511,17 +557,19 @@ class DonneesComptabilite {
       }
     }
 
-    // Ouverture : le même cumul « strictement avant le début » que la Balance (ticket F0.86).
-    final avant = _cumulsAvant(jourDebut)[compteId];
-    final debitAvant = avant?.debit ?? 0.0;
-    final creditAvant = avant?.credit ?? 0.0;
+    // Ouverture : les mêmes soldes R1 que la Balance (tickets F0.86, EX1).
+    final soldes = debut == null
+        ? null
+        : soldesExercice.soldes(debut, inclus: false);
+    final netAvant = soldes?.netDe(compteId) ?? 0.0;
     final periode = <({AccountingEntry e, AccountingEntryLine l})>[];
     final aChercher = _plier(recherche.trim());
 
     for (final m in lignes) {
       final jour = _jour(m.e.entryDate);
 
-      // Déjà compté dans l'ouverture : hors des lignes de la période.
+      // Déjà compté dans l'ouverture : hors des lignes de la période. Un à-nouveau EST l'ouverture.
+      if (SoldesExercice.estANouveau(m.e)) continue;
       if (jourDebut != null && jour < jourDebut) continue;
       if (jourFin != null && jour > jourFin) continue;
 
@@ -554,9 +602,7 @@ class DonneesComptabilite {
       return a.l.id.compareTo(b.l.id);
     });
 
-    final ouverture = _arrondi(
-      estDebitrice ? debitAvant - creditAvant : creditAvant - debitAvant,
-    );
+    final ouverture = _arrondi(estDebitrice ? netAvant : -netAvant);
 
     var solde = ouverture;
     var totalDebit = 0.0;
@@ -575,7 +621,8 @@ class DonneesComptabilite {
       );
     }
 
-    final sansEcriture = lignes.isEmpty;
+    // Le compte d'un résultat provisoire (R3) n'a souvent aucune ligne : il a pourtant une ouverture connue.
+    final sansEcriture = lignes.isEmpty && netAvant == 0;
     final incomplet = ecrituresIncompletes > 0;
     final connu = !sansEcriture && !incomplet;
 
@@ -589,6 +636,7 @@ class DonneesComptabilite {
       totalDebit: _arrondi(totalDebit),
       totalCredit: _arrondi(totalCredit),
       soldeFinal: connu ? solde : null,
+      ouverture: soldes?.ouverture,
     );
   }
 

@@ -7,6 +7,7 @@ import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
+import 'mention_anouveaux.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/comptabilite-hub.html` → Comptabilité.
@@ -601,6 +602,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX2 — `<x-anouveaux-provisoires>` du web, sous l'en-tête.
+        MentionAnouveauxProvisoires(ouverture: g?.ouverture),
         // ⚠️ Barre de filtres de `grand-livre.html` : compte, période « du … au … ».
         Container(
           padding: const EdgeInsets.all(AgriSpacing.md),
@@ -937,6 +940,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX2 — `<x-anouveaux-provisoires>` du web, sous l'en-tête.
+        MentionAnouveauxProvisoires(ouverture: b.ouverture),
         // ⚠️ Sélecteur de `balance-generale.html` (`bal-periode-select`) : DEUX options, pas un
         // calendrier — « mois courant » ou « exercice complet », comme le composant web.
         Container(

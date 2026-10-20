@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/sync/agregats_coherence.dart';
 import '../../core/sync/perimetre_tirage.dart';
 import '../../core/temps/heure_benin.dart';
+import '../comptabilite/soldes_exercice.dart';
 
 /// Nombre de lignes et total d'un jour, d'un côté.
 class TotauxJour {
@@ -60,12 +61,29 @@ class TableCoherence {
 }
 
 class ResultatCoherence {
-  const ResultatCoherence({required this.depuis, required this.tables});
+  const ResultatCoherence({
+    required this.depuis,
+    required this.tables,
+    this.anouveauxPoste,
+    this.anouveauxServeur,
+  });
 
   final DateTime depuis;
   final List<TableCoherence> tables;
 
+  /// Ticket EX1 — invariant « ouverture de N+1 = clôture de N » (classes 1 à 5), calculé sur le journal du poste
+  /// ([SoldesExercice.controleAnouveaux]) et par le serveur (`anouveaux` de `GET /api/sync/coherence`). `null` :
+  /// non contrôlé (compte sans la comptabilité : le journal ne descend pas, le serveur ne le sert pas).
+  final List<ControleAnouveau>? anouveauxPoste;
+  final List<ControleAnouveau>? anouveauxServeur;
+
   int get nombreEcarts => tables.fold(0, (s, t) => s + t.ecarts.length);
+
+  /// Comptes en écart à l'invariant, au poste et au serveur réunis.
+  int get nombreEcartsAnouveaux => [
+    ...?anouveauxPoste,
+    ...?anouveauxServeur,
+  ].fold(0, (s, c) => s + c.ecarts.length);
 }
 
 /// Ticket S-T6 — CONTRÔLE DE COHÉRENCE DU POSTE (méthode TATACORA).
@@ -182,6 +200,48 @@ class ControleCoherenceRepository {
     return resultat;
   }
 
+  /// Ticket EX1 — `anouveaux` de la réponse : `null` (non servi : compte sans la comptabilité, ou serveur plus
+  /// ancien) ou la liste de `FinancialReportService::controleAnouveaux()` (montants en solde net débit − crédit).
+  static List<ControleAnouveau>? lireAnouveaux(Map<String, dynamic> corps) {
+    final brut = corps['anouveaux'];
+    if (brut is! List) return null;
+    double reel(Object? v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+    return [
+      for (final c in brut)
+        if (c is Map)
+          ControleAnouveau(
+            exercice: (c['exercice'] as num).toInt(),
+            precedent: (c['precedent'] as num).toInt(),
+            statutPrecedent: c['statut_precedent'] as String?,
+            ecarts: [
+              for (final e in (c['ecarts'] as List? ?? const []))
+                if (e is Map)
+                  EcartAnouveau(
+                    code: '${e['code']}',
+                    libelle: '${e['libelle']}',
+                    cloture: reel(e['cloture']),
+                    ouverture: reel(e['ouverture']),
+                  ),
+            ],
+          ),
+    ];
+  }
+
+  /// Ticket EX1 — le même invariant sur le journal reçu par le poste.
+  Future<List<ControleAnouveau>> anouveauxLocaux() async {
+    final ecritures = await _db.select(_db.accountingEntries).get();
+    final parEcriture = <String, List<AccountingEntryLine>>{};
+    for (final l in await _db.select(_db.accountingEntryLines).get()) {
+      parEcriture.putIfAbsent(l.entryId, () => []).add(l);
+    }
+    return SoldesExercice(
+      exercices: await _db.select(_db.fiscalYears).get(),
+      ecritures: ecritures,
+      lignesParEcriture: parEcriture,
+      plan: await _db.select(_db.chartOfAccounts).get(),
+    ).controleAnouveaux();
+  }
+
   /// Compare les deux côtés, table par table dans l'ordre de [AgregatsCoherence.tables].
   ///
   /// Ticket S-T4 — [perimetre] : tables que le serveur sert à ce compte (dernier tirage, [PerimetreTirage]). Une
@@ -225,6 +285,7 @@ class ControleCoherenceRepository {
 
     final corps = await _serveur(cleJour(debut));
     final local = await calculerLocal(debut);
+    final anouveauxServeur = lireAnouveaux(corps);
 
     return ResultatCoherence(
       depuis: DateTime(debut.year, debut.month, debut.day),
@@ -233,6 +294,9 @@ class ControleCoherenceRepository {
         lireServeur(corps),
         perimetre: await PerimetreTirage.lire(_db),
       ),
+      anouveauxServeur: anouveauxServeur,
+      // Le poste ne contrôle que s'il reçoit le journal (le serveur le dit en servant `anouveaux`).
+      anouveauxPoste: anouveauxServeur == null ? null : await anouveauxLocaux(),
     );
   }
 }

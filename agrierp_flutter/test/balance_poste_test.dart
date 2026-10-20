@@ -215,33 +215,100 @@ void main() {
 
   /// Règle relue dans `FinancialReportService::balanceGenerale`, réécrite autrement : en centimes
   /// entiers, sur les lignes brutes, codes connus seulement.
+  ///
+  /// Tickets EX1 / EX2 — l'ouverture suit R1 (PRD `docs/prd/exercices-comptables.md` § 5), réécrite ici pour les
+  /// jeux de ce fichier (exercices CIVILS ; seul 2026 est enregistré, ouvert, sans à-nouveau) :
+  ///  - année ≤ 2026 (aucun exercice enregistré avant) : historique antérieur au 01/01, classes 1 à 5 ; son
+  ///    résultat (classes 6+) porté au 131 (bénéfice) ou 139 (perte), FUSIONNÉ (pas une ligne provisoire) ;
+  ///  - année 2027 (précédent 2026 ouvert) : R3 — clôture calculée de 2026 (son ouverture + ses mouvements,
+  ///    classes 1 à 5), et son résultat sur une ligne PROVISOIRE à part (131 / 139) ;
+  ///  - puis, dans l'exercice, les mouvements du 01/01 à la veille du début (toutes classes).
   ({List<(String, List<int>)> lignes, List<int> totaux}) recalcul(
     DateTime debut,
     DateTime fin,
   ) {
     final d = jourDe(debut);
     final f = jourDe(fin);
-    final ouvD = <String, int>{};
-    final ouvC = <String, int>{};
+    bool bilan(String code) => int.parse(code[0]) <= 5;
+
+    Map<String, int> nets(int? du, int au) {
+      final r = <String, int>{};
+      for (final l in brut) {
+        final j = jourDe(l.jour);
+        if (j > au || (du != null && j < du)) continue;
+        r[l.code] = (r[l.code] ?? 0) + l.debitCts - l.creditCts;
+      }
+      return r;
+    }
+
+    /// (comptes de bilan, résultat reporté à part) — résultat en « produits − charges ».
+    (Map<String, int>, int) cloture(Map<String, int> depart, Map<String, int> m) {
+      final c = Map<String, int>.of(depart);
+      var resultat = 0;
+      m.forEach((code, n) {
+        if (bilan(code)) {
+          c[code] = (c[code] ?? 0) + n;
+        } else {
+          resultat -= n;
+        }
+      });
+      return (c, resultat);
+    }
+
+    String compteResultat(int r) => r > 0 ? '131' : '139';
+
+    ({Map<String, int> comptes, int provisoire}) ouverture(int annee) {
+      if (annee <= 2026) {
+        final (c, r) = cloture({}, nets(null, (annee - 1) * 10000 + 1231));
+        if (r != 0) c[compteResultat(r)] = (c[compteResultat(r)] ?? 0) - r;
+        return (comptes: c, provisoire: 0);
+      }
+      final o = ouverture(annee - 1);
+      final depart = Map<String, int>.of(o.comptes);
+      if (o.provisoire != 0) {
+        final code = o.provisoire < 0 ? '131' : '139';
+        depart[code] = (depart[code] ?? 0) + o.provisoire;
+      }
+      final (c, r) = cloture(
+        depart,
+        nets((annee - 1) * 10000 + 101, (annee - 1) * 10000 + 1231),
+      );
+      return (comptes: c, provisoire: -r);
+    }
+
+    final annee = d ~/ 10000;
+    final o = ouverture(annee);
+    final ouv = Map<String, int>.of(o.comptes);
+    nets(annee * 10000 + 101, d - 1).forEach((code, n) {
+      ouv[code] = (ouv[code] ?? 0) + n;
+    });
+    // `d - 1` sur un 1er du mois tombe sur un « jour 0 » : aucune écriture n'y est datée, la borne reste juste.
+
     final perD = <String, int>{};
     final perC = <String, int>{};
     for (final l in brut) {
       final j = jourDe(l.jour);
-      if (j < d) {
-        ouvD[l.code] = (ouvD[l.code] ?? 0) + l.debitCts;
-        ouvC[l.code] = (ouvC[l.code] ?? 0) + l.creditCts;
-      } else if (j <= f) {
+      if (j >= d && j <= f) {
         perD[l.code] = (perD[l.code] ?? 0) + l.debitCts;
         perC[l.code] = (perC[l.code] ?? 0) + l.creditCts;
       }
     }
-    final codes = {...ouvD.keys, ...perD.keys}.toList()..sort();
+
+    // La ligne provisoire suit le compte réel du même numéro (aucun 131 / 139 au plan de ces jeux).
+    final codes = {...ouv.keys, ...perD.keys}.toList()..sort();
+    final entrees = <(String, int, int, int)>[
+      for (final c in codes) (c, ouv[c] ?? 0, perD[c] ?? 0, perC[c] ?? 0),
+    ];
+    if (o.provisoire != 0) {
+      final code = o.provisoire < 0 ? '131' : '139';
+      var i = entrees.indexWhere((e) => e.$1.compareTo(code) > 0);
+      if (i < 0) i = entrees.length;
+      entrees.insert(i, (code, o.provisoire, 0, 0));
+    }
+
     final lignes = <(String, List<int>)>[];
     final t = List<int>.filled(6, 0);
-    for (final c in codes) {
-      final net = (ouvD[c] ?? 0) - (ouvC[c] ?? 0);
-      final pd = perD[c] ?? 0;
-      final pc = perC[c] ?? 0;
+    for (final (c, net, pd, pc) in entrees) {
       if (net == 0 && pd == 0 && pc == 0) continue;
       final od = net > 0 ? net : 0;
       final oc = net < 0 ? -net : 0;

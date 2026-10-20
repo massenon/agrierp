@@ -1,6 +1,7 @@
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
+import '../comptabilite/soldes_exercice.dart';
 import '../elevage/effectif_precedent.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
@@ -225,6 +226,8 @@ class RapportsRepository {
         .select(database.accountingEntryLines)
         .get();
     final planComptable = await database.select(database.chartOfAccounts).get();
+    // Tickets EX1 / EX2 — les exercices reçus : l'ouverture de chaque exercice suit R1 / R3.
+    final exercices = await database.select(database.fiscalYears).get();
     // Ticket U9 — grand livre des stocks (descendu + saisies en attente) : Tableau 3 de la ponte.
     final journal = await JournalStocks.charger(
       database,
@@ -276,6 +279,7 @@ class RapportsRepository {
         comptes: planComptable,
         du: debut,
         au: fin,
+        exercices: exercices,
       ),
       creances: creancesDe(creances, clients, debut, fin),
       dettes: dettesDe(dettes, nomFournisseur, debut, fin),
@@ -443,54 +447,68 @@ class RapportsRepository {
   /// écritures actives pour les retraits) pour les rôles qui ouvrent ce hub (`view-comptabilite`). Un compte mouvementé
   /// ne peut pas être archivé au web (`PlanComptable::archiveAccount`) : le plan servi (comptes actifs) les contient
   /// tous.
+  ///
+  /// 🔴→✅ Ticket EX1 (défaut C1) — le solde de chaque jour suit la règle R1 ([SoldesExercice.soldes], comme
+  /// `FinancialReportService::soldes` au web) : ouverture de l'exercice (à-nouveau, ou calcul R3) + mouvements de
+  /// l'exercice ; il cumulait tout l'historique ET l'à-nouveau du 01/01, deux fois l'exercice clos. Une écriture
+  /// d'à-nouveau n'est pas une activité : sa date n'ouvre pas de ligne. [exercices] : les exercices reçus (sans eux,
+  /// le cumul de tout l'historique, hors à-nouveaux).
   static List<SoldeTresorerie> soldesTresorerie({
     required List<AccountingEntry> ecritures,
     required List<AccountingEntryLine> lignes,
     required List<ChartOfAccount> comptes,
     required DateTime du,
     required DateTime au,
+    List<FiscalYear> exercices = const [],
   }) {
-    final codeClasse5 = {
+    final classe5 = {
       for (final c in comptes)
-        if (c.accountClass == 5) c.id: c.code,
+        if (c.accountClass == 5) c.id,
     };
-    final jourDe = {for (final e in ecritures) e.id: _jour(e.entryDate)};
-
-    final caisseDuJour = <DateTime, double>{};
-    final banqueDuJour = <DateTime, double>{};
-    final jours = <DateTime>{};
+    final parEcriture = <String, List<AccountingEntryLine>>{};
     for (final l in lignes) {
-      final code = codeClasse5[l.accountId];
-      final jour = jourDe[l.entryId];
-      if (code == null || jour == null) continue;
-      jours.add(jour);
-      final mouvement = l.debit - l.credit;
-      if (code.startsWith('531')) {
-        caisseDuJour[jour] = (caisseDuJour[jour] ?? 0) + mouvement;
-      } else {
-        banqueDuJour[jour] = (banqueDuJour[jour] ?? 0) + mouvement;
+      parEcriture.putIfAbsent(l.entryId, () => []).add(l);
+    }
+
+    final jours = <DateTime>{};
+    for (final e in ecritures) {
+      if (SoldesExercice.estANouveau(e)) continue;
+      final jour = _jour(e.entryDate);
+      if (!_dansLaPeriode(jour, du, au)) continue;
+      if ((parEcriture[e.id] ?? const []).any((l) => classe5.contains(l.accountId))) {
+        jours.add(jour);
       }
     }
 
-    final croissants = jours.toList()..sort();
-    var caisse = 0.0;
-    var banque = 0.0;
-    final soldes = <SoldeTresorerie>[];
-    for (final jour in croissants) {
-      caisse += caisseDuJour[jour] ?? 0;
-      banque += banqueDuJour[jour] ?? 0;
-      if (_dansLaPeriode(jour, du, au)) {
-        soldes.add(
-          SoldeTresorerie(
+    final r1 = SoldesExercice(
+      exercices: exercices,
+      ecritures: ecritures,
+      lignesParEcriture: parEcriture,
+      plan: comptes,
+    );
+
+    final decroissants = jours.toList()..sort((a, b) => b.compareTo(a));
+    return [
+      for (final jour in decroissants)
+        () {
+          var caisse = 0.0;
+          var banque = 0.0;
+          for (final c in r1.soldes(jour).comptes.values) {
+            if (c.classe != 5) continue;
+            if (c.code.startsWith('531')) {
+              caisse += c.net;
+            } else {
+              banque += c.net;
+            }
+          }
+          return SoldeTresorerie(
             date: jour,
             caisse: PmpService.arrondi(caisse, 2),
             banque: PmpService.arrondi(banque, 2),
             total: PmpService.arrondi(caisse + banque, 2),
-          ),
-        );
-      }
-    }
-    return soldes.reversed.toList();
+          );
+        }(),
+    ];
   }
 
   /// Cellules d'une ligne de trésorerie (`number_format(…, 0, ',', ' ')`, sans unité, comme le Blade).

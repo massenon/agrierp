@@ -1,5 +1,6 @@
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
+import 'mention_anouveaux.dart';
 
 /// Documents officiels (PDF) des quatre pages comptables du poste — ticket F0.87 (item 9, T4).
 ///
@@ -196,7 +197,10 @@ class DocumentsComptabilite {
       titre: c == null
           ? 'Grand Livre'
           : 'Grand Livre — Compte ${c.code} — ${c.label}',
-      sousTitre: 'Période du ${jour(debut)} au ${jour(fin)}',
+      // Ticket EX2 — le sous-titre du web dit l'ouverture calculée (« — À-nouveaux provisoires »).
+      sousTitre:
+          'Période du ${jour(debut)} au ${jour(fin)}'
+          '${g.ouverture?.provisoire == true ? MentionAnouveauxProvisoires.suffixeDocument : ''}',
       // Ticket U11 — `'grand-livre-'.($account?->code ?? 'compte').'-'.now()->format('Y-m-d').'.pdf'` du web.
       fichier: 'grand-livre-${c?.code ?? 'compte'}-{jour}.pdf',
       entetes: const [
@@ -265,7 +269,9 @@ class DocumentsComptabilite {
     return DocumentOfficiel(
       titre: 'Balance Générale',
       fichier: 'balance-generale-{jour}.pdf',
-      sousTitre: periode,
+      // Ticket EX2 — comme le web : `periodLabel` + « — À-nouveaux provisoires » quand l'ouverture est calculée.
+      sousTitre:
+          '$periode${b.ouverture?.provisoire == true ? MentionAnouveauxProvisoires.suffixeDocument : ''}',
       entetes: const [
         'N° Compte',
         'Libellé',
