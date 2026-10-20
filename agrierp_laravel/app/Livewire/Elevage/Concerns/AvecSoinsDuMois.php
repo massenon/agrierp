@@ -14,7 +14,8 @@ use Illuminate\Support\Collection;
  * n'y apparaissaient JAMAIS. Elle lit désormais les soins ACTIFS du registre de la bande à cette date, puis le
  * produit de la fiche, puis les symptômes ; « — » s'il n'y a rien.
  *
- * Exige du composant : `lotsDuTableauMensuel()` (identifiants des bandes affichées dans le tableau).
+ * Exige du composant : `lotsDuTableauMensuel()` (identifiants des bandes affichées dans le tableau) et le trait
+ * `AvecMoisDeFiche` (mois affiché, ticket EX8).
  */
 trait AvecSoinsDuMois
 {
@@ -29,7 +30,8 @@ trait AvecSoinsDuMois
 
         return VeterinaryRecord::whereIn('lot_id', $lots)
             ->where('is_active', true)
-            ->whereBetween('record_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+            // Ticket EX8 (EF12) — le mois AFFICHÉ (`AvecMoisDeFiche`), plus seulement le mois en cours.
+            ->whereBetween('record_date', [$this->debutMoisFiche()->toDateString(), $this->finMoisFiche()->toDateString()])
             ->orderBy('created_at')
             ->get()
             ->groupBy(fn (VeterinaryRecord $r) => $r->record_date->format('Y-m-d'));

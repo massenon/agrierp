@@ -43,12 +43,17 @@
                 @endif
                 <span class="text-xs text-outline font-semibold">Date :</span>
                 <input type="date" wire:model.live="selectedDate" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
+                {{-- Ticket EX8 (EF12) : consulter un mois passé. --}}
+                <x-mois-de-fiche :libelle="$this->libelleMois" :courant="$this->estMoisCourant" />
             </div>
         </div>
 
         @php $cat = $this->categoriesJour; $provende = $this->provendeCalculation; @endphp
 
         <form wire:submit="saveDay" class="space-y-md">
+            {{-- Ticket EX8 (EF12) : un jour d'un exercice clos se consulte, le formulaire est grisé (refus de saveDay : EX5). --}}
+            <x-fiche-lecture-seule :motif="$this->motifLectureSeule" />
+            <fieldset @disabled($this->motifLectureSeule) class="space-y-md min-w-0">
             <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             @if($cat['depart_requis'] && $cat['ancien'])
                 {{-- D6 : les effectifs saisis à la main ne sont jamais repris ; le départ est déduit du stade de la bande (17/10/2026). --}}
@@ -312,6 +317,7 @@
                     <span class="material-symbols-outlined text-[16px] align-middle mr-1">save</span>Enregistrer ce Jour
                 </button>
             </div>
+            </fieldset>
         </form>
     </div>
 
@@ -344,7 +350,7 @@
                 <tbody>
                     @foreach($this->daysInMonth as $day)
                         @php
-                            $dateStr = now()->startOfMonth()->addDays($day - 1)->format('Y-m-d');
+                            $dateStr = $this->debutMoisFiche()->addDays($day - 1)->format('Y-m-d');   // EX8 : le mois affiché
                             $entry = $this->monthlyEntries->get($dateStr);
                             $poidsKg = ($entry?->weight_sample_avg_g && $entry->effectif_final) ? round(($entry->weight_sample_avg_g * $entry->effectif_final) / 1000, 1) : null;
                         @endphp

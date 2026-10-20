@@ -51,6 +51,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePondeuses extends Component
 {
+    use \App\Livewire\Elevage\Concerns\AvecMoisDeFiche;   // Ticket EX8 (EF12) : mois passés, lecture seule
     use AvecTransfertsDuJour;
     use AvecProphylaxieDuJour;
     use AvecSoinsDuMois;
@@ -174,7 +175,7 @@ class FichePondeuses extends Component
     {
         $lotIds = $this->lots->pluck('id');
         $monthEntries = LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->get();
 
         $totalMorts = $monthEntries->sum('mort');
@@ -213,7 +214,7 @@ class FichePondeuses extends Component
         // "Traitements & Rappels" du prototype, trouvée manquante du
         // tableau mensuel (même écart que fiche-lapins.html).
         return LivestockDailyEntry::where('lot_id', $bande->id)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->with('treatmentProduct')
             ->orderBy('entry_date')
             ->get()
@@ -238,16 +239,12 @@ class FichePondeuses extends Component
             'exports.fiche-elevage',
             ['entries' => $entries],
             'Fiche Pondeuses — Suivi Mensuel',
-            now()->translatedFormat('F Y')
+            $this->moisDuPdf()   // EX8 : le mois affiché
         );
 
-        return response()->streamDownload(fn () => print($pdf->output()), 'fiche-'.now()->format('Y-m').'.pdf');
+        return response()->streamDownload(fn () => print($pdf->output()), $this->fichierDuPdf());
     }
 
-    public function getDaysInMonthProperty(): array
-    {
-        return range(1, now()->daysInMonth);
-    }
 
     /** Veille de LA bande : dernière fiche antérieure, sinon son effectif initial (point unique `previousEffectif`). */
     public function getPreviousEffectifProperty(): int

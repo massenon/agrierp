@@ -160,7 +160,7 @@ class FichesMoisPassesTest extends TestCase
             ->assertSee('Décembre 2025')
             ->assertSee('20/12')
             ->assertSee('Lecture seule')
-            ->assertSee("L'exercice 2025 est clôturé : aucune saisie ne peut être datée du 01/12/2025.", false);
+            ->assertSee("L'exercice 2025 est clôturé : aucune saisie ne peut être datée du 01/12/2025.");
         $this->assertMatchesRegularExpression('/<fieldset[^>]*disabled/', $fiche->html(), 'formulaire grisé');
 
         // La fiche du 20/12/2025 se relit ; l'enregistrer reste refusé au serveur (EX5), rien n'est écrit.

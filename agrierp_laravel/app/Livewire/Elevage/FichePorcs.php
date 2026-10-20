@@ -78,6 +78,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePorcs extends Component
 {
+    use \App\Livewire\Elevage\Concerns\AvecMoisDeFiche;   // Ticket EX8 (EF12) : mois passés, lecture seule
     use AvecTransfertsDuJour;
     use AvecDepartAutomatique;
     use AvecProphylaxieDuJour;
@@ -190,7 +191,7 @@ class FichePorcs extends Component
             ->map(fn ($group) => $group->last());
 
         $monthEntries = LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->get();
 
         $totalMorts = $monthEntries->sum('mort');
@@ -241,7 +242,7 @@ class FichePorcs extends Component
         // tableau mensuel (même écart que fiche-lapins.html), corrigée
         // dans la foulée pour les 3 fiches partageant ce même patron.
         return LivestockDailyEntry::where('lot_id', $bande->id)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->with('treatmentProduct')
             ->orderBy('entry_date')
             ->get()
@@ -266,16 +267,12 @@ class FichePorcs extends Component
             'exports.fiche-elevage',
             ['entries' => $entries],
             'Fiche Porcs — Suivi Mensuel',
-            now()->translatedFormat('F Y')
+            $this->moisDuPdf()   // EX8 : le mois affiché
         );
 
-        return response()->streamDownload(fn () => print($pdf->output()), 'fiche-'.now()->format('Y-m').'.pdf');
+        return response()->streamDownload(fn () => print($pdf->output()), $this->fichierDuPdf());
     }
 
-    public function getDaysInMonthProperty(): array
-    {
-        return range(1, now()->daysInMonth);
-    }
 
     public function getRationStandardsProperty()
     {
