@@ -352,7 +352,13 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 ### Lot 2 — avant la clôture de 2026 (mars 2027)
 | EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | 🔧 |
-| EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | 🔧 |
+| EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | ✅ (20/10/2026, `README_SPRINT0.md` : exercice affiché en paramètre `exercice` du Bilan et des États financiers — à brancher par EX7 ; parité exécutée au poste) |
+
+**Questions nées d'EX8 (non tranchées)** — détail dans `README_SPRINT0.md` :
+- **EX-Q8** : le Bilan et le Compte de résultat écartent l'écriture de solde des comptes de gestion (étape 2, `closing`) et sa contrepartie 131/139 : le résultat d'un exercice dont l'étape 2 est passée reste sur la ligne « Résultat de l'exercice » (avant : au 131, résultat 0) — mêmes totaux. Présentation « avant affectation » à confirmer par le cabinet FAGUEZ.
+- **EX-Q9** : la colonne N-1 présente l'exercice précédent À SA CLÔTURE (Bilan au 31/12/N-1, Compte de résultat de l'année entière), quelle que soit la date d'arrêté de N. Un comparatif « à date égale » (N au 31/01 contre N-1 au 31/01) n'est pas fait. À confirmer.
+- **EX-Q10** : le « Rapport mensuel » et la carte « Recettes du Mois » du hub (`produitsPeriode` / `chargesPeriode`) comptent encore l'écriture de solde : décembre d'un exercice dont l'étape 2 est passée affiche un chiffre d'affaires NÉGATIF (ventes de décembre − ventes de l'année). Relevé, non corrigé (hors du périmètre d'EX8). À corriger comme le Compte de résultat ?
+- **EX-Q11** : au poste, l'onglet « Flux de Trésorerie » et les « Notes Annexes » des États financiers restent sur le web (la décision Q5 ne vise que le Bilan et le Compte de résultat ; les Notes lisent le registre des immobilisations, qui ne descend pas). Les porter aussi ?
 
 ### Lot 3 — avec la clôture de 2026
 | EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
