@@ -71,6 +71,13 @@ class FicheLapinsScreen extends StatelessWidget {
       CategorieRationLapin.chair: 'Jeune',
       CategorieRationLapin.sousMeres: 'Sous-mères',
     },
+    // Ticket U14 — info-bulles du Blade (`title` des champs grisés `cat-eff-*`).
+    infobullesRation: const {
+      CategorieRationLapin.reproducteur: 'Calculé automatiquement : veille (ou départ) − morts − dons Reproducteur.',
+      CategorieRationLapin.chair: 'Calculé automatiquement : veille − ventes − morts − dons Jeune + sevrage du jour.',
+      CategorieRationLapin.sousMeres:
+          'Calculé automatiquement : veille + achats + nés − morts − dons Sous-mères − sevrage du jour.',
+    },
     rationAffichee: (l) => '${l.ration} g/j',
     ligneRationMiseEnAvant: CategorieRationLapin.chair,
     filiere: 'cuniculture',

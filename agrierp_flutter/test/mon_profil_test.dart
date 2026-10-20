@@ -269,7 +269,7 @@ void main() {
       expect(find.byKey(const Key('journal-vide')), findsOneWidget);
       expect(
         texte(tester, 'journal-portee'),
-        contains('100 dernières actions'),
+        contains('200 dernières actions'),
       );
     });
 

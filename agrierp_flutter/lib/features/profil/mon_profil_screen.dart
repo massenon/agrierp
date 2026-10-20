@@ -645,11 +645,11 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
           ),
         ),
         _tableauJournal(d),
-        // ⚠️ DIT CE QUE LE POSTE DÉTIENT : cent actions pour toute la ferme.
+        // ⚠️ DIT CE QUE LE POSTE DÉTIENT : deux cents actions pour toute la ferme (U14 : la liste du web, `limit(200)`).
         Padding(
           padding: const EdgeInsets.all(AgriSpacing.sm),
           child: Text(
-            "Le poste ne détient que les 100 dernières actions de l'ensemble "
+            "Le poste ne détient que les 200 dernières actions de l'ensemble "
             "de la ferme : ce journal peut compter moins de dix lignes.",
             key: const Key('journal-portee'),
             style: const TextStyle(fontSize: 10, color: AgriColors.outline),

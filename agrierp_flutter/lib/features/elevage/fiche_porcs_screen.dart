@@ -77,6 +77,14 @@ class FichePorcsScreen extends StatelessWidget {
       CategorieRationPorc.marchand: 'Porc Marchand',
       CategorieRationPorc.reproducteur: 'Reproducteur',
     },
+    // Ticket U14 — info-bulles du Blade (`title` des champs grisés `cat-eff-*`).
+    infobullesRation: const {
+      CategorieRationPorc.porcelet: 'Calculé automatiquement : veille + nés − morts − dons Porcelet − passage de stade.',
+      CategorieRationPorc.marchand:
+          'Calculé automatiquement : veille − ventes − morts − dons Porc Marchand + passage de stade.',
+      CategorieRationPorc.reproducteur:
+          'Calculé automatiquement : veille (ou départ) + achats − morts − dons Reproducteur.',
+    },
     // `number_format(ration, 0, ',', ' ') g/j (number_format(ration / 1000, 1) Kg)` pour le Reproducteur.
     rationAffichee: (l) => l.cle == CategorieRationPorc.reproducteur
         ? '${PmpService.francs(l.ration.toDouble())} g/j '

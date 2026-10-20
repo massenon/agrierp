@@ -153,7 +153,6 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
               // interdit la rechute.
               builder: (context) {
                 final large = AgriBreakpoints.large(context);
-                final moyen = AgriBreakpoints.moyen(context);
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.all(
@@ -165,7 +164,9 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                       // `<x-tab-page>` : la barre d'onglets, puis (`mt-md`) l'accordéon des KPI.
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.md),
-                      _kpis(moyen),
+                      // 🔴→✅ Ticket U14 — `x-kpi-accordion` : `grid-cols-2 xl:grid-cols-4` (le poste passait à quatre
+                      // colonnes dès `md`).
+                      _kpis(AgriBreakpoints.tresLarge(context)),
                       const SizedBox(height: AgriSpacing.md),
                       switch (_onglet) {
                         'Volailles' => _ongletCouvoir(
@@ -175,7 +176,8 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                             'Éclosion Attendue J+21',
                           ],
                           resume: _donnees!.volailles,
-                          moyen: moyen,
+                          // 🔴→✅ Ticket U14 — `grid-cols-2 lg:grid-cols-4` du Blade (le poste passait à `md`).
+                          moyen: large,
                         ),
                         'Porcs' => _ongletCycles(
                           lapins: false,
@@ -188,7 +190,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                             'Éclosion Naissains Attendue J+25',
                           ],
                           resume: _donnees!.escargots,
-                          moyen: moyen,
+                          moyen: large,
                         ),
                         _ => _ongletCycles(
                           lapins: true,
@@ -209,14 +211,9 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   Widget _kpis(bool moyen) {
     final d = _donnees!;
 
-    return GridView.count(
-      crossAxisCount: moyen ? 4 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: moyen ? 2.6 : 1.8,
-      children: [
+    return _grille(
+      colonnes: moyen ? 4 : 2,
+      enfants: [
         _carteKpi(
           'Reproductrices Gestantes',
           '${d.gestantes}',
@@ -246,6 +243,30 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   }
 
   /// `kpi-card.blade.php` : liseré et icône selon `color`, valeur `text-on-surface`.
+  /// Ticket U14 — la grille CSS du Blade (`grid gap-md`) : colonnes de même largeur, cartes d'une rangée à la même
+  /// hauteur, hauteur prise sur le CONTENU. Une `GridView` à proportions fixes débordait (« RenderFlex overflowed »)
+  /// dès que la colonne rétrécissait, entre deux points de rupture.
+  Widget _grille({required int colonnes, required List<Widget> enfants}) {
+    final rangees = <Widget>[];
+    for (var i = 0; i < enfants.length; i += colonnes) {
+      if (i > 0) rangees.add(const SizedBox(height: AgriSpacing.md));
+      rangees.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var j = 0; j < colonnes; j++) ...[
+                if (j > 0) const SizedBox(width: AgriSpacing.md),
+                Expanded(child: i + j < enfants.length ? enfants[i + j] : const SizedBox.shrink()),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rangees);
+  }
+
   Widget _carteKpi(
     String libelle,
     String valeur,
@@ -1026,14 +1047,9 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
               'donnée.',
         ),
         const SizedBox(height: AgriSpacing.md),
-        GridView.count(
-          crossAxisCount: moyen ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: moyen ? 2.6 : 1.8,
-          children: [
+        _grille(
+          colonnes: moyen ? 4 : 2,
+          enfants: [
             _carteKpi(
               'Œufs Couvés (mois)',
               '${resume.couves}',

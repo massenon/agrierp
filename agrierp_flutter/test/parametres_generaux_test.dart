@@ -1,5 +1,6 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_screen.dart';
@@ -451,6 +452,65 @@ void main() {
       expect(find.text('Mobile Money - Multi-Opérateurs (5212)'), findsOne);
       // Les deux banques sont cumulées, pas la première seule.
       expect(find.text('2 340 000'), findsOne);
+    });
+
+    // 🔴→✅ Ticket U14 — l'onglet du Blade (`audit-logs.blade.php`, `AuditLogs.php`).
+    test('U14 — connexions échouées sur 24 h, comme le web', () async {
+      await trace('a1', 'login.failed');
+      await trace('a2', 'login.failed', quand: DateTime.now().subtract(const Duration(days: 2)));
+
+      expect((await depot.charger()).connexionsEchouees, 1);
+    });
+
+    test('U14 — « Rechercher... » : clés techniques de l action OU du module, comme `LIKE`', () async {
+      await trace('a1', 'sale.created', module: 'ventes');
+      await trace('a2', 'expense.archived', module: 'achats');
+      await trace('a3', 'login.failed', module: 'auth');
+      final lignes = (await depot.charger()).audit;
+      List<String> chercher(String r) => [
+        for (final l in DonneesParametresGeneraux.filtrerAudit(lignes, r)) l.action,
+      ]..sort();
+
+      expect(chercher('SALE'), ['sale.created']);
+      expect(chercher('achat'), ['expense.archived'], reason: 'le module');
+      expect(chercher('Vente enregistrée'), isEmpty, reason: 'le libellé n est pas cherché, comme au web');
+      expect(chercher('e_p'), ['expense.archived'], reason: '`_` : un caractère');
+      expect(chercher('0'), hasLength(3));
+    });
+
+    testWidgets('U14 — libellés, info-bulle, carte bleue « Sur les dernières 24 h », recherche à 300 ms, état vide', (
+      tester,
+    ) async {
+      await fermeComplete();
+      await trace('a1', 'sale.created', module: 'ventes');
+      await trace('a2', 'login.failed', module: 'auth');
+      await afficher(tester);
+      await ouvrir(tester, 'Audit Logs');
+
+      expect(find.text('Vente enregistrée'), findsOne, reason: '`action_label`');
+      expect(find.text('Ventes & Devis'), findsOne, reason: '`module_label`');
+      expect(find.text('sale.created'), findsNothing);
+      expect(find.text('Sur les dernières 24 h'), findsOne);
+      final carte = tester.widget<CarteKpi>(
+        find.ancestor(of: find.text('CONNEXIONS ÉCHOUÉES'), matching: find.byType(CarteKpi)),
+      );
+      expect((carte.valeur, carte.couleurLisere), ('1', AgriColors.infoBlue));
+      expect(
+        find.byTooltip("Les journaux d'audit sont immuables : aucune modification ni suppression n'est possible."),
+        findsNWidgets(2),
+      );
+
+      await tester.enterText(find.byKey(const Key('audit-recherche')), 'login');
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Vente enregistrée'), findsOne, reason: 'pas avant 300 ms');
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.text('Vente enregistrée'), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('audit-recherche')), 'zzz');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.text('Aucun événement pour le moment.'), findsOne);
     });
 
     testWidgets('la trace d audit porte les cinq colonnes de la maquette', (

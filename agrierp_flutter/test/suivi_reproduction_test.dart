@@ -112,6 +112,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // 🔴→✅ Ticket U14 — points de rupture du Blade : cartes `grid-cols-2 xl:grid-cols-4` (1280 px), couvoir
+  // `grid-cols-2 lg:grid-cols-4` (1024 px). Le poste passait aux quatre colonnes dès `md` (768 px).
+  testWidgets('U14 — à 1100 px : cartes sur deux colonnes (xl), couvoir sur quatre (lg), comme le Blade', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: SuiviReproductionScreen(depot: depot)));
+    await tester.pumpAndSettle();
+
+    double y(String libelle) => tester.getTopLeft(find.text(libelle.toUpperCase())).dy;
+    expect(y('Mises bas / Éclosions (mois)'), greaterThan(y('Reproductrices Gestantes')), reason: 'deux colonnes');
+
+    await ouvrir(tester, 'Volailles');
+    expect(y('Naissains Nés (mois)'), y('Œufs Couvés (mois)'), reason: 'quatre colonnes dès lg');
+    expect(y("Taux d'Éclosion"), y('Œufs Couvés (mois)'));
+  });
+
   testWidgets('⚠️ les quatre onglets de la maquette sont là, dans son ordre', (
     tester,
   ) async {

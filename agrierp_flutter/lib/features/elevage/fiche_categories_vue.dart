@@ -41,6 +41,7 @@ class ConfigFicheCategories {
     required this.titreRationnement,
     required this.enteteRation,
     required this.libellesRation,
+    required this.infobullesRation,
     required this.rationAffichee,
     required this.ligneRationMiseEnAvant,
     required this.filiere,
@@ -85,6 +86,10 @@ class ConfigFicheCategories {
   final String titreRationnement;
   final String enteteRation;
   final Map<String, String> libellesRation;
+
+  /// Ticket U14 — `title="Calculé automatiquement : …"` du champ grisé de l'effectif de chaque ligne du rationnement
+  /// (Blade), par catégorie.
+  final Map<String, String> infobullesRation;
   final String Function(LigneProvende) rationAffichee;
 
   /// Ligne du rationnement à la ration en vert gras (`text-brand-emerald font-bold`) — Jeune / Reproducteur.
@@ -752,11 +757,37 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
                         gras: true,
                         couleur: AgriColors.brandForest,
                       ),
-                      CelluleFiche(
-                        l.effectif == null ? '—' : '${l.effectif}',
-                        cleTexte: Key('ration-effectif-${l.cle}'),
-                        centre: true,
-                        gras: true,
+                      // 🔴→✅ Ticket U14 — le champ GRISÉ du Blade (`<input disabled … class="w-16 h-8 text-center border
+                      // rounded text-xs font-bold">`, fond zébré sur les lignes blanches et blanc sur la ligne zébrée)
+                      // et son info-bulle « Calculé automatiquement : … » : le poste écrivait le nombre nu.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
+                        child: Center(
+                          child: Tooltip(
+                            key: Key('ration-infobulle-${l.cle}'),
+                            message: _c.infobullesRation[l.cle]!,
+                            child: Container(
+                              width: 64,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: i == 1 ? AgriColors.surfaceCard : AgriColors.surfaceZebra,
+                                border: Border.all(color: AgriColors.outlineVariant),
+                                borderRadius: BorderRadius.circular(AgriRadius.base),
+                              ),
+                              child: Text(
+                                l.effectif == null ? '—' : '${l.effectif}',
+                                key: Key('ration-effectif-${l.cle}'),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                  fontWeight: AgriTypography.gras,
+                                  color: AgriColors.onSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       CelluleFiche(
                         _c.rationAffichee(l),

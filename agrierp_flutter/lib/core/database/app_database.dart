@@ -664,7 +664,7 @@ class Utilisateurs extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Ligne du journal d'audit — les cent dernières actions de la ferme.
+/// Ligne du journal d'audit — les deux cents dernières actions de la ferme (U14 : la liste du web).
 class AuditLogs extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get userName => text().nullable()();

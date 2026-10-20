@@ -2663,7 +2663,7 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Journal d'audit — les cent dernières actions, remplacées à chaque tirage.
+  /// Journal d'audit — les deux cents dernières actions (U14 : la liste du web), remplacées à chaque tirage.
   Future<int> _absorberAudit(Object? brut) async {
     if (brut == null) return 0;
 
@@ -2881,7 +2881,7 @@ class SyncEngine {
 
   /// Nombre d'attestations émises, par type — ⚠️ UN DÉCOMPTE D'AUDIT DU SERVEUR.
   ///
-  /// Le poste ne détient que les cent dernières lignes d'audit de la ferme : il
+  /// Le poste ne détient que les deux cents dernières lignes d'audit de la ferme : il
   /// ne peut pas recompter. Le serveur compte sur l'historique entier ; le poste
   /// garde ce nombre tel quel, dans `app_settings`.
   Future<int> _absorberCompteursAttestation(Object? brut) async {

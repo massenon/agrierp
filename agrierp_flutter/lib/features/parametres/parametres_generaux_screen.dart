@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../core/audit/libelles_audit.dart';
 
 import '../../core/config/envoi_email_test.dart';
 import '../../core/config/parametres_smtp.dart';
@@ -143,10 +147,22 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
   DonneesParametresGeneraux? _donnees;
 
+  /// Ticket U14 — « Rechercher... » de l'onglet Audit Logs (`wire:model.live.debounce.300ms="search"`).
+  final _rechercheAudit = TextEditingController();
+  String _filtreAudit = '';
+  Timer? _attenteAudit;
+
   @override
   void initState() {
     super.initState();
     _charger();
+  }
+
+  @override
+  void dispose() {
+    _attenteAudit?.cancel();
+    _rechercheAudit.dispose();
+    super.dispose();
   }
 
   Future<void> _charger() async {
@@ -933,21 +949,67 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.history,
         ),
+        // 🔴→✅ Ticket U14 — la carte du Blade : `color="blue"`, légende « Sur les dernières 24 h », compte sur 24 h (le
+        // poste comptait toutes les traces reçues, en rouge). Même tiret que la carte voisine quand le poste ne sait pas.
         CarteKpi(
           libelle: 'Connexions échouées',
-          valeur: '${d.connexionsEchouees}',
-          legende: 'Sur les traces reçues',
-          couleurLisere: d.connexionsEchouees > 0
-              ? AgriColors.errorRed
-              : AgriColors.outline,
+          valeur: d.auditRecent ? '${d.connexionsEchouees}' : '—',
+          legende: d.auditRecent ? 'Sur les dernières 24 h' : 'Dernier tirage il y a plus de 24 h',
+          couleurLisere: AgriColors.infoBlue,
           icone: SymbolesAgri.lock,
-          couleurIcone: d.connexionsEchouees > 0
-              ? AgriColors.errorRed
-              : AgriColors.outline,
+          couleurIcone: AgriColors.infoBlue,
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
-      _tableau(
+      // 🔴→✅ Ticket U14 — « Rechercher... » du Blade (en tête du tableau, `max-w-xs`), 300 ms d'attente.
+      Align(
+        alignment: Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: SizedBox(
+            height: 36,
+            child: TextField(
+              key: const Key('audit-recherche'),
+              controller: _rechercheAudit,
+              onChanged: (texte) {
+                _attenteAudit?.cancel();
+                _attenteAudit = Timer(const Duration(milliseconds: 300), () {
+                  if (mounted) setState(() => _filtreAudit = texte);
+                });
+              },
+              style: const TextStyle(fontSize: AgriTypography.xs),
+              decoration: InputDecoration(
+                hintText: 'Rechercher...',
+                isDense: true,
+                prefixIcon: const Icon(SymbolesAgri.search, size: 18, color: AgriColors.outline),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  borderSide: const BorderSide(color: AgriColors.outlineVariant),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.sm),
+      _tableauAudit(DonneesParametresGeneraux.filtrerAudit(d.audit, _filtreAudit)),
+      const SizedBox(height: AgriSpacing.md),
+      // ⚠️ DEUX CENTS LIGNES, comme la liste du web (`limit(200)`) : la table grossit d'une ligne par action et n'a
+      // d'intérêt, au poste, que pour les dernières.
+      _mentionPoste(
+        'Les deux cents dernières actions de la ferme, comme la liste du web. La trace complète vit sur le '
+        "serveur : elle grossit d'une ligne à chaque opération, et un poste "
+        "n'a pas à en porter des années. L'export du journal se fait sur la "
+        'surface web.',
+        cle: 'audit',
+      ),
+    ],
+  );
+
+  /// Le tableau du Blade : Horodatage · Utilisateur · Action · Module · Actions, LIBELLÉS de l'action et du module
+  /// (`action_label`, `module_label ?? '—'`), « Lecture seule » en italique avec son info-bulle, et l'état vide du web.
+  Widget _tableauAudit(List<AuditLog> lignes) => _tableau(
         largeur: 980,
         colonnes: const [
           ('Horodatage', 3),
@@ -956,14 +1018,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ('Module', 3),
           ('Actions', 3),
         ],
-        vide: '— Aucune trace synchronisée —',
+        vide: 'Aucun événement pour le moment.',
         lignes: [
-          for (var i = 0; i < d.audit.length; i++)
+          for (var i = 0; i < lignes.length; i++)
             _ligne(i, [
-              (Text(_dateHeure(d.audit[i].createdAt), style: _cellule), 3),
+              (Text(_dateHeure(lignes[i].createdAt), style: _cellule), 3),
               (
                 Text(
-                  d.audit[i].userName ?? 'Inconnu',
+                  lignes[i].userName ?? 'Inconnu',
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -971,47 +1033,36 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               ),
               (
                 Text(
-                  d.audit[i].action,
+                  LibellesAudit.action(lignes[i].action),
+                  key: Key('audit-action-$i'),
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                  ),
+                  style: _cellule,
                 ),
                 5,
               ),
               (
                 Text(
-                  d.audit[i].module ?? '—',
+                  LibellesAudit.module(lignes[i].module) ?? '—',
+                  key: Key('audit-module-$i'),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
                 3,
               ),
-              // La maquette écrit « Lecture seule » dans cette colonne : une
-              // trace d'audit ne se modifie ni ne s'efface, par définition.
+              // Une trace d'audit ne se modifie ni ne s'efface, par définition.
               (
-                const Text(
-                  'Lecture seule',
-                  style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                const Tooltip(
+                  message: "Les journaux d'audit sont immuables : aucune modification ni suppression n'est possible.",
+                  child: Text(
+                    'Lecture seule',
+                    style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AgriColors.outline),
+                  ),
                 ),
                 3,
               ),
             ]),
         ],
-      ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️ CENT LIGNES, PAS TOUT L'HISTORIQUE : la table grossit d'une ligne
-      // par action et n'a d'intérêt, au poste, que pour les dernières.
-      _mentionPoste(
-        'Les cent dernières actions de la ferme. La trace complète vit sur le '
-        "serveur : elle grossit d'une ligne à chaque opération, et un poste "
-        "n'a pas à en porter des années. L'export du journal se fait sur la "
-        'surface web.',
-        cle: 'audit',
-      ),
-    ],
-  );
+      );
 
   // ── Briques communes ──────────────────────────────────────────────────────
 

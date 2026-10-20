@@ -55,6 +55,10 @@ class AgriSpacing {
 class AgriRadius {
   const AgriRadius._();
 
+  /// Ticket U14 — `rounded` seul : la valeur par défaut de Tailwind (0.25rem, 4 px), que `tailwind.config.js` étend
+  /// sans la redéfinir (champs grisés de l'effectif du rationnement des fiches Lapins et Porcs).
+  static const double base = 4;
+
   static const double lg = 8;
   static const double xl = 12;
 

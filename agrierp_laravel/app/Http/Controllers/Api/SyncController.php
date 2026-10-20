@@ -1155,7 +1155,9 @@ class SyncController extends Controller
                 ->when(! $request->user()?->can('manage-users'), fn ($q) => $q->whereRaw('1 = 0'))
                 ->with('user:id,name')
                 ->orderByDesc('created_at')
-                ->limit(100)
+                // Ticket U14 — les deux cents lignes de la liste du web (`AuditLogs::getLogsProperty()`, `limit(200)`),
+                // et non cent : l'onglet du poste montre la même liste.
+                ->limit(200)
                 ->get()
                 ->map(fn (AuditLog $log) => [
                     'id' => $log->id,
