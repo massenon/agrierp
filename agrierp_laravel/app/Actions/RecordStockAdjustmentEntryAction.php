@@ -46,10 +46,15 @@ use App\Services\AccountingEntryService;
 class RecordStockAdjustmentEntryAction
 {
     /**
+     * 🔴→✅ Ticket EX5 (R4) — l'écriture est datée du JOUR DU COMPTAGE (`$dateDuComptage`), jamais de l'instant où
+     * elle est enregistrée : un inventaire du 30/12/2026 reçu d'un poste le 03/01/2027 passait sa perte en 2027, et
+     * dans un exercice clos le stock refusé laissait sa perte acceptée. Même date que le mouvement de stock (S-T10 :
+     * l'instant du comptage), donc le même exercice — et le même refus R4 s'il est clos.
+     *
      * @param  float  $ecart  négatif = manquant constaté, positif = excédent
      * @return AccountingEntry|null  null si rien n'était à comptabiliser
      */
-    public function execute(Product $produit, float $ecart, ?string $motif = null): ?AccountingEntry
+    public function execute(Product $produit, float $ecart, ?string $motif = null, ?\DateTimeInterface $dateDuComptage = null): ?AccountingEntry
     {
         // Excédent : régularisation de stock seule, jamais un profit.
         if ($ecart >= 0) {
@@ -83,7 +88,7 @@ class RecordStockAdjustmentEntryAction
                 ['account_id' => $chargesExceptionnelles->id, 'debit' => $valeur, 'credit' => 0],
                 ['account_id' => $achats->id, 'debit' => 0, 'credit' => $valeur],
             ],
-            entryDate: now()->format('Y-m-d'),
+            entryDate: $this->jourDuComptage($dateDuComptage),
             reference: mb_substr(
                 AccountingEntry::generateReference().' — Écart inventaire '.$produit->sku
                     .($motif ? ' ('.$motif.')' : ''),
@@ -106,7 +111,7 @@ class RecordStockAdjustmentEntryAction
      * ⚠️ Mêmes garde-fous que `execute` : produit sans PMP (aucun coût connu) ou plan comptable incomplet → aucune
      * écriture, jamais une valeur devinée.
      */
-    public function annulerPerte(Product $produit, float $quantite, ?string $motif = null): ?AccountingEntry
+    public function annulerPerte(Product $produit, float $quantite, ?string $motif = null, ?\DateTimeInterface $dateDuComptage = null): ?AccountingEntry
     {
         $pmp = $produit->computePmp();
         if ($quantite <= 0 || $pmp === null || $pmp <= 0) {
@@ -125,7 +130,7 @@ class RecordStockAdjustmentEntryAction
                 ['account_id' => $achats->id, 'debit' => $valeur, 'credit' => 0],
                 ['account_id' => $chargesExceptionnelles->id, 'debit' => 0, 'credit' => $valeur],
             ],
-            entryDate: now()->format('Y-m-d'),
+            entryDate: $this->jourDuComptage($dateDuComptage),
             reference: mb_substr(
                 AccountingEntry::generateReference().' — Écart inventaire annulé '.$produit->sku
                     .($motif ? ' ('.$motif.')' : ''),
@@ -134,5 +139,13 @@ class RecordStockAdjustmentEntryAction
             sourceType: 'stock_adjustment',
             sourceId: $produit->id,
         );
+    }
+
+    /** Le jour du comptage à l'heure du Bénin (`app.timezone`, celle des mouvements de stock) ; aujourd'hui à défaut. */
+    private function jourDuComptage(?\DateTimeInterface $dateDuComptage): string
+    {
+        return $dateDuComptage === null
+            ? now()->format('Y-m-d')
+            : \Carbon\Carbon::instance($dateDuComptage)->setTimezone(config('app.timezone'))->format('Y-m-d');
     }
 }

@@ -126,19 +126,40 @@ class CaisseRepository {
           e,
     ];
 
+    // 🔴→✅ Ticket EX5 (règle R4 du PRD exercices comptables) — messages du serveur réécrits,
+    // repris mot pour mot : `NoOpenFiscalYearException` / `ClosedFiscalYearException`, précédés
+    // de « Vente refusée : » (`VerifySaleDateAction::prefixe`).
     if (couvrants.isEmpty) {
+      // 🔴→✅ Ticket EX3 (R2) — LE FILET DU SERVEUR, recopié : la première saisie datée de N+1
+      // y OUVRE l'exercice N+1 si N est l'exercice ouvert le plus récent et que deux exercices
+      // ne sont pas déjà ouverts (`OuvertureExerciceService::refusOuverture`). Un poste qui ne
+      // connaît pas encore N+1 (hors ligne le 1er janvier) ne refuse donc pas à tort une vente
+      // du 1er janvier saisie le 2 : le serveur l'acceptera.
+      if (_filetOuvrirait(j.year, exercices)) return null;
+
       return 'Vente refusée : aucun exercice comptable ne couvre le ${_jourFr(j)}. '
-          "Créez l'exercice avant d'enregistrer cette vente.";
+          "Ouvrez l'exercice ${j.year} (Comptabilité › Clôture d'exercice).";
     }
 
     // Exercices qui se chevauchent (anomalie) : le serveur prend « le premier » sans ordre
     // défini ; le poste accepte dès qu'un exercice OUVERT couvre le jour (le serveur tranchera).
     if (!couvrants.any((e) => e.status == 'ouvert')) {
-      return "Vente refusée : l'exercice comptable qui couvre le ${_jourFr(j)} "
-          'est clos. Aucune vente ne peut y être datée.';
+      return "Vente refusée : l'exercice ${couvrants.first.year} est clôturé : "
+          'aucune saisie ne peut être datée du ${_jourFr(j)}.';
     }
 
     return null;
+  }
+
+  /// Copie de `OuvertureExerciceService::refusOuverture(…, FILET)` (serveur, ticket EX3) pour
+  /// une date passée (le 1er janvier de [annee] est donc atteint) : l'exercice de [annee]
+  /// n'existe pas, celui de l'année précédente existe et est OUVERT, et moins de deux
+  /// exercices sont ouverts.
+  bool _filetOuvrirait(int annee, List<FiscalYear> exercices) {
+    if (exercices.any((e) => e.year == annee)) return false;
+    final precedent = exercices.where((e) => e.year == annee - 1);
+    if (precedent.isEmpty || precedent.first.status != 'ouvert') return false;
+    return exercices.where((e) => e.status == 'ouvert').length < 2;
   }
 
   /// Bornes INDICATIVES du calendrier (comme `PosInterface::getDateMin/MaxProperty`, 15.32) :

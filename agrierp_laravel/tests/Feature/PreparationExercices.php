@@ -124,6 +124,15 @@ trait PreparationExercices
         PurchaseLine::create(['purchase_id' => $achat->id, 'product_id' => $this->mais->id, 'qty' => $quantite, 'unit_price' => 15_000]);
     }
 
+    /**
+     * Le message exact sous le champ. ⚠️ `assertHasErrors(['champ' => ['message']])` de Livewire coupe la valeur au
+     * premier « : » (il la lit comme une règle `regle:parametres`) : inutilisable pour les messages R4.
+     */
+    protected function assertErreurSousLeChamp($composant, string $champ, string $message): void
+    {
+        $this->assertSame($message, $composant->errors()->first($champ), "message sous le champ « {$champ} »");
+    }
+
     protected function connecterLePoste(): void
     {
         $this->jeton = $this->postJson('/api/auth/login', [

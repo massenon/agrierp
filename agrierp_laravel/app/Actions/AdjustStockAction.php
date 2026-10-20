@@ -37,6 +37,14 @@ class AdjustStockAction
         ?\DateTimeInterface $movementDate = null,
         ?string $reason = null,
     ): StockMovement {
+        // 🔴→✅ TICKET EX5 (EF5, R4) — UN EXERCICE CLOS EST EN LECTURE SEULE, LE STOCK COMPRIS. Un ajout de stock daté du
+        // 20/12/2026 était accepté le 15/03/2027 alors que 2026 était clôturé (web et poste) : le stock de 2026, figé par
+        // son inventaire de clôture, bougeait après coup. Le refus vient ICI, avant toute écriture, pour tout mouvement
+        // (ajout, inventaire, fiche, et ceux des ventes ou achats, déjà refusés par leur écriture comptable).
+        app(\App\Services\AccountingEntryService::class)->refuserSiExerciceClos(
+            ($movementDate ?? now())->format('Y-m-d')
+        );
+
         if ($delta > 0) {
             $product->increment('stock_qty', $delta);
         } elseif ($delta < 0) {

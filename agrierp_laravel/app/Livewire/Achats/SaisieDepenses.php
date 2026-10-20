@@ -140,13 +140,25 @@ class SaisieDepenses extends Component
                 $this->addError('amount', $e->getMessage());
 
                 return;
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+                // 🔴→✅ Ticket EX5 (EF6, R4) — exercice clos ou absent : le motif sous « Date », jamais une erreur 500.
+                $this->addError('expenseDate', $e->getMessage());
+
+                return;
             }
         } else {
-            [, $ecritureManquante] = app(SaisieDepenseAction::class)->creer(
-                $donnees,
-                null,
-                $this->receiptFile ? $this->receiptFile->store('depenses-recus', 'local') : null,
-            );
+            try {
+                [, $ecritureManquante] = app(SaisieDepenseAction::class)->creer(
+                    $donnees,
+                    null,
+                    $this->receiptFile ? $this->receiptFile->store('depenses-recus', 'local') : null,
+                );
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+                // 🔴→✅ Ticket EX5 (EF6, R4) — l'erreur 500 constatée le 20/10/2026 : le motif sous « Date ».
+                $this->addError('expenseDate', $e->getMessage());
+
+                return;
+            }
 
             if ($ecritureManquante) {
                 // Jamais silencieux — même discipline que le POS (14.23), les achats (14.24) et les avoirs (14.27).
@@ -183,7 +195,14 @@ class SaisieDepenses extends Component
 
         // 🔴→✅ TICKET 14.33 — CONTRE-PASSATION (écriture d'annulation de sens inverse, jamais suppression de
         // l'originale) et trésorerie réintégrée : `SaisieDepenseAction::archiver()` (U14, partagé avec les postes).
-        $resultat = app(SaisieDepenseAction::class)->archiver($id);
+        try {
+            $resultat = app(SaisieDepenseAction::class)->archiver($id);
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            // 🔴→✅ Ticket EX5 — dépense d'un exercice clos, ou contre-passation du jour sans exercice : motif R4.
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
 
         // 🔴→✅ U14 — déjà archivée (double clic, page restée ouverte) : rien n'est refait, rien à annoncer.
         if ($resultat === SaisieDepenseAction::DEJA_ARCHIVEE) {

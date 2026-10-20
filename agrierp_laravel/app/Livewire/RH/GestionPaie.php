@@ -62,6 +62,17 @@ class GestionPaie extends Component
         return $this->periodMonth.'-01';
     }
 
+    /**
+     * Ticket EX5 (Q4) — date de la charge d'une paie : le dernier jour de la période payée, sauf si le règlement a lieu
+     * avant (paie du mois en cours réglée avant sa fin) — jamais une charge datée APRÈS son règlement ni dans le futur.
+     */
+    private function dateDeLaCharge(string $period): string
+    {
+        $finDePeriode = \Carbon\Carbon::parse($period)->endOfMonth()->format('Y-m-d');
+
+        return min($finDePeriode, now()->format('Y-m-d'));
+    }
+
     public function getRowsProperty()
     {
         $employees = Employee::where('is_active', true)->orderBy('last_name')->get();
@@ -173,6 +184,22 @@ class GestionPaie extends Component
             return;
         }
 
+        // 🔴→✅ TICKET EX5 (EF5, EF6, décision Q4 du 20/10/2026) — À QUEL EXERCICE APPARTIENT LA PAIE ?
+        // La charge (661) appartient à la PÉRIODE payée : datée de son dernier jour (31/12/N pour décembre), jamais après
+        // le règlement ; le règlement, à sa date. Exercice de la charge clos → refus ; aucun exercice → refus. Avant : la
+        // paie de 11/2026 validée le 15/03/2027 passait au 15/03/2027 alors que 2026 était clos, et un exercice absent
+        // finissait en erreur 500. Contrôlé AVANT toute écriture : ni bulletin, ni trésorerie, ni écriture.
+        $dateCharge = $this->dateDeLaCharge($period);
+        $dateReglement = now()->format('Y-m-d');
+        try {
+            app(\App\Services\AccountingEntryService::class)->exerciceOuvertPour($dateCharge);
+            app(\App\Services\AccountingEntryService::class)->exerciceOuvertPour($dateReglement);
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
+
         $gross = (float) ($employee->base_salary ?? 0);
         $absenceDays = AttendanceRecord::where('employee_id', $employee->id)
             ->where('status', 'absent')
@@ -194,7 +221,7 @@ class GestionPaie extends Component
         $cnssDeduction = $calcul['cnss_salariale'];
         $net = $calcul['net'];
 
-        DB::transaction(function () use ($employee, $period, $gross, $calcul, $absenceDeduction, $cnssDeduction, $net) {
+        DB::transaction(function () use ($employee, $period, $gross, $calcul, $absenceDeduction, $cnssDeduction, $net, $dateCharge, $dateReglement) {
             $payslip = Payslip::create([
                 'employee_id' => $employee->id,
                 'period_month' => $period,
@@ -224,7 +251,7 @@ class GestionPaie extends Component
             // dette envers l'organisme et non une non-depense : comptabiliser
             // le seul net sous-estimerait les charges de personnel chaque mois.
             $ecriture = app(RecordPayrollAccountingEntryAction::class)
-                ->execute($payslip, $account?->id);
+                ->execute($payslip, $account?->id, $dateCharge, $dateReglement);
 
             AuditLog::record('payslip.paid', 'rh');
 

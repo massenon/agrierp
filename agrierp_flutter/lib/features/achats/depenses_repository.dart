@@ -56,7 +56,7 @@ class LigneDepense {
 /// 🔴→✅ Ticket U14 — **MODIFIER ET ARCHIVER, COMME LE WEB** (`SaisieDepenses::submitExpense()` en modification,
 /// `archiveExpense()`). Le poste écrit le FAIT (`pending`) ; le serveur le rejoue par `SaisieDepenseAction`, le point de
 /// passage du composant Livewire (trésorerie réajustée ou réintégrée, contre-passation, journal d'audit). Les règles du
-/// web sont appliquées ICI, avant d'écrire, avec ses messages : une dépense comptabilisée ne change ni de montant, ni de
+/// web sont appliquées ICI, avant d'écrire, avec ses messages : une dépense comptabilisée ne change ni de date (EX5), ni de montant, ni de
 /// compte de charge, ni de compte de trésorerie ; une dépense archivée ne se modifie plus.
 class DepensesRepository {
   DepensesRepository({
@@ -74,8 +74,8 @@ class DepensesRepository {
 
   /// `SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE` du web, mot pour mot.
   static const messageDejaComptabilisee =
-      'Cette dépense est déjà comptabilisée : son montant, son compte de charge et son compte de trésorerie ne '
-      'peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
+      'Cette dépense est déjà comptabilisée : sa date, son montant, son compte de charge et son compte de '
+      'trésorerie ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
 
   /// `SaisieDepenseAction::MESSAGE_ARCHIVEE` du web, mot pour mot.
   static const messageArchivee = 'Cette dépense est archivée : elle ne peut plus être modifiée.';
@@ -217,7 +217,7 @@ class DepensesRepository {
   ///
   /// ⚠️ **LES MÊMES BORNES QUE LE WEB, APPLIQUÉES ICI** ([valider]) ; puis, en modification, les deux refus de
   /// `SaisieDepenseAction::modifier()`, sous le champ « Montant » comme au web : dépense archivée, et dépense
-  /// comptabilisée (`accounting_entry_id` servi par le tirage) dont le montant, le compte de charge ou le compte de
+  /// comptabilisée (`accounting_entry_id` servi par le tirage) dont la date (EX5), le montant, le compte de charge ou le compte de
   /// trésorerie changerait.
   ///
   /// Une modification repasse la ligne en `pending` à l'instant de la saisie (`updatedAt`) ; elle part entière, le
@@ -298,8 +298,16 @@ class DepensesRepository {
       }
       final montantChange =
           PmpService.arrondi(valeur, 2) != PmpService.arrondi(existante.amount, 2);
+      // 🔴→✅ Ticket EX5 (décision D-U14-1 du 20/10/2026) — la DATE d'une dépense comptabilisée
+      // est verrouillée comme son montant (`SaisieDepenseAction::modifier`, même message).
+      final ancienJour = DateTime(
+        existante.expenseDate.year,
+        existante.expenseDate.month,
+        existante.expenseDate.day,
+      );
       if (existante.accountingEntryId != null &&
           (montantChange ||
+              jour != ancienJour ||
               categorie != existante.category ||
               compteTresorerieId != existante.treasuryAccountId)) {
         throw DepenseRefusee({'montant': messageDejaComptabilisee});

@@ -336,6 +336,14 @@ class FicheReproducteurs extends Component
             return;
         }
 
+        // 🔴→✅ Ticket EX5 (EF5, décision Q3 du 20/10/2026) — une fiche datée dans un exercice CLOS est refusée : le stock
+        // consommé de cet exercice est figé avec son inventaire. Même motif R4 qu'à l'envoi d'un poste.
+        if ($refusExercice = app(\App\Services\AccountingEntryService::class)->refusExerciceClos($this->selectedDate)) {
+            $this->dispatch('toast', message: $refusExercice, type: 'error');
+
+            return;
+        }
+
         $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;        // 🔴→✅ TICKET 14.37 — état AVANT enregistrement, pour n'appliquer
         // au stock que l'ÉCART. Une fiche se corrige : appliquer les

@@ -256,7 +256,15 @@ class GestionStocks extends Component
         ]);
 
         $product = Product::findOrFail($this->addProductId);
-        app(AdjustStockAction::class)->execute($product, (float) $this->addQty, 'manual_addition', null, \Carbon\Carbon::parse($this->addDate));
+
+        try {
+            app(AdjustStockAction::class)->execute($product, (float) $this->addQty, 'manual_addition', null, \Carbon\Carbon::parse($this->addDate));
+        } catch (\App\Exceptions\ClosedFiscalYearException $e) {
+            // Ticket EX5 — exercice clos : le motif R4 sous le champ « Date », rien n'est écrit.
+            $this->addError('addDate', $e->getMessage());
+
+            return;
+        }
 
         AuditLog::record('stock.manual_addition', 'stocks');
         $this->dispatch('close-modal', name: 'modal-ajouter-stock');
@@ -315,18 +323,31 @@ class GestionStocks extends Component
         }
 
         $product = Product::findOrFail($this->adjProductId);
-        app(AdjustStockAction::class)->execute($product, $diff, 'adjustment', null, now(), $this->adjReason ?: null);
 
-        // 🔴→✅ TICKET 14.41 — LA PERTE EST ENFIN COMPTABILISÉE.
-        //
-        // Le CDC exige que « toute opération financière (vente, achat, paie,
-        // **perte**) déclenche automatiquement la génération de l'écriture ».
-        // Les trois premiers flux ont été câblés aux tickets 14.23 à 14.25 ; la
-        // perte ne l'était pas, et cet écran l'annonçait lui-même à
-        // l'utilisateur depuis le Sprint 6. Un manquant d'inventaire faisait
-        // baisser le stock sans jamais réduire le résultat.
-        $ecriture = app(RecordStockAdjustmentEntryAction::class)
-            ->execute($product, $diff, $this->adjReason ?: null);
+        // 🔴→✅ TICKET EX5 (EF6) — LE MOUVEMENT ET SA PERTE, ENSEMBLE OU PAS DU TOUT. Ils partaient l'un après l'autre :
+        // un exercice absent faisait échouer l'écriture de perte (erreur 500) APRÈS que le stock avait bougé — un
+        // manquant au stock, sans sa charge 657. Une transaction ; le refus devient un toast, rien n'est écrit.
+        try {
+            $ecriture = \Illuminate\Support\Facades\DB::transaction(function () use ($product, $diff) {
+                app(AdjustStockAction::class)->execute($product, $diff, 'adjustment', null, now(), $this->adjReason ?: null);
+
+                // 🔴→✅ TICKET 14.41 — LA PERTE EST ENFIN COMPTABILISÉE.
+                //
+                // Le CDC exige que « toute opération financière (vente, achat, paie,
+                // **perte**) déclenche automatiquement la génération de l'écriture ».
+                // Les trois premiers flux ont été câblés aux tickets 14.23 à 14.25 ; la
+                // perte ne l'était pas, et cet écran l'annonçait lui-même à
+                // l'utilisateur depuis le Sprint 6. Un manquant d'inventaire faisait
+                // baisser le stock sans jamais réduire le résultat.
+                // Ticket EX5 — datée du jour du comptage (ici, maintenant), comme le mouvement.
+                return app(RecordStockAdjustmentEntryAction::class)
+                    ->execute($product, $diff, $this->adjReason ?: null, now());
+            });
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
 
         AuditLog::record('stock.adjusted', 'stocks');
 

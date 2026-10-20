@@ -6,6 +6,7 @@ use App\Exceptions\DepenseNonModifiableException;
 use App\Models\AuditLog;
 use App\Models\Expense;
 use App\Models\TreasuryAccount;
+use App\Services\AccountingEntryService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,8 +21,9 @@ use Illuminate\Support\Facades\DB;
  *  - création : `payee`, décaissée tout de suite (trésorerie − montant), écriture Débit 6 / Crédit 5 ; écriture non
  *    générée (plan comptable incomplet) → `expense.accounting_entry_missing`, jamais silencieux ;
  *  - modification : trésorerie réajustée (ancien compte + ancien montant, nouveau compte − nouveau montant) ; une
- *    dépense COMPTABILISÉE ne change ni de montant, ni de compte de charge, ni de compte de trésorerie
- *    ([MESSAGE_DEJA_COMPTABILISEE]) ;
+ *    dépense COMPTABILISÉE ne change ni de date (D-U14-1, EX5), ni de montant, ni de compte de charge, ni de compte
+ *    de trésorerie ([MESSAGE_DEJA_COMPTABILISEE]) ;
+ *  - EX5 : exercice clos (date d'origine ou nouvelle) ou absent → motif R4, avant toute écriture ;
  *  - archivage : contre-passation datée du jour, trésorerie réintégrée, `is_active = false`.
  *
  * ⚠️ VERROUS : la dépense est relue SOUS VERROU (`lockForUpdate`) avant toute écriture, puis la trésorerie est touchée
@@ -36,7 +38,7 @@ class SaisieDepenseAction
      * l'écriture, qui créditait toujours l'ancien compte de classe 5 : les deux livres de trésorerie divergeaient pour
      * les DEUX comptes, et l'archivage contre-passait ensuite sur le nouveau.
      */
-    public const MESSAGE_DEJA_COMPTABILISEE = 'Cette dépense est déjà comptabilisée : son montant, son compte de charge et son compte de trésorerie ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
+    public const MESSAGE_DEJA_COMPTABILISEE = 'Cette dépense est déjà comptabilisée : sa date, son montant, son compte de charge et son compte de trésorerie ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
 
     /**
      * 🔴→✅ Ticket U14 — modifier une dépense ARCHIVÉE (page restée ouverte au web, ou poste qui ne l'a pas encore appris)
@@ -56,6 +58,11 @@ class SaisieDepenseAction
      */
     public function creer(array $donnees, ?string $id = null, ?string $justificatif = null): array
     {
+        // 🔴→✅ Ticket EX5 (EF5, EF6, R4) — un exercice CLOS est jugé AVANT tout effet (motif R4 sous « Date » au web, refus
+        // motivé à l'envoi du poste) : une dépense sans écriture possible (compte de charge absent) y passait. Un exercice
+        // ABSENT est jugé par l'écriture (`record()`, filet R2 compris), dans la transaction : rien n'est écrit.
+        app(AccountingEntryService::class)->refuserSiExerciceClos($donnees['expense_date']);
+
         return DB::transaction(function () use ($donnees, $id, $justificatif) {
             $depense = new Expense();
             if ($id !== null) {
@@ -102,10 +109,20 @@ class SaisieDepenseAction
                 throw new DepenseNonModifiableException(self::MESSAGE_ARCHIVEE);
             }
 
+            // 🔴→✅ Ticket EX5 (EF5) — une dépense d'un exercice CLOS ne se modifie plus (motif R4 de sa date), et ne passe
+            // pas non plus dans un exercice clos.
+            $ancienneDate = $depense->expense_date->format('Y-m-d');
+            $nouvelleDate = \Illuminate\Support\Carbon::parse($donnees['expense_date'])->format('Y-m-d');
+            app(AccountingEntryService::class)->refuserSiExerciceClos($ancienneDate);
+            app(AccountingEntryService::class)->refuserSiExerciceClos($nouvelleDate);
+
             // ⚠️ UNE DÉPENSE DÉJÀ COMPTABILISÉE NE SE RÉÉCRIT PAS (14.33) : la correction passe par une écriture au
             // Journal Comptable — même discipline que pour une immobilisation déjà capitalisée (14.26).
+            // 🔴→✅ Décision D-U14-1 du 20/10/2026 — SA DATE NON PLUS : changée seule, elle faisait passer la dépense dans
+            // un autre jour (ou un autre exercice) pendant que son écriture restait à l'ancienne date.
             $montantChange = round((float) $donnees['amount'], 2) !== round((float) $depense->amount, 2);
             if ($depense->accounting_entry_id && ($montantChange
+                || $nouvelleDate !== $ancienneDate
                 || $donnees['category'] !== $depense->category
                 || $donnees['treasury_account_id'] !== $depense->treasury_account_id)) {
                 throw new DepenseNonModifiableException(self::MESSAGE_DEJA_COMPTABILISEE);
@@ -142,6 +159,10 @@ class SaisieDepenseAction
             if (! $depense->is_active) {
                 return self::DEJA_ARCHIVEE;
             }
+
+            // 🔴→✅ Ticket EX5 (EF5) — une dépense d'un exercice CLOS ne s'archive plus : elle disparaîtrait des états de
+            // cet exercice, et sa trésorerie serait réintégrée après coup. Motif R4 de sa date.
+            app(AccountingEntryService::class)->refuserSiExerciceClos($depense->expense_date->format('Y-m-d'));
 
             // TICKET 14.33 — CONTRE-PASSATION, jamais suppression de l'originale : le grand livre est immuable.
             $annulation = app(RecordExpenseAccountingEntryAction::class)->reverse($depense);
