@@ -344,14 +344,19 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **EX-Q2** : paie (Q4) — la charge est datée du dernier jour de la période, **sauf** si le règlement a lieu avant (charge au jour du règlement, une seule écriture). Les deux écritures (par le 422) ne sont passées que quand les deux dates diffèrent. À confirmer.
 - **EX-Q3** : au Journal, une écriture ne change plus d'exercice, même entre deux exercices ouverts (EF5 « vers un autre exercice ») : archiver puis ressaisir. À confirmer.
 - **EX-Q4** : au plus deux exercices ouverts (R2) : si N n'est pas clôturé au 31/12/N+1, N+2 ne s'ouvre pas et toute saisie de N+2 est refusée (l'administrateur est prévenu). Est-ce voulu, ou faut-il une marge ?
-- **EX-Q5** : « griser la date d'une dépense comptabilisée comme le montant » — ni le web ni le poste ne grisent le montant : le refus se fait à l'enregistrement, sous « Montant ». La date suit ce comportement ; le grisé relève d'EF10 (lot 2), à construire d'abord au web.
+- **EX-Q5** : « griser la date d'une dépense comptabilisée comme le montant » — ni le web ni le poste ne grisent le montant : le refus se fait à l'enregistrement, sous « Montant ». La date suit ce comportement ; le grisé relève d'EF10 (lot 2), à construire d'abord au web. → **Fait en EX7** : la date d'une dépense comptabilisée est grisée en modification, au web puis au poste, motif « Dépense déjà comptabilisée : sa date ne peut plus être modifiée. » en info-bulle ; le montant reste refusé à l'enregistrement (non grisé : à décider s'il doit l'être aussi).
 
 **Questions nées d'EX6 (non tranchées)** — détail dans `README_SPRINT0.md` :
 - **EX-Q6** : les **transferts entre bandes** (web et poste) ne sont jugés par aucun exercice au serveur, alors qu'ils écrivent les fiches des deux bandes ; au poste, la fiche du transfert part ensuite à l'envoi et le serveur la refuse si l'exercice est clos (transfert accepté, fiche refusée). Faut-il refuser le transfert lui-même dans un exercice clos (Q3 étendue), d'abord au web ?
 - **EX-Q7** : les calendriers bornés (EF7) ne l'étaient qu'à la caisse ; EX6 a borné au web d'abord (`min`) la Saisie des Dépenses, les Dettes Fournisseurs, le remboursement, les Avances et l'Ajout de stock, puis le poste. Le sélecteur de date des **fiches d'élevage** n'est PAS borné (il sert aussi à consulter un jour passé, EF12) : le refus vient à l'enregistrement. À confirmer.
 
+**Questions nées d'EX7 (non tranchées)** — détail dans `README_SPRINT0.md` :
+- **EX-Q8** : un exercice clos grise les saisies des écrans PILOTÉS (EF9 : Journal, Achats, Dépenses, Stocks, Soins, Transferts, Rapprochement, Historique des ventes) ; la **caisse**, les **fiches d'élevage**, la **paie** et les écrans clients ne lisent pas l'exercice affiché (une vente se date du jour). Faut-il les griser aussi quand 2026 clos est affiché ?
+- **EX-Q9** : les indicateurs « du mois » des écrans pilotés suivent le mois de référence de l'exercice affiché (le mois du jour, ou décembre 2026 lu en 2027) ; ceux qui ne sont pas « du mois » (Liste d'Achats, Historique des ventes au poste, totaux du Journal au poste) restent sur toute la ferme, comme avant. À confirmer.
+- **EX-Q10** : la Déclaration TVA et le Rapport mensuel ne proposent plus que les mois de l'exercice affiché (avant : les 12 derniers mois glissants, à cheval sur deux exercices). À confirmer.
+
 ### Lot 2 — avant la clôture de 2026 (mars 2027)
-| EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | 🔧 |
+| EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | ✅ 20/10/2026 (+ EX-Q5 : date d'une dépense comptabilisée grisée ; voir README_SPRINT0) |
 | EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | 🔧 |
 
 ### Lot 3 — avec la clôture de 2026
