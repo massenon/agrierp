@@ -1,7 +1,7 @@
 # PRD — Bascule et clôture d'exercice, navigation N / N-1 / N+1 (web et poste)
-**Statut :** validé par le client le 20/10/2026 · **Date :** 2026-10-20 · **Ticket(s) :** à créer (skill `plan`, préfixe EX) ; reprend la question client Q4 « historique des exercices antérieurs » (`agrierp_flutter/AUDIT_FIDELISATION.md:1020`) et D-U14-1 (`PLAN_FINALISATION.md`)
+**Statut :** validé par le client le 20/10/2026 · **Date :** 2026-10-20 · **Ticket(s) :** à créer (skill `plan`, préfixe EX) ; reprend la question client Q4 « historique des exercices antérieurs » (`agrierp_flutter/AUDIT_FIDELISATION.md:1020`) et D-U14-1 (`docs/PLAN_FINALISATION.md`)
 
-> **Construit d'abord sur le web** (Doctrine, article 0 et article 5), puis porté au poste à l'identique. La clôture elle-même reste au web seulement (`DOCTRINE_PORTAGE.md:36` : « clôture d'exercice = jamais synchronisée ») ; le poste **affiche** l'état des exercices, **refuse** les saisies dans un exercice clos et **consulte** N-1.
+> **Construit d'abord sur le web** (Doctrine, article 0 et article 5), puis porté au poste à l'identique. La clôture elle-même reste au web seulement (`docs/DOCTRINE_PORTAGE.md:36` : « clôture d'exercice = jamais synchronisée ») ; le poste **affiche** l'état des exercices, **refuse** les saisies dans un exercice clos et **consulte** N-1.
 >
 > ⚠️ **Échéance ferme : 01/01/2027.** Sans le lot 1 (§ 11), toute vente, dépense, achat et paie est bloqué dès le 1er janvier (défaut C2 ci-dessous).
 
@@ -210,13 +210,13 @@ Les ventes gardent leur préfixe actuel « Vente refusée : » (`VerifySaleDateA
 
 - **Affectation du résultat** (compte 12x, réserves, dividendes, décision d'assemblée). Le résultat reste au 131 ou au 139, comme aujourd'hui. Ce sera un PRD séparé si le cabinet le demande.
 - **Exercices décalés** (non civils) et plusieurs sociétés : la ferme est une seule entité, en exercice civil.
-- **Clôture ou ouverture d'exercice au poste** : la doctrine l'exclut (`DOCTRINE_PORTAGE.md:36`). Le poste affiche et refuse, il ne décide pas.
-- **Conservation hors du serveur** (cloud, disque externe automatique) : elle relève de l'hébergement cPanel. Le PRD fournit l'archive téléchargeable ; la copie externe reste une procédure, à documenter dans `GUIDE_DEPLOIEMENT.md`.
+- **Clôture ou ouverture d'exercice au poste** : la doctrine l'exclut (`docs/DOCTRINE_PORTAGE.md:36`). Le poste affiche et refuse, il ne décide pas.
+- **Conservation hors du serveur** (cloud, disque externe automatique) : elle relève de l'hébergement cPanel. Le PRD fournit l'archive téléchargeable ; la copie externe reste une procédure, à documenter dans `docs/GUIDE_DEPLOIEMENT.md`.
 - **Tables à fenêtre du poste** (pointages, journal d'audit, notifications) : elles ne servent pas aux états d'un exercice.
 
 ## 9. Questions au client — tranchées le 20/10/2026
 
-**Décision du client du 20/10/2026 : toutes les propositions recommandées ci-dessous sont retenues.** Q6 (10 ans) reste à faire confirmer par le cabinet FAGUEZ. Tickets EX1 à EX9 dans `PLAN_FINALISATION.md`.
+**Décision du client du 20/10/2026 : toutes les propositions recommandées ci-dessous sont retenues.** Q6 (10 ans) reste à faire confirmer par le cabinet FAGUEZ. Tickets EX1 à EX9 dans `docs/PLAN_FINALISATION.md`.
 
 | # | Question | Proposition recommandée (retenue) | Bloquante pour |
 |---|---|---|---|
@@ -275,5 +275,5 @@ Les ventes gardent leur préfixe actuel « Vente refusée : » (`VerifySaleDateA
 | 3 | EF13 et EF14 (archive, audit) | Avec la clôture de 2026 |
 
 **Dépendances**
-- La tâche cron `schedule:run` doit tourner en production (`GUIDE_DEPLOIEMENT.md`) ; sinon, seul le filet de R2 joue.
+- La tâche cron `schedule:run` doit tourner en production (`docs/GUIDE_DEPLOIEMENT.md`) ; sinon, seul le filet de R2 joue.
 - Les postes sont déployés **après** le serveur, comme pour toute livraison.

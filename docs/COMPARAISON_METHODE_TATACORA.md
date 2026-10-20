@@ -2,7 +2,7 @@
 
 **Date :** 19/10/2026 · **Source :** la note « reprendre la méthode et la structure » transmise par le client (7 sections).
 **Règle de lecture :** la méthode et la structure se transposent ; le code se réécrit sur les tables d'AgriERP. Une
-décision déjà prise par le client (D-SYNC-1 à D-SYNC-7, `PLAN_FINALISATION.md`) n'est pas rouverte sans lui.
+décision déjà prise par le client (D-SYNC-1 à D-SYNC-7, `docs/PLAN_FINALISATION.md`) n'est pas rouverte sans lui.
 
 Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé en comparant, corrigé.
 

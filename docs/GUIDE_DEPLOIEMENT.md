@@ -2,8 +2,8 @@
 
 **Date :** 19/10/2026 · **Pour :** l'éditeur et l'équipe technique de la ferme.
 Ce guide complète [`INSTALLATION_LOCALE.md`](INSTALLATION_LOCALE.md) (poste Windows de développement, pas à pas),
-[`agrierp_laravel/RUNBOOK_DEPLOIEMENT_CPANEL.md`](agrierp_laravel/RUNBOOK_DEPLOIEMENT_CPANEL.md) et
-[`agrierp_laravel/CHECKLIST_PRE_DEPLOIEMENT.md`](agrierp_laravel/CHECKLIST_PRE_DEPLOIEMENT.md). En cas de désaccord, **ce guide
+[`agrierp_laravel/RUNBOOK_DEPLOIEMENT_CPANEL.md`](../agrierp_laravel/RUNBOOK_DEPLOIEMENT_CPANEL.md) et
+[`agrierp_laravel/CHECKLIST_PRE_DEPLOIEMENT.md`](../agrierp_laravel/CHECKLIST_PRE_DEPLOIEMENT.md). En cas de désaccord, **ce guide
 fait foi** : il tient compte des tickets du 19/10/2026 (synchronisation S-T1 à S-T11, file d'attente des tâches).
 
 > ⚠️ **Ordre de mise en production : le SERVEUR d'abord, les postes ensuite.** Un poste à jour face à un ancien
