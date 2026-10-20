@@ -11,6 +11,8 @@
         </div>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->bilan['ouverture']" />
+
     <div class="mb-lg">
         @if($this->bilan['is_balanced'])
             <div class="bg-brand-emerald/10 border border-brand-emerald/30 rounded-lg p-md flex items-center gap-xs text-brand-forest text-sm font-bold">

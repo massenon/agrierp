@@ -118,6 +118,7 @@ class GrandLivre extends Component
             ['ledger' => $ledger],
             $title,
             'Période du '.\Carbon\Carbon::parse($this->startDate)->format('d/m/Y').' au '.\Carbon\Carbon::parse($this->endDate)->format('d/m/Y')
+                .($ledger['ouverture']['provisoire'] ? ' — À-nouveaux provisoires' : '')
         );
 
         return response()->streamDownload(

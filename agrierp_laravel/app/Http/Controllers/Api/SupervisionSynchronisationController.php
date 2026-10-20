@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ControleCoherence;
 use App\Services\CoherenceSynchronisationService;
+use App\Services\FinancialReportService;
 use App\Services\DemandeSynchronisationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,11 @@ class SupervisionSynchronisationController extends Controller
             'server_time' => now()->toIso8601String(),
             'depuis' => $depuis->toDateString(),
             'tables' => $coherence->calculer($depuis),
+            // Ticket EX1 — invariant comptable « ouverture de N+1 = clôture de N » (classes 1 à 5), vu du serveur.
+            // Servi aux seuls comptes qui lisent la comptabilité (ceux à qui le journal descend) ; `null` sinon.
+            'anouveaux' => $request->user()?->can('view-comptabilite')
+                ? app(FinancialReportService::class)->controleAnouveaux()
+                : null,
         ];
 
         // La modale « Synchronisation » du web montre le dernier contrôle de chaque poste. Un échec de cette note ne

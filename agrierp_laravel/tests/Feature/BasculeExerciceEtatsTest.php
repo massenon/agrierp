@@ -236,8 +236,8 @@ class BasculeExerciceEtatsTest extends TestCase
         $explication = "L'exercice 2026 n'est pas clôturé : l'ouverture de l'exercice 2027 est calculée à partir de ses soldes au 31/12/2026";
 
         Livewire::test(Bilan::class)->set('asOfDate', '2027-01-31')->assertSee($mention)->assertSee($explication, false)
-            ->assertSee("Résultat de l'exercice 2026 (provisoire)", false);
-        Livewire::test(BalanceGenerale::class)->set('periode', 'exercice')->assertSee($mention)->assertSee("Résultat de l'exercice 2026 (provisoire)", false);
+            ->assertSee("Résultat de l'exercice 2026 (provisoire)");
+        Livewire::test(BalanceGenerale::class)->set('periode', 'exercice')->assertSee($mention)->assertSee("Résultat de l'exercice 2026 (provisoire)");
         Livewire::test(GrandLivre::class)->set('accountId', $this->comptes['531']->id)
             ->set('startDate', '2027-01-01')->set('endDate', '2027-01-31')->assertSee($mention);
         Livewire::test(EtatsFinanciers::class)->assertSee($mention);
@@ -248,7 +248,7 @@ class BasculeExerciceEtatsTest extends TestCase
         $this->cloturer2026();
 
         Livewire::test(Bilan::class)->set('asOfDate', '2027-01-31')->assertDontSee($mention)
-            ->assertDontSee("Résultat de l'exercice 2026 (provisoire)", false);
+            ->assertDontSee("Résultat de l'exercice 2026 (provisoire)");
         Livewire::test(BalanceGenerale::class)->set('periode', 'exercice')->assertDontSee($mention);
         Livewire::test(GrandLivre::class)->set('accountId', $this->comptes['531']->id)
             ->set('startDate', '2027-01-01')->set('endDate', '2027-01-31')->assertDontSee($mention);

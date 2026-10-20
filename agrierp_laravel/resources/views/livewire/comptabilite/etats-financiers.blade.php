@@ -11,6 +11,8 @@
         </button>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->bilan['ouverture']" />
+
     <div class="flex items-center gap-xs border-b border-outline-variant mb-md overflow-x-auto">
         @foreach(['bilan' => 'Bilan', 'resultat' => 'Compte de Résultat', 'tafire' => 'Flux de Trésorerie', 'notes' => 'Notes Annexes'] as $key => $label)
             <button type="button" wire:click="switchTab('{{ $key }}')" class="px-md py-2.5 text-xs font-bold border-b-2 whitespace-nowrap {{ $tab === $key ? 'border-brand-emerald text-brand-emerald' : 'border-transparent text-outline' }}">{{ $label }}</button>

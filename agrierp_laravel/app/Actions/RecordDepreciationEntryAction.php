@@ -3,9 +3,9 @@
 namespace App\Actions;
 
 use App\Models\AccountingEntry;
-use App\Models\AccountingEntryLine;
 use App\Models\ChartOfAccount;
 use App\Models\FixedAsset;
+use App\Services\FinancialReportService;
 use App\Services\AccountingEntryService;
 
 /**
@@ -105,11 +105,8 @@ class RecordDepreciationEntryAction
      */
     private function dejaComptabilise(string $accountId, string $dateArrete): float
     {
-        $lignes = AccountingEntryLine::where('account_id', $accountId)
-            ->whereHas('entry', function ($q) use ($dateArrete) {
-                $q->where('is_active', true)->whereDate('entry_date', '<=', $dateArrete);
-            });
-
-        return round((float) (clone $lignes)->sum('credit') - (float) $lignes->sum('debit'), 2);
+        // 🔴→✅ Ticket EX1 (défaut C1) : le cumul lisait tout l'historique ET l'à-nouveau du 281 après une clôture —
+        // le double de l'amortissement déjà passé, et la dotation de l'exercice suivant tombait à zéro. Règle R1.
+        return round(-app(FinancialReportService::class)->soldeCompte($accountId, $dateArrete), 2);
     }
 }

@@ -11,6 +11,8 @@
         </button>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->balance['ouverture']" />
+
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
         <label for="bal-periode-select" class="text-[10px] text-brand-forest font-bold uppercase">Période :</label>
         <select id="bal-periode-select" wire:model.live="periode" class="text-sm font-bold border border-outline-variant rounded-lg px-md py-2 bg-white focus:ring-2 focus:ring-brand-emerald outline-none">

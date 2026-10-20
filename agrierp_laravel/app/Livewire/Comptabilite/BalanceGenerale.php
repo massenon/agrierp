@@ -99,7 +99,7 @@ class BalanceGenerale extends Component
             'exports.balance-generale',
             ['balance' => $this->balance],
             'Balance Générale',
-            $this->periodLabel
+            $this->periodLabel.($this->balance['ouverture']['provisoire'] ? ' — À-nouveaux provisoires' : '')
         );
 
         return response()->streamDownload(

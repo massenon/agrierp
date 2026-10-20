@@ -161,7 +161,8 @@ class EtatsFinanciers extends Component
                 'stockValuation' => $this->stockValuation,
             ],
             $titres[$this->tab] ?? 'États Financiers',
-            $this->situationLabel
+            // Ticket EX2 — l'ouverture calculée (exercice précédent encore ouvert) est dite sur le document aussi.
+            $this->situationLabel.($this->bilan['ouverture']['provisoire'] ? ' — À-nouveaux provisoires' : '')
         );
 
         return response()->streamDownload(

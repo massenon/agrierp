@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\AccountingEntryLine;
 use App\Models\ChartOfAccount;
+use App\Models\FiscalYear;
+use Carbon\Carbon;
 
 /**
  * Ticket 10.8 (Sprint 10) — extraction du calcul de bilan hors de
@@ -20,9 +22,390 @@ use App\Models\ChartOfAccount;
  */
 class FinancialReportService
 {
+    /**
+     * Tickets EX1 / EX2 — écritures d'À-NOUVEAU : elles portent l'OUVERTURE d'un exercice, jamais un mouvement de sa
+     * période. `ran` = report écrit à la clôture de l'exercice précédent (ou à-nouveau initial des reprises, Q7) ;
+     * `ran_reversal` = sa contre-passation à la réouverture (ticket 15.53).
+     */
+    public const SOURCES_A_NOUVEAU = ['ran', 'ran_reversal'];
+
+    /** Libellé de la ligne de résultat d'un exercice encore ouvert, reporté dans l'ouverture du suivant (R3). */
+    public static function libelleResultatProvisoire(int $annee): string
+    {
+        return "Résultat de l'exercice {$annee} (provisoire)";
+    }
+
+    /** @var array<string, array<string, mixed>> ouvertures déjà calculées par ce service (récursion R3) */
+    private array $ouvertures = [];
+
+    /**
+     * Ticket EX1 — RÈGLE R1 (PRD `docs/prd/exercices-comptables.md` § 5) : l'exercice F qui contient `$date`.
+     *
+     * L'exercice enregistré qui couvre la date ; à défaut (exercice pas encore créé, date antérieure au premier
+     * exercice), l'année civile de la date, « non enregistrée » (`reel` faux, `statut` null) — elle se traite comme un
+     * exercice ouvert.
+     *
+     * @return array{annee: int, debut: string, fin: string, statut: ?string, reel: bool}
+     */
+    public function exerciceDe(string $date): array
+    {
+        $date = substr($date, 0, 10);
+        $exercice = FiscalYear::whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->orderBy('start_date')
+            ->first();
+
+        if ($exercice) {
+            return [
+                'annee' => (int) $exercice->year,
+                'debut' => $exercice->start_date->format('Y-m-d'),
+                'fin' => $exercice->end_date->format('Y-m-d'),
+                'statut' => $exercice->status,
+                'reel' => true,
+            ];
+        }
+
+        $annee = (int) substr($date, 0, 4);
+
+        return ['annee' => $annee, 'debut' => "{$annee}-01-01", 'fin' => "{$annee}-12-31", 'statut' => null, 'reel' => false];
+    }
+
+    /**
+     * Tickets EX1 / EX2 — OUVERTURE de l'exercice qui contient `$date` (R1), pour les comptes des classes 1 à 5.
+     *
+     * Un seul cas par exercice, JAMAIS deux additionnés (défaut C1 : l'historique de N ET l'à-nouveau de N+1) :
+     *  - `anouveau` : l'exercice précédent est clos → les écritures `ran` de F, nettes de leurs `ran_reversal` ;
+     *    premier exercice → son à-nouveau initial (reprises d'avant le logiciel, Q7) ;
+     *  - `provisoire` (R3) : l'exercice précédent est encore ouvert (ou pas enregistré) → ses soldes de clôture
+     *    CALCULÉS (son ouverture + ses mouvements, classes 1 à 5) et une ligne « Résultat de l'exercice N
+     *    (provisoire) » au 131 (bénéfice) ou au 139 (perte), ce que fera l'étape 2. Rien n'est écrit au journal ;
+     *    à la clôture, l'à-nouveau écrit donne les mêmes chiffres ;
+     *  - `historique` : premier exercice SANS à-nouveau initial → les écritures datées avant lui (vide en pratique :
+     *    `record()` refuse toute date hors exercice, et la migration Q7 les reprend en à-nouveau initial). Jamais
+     *    additionné à un à-nouveau : il n'est lu que s'il n'y en a aucun.
+     *
+     * `comptes` : solde NET (débit − crédit) par compte, comptes soldés exclus ; `resultat_provisoire` : la ligne R3,
+     * à part (`net` < 0 = bénéfice, au crédit du 131), `null` hors mode provisoire.
+     *
+     * @return array{annee: int, debut: string, fin: string, mode: string, provisoire: bool, precedent: ?int, comptes: array<string, array{code: string, label: string, class: int, net: float}>, resultat_provisoire: ?array{annee: int, account_id: ?string, code: string, label: string, net: float}}
+     */
+    public function ouvertureExercice(string $date): array
+    {
+        return $this->ouverture($this->exerciceDe($date));
+    }
+
+    /** @param array{annee: int, debut: string, fin: string, statut: ?string, reel: bool} $exercice */
+    private function ouverture(array $exercice): array
+    {
+        $cle = $exercice['debut'];
+        if (isset($this->ouvertures[$cle])) {
+            return $this->ouvertures[$cle];
+        }
+
+        $veille = Carbon::parse($exercice['debut'])->subDay()->format('Y-m-d');
+        $precedent = FiscalYear::whereDate('start_date', '<', $exercice['debut'])->exists()
+            ? $this->exerciceDe($veille)
+            : null;
+
+        $resultatProvisoire = null;
+
+        if ($precedent === null) {
+            $anouveau = $exercice['reel'] ? $this->cumuls($exercice['debut'], $exercice['fin'], true) : [];
+            if ($anouveau !== []) {
+                $mode = 'anouveau';
+                $comptes = $this->nets($anouveau);
+            } else {
+                $mode = 'historique';
+                $calcul = $this->clotureDepuis([], $this->cumuls(null, $veille, false));
+                $comptes = $this->fusionner($calcul['comptes'], $this->ligneResultat(
+                    $calcul['resultat'],
+                    $exercice['annee'] - 1,
+                    'Résultat antérieur au '.Carbon::parse($exercice['debut'])->format('d/m/Y'),
+                ));
+            }
+        } elseif ($precedent['statut'] === 'cloture') {
+            $mode = 'anouveau';
+            $comptes = $this->nets($this->cumuls($exercice['debut'], $exercice['fin'], true));
+        } else {
+            $mode = 'provisoire';
+            $calcul = $this->clotureCalculee($precedent);
+            $comptes = $calcul['comptes'];
+            $resultatProvisoire = $this->ligneResultat(
+                $calcul['resultat'],
+                $precedent['annee'],
+                self::libelleResultatProvisoire($precedent['annee']),
+            );
+        }
+
+        $comptes = array_filter($comptes, fn ($c) => abs($c['net']) >= 0.005);
+        uasort($comptes, fn ($a, $b) => strcmp($a['code'], $b['code']));
+
+        return $this->ouvertures[$cle] = [
+            'annee' => $exercice['annee'],
+            'debut' => $exercice['debut'],
+            'fin' => $exercice['fin'],
+            'mode' => $mode,
+            'provisoire' => $mode === 'provisoire',
+            'precedent' => $precedent['annee'] ?? null,
+            'comptes' => $comptes,
+            'resultat_provisoire' => $resultatProvisoire,
+        ];
+    }
+
+    /**
+     * Soldes de CLÔTURE calculés d'un exercice (R3) : son ouverture (ligne provisoire comprise, reportée sur son
+     * compte) + ses mouvements hors à-nouveau ; les classes 6 et au-delà forment le résultat (produits − charges).
+     *
+     * @return array{comptes: array<string, array{code: string, label: string, class: int, net: float}>, resultat: float}
+     */
+    private function clotureCalculee(array $exercice): array
+    {
+        $ouverture = $this->ouverture($exercice);
+        $comptes = $this->fusionner($ouverture['comptes'], $ouverture['resultat_provisoire']);
+
+        return $this->clotureDepuis($comptes, $this->cumuls($exercice['debut'], $exercice['fin'], false));
+    }
+
+    /** @return array{comptes: array<string, array{code: string, label: string, class: int, net: float}>, resultat: float} */
+    private function clotureDepuis(array $comptes, array $mouvements): array
+    {
+        $resultat = 0.0;
+        foreach ($mouvements as $id => $m) {
+            $net = (float) $m['debit'] - (float) $m['credit'];
+            if ($m['class'] >= 1 && $m['class'] <= 5) {
+                $comptes[$id] ??= ['code' => $m['code'], 'label' => $m['label'], 'class' => $m['class'], 'net' => 0.0];
+                $comptes[$id]['net'] = round($comptes[$id]['net'] + $net, 2);
+            } else {
+                $resultat -= $net;   // produits (crédit) − charges (débit)
+            }
+        }
+
+        return ['comptes' => $comptes, 'resultat' => round($resultat, 2)];
+    }
+
+    /**
+     * La ligne de résultat d'un exercice reporté : au 131 s'il est positif, au 139 sinon (la règle de l'étape 2 de la
+     * clôture) ; `null` s'il est nul.
+     */
+    private function ligneResultat(float $resultat, int $annee, string $libelle): ?array
+    {
+        if (abs($resultat) < 0.005) {
+            return null;
+        }
+
+        $code = $resultat > 0 ? '131' : '139';
+
+        return [
+            'annee' => $annee,
+            'account_id' => ChartOfAccount::where('code', $code)->value('id'),
+            'code' => $code,
+            'label' => $libelle,
+            'net' => round(-$resultat, 2),
+        ];
+    }
+
+    /** Reporte la ligne de résultat sur son compte (clé de repli quand le 131/139 manque au plan). */
+    private function fusionner(array $comptes, ?array $ligne): array
+    {
+        if ($ligne === null) {
+            return $comptes;
+        }
+
+        $id = $ligne['account_id'] ?? 'resultat-'.$ligne['code'];
+        $comptes[$id] ??= ['code' => $ligne['code'], 'label' => $ligne['label'], 'class' => 1, 'net' => 0.0];
+        $comptes[$id]['net'] = round($comptes[$id]['net'] + $ligne['net'], 2);
+
+        return $comptes;
+    }
+
+    /** @return array<string, array{code: string, label: string, class: int, net: float}> */
+    private function nets(array $cumuls): array
+    {
+        return array_map(fn ($c) => [
+            'code' => $c['code'], 'label' => $c['label'], 'class' => $c['class'],
+            'net' => round((float) $c['debit'] - (float) $c['credit'], 2),
+        ], $cumuls);
+    }
+
+    /**
+     * Ticket EX1 — SOLDES À UNE DATE selon R1 : classes 1 à 5 = ouverture de l'exercice + mouvements de l'exercice
+     * jusqu'à la date ; classes 6 et au-delà = mouvements de l'exercice seulement. `$inclus` faux : à l'ouverture de
+     * la journée (« strictement avant » : l'ouverture d'une période).
+     *
+     * @return array{ouverture: array, comptes: array<string, array{code: string, label: string, class: int, net: float}>, resultat_provisoire: ?array}
+     */
+    public function soldes(string $date, bool $inclus = true): array
+    {
+        $date = substr($date, 0, 10);
+        $exercice = $this->exerciceDe($date);
+        $ouverture = $this->ouverture($exercice);
+        $fin = $inclus ? $date : Carbon::parse($date)->subDay()->format('Y-m-d');
+
+        $comptes = $ouverture['comptes'];
+        if ($fin >= $exercice['debut']) {
+            foreach ($this->cumuls($exercice['debut'], $fin, false) as $id => $m) {
+                $comptes[$id] ??= ['code' => $m['code'], 'label' => $m['label'], 'class' => $m['class'], 'net' => 0.0];
+                $comptes[$id]['net'] = round($comptes[$id]['net'] + (float) $m['debit'] - (float) $m['credit'], 2);
+            }
+        }
+
+        return ['ouverture' => $ouverture, 'comptes' => $comptes, 'resultat_provisoire' => $ouverture['resultat_provisoire']];
+    }
+
+    /** Solde net (débit − crédit) d'UN compte selon R1, ligne de résultat provisoire comprise si elle est la sienne. */
+    public function soldeCompte(string $accountId, string $date, bool $inclus = true): float
+    {
+        return $this->netDans($this->soldes($date, $inclus), $accountId);
+    }
+
+    private function netDans(array $soldes, string $accountId): float
+    {
+        $net = (float) ($soldes['comptes'][$accountId]['net'] ?? 0);
+        if (($soldes['resultat_provisoire']['account_id'] ?? null) === $accountId) {
+            $net += $soldes['resultat_provisoire']['net'];
+        }
+
+        return round($net, 2);
+    }
+
+    /** Ce que les écrans disent de l'ouverture : « À-nouveaux provisoires » tant que l'exercice précédent est ouvert. */
+    public function resumeOuverture(array $ouverture): array
+    {
+        return [
+            'provisoire' => $ouverture['provisoire'],
+            'annee' => $ouverture['annee'],
+            'precedent' => $ouverture['precedent'],
+            'mode' => $ouverture['mode'],
+        ];
+    }
+
+    /**
+     * Ticket EX1 — CONTRÔLE PERMANENT (PRD § 5, ajouté au contrôle de cohérence S-T6) : pour chaque exercice qui a un
+     * précédent, et pour chaque compte des classes 1 à 5, OUVERTURE de N+1 = CLÔTURE de N (son ouverture + ses
+     * mouvements, résultat porté au 131/139). Vrai par construction en provisoire ; après la clôture, il compare
+     * l'à-nouveau ÉCRIT au calcul — une écriture de N déplacée hors de son exercice, un à-nouveau altéré, s'y voient.
+     * Montants en solde net (débit − crédit).
+     *
+     * @return array<int, array{exercice: int, precedent: int, statut_precedent: ?string, ecarts: array<int, array{code: string, libelle: string, cloture: float, ouverture: float}>}>
+     */
+    public function controleAnouveaux(): array
+    {
+        $resultat = [];
+
+        foreach (FiscalYear::orderBy('start_date')->get() as $enregistre) {
+            $debut = $enregistre->start_date->format('Y-m-d');
+            if (! FiscalYear::whereDate('start_date', '<', $debut)->exists()) {
+                continue;
+            }
+            $exercice = $this->exerciceDe($debut);
+            $precedent = $this->exerciceDe(Carbon::parse($debut)->subDay()->format('Y-m-d'));
+
+            $calcul = $this->clotureCalculee($precedent);
+            $attendu = $this->fusionner($calcul['comptes'], $this->ligneResultat(
+                $calcul['resultat'],
+                $precedent['annee'],
+                self::libelleResultatProvisoire($precedent['annee']),
+            ));
+            $ouverture = $this->ouverture($exercice);
+            $obtenu = $this->fusionner($ouverture['comptes'], $ouverture['resultat_provisoire']);
+
+            $ecarts = [];
+            foreach (array_keys($attendu + $obtenu) as $id) {
+                $meta = $attendu[$id] ?? $obtenu[$id];
+                if ($meta['class'] < 1 || $meta['class'] > 5) {
+                    continue;
+                }
+                $cloture = round((float) ($attendu[$id]['net'] ?? 0), 2);
+                $ouvert = round((float) ($obtenu[$id]['net'] ?? 0), 2);
+                if (abs($cloture - $ouvert) >= 0.01) {
+                    $ecarts[] = ['code' => $meta['code'], 'libelle' => $meta['label'], 'cloture' => $cloture, 'ouverture' => $ouvert];
+                }
+            }
+            usort($ecarts, fn ($a, $b) => strcmp($a['code'], $b['code']));
+
+            $resultat[] = [
+                'exercice' => $exercice['annee'],
+                'precedent' => $precedent['annee'],
+                'statut_precedent' => $precedent['statut'],
+                'ecarts' => $ecarts,
+            ];
+        }
+
+        return $resultat;
+    }
+
+    /**
+     * Cumuls débit / crédit par compte des écritures ACTIVES datées de `$du` (inclus ; `null` = depuis l'origine) à
+     * `$au` (inclus). `$aNouveau` vrai : les seules écritures d'à-nouveau ; faux : toutes les AUTRES.
+     *
+     * @return array<string, array{code: string, label: string, class: int, debit: float, credit: float}>
+     */
+    private function cumuls(?string $du, string $au, bool $aNouveau): array
+    {
+        $query = AccountingEntryLine::query()
+            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
+            ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
+            ->where('accounting_entries.is_active', true)
+            ->whereDate('accounting_entries.entry_date', '<=', $au)
+            ->when($du !== null, fn ($q) => $q->whereDate('accounting_entries.entry_date', '>=', $du));
+
+        self::filtrerANouveau($query, $aNouveau);
+
+        return $query
+            ->groupBy('chart_of_accounts.id', 'chart_of_accounts.code', 'chart_of_accounts.label', 'chart_of_accounts.class')
+            ->selectRaw('chart_of_accounts.id as account_id, chart_of_accounts.code, chart_of_accounts.label, chart_of_accounts.class, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
+            ->get()
+            ->mapWithKeys(fn ($l) => [$l->account_id => [
+                'code' => (string) $l->code,
+                'label' => (string) $l->label,
+                'class' => (int) $l->class,
+                'debit' => (float) $l->total_debit,
+                'credit' => (float) $l->total_credit,
+            ]])
+            ->all();
+    }
+
+    /**
+     * Garde (vrai) ou écarte (faux) les écritures d'à-nouveau d'une requête jointe à `accounting_entries`.
+     * ⚠️ Une écriture SANS `source_type` est un mouvement : `NOT IN` seul l'écarterait (NULL n'est jamais « pas dans »).
+     */
+    public static function filtrerANouveau($query, bool $aNouveau)
+    {
+        return $aNouveau
+            ? $query->whereIn('accounting_entries.source_type', self::SOURCES_A_NOUVEAU)
+            : $query->where(fn ($q) => $q->whereNull('accounting_entries.source_type')
+                ->orWhereNotIn('accounting_entries.source_type', self::SOURCES_A_NOUVEAU));
+    }
+
+    /** Lignes « compte » d'un jeu de soldes R1, ligne de résultat provisoire comprise (classe 1, marquée). */
+    private function lignesDeSoldes(array $soldes): array
+    {
+        $lignes = [];
+        foreach ($soldes['comptes'] as $c) {
+            $lignes[] = ['code' => $c['code'], 'label' => $c['label'], 'class' => $c['class'], 'balance' => round($c['net'], 2)];
+        }
+        if ($soldes['resultat_provisoire'] !== null) {
+            $p = $soldes['resultat_provisoire'];
+            $lignes[] = ['code' => $p['code'], 'label' => $p['label'], 'class' => 1, 'balance' => $p['net'], 'provisoire' => true];
+        }
+        // Tri par code, stable : la ligne provisoire suit le compte réel du même numéro.
+        usort($lignes, fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']));
+
+        return $lignes;
+    }
+
+    /**
+     * Ticket EX1 — le Bilan lit les soldes de R1 (`soldes()`) : classes 1 à 5 depuis l'ouverture de l'exercice,
+     * résultat = classes 6 et 7 de l'exercice seulement.
+     */
     public function bilan(string $asOfDate): array
     {
-        $balances = $this->accountBalances($asOfDate);
+        return $this->bilanDepuis($this->soldes($asOfDate));
+    }
+
+    private function bilanDepuis(array $soldes): array
+    {
+        $balances = $this->lignesDeSoldes($soldes);
 
         $immo = array_values(array_filter($balances, fn ($b) => $b['class'] === 2));
         $stocks = array_values(array_filter($balances, fn ($b) => $b['class'] === 3));
@@ -66,6 +449,7 @@ class FinancialReportService
             'total_dettes' => $totalDettes,
             'total_passif' => $totalPassif,
             'is_balanced' => abs($totalActif - $totalPassif) < 0.01,
+            'ouverture' => $this->resumeOuverture($soldes['ouverture']),
         ];
     }
 
@@ -118,9 +502,12 @@ class FinancialReportService
      * compte — un seul point de vérité dès maintenant, plutôt que trois
      * implémentations qui divergeront.
      *
-     * Le solde d'ouverture est calculé depuis TOUTES les écritures
-     * antérieures à `$startDate`, jamais depuis une valeur saisie ou figée :
-     * changer la période recalcule réellement l'ouverture.
+     * Le solde d'ouverture est CALCULÉ, jamais saisi ou figé : changer la
+     * période recalcule réellement l'ouverture. Ticket EX1 : il suit la règle
+     * R1 (`soldes()`) — ouverture de l'exercice de `$startDate` (à-nouveau, ou
+     * calcul R3 tant que l'exercice précédent est ouvert) + mouvements de cet
+     * exercice avant `$startDate` ; jamais tout l'historique EN PLUS de
+     * l'à-nouveau. Les écritures d'à-nouveau ne sont jamais des lignes.
      *
      * @return array{account: ?ChartOfAccount, is_debit_nature: bool, opening_balance: float, lines: array<int, array{date: string, reference: string, label: string, debit: float, credit: float, running_balance: float}>, total_debit: float, total_credit: float, closing_balance: float}
      */
@@ -136,6 +523,7 @@ class FinancialReportService
             'total_debit' => 0.0,
             'total_credit' => 0.0,
             'closing_balance' => 0.0,
+            'ouverture' => ['provisoire' => false, 'annee' => null, 'precedent' => null, 'mode' => null],
         ];
 
         if (! $account) {
@@ -144,16 +532,15 @@ class FinancialReportService
 
         $isDebitNature = $this->isDebitNature($account);
 
-        $before = $this->accountLinesQuery($accountId)
-            ->whereDate('accounting_entries.entry_date', '<', $startDate)
-            ->selectRaw('SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-            ->first();
+        // 🔴→✅ TICKET EX1 (défaut C1) — l'ouverture était TOUT l'historique antérieur au début de la période, ET
+        // l'à-nouveau du 01/01 arrivait ensuite comme une ligne de la période : la caisse comptait deux fois le solde
+        // de l'exercice clos. Désormais : règle R1 (ouverture de l'exercice + mouvements de l'exercice avant le
+        // début), et les écritures d'à-nouveau ne sont jamais des lignes de la période.
+        $soldes = $this->soldes($startDate, false);
+        $openingNet = $this->netDans($soldes, $accountId);
+        $openingBalance = round($isDebitNature ? $openingNet : -$openingNet, 2);
 
-        $openingDebit = (float) ($before->total_debit ?? 0);
-        $openingCredit = (float) ($before->total_credit ?? 0);
-        $openingBalance = round($isDebitNature ? $openingDebit - $openingCredit : $openingCredit - $openingDebit, 2);
-
-        $rows = $this->accountLinesQuery($accountId)
+        $rows = self::filtrerANouveau($this->accountLinesQuery($accountId), false)
             ->whereDate('accounting_entries.entry_date', '>=', $startDate)
             ->whereDate('accounting_entries.entry_date', '<=', $endDate)
             ->when(
@@ -206,6 +593,7 @@ class FinancialReportService
             'total_debit' => round($totalDebit, 2),
             'total_credit' => round($totalCredit, 2),
             'closing_balance' => $balance,
+            'ouverture' => $this->resumeOuverture($soldes['ouverture']),
         ];
     }
 
@@ -218,8 +606,9 @@ class FinancialReportService
      * COÏNCIDENCE — exigence explicite du prototype : *"Le Résultat Net est
      * calculé depuis la même source que celui affiché au Bilan — toujours
      * strictement identiques."* Deux moyens l'assurent :
-     *   1. même fenêtre que `bilan()` : tout ce qui précède `$asOfDate`
-     *      (et non une période glissante qui divergerait) ;
+     *   1. même fenêtre que `bilan()` : les mêmes soldes R1 (`soldes()`), soit
+     *      les classes 6-7 de l'exercice jusqu'à `$asOfDate` (ticket EX1 :
+     *      plus l'historique depuis l'origine) ;
      *   2. la ligne « autres charges » ABSORBE tout compte de classe 6 non
      *      classé ailleurs dans la cascade. La somme des lignes est donc
      *      identiquement `produits(7) − charges(6)`, quel que soit le plan
@@ -230,7 +619,13 @@ class FinancialReportService
      */
     public function compteResultat(string $asOfDate): array
     {
-        $balances = $this->accountBalances($asOfDate);
+        return $this->compteResultatDepuis($this->soldes($asOfDate));
+    }
+
+    /** Ticket EX1 — classes 6 et 7 de l'EXERCICE seulement (R1), depuis son premier jour. */
+    private function compteResultatDepuis(array $soldes): array
+    {
+        $balances = $this->lignesDeSoldes($soldes);
 
         // Solde débiteur (charges) / créditeur (produits) par préfixe de compte.
         $charges = fn (string ...$prefixes) => round(array_sum(array_map(
@@ -306,14 +701,20 @@ class FinancialReportService
      */
     public function tafire(string $startDate, string $endDate): array
     {
-        $veille = \Carbon\Carbon::parse($startDate)->subDay()->format('Y-m-d');
-
-        $ouverture = $this->bilan($veille);
+        // 🔴→✅ TICKET EX1 — l'ouverture est la situation à l'OUVERTURE de la journée `$startDate` dans son exercice
+        // (R1), et non le Bilan de la veille : au 01/01, la veille appartient à l'exercice précédent, dont le résultat
+        // est encore en classes 6-7 (ou provisoire), alors que l'ouverture du nouvel exercice le porte au 131/139.
+        // Comparer les deux faisait passer le résultat reporté pour un flux de financement.
+        $soldesOuverture = $this->soldes($startDate, false);
+        $ouverture = $this->bilanDepuis($soldesOuverture);
         $cloture = $this->bilan($endDate);
 
+        // Résultat et dotations DE LA PÉRIODE : ceux de l'exercice au `$endDate`, moins ceux déjà acquis avant
+        // `$startDate` (zéro quand la période part du premier jour de l'exercice).
         $resultat = $this->compteResultat($endDate);
-        $resultatNet = $resultat['resultat_net'];
-        $dotations = $resultat['dotations'];
+        $resultatAvant = $this->compteResultatDepuis($soldesOuverture);
+        $resultatNet = round($resultat['resultat_net'] - $resultatAvant['resultat_net'], 2);
+        $dotations = round($resultat['dotations'] - $resultatAvant['dotations'], 2);
 
         $bfrOuverture = round($ouverture['total_circulant'] - $ouverture['total_dettes'], 2);
         $bfrCloture = round($cloture['total_circulant'] - $cloture['total_dettes'], 2);
@@ -384,10 +785,28 @@ class FinancialReportService
      */
     public function balanceGenerale(string $startDate, string $endDate): array
     {
-        $opening = $this->sumsByAccount(null, $startDate);       // strictement avant le début de période
-        $period = $this->sumsByAccount($startDate, $endDate);
+        // 🔴→✅ TICKET EX1 (défaut C1) — l'ouverture cumulait TOUT l'historique avant le début de la période, et
+        // l'à-nouveau du 01/01 entrait en plus dans les mouvements : « Exercice 2027 » montrait chaque solde de bilan
+        // deux fois. Désormais : ouverture = soldes R1 à l'ouverture de la journée `$startDate` (à-nouveau ou calcul
+        // R3 + mouvements de l'exercice avant le début ; classes 6-7 depuis le premier jour de l'exercice), et les
+        // mouvements de la période n'incluent jamais un à-nouveau.
+        $soldes = $this->soldes($startDate, false);
+        $period = $this->cumuls($startDate, $endDate, false);
 
-        $accounts = $opening + $period;   // union par clé (id de compte)
+        $opening = [];
+        foreach ($soldes['comptes'] as $id => $c) {
+            $opening[$id] = ['code' => $c['code'], 'label' => $c['label'], 'class' => $c['class'], 'net' => $c['net']];
+        }
+        // Ligne « Résultat de l'exercice N (provisoire) » : une ligne à part, après le compte du même numéro.
+        if ($soldes['resultat_provisoire'] !== null) {
+            $p = $soldes['resultat_provisoire'];
+            $opening['resultat-provisoire'] = ['code' => $p['code'], 'label' => $p['label'], 'class' => 1, 'net' => $p['net'], 'provisoire' => true];
+        }
+
+        $accounts = [];
+        foreach ($opening + $period as $id => $meta) {   // union par clé (id de compte)
+            $accounts[$id] = $meta;
+        }
         uasort($accounts, fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']));
 
         $rows = [];
@@ -398,10 +817,7 @@ class FinancialReportService
         ];
 
         foreach ($accounts as $id => $meta) {
-            $openingNet = round(
-                (float) ($opening[$id]['debit'] ?? 0) - (float) ($opening[$id]['credit'] ?? 0),
-                2
-            );
+            $openingNet = round((float) ($opening[$id]['net'] ?? 0), 2);
 
             // Le solde d'ouverture est un NET, présenté dans une seule des deux
             // colonnes — même convention que le prototype.
@@ -426,6 +842,7 @@ class FinancialReportService
                 'code' => $meta['code'],
                 'label' => $meta['label'],
                 'class' => $meta['class'],
+                'provisoire' => (bool) ($meta['provisoire'] ?? false),
                 'opening_debit' => $openingDebit,
                 'opening_credit' => $openingCredit,
                 'period_debit' => $periodDebit,
@@ -454,45 +871,8 @@ class FinancialReportService
             'total_final_credit' => round($totals['final_credit'], 2),
             'ecart' => $ecart,
             'is_balanced' => abs($ecart) < 0.01,
+            'ouverture' => $this->resumeOuverture($soldes['ouverture']),
         ];
-    }
-
-    /**
-     * Cumuls débit/crédit par compte sur un intervalle de dates.
-     * `$from` à `null` = tout ce qui précède strictement `$to` (solde
-     * d'ouverture). Deux requêtes distinctes plutôt qu'un `SUM(CASE WHEN …)` :
-     * `whereDate()` compare des dates de façon portable, là où une comparaison
-     * brute de chaîne dépend de la sérialisation du pilote — le piège
-     * exact rencontré au ticket 14.4 sur `livestock_daily_entries`.
-     *
-     * @return array<string, array{code: string, label: string, class: int, debit: float, credit: float}>
-     */
-    private function sumsByAccount(?string $from, string $to): array
-    {
-        $query = AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-            ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
-            ->where('accounting_entries.is_active', true);
-
-        if ($from === null) {
-            $query->whereDate('accounting_entries.entry_date', '<', $to);
-        } else {
-            $query->whereDate('accounting_entries.entry_date', '>=', $from)
-                ->whereDate('accounting_entries.entry_date', '<=', $to);
-        }
-
-        return $query
-            ->groupBy('chart_of_accounts.id', 'chart_of_accounts.code', 'chart_of_accounts.label', 'chart_of_accounts.class')
-            ->selectRaw('chart_of_accounts.id as account_id, chart_of_accounts.code, chart_of_accounts.label, chart_of_accounts.class, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-            ->get()
-            ->mapWithKeys(fn ($l) => [$l->account_id => [
-                'code' => (string) $l->code,
-                'label' => (string) $l->label,
-                'class' => (int) $l->class,
-                'debit' => (float) $l->total_debit,
-                'credit' => (float) $l->total_credit,
-            ]])
-            ->all();
     }
 
     /**
@@ -560,25 +940,5 @@ class FinancialReportService
             ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
             ->where('accounting_entries.is_active', true)
             ->where('accounting_entry_lines.account_id', $accountId);
-    }
-
-    /** Solde de chaque compte (débit-crédit) à la date choisie. */
-    private function accountBalances(string $asOfDate): array
-    {
-        $lines = AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-            ->where('accounting_entries.is_active', true)
-            ->whereDate('accounting_entries.entry_date', '<=', $asOfDate)
-            ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
-            ->selectRaw('chart_of_accounts.id as account_id, chart_of_accounts.code, chart_of_accounts.label, chart_of_accounts.class, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-            ->groupBy('chart_of_accounts.id', 'chart_of_accounts.code', 'chart_of_accounts.label', 'chart_of_accounts.class')
-            ->get();
-
-        return $lines->map(fn ($l) => [
-            'code' => $l->code,
-            'label' => $l->label,
-            'class' => (int) $l->class,
-            'balance' => round((float) $l->total_debit - (float) $l->total_credit, 2),
-        ])->all();
     }
 }

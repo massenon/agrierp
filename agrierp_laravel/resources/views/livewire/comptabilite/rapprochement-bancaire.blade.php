@@ -19,6 +19,8 @@
         </div>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->reconciliation['ouverture'] ?? null" />
+
     @if($releve)
         <div class="bg-info-blue/10 border border-info-blue/30 rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
             <span class="material-symbols-outlined text-info-blue text-[18px]">description</span>

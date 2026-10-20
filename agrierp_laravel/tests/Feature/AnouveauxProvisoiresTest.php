@@ -170,7 +170,7 @@ class AnouveauxProvisoiresTest extends TestCase
         Livewire::test(Bilan::class)
             ->set('asOfDate', '2027-01-31')
             ->assertSee('À-nouveaux provisoires')
-            ->assertSee("131 - Résultat de l'exercice 2026 (provisoire)", false)
+            ->assertSee("131 - Résultat de l'exercice 2026 (provisoire)")
             ->assertSee("Elle suit toute écriture passée en 2026 ; à la clôture, l'à-nouveau définitif la remplace sans changer aucun chiffre.", false);
     }
 }
