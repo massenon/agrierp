@@ -56,16 +56,19 @@ class VerifySaleDateAction
             );
         }
 
+        // 🔴→✅ Ticket EX5 (R4) — le motif est celui de toute saisie, précédé de « Vente refusée : » (seul écart permis
+        // aux ventes par le PRD) : « Vente refusée : l'exercice 2026 est clôturé : aucune saisie ne peut être datée du
+        // 20/12/2026. » Le filet R2 (EX3) joue avant : la première vente de l'année ouvre l'exercice.
         try {
             app(AccountingEntryService::class)->exerciceOuvertPour($jour);
-        } catch (NoOpenFiscalYearException) {
-            throw new SaleDateRefusedException(
-                "Vente refusée : aucun exercice comptable ne couvre le {$jourFr}. Créez l'exercice avant d'enregistrer cette vente."
-            );
-        } catch (ClosedFiscalYearException) {
-            throw new SaleDateRefusedException(
-                "Vente refusée : l'exercice comptable qui couvre le {$jourFr} est clos. Aucune vente ne peut y être datée."
-            );
+        } catch (NoOpenFiscalYearException|ClosedFiscalYearException $e) {
+            throw new SaleDateRefusedException(self::prefixe($e->getMessage()));
         }
+    }
+
+    /** « Vente refusée : » + le motif R4, première lettre en minuscule. */
+    public static function prefixe(string $motif): string
+    {
+        return 'Vente refusée : '.mb_strtolower(mb_substr($motif, 0, 1)).mb_substr($motif, 1);
     }
 }

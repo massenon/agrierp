@@ -147,8 +147,12 @@ class JournalComptable extends Component
 
         $entry = AccountingEntry::with('lines')->findOrFail($id);
 
-        if ($entry->is_locked) {
-            $this->dispatch('toast', message: 'Cette écriture est verrouillée (exercice clôturé) et ne peut plus être modifiée.', type: 'error');
+        // Écriture verrouillée par la clôture ; ticket EX4 : à-nouveau ou sa contre-passation ; ticket EX5 : exercice
+        // clos. Le refus vient du service, au même texte qu'à l'enregistrement — le formulaire ne s'ouvre pas.
+        try {
+            app(AccountingEntryService::class)->verifierModifiable($entry);
+        } catch (\App\Exceptions\EcritureVerrouilleeException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
@@ -223,13 +227,15 @@ class JournalComptable extends Component
 
         $entry = AccountingEntry::findOrFail($id);
 
-        if ($entry->is_locked) {
-            $this->dispatch('toast', message: 'Cette écriture est verrouillée (exercice clôturé) et ne peut plus être archivée.', type: 'error');
+        // Tickets EX4 / EX5 — mêmes refus que la modification (verrouillée, à-nouveau, exercice clos), dans le service.
+        try {
+            app(AccountingEntryService::class)->archiver($entry);
+        } catch (\App\Exceptions\EcritureVerrouilleeException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        $entry->update(['is_active' => false]);
         AuditLog::record('accounting_entry.archived', 'comptabilite');
         $this->dispatch('toast', message: 'Écriture archivée avec succès.', type: 'warning');
     }

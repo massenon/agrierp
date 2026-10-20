@@ -35,6 +35,8 @@ class ReouvertureExerciceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Ticket EX4 — la clôture de 2026 n'est admise qu'après son échéance (Q2) : on se place en février 2027.
+        \Carbon\Carbon::setTestNow('2027-02-15 10:00:00');
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->admin = $this->compte('admin');
 
@@ -46,6 +48,12 @@ class ReouvertureExerciceTest extends TestCase
         $this->caisse = $compte('531', 'Caisse', 5);
 
         app(AccountingEntryService::class)->recordManual($this->caisse->id, $this->capital->id, 1_000_000, '2026-03-01');
+    }
+
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
     }
 
     private function compte(string $role): User
@@ -62,7 +70,8 @@ class ReouvertureExerciceTest extends TestCase
     private function cloturer(): void
     {
         $this->actingAs($this->admin);
-        Livewire::test(ClotureExercice::class)->set('selectedYear', '2026')->call('confirmCloture');
+        // Ticket EX4 — l'étape 1 doit être confirmée (aucune charge ni produit : l'étape 2 n'a rien à solder).
+        Livewire::test(ClotureExercice::class)->set('selectedYear', '2026')->call('confirmStep1')->call('confirmCloture');
     }
 
     /** Solde débiteur de la caisse sur les écritures ACTIVES datées dans [début, fin]. */

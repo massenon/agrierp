@@ -4501,7 +4501,8 @@ class SyncController extends Controller
                 // rejouait en boucle, emportant fiches et autres ventes. Même règle que les achats,
                 // avances et retours. La transaction ayant été annulée, ni stock, ni fiche, ni caisse
                 // n'ont bougé.
-                $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => 'Vente refusée : '.$e->getMessage()];
+                // Ticket EX5 (R4) — même texte que le refus d'une vente datée (`VerifySaleDateAction::prefixe`).
+                $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => \App\Actions\VerifySaleDateAction::prefixe($e->getMessage())];
                 $this->retirerDesFichesPorteuses($saleData, $fichesRecues);
             }
         }

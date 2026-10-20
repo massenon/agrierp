@@ -202,19 +202,22 @@ class SyncJournalComptableImportTest extends TestCase
     {
         ChartOfAccount::create(['code' => '131', 'label' => 'Résultat - Bénéfice', 'class' => 1, 'is_active' => true]);
         ChartOfAccount::create(['code' => '139', 'label' => 'Résultat - Perte', 'class' => 1, 'is_active' => true]);
+        // Ticket EX4 — la clôture de 2026 n'est admise qu'après son échéance (Q2) : le scénario se joue le 10/01/2027.
+        Carbon::setTestNow('2027-01-10 10:00:00');
         $e = $this->ecrire(1_000, 'Avant clôture');
         $this->assertFalse((bool) $e->fresh()->is_locked);
 
-        // Un poste a tiré à 10:01, puis l'exercice est clôturé à 10:05 par l'écran réel.
-        Carbon::setTestNow('2026-10-10 10:05:00');
+        // Un poste a tiré à 10:01, puis l'exercice est clôturé à 10:05 par l'écran réel (étapes 1, 2 et 3).
+        Carbon::setTestNow('2027-01-10 10:05:00');
         Livewire::test(ClotureExercice::class)
             ->set('selectedYear', '2026')
+            ->call('confirmStep1')
             ->call('soldeComptesGestion')
             ->call('confirmCloture');
 
         $this->assertSame('cloture', FiscalYear::where('year', 2026)->first()->status, "l'écran a bien clôturé");
 
-        $corps = $this->tirer('2026-10-10T10:01:00')->assertOk()->json();
+        $corps = $this->tirer('2027-01-10T10:01:00')->assertOk()->json();
 
         $servie = collect($corps['accounting_entries'])->firstWhere('id', $e->id);
         $this->assertNotNull($servie, "L'écriture verrouillée par la clôture DOIT être servie (updated_at mis à jour).");

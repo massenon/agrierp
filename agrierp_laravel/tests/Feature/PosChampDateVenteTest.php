@@ -307,7 +307,7 @@ class PosChampDateVenteTest extends TestCase
 
         $this->panier('especes', '2025-06-10')->call('validateSale')
             ->assertHasErrors(['dateVente'])
-            ->assertSee('est clos. Aucune vente ne peut y être datée');
+            ->assertSee('Vente refusée : l\'exercice 2025 est clôturé : aucune saisie ne peut être datée du 10/06/2025.');
 
         $this->assertSame(0, Sale::count());
     }

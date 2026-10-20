@@ -163,6 +163,13 @@ class PosInterface extends Component
         $today = now()->format('Y-m-d');
         $finExercice = FiscalYear::where('status', 'ouvert')->max('end_date');
 
+        // Ticket EX3 — le 1er janvier sans la tâche planifiée, la vente du jour ouvrira l'exercice (filet R2) : le jour
+        // reste sélectionnable.
+        if ($finExercice && $today > substr((string) $finExercice, 0, 10)
+            && app(\App\Services\OuvertureExerciceService::class)->filetCouvrirait($today)) {
+            return $today;
+        }
+
         return $finExercice ? min($today, substr((string) $finExercice, 0, 10)) : $today;
     }
 
@@ -520,6 +527,15 @@ class PosInterface extends Component
         } catch (TransactionInterbloqueeException $e) {
             // Trois interblocages de suite : rien n'est écrit, le panier est gardé tel quel pour revalider.
             $this->dispatch('toast', message: 'Vente NON enregistrée — '.$e->getMessage().' Le panier est conservé : validez à nouveau.', type: 'error');
+
+            return;
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            // 🔴→✅ Ticket EX5 (EF6) — LA VENTE DU JOUR n'est pas jugée par `VerifySaleDateAction` (15.32) : un exercice
+            // absent (le filet R2 n'a pas pu ouvrir l'année) remontait de `record()` en erreur 500. Rien n'est écrit
+            // (transaction annulée), le panier est gardé, le motif R4 s'affiche sous la date et en toast.
+            $refus = VerifySaleDateAction::prefixe($e->getMessage());
+            $this->addError('dateVente', $refus);
+            $this->dispatch('toast', message: $refus, type: 'error');
 
             return;
         }

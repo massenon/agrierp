@@ -126,6 +126,15 @@
                 <span class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">
                     <span class="material-symbols-outlined text-[16px]">lock_open</span>EXERCICE {{ $selectedYear }} — OUVERT (Lecture / Écriture)
                 </span>
+                {{-- Ticket EX3 (EF2) — ouverture de N+1 sans attendre la clôture de N, à partir du 1er décembre. --}}
+                @can('close-fiscal-year')
+                    @if($this->peutOuvrirSuivant)
+                        <button type="button" wire:click="ouvrirExerciceSuivant" wire:loading.attr="disabled" wire:target="ouvrirExerciceSuivant" dusk="ouvrir-exercice-suivant"
+                            class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold bg-brand-emerald text-white hover:bg-brand-forest disabled:opacity-50">
+                            <span class="material-symbols-outlined text-[16px]">calendar_month</span>Ouvrir l'exercice {{ (int)$selectedYear + 1 }}
+                        </button>
+                    @endif
+                @endcan
             @else
                 <span class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold border bg-error-bg text-error-deep border-error-deep/30">
                     <span class="material-symbols-outlined text-[16px]">lock</span>EXERCICE {{ $selectedYear }} — CLOS (Lecture Seule)
@@ -190,7 +199,12 @@
                     <div class="flex-1">
                         <p class="text-sm font-bold text-brand-forest">Génération des Écritures d'À-Nouveaux (RAN)</p>
                         <p class="text-xs text-outline mt-xs">Création de l'exercice {{ (int)$selectedYear + 1 }} et report des soldes de bilan (Classes 1 à 5) au 1er janvier {{ (int)$selectedYear + 1 }}. Verrouillage définitif de l'exercice {{ $selectedYear }}.</p>
-                        <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-confirm-cloture' })" dusk="cloture-step3" class="mt-sm text-xs font-bold bg-error-red text-white px-md py-2 rounded-full">Clôturer l'Exercice {{ $selectedYear }}</button>
+                        {{-- Ticket EX4 (EF4) — grisé avec son motif tant qu'une garde refuse ; le serveur rejuge à l'appel. --}}
+                        @php($motifCloture = $this->motifRefusCloture)
+                        <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-confirm-cloture' })" dusk="cloture-step3" @disabled($motifCloture !== null) @if($motifCloture) title="{{ $motifCloture }}" @endif class="mt-sm text-xs font-bold bg-error-red text-white px-md py-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed">Clôturer l'Exercice {{ $selectedYear }}</button>
+                        @if($motifCloture)
+                            <p class="mt-xs text-xs text-error-deep flex items-start gap-xs" dusk="cloture-step3-motif"><span class="material-symbols-outlined text-[16px]">info</span>{{ $motifCloture }}</p>
+                        @endif
                     </div>
                 </div>
             </div>
