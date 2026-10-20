@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'facturation_repository.dart';
@@ -52,6 +54,9 @@ class _FacturationScreenState extends State<FacturationScreen> {
   String _filtre = filtres.first;
   DonneesFacturation? _donnees;
 
+  /// Ticket EX7 (EF9) — page des factures (25), dans l'exercice affiché.
+  int _page = 1;
+
   @override
   void initState() {
     super.initState();
@@ -59,14 +64,22 @@ class _FacturationScreenState extends State<FacturationScreen> {
   }
 
   Future<void> _charger() async {
-    final donnees = await widget.depot.charger();
+    // Ticket EX7 — « (mois) » sur le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de
+    // 2026 lu en 2027), comme `Facturation::getKpisProperty`.
+    final donnees = await widget.depot.charger(mois: PorteeExerciceChoisi.lire(context)?.moisDeReference);
     if (!mounted) return;
     setState(() => _donnees = donnees);
   }
 
+  /// Ticket EX7 (EF9) — les factures de l'exercice AFFICHÉ (web : `soldBetween` de l'exercice), filtre compris.
   List<LigneFacture> _visibles(DonneesFacturation d) {
-    if (_filtre == filtres.first) return d.factures;
-    return d.factures.where((f) => f.statut.libelle == _filtre).toList();
+    final etat = PorteeExerciceChoisi.lire(context);
+    return [
+      for (final f in d.factures)
+        if ((etat == null || etat.contient(f.vente.soldAt)) &&
+            (_filtre == filtres.first || f.statut.libelle == _filtre))
+          f,
+    ];
   }
 
   @override
@@ -95,7 +108,18 @@ class _FacturationScreenState extends State<FacturationScreen> {
                       const SizedBox(height: AgriSpacing.md),
                       _barreFiltres(),
                       const SizedBox(height: AgriSpacing.md),
-                      _tableau(lignes),
+                      // Ticket EX7 (EF9) — 25 factures par page, `<x-pagination>` du web sous le tableau.
+                      _tableau(
+                        PorteeExerciceChoisi.lire(context) == null ? lignes : PaginationAgri.tranche(lignes, _page),
+                      ),
+                      if (PorteeExerciceChoisi.lire(context) case final etat?)
+                        PaginationAgri(
+                          nom: 'factures',
+                          total: lignes.length,
+                          page: _page,
+                          annee: etat.annee,
+                          onPage: (p) => setState(() => _page = p),
+                        ),
                       const SizedBox(height: AgriSpacing.md),
                       _mentionPoste(
                         "Une facture naît d'une vente : elle se crée à la "
@@ -204,7 +228,10 @@ class _FacturationScreenState extends State<FacturationScreen> {
         for (final filtre in filtres) ...[
           InkWell(
             key: Key('filtre-$filtre'),
-            onTap: () => setState(() => _filtre = filtre),
+            onTap: () => setState(() {
+              _filtre = filtre;
+              _page = 1;
+            }),
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AgriSpacing.md,

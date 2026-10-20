@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
@@ -379,6 +380,14 @@ class AchatsRepository {
 
   DateTime get _maintenant => (horloge ?? HeureBenin.maintenant)();
 
+  /// Ticket EX6 — le point de passage commun de l'exercice d'une saisie (`lib/core/comptabilite/`).
+  ExerciceDeSaisie get _exercice =>
+      ExerciceDeSaisie(database, maintenant: horloge ?? HeureBenin.maintenant);
+
+  /// Borne basse du calendrier des saisies datées de cet écran (remboursement) : début du plus ancien exercice
+  /// OUVERT connu, `null` si aucun.
+  Future<DateTime?> premierJourSaisissable() => _exercice.premierJour();
+
   static DateTime _jourSeul(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// `device_id` des lignes de retour SERVIES par le serveur (`purchase_returns`, ticket U8) : l'absorbeur les
@@ -568,6 +577,11 @@ class AchatsRepository {
 
     final total = lignes.fold<double>(0, (t, l) => t + l.total);
     final jour = date ?? HeureBenin.maintenant();
+
+    // 🔴→✅ Ticket EX6 (EF7) — exercice absent (sans filet R2) ou clos : refusé AVANT d'écrire, motif R4 du serveur
+    // (`RecordPurchaseAccountingEntryAction` → `AccountingEntryService::record`, datée de `purchase_date`).
+    await _exercice.refuser(jour);
+
     final id = _uuid.v4();
 
     await database.transaction(() async {
@@ -699,6 +713,10 @@ class AchatsRepository {
       }
     }
 
+    // 🔴→✅ Ticket EX6 (EF7) — la contre-passation est datée du retour (`RecordPurchaseReturnAccountingEntryAction`) :
+    // exercice absent (sans filet R2) ou clos → refusé AVANT d'écrire, motif R4 du serveur.
+    await _exercice.refuser(jour);
+
     final id = _uuid.v4();
     await database
         .into(database.purchaseReturns)
@@ -807,6 +825,10 @@ class AchatsRepository {
         '(${montantTexte(ouverte)} FCFA), remboursements en attente déduits.',
       );
     }
+
+    // 🔴→✅ Ticket EX6 (EF7) — l'écriture Débit trésorerie / Crédit 409 est datée du remboursement : exercice absent
+    // (sans filet R2) ou clos → refusé AVANT d'écrire, motif R4 du serveur.
+    await _exercice.refuser(jour);
 
     final id = _uuid.v4();
     await database

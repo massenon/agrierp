@@ -145,6 +145,21 @@ void main() {
 
   /// Recherche globale de la barre supérieure (tous rôles) : tables lues PAR DOMAINE, sous la permission du web
   /// qui ouvre le domaine. Vérifié ci-dessous contre ce que le dépôt de la recherche lit réellement.
+  /// Ticket EX1 — tables qu'un écran ne lit que SI le compte a le droit indiqué, le serveur le lui disant.
+  /// « Synchronisation » : le contrôle « ouverture N+1 = clôture N » (S-T6) ne relit le journal du poste que si le
+  /// serveur a servi `anouveaux` (`SupervisionSynchronisationController::coherence`, comptes `view-comptabilite`, ceux
+  /// à qui le journal descend) ; `coherence_synchronisation_test.dart` vérifie qu'un compte sans ce droit n'y touche
+  /// pas. Pour un compte qui a le droit, ces tables restent exigées.
+  const lecturesConditionnelles = <EcranPoste, Map<String, Set<String>>>{
+    EcranPoste.synchronisation: {
+      'view-comptabilite': {
+        'chart_of_accounts',
+        'accounting_entries',
+        'accounting_entry_lines',
+      },
+    },
+  };
+
   const rechercheParPermission = <String, Set<String>>{
     'view-elevage': {
       'livestock_lots',
@@ -226,7 +241,8 @@ void main() {
       ).allMatches(source)) {
         final cible = m.group(1)!;
         if (cible.startsWith('package:') || cible.startsWith('dart:')) continue;
-        final resolu = File(f).parent.uri.resolve(cible).toFilePath();
+        // Sous Windows `toFilePath()` rend des `\\` : on normalise avant de chercher `lib/`.
+        final resolu = File(f).parent.uri.resolve(cible).toFilePath().replaceAll('\\', '/');
         final relatif = resolu.substring(resolu.indexOf('lib/'));
         if (relatif.startsWith('lib/core/database/') ||
             relatif == 'lib/core/sync/sync_engine.dart') {
@@ -334,9 +350,16 @@ void main() {
         final manques = <String>[];
 
         for (final ecran in PermissionsPoste.ecransDe(role)) {
-          final privees = tablesLuesParEcran(
-            ecran,
-          ).difference(tablesLocales).difference(servies);
+          // Lectures CONDITIONNELLES, sous le même droit que le serveur : elles n'ont lieu que si le compte l'a.
+          final conditionnelles = {
+            for (final MapEntry(key: permission, value: tables)
+                in (lecturesConditionnelles[ecran] ?? const {}).entries)
+              if (!PermissionsPoste.peut(role, permission)) ...tables,
+          };
+          final privees = tablesLuesParEcran(ecran)
+              .difference(tablesLocales)
+              .difference(servies)
+              .difference(conditionnelles);
           if (privees.isNotEmpty) {
             manques.add('${ecran.name} : ${privees.join(', ')}');
           }

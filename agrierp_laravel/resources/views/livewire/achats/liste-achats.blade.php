@@ -7,9 +7,9 @@
             <p class="text-xs text-outline mt-xs">Grand livre d'achats et d'approvisionnements de marchandises.</p>
         </div>
         <div class="flex flex-wrap items-center gap-xs">
-            <input wire:model.live="dateFilter" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+            <input wire:model.live="dateFilter" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
             <button type="button" wire:click="exportAchatsPdf" wire:loading.attr="disabled" wire:target="exportAchatsPdf" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF</button>
-            <button type="button" wire:click="openRefundModal" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-error-deep font-bold text-xs px-md py-sm rounded-full"><span class="material-symbols-outlined text-[18px]">payments</span>Ajouter Remboursement</button>
+            <button @lectureSeule type="button" wire:click="openRefundModal" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-error-deep font-bold text-xs px-md py-sm rounded-full"><span class="material-symbols-outlined text-[18px]">payments</span>Ajouter Remboursement</button>
         </div>
     </div>
 
@@ -66,7 +66,7 @@
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="view('{{ $purchase->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Voir"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
                                 @unless($purchase->returned_at)
-                                    <button type="button" wire:click="openReturnModal('{{ $purchase->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retour fournisseur"><span class="material-symbols-outlined text-[18px]">cancel</span></button>
+                                    <button @lectureSeule type="button" wire:click="openReturnModal('{{ $purchase->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retour fournisseur"><span class="material-symbols-outlined text-[18px]">cancel</span></button>
                                 @endunless
                             </td>
                         </tr>
@@ -76,6 +76,7 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->purchases" />
     </div>
 
     <x-modal name="modal-return-purchase" max-width="md">
@@ -96,7 +97,7 @@
         @error('returnReason') <p class="invalid-feedback">{{ $message }}</p> @enderror
         <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-return-purchase' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-            <button type="button" wire:click="confirmReturnPurchase" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold hover:bg-red-800">Confirmer le Retour</button>
+            <button @lectureSeule type="button" wire:click="confirmReturnPurchase" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold hover:bg-red-800">Confirmer le Retour</button>
         </div>
     </x-modal>
 
@@ -123,7 +124,7 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du Remboursement *</label>
-                <input wire:model="refundDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="refundDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte de Trésorerie</label>
@@ -136,7 +137,7 @@
             </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-ajouter-remboursement' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
             </div>
         </form>
     </x-modal>

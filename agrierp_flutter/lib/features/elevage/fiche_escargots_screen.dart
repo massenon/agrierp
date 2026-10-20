@@ -7,6 +7,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 import 'elements_fiche.dart';
@@ -80,6 +81,9 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   bool _chargement = true;
   DonneesMoisFiche? _mois;
 
+  /// Ticket EX8 (EF12) — motif R4 de la lecture seule (exercice clos), `null` quand le jour se saisit.
+  LectureSeuleDuJour? _lectureSeule;
+
   int _precedent = 0;
   LivestockDailyEntry? _fiche;
   int _achat = 0;
@@ -134,18 +138,22 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   /// morts et dons enregistrés, dont la répartition n'est pas stockée, gardés en total.
   Future<void> _chargerJour() async {
     final bande = _bande;
+    // Ticket EX8 (EF12) : le mois AFFICHÉ est celui du jour choisi (`AvecMoisDeFiche` du web).
     final mois = await MoisFiche.charger(
       widget.depot.database,
       espece: EspeceFiche.escargots,
       bandes: _bandes,
       bande: bande,
-      maintenant: _maintenant,
+      maintenant: _jour,
     );
+    // Ticket EX8 (EF12) : un jour d'un exercice CLOS se consulte en lecture seule ; fusion EX7 + EX8 : bandeau d'EX7.
+    final lectureSeule = await LectureSeuleDuJour.charger(widget.depot.database, _jour, maintenant: _maintenant);
     final precedent = bande == null ? 0 : await widget.depot.effectifPrecedent(bande.id, _jour);
     final fiche = bande == null ? null : await widget.depot.chargerJour(bande.id, _jour);
     if (!mounted) return;
     setState(() {
       _mois = mois;
+      _lectureSeule = lectureSeule;
       _precedent = precedent;
       _fiche = fiche;
       _morts.updateAll((_, _) => 0);
@@ -308,6 +316,8 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   Widget _carteSaisie() {
     final moyen = _pesee == null || _pesee == 0 || _effectifFinal <= 0 ? '—' : '${(_pesee! / _effectifFinal).round()} g';
     return CarteSaisieFiche(
+      lectureSeule: _lectureSeule,
+      onJour: _ouvrirJour,
       enTete: EnTeteSaisieFiche(
         titre: 'Saisie Journalière du Cheptel',
         jour: _jour,
@@ -318,6 +328,9 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
           setState(() => _bande = _bandes.firstWhere((b) => b.id == id));
           await _chargerJour();
         },
+        maintenant: _maintenant,
+        onMoisPrecedent: _moisPrecedent,
+        onMoisSuivant: _moisSuivant,
       ),
       blocs: [
         if ((_fiche?.transfertEntree ?? 0) > 0 || (_fiche?.transfertSortie ?? 0) > 0)
@@ -497,20 +510,26 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
       ToastAgri.afficher(context, "Aucune bande active en héliciculture. Créez d'abord une bande.", type: TypeToast.erreur);
       return;
     }
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _naissainsNes,
-      mort: _totalMorts,
-      don: _totalDons,
-      ponteTotal: _oeufsTerre,
-      poidsMoyen: FicheJournaliereRepository.poidsMoyen(
-        poidsTotalG: _pesee ?? 0,
-        tailleEchantillon: _effectifFinal,
-      ),
-      effectifs: EffectifsSaisis(m: _effectifNaissains, f: _effectifEngraissement, sevres: _effectifBordes),
-    );
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _naissainsNes,
+        mort: _totalMorts,
+        don: _totalDons,
+        ponteTotal: _oeufsTerre,
+        poidsMoyen: FicheJournaliereRepository.poidsMoyen(
+          poidsTotalG: _pesee ?? 0,
+          tailleEchantillon: _effectifFinal,
+        ),
+        effectifs: EffectifsSaisis(m: _effectifNaissains, f: _effectifEngraissement, sevres: _effectifBordes),
+      );
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur.
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
     if (!mounted) return;
     ToastAgri.afficher(context, 'Jour enregistré avec succès.');
     await _chargerJour();
@@ -588,5 +607,14 @@ class _FicheEscargotsScreenState extends State<FicheEscargotsScreen> {
   Future<void> _ouvrirJour(DateTime jour) async {
     setState(() => _jour = DateTime(jour.year, jour.month, jour.day));
     await _chargerJour();
+  }
+
+  /// Ticket EX8 (EF12) — « ‹ » : le premier jour du mois précédent (`moisPrecedent()` du web).
+  Future<void> _moisPrecedent() => _ouvrirJour(MoisDeFiche.precedent(_jour));
+
+  /// Ticket EX8 (EF12) — « › » : le mois suivant, jamais au-delà du mois en cours (`moisSuivant()` du web).
+  Future<void> _moisSuivant() async {
+    final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+    if (suivant != null) await _ouvrirJour(suivant);
   }
 }

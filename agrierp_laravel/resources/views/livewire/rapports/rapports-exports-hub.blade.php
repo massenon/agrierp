@@ -7,9 +7,9 @@
     </div>
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
-        <input wire:model.live="startDate" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+        <input wire:model.live="startDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
         <span class="text-xs text-outline">au</span>
-        <input wire:model.live="endDate" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+        <input wire:model.live="endDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
         <div class="flex items-center gap-xs ml-auto">
             @can('export-rapports')
             <button type="button" wire:click="exportPdf" wire:loading.attr="disabled" wire:target="exportPdf" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">

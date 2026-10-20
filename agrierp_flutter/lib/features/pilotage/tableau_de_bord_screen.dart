@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/permissions_poste.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -137,7 +138,11 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   // ── 1. En-tête ────────────────────────────────────────────────────────────
 
   Widget _entete(bool large) {
-    final exercice = _donnees?.exerciceOuvert;
+    // Ticket EX7 — l'exercice AFFICHÉ et son statut (`ExerciceChoisi::exercice()` du web : « Exercice 2026 actif » ou
+    // « Exercice 2026 clôturé ») ; hors du socle, l'exercice ouvert le plus récent, comme avant.
+    final affiche = PorteeExerciceChoisi.lire(context)?.exercice;
+    final exercice = affiche?.year ?? _donnees?.exerciceOuvert;
+    final etatExercice = affiche?.status == 'cloture' ? 'clôturé' : 'actif';
     final titre = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,7 +158,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         Text(
           'Rapport généré le ${_dateCourte(HeureBenin.maintenant())} '
           'à ${_heure(HeureBenin.maintenant())} · '
-          '${exercice == null ? 'Aucun exercice ouvert' : 'Exercice $exercice actif'}',
+          '${exercice == null ? 'Aucun exercice ouvert' : 'Exercice $exercice $etatExercice'}',
           style: const TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,

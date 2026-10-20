@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
@@ -545,6 +546,11 @@ class ClientsCreancesRepository {
     }
 
     final jour = date ?? HeureBenin.maintenant();
+
+    // 🔴→✅ Ticket EX6 (EF7) — l'écriture D 5xx / C 419 est datée de l'avance (`CustomerAdvanceService::recevoir`) :
+    // exercice absent (sans filet R2) ou clos → refusé AVANT d'écrire, motif R4 du serveur ([RefusExercice]).
+    await ExerciceDeSaisie(database).refuser(jour);
+
     final id = _uuid.v4();
 
     await database
@@ -645,6 +651,11 @@ class ClientsCreancesRepository {
     }
 
     final jour = date ?? HeureBenin.maintenant();
+
+    // 🔴→✅ Ticket EX6 (EF7) — l'écriture D 419 / C 411 est datée de l'imputation (`CustomerAdvanceService::imputer`) :
+    // exercice absent (sans filet R2) ou clos → refusé AVANT d'écrire, motif R4 du serveur ([RefusExercice]).
+    await ExerciceDeSaisie(database).refuser(jour);
+
     final id = _uuid.v4();
 
     await database

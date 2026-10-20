@@ -5,7 +5,6 @@ namespace App\Livewire\Comptabilite;
 use App\Models\AccountingEntryLine;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
-use App\Models\FiscalYear;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -28,7 +27,7 @@ use Livewire\Component;
  * (ticket 10.1) — bloquer AVANT plutôt que de laisser l'utilisateur
  * découvrir une erreur SQL confuse.
  *
- * "Exercice" (KPI) : `FiscalYear::current()->year`, un seul point de
+ * "Exercice" (KPI) : l'exercice affiché (`ExerciceChoisi`, ticket EX7 ; `FiscalYear::current()` avant), un seul point de
  * vérité — jamais une valeur codée en dur.
  *
  * 🔴→✅ ÉCRAN DE RÉFÉRENCE POUR LE PATTERN RBAC CRUD AU NIVEAU ACTION,
@@ -75,7 +74,8 @@ class PlanComptable extends Component
     {
         return [
             'comptes_actifs' => ChartOfAccount::where('is_active', true)->count(),
-            'exercice' => FiscalYear::current()?->year ?? '—',
+            // Ticket EX7 — l'exercice AFFICHÉ (sélecteur de la barre supérieure), plus le plus récent ouvert.
+            'exercice' => \App\Support\ExerciceChoisi::exercice()?->year ?? '—',
         ];
     }
 

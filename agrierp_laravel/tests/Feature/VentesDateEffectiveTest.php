@@ -115,6 +115,11 @@ class VentesDateEffectiveTest extends TestCase
     /** @return array<int, string> */
     private function ids(iterable $ventes): array
     {
+        // Ticket EX7 : l'historique et la facturation rendent une PAGE (paginateur) de l'exercice affiché.
+        if ($ventes instanceof \Illuminate\Pagination\AbstractPaginator) {
+            $ventes = $ventes->getCollection();
+        }
+
         return collect($ventes)->pluck('id')->all();
     }
 

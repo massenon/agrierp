@@ -408,8 +408,8 @@ void main() {
             isA<VenteRefusee>().having(
               (e) => e.message,
               'message',
-              "Vente refusée : l'exercice comptable qui couvre le 31/12/2025 "
-                  'est clos. Aucune vente ne peut y être datée.',
+              "Vente refusée : l'exercice 2025 est clôturé : "
+                  'aucune saisie ne peut être datée du 31/12/2025.',
             ),
           ),
         );
@@ -431,11 +431,56 @@ void main() {
         expect(
           await caisse.refusDeDate(DateTime(2025, 12, 31)),
           'Vente refusée : aucun exercice comptable ne couvre le 31/12/2025. '
-          "Créez l'exercice avant d'enregistrer cette vente.",
+          "Ouvrez l'exercice 2025 (Comptabilité › Clôture d'exercice).",
         );
         // Le premier jour de l'exercice est accepté (borne incluse).
         expect(await caisse.refusDeDate(DateTime(2026, 1, 1)), isNull);
         expect(await caisse.refusDeDate(DateTime(2026, 10, 13)), isNull);
+      },
+    );
+
+    test(
+      '🔴 EX3 — hors ligne au passage de l’année : la vente du 1er janvier saisie le 2 n’est pas '
+      'refusée à tort (filet du serveur recopié), sauf si le serveur refuserait',
+      () async {
+        // Le 02/01/2027, le poste ne connaît que 2026 (ouvert) : le serveur ouvrira 2027 à la
+        // réception (`OuvertureExerciceService::filet`). Refuser ici serait un refus à tort.
+        final le2Janvier = CaisseRepository(
+          database: db,
+          deviceId: 'poste-test',
+          maintenant: () => DateTime(2027, 1, 2, 9, 0),
+        );
+        await exercice(
+          'f2026000-0000-4000-8000-000000000000',
+          2026,
+          DateTime(2026, 1, 1),
+          DateTime(2026, 12, 31),
+          'ouvert',
+        );
+        expect(await le2Janvier.refusDeDate(DateTime(2027, 1, 1)), isNull);
+
+        // Deux exercices déjà ouverts (2025 et 2026) : le serveur n'ouvrira pas 2027 (R2).
+        await exercice(
+          'f2025000-0000-4000-8000-000000000000',
+          2025,
+          DateTime(2025, 1, 1),
+          DateTime(2025, 12, 31),
+          'ouvert',
+        );
+        expect(
+          await le2Janvier.refusDeDate(DateTime(2027, 1, 1)),
+          'Vente refusée : aucun exercice comptable ne couvre le 01/01/2027. '
+          "Ouvrez l'exercice 2027 (Comptabilité › Clôture d'exercice).",
+        );
+
+        // 2026 clôturé sans 2027 : le filet ne joue pas non plus (N doit être ouvert).
+        await (db.update(db.fiscalYears)..where((t) => t.year.isIn([2025, 2026])))
+            .write(const FiscalYearsCompanion(status: Value('cloture')));
+        expect(
+          await le2Janvier.refusDeDate(DateTime(2027, 1, 1)),
+          'Vente refusée : aucun exercice comptable ne couvre le 01/01/2027. '
+          "Ouvrez l'exercice 2027 (Comptabilité › Clôture d'exercice).",
+        );
       },
     );
 
@@ -772,10 +817,10 @@ void main() {
       'Vente refusée : le mois 2026-10 est clôturé — aucune vente ne peut y être '
           'datée (le Journal Comptable applique la même règle). Un Administrateur '
           'peut déclôturer ce mois exceptionnellement.',
-      'Vente refusée : aucun exercice comptable ne couvre le 11/10/2026. Créez '
-          "l'exercice avant d'enregistrer cette vente.",
-      "Vente refusée : l'exercice comptable qui couvre le 11/10/2026 est clos. "
-          'Aucune vente ne peut y être datée.',
+      'Vente refusée : aucun exercice comptable ne couvre le 11/10/2026. Ouvrez '
+          "l'exercice 2026 (Comptabilité › Clôture d'exercice).",
+      "Vente refusée : l'exercice 2026 est clôturé : aucune saisie ne peut être "
+          'datée du 11/10/2026.',
     ]) {
       test(
         '🔴 rejet serveur « ${motif.substring(16, 40)}… » : conflict, motif tel quel, sans boucle',
@@ -1207,8 +1252,8 @@ void main() {
 
         await choisirJour(tester, '11');
         const motif =
-            "Vente refusée : l'exercice comptable qui couvre le 11/10/2026 "
-            'est clos. Aucune vente ne peut y être datée.';
+            "Vente refusée : l'exercice 2026 est clôturé : "
+            'aucune saisie ne peut être datée du 11/10/2026.';
         expect(
           find.descendant(
             of: find.byKey(const Key('date-vente-erreur')),

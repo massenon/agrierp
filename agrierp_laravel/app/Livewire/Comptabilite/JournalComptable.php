@@ -6,9 +6,11 @@ use App\Models\AccountingEntry;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use App\Services\AccountingEntryService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 10.4 (Sprint 10) — journal-comptable.html → Livewire\Comptabilite\JournalComptable
@@ -50,6 +52,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class JournalComptable extends Component
 {
+    use WithPagination;
+
     #[Url]
     public string $search = '';
 
@@ -77,9 +81,11 @@ class JournalComptable extends Component
 
     public function getKpisProperty(): array
     {
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $monthEntries = AccountingEntry::with('lines')
             ->where('is_active', true)
-            ->whereMonth('entry_date', now()->month)->whereYear('entry_date', now()->year)
+            ->whereMonth('entry_date', $mois->month)->whereYear('entry_date', $mois->year)
             ->get();
 
         return [
@@ -89,15 +95,38 @@ class JournalComptable extends Component
         ];
     }
 
-    public function getEntriesProperty()
+    /**
+     * Ticket EX7 (EF9) — les écritures de l'exercice AFFICHÉ, PAGINÉES (25 par page), au lieu des 100 dernières toutes
+     * années confondues : avec le volume, l'année N disparaissait de l'écran dès N+1.
+     */
+    private function requeteEcritures()
     {
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
         return AccountingEntry::with(['lines.account'])
             ->where('is_active', true)
+            ->whereDate('entry_date', '>=', $debut)
+            ->whereDate('entry_date', '<=', $fin)
             ->when($this->search, fn ($q) => $q->where('reference', 'like', '%'.$this->search.'%'))
             ->orderByDesc('entry_date')
             ->orderByDesc('created_at')
-            ->limit(100)
-            ->get();
+            ->orderByDesc('id');
+    }
+
+    public function getEntriesProperty()
+    {
+        return $this->requeteEcritures()->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageJournal');
+    }
+
+    /** Toutes les écritures de l'exercice affiché (recherche comprise) : l'export PDF, jamais la seule page affichée. */
+    public function ecrituresDeLExercice()
+    {
+        return $this->requeteEcritures()->get();
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage('pageJournal');
     }
 
     public function debitLine(AccountingEntry $entry)
@@ -120,7 +149,7 @@ class JournalComptable extends Component
     {
         $this->authorize('view-comptabilite');
 
-        $entries = $this->entries;
+        $entries = $this->ecrituresDeLExercice();
 
         $pdf = app(\App\Services\PdfExportService::class)->render(
             'exports.journal-comptable',
@@ -147,8 +176,12 @@ class JournalComptable extends Component
 
         $entry = AccountingEntry::with('lines')->findOrFail($id);
 
-        if ($entry->is_locked) {
-            $this->dispatch('toast', message: 'Cette écriture est verrouillée (exercice clôturé) et ne peut plus être modifiée.', type: 'error');
+        // Écriture verrouillée par la clôture ; ticket EX4 : à-nouveau ou sa contre-passation ; ticket EX5 : exercice
+        // clos. Le refus vient du service, au même texte qu'à l'enregistrement — le formulaire ne s'ouvre pas.
+        try {
+            app(AccountingEntryService::class)->verifierModifiable($entry);
+        } catch (\App\Exceptions\EcritureVerrouilleeException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
@@ -223,13 +256,15 @@ class JournalComptable extends Component
 
         $entry = AccountingEntry::findOrFail($id);
 
-        if ($entry->is_locked) {
-            $this->dispatch('toast', message: 'Cette écriture est verrouillée (exercice clôturé) et ne peut plus être archivée.', type: 'error');
+        // Tickets EX4 / EX5 — mêmes refus que la modification (verrouillée, à-nouveau, exercice clos), dans le service.
+        try {
+            app(AccountingEntryService::class)->archiver($entry);
+        } catch (\App\Exceptions\EcritureVerrouilleeException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        $entry->update(['is_active' => false]);
         AuditLog::record('accounting_entry.archived', 'comptabilite');
         $this->dispatch('toast', message: 'Écriture archivée avec succès.', type: 'warning');
     }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'caisse_repository.dart';
 import 'caisse_screen.dart';
@@ -47,6 +49,9 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
   String _mode = '';
 
   DonneesHistorique? _donnees;
+
+  /// Ticket EX7 (EF9) — page de l'historique (25 ventes), dans l'exercice affiché.
+  int _page = 1;
 
   @override
   void initState() {
@@ -443,7 +448,14 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
   );
 
   Widget _tableau(DonneesHistorique d) {
-    final lignes = _filtrees(d);
+    // Ticket EX7 (EF9) — les ventes de l'exercice AFFICHÉ, 25 par page (web : `soldBetween` de l'exercice puis
+    // `paginate(25)`), au lieu de toutes.
+    final etat = PorteeExerciceChoisi.lire(context);
+    final toutes = [
+      for (final l in _filtrees(d))
+        if (etat == null || etat.contient(l.vente.soldAt)) l,
+    ];
+    final lignes = etat == null ? toutes : PaginationAgri.tranche(toutes, _page);
 
     return Container(
       decoration: BoxDecoration(
@@ -519,6 +531,14 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
                   ),
                 ),
               for (var i = 0; i < lignes.length; i++) _ligne(lignes[i], i),
+              if (etat != null)
+                PaginationAgri(
+                  nom: 'ventes',
+                  total: toutes.length,
+                  page: _page,
+                  annee: etat.annee,
+                  onPage: (p) => setState(() => _page = p),
+                ),
             ],
           ),
         ),

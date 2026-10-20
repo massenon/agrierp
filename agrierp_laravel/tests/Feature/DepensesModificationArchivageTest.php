@@ -200,16 +200,28 @@ class DepensesModificationArchivageTest extends TestCase
         $this->assertSame(1, AccountingEntry::where('source_type', 'expense_reversal')->count());
     }
 
-    public function test_poste_modifie_le_libelle_et_la_date_d_une_depense_comptabilisee(): void
+    /**
+     * 🔁 Ticket EX5 (décision D-U14-1 du 20/10/2026) — la DATE d'une dépense comptabilisée est verrouillée comme son
+     * montant : changée seule, la dépense passait à un autre jour (ou un autre exercice) pendant que son écriture restait
+     * à l'ancienne date. Le libellé, lui, se modifie toujours.
+     */
+    public function test_poste_modifie_le_libelle_mais_pas_la_date_d_une_depense_comptabilisee(): void
     {
         $d = $this->depenseDuWeb();
+        $aujourdhui = $d->expense_date->format('Y-m-d');
         $hier = now()->subDay()->format('Y-m-d');
 
         $this->pousser([$this->ligne($d, ['label' => 'Provende ponte', 'expense_date' => $hier])])
+            ->assertJsonPath('expenses.accepted', [])
+            ->assertJsonPath('expenses.rejected.0.reason', SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE);
+        $this->assertSame($aujourdhui, $d->fresh()->expense_date->format('Y-m-d'));
+        $this->assertSame('Sac de provende', $d->fresh()->label);
+
+        $this->pousser([$this->ligne($d, ['label' => 'Provende ponte'])])
             ->assertJsonPath('expenses.accepted', [$d->id]);
 
         $this->assertSame('Provende ponte', $d->fresh()->label);
-        $this->assertSame($hier, $d->fresh()->expense_date->format('Y-m-d'));
+        $this->assertSame($aujourdhui, $d->fresh()->expense_date->format('Y-m-d'));
         $this->assertEquals(475_000, (float) $this->caisse->fresh()->balance);
         $this->assertSame(1, AuditLog::where('action', 'expense.updated')->count());
     }

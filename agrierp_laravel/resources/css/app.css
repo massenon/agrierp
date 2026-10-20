@@ -266,3 +266,14 @@ body.dark-mode .border-outline-variant {
 @media (max-width: 1023px) {
   #sidebar.-translate-x-full { transform: translateX(-100%) !important; }
 }
+
+/* ==========================================================================
+   Ticket EX7 (EF10) — bouton de saisie grisé dans un exercice clos
+   (`@lectureSeule` → `ExerciceChoisi::attributs()`). Une règle CSS plutôt que
+   des classes Tailwind ajoutées à la volée : une classe concaténée échapperait
+   au scanner de Tailwind et disparaîtrait du build.
+   ========================================================================== */
+[data-lecture-seule] {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}

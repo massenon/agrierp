@@ -37,6 +37,8 @@ use Livewire\Component;
  */
 class HistoriqueAvances extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     #[Url]
     public string $search = '';
 

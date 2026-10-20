@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
+import '../../core/database/app_database.dart' show FiscalYear;
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
+import 'etats_comparatifs.dart';
+import 'mention_anouveaux.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/comptabilite-hub.html` → Comptabilité.
@@ -26,9 +31,17 @@ class ComptabiliteScreen extends StatefulWidget {
     required this.depot,
     this.maintenant = HeureBenin.maintenant,
     this.imprimer,
+    this.exercice,
   });
 
   final ComptabiliteRepository depot;
+
+  /// Ticket EX8 (EF11) — L'EXERCICE AFFICHÉ, paramètre explicite (`exercice` du composant web). Fusion EX7 + EX8 : le
+  /// socle y passe l'exercice choisi au sélecteur (`ExerciceChoisi`) ; c'est un CHOIX, jamais une seconde vérité —
+  /// toutes les pages de l'écran le lisent par le même accesseur (`_etat`). `null` : l'exercice du socle, à défaut celui
+  /// qui contient le jour. Une année = cet exercice (colonne N), arrêté à aujourd'hui s'il est en cours, à sa clôture
+  /// s'il est passé ; son précédent en colonne N-1.
+  final int? exercice;
 
   /// Éditeur des documents officiels (« Exporter PDF », ticket F0.87). Injecté : `main.dart` y
   /// branche `EditeursRapports.imprimer` (polices embarquées, boîte d'impression de Windows) ; un
@@ -38,6 +51,24 @@ class ComptabiliteScreen extends StatefulWidget {
   /// L'horloge du poste — injectable pour que la période par défaut du Grand Livre (du premier du
   /// mois à aujourd'hui, comme le composant web) se teste sans dépendre du jour d'exécution.
   final DateTime Function() maintenant;
+
+  /// Ticket EX8 — les deux onglets des États Financiers qui restent sur le web, chacun pour sa raison.
+  static const motifsOngletsWeb = <String, String>{
+    'tafire':
+        'Le Tableau des Flux de Trésorerie se consulte sur la surface web : le poste présente le Bilan et le '
+        'Compte de Résultat N / N-1 (décision du client du 20/10/2026).',
+    'notes':
+        "Les Notes Annexes s'appuient sur le registre des immobilisations et la valorisation des stocks au PMP, "
+        'qui ne descendent pas au poste : elles se consultent sur la surface web.',
+  };
+
+  /// Les quatre onglets de `etats-financiers.blade.php`, dans leur ordre.
+  static const ongletsEtats = <(String, String)>[
+    ('bilan', 'Bilan'),
+    ('resultat', 'Compte de Résultat'),
+    ('tafire', 'Flux de Trésorerie'),
+    ('notes', 'Notes Annexes'),
+  ];
 
   @override
   State<ComptabiliteScreen> createState() => _ComptabiliteScreenState();
@@ -63,15 +94,16 @@ enum PageComptable {
 }
 
 class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
-  /// ⚠️ **CINQ PAGES RESTENT SUR LE WEB, CHACUNE POUR SA RAISON.** Un motif
+  /// ⚠️ **QUATRE PAGES RESTENT SUR LE WEB, CHACUNE POUR SA RAISON.** Un motif
   /// générique — « non embarqué » — ne dirait pas au comptable s'il doit
   /// attendre une synchronisation ou aller sur un poste connecté.
+  ///
+  /// 🔴→✅ Ticket EX8 (décision Q5 du client du 20/10/2026) — les ÉTATS FINANCIERS sont embarqués : Bilan et Compte de
+  /// Résultat N / N-1, en consultation, calculés par la transposition de `FinancialReportService` (rubriques
+  /// SYSCOHADA comprises) et prouvés égaux au PHP par une parité exécutée — le motif d'avant (« un état recomposé ici
+  /// pourrait être faux de structure ») est levé par cette preuve. Leurs onglets Flux de Trésorerie et Notes Annexes
+  /// restent sur le web ([motifsOngletsWeb]).
   static const motifs = <PageComptable, String>{
-    PageComptable.etatsFinanciers:
-        "Bilan et Compte de Résultat rangent chaque compte dans une rubrique "
-        "SYSCOHADA selon des règles qui vivent sur le serveur. Un état "
-        "recomposé ici pourrait être juste au centime près et faux de "
-        'structure — et rien à l\'écran ne le dirait.',
     PageComptable.cloture:
         "La clôture d'exercice est explicitement hors du contrat de "
         'synchronisation : elle fige les comptes de toute la ferme. La lancer '
@@ -90,6 +122,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         "de Mobile Money — un document que le poste ne reçoit pas.",
   };
 
+  /// Onglet actif des États Financiers (`#[Url] public string $tab = 'bilan'`).
+  String _ongletEtats = 'bilan';
+
   PageComptable _page = PageComptable.hub;
   String? _compteGrandLivre;
 
@@ -105,6 +140,43 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   DonneesComptabilite? _donnees;
 
+  /// Ticket EX7 (EF9) — page affichée du Journal (25 écritures par page), dans l'exercice affiché.
+  int _pageDuJournal = 1;
+
+  /// Fusion EX7 + EX8 — L'EXERCICE AFFICHÉ, un seul accesseur pour toutes les pages (Balance, Grand Livre, Journal,
+  /// carte Exercice, États Financiers N / N-1) : celui du socle (`PorteeExerciceChoisi`, le sélecteur de la barre). Le
+  /// paramètre [ComptabiliteScreen.exercice] d'EX8 y est un CHOIX, comme `ExerciceChoisi::choisir()` au web (le socle
+  /// le passe = l'exercice choisi) : une année inconnue du poste est refusée. `null` : ni socle ni paramètre (tests
+  /// d'écran) — rien n'est borné ni filtré (comportement d'avant EX7).
+  EtatExercice? _etatPilote([DonneesComptabilite? d]) {
+    final socle = PorteeExerciceChoisi.lire(context);
+    final choix = widget.exercice;
+    if (choix == null) return socle;
+    final exercices = socle?.exercices ?? (d ?? _donnees)?.exercices ?? const <FiscalYear>[];
+    if (!exercices.any((e) => e.year == choix)) return socle;
+    return EtatExercice(
+      exercices: exercices,
+      memorise: choix,
+      aujourdhui: socle?.aujourdhui ?? widget.maintenant(),
+    );
+  }
+
+  /// [_etatPilote], ou hors du socle son défaut : l'exercice qui contient le jour, comme au web sans choix en session.
+  EtatExercice _etat(DonneesComptabilite d) =>
+      _etatPilote(d) ??
+      EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: widget.maintenant());
+
+  /// Les écritures listées : celles de l'exercice affiché sous le socle (web : `requeteEcritures()`), tout le journal
+  /// reçu hors du socle (comportement d'avant EX7).
+  List<LigneJournal> _ecrituresAffichees(DonneesComptabilite d) {
+    final etat = _etatPilote(d);
+    if (etat == null) return d.journal;
+    return [
+      for (final e in d.journal)
+        if (etat.contient(e.ecriture.entryDate)) e,
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,12 +188,18 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     if (!mounted) return;
 
     final aujourdhui = widget.maintenant();
+    // Ticket EX7 (EF9) — du 1er du mois à aujourd'hui quand l'exercice affiché contient le jour, l'exercice entier
+    // sinon (`ExerciceChoisi::periodeParDefaut`, comme `GrandLivre::mount` du web).
+    final defaut = _etat(donnees).periodeParDefaut(
+      DateTime(aujourdhui.year, aujourdhui.month, 1),
+      aujourdhui,
+    );
 
     setState(() {
       _donnees = donnees;
       _compteGrandLivre ??= donnees.compteGrandLivreParDefaut?.id;
-      _debut ??= DateTime(aujourdhui.year, aujourdhui.month, 1);
-      _fin ??= DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
+      _debut ??= defaut.debut;
+      _fin ??= defaut.fin;
     });
   }
 
@@ -156,6 +234,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                         PageComptable.journal => _pageJournal(d, large),
                         PageComptable.grandLivre => _pageGrandLivre(d, large),
                         PageComptable.balance => _pageBalance(d, large),
+                        PageComptable.etatsFinanciers => _pageEtatsFinanciers(d, large),
                         PageComptable.hub => _pageHub(d, large),
                         _ => _pageNonEmbarquee(_page, large),
                       },
@@ -198,9 +277,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           libelle: 'Écritures reçues',
           valeur: '${d.journal.length}',
-          legende: d.exerciceOuvert == null
+          legende: _etat(d).exercice == null
               ? 'Exercice non synchronisé'
-              : 'Exercice ${d.exerciceOuvert!.year}',
+              : 'Exercice ${_etat(d).annee}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.menu_book,
         ),
@@ -330,9 +409,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           key: const Key('kpi-plan-exercice'),
           libelle: 'Exercice',
-          // ⚠️ Un tiret si aucun exercice OUVERT n'est descendu : afficher
-          // l'année courante laisserait croire qu'un exercice l'est.
-          valeur: '${d.anneeExerciceOuvert ?? '—'}',
+          // ⚠️ Un tiret si aucun exercice n'est descendu : afficher l'année courante laisserait croire qu'un exercice
+          // existe. Ticket EX7 : l'exercice AFFICHÉ (`ExerciceChoisi::exercice()?->year ?? '—'` du web).
+          valeur: '${_etat(d).exercice?.year ?? '—'}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.event,
           couleurIcone: AgriColors.outline,
@@ -389,7 +468,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   // ── Journal Comptable ─────────────────────────────────────────────────────
 
-  Widget _pageJournal(DonneesComptabilite d, bool large) => Column(
+  Widget _pageJournal(DonneesComptabilite d, bool large) {
+    // Ticket EX7 (EF9) — les écritures de l'exercice affiché, 25 par page (web : `paginate(25)`) ; l'export reprend
+    // tout l'exercice, jamais la seule page.
+    final etat = _etatPilote(d);
+    final ecritures = _ecrituresAffichees(d);
+    final page = etat == null ? ecritures : PaginationAgri.tranche(ecritures, _pageDuJournal);
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _enTete(
@@ -397,7 +482,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         _boutonExport(
           'exporter-pdf-journal',
           () => _exporter(
-            DocumentsComptabilite.journal(d, le: widget.maintenant()),
+            DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
             'Aucune écriture à exporter.',
           ),
         ),
@@ -414,7 +499,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           key: const Key('kpi-journal-ecritures'),
           libelle: 'Écritures (mois)',
-          valeur: '${d.ecrituresDuMois(HeureBenin.maintenant())}',
+          // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+          valeur: '${d.ecrituresDuMois(etat?.moisDeReference ?? HeureBenin.maintenant())}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.receipt_long,
           couleurIcone: AgriColors.outline,
@@ -454,13 +540,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ],
         vide: '— Aucune écriture synchronisée —',
         lignes: [
-          for (var i = 0; i < d.journal.length; i++)
+          for (var i = 0; i < page.length; i++)
             _ligne(i, [
               (
                 // ⚠️ F0.87 : la PIÈCE (référence avant « — »), comme la page web — et non plus le
                 // type de source (« sale », « purchase »), qui n'est pas un numéro de pièce.
                 Text(
-                  d.journal[i].piece.isEmpty ? '—' : d.journal[i].piece,
+                  page[i].piece.isEmpty ? '—' : page[i].piece,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
@@ -470,12 +556,12 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 4,
               ),
               (
-                Text(_date(d.journal[i].ecriture.entryDate), style: _cellule),
+                Text(_date(page[i].ecriture.entryDate), style: _cellule),
                 2,
               ),
               (
                 Text(
-                  d.journal[i].libelle.isEmpty ? '—' : d.journal[i].libelle,
+                  page[i].libelle.isEmpty ? '—' : page[i].libelle,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -483,7 +569,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
               ),
               (
                 Text(
-                  d.journal[i].comptesDebites,
+                  page[i].comptesDebites,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -491,17 +577,25 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
               ),
               (
                 Text(
-                  d.journal[i].comptesCredites,
+                  page[i].comptesCredites,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
                 2,
               ),
-              (_montantEcriture(d.journal[i]), 3),
+              (_montantEcriture(page[i]), 3),
               (_actionInerte(), 2),
             ]),
         ],
       ),
+      if (etat != null)
+        PaginationAgri(
+          nom: 'journal',
+          total: ecritures.length,
+          page: _pageDuJournal,
+          annee: etat.annee,
+          onPage: (p) => setState(() => _pageDuJournal = p),
+        ),
       const SizedBox(height: AgriSpacing.md),
       // ⚠️⚠️ AUCUNE ÉCRITURE NE SE SAISIT AU POSTE, et ce n'est pas un manque.
       // Une écriture naît d'une opération — vente, achat, dépense, ponte,
@@ -516,6 +610,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       ),
     ],
   );
+  }
 
   Widget _montantEcriture(LigneJournal e) {
     if (!e.equilibree) {
@@ -601,6 +696,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX2 — `<x-anouveaux-provisoires>` du web, sous l'en-tête.
+        MentionAnouveauxProvisoires(ouverture: g?.ouverture),
         // ⚠️ Barre de filtres de `grand-livre.html` : compte, période « du … au … ».
         Container(
           padding: const EdgeInsets.all(AgriSpacing.md),
@@ -859,11 +956,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     return InkWell(
       key: cle,
       onTap: () async {
+        // Ticket EX7 (EF9) — calendrier borné à l'exercice affiché (`min` / `max` du web) sous le socle.
+        final etat = _etatPilote();
         final choisie = await showDatePicker(
           context: context,
-          initialDate: valeur,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
+          initialDate: etat?.borner(valeur) ?? valeur,
+          firstDate: etat?.bornes.debut ?? DateTime(2000),
+          lastDate: etat?.bornes.fin ?? DateTime(2100),
         );
         if (choisie == null) return;
         setState(() => affecter(choisie));
@@ -885,13 +984,10 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   // ── Balance Générale ──────────────────────────────────────────────────────
 
   Widget _pageBalance(DonneesComptabilite d, bool large) {
-    final maintenant = widget.maintenant();
-    final exercice = d.exerciceOuvert;
-    final bornes = DonneesComptabilite.bornesBalance(
-      _periodeBalance,
-      maintenant,
-      exercice,
-    );
+    // Ticket EX7 (EF9) — les deux options DANS l'exercice affiché ; « Exercice 2026 » = cet exercice, et non plus le
+    // plus récent ouvert.
+    final etat = _etat(d);
+    final bornes = DonneesComptabilite.bornesBalance(_periodeBalance, etat);
     final b = d.balanceGenerale(debut: bornes.debut, fin: bornes.fin);
     final lignes = b.lignes;
 
@@ -918,11 +1014,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
             () => _exporter(
               DocumentsComptabilite.balance(
                 b,
-                periode: DonneesComptabilite.libellePeriodeBalance(
-                  _periodeBalance,
-                  maintenant,
-                  exercice,
-                ),
+                periode: DonneesComptabilite.libellePeriodeBalance(_periodeBalance, etat),
               ),
               'Aucun compte mouvementé à exporter sur cette période.',
             ),
@@ -937,6 +1029,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX2 — `<x-anouveaux-provisoires>` du web, sous l'en-tête.
+        MentionAnouveauxProvisoires(ouverture: b.ouverture),
         // ⚠️ Sélecteur de `balance-generale.html` (`bal-periode-select`) : DEUX options, pas un
         // calendrier — « mois courant » ou « exercice complet », comme le composant web.
         Container(
@@ -980,11 +1074,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                       DropdownMenuItem(
                         value: p,
                         child: Text(
-                          DonneesComptabilite.libellePeriodeBalance(
-                            p,
-                            maintenant,
-                            exercice,
-                          ),
+                          DonneesComptabilite.libellePeriodeBalance(p, etat),
                         ),
                       ),
                   ],
@@ -1297,7 +1387,396 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     2,
   );
 
-  // ── Les cinq pages qui restent sur le web ─────────────────────────────────
+  // ── États Financiers : Bilan et Compte de Résultat N / N-1 (ticket EX8) ──
+
+  /// `etats-financiers.blade.php` : titre, sous-titre, « Exporter PDF (Onglet Actif) », mention des à-nouveaux
+  /// provisoires, quatre onglets ; Bilan et Compte de Résultat en deux colonnes « Exercice N » / « Exercice N-1 »
+  /// (« — » sans exercice N-1, jamais 0) ; Flux de Trésorerie et Notes Annexes : motif.
+  ///
+  /// ⚠️ Comme la Balance, un état que le poste ne peut pas affirmer (journal vide ou incomplet) ne montre aucun chiffre :
+  /// la raison s'affiche à la place.
+  Widget _pageEtatsFinanciers(DonneesComptabilite d, bool large) {
+    // Fusion EX7 + EX8 — colonne N = l'exercice AFFICHÉ (le sélecteur), arrêté à `ExerciceChoisi::dateArrete()` ;
+    // N-1 = son précédent, à sa clôture. Changer d'exercice au sélecteur change les deux colonnes.
+    final etat = _etat(d);
+    final arrete = d.arreteEtatsFinanciers(etat);
+    final situation = EtatsComparatifs.situation(arrete, d.anneeEtatsFinanciers(etat));
+    final bilan = d.bilanComparatif(arrete);
+    final resultat = d.compteResultatComparatif(arrete);
+    final motif = d.journal.isEmpty
+        ? 'Aucune écriture reçue au poste'
+        : d.ecrituresIncompletes > 0
+        ? _motifJournalIncomplet
+        : null;
+
+    void exporter() {
+      if (motif != null) {
+        _annoncer(motif);
+        return;
+      }
+      final message = ComptabiliteScreen.motifsOngletsWeb[_ongletEtats];
+      if (message != null) {
+        _annoncer(message);
+        return;
+      }
+      _exporter(
+        _ongletEtats == 'bilan'
+            ? EtatsComparatifs.documentBilan(bilan, situation: situation)
+            : EtatsComparatifs.documentResultat(
+                resultat,
+                situation: situation,
+                provisoire: bilan.n.ouverture.provisoire,
+              ),
+        'Aucune ligne à exporter.',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _titre('États Financiers', large),
+                  const SizedBox(height: AgriSpacing.xs),
+                  const Text(
+                    'Bilan, Compte de Résultat, Tableau des Flux de Trésorerie et Notes Annexes — conformité SYSCOHADA.',
+                    style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            OutlinedButton.icon(
+              key: const Key('exporter-pdf-etats'),
+              onPressed: exporter,
+              icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AgriColors.brandForest,
+                side: const BorderSide(color: AgriColors.outlineVariant),
+                shape: const StadiumBorder(),
+              ),
+              label: const Text(
+                'Exporter PDF (Onglet Actif)',
+                style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        MentionAnouveauxProvisoires(ouverture: bilan.n.ouverture),
+        // Onglets : `border-b-2` émeraude pour l'actif, transparent sinon.
+        Container(
+          margin: const EdgeInsets.only(bottom: AgriSpacing.md),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final (cle, libelle) in ComptabiliteScreen.ongletsEtats)
+                  InkWell(
+                    key: Key('onglet-etats-$cle'),
+                    onTap: () => setState(() => _ongletEtats = cle),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            width: 2,
+                            color: _ongletEtats == cle ? AgriColors.brandEmerald : Colors.transparent,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        libelle,
+                        style: TextStyle(
+                          fontSize: AgriTypography.xs,
+                          fontWeight: FontWeight.bold,
+                          color: _ongletEtats == cle ? AgriColors.brandEmerald : AgriColors.outline,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (motif != null)
+          _mentionPoste('$motif : le Bilan et le Compte de Résultat ne peuvent pas être affirmés sur ce poste.')
+        else
+          switch (_ongletEtats) {
+            'bilan' => _ongletBilan(bilan, situation, large),
+            'resultat' => _ongletResultat(resultat),
+            _ => _mentionPoste(ComptabiliteScreen.motifsOngletsWeb[_ongletEtats] ?? ''),
+          },
+      ],
+    );
+  }
+
+  Widget _ongletBilan(BilanComparatif c, String situation, bool large) {
+    final equilibre = c.n.equilibre;
+    final ecart = (c.n.totalActif - c.n.totalPassif).abs();
+    final actif = _carteEtat(
+      cle: 'etat-actif',
+      titre: 'Actif (Emplois)',
+      couleur: AgriColors.brandEmerald,
+      couleurTotal: AgriColors.brandEmerald,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauActif(c),
+    );
+    final passif = _carteEtat(
+      cle: 'etat-passif',
+      titre: 'Passif (Ressources)',
+      couleur: AgriColors.infoBlue,
+      couleurTotal: AgriColors.infoBlue,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauPassif(c),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AgriSpacing.md),
+          margin: const EdgeInsets.only(bottom: AgriSpacing.md),
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  situation,
+                  key: const Key('etat-situation'),
+                  style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (equilibre ? AgriColors.brandEmerald : AgriColors.errorRed).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      equilibre ? SymbolesAgri.check_circle : SymbolesAgri.warning,
+                      size: 14,
+                      color: equilibre ? AgriColors.brandEmerald : AgriColors.errorDeep,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      equilibre ? 'Bilan Équilibré' : 'Écart de ${EtatsComparatifs.montant(ecart)} F',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: equilibre ? AgriColors.brandEmerald : AgriColors.errorDeep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (large)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: actif),
+              const SizedBox(width: AgriSpacing.md),
+              Expanded(child: passif),
+            ],
+          )
+        else ...[
+          actif,
+          const SizedBox(height: AgriSpacing.md),
+          passif,
+        ],
+      ],
+    );
+  }
+
+  Widget _ongletResultat(CompteResultatComparatif c) => Align(
+    alignment: Alignment.centerLeft,
+    child: ConstrainedBox(
+      // `max-w-3xl` (48 rem).
+      constraints: const BoxConstraints(maxWidth: 768),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _carteEtat(
+            cle: 'etat-resultat',
+            titre: 'Compte de Résultat — Structure en Cascade SYSCOHADA',
+            couleur: AgriColors.brandForest,
+            couleurTotal: Colors.white,
+            entetes: (c.exerciceN, c.exerciceN1),
+            lignes: EtatsComparatifs.tableauResultat(c),
+            totalSombre: true,
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          const Text(
+            EtatsComparatifs.noteResultat,
+            style: TextStyle(fontSize: 11, color: AgriColors.outline),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  /// Une carte d'état : bandeau titre (`border-b-2`), en-têtes « Exercice N » / « Exercice N-1 » et leurs
+  /// sous-titres, puis les lignes ([LigneTableauEtat]) ; chaque montant porte la clé de sa colonne.
+  Widget _carteEtat({
+    required String cle,
+    required String titre,
+    required Color couleur,
+    required Color couleurTotal,
+    required (ColonneExercice, ColonneExercice?) entetes,
+    required List<LigneTableauEtat> lignes,
+    bool totalSombre = false,
+  }) {
+    const enTete = TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AgriColors.outline);
+    Widget colonneEntete(String titre, String sousTitre) => Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(titre.toUpperCase(), textAlign: TextAlign.right, style: enTete),
+        Text(
+          sousTitre,
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+        ),
+      ],
+    );
+
+    Widget ligne(int i, LigneTableauEtat l) {
+      if (l.genre == GenreLigneEtat.titre) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AgriColors.outlineVariant))),
+          child: Text(
+            l.libelle.toUpperCase(),
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AgriColors.brandForest),
+          ),
+        );
+      }
+      final total = l.genre == GenreLigneEtat.total;
+      final sousTotal = l.genre == GenreLigneEtat.sousTotal;
+      final sombre = total && totalSombre;
+      final fond = sombre
+          ? AgriColors.brandForest
+          : (total || sousTotal)
+          ? AgriColors.surfaceZebra
+          : AgriColors.surfaceCard;
+      final couleurTexte = sombre ? Colors.white : (sousTotal || total) ? AgriColors.brandForest : null;
+      final poids = total ? FontWeight.w900 : (sousTotal || l.gras) ? FontWeight.bold : FontWeight.normal;
+      TextStyle style(Color? c) => TextStyle(fontSize: AgriTypography.xs, fontWeight: poids, color: c);
+      return Container(
+        key: Key('$cle-ligne-$i'),
+        color: fond,
+        padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+        decoration: null,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 6,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: l.genre == GenreLigneEtat.ligne && !totalSombre && !l.gras ? AgriSpacing.md : 0,
+                ),
+                child: Text(
+                  total ? l.libelle.toUpperCase() : l.libelle,
+                  style: style(
+                    couleurTexte ??
+                        (l.genre == GenreLigneEtat.ligne && !totalSombre ? AgriColors.outline : null),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                l.n,
+                key: Key('$cle-$i-n'),
+                textAlign: TextAlign.right,
+                style: style(
+                  sombre
+                      ? Colors.white
+                      : total
+                      ? couleurTotal
+                      : l.charge || l.negatifN
+                      ? AgriColors.errorDeep
+                      : couleurTexte,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                l.n1,
+                key: Key('$cle-$i-n1'),
+                textAlign: TextAlign.right,
+                style: style(sombre ? Colors.white : l.charge ? AgriColors.errorDeep : AgriColors.outline),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      key: Key(cle),
+      decoration: BoxDecoration(
+        color: AgriColors.surfaceCard,
+        border: Border.all(color: AgriColors.outlineVariant),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+            decoration: BoxDecoration(
+              color: couleur.withValues(alpha: 0.05),
+              border: Border(bottom: BorderSide(color: couleur, width: 2)),
+            ),
+            child: Text(
+              titre.toUpperCase(),
+              style: TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold, color: couleur),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AgriColors.outlineVariant))),
+            child: Row(
+              children: [
+                const Expanded(flex: 6, child: SizedBox.shrink()),
+                Expanded(
+                  flex: 3,
+                  child: colonneEntete(EtatsComparatifs.enteteN, EtatsComparatifs.sousTitre(entetes.$1)),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: colonneEntete(EtatsComparatifs.enteteN1, EtatsComparatifs.sousTitre(entetes.$2)),
+                ),
+              ],
+            ),
+          ),
+          for (var i = 0; i < lignes.length; i++) ligne(i, lignes[i]),
+        ],
+      ),
+    );
+  }
+
+  // ── Les quatre pages qui restent sur le web ───────────────────────────────
 
   Widget _pageNonEmbarquee(PageComptable page, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,

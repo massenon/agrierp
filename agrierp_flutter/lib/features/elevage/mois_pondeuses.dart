@@ -95,7 +95,7 @@ class DonneesMoisPondeuses {
 
   final IndicateursPondeuses indicateurs;
 
-  /// TOUS les jours du mois en cours, du 1er au dernier (`range(1, now()->daysInMonth)`).
+  /// TOUS les jours du mois affiché, du 1er au dernier (`getDaysInMonthProperty()` d'`AvecMoisDeFiche`).
   final List<JourPondeuses> jours;
 
   /// « Exporter PDF » (`exportFichePdf()`).
@@ -120,6 +120,8 @@ class DonneesMoisPondeuses {
 /// ⚠️ Ordre de deux soins du même jour : `created_at` au web, qui ne descend pas au poste ; le poste prend
 /// `updated_at` (l'instant de saisie, jamais touché ensuite tant que le soin est actif), puis l'identifiant.
 abstract final class MoisPondeuses {
+  /// 🔴→✅ Ticket EX8 (EF12) — [maintenant] est un jour du MOIS AFFICHÉ (le jour choisi, `AvecMoisDeFiche` du web) :
+  /// tableau, cartes du mois, soins du mois et PDF le suivent ; seul son mois compte.
   static Future<DonneesMoisPondeuses> charger(
     AppDatabase db, {
     required List<LivestockLot> bandes,
@@ -272,7 +274,8 @@ abstract final class MoisPondeuses {
     return DocumentOfficiel(
       titre: 'Fiche Pondeuses — Suivi Mensuel',
       sousTitre: '${_mois[maintenant.month - 1]} ${maintenant.year}',
-      fichier: 'fiche-{mois}.pdf',
+      // Ticket EX8 (EF12) : le mois AFFICHÉ (`fichierDuPdf()` du web), jamais celui de l'horloge à l'édition.
+      fichier: 'fiche-${maintenant.year}-${deux(maintenant.month)}.pdf',
       entetes: const [
         'Date',
         'Achat',

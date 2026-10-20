@@ -7,10 +7,12 @@ use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockTransfer;
 use App\Services\EffectifParCategorieService;
+use App\Support\ExerciceChoisi;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 15.46 — ÉCRAN DÉDIÉ « TRANSFERTS ENTRE BANDES » (A2, décision client du 17/10/2026).
@@ -28,6 +30,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class TransfertsBandes extends Component
 {
+    use WithPagination;
+
     public string $source_lot_id = '';
 
     public string $target_lot_id = '';
@@ -80,11 +84,19 @@ class TransfertsBandes extends Component
         };
     }
 
+    /**
+     * Ticket EX7 (EF9) — les transferts de l'exercice AFFICHÉ, PAGINÉS (25 par page), au lieu des 100 derniers toutes
+     * années confondues.
+     */
     public function getTransfertsProperty()
     {
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
         return LivestockTransfer::with(['source', 'cible', 'user'])
-            ->orderByDesc('transfer_date')->orderByDesc('created_at')
-            ->limit(100)->get();
+            ->whereDate('transfer_date', '>=', $debut)
+            ->whereDate('transfer_date', '<=', $fin)
+            ->orderByDesc('transfer_date')->orderByDesc('created_at')->orderByDesc('id')
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageTransferts');
     }
 
     /**
@@ -110,8 +122,10 @@ class TransfertsBandes extends Component
 
     public function getKpisProperty(): array
     {
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $duMois = LivestockTransfer::actifs()
-            ->whereBetween('transfer_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()]);
+            ->whereBetween('transfer_date', [$mois->toDateString(), $mois->copy()->endOfMonth()->toDateString()]);
 
         return [
             'transferts_mois' => (clone $duMois)->count(),

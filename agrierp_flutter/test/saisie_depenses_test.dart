@@ -225,7 +225,7 @@ void main() {
             id: 'expenses:$refusee',
             sourceTable: 'expenses',
             recordId: refusee,
-            reason: 'Aucun exercice ouvert.',
+            reason: "L'exercice 2026 est clôturé : aucune saisie ne peut être datée du 05/08/2026.",
             detectedAt: DateTime(2026, 8, 6),
           ),
         );
@@ -236,7 +236,10 @@ void main() {
           [refusee, web, memeJourA, memeJourB],
           reason: 'même jour : identifiant croissant (`orderBy(\'id\')`, U14)',
         );
-        expect(liste.first.motifRefus, 'Aucun exercice ouvert.');
+        expect(
+          liste.first.motifRefus,
+          "L'exercice 2026 est clôturé : aucune saisie ne peut être datée du 05/08/2026.",
+        );
         expect(liste[1].motifRefus, isNull);
         // 12 000 + 1 000 + 1 000 ; ni l'archivée (70 000), ni la refusée (9 000).
         expect(await depot.totalDuMois(DateTime(2026, 8, 19)), 14000);
@@ -269,19 +272,20 @@ void main() {
       expect(await chercher('zzz'), isEmpty);
     });
 
-    test('⚠️ U14 — modifier une dépense comptabilisée : libellé et date oui ; montant, compte de charge, compte de '
-        'trésorerie non (message du web sous « Montant »)', () async {
+    test('⚠️ U14 / EX5 — modifier une dépense comptabilisée : libellé oui ; date (D-U14-1), montant, compte de '
+        'charge, compte de trésorerie non (message du web sous « Montant »)', () async {
       const id = 'aaaaaaaa-0000-4000-8000-000000000021';
       await depenseDuServeur(id, DateTime(2026, 8, 3), 25000, ecriture: 'eeeeeeee-0000-4000-8000-000000000001');
 
       Future<Map<String, String>> modifier({
+        DateTime? date,
         String libelle = 'Dépense corrigée',
         String categorie = '601 - Aliments',
         double montant = 25000,
         String compte = compteId,
       }) => refus(
         () => depot.enregistrer(
-          date: DateTime(2026, 8, 4),
+          date: date ?? DateTime(2026, 8, 3),
           libelle: libelle,
           categorie: categorie,
           montant: montant,
@@ -291,6 +295,8 @@ void main() {
       );
 
       for (final interdit in [
+        // 🔴→✅ EX5 (D-U14-1) : la date changée seule déplaçait la dépense, son écriture restait au 03/08.
+        () => modifier(date: DateTime(2026, 8, 4)),
         () => modifier(montant: 30000),
         () => modifier(categorie: '605 - Énergie'),
         () => modifier(compte: banqueId),
@@ -302,7 +308,7 @@ void main() {
       expect(await modifier(), isEmpty);
       final d = await lire(id);
       expect(d.label, 'Dépense corrigée');
-      expect(d.expenseDate, DateTime(2026, 8, 4));
+      expect(d.expenseDate, DateTime(2026, 8, 3));
       expect(d.syncStatus, SyncStatus.pending, reason: 'la modification part au serveur');
       expect(d.deviceId, 'serveur', reason: 'l origine de la saisie est gardée');
     });
@@ -421,7 +427,9 @@ void main() {
         for (final m in RegExp(r'<option[^>]*>([^<{]+)</option>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'<x-kpi-card label="([^"]+)"').allMatches(b)) html(m[1]!),
-        for (final m in RegExp(r'title="([^"]+)"').allMatches(b)) html(m[1]!),
+        // Ticket EX7 : une info-bulle CALCULÉE (`title="{{ … }}"`, motif de la date grisée) n'est pas un texte littéral ;
+        // `selecteur_exercice_test.dart` la compare à la constante du poste.
+        for (final m in RegExp(r'title="([^"{]+)"').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'border-brand-emerald/30">([^<]+)</span>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'border-accent-yellow">([^<]+)</span>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r"editingExpenseId \? '([^']+)' : '([^']+)'").allMatches(b)) ...[

@@ -7,7 +7,9 @@ use App\Exceptions\NoOpenFiscalYearException;
 use App\Exceptions\UnbalancedAccountingEntryException;
 use App\Models\AccountingEntry;
 use App\Models\AccountingEntryLine;
+use App\Exceptions\EcritureVerrouilleeException;
 use App\Models\FiscalYear;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -56,24 +58,91 @@ class AccountingEntryService
      * refus vient alors avant tout effet de bord, y compris pour un mode de
      * règlement qui ne produit aucune écriture).
      *
+     * 🔴→✅ Ticket EX3 (R2) — LE FILET : aucun exercice ne couvre la date, mais c'est la première saisie de l'année qui
+     * suit l'exercice ouvert le plus récent, et la tâche du 1er janvier n'a pas tourné → l'exercice est ouvert ICI, avant
+     * tout refus (`OuvertureExerciceService::filet`). Sans lui, un cron absent bloquait la caisse jusqu'à la clôture.
+     *
+     * 🔴→✅ Ticket EX5 (R4) — messages réécrits, date au format JJ/MM/AAAA, mêmes au web et à l'envoi d'un poste.
+     *
      * @throws NoOpenFiscalYearException  aucun exercice ne couvre la date
      * @throws ClosedFiscalYearException  l'exercice qui la couvre est clos
      */
     public function exerciceOuvertPour(string $entryDate): FiscalYear
     {
-        $fiscalYear = FiscalYear::whereDate('start_date', '<=', $entryDate)
-            ->whereDate('end_date', '>=', $entryDate)
-            ->first();
+        $fiscalYear = $this->exerciceQuiCouvre($entryDate)
+            ?? app(OuvertureExerciceService::class)->filet($entryDate);
 
         if (! $fiscalYear) {
-            throw new NoOpenFiscalYearException();
+            throw NoOpenFiscalYearException::pourDate($entryDate);
         }
 
         if ($fiscalYear->status !== 'ouvert') {
-            throw ClosedFiscalYearException::forDate($entryDate);
+            throw ClosedFiscalYearException::forDate($entryDate, (int) $fiscalYear->year);
         }
 
         return $fiscalYear;
+    }
+
+    /**
+     * Ticket EX5 (EF5, R4) — « exercice clos = rien ne s'y écrit », pour une saisie qui ne produit pas forcément
+     * d'écriture : mouvement de stock (`AdjustStockAction`), fiche d'élevage (Q3), modification ou archivage d'une
+     * dépense. Le motif R4 si un exercice CLOS couvre [$date], `null` sinon — une date qu'aucun exercice ne couvre n'est
+     * pas refusée ici (une fiche ou un ajout de stock n'a pas besoin d'exercice ; l'écriture, s'il y en a une, passe par
+     * `record()`, qui la refusera).
+     */
+    public function refusExerciceClos(string $date): ?string
+    {
+        $exercice = $this->exerciceQuiCouvre($date);
+
+        return $exercice !== null && $exercice->status !== 'ouvert'
+            ? ClosedFiscalYearException::message((int) $exercice->year, Carbon::parse($date)->format('d/m/Y'))
+            : null;
+    }
+
+    /**
+     * @throws ClosedFiscalYearException  un exercice clos couvre [$date]
+     */
+    public function refuserSiExerciceClos(string $date): void
+    {
+        $refus = $this->refusExerciceClos($date);
+
+        if ($refus !== null) {
+            throw new ClosedFiscalYearException($refus);
+        }
+    }
+
+    /**
+     * Ticket EX6 (EF7) — BORNE BASSE du calendrier d'une saisie qui passe une écriture (dépense, règlement,
+     * remboursement, avance, vente datée) : le début du plus ancien exercice OUVERT, `null` s'il n'y en a aucun.
+     * Indicative : [exerciceOuvertPour] reste le juge. Le poste en garde la copie (`ExerciceDeSaisie::premierJour`,
+     * règle `ecriture`).
+     */
+    public function premierJourSaisissable(): ?string
+    {
+        $debut = FiscalYear::where('status', 'ouvert')->min('start_date');
+
+        return $debut ? substr((string) $debut, 0, 10) : null;
+    }
+
+    /**
+     * Ticket EX6 (EF7) — BORNE BASSE du calendrier d'une saisie jugée par [refusExerciceClos] seulement (ajout de
+     * stock) : le lendemain du plus récent exercice CLOS, `null` s'il n'y en a aucun — un jour qu'aucun exercice ne
+     * couvre reste admis. Copie au poste : `ExerciceDeSaisie::premierJour`, règle `closSeulement`.
+     */
+    public function premierJourHorsExerciceClos(): ?string
+    {
+        $fin = FiscalYear::where('status', '!=', 'ouvert')->max('end_date');
+
+        return $fin ? Carbon::parse(substr((string) $fin, 0, 10))->addDay()->format('Y-m-d') : null;
+    }
+
+    private function exerciceQuiCouvre(string $date): ?FiscalYear
+    {
+        $jour = Carbon::parse($date)->format('Y-m-d');
+
+        return FiscalYear::whereDate('start_date', '<=', $jour)
+            ->whereDate('end_date', '>=', $jour)
+            ->first();
     }
 
     /**
@@ -185,8 +254,20 @@ class AccountingEntryService
             throw new \InvalidArgumentException('Le compte débité doit être différent du compte crédité.');
         }
 
-        if ($entry->is_locked) {
-            throw new \RuntimeException("Cette écriture est verrouillée (exercice clôturé) et ne peut plus être modifiée.");
+        $this->verifierModifiable($entry);
+
+        // 🔴→✅ TICKET EX5 (EF5) — LE DÉPLACEMENT D'UNE ÉCRITURE. Changer la date ne recalculait pas `fiscal_year_id` :
+        // une écriture de 2027 déplacée au 15/12/2026 restait rattachée à 2027 (et à sa numérotation), y compris quand
+        // 2026 était CLOS. La nouvelle date passe la règle de `record()` (exercice ouvert qui la couvre, motif R4), puis
+        // une écriture ne change jamais d'exercice : la numérotation est par exercice (15.20a), et les états d'un
+        // exercice se lisent par `fiscal_year_id`.
+        $nouvelExercice = $this->exerciceOuvertPour($entryDate);
+        if ($nouvelExercice->id !== $entry->fiscal_year_id) {
+            $ancien = FiscalYear::find($entry->fiscal_year_id);
+            throw new EcritureVerrouilleeException(
+                "Une écriture ne change pas d'exercice : celle-ci appartient à l'exercice {$ancien?->year}. "
+                ."Archivez-la, puis saisissez-la à nouveau dans l'exercice {$nouvelExercice->year}."
+            );
         }
 
         DB::transaction(function () use ($entry, $debitAccountId, $creditAccountId, $amount, $entryDate, $reference) {
@@ -205,5 +286,46 @@ class AccountingEntryService
         });
 
         return $entry->fresh('lines');
+    }
+
+    /**
+     * Ticket EX4 / EX5 — ARCHIVAGE d'une écriture au Journal (`JournalComptable::archiveEntry`), avec les mêmes refus
+     * que la modification : écriture verrouillée par la clôture, à-nouveau ou sa contre-passation, exercice clos.
+     *
+     * @throws EcritureVerrouilleeException|ClosedFiscalYearException
+     */
+    public function archiver(AccountingEntry $entry): void
+    {
+        $this->verifierModifiable($entry, 'archivée');
+
+        $entry->update(['is_active' => false]);
+    }
+
+    /**
+     * Ce qui interdit de toucher une écriture existante, quelle que soit la nouvelle saisie.
+     *
+     * 🔴→✅ TICKET EX4 (EF4, défaut É3) — L'À-NOUVEAU DE N+1 SE MODIFIAIT ET S'ARCHIVAIT AU JOURNAL. Il appartient à
+     * N+1, exercice ouvert : la clôture de N ne le verrouille pas (`is_locked` ne vise que les écritures de N). Le
+     * modifier ou l'archiver faisait diverger l'ouverture de N+1 de la clôture de N, sans aucune erreur. Il ne se
+     * corrige que par la réouverture de N (15.53), qui le contre-passe — et la contre-passation est protégée de même.
+     */
+    public function verifierModifiable(AccountingEntry $entry, string $geste = 'modifiée'): void
+    {
+        if (in_array($entry->source_type, ['ran', 'ran_reversal'], true)) {
+            $exercice = FiscalYear::find($entry->fiscal_year_id);
+            $annee = (int) ($exercice?->year ?? $entry->entry_date->format('Y'));
+
+            throw new EcritureVerrouilleeException(
+                "L'écriture d'à-nouveau de l'exercice {$annee} est verrouillée : elle ne se modifie ni ne s'archive. "
+                .'Pour la corriger, rouvrez l\'exercice '.($annee - 1).'.'
+            );
+        }
+
+        if ($entry->is_locked) {
+            throw new EcritureVerrouilleeException("Cette écriture est verrouillée (exercice clôturé) et ne peut plus être {$geste}.");
+        }
+
+        // Une écriture d'un exercice clos qui ne serait pas verrouillée (base antérieure à la clôture verrouillante).
+        $this->refuserSiExerciceClos($entry->entry_date->format('Y-m-d'));
     }
 }

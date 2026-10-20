@@ -1780,11 +1780,11 @@ void main() {
         // Exercice complet 2026 : ouverture nulle, tout le journal de l'exercice.
         await tester.tap(find.byKey(const Key('balance-periode')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Exercice complet — 2026').last);
+        await tester.tap(find.text('Exercice 2026').last);
         await tester.pumpAndSettle();
         await exporter(tester, 'exporter-pdf-balance');
         doc = editions.last.$1;
-        expect(doc.sousTitre, 'Exercice complet — 2026');
+        expect(doc.sousTitre, 'Exercice 2026');
         expect(donnees(doc), tableauEcran(tester));
         // 531 : D 100 000 + 25 000 + 500 + 1 234,60 + 3 000 = 129 734,60 ; C 15 000 + 600 = 15 600 ;
         // final 114 134,60. Mouvements totaux 185 334,60 ; finals 154 734,60 des deux côtés.

@@ -171,10 +171,12 @@ class InventaireAuComptageService
         $perteApres = max(0.0, -($ecartAvant - $delta));
         $variation = round($perteApres - $perteAvant, 2);
         $ecritures = app(RecordStockAdjustmentEntryAction::class);
+        // Ticket EX5 — la perte recalculée appartient au COMPTAGE : datée de son jour, comme la régularisation de stock
+        // (elle était datée de l'arrivée du mouvement, parfois dans l'exercice suivant).
         if ($variation > 0) {
-            $ecritures->execute($produit->fresh(), -$variation, 'régularisation d\'inventaire');
+            $ecritures->execute($produit->fresh(), -$variation, 'régularisation d\'inventaire', $instant);
         } elseif ($variation < 0) {
-            $ecritures->annulerPerte($produit->fresh(), -$variation, 'régularisation d\'inventaire');
+            $ecritures->annulerPerte($produit->fresh(), -$variation, 'régularisation d\'inventaire', $instant);
         }
 
         AuditLog::record('stock.inventaire_regularise', 'stocks');

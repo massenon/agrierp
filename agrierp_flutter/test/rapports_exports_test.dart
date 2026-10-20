@@ -10,6 +10,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 import 'cartes_attendues.dart';
 
@@ -1114,14 +1115,16 @@ void main() {
       expect(ExportTableur.nomClasseur(classeur, maintenant), 'dettes-2026-08-25.xlsx');
 
       // Deux éditions le même jour : « nom (1).xlsx », comme un second téléchargement du navigateur.
-      final pris = {'/d/dettes-2026-08-25.xlsx', '/d/dettes-2026-08-25 (1).xlsx'};
+      // Chemins construits avec le séparateur de la plateforme (`p.join`), comme l'application : « / » ou « \\ ».
+      String d(String nom) => p.join('/d', nom);
+      final pris = {d('dettes-2026-08-25.xlsx'), d('dettes-2026-08-25 (1).xlsx')};
       expect(
         ExportTableur.cheminLibre('/d', 'dettes-2026-08-25.xlsx', pris.contains),
-        '/d/dettes-2026-08-25 (2).xlsx',
+        d('dettes-2026-08-25 (2).xlsx'),
       );
       expect(
         ExportTableur.cheminLibre('/d', 'creances-2026-08-25.xlsx', pris.contains),
-        '/d/creances-2026-08-25.xlsx',
+        d('creances-2026-08-25.xlsx'),
       );
     });
   });

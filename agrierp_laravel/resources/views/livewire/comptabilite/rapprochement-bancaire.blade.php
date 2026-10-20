@@ -19,11 +19,13 @@
         </div>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->reconciliation['ouverture'] ?? null" />
+
     @if($releve)
         <div class="bg-info-blue/10 border border-info-blue/30 rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
             <span class="material-symbols-outlined text-info-blue text-[18px]">description</span>
             <p class="text-xs text-on-surface flex-1">Fichier prêt : <strong>{{ $releve->getClientOriginalName() }}</strong> — format attendu <code>date;libellé;montant</code>, montant signé.</p>
-            <button type="button" wire:click="importReleve" wire:loading.attr="disabled" wire:target="importReleve" class="bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">Lancer l'import</button>
+            <button @lectureSeule type="button" wire:click="importReleve" wire:loading.attr="disabled" wire:target="importReleve" class="bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">Lancer l'import</button>
             <button type="button" wire:click="$set('releve', null)" class="text-outline text-xs underline">Annuler</button>
         </div>
     @endif
@@ -39,9 +41,9 @@
             @endforelse
         </select>
         <div class="flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1">
-            <input wire:model.live="startDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="startDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
             <span class="text-outline text-xs">au</span>
-            <input wire:model.live="endDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="endDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
         </div>
     </div>
 

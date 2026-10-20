@@ -49,7 +49,10 @@ Object? executerPhp(
   bool application = false,
 }) {
   final php = executablePhp()!;
-  final marque = DateTime.now().microsecondsSinceEpoch;
+  // ⚠️ Le numéro du PROCESSUS en plus de l'instant : `flutter test --concurrency=3` lance plusieurs processus, et
+  // deux d'entre eux ont écrit le même fichier à la même microseconde (« PHP Parse error » : le script de l'un exécuté
+  // par l'autre, constaté au ticket EX1).
+  final marque = '${pid}_${DateTime.now().microsecondsSinceEpoch}';
   final fichierScript = File(
     '${Directory.systemTemp.path}/agrierp_f095_$marque.php',
   )..writeAsStringSync(script);

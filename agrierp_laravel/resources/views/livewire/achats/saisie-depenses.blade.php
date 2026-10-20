@@ -20,7 +20,7 @@
         <form wire:submit="submitExpense" class="grid grid-cols-1 md:grid-cols-2 gap-md">
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la Transaction *</label>
-                <input wire:model="expenseDate" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                <input wire:model="expenseDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif @if($this->dateVerrouillee) disabled data-date-verrouillee title="{{ \App\Actions\SaisieDepenseAction::MOTIF_DATE_VERROUILLEE }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('expenseDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
@@ -63,7 +63,7 @@
                 @error('receiptFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="md:col-span-2 flex justify-end">
-                <button type="submit" wire:loading.attr="disabled" wire:target="submitExpense" class="py-sm px-lg rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs disabled:opacity-50">
+                <button @lectureSeule type="submit" wire:loading.attr="disabled" wire:target="submitExpense" class="py-sm px-lg rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs disabled:opacity-50">
                     <span class="material-symbols-outlined text-[18px]">save</span>Enregistrer la Dépense
                 </button>
             </div>
@@ -110,8 +110,8 @@
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                <button type="button" wire:click="editExpense('{{ $expense->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
-                                <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-expense-{{ $expense->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                <button @lectureSeule type="button" wire:click="editExpense('{{ $expense->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+                                <button @lectureSeule type="button" x-on:click="$dispatch('open-modal', { name: 'archive-expense-{{ $expense->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                             </td>
                         </tr>
                         <x-modal-confirm-delete :name="'archive-expense-'.$expense->id" :item-label="$expense->label" :action="'archiveExpense(\''.$expense->id.'\')'" />
@@ -121,5 +121,6 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->expenses" />
     </div>
 </div>

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
@@ -84,6 +85,9 @@ class CaisseRepository {
   /// Aujourd'hui, à minuit.
   DateTime aujourdhui() => _minuit(maintenant());
 
+  /// Ticket EX6 — le point de passage commun de l'exercice d'une saisie, à l'horloge de cette caisse.
+  ExerciceDeSaisie get _exercice => ExerciceDeSaisie(_db, maintenant: maintenant);
+
   /// 🔴→✅ TICKET F0.89 — LA DATE CHOISIE EST-ELLE ACCEPTABLE ? `null` = oui, sinon le motif.
   ///
   /// Copie des contrôles de `VerifySaleDateAction` (serveur, 15.30) que le poste PEUT juger,
@@ -114,31 +118,12 @@ class CaisseRepository {
     }
     if (j == auj) return null;
 
-    final exercices = await _db.select(_db.fiscalYears).get();
-    if (exercices.isEmpty) return null;
-
-    final couvrants = [
-      for (final e in exercices)
-        if (e.startDate != null &&
-            e.endDate != null &&
-            !_minuit(e.startDate!).isAfter(j) &&
-            !_minuit(e.endDate!).isBefore(j))
-          e,
-    ];
-
-    if (couvrants.isEmpty) {
-      return 'Vente refusée : aucun exercice comptable ne couvre le ${_jourFr(j)}. '
-          "Créez l'exercice avant d'enregistrer cette vente.";
-    }
-
-    // Exercices qui se chevauchent (anomalie) : le serveur prend « le premier » sans ordre
-    // défini ; le poste accepte dès qu'un exercice OUVERT couvre le jour (le serveur tranchera).
-    if (!couvrants.any((e) => e.status == 'ouvert')) {
-      return "Vente refusée : l'exercice comptable qui couvre le ${_jourFr(j)} "
-          'est clos. Aucune vente ne peut y être datée.';
-    }
-
-    return null;
+    // 🔴→✅ Ticket EX6 (EF7) — la règle de l'exercice vit dans UN point de passage, partagé par tous les écrans de
+    // saisie du poste : `ExerciceDeSaisie` (règle `exerciceOuvertPour` du serveur, filet R2 compris, aucun exercice
+    // connu = aucun blocage, messages R4 de `NoOpenFiscalYearException` / `ClosedFiscalYearException`), précédés de
+    // « Vente refusée : » (`VerifySaleDateAction::prefixe`).
+    final motif = await _exercice.refus(j);
+    return motif == null ? null : ExerciceDeSaisie.prefixeVente(motif);
   }
 
   /// Bornes INDICATIVES du calendrier (comme `PosInterface::getDateMin/MaxProperty`, 15.32) :
@@ -148,21 +133,8 @@ class CaisseRepository {
   /// ⚠️ La borne haute n'est PAS rabattue sur la fin de l'exercice ouvert (le web le fait) : le
   /// calendrier s'ouvre sur aujourd'hui, qui doit rester sélectionnable ; une date postérieure
   /// à l'exercice est refusée par [refusDeDate] avec son motif.
-  Future<({DateTime? premier, DateTime dernier})> bornesDateVente() async {
-    final ouverts = await (_db.select(
-      _db.fiscalYears,
-    )..where((t) => t.status.equals('ouvert'))).get();
-
-    DateTime? premier;
-    for (final e in ouverts) {
-      final debut = e.startDate == null ? null : _minuit(e.startDate!);
-      if (debut != null && (premier == null || debut.isBefore(premier))) {
-        premier = debut;
-      }
-    }
-
-    return (premier: premier, dernier: aujourdhui());
-  }
+  Future<({DateTime? premier, DateTime dernier})> bornesDateVente() async =>
+      (premier: await _exercice.premierJour(), dernier: aujourdhui());
 
   Future<List<Product>> catalogue() {
     return (_db.select(_db.products)

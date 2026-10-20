@@ -76,8 +76,10 @@ class ClotureExerciceTest extends TestCase
         $component->call('soldeComptesGestion');
         $this->assertEquals(0, $component->instance()->kpis['comptes_a_solder']);
 
-        // Étape 3 : clôture réelle.
-        $component->call('confirmCloture');
+        // Étape 3 : clôture réelle — ticket EX4 : après l'échéance (Q2) et l'étape 1 confirmée.
+        \Carbon\Carbon::setTestNow('2027-01-15 09:00:00');
+        $component->call('confirmStep1')->call('confirmCloture');
+        \Carbon\Carbon::setTestNow();
 
         $year->refresh();
         $this->assertEquals('cloture', $year->status);

@@ -52,7 +52,7 @@
                 </select>
                 <button type="button" wire:click="exportStocksPdf" wire:loading.attr="disabled" wire:target="exportStocksPdf" class="flex items-center gap-xs text-xs font-bold px-md py-2 rounded-lg border border-outline-variant hover:bg-surface-zebra disabled:opacity-50"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>Exporter</button>
                 @can('manage-stocks')
-                <button type="button" wire:click="openAddStockModal" class="flex items-center gap-xs text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest"><span class="material-symbols-outlined text-[16px]">add_circle</span>Ajouter Stock</button>
+                <button @lectureSeule type="button" wire:click="openAddStockModal" class="flex items-center gap-xs text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest"><span class="material-symbols-outlined text-[16px]">add_circle</span>Ajouter Stock</button>
                 @endcan
             </div>
             <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -116,7 +116,9 @@
             <form wire:submit="submitAjouterStock" class="space-y-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du Nouveau Stock *</label>
-                    <input wire:model="addDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="addDate" type="date" @if($this->dateMinHorsExerciceClos) min="{{ $this->dateMinHorsExerciceClos }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('addDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                    {{-- 🔴→✅ Ticket EX6 — le motif R4 posé sous « Date » par EX5 n'était affiché nulle part : refus muet. --}}
+                    @error('addDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Produit *</label>
@@ -135,7 +137,7 @@
                 </div>
                 <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                     <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-ajouter-stock' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                    <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                    <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
                 </div>
             </form>
         </x-modal>
@@ -182,6 +184,7 @@
                     </tbody>
                 </table>
             </div>
+            <x-pagination :paginator="$this->movements" />
         </div>
     @endif
 
@@ -232,7 +235,7 @@
                         </optgroup>
                     </select>
                 </div>
-                <button type="button" wire:click="validateAdjustment" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Valider l'ajustement</button>
+                <button @lectureSeule type="button" wire:click="validateAdjustment" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Valider l'ajustement</button>
                 {{-- Ticket U11 : l'aide annonçait l'écriture « pas encore active » ; elle l'est depuis le ticket 14.41
                      (`RecordStockAdjustmentEntryAction`). Même texte au poste (`gestion_stocks_screen.dart`). --}}
                 <p class="text-[10px] text-outline">Si l'écart est négatif, une écriture de charge exceptionnelle (compte 657) est générée automatiquement, valorisée au PMP.</p>

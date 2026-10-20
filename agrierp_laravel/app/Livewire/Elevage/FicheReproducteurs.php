@@ -53,6 +53,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheReproducteurs extends Component
 {
+    use \App\Livewire\Elevage\Concerns\AvecMoisDeFiche;   // Ticket EX8 (EF12) : mois passés, lecture seule
     use AvecTransfertsDuJour;
     use AvecProphylaxieDuJour;
 
@@ -139,7 +140,7 @@ class FicheReproducteurs extends Component
     {
         $lotIds = $this->lots->pluck('id');
         $monthEntries = LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->get();
 
         $totalCouves = $monthEntries->sum('ponte_total');
@@ -165,7 +166,7 @@ class FicheReproducteurs extends Component
         }
 
         return LivestockDailyEntry::where('lot_id', $this->selectedLotId)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->orderBy('entry_date')
             ->get()
             ->keyBy(fn ($e) => $e->entry_date->format('Y-m-d'));
@@ -189,16 +190,12 @@ class FicheReproducteurs extends Component
             'exports.fiche-elevage',
             ['entries' => $entries],
             'Fiche Reproducteurs (Aviculture) — Suivi Mensuel',
-            now()->translatedFormat('F Y')
+            $this->moisDuPdf()   // EX8 : le mois affiché
         );
 
-        return response()->streamDownload(fn () => print($pdf->output()), 'fiche-'.now()->format('Y-m').'.pdf');
+        return response()->streamDownload(fn () => print($pdf->output()), $this->fichierDuPdf());
     }
 
-    public function getDaysInMonthProperty(): array
-    {
-        return range(1, now()->daysInMonth);
-    }
 
     public function getPreviousEffectifProperty(): int
     {
@@ -332,6 +329,14 @@ class FicheReproducteurs extends Component
         $this->authorize('manage-elevage');
         if (! $this->selectedLot) {
             $this->dispatch('toast', message: "Sélectionnez d'abord une bande.", type: 'error');
+
+            return;
+        }
+
+        // 🔴→✅ Ticket EX5 (EF5, décision Q3 du 20/10/2026) — une fiche datée dans un exercice CLOS est refusée : le stock
+        // consommé de cet exercice est figé avec son inventaire. Même motif R4 qu'à l'envoi d'un poste.
+        if ($refusExercice = app(\App\Services\AccountingEntryService::class)->refusExerciceClos($this->selectedDate)) {
+            $this->dispatch('toast', message: $refusExercice, type: 'error');
 
             return;
         }

@@ -121,7 +121,7 @@
                 @error('receiptFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
 
-            <button type="button" wire:click="submitAchat" wire:loading.attr="disabled" wire:target="submitAchat" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs disabled:opacity-50">
+            <button @lectureSeule type="button" wire:click="submitAchat" wire:loading.attr="disabled" wire:target="submitAchat" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs disabled:opacity-50">
                 <span class="material-symbols-outlined text-[18px]">check_circle</span>Enregistrer l'Achat
             </button>
         </div>

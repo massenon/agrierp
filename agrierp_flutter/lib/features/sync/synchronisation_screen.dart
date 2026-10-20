@@ -8,6 +8,7 @@ import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../comptabilite/soldes_exercice.dart';
 import 'coherence_repository.dart';
 
 /// Écran de synchronisation — ce qui attend, ce qui est parti, ce qui a été
@@ -421,12 +422,16 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
       if (!mounted) return;
       setState(() => _coherence = resultat);
       final n = resultat.nombreEcarts;
+      final a = resultat.nombreEcartsAnouveaux;
       ToastAgri.afficher(
         context,
-        n == 0
+        n == 0 && a == 0
             ? 'Contrôle de cohérence : aucun écart.'
-            : 'Contrôle de cohérence : $n jour(s) en écart.',
-        type: n == 0 ? TypeToast.succes : TypeToast.avertissement,
+            : 'Contrôle de cohérence : ${[
+                if (n > 0) '$n jour(s) en écart',
+                if (a > 0) "$a compte(s) dont l'ouverture ne reprend pas la clôture",
+              ].join(' ; ')}.',
+        type: n == 0 && a == 0 ? TypeToast.succes : TypeToast.avertissement,
       );
     } catch (e) {
       if (mounted) {
@@ -514,9 +519,62 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
                 ),
               ),
               for (final t in resultat.tables) _tableCoherence(t),
+              if (resultat.anouveauxServeur != null) _blocAnouveaux(resultat),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Ticket EX1 — invariant « ouverture de N+1 = clôture de N » (classes 1 à 5), au serveur et au poste.
+  Widget _blocAnouveaux(ResultatCoherence r) {
+    final controles = <({String cote, ControleAnouveau c})>[
+      for (final c in r.anouveauxServeur ?? const <ControleAnouveau>[]) (cote: 'Serveur', c: c),
+      for (final c in r.anouveauxPoste ?? const <ControleAnouveau>[]) (cote: 'Poste', c: c),
+    ];
+    const style = TextStyle(fontSize: 11, color: AgriColors.onSurface);
+
+    return Padding(
+      key: const Key('coherence-anouveaux'),
+      padding: const EdgeInsets.only(top: AgriSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Ouverture N+1 = clôture N (comptes des classes 1 à 5)',
+                  style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                r.nombreEcartsAnouveaux == 0 ? 'Conforme' : '${r.nombreEcartsAnouveaux} écart(s)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: r.nombreEcartsAnouveaux == 0 ? AgriColors.brandEmerald : AgriColors.errorDeep,
+                ),
+              ),
+            ],
+          ),
+          if (controles.isEmpty)
+            const Text('Un seul exercice : rien à comparer.', style: TextStyle(fontSize: 11, color: AgriColors.outline)),
+          for (final x in controles) ...[
+            Text(
+              '${x.cote} — exercice ${x.c.exercice} (ouverture) / ${x.c.precedent} '
+              '(${x.c.statutPrecedent == 'cloture' ? 'clôturé' : 'ouvert — à-nouveaux provisoires'}) : '
+              '${x.c.ecarts.isEmpty ? 'conforme' : '${x.c.ecarts.length} compte(s) en écart'}',
+              style: style,
+            ),
+            for (final e in x.c.ecarts)
+              Text(
+                '   ${e.code} — ${e.libelle} : clôture ${_nombre(e.cloture)}, ouverture ${_nombre(e.ouverture)}',
+                style: style.copyWith(color: AgriColors.errorDeep, fontWeight: FontWeight.bold),
+              ),
+          ],
+        ],
       ),
     );
   }

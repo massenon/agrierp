@@ -14,7 +14,7 @@
                         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald text-[26px]">vaccines</span>Registre Vétérinaire</h2>
                         <p class="text-xs text-outline mt-xs">Carnet médical numérique : vaccinations, traitements et vermifuges du cheptel.</p>
                     </div>
-                    <button type="button" wire:click="newSoin" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                    <button @lectureSeule type="button" wire:click="newSoin" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                         <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Soin
                     </button>
                 </div>
@@ -72,7 +72,7 @@
                                         <td data-label="Produit" class="px-md py-sm text-xs">{{ $rec->product_used ?? '—' }}</td>
                                         <td data-label="Dose" class="px-md py-sm text-xs">{{ $rec->dose ?? '—' }}</td>
                                         <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                            <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-soin-{{ $rec->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                            <button @lectureSeule type="button" x-on:click="$dispatch('open-modal', { name: 'archive-soin-{{ $rec->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                         </td>
                                         {{-- Un soin du registre est un soin ADMINISTRÉ (le planifié vit au calendrier) : « Effectué », comme au poste. --}}
                                         <td data-label="Statut" class="px-md py-sm"><span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Effectué</span></td>
@@ -84,6 +84,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <x-pagination :paginator="$this->veterinaryRecords" />
                 </div>
             </div>
 
@@ -144,7 +145,7 @@
                     </div>
                     <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                         <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-nouveau-soin' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                        <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                        <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
                     </div>
                 </form>
             </x-modal>
@@ -157,7 +158,7 @@
                         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald text-[26px]">event</span>Calendrier Vétérinaire</h2>
                         <p class="text-xs text-outline mt-xs">Planificateur de prophylaxie : lots d'élevage × échéances de soins (14 prochains jours).</p>
                     </div>
-                    <button type="button" wire:click="newIntervention" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                    <button @lectureSeule type="button" wire:click="newIntervention" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                         <span class="material-symbols-outlined text-[18px]">add_circle</span>Planifier une Intervention
                     </button>
                 </div>
@@ -240,7 +241,7 @@
                     </div>
                     <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                         <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-planifier-intervention' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                        <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Planifier</button>
+                        <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Planifier</button>
                     </div>
                 </form>
             </x-modal>
@@ -253,7 +254,7 @@
                         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald text-[26px]">monitor_heart</span>Suivi Sanitaire</h2>
                         <p class="text-xs text-outline mt-xs">Infirmerie d'élevage : suivi clinique des animaux en isolement, quarantaine ou observation.</p>
                     </div>
-                    <button type="button" wire:click="newInfirmaryEntry" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                    <button @lectureSeule type="button" wire:click="newInfirmaryEntry" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                         <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Entrée Infirmerie
                     </button>
                 </div>
@@ -296,8 +297,8 @@
                                         </td>
                                         <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                             @if($rec->status === 'en_cours')
-                                                <button type="button" wire:click="reintegrer('{{ $rec->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Valider la guérison et réintégrer"><span class="material-symbols-outlined text-[18px]">settings_backup_restore</span></button>
-                                                <button type="button" wire:click="declarerDeces('{{ $rec->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Déclarer le décès"><span class="material-symbols-outlined text-[18px]">heart_broken</span></button>
+                                                <button @lectureSeule type="button" wire:click="reintegrer('{{ $rec->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Valider la guérison et réintégrer"><span class="material-symbols-outlined text-[18px]">settings_backup_restore</span></button>
+                                                <button @lectureSeule type="button" wire:click="declarerDeces('{{ $rec->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Déclarer le décès"><span class="material-symbols-outlined text-[18px]">heart_broken</span></button>
                                             @else
                                                 <span class="text-outline text-[11px]">Clôturé</span>
                                             @endif
@@ -309,6 +310,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <x-pagination :paginator="$this->infirmaryRecords" />
                 </div>
             </div>
 
@@ -351,7 +353,7 @@
                     </div>
                     <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                         <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-nouvelle-entree-infirmerie' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                        <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                        <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
                     </div>
                 </form>
             </x-modal>

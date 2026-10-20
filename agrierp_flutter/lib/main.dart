@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 
 import 'core/auth/auth_service.dart';
+import 'core/comptabilite/exercice_choisi.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
 import 'core/config/envoi_email_test.dart';
@@ -24,7 +25,9 @@ import 'features/recherche/recherche_globale_repository.dart';
 import 'core/widgets/modale_agri.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
+import 'core/widgets/bandeau_exercice.dart';
 import 'core/widgets/barre_superieure.dart';
+import 'core/widgets/selecteur_exercice.dart';
 import 'core/widgets/rafraichissement_periodique.dart';
 import 'core/widgets/toast_agri.dart';
 import 'core/theme/agri_tokens.dart';
@@ -627,6 +630,24 @@ class _SocleAccueilState extends State<SocleAccueil> {
     ongletInitial: ongletInitial,
   );
 
+  /// Ticket EX7 (EF8) — l'exercice AFFICHÉ, un seul pour la session, diffusé par [PorteeExerciceChoisi] : sélecteur de
+  /// la barre supérieure, bandeau de lecture seule, bornes et boutons des écrans. Relu après chaque synchronisation
+  /// (les exercices descendent au tirage) ; l'écran affiché est reconstruit quand l'exercice ou son statut change.
+  late final ExerciceChoisi _exercice = ExerciceChoisi(widget.database)
+    ..addListener(_exerciceChange)
+    ..charger();
+
+  void _exerciceChange() {
+    if (mounted) setState(() {});
+  }
+
+  /// Après un tirage : les notifications et la file (`_versionTirage`), et les exercices (statut, N+1 ouvert).
+  void _apresTirage() {
+    if (!mounted) return;
+    setState(() => _versionTirage++);
+    _exercice.charger();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -663,9 +684,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
       // Ticket S-T6 — « Demander la synchronisation des postes » du web, lue toutes les 30 s.
       demandeDuServeur: widget.engine.demandeDuServeur,
       // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
-      onTermine: () {
-        if (mounted) setState(() => _versionTirage++);
-      },
+      onTermine: _apresTirage,
       gestes: widget.gestes,
     )..demarrer(aussitot: widget.synchroniserALOuverture);
     _cycleDeVie = AppLifecycleListener(
@@ -695,6 +714,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
   void dispose() {
     _automatique?.arreter();
     _cycleDeVie?.dispose();
+    _exercice
+      ..removeListener(_exerciceChange)
+      ..dispose();
     _brouillonContact.dispose();
     super.dispose();
   }
@@ -703,7 +725,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
   Widget build(BuildContext context) {
     final (groupe, ecranCourant) = _situation;
 
-    return Scaffold(
+    return PorteeExerciceChoisi(
+      notifier: _exercice,
+      child: Scaffold(
       body: Row(
         children: [
           // ⚠️ La bascule de la barre supérieure replie la barre latérale,
@@ -786,6 +810,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
                       onNaviguer: (e) => setState(() => _ecran = e),
                     ),
                     onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
+                    // Ticket EX7 (EF8) — « Exercice 2027 ▾ », à gauche de « Synchroniser ».
+                    selecteurExercice: const SelecteurExercice(),
                   ),
                   ),
                 ),
@@ -793,7 +819,21 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 Expanded(
                   child: Stack(
                     children: [
-                      Positioned.fill(child: _contenu()),
+                      // Ticket EX7 (EF10) — bandeau de lecture seule d'un exercice clos en haut du contenu, puis
+                      // l'écran, RECONSTRUIT quand l'exercice affiché ou son statut change (bornes, listes, boutons).
+                      Positioned.fill(
+                        child: Column(
+                          children: [
+                            const BandeauExercice(),
+                            Expanded(
+                              child: KeyedSubtree(
+                                key: ValueKey('exercice-${_exercice.etat?.annee}-${_exercice.etat?.clos}'),
+                                child: _contenu(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       BoutonAccesRapide(onNaviguer: (e) => setState(() => _ecran = e)),
                     ],
                   ),
@@ -808,6 +848,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
             onReafficher: () => setState(() => _menuOuvert = true),
           ),
         ],
+      ),
       ),
     );
   }
@@ -847,9 +888,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
           ? () => setState(() => _ecran = EcranPoste.synchronisation)
           : null,
       // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
-      onTermine: () {
-        if (mounted) setState(() => _versionTirage++);
-      },
+      onTermine: _apresTirage,
     ),
   );
 
@@ -990,6 +1029,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
           imprimer: EditeursRapports.imprimer,
+          // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.
+          exercice: _exercice.etat?.annee,
         ),
         EcranPoste.parametresGeneraux => _parametresGeneraux(),
         EcranPoste.rapportsEtExports => RapportsExportsScreen(

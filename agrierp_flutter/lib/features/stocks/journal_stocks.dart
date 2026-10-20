@@ -359,6 +359,16 @@ class JournalStocks {
     return PmpService.arrondi(somme, 0);
   }
 
+  /// Ticket EX7 (EF9) — les mouvements datés de [debut] à [fin] (l'exercice affiché), du plus récent au plus ancien,
+  /// sans plafond : l'écran les pagine, comme le web (`paginate(25)` dans l'exercice).
+  List<MouvementStock> dansLaPeriode(DateTime debut, DateTime fin) {
+    final finExclue = DateTime(fin.year, fin.month, fin.day + 1);
+    return [
+      for (final m in mouvements)
+        if (!m.date.isBefore(DateTime(debut.year, debut.month, debut.day)) && m.date.isBefore(finExclue)) m,
+    ]..sort((a, b) => b.date.compareTo(a.date));
+  }
+
   /// Journal des Mouvements du web : les 100 derniers, du plus récent au plus ancien.
   List<MouvementStock> derniers([int nombre = 100]) {
     final tries = [...mouvements]..sort((a, b) => b.date.compareTo(a.date));

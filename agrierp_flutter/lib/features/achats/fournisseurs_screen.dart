@@ -9,6 +9,7 @@ import 'fiche_fournisseur_modales.dart';
 import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 
 /// `prototype_html/fournisseurs.html` → Fournisseurs.
 ///
@@ -794,6 +795,9 @@ class _ModaleReglementState extends State<_ModaleReglement> {
   String _compte = '';
   DateTime _date = HeureBenin.aujourdhui();
   String? _erreur;
+
+  /// Ticket EX6 — refus d'exercice (motif R4), sous « Date de règlement » comme `@error('paymentDate')` du web.
+  String? _erreurDate;
   bool _envoi = false;
 
   @override
@@ -815,6 +819,7 @@ class _ModaleReglementState extends State<_ModaleReglement> {
     setState(() {
       _envoi = true;
       _erreur = null;
+      _erreurDate = null;
     });
 
     try {
@@ -831,6 +836,12 @@ class _ModaleReglementState extends State<_ModaleReglement> {
       setState(() {
         _envoi = false;
         _erreur = e.motif;
+      });
+    } on RefusExercice catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _envoi = false;
+        _erreurDate = e.motif;
       });
     }
   }
@@ -909,11 +920,21 @@ class _ModaleReglementState extends State<_ModaleReglement> {
           OutlinedButton(
             key: const Key('reglement-date'),
             onPressed: () async {
+              // Ticket EX6 (EF7) — calendrier borné au plus ancien exercice OUVERT connu (`min` du web).
+              final premier = await widget.depot.premierJourSaisissable();
+              if (!context.mounted) return;
+              final dernier = HeureBenin.maintenant();
+              final bornes = ExerciceDeSaisie.calendrier(
+                premier: premier,
+                repli: DateTime(2020),
+                dernier: dernier,
+                initial: _date,
+              );
               final choisie = await showDatePicker(
                 context: context,
-                initialDate: _date,
-                firstDate: DateTime(2020),
-                lastDate: HeureBenin.maintenant(),
+                initialDate: bornes.initial,
+                firstDate: bornes.premier,
+                lastDate: dernier,
               );
               if (choisie != null) setState(() => _date = choisie);
             },
@@ -925,6 +946,18 @@ class _ModaleReglementState extends State<_ModaleReglement> {
               ),
             ),
           ),
+          if (_erreurDate != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AgriSpacing.xs),
+              child: Text(
+                _erreurDate!,
+                key: const Key('reglement-erreur-date'),
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.errorDeep,
+                ),
+              ),
+            ),
           const SizedBox(height: AgriSpacing.md),
           const Text(
             'Compte de Trésorerie *',

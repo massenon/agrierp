@@ -10,9 +10,11 @@ use App\Models\ProductCategory;
 use App\Models\PurchaseLine;
 use App\Models\StockMovement;
 use App\Services\StockRotationService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 6.2 (Sprint 6) — gestion-stocks.html → Livewire\Stocks\GestionStocks
@@ -110,6 +112,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class GestionStocks extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+    use WithPagination;
+
     /** Ticket U8 — les mouvements qui sont des écarts d'inventaire : cet écran (`adjustment`) et le poste (`inventaire`). */
     public const TYPES_ECART_INVENTAIRE = ['adjustment', 'inventaire'];
 
@@ -216,8 +221,10 @@ class GestionStocks extends Component
         // perte comme ceux de cet écran (`RecordStockAdjustmentEntryAction`) — mais cette carte ne lisait que
         // `adjustment` : un manquant constaté hors ligne n'apparaissait jamais dans les « Écarts d'Inventaire » de
         // la ferme, alors que le poste, lui, le compte.
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $ecartsMois = StockMovement::whereIn('reference_type', self::TYPES_ECART_INVENTAIRE)
-            ->whereMonth('movement_date', now()->month)->whereYear('movement_date', now()->year)
+            ->whereMonth('movement_date', $mois->month)->whereYear('movement_date', $mois->year)
             ->get();
 
         $ecartsValeur = $ecartsMois->sum(function ($m) {
@@ -256,16 +263,35 @@ class GestionStocks extends Component
         ]);
 
         $product = Product::findOrFail($this->addProductId);
-        app(AdjustStockAction::class)->execute($product, (float) $this->addQty, 'manual_addition', null, \Carbon\Carbon::parse($this->addDate));
+
+        try {
+            app(AdjustStockAction::class)->execute($product, (float) $this->addQty, 'manual_addition', null, \Carbon\Carbon::parse($this->addDate));
+        } catch (\App\Exceptions\ClosedFiscalYearException $e) {
+            // Ticket EX5 — exercice clos : le motif R4 sous le champ « Date », rien n'est écrit.
+            $this->addError('addDate', $e->getMessage());
+
+            return;
+        }
 
         AuditLog::record('stock.manual_addition', 'stocks');
         $this->dispatch('close-modal', name: 'modal-ajouter-stock');
         $this->dispatch('toast', message: 'Stock ajouté avec succès.', type: 'success');
     }
 
+    /**
+     * Ticket EX7 (EF9) — le Journal des Mouvements de l'exercice AFFICHÉ, PAGINÉ (25 par page), au lieu des 100 derniers
+     * toutes années confondues.
+     */
     public function getMovementsProperty()
     {
-        return StockMovement::with('product')->orderByDesc('movement_date')->limit(100)->get();
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
+        return StockMovement::with('product')
+            ->whereDate('movement_date', '>=', $debut)
+            ->whereDate('movement_date', '<=', $fin)
+            ->orderByDesc('movement_date')
+            ->orderByDesc('id')
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageMouvements');
     }
 
     public function referenceLabel(string $type): string
@@ -315,18 +341,31 @@ class GestionStocks extends Component
         }
 
         $product = Product::findOrFail($this->adjProductId);
-        app(AdjustStockAction::class)->execute($product, $diff, 'adjustment', null, now(), $this->adjReason ?: null);
 
-        // 🔴→✅ TICKET 14.41 — LA PERTE EST ENFIN COMPTABILISÉE.
-        //
-        // Le CDC exige que « toute opération financière (vente, achat, paie,
-        // **perte**) déclenche automatiquement la génération de l'écriture ».
-        // Les trois premiers flux ont été câblés aux tickets 14.23 à 14.25 ; la
-        // perte ne l'était pas, et cet écran l'annonçait lui-même à
-        // l'utilisateur depuis le Sprint 6. Un manquant d'inventaire faisait
-        // baisser le stock sans jamais réduire le résultat.
-        $ecriture = app(RecordStockAdjustmentEntryAction::class)
-            ->execute($product, $diff, $this->adjReason ?: null);
+        // 🔴→✅ TICKET EX5 (EF6) — LE MOUVEMENT ET SA PERTE, ENSEMBLE OU PAS DU TOUT. Ils partaient l'un après l'autre :
+        // un exercice absent faisait échouer l'écriture de perte (erreur 500) APRÈS que le stock avait bougé — un
+        // manquant au stock, sans sa charge 657. Une transaction ; le refus devient un toast, rien n'est écrit.
+        try {
+            $ecriture = \Illuminate\Support\Facades\DB::transaction(function () use ($product, $diff) {
+                app(AdjustStockAction::class)->execute($product, $diff, 'adjustment', null, now(), $this->adjReason ?: null);
+
+                // 🔴→✅ TICKET 14.41 — LA PERTE EST ENFIN COMPTABILISÉE.
+                //
+                // Le CDC exige que « toute opération financière (vente, achat, paie,
+                // **perte**) déclenche automatiquement la génération de l'écriture ».
+                // Les trois premiers flux ont été câblés aux tickets 14.23 à 14.25 ; la
+                // perte ne l'était pas, et cet écran l'annonçait lui-même à
+                // l'utilisateur depuis le Sprint 6. Un manquant d'inventaire faisait
+                // baisser le stock sans jamais réduire le résultat.
+                // Ticket EX5 — datée du jour du comptage (ici, maintenant), comme le mouvement.
+                return app(RecordStockAdjustmentEntryAction::class)
+                    ->execute($product, $diff, $this->adjReason ?: null, now());
+            });
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
 
         AuditLog::record('stock.adjusted', 'stocks');
 

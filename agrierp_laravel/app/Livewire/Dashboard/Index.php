@@ -355,7 +355,9 @@ class Index extends Component
             'produits_critiques' => \App\Models\Product::where('is_active', true)
                 ->whereColumn('stock_qty', '<=', 'alert_threshold')
                 ->orderBy('name')->limit(3)->pluck('name')->all(),
-            'exercice' => \App\Models\FiscalYear::current()?->year,
+            // Ticket EX7 — l'exercice AFFICHÉ (sélecteur de la barre supérieure) et son statut.
+            'exercice' => \App\Support\ExerciceChoisi::exercice()?->year,
+            'exercice_clos' => \App\Support\ExerciceChoisi::estClos(),
         ];
     }
 

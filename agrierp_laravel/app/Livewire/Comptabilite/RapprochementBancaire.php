@@ -5,6 +5,7 @@ namespace App\Livewire\Comptabilite;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use App\Services\BankReconciliationService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -55,17 +56,24 @@ class RapprochementBancaire extends Component
 
     public function mount(): void
     {
-        if ($this->startDate === '') {
-            $this->startDate = now()->startOfMonth()->format('Y-m-d');
-        }
-
-        if ($this->endDate === '') {
-            $this->endDate = now()->format('Y-m-d');
-        }
+        // Ticket EX7 (EF9) — période par défaut DANS l'exercice affiché (voir `GrandLivre::mount`).
+        [$debut, $fin] = ExerciceChoisi::periodeParDefaut(now()->startOfMonth()->format('Y-m-d'), now()->format('Y-m-d'));
+        [$this->startDate, $this->endDate] = ExerciceChoisi::bornerPeriode($this->startDate !== '' ? $this->startDate : $debut, $this->endDate !== '' ? $this->endDate : $fin);
 
         if ($this->accountId === '') {
             $this->accountId = (string) ($this->treasuryAccounts->first()?->id ?? '');
         }
+    }
+
+    /** Ticket EX7 (EF9) — une date saisie hors de l'exercice affiché est ramenée à sa borne. */
+    public function updatedStartDate(): void
+    {
+        [$this->startDate, $this->endDate] = ExerciceChoisi::bornerPeriode($this->startDate, $this->endDate);
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->updatedStartDate();
     }
 
     /**

@@ -71,13 +71,26 @@ class TransfertsRepository {
         ..orderBy([(t) => OrderingTerm(expression: t.code)]))
       .get();
 
-  Future<List<LivestockTransfer>> transferts() => (_db.select(_db.livestockTransfers)
-        ..orderBy([
-          (t) => OrderingTerm.desc(t.transferDate),
-          (t) => OrderingTerm.desc(t.updatedAt),
-        ])
-        ..limit(100))
-      .get();
+  /// L'historique des transferts. Ticket EX7 (EF9) — [bornes] (l'exercice affiché) : tous ceux de l'exercice, sans
+  /// plafond (l'écran pagine, comme le web) ; sans bornes : les 100 derniers, comme avant.
+  Future<List<LivestockTransfer>> transferts({({DateTime debut, DateTime fin})? bornes}) {
+    final requete = _db.select(_db.livestockTransfers)
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.transferDate),
+        (t) => OrderingTerm.desc(t.updatedAt),
+        (t) => OrderingTerm.desc(t.id),
+      ]);
+    if (bornes == null) {
+      requete.limit(100);
+    } else {
+      requete.where(
+        (t) =>
+            t.transferDate.isBiggerOrEqualValue(bornes.debut) &
+            t.transferDate.isSmallerThanValue(DateTime(bornes.fin.year, bornes.fin.month, bornes.fin.day + 1)),
+      );
+    }
+    return requete.get();
+  }
 
   /// Bandes vivantes sans origine, précédées par une autre bande de la même espèce : seules celles-là
   /// peuvent être issues d'une autre. Le rattachement reste une décision de l'exploitant.

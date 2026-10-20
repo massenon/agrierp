@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
@@ -168,6 +170,15 @@ class StocksRepository {
 
   /// Horloge injectée (tests) : borne le mois des « Écarts d'Inventaire ».
   final DateTime Function() _horloge;
+
+  /// Ticket EX6 — le point de passage commun de l'exercice d'une saisie (`lib/core/comptabilite/`).
+  ExerciceDeSaisie get _exercice =>
+      ExerciceDeSaisie(database, maintenant: _horloge);
+
+  /// Borne basse du calendrier « Date du Nouveau Stock » : lendemain du plus récent exercice CLOS connu (un ajout ne
+  /// passe aucune écriture : seul un exercice clos le refuse), `null` si aucun.
+  Future<DateTime?> premierJourAjout() =>
+      _exercice.premierJour(regle: RegleExercice.closSeulement);
 
   /// Ticket U11 — les deux `<optgroup>` du Blade, dans son ordre : « Écart négatif (perte) » (cinq motifs) puis
   /// « Écart positif (surplus) » (trois). Le poste les présentait à plat, et sa note parlait de « quatre + quatre ».
@@ -357,7 +368,9 @@ class StocksRepository {
     );
   }
 
-  Future<DonneesStocks> charger() async {
+  /// Ticket EX7 (EF9) — [exercice] (l'exercice affiché) : le Journal des Mouvements de l'exercice, sans plafond, et
+  /// les écarts d'inventaire de son mois de référence ; sans exercice, les 100 derniers et le mois du jour.
+  Future<DonneesStocks> charger({EtatExercice? exercice}) async {
     final maintenant = _horloge();
     final tousProduits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
@@ -391,7 +404,9 @@ class StocksRepository {
           ),
       ],
       journal: [
-        for (final m in journal.derniers())
+        for (final m in exercice == null
+            ? journal.derniers()
+            : journal.dansLaPeriode(exercice.bornes.debut, exercice.bornes.fin))
           LigneJournal(
             mouvement: m,
             designation: nomDe[m.productId],
@@ -401,7 +416,7 @@ class StocksRepository {
       categories:
           categories.where((c) => c.isActive).toList()
             ..sort((a, b) => comparerCommeLeServeur(a.label, b.label)),
-      ecartsDuMois: journal.ecartsDuMois(pmpDe, maintenant),
+      ecartsDuMois: journal.ecartsDuMois(pmpDe, exercice?.moisDeReference ?? maintenant),
       rotation: journal.rotation(
         produits: tousProduits,
         pmp: pmpDe,
@@ -472,6 +487,11 @@ class StocksRepository {
     final qte = double.parse(quantite.trim());
     final id = _uuid.v4();
     final jour = DateTime(date!.year, date.month, date.day);
+
+    // 🔴→✅ Ticket EX6 (EF7) — `AdjustStockAction` refuse tout mouvement daté d'un exercice CLOS (EX5) ; l'ajout manuel
+    // ne passe aucune écriture : un jour qu'aucun exercice ne couvre reste admis (`refusExerciceClos`). Motif R4 sous
+    // « Date », comme `submitAjouterStock()`.
+    await _exercice.refuser(jour, regle: RegleExercice.closSeulement);
 
     await database.transaction(() async {
       await database
@@ -551,6 +571,32 @@ class StocksRepository {
     }
 
     // Ticket U11 — le motif est FACULTATIF, comme au web (`$this->adjReason ?: null`) : plus de refus ici.
+
+    // 🔴→✅ Ticket EX6 (EF7) — le mouvement est daté du COMPTAGE (S-T10) et `AdjustStockAction` refuse un exercice
+    // CLOS ; un MANQUANT valorisé passe en plus la perte 657 / 601 à cette date (`RecordStockAdjustmentEntryAction`,
+    // EX5) : son écriture refuse aussi un jour qu'aucun exercice ne couvre (filet R2 compris). Même prédicat que
+    // [messageAjustement] pour « perte comptabilisée » : manquant, PMP connu, valeur ≥ 0,01, comptes 657 et 601
+    // présents (ou plan comptable non servi). Un excédent, ou un manquant sans coût connu, ne passe aucune écriture.
+    final pmp = PmpService.pmp(
+      productId,
+      PmpService.lignesRetenues(
+        await database.select(database.purchases).get(),
+        await database.select(database.purchaseLines).get(),
+      ),
+    );
+    final valeurPerte = ecart >= 0 || pmp == null || pmp <= 0
+        ? null
+        : PmpService.arrondi(ecart.abs() * pmp, 2);
+    final perteComptabilisee =
+        valeurPerte != null &&
+        valeurPerte >= 0.01 &&
+        await comptesDePerte() != false;
+    await _exercice.refuser(
+      maintenant,
+      regle: perteComptabilisee
+          ? RegleExercice.ecriture
+          : RegleExercice.closSeulement,
+    );
 
     final id = _uuid.v4();
 

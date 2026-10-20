@@ -11,8 +11,11 @@ use App\Models\Supplier;
 use App\Models\TreasuryAccount;
 use App\Services\PurchaseReturnService;
 use App\Services\SupplierRefundService;
+use App\Support\ExerciceChoisi;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 5.4 (Sprint 5) — liste-achats.html → Livewire\Achats\ListeAchats
@@ -44,6 +47,10 @@ use Livewire\Component;
  */
 class ListeAchats extends Component
 {
+    use WithPagination;
+
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     public string $search = '';
 
     public string $statusFilter = '';
@@ -83,14 +90,23 @@ class ListeAchats extends Component
         ];
     }
 
-    public function getPurchasesProperty()
+    /**
+     * Ticket EX7 (EF9) — les achats de l'exercice AFFICHÉ (filtres compris), sans plafond : la source de la liste
+     * paginée ET de l'export PDF (jamais la seule page affichée).
+     */
+    public function achatsDeLExercice()
     {
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
         return Purchase::with(['supplier', 'lines.product.category', 'payable'])
+            ->whereDate('purchase_date', '>=', $debut)
+            ->whereDate('purchase_date', '<=', $fin)
             ->when($this->search, fn ($q) => $q->where(fn ($q2) => $q2->where('id', 'like', '%'.$this->search.'%')
                 ->orWhereHas('supplier', fn ($q3) => $q3->where('name', 'like', '%'.$this->search.'%'))))
             ->when($this->dateFilter, fn ($q) => $q->whereDate('purchase_date', $this->dateFilter))
             ->orderByDesc('purchase_date')
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get()
             ->map(function ($purchase) {
                 $solde = $purchase->payable && $purchase->payable->status !== 'soldee' ? $purchase->payable->balance : 0;
@@ -100,7 +116,35 @@ class ListeAchats extends Component
                 return $purchase;
             })
             ->when($this->statusFilter === 'paye', fn ($rows) => $rows->where('is_dette', false))
-            ->when($this->statusFilter === 'dette', fn ($rows) => $rows->where('is_dette', true));
+            ->when($this->statusFilter === 'dette', fn ($rows) => $rows->where('is_dette', true))
+            ->values();
+    }
+
+    /**
+     * Ticket EX7 (EF9) — la page affichée (25 achats). Le statut « payé / dette » se lit sur la dette liée après la
+     * requête : la page se découpe donc dans la liste filtrée, jamais avant le filtre.
+     */
+    public function getPurchasesProperty(): LengthAwarePaginator
+    {
+        $tous = $this->achatsDeLExercice();
+        $page = max(1, min((int) $this->getPage('pageAchats'), (int) ceil(max(1, $tous->count()) / ExerciceChoisi::PAR_PAGE)));
+
+        return new LengthAwarePaginator($tous->forPage($page, ExerciceChoisi::PAR_PAGE)->values(), $tous->count(), ExerciceChoisi::PAR_PAGE, $page, ['pageName' => 'pageAchats']);
+    }
+
+    /** Un filtre change : retour à la première page ; la date filtrée reste dans l'exercice affiché. */
+    public function updating(string $propriete): void
+    {
+        if (in_array($propriete, ['search', 'statusFilter', 'dateFilter'], true)) {
+            $this->resetPage('pageAchats');
+        }
+    }
+
+    public function updatedDateFilter(): void
+    {
+        if ($this->dateFilter !== '') {
+            $this->dateFilter = ExerciceChoisi::borner($this->dateFilter);
+        }
     }
 
     /**
@@ -117,7 +161,7 @@ class ListeAchats extends Component
     {
         $this->authorize('view-achats');
 
-        $purchases = $this->purchases;
+        $purchases = $this->achatsDeLExercice();
 
         $pdf = app(\App\Services\PdfExportService::class)->render(
             'exports.liste-achats',

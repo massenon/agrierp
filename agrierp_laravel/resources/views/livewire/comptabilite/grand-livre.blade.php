@@ -13,6 +13,8 @@
         </div>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->ledger['ouverture']" />
+
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
         <label for="gl-compte-select" class="text-[10px] text-brand-forest font-bold uppercase">Compte :</label>
         <select id="gl-compte-select" wire:model.live="accountId" class="text-sm font-bold border border-outline-variant rounded-lg px-md py-2 bg-white min-w-[260px] focus:ring-2 focus:ring-brand-emerald outline-none">
@@ -23,9 +25,9 @@
             @endforelse
         </select>
         <div class="flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1">
-            <input wire:model.live="startDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="startDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
             <span class="text-outline text-xs">au</span>
-            <input wire:model.live="endDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="endDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
         </div>
     </div>
 

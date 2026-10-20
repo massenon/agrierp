@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 135 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 139 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -151,6 +151,10 @@ class LibellesAudit {
     'fiscal_year.step1_confirmed': 'Travaux d\'inventaire confirmés',
     'fiscal_year.gestion_accounts_closed': 'Comptes de gestion soldés',
     'fiscal_year.closed': 'Exercice clôturé',
+    'fiscal_year.opened': 'Exercice ouvert',
+    'fiscal_year.opened_auto': 'Exercice ouvert automatiquement (1er janvier)',
+    'fiscal_year.opened_on_first_entry': 'Exercice ouvert à la première saisie de l\'année',
+    'fiscal_year.reopened': 'Exercice rouvert',
     'contact.message_sent': 'Message envoyé à l\'éditeur',
     'contact.bug_reported': 'Bug signalé à l\'éditeur',
   };

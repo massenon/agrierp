@@ -84,7 +84,16 @@ class BankReconciliationService
             'nouveau_non_saisi' => $nouveauNonSaisi,
             'ecart' => $ecart,
             'is_balanced' => abs($ecart) < 0.01,
+            'ouverture' => $this->resumeOuverture($startDate),
         ];
+    }
+
+    /** Ticket EX2 — « À-nouveaux provisoires » quand l'exercice précédent est encore ouvert. */
+    private function resumeOuverture(string $startDate): array
+    {
+        $rapports = app(FinancialReportService::class);
+
+        return $rapports->resumeOuverture($rapports->ouvertureExercice($startDate));
     }
 
     /**
@@ -159,25 +168,24 @@ class BankReconciliationService
         ];
     }
 
-    /** Solde du compte au grand livre, strictement avant la période. */
+    /**
+     * Solde du compte au grand livre à l'ouverture de la période.
+     *
+     * 🔴→✅ TICKET EX1 (défaut C1) — c'était TOUT l'historique antérieur, et l'à-nouveau du 01/01 s'y ajoutait comme
+     * ligne du livre : après une clôture, le solde du livre comptait deux fois celui de l'exercice clos (et
+     * l'à-nouveau restait « en instance », faute de ligne de relevé en face). Règle R1 (`FinancialReportService`).
+     */
     private function openingBalance(string $accountId, string $startDate): float
     {
-        $row = AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-            ->where('accounting_entries.is_active', true)
-            ->where('accounting_entry_lines.account_id', $accountId)
-            ->whereDate('accounting_entries.entry_date', '<', $startDate)
-            ->selectRaw('SUM(accounting_entry_lines.debit) as d, SUM(accounting_entry_lines.credit) as c')
-            ->first();
-
-        return round((float) ($row->d ?? 0) - (float) ($row->c ?? 0), 2);
+        return app(FinancialReportService::class)->soldeCompte($accountId, $startDate, false);
     }
 
     /** @return array<int, array<string, mixed>> */
     private function ledgerLines(string $accountId, string $startDate, string $endDate): array
     {
-        return AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
+        // Ticket EX1 — un à-nouveau n'est pas une opération à rapprocher : il est déjà dans l'ouverture.
+        return FinancialReportService::filtrerANouveau(AccountingEntryLine::query()
+            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id'), false)
             ->where('accounting_entries.is_active', true)
             ->where('accounting_entry_lines.account_id', $accountId)
             ->whereDate('accounting_entries.entry_date', '>=', $startDate)

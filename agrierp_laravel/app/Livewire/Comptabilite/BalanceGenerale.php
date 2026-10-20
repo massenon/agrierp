@@ -4,6 +4,7 @@ namespace App\Livewire\Comptabilite;
 
 use App\Models\FiscalYear;
 use App\Services\FinancialReportService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -47,41 +48,54 @@ class BalanceGenerale extends Component
     #[Url]
     public string $periode = 'mois';
 
+    /**
+     * Ticket EX7 (EF9) — l'exercice AFFICHÉ (`ExerciceChoisi`), et non plus `FiscalYear::current()` (le plus récent
+     * ouvert) : avec 2026 et 2027 ouverts, 2026 ne s'affichait plus qu'en période libre.
+     */
     public function getFiscalYearProperty(): ?FiscalYear
     {
-        return FiscalYear::current();
+        return ExerciceChoisi::exercice();
     }
 
     /**
-     * Bornes réelles de la période choisie. L'option "exercice" s'appuie sur
-     * l'exercice réellement ouvert (`fiscal_years`) — jamais sur l'année
-     * civile supposée — et retombe sur l'année civile seulement si aucun
-     * exercice n'existe encore en base.
+     * Bornes réelles de la période choisie, toujours DANS l'exercice affiché (EF9) :
+     *  - « exercice » : ses dates réelles (`fiscal_years`), jamais l'année civile supposée — l'année civile du jour
+     *    seulement si aucun exercice n'existe encore ;
+     *  - « mois » : le mois du jour quand l'exercice le contient, sinon son DERNIER mois (2026 lu en 2027 : décembre).
      *
      * @return array{0: string, 1: string}
      */
     public function periodBounds(): array
     {
         if ($this->periode === 'exercice') {
-            $year = $this->fiscalYear;
-
-            if ($year) {
-                return [$year->start_date->format('Y-m-d'), $year->end_date->format('Y-m-d')];
-            }
-
-            return [now()->startOfYear()->format('Y-m-d'), now()->endOfYear()->format('Y-m-d')];
+            return ExerciceChoisi::bornes();
         }
 
-        return [now()->startOfMonth()->format('Y-m-d'), now()->endOfMonth()->format('Y-m-d')];
+        $mois = ExerciceChoisi::moisDeReference();
+
+        return [$mois->format('Y-m-d'), $mois->copy()->endOfMonth()->format('Y-m-d')];
+    }
+
+    /**
+     * Libellés des deux options, repris tels quels au poste (`DonneesComptabilite.libellePeriodeBalance`) :
+     * « Février 2027 (période courante) » — « Décembre 2026 » pour un mois qui n'est pas le mois courant — et
+     * « Exercice 2026 » (PRD § 7 : l'option prend le libellé de l'exercice choisi ; « Exercice complet — 2026 » avant).
+     *
+     * @return array{mois: string, exercice: string}
+     */
+    public function getLibellesPeriodeProperty(): array
+    {
+        $mois = ExerciceChoisi::moisDeReference();
+
+        return [
+            'mois' => ucfirst($mois->translatedFormat('F Y')).(ExerciceChoisi::contientAujourdhui() ? ' (période courante)' : ''),
+            'exercice' => 'Exercice '.ExerciceChoisi::annee(),
+        ];
     }
 
     public function getPeriodLabelProperty(): string
     {
-        if ($this->periode === 'exercice') {
-            return 'Exercice complet — '.($this->fiscalYear?->year ?? now()->year);
-        }
-
-        return ucfirst(now()->translatedFormat('F Y')).' (période courante)';
+        return $this->libellesPeriode[$this->periode === 'exercice' ? 'exercice' : 'mois'];
     }
 
     public function getBalanceProperty(): array
@@ -99,7 +113,7 @@ class BalanceGenerale extends Component
             'exports.balance-generale',
             ['balance' => $this->balance],
             'Balance Générale',
-            $this->periodLabel
+            $this->periodLabel.($this->balance['ouverture']['provisoire'] ? ' — À-nouveaux provisoires' : '')
         );
 
         return response()->streamDownload(

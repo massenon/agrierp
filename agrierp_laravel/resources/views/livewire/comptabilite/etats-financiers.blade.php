@@ -11,23 +11,40 @@
         </button>
     </div>
 
+    <x-anouveaux-provisoires :ouverture="$this->bilan['ouverture']" />
+
     <div class="flex items-center gap-xs border-b border-outline-variant mb-md overflow-x-auto">
         @foreach(['bilan' => 'Bilan', 'resultat' => 'Compte de Résultat', 'tafire' => 'Flux de Trésorerie', 'notes' => 'Notes Annexes'] as $key => $label)
             <button type="button" wire:click="switchTab('{{ $key }}')" class="px-md py-2.5 text-xs font-bold border-b-2 whitespace-nowrap {{ $tab === $key ? 'border-brand-emerald text-brand-emerald' : 'border-transparent text-outline' }}">{{ $label }}</button>
         @endforeach
     </div>
 
+    @php
+        // Ticket EX8 (EF11) — Bilan et Compte de Résultat N / N-1 : colonne « Exercice N » (exercice affiché) et
+        // « Exercice N-1 » (à sa clôture, « — » s'il n'existe pas, jamais 0). `FinancialReportService::bilanComparatif`
+        // et `compteResultatComparatif`, un seul point de calcul.
+        $m = fn ($v) => \App\Support\ComparatifNMoinsUn::montant($v);
+        $f = fn ($v) => $v === null ? '—' : \App\Support\ComparatifNMoinsUn::montant($v).' F';
+        $p = fn ($v) => $v === null ? '—' : '('.\App\Support\ComparatifNMoinsUn::montant($v).')';
+        $neg = fn ($v) => $v === null ? null : -$v;
+    @endphp
+
     @if($tab === 'bilan')
+        @php
+            $c = $this->bilanComparatif;
+            $bn = $c['n'];
+            $b1 = $c['n1'];
+        @endphp
         <div>
             <div class="bg-white border border-outline-variant rounded-lg p-md mb-md flex items-center justify-between">
                 <span class="text-xs text-outline">{{ $this->situationLabel }}</span>
-                @if($this->bilan['is_balanced'])
+                @if($bn['is_balanced'])
                     <span class="text-[11px] font-bold px-sm py-1 rounded-full bg-brand-emerald/10 text-brand-emerald">
                         <span class="material-symbols-outlined text-[14px] align-middle">check_circle</span> Bilan Équilibré
                     </span>
                 @else
                     <span class="text-[11px] font-bold px-sm py-1 rounded-full bg-error-red/10 text-error-deep">
-                        <span class="material-symbols-outlined text-[14px] align-middle">warning</span> Écart de {{ number_format(abs($this->bilan['total_actif'] - $this->bilan['total_passif']), 0, ',', ' ') }} F
+                        <span class="material-symbols-outlined text-[14px] align-middle">warning</span> Écart de {{ number_format(abs($bn['total_actif'] - $bn['total_passif']), 0, ',', ' ') }} F
                     </span>
                 @endif
             </div>
@@ -36,35 +53,41 @@
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="px-md py-sm border-b-2 border-brand-emerald bg-brand-emerald/5"><h3 class="text-sm font-bold text-brand-emerald uppercase">Actif (Emplois)</h3></div>
                     <table class="w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-outline-variant text-[10px] text-outline uppercase">
+                                <th class="px-md py-sm"></th>
+                                <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($c['exercice_n']) }}</span></th>
+                                <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N1 }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($c['exercice_n1']) }}</span></th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="2">Actif Immobilisé (Classe 2)</td></tr>
-                            @foreach($this->bilan['immo'] as $ligne)
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="3">Actif Immobilisé (Classe 2)</td></tr>
+                            @foreach($c['lignes']['immo'] as $ligne)
                                 <tr class="border-b border-outline-variant">
                                     <td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td>
-                                    <td class="px-md py-sm text-right {{ $ligne['balance'] < 0 ? 'text-error-deep' : '' }}">{{ number_format($ligne['balance'], 0, ',', ' ') }}</td>
+                                    <td class="px-md py-sm text-right {{ $ligne['n'] < 0 ? 'text-error-deep' : '' }}" data-colonne="n">{{ $m($ligne['n']) }}</td>
+                                    <td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($ligne['n1']) }}</td>
                                 </tr>
                             @endforeach
-                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Immobilisé</td><td class="px-md py-sm text-right font-bold text-brand-forest">{{ number_format($this->bilan['total_immo'], 0, ',', ' ') }}</td></tr>
+                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Immobilisé</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n">{{ $m($bn['total_immo']) }}</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n1">{{ $m($b1['total_immo'] ?? null) }}</td></tr>
 
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="2">Actif Circulant (Classes 3 &amp; 4)</td></tr>
-                            @foreach($this->bilan['stocks'] as $ligne)
-                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right">{{ number_format($ligne['balance'], 0, ',', ' ') }}</td></tr>
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="3">Actif Circulant (Classes 3 &amp; 4)</td></tr>
+                            @foreach(array_merge($c['lignes']['stocks'], $c['lignes']['creances']) as $ligne)
+                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($ligne['n']) }}</td><td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($ligne['n1']) }}</td></tr>
                             @endforeach
-                            @foreach($this->bilan['creances'] as $ligne)
-                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right">{{ number_format($ligne['balance'], 0, ',', ' ') }}</td></tr>
-                            @endforeach
-                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Circulant</td><td class="px-md py-sm text-right font-bold text-brand-forest">{{ number_format($this->bilan['total_circulant'], 0, ',', ' ') }}</td></tr>
+                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Circulant</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n">{{ $m($bn['total_circulant']) }}</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n1">{{ $m($b1['total_circulant'] ?? null) }}</td></tr>
 
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="2">Trésorerie Actif (Classe 5)</td></tr>
-                            @foreach($this->bilan['tresorerie'] as $ligne)
-                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right">{{ number_format($ligne['balance'], 0, ',', ' ') }}</td></tr>
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="3">Trésorerie Actif (Classe 5)</td></tr>
+                            @foreach($c['lignes']['tresorerie'] as $ligne)
+                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($ligne['n']) }}</td><td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($ligne['n1']) }}</td></tr>
                             @endforeach
-                            <tr class="bg-surface-zebra"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Trésorerie</td><td class="px-md py-sm text-right font-bold text-brand-forest">{{ number_format($this->bilan['total_tresorerie'], 0, ',', ' ') }}</td></tr>
+                            <tr class="bg-surface-zebra"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Trésorerie</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n">{{ $m($bn['total_tresorerie']) }}</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n1">{{ $m($b1['total_tresorerie'] ?? null) }}</td></tr>
                         </tbody>
                         <tfoot>
                             <tr class="bg-surface-zebra border-t-2 border-brand-forest">
                                 <td class="px-md py-sm font-black text-brand-forest uppercase">Total Actif</td>
-                                <td class="px-md py-sm font-black text-brand-emerald text-right">{{ number_format($this->bilan['total_actif'], 0, ',', ' ') }} F</td>
+                                <td class="px-md py-sm font-black text-brand-emerald text-right" data-colonne="n">{{ $f($bn['total_actif']) }}</td>
+                                <td class="px-md py-sm font-black text-outline text-right" data-colonne="n1">{{ $f($b1['total_actif'] ?? null) }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -73,24 +96,32 @@
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="px-md py-sm border-b-2 border-info-blue bg-info-blue/5"><h3 class="text-sm font-bold text-info-blue uppercase">Passif (Ressources)</h3></div>
                     <table class="w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-outline-variant text-[10px] text-outline uppercase">
+                                <th class="px-md py-sm"></th>
+                                <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($c['exercice_n']) }}</span></th>
+                                <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N1 }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($c['exercice_n1']) }}</span></th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="2">Capitaux Propres (Classe 1)</td></tr>
-                            @foreach($this->bilan['capitaux'] as $ligne)
-                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right">{{ number_format(-$ligne['balance'], 0, ',', ' ') }}</td></tr>
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="3">Capitaux Propres (Classe 1)</td></tr>
+                            @foreach($c['lignes']['capitaux'] as $ligne)
+                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m(-$ligne['n']) }}</td><td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($neg($ligne['n1'])) }}</td></tr>
                             @endforeach
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">Résultat de l'Exercice</td><td class="px-md py-sm text-right font-bold text-brand-emerald">{{ number_format($this->bilan['resultat'], 0, ',', ' ') }}</td></tr>
-                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Capitaux Propres</td><td class="px-md py-sm text-right font-bold text-brand-forest">{{ number_format($this->bilan['total_capitaux'] + $this->bilan['resultat'], 0, ',', ' ') }}</td></tr>
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">Résultat de l'Exercice</td><td class="px-md py-sm text-right font-bold text-brand-emerald" data-colonne="n">{{ $m($bn['resultat']) }}</td><td class="px-md py-sm text-right font-bold text-outline" data-colonne="n1">{{ $m($b1['resultat'] ?? null) }}</td></tr>
+                            <tr class="bg-surface-zebra border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Capitaux Propres</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n">{{ $m($bn['total_capitaux'] + $bn['resultat']) }}</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n1">{{ $m($b1 === null ? null : $b1['total_capitaux'] + $b1['resultat']) }}</td></tr>
 
-                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="2">Dettes (Classe 4)</td></tr>
-                            @foreach($this->bilan['dettes'] as $ligne)
-                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right">{{ number_format($ligne['balance'], 0, ',', ' ') }}</td></tr>
+                            <tr class="border-b border-outline-variant"><td class="px-md py-sm font-bold text-brand-forest uppercase text-[10px]" colspan="3">Dettes (Classe 4)</td></tr>
+                            @foreach($c['lignes']['dettes'] as $ligne)
+                                <tr class="border-b border-outline-variant"><td class="px-md py-sm pl-lg text-outline">{{ $ligne['code'] }} — {{ $ligne['label'] }}</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($ligne['n']) }}</td><td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($ligne['n1']) }}</td></tr>
                             @endforeach
-                            <tr class="bg-surface-zebra"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Dettes</td><td class="px-md py-sm text-right font-bold text-brand-forest">{{ number_format($this->bilan['total_dettes'], 0, ',', ' ') }}</td></tr>
+                            <tr class="bg-surface-zebra"><td class="px-md py-sm font-bold text-brand-forest">Sous-total Dettes</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n">{{ $m($bn['total_dettes']) }}</td><td class="px-md py-sm text-right font-bold text-brand-forest" data-colonne="n1">{{ $m($b1['total_dettes'] ?? null) }}</td></tr>
                         </tbody>
                         <tfoot>
                             <tr class="bg-surface-zebra border-t-2 border-brand-forest">
                                 <td class="px-md py-sm font-black text-brand-forest uppercase">Total Passif</td>
-                                <td class="px-md py-sm font-black text-info-blue text-right">{{ number_format($this->bilan['total_passif'], 0, ',', ' ') }} F</td>
+                                <td class="px-md py-sm font-black text-info-blue text-right" data-colonne="n">{{ $f($bn['total_passif']) }}</td>
+                                <td class="px-md py-sm font-black text-outline text-right" data-colonne="n1">{{ $f($b1['total_passif'] ?? null) }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -100,26 +131,38 @@
     @endif
 
     @if($tab === 'resultat')
+        @php
+            $cr = $this->resultatComparatif;
+            $rn = $cr['n'];
+            $r1 = $cr['n1'];
+        @endphp
         <div>
-            <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden max-w-2xl">
+            <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden max-w-3xl">
                 <div class="px-md py-sm border-b-2 border-brand-emerald bg-brand-emerald/5"><h3 class="text-sm font-bold text-brand-forest uppercase">Compte de Résultat — Structure en Cascade SYSCOHADA</h3></div>
                 <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-outline-variant text-[10px] text-outline uppercase">
+                            <th class="px-md py-sm"></th>
+                            <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($cr['exercice_n']) }}</span></th>
+                            <th class="px-md py-sm text-right">{{ \App\Support\ComparatifNMoinsUn::ENTETE_N1 }}<span class="block normal-case font-normal">{{ \App\Support\ComparatifNMoinsUn::sousTitre($cr['exercice_n1']) }}</span></th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">Ventes (Aviculture, Cuniculture, Porciculture)</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['ventes'], 0, ',', ' ') }}</td></tr>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Achats (Aliments, Intrants)</td><td class="px-md py-sm text-right text-error-deep">({{ number_format($this->resultat['achats'], 0, ',', ' ') }})</td></tr>
-                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= MARGE COMMERCIALE</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['marge_commerciale'], 0, ',', ' ') }}</td></tr>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Charges de Personnel</td><td class="px-md py-sm text-right text-error-deep">({{ number_format($this->resultat['charges_personnel'], 0, ',', ' ') }})</td></tr>
-                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= EXCÉDENT BRUT D'EXPLOITATION</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['ebe'], 0, ',', ' ') }}</td></tr>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Dotations aux Amortissements</td><td class="px-md py-sm text-right text-error-deep">({{ number_format($this->resultat['dotations'], 0, ',', ' ') }})</td></tr>
-                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= RÉSULTAT D'EXPLOITATION</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['resultat_exploitation'], 0, ',', ' ') }}</td></tr>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">+ Résultat Financier</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['resultat_financier'], 0, ',', ' ') }}</td></tr>
-                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= RÉSULTAT DES ACTIVITÉS ORDINAIRES (RAO)</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['rao'], 0, ',', ' ') }}</td></tr>
-                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">+ Résultat Hors Activités Ordinaires (charges diverses de gestion)</td><td class="px-md py-sm text-right text-error-deep">({{ number_format($this->resultat['autres_charges'], 0, ',', ' ') }})</td></tr>
-                        <tr class="bg-brand-forest text-white font-extrabold"><td class="px-md py-sm">= RÉSULTAT NET DE L'EXERCICE</td><td class="px-md py-sm text-right">{{ number_format($this->resultat['resultat_net'], 0, ',', ' ') }} F</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">Ventes (Aviculture, Cuniculture, Porciculture)</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['ventes']) }}</td><td class="px-md py-sm text-right text-outline" data-colonne="n1">{{ $m($r1['ventes'] ?? null) }}</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Achats (Aliments, Intrants)</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n">{{ $p($rn['achats']) }}</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n1">{{ $p($r1['achats'] ?? null) }}</td></tr>
+                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= MARGE COMMERCIALE</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['marge_commerciale']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $m($r1['marge_commerciale'] ?? null) }}</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Charges de Personnel</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n">{{ $p($rn['charges_personnel']) }}</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n1">{{ $p($r1['charges_personnel'] ?? null) }}</td></tr>
+                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= EXCÉDENT BRUT D'EXPLOITATION</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['ebe']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $m($r1['ebe'] ?? null) }}</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">− Dotations aux Amortissements</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n">{{ $p($rn['dotations']) }}</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n1">{{ $p($r1['dotations'] ?? null) }}</td></tr>
+                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= RÉSULTAT D'EXPLOITATION</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['resultat_exploitation']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $m($r1['resultat_exploitation'] ?? null) }}</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">+ Résultat Financier</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['resultat_financier']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $m($r1['resultat_financier'] ?? null) }}</td></tr>
+                        <tr class="bg-surface-zebra border-b border-outline-variant font-bold"><td class="px-md py-sm">= RÉSULTAT DES ACTIVITÉS ORDINAIRES (RAO)</td><td class="px-md py-sm text-right" data-colonne="n">{{ $m($rn['rao']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $m($r1['rao'] ?? null) }}</td></tr>
+                        <tr class="border-b border-outline-variant"><td class="px-md py-sm">+ Résultat Hors Activités Ordinaires (charges diverses de gestion)</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n">{{ $p($rn['autres_charges']) }}</td><td class="px-md py-sm text-right text-error-deep" data-colonne="n1">{{ $p($r1['autres_charges'] ?? null) }}</td></tr>
+                        <tr class="bg-brand-forest text-white font-extrabold"><td class="px-md py-sm">= RÉSULTAT NET DE L'EXERCICE</td><td class="px-md py-sm text-right" data-colonne="n">{{ $f($rn['resultat_net']) }}</td><td class="px-md py-sm text-right" data-colonne="n1">{{ $f($r1['resultat_net'] ?? null) }}</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="text-[11px] text-outline mt-sm max-w-2xl">Le Résultat Net de l'Exercice ci-dessus est calculé depuis la même source que celui affiché au Bilan — les deux valeurs sont toujours strictement identiques.</p>
+            <p class="text-[11px] text-outline mt-sm max-w-3xl">Le Résultat Net de l'Exercice ci-dessus est calculé depuis la même source que celui affiché au Bilan — les deux valeurs sont toujours strictement identiques.</p>
         </div>
     @endif
 

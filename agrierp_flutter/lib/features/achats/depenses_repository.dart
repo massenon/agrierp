@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
@@ -56,7 +57,7 @@ class LigneDepense {
 /// 🔴→✅ Ticket U14 — **MODIFIER ET ARCHIVER, COMME LE WEB** (`SaisieDepenses::submitExpense()` en modification,
 /// `archiveExpense()`). Le poste écrit le FAIT (`pending`) ; le serveur le rejoue par `SaisieDepenseAction`, le point de
 /// passage du composant Livewire (trésorerie réajustée ou réintégrée, contre-passation, journal d'audit). Les règles du
-/// web sont appliquées ICI, avant d'écrire, avec ses messages : une dépense comptabilisée ne change ni de montant, ni de
+/// web sont appliquées ICI, avant d'écrire, avec ses messages : une dépense comptabilisée ne change ni de date (EX5), ni de montant, ni de
 /// compte de charge, ni de compte de trésorerie ; une dépense archivée ne se modifie plus.
 class DepensesRepository {
   DepensesRepository({
@@ -72,10 +73,17 @@ class DepensesRepository {
   final String _deviceId;
   final Uuid _uuid;
 
+  /// Ticket EX6 — le point de passage commun de l'exercice d'une saisie (`lib/core/comptabilite/`).
+  ExerciceDeSaisie get _exercice => ExerciceDeSaisie(_db);
+
+  /// Borne basse du calendrier « Date de la Transaction » : début du plus ancien exercice OUVERT connu (une
+  /// dépense créée passe une écriture), `null` si aucun.
+  Future<DateTime?> premierJourSaisissable() => _exercice.premierJour();
+
   /// `SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE` du web, mot pour mot.
   static const messageDejaComptabilisee =
-      'Cette dépense est déjà comptabilisée : son montant, son compte de charge et son compte de trésorerie ne '
-      'peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
+      'Cette dépense est déjà comptabilisée : sa date, son montant, son compte de charge et son compte de '
+      'trésorerie ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
 
   /// `SaisieDepenseAction::MESSAGE_ARCHIVEE` du web, mot pour mot.
   static const messageArchivee = 'Cette dépense est archivée : elle ne peut plus être modifiée.';
@@ -111,9 +119,12 @@ class DepensesRepository {
   /// Ticket U13 — les dépenses du serveur DESCENDENT au poste : la liste est celle de l'exploitation, plus les saisies
   /// de ce poste pas encore acquittées. ➕ Ajout du poste : une saisie REFUSÉE (`conflict`) reste listée avec son motif,
   /// même un ARCHIVAGE refusé (la dépense est encore active au serveur) — c'est ici que le refus se voit.
+  /// Ticket EX7 (EF9) — [bornes] (l'exercice affiché) : seules les dépenses datées dans l'exercice (le web les
+  /// pagine dans l'exercice) ; sans bornes, toutes, comme avant.
   Future<List<LigneDepense>> depenses({
     String recherche = '',
     String statut = '',
+    ({DateTime debut, DateTime fin})? bornes,
   }) async {
     final lignes =
         await (_db.select(_db.expenses)..where(
@@ -131,9 +142,14 @@ class DepensesRepository {
     final filtreTexte = recherche.isEmpty || recherche == '0'
         ? null
         : _motifLike(recherche);
+    bool dansLExercice(DateTime jour) =>
+        bornes == null ||
+        (!DateTime(jour.year, jour.month, jour.day).isBefore(bornes.debut) &&
+            !DateTime(jour.year, jour.month, jour.day).isAfter(bornes.fin));
     final retenues = [
       for (final d in lignes)
-        if ((filtreTexte == null ||
+        if (dansLExercice(d.expenseDate) &&
+            (filtreTexte == null ||
                 filtreTexte.hasMatch(cleCommeLeServeur(d.label))) &&
             (statut.isEmpty ||
                 (statut == 'Payée' && d.status == 'payee') ||
@@ -217,7 +233,7 @@ class DepensesRepository {
   ///
   /// ⚠️ **LES MÊMES BORNES QUE LE WEB, APPLIQUÉES ICI** ([valider]) ; puis, en modification, les deux refus de
   /// `SaisieDepenseAction::modifier()`, sous le champ « Montant » comme au web : dépense archivée, et dépense
-  /// comptabilisée (`accounting_entry_id` servi par le tirage) dont le montant, le compte de charge ou le compte de
+  /// comptabilisée (`accounting_entry_id` servi par le tirage) dont la date (EX5), le montant, le compte de charge ou le compte de
   /// trésorerie changerait.
   ///
   /// Une modification repasse la ligne en `pending` à l'instant de la saisie (`updatedAt`) ; elle part entière, le
@@ -296,10 +312,27 @@ class DepensesRepository {
       if (!existante.isActive && !archivageRefuse) {
         throw DepenseRefusee({'montant': messageArchivee});
       }
+      // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::modifier` : une dépense d'un exercice CLOS ne se modifie plus
+      // (motif R4 de sa date d'origine), et ne passe pas non plus dans un exercice clos (motif R4 de la nouvelle date).
+      // Règle `refusExerciceClos` : une modification ne passe aucune écriture, un jour qu'aucun exercice ne couvre
+      // reste admis.
+      await _exercice.refuser(
+        existante.expenseDate,
+        regle: RegleExercice.closSeulement,
+      );
+      await _exercice.refuser(jour, regle: RegleExercice.closSeulement);
       final montantChange =
           PmpService.arrondi(valeur, 2) != PmpService.arrondi(existante.amount, 2);
+      // 🔴→✅ Ticket EX5 (décision D-U14-1 du 20/10/2026) — la DATE d'une dépense comptabilisée
+      // est verrouillée comme son montant (`SaisieDepenseAction::modifier`, même message).
+      final ancienJour = DateTime(
+        existante.expenseDate.year,
+        existante.expenseDate.month,
+        existante.expenseDate.day,
+      );
       if (existante.accountingEntryId != null &&
           (montantChange ||
+              jour != ancienJour ||
               categorie != existante.category ||
               compteTresorerieId != existante.treasuryAccountId)) {
         throw DepenseRefusee({'montant': messageDejaComptabilisee});
@@ -324,6 +357,10 @@ class DepensesRepository {
       });
       return _lire(existante.id);
     }
+
+    // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::creer` : exercice clos refusé avant tout effet, puis l'écriture
+    // Débit 6 / Crédit 5 datée de la dépense (`record()`, filet R2 compris) refuse un jour qu'aucun exercice ne couvre.
+    await _exercice.refuser(jour);
 
     final id = _uuid.v4();
     await _db
@@ -355,6 +392,9 @@ class DepensesRepository {
       if (d == null || (!d.isActive && d.syncStatus != SyncStatus.conflict)) {
         return;
       }
+      // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::archiver` : une dépense d'un exercice CLOS ne s'archive plus
+      // (elle disparaîtrait des états de cet exercice) ; motif R4 de sa date, toast au web.
+      await _exercice.refuser(d.expenseDate, regle: RegleExercice.closSeulement);
       await (_db.update(_db.expenses)..where((t) => t.id.equals(id))).write(
         ExpensesCompanion(
           isActive: const Value(false),

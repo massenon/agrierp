@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/export/document_officiel.dart';
 import '../../core/export/export_tableur.dart';
 import '../../core/temps/heure_benin.dart';
@@ -120,9 +121,16 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     super.initState();
 
     // `RapportsExportsHub::mount()` : du 1er au DERNIER jour du mois en cours (ticket U11), à l'heure du Bénin.
+    // Ticket EX7 (EF9) — ramenés dans l'exercice affiché quand il contient le jour, l'exercice entier sinon
+    // (`ExerciceChoisi::periodeParDefaut`).
     final aujourdHui = _maintenant;
-    _du = DateTime(aujourdHui.year, aujourdHui.month, 1);
-    _au = DateTime(aujourdHui.year, aujourdHui.month + 1, 0);
+    final defaut = PorteeExerciceChoisi.lire(context)?.periodeParDefaut(
+          DateTime(aujourdHui.year, aujourdHui.month, 1),
+          DateTime(aujourdHui.year, aujourdHui.month + 1, 0),
+        ) ??
+        (debut: DateTime(aujourdHui.year, aujourdHui.month, 1), fin: DateTime(aujourdHui.year, aujourdHui.month + 1, 0));
+    _du = defaut.debut;
+    _au = defaut.fin;
 
     _charger();
   }
@@ -329,11 +337,13 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
   ) => OutlinedButton.icon(
     key: Key(cle),
     onPressed: () async {
+      // Ticket EX7 (EF9) — calendrier borné à l'exercice affiché (`min` / `max` du web).
+      final etat = PorteeExerciceChoisi.lire(context);
       final choix = await showDatePicker(
         context: context,
-        initialDate: valeur,
-        firstDate: DateTime(2020),
-        lastDate: DateTime(2100),
+        initialDate: etat?.borner(valeur) ?? valeur,
+        firstDate: etat?.bornes.debut ?? DateTime(2020),
+        lastDate: etat?.bornes.fin ?? DateTime(2100),
         locale: const Locale('fr'),
       );
       if (choix != null) quand(choix);

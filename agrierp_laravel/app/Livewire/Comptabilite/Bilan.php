@@ -3,6 +3,7 @@
 namespace App\Livewire\Comptabilite;
 
 use App\Services\FinancialReportService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -68,15 +69,64 @@ class Bilan extends Component
 {
     public string $asOfDate = '';
 
-    public function mount(): void
+    /**
+     * Ticket EX8 (EF11) + EX7 (EF8) — L'EXERCICE AFFICHÉ. Il vient du point de passage unique
+     * `App\Support\ExerciceChoisi` (le sélecteur de la barre supérieure, mémorisé en session) : changer d'exercice au
+     * sélecteur recharge la page, `mount` relit l'exercice choisi, et les DEUX colonnes changent (N = l'exercice choisi,
+     * N-1 = son précédent, à sa clôture).
+     *
+     * Le paramètre `exercice` (d'EX8) n'est pas une seconde vérité : une année donnée à la page (ou changée en cours de
+     * route) est CHOISIE par `ExerciceChoisi::choisir()` — bandeau, sélecteur et Bilan disent alors la même année. Une
+     * année sans exercice enregistré est refusée par `choisir()` : la page reste sur l'exercice affiché.
+     */
+    public ?int $exercice = null;
+
+    public function mount(?int $exercice = null): void
     {
-        $this->asOfDate = now()->format('Y-m-d');
+        if ($exercice !== null) {
+            ExerciceChoisi::choisir($exercice);
+        }
+
+        $this->exercice = ExerciceChoisi::annee();
+        // Ticket EX7 (EF9) — arrêté à aujourd'hui, ramené dans l'exercice affiché (sa clôture pour 2026 consulté en
+        // 2027, son premier jour pour un exercice à venir) : `ExerciceChoisi::dateArrete()`, la règle unique (EX8 :
+        // `FinancialReportService::arreteDeLExercice` y renvoie).
+        $this->asOfDate = ExerciceChoisi::dateArrete();
     }
 
-    /** Solde de chaque compte (débit-crédit) à la date choisie, un seul point de calcul. */
+    /** Ticket EX7 (EF9) — une date d'arrêté hors de l'exercice affiché est ramenée à sa borne. */
+    public function updatedAsOfDate(): void
+    {
+        $this->asOfDate = ExerciceChoisi::borner($this->asOfDate !== '' ? $this->asOfDate : ExerciceChoisi::dateArrete());
+    }
+
+    /** Ticket EX8 — l'exercice changé en cours de route est CHOISI (un seul exercice affiché), la date recalée. */
+    public function updatedExercice(): void
+    {
+        if ($this->exercice !== null) {
+            ExerciceChoisi::choisir($this->exercice);
+        }
+
+        $this->exercice = ExerciceChoisi::annee();
+        $this->asOfDate = ExerciceChoisi::dateArrete();
+    }
+
+    /**
+     * Ticket EX8 (EF11) — Bilan N / N-1 : l'exercice de la date choisie (colonne « Exercice N ») et l'exercice précédent
+     * à sa clôture (colonne « Exercice N-1 », « — » s'il n'existe pas). Un seul point de calcul.
+     */
+    public function getComparatifProperty(): array
+    {
+        return $this->calculs[$this->asOfDate] ??= app(FinancialReportService::class)->bilanComparatif($this->asOfDate);
+    }
+
+    /** @var array<string, array> calculs de la requête en cours, par date d'arrêté (jamais conservés d'une requête à l'autre) */
+    private array $calculs = [];
+
+    /** Solde de chaque compte (débit-crédit) à la date choisie — la colonne N du comparatif. */
     public function getBilanProperty(): array
     {
-        return app(FinancialReportService::class)->bilan($this->asOfDate);
+        return $this->comparatif['n'];
     }
 
     public function render()

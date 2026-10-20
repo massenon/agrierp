@@ -177,7 +177,8 @@ class BalanceJeuDuPosteTest extends TestCase
 
             $composant->periode = 'exercice';
             $this->assertSame(['2026-01-01', '2026-12-31'], $composant->periodBounds());
-            $this->assertSame('Exercice complet — 2026', $composant->periodLabel);
+            // Ticket EX7 (PRD § 7) : l'option prend le libellé de l'exercice choisi (« Exercice complet — 2026 » avant).
+            $this->assertSame('Exercice 2026', $composant->periodLabel);
         } finally {
             Carbon::setTestNow();
         }

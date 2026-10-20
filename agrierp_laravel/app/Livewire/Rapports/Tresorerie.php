@@ -3,6 +3,7 @@
 namespace App\Livewire\Rapports;
 
 use App\Models\AccountingEntryLine;
+use App\Services\FinancialReportService;
 use App\Services\PdfExportService;
 use Illuminate\Support\Facades\Response;
 use Livewire\Attributes\On;
@@ -55,8 +56,10 @@ class Tresorerie extends Component
     {
         // Solde cumulé de chaque compte classe 5 à CHAQUE date d'activité
         // dans la période — jamais seulement le mouvement du jour.
-        $dates = AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
+        // 🔴→✅ Ticket EX1 (défaut C1) : un à-nouveau n'est pas une activité (sa date n'ouvre pas de ligne), et le
+        // solde suit la règle R1 — il cumulait tout l'historique ET l'à-nouveau, deux fois l'exercice clos.
+        $dates = FinancialReportService::filtrerANouveau(AccountingEntryLine::query()
+            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id'), false)
             ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
             ->where('accounting_entries.is_active', true)
             ->where('chart_of_accounts.class', 5)
@@ -66,21 +69,16 @@ class Tresorerie extends Component
             ->orderByDesc('accounting_entries.entry_date')
             ->pluck('entry_date');
 
-        return $dates->map(function ($date) {
-            $balances = AccountingEntryLine::query()
-                ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-                ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
-                ->where('accounting_entries.is_active', true)
-                ->where('chart_of_accounts.class', 5)
-                ->whereDate('accounting_entries.entry_date', '<=', $date)
-                ->selectRaw('chart_of_accounts.code, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-                ->groupBy('chart_of_accounts.code')
-                ->get();
+        $rapports = app(FinancialReportService::class);
 
-            $caisse = $balances->filter(fn ($b) => str_starts_with($b->code, '531'))
-                ->sum(fn ($b) => $b->total_debit - $b->total_credit);
-            $banque = $balances->filter(fn ($b) => ! str_starts_with($b->code, '531'))
-                ->sum(fn ($b) => $b->total_debit - $b->total_credit);
+        return $dates->map(function ($date) use ($rapports) {
+            $balances = array_filter(
+                $rapports->soldes(substr((string) $date, 0, 10))['comptes'],
+                fn ($c) => $c['class'] === 5,
+            );
+
+            $caisse = array_sum(array_map(fn ($b) => str_starts_with($b['code'], '531') ? $b['net'] : 0, $balances));
+            $banque = array_sum(array_map(fn ($b) => ! str_starts_with($b['code'], '531') ? $b['net'] : 0, $balances));
 
             return [
                 'date' => $date,

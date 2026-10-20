@@ -6,6 +6,8 @@ import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
 import 'fournisseurs_repository.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/widgets/toast_agri.dart';
 
 /// `prototype_html/profile-fournisseur.html` → Profil Fournisseur.
 ///
@@ -532,6 +534,11 @@ class _ModaleReglementProfilState extends State<_ModaleReglementProfil> {
         _envoi = false;
         _erreur = e.motif;
       });
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `ProfileFournisseur::confirmRegularisation()` : motif R4 en toast d'erreur, modale ouverte.
+      if (!mounted) return;
+      setState(() => _envoi = false);
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
     }
   }
 

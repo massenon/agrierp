@@ -48,6 +48,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FicheEscargots extends Component
 {
+    use \App\Livewire\Elevage\Concerns\AvecMoisDeFiche;   // Ticket EX8 (EF12) : mois passés, lecture seule
     use AvecTransfertsDuJour;
     use AvecSoinsDuMois;
 
@@ -167,7 +168,7 @@ class FicheEscargots extends Component
     {
         $lotIds = $this->lots->pluck('id');
         $monthEntries = LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->get();
 
         $totalOeufs = $monthEntries->sum('ponte_total');
@@ -207,7 +208,7 @@ class FicheEscargots extends Component
         // tableau mensuel (même écart que fiche-lapins.html), corrigée
         // dans la foulée pour les 3 fiches partageant ce même patron.
         return LivestockDailyEntry::whereIn('lot_id', $lotIds)
-            ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('entry_date', [$this->debutMoisFiche(), $this->finMoisFiche()])   // EX8 : le mois affiché
             ->with('treatmentProduct')
             ->orderBy('entry_date')
             ->get()
@@ -232,16 +233,12 @@ class FicheEscargots extends Component
             'exports.fiche-elevage',
             ['entries' => $entries],
             'Fiche Escargots — Suivi Mensuel',
-            now()->translatedFormat('F Y')
+            $this->moisDuPdf()   // EX8 : le mois affiché
         );
 
-        return response()->streamDownload(fn () => print($pdf->output()), 'fiche-'.now()->format('Y-m').'.pdf');
+        return response()->streamDownload(fn () => print($pdf->output()), $this->fichierDuPdf());
     }
 
-    public function getDaysInMonthProperty(): array
-    {
-        return range(1, now()->daysInMonth);
-    }
 
     public function getPreviousEffectifProperty(): int
     {
@@ -346,6 +343,14 @@ class FicheEscargots extends Component
 
         if (! $lot) {
             $this->dispatch('toast', message: "Aucune bande active en héliciculture. Créez d'abord une bande.", type: 'error');
+
+            return;
+        }
+
+        // 🔴→✅ Ticket EX5 (EF5, décision Q3 du 20/10/2026) — une fiche datée dans un exercice CLOS est refusée : le stock
+        // consommé de cet exercice est figé avec son inventaire. Même motif R4 qu'à l'envoi d'un poste.
+        if ($refusExercice = app(\App\Services\AccountingEntryService::class)->refusExerciceClos($this->selectedDate)) {
+            $this->dispatch('toast', message: $refusExercice, type: 'error');
 
             return;
         }

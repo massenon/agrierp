@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:agrierp/core/comptabilite/exercice_choisi.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
@@ -215,33 +216,100 @@ void main() {
 
   /// Règle relue dans `FinancialReportService::balanceGenerale`, réécrite autrement : en centimes
   /// entiers, sur les lignes brutes, codes connus seulement.
+  ///
+  /// Tickets EX1 / EX2 — l'ouverture suit R1 (PRD `docs/prd/exercices-comptables.md` § 5), réécrite ici pour les
+  /// jeux de ce fichier (exercices CIVILS ; seul 2026 est enregistré, ouvert, sans à-nouveau) :
+  ///  - année ≤ 2026 (aucun exercice enregistré avant) : historique antérieur au 01/01, classes 1 à 5 ; son
+  ///    résultat (classes 6+) porté au 131 (bénéfice) ou 139 (perte), FUSIONNÉ (pas une ligne provisoire) ;
+  ///  - année 2027 (précédent 2026 ouvert) : R3 — clôture calculée de 2026 (son ouverture + ses mouvements,
+  ///    classes 1 à 5), et son résultat sur une ligne PROVISOIRE à part (131 / 139) ;
+  ///  - puis, dans l'exercice, les mouvements du 01/01 à la veille du début (toutes classes).
   ({List<(String, List<int>)> lignes, List<int> totaux}) recalcul(
     DateTime debut,
     DateTime fin,
   ) {
     final d = jourDe(debut);
     final f = jourDe(fin);
-    final ouvD = <String, int>{};
-    final ouvC = <String, int>{};
+    bool bilan(String code) => int.parse(code[0]) <= 5;
+
+    Map<String, int> nets(int? du, int au) {
+      final r = <String, int>{};
+      for (final l in brut) {
+        final j = jourDe(l.jour);
+        if (j > au || (du != null && j < du)) continue;
+        r[l.code] = (r[l.code] ?? 0) + l.debitCts - l.creditCts;
+      }
+      return r;
+    }
+
+    /// (comptes de bilan, résultat reporté à part) — résultat en « produits − charges ».
+    (Map<String, int>, int) cloture(Map<String, int> depart, Map<String, int> m) {
+      final c = Map<String, int>.of(depart);
+      var resultat = 0;
+      m.forEach((code, n) {
+        if (bilan(code)) {
+          c[code] = (c[code] ?? 0) + n;
+        } else {
+          resultat -= n;
+        }
+      });
+      return (c, resultat);
+    }
+
+    String compteResultat(int r) => r > 0 ? '131' : '139';
+
+    ({Map<String, int> comptes, int provisoire}) ouverture(int annee) {
+      if (annee <= 2026) {
+        final (c, r) = cloture({}, nets(null, (annee - 1) * 10000 + 1231));
+        if (r != 0) c[compteResultat(r)] = (c[compteResultat(r)] ?? 0) - r;
+        return (comptes: c, provisoire: 0);
+      }
+      final o = ouverture(annee - 1);
+      final depart = Map<String, int>.of(o.comptes);
+      if (o.provisoire != 0) {
+        final code = o.provisoire < 0 ? '131' : '139';
+        depart[code] = (depart[code] ?? 0) + o.provisoire;
+      }
+      final (c, r) = cloture(
+        depart,
+        nets((annee - 1) * 10000 + 101, (annee - 1) * 10000 + 1231),
+      );
+      return (comptes: c, provisoire: -r);
+    }
+
+    final annee = d ~/ 10000;
+    final o = ouverture(annee);
+    final ouv = Map<String, int>.of(o.comptes);
+    nets(annee * 10000 + 101, d - 1).forEach((code, n) {
+      ouv[code] = (ouv[code] ?? 0) + n;
+    });
+    // `d - 1` sur un 1er du mois tombe sur un « jour 0 » : aucune écriture n'y est datée, la borne reste juste.
+
     final perD = <String, int>{};
     final perC = <String, int>{};
     for (final l in brut) {
       final j = jourDe(l.jour);
-      if (j < d) {
-        ouvD[l.code] = (ouvD[l.code] ?? 0) + l.debitCts;
-        ouvC[l.code] = (ouvC[l.code] ?? 0) + l.creditCts;
-      } else if (j <= f) {
+      if (j >= d && j <= f) {
         perD[l.code] = (perD[l.code] ?? 0) + l.debitCts;
         perC[l.code] = (perC[l.code] ?? 0) + l.creditCts;
       }
     }
-    final codes = {...ouvD.keys, ...perD.keys}.toList()..sort();
+
+    // La ligne provisoire suit le compte réel du même numéro (aucun 131 / 139 au plan de ces jeux).
+    final codes = {...ouv.keys, ...perD.keys}.toList()..sort();
+    final entrees = <(String, int, int, int)>[
+      for (final c in codes) (c, ouv[c] ?? 0, perD[c] ?? 0, perC[c] ?? 0),
+    ];
+    if (o.provisoire != 0) {
+      final code = o.provisoire < 0 ? '131' : '139';
+      var i = entrees.indexWhere((e) => e.$1.compareTo(code) > 0);
+      if (i < 0) i = entrees.length;
+      entrees.insert(i, (code, o.provisoire, 0, 0));
+    }
+
     final lignes = <(String, List<int>)>[];
     final t = List<int>.filled(6, 0);
-    for (final c in codes) {
-      final net = (ouvD[c] ?? 0) - (ouvC[c] ?? 0);
-      final pd = perD[c] ?? 0;
-      final pc = perC[c] ?? 0;
+    for (final (c, net, pd, pc) in entrees) {
       if (net == 0 && pd == 0 && pc == 0) continue;
       final od = net > 0 ? net : 0;
       final oc = net < 0 ? -net : 0;
@@ -412,11 +480,7 @@ void main() {
     test(
       '⚠️⚠️ « mois » : du 1er au DERNIER jour du mois (pas à aujourd hui)',
       () {
-        final b = DonneesComptabilite.bornesBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 3, 15, 10),
-          null,
-        );
+        final b = DonneesComptabilite.bornesBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15, 10)));
 
         expect(b.debut, DateTime(2026, 3, 1));
         expect(b.fin, DateTime(2026, 3, 31));
@@ -424,11 +488,7 @@ void main() {
     );
 
     test('« mois » de février d une année bissextile', () {
-      final b = DonneesComptabilite.bornesBalance(
-        PeriodeBalance.mois,
-        DateTime(2028, 2, 3),
-        null,
-      );
+      final b = DonneesComptabilite.bornesBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2028, 2, 3)));
 
       expect(b.fin, DateTime(2028, 2, 29));
     });
@@ -446,61 +506,37 @@ void main() {
         fin: DateTime(2026, 6, 30),
       );
       final d = await depot.charger();
-      final b = DonneesComptabilite.bornesBalance(
-        PeriodeBalance.exercice,
-        DateTime(2026, 3, 15),
-        d.exerciceOuvert,
-      );
+      final b = DonneesComptabilite.bornesBalance(PeriodeBalance.exercice, EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: DateTime(2026, 3, 15)));
 
       expect(b.debut, DateTime(2025, 7, 1));
       expect(b.fin, DateTime(2026, 6, 30));
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.exercice,
-          DateTime(2026, 3, 15),
-          d.exerciceOuvert,
-        ),
-        'Exercice complet — 2026',
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.exercice, EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: DateTime(2026, 3, 15))),
+        'Exercice 2026',
       );
     });
 
     test(
       '« exercice » sans exercice ouvert : l année civile (comme le serveur)',
       () {
-        final b = DonneesComptabilite.bornesBalance(
-          PeriodeBalance.exercice,
-          DateTime(2026, 3, 15),
-          null,
-        );
+        final b = DonneesComptabilite.bornesBalance(PeriodeBalance.exercice, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15)));
 
         expect(b.debut, DateTime(2026, 1, 1));
         expect(b.fin, DateTime(2026, 12, 31));
         expect(
-          DonneesComptabilite.libellePeriodeBalance(
-            PeriodeBalance.exercice,
-            DateTime(2026, 3, 15),
-            null,
-          ),
-          'Exercice complet — 2026',
+          DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.exercice, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15))),
+          'Exercice 2026',
         );
       },
     );
 
     test('le libellé du mois : « Mars 2026 (période courante) »', () {
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 3, 15),
-          null,
-        ),
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15))),
         'Mars 2026 (période courante)',
       );
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 8, 2),
-          null,
-        ),
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 8, 2))),
         'Août 2026 (période courante)',
       );
     });
@@ -900,7 +936,7 @@ void main() {
         }
 
         verifier(debutMars, finMars);
-        await choisir(tester, 'Exercice complet — 2026');
+        await choisir(tester, 'Exercice 2026');
         verifier(DateTime(2026, 1, 1), DateTime(2026, 12, 31));
       },
     );
@@ -1161,7 +1197,7 @@ void main() {
         await afficher(tester);
         expect(texteDe('bal-total-2'), '40 501');
 
-        await choisir(tester, 'Exercice complet — 2026');
+        await choisir(tester, 'Exercice 2026');
         expect(texteDe('bal-total-2'), '207 101');
         expect(texteDe('bal-total-0'), '0');
 

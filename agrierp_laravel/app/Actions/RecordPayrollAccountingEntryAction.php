@@ -37,7 +37,7 @@ class RecordPayrollAccountingEntryAction
      * @return AccountingEntry|null  null si l'écriture n'a pas pu être générée
      *                               — l'appelant DOIT alors avertir.
      */
-    public function execute(Payslip $payslip, ?string $treasuryAccountId = null): ?AccountingEntry
+    public function execute(Payslip $payslip, ?string $treasuryAccountId = null, ?string $dateCharge = null, ?string $dateReglement = null): ?AccountingEntry
     {
         if ($payslip->accounting_entry_id !== null) {
             return null;   // déjà comptabilisée — jamais de doublon
@@ -141,6 +141,47 @@ class RecordPayrollAccountingEntryAction
             return null;
         }
 
+        $dateReglement ??= now()->format('Y-m-d');
+        $dateCharge ??= $dateReglement;
+        $reference = AccountingEntry::generateReference().' — Paie '.($payslip->period_month?->format('m/Y') ?? '');
+
+        // 🔴→✅ TICKET EX5 (décision Q4 du 20/10/2026) — CHARGE ET RÈGLEMENT À DEUX DATES. La paie de décembre N réglée en
+        // janvier N+1 : la charge appartient à N (datée du 31/12/N), le décaissement à N+1 (à sa date). Une seule
+        // écriture ne peut porter qu'une date — elle aurait fait sortir la caisse au 31/12 (rapprochement faux) ou passé
+        // la charge en N+1. Deux écritures, par le compte 422 « Personnel, rémunérations dues » (plan SYSCOHADA importé,
+        // 15.27) : charge D 661/664 — C 431/4472/4473/422 ; règlement D 422 — C trésorerie. Le cas courant (paie réglée
+        // le jour où sa charge est datée) garde l'écriture unique ci-dessous, inchangée.
+        if ($dateCharge !== $dateReglement) {
+            $remunerationsDues = ChartOfAccount::where('code', '422')->first();
+
+            if (! $remunerationsDues) {
+                return null;   // plan comptable incomplet — signalé par l'appelant, jamais un compte inventé
+            }
+
+            $service = app(AccountingEntryService::class);
+            $entry = $service->record(
+                lines: [...$lignes, ['account_id' => $remunerationsDues->id, 'debit' => 0, 'credit' => $net]],
+                entryDate: $dateCharge,
+                reference: $reference,
+                sourceType: 'payroll',
+                sourceId: $payslip->id,
+            );
+            $service->record(
+                lines: [
+                    ['account_id' => $remunerationsDues->id, 'debit' => $net, 'credit' => 0],
+                    ['account_id' => $compteTresorerie->id, 'debit' => 0, 'credit' => $net],
+                ],
+                entryDate: $dateReglement,
+                reference: mb_substr($reference.' — règlement', 0, 100),
+                sourceType: 'payroll_payment',
+                sourceId: $payslip->id,
+            );
+
+            $payslip->update(['accounting_entry_id' => $entry->id]);
+
+            return $entry;
+        }
+
         $lignes[] = ['account_id' => $compteTresorerie->id, 'debit' => 0, 'credit' => $net];
 
         $entry = app(AccountingEntryService::class)->record(
@@ -153,12 +194,11 @@ class RecordPayrollAccountingEntryAction
             // n'apparaîtrait pas dans les états arrêtés à ce jour (défaut
             // constaté au test avant correction).
             //
-            // Une comptabilisation en droits constatés — charge à la clôture de
-            // période, paiement ensuite — exigerait DEUX écritures et un compte
-            // 422 « Personnel, rémunérations dues » absent du plan comptable
-            // semé. Limite assumée et documentée, jamais un compte inventé.
-            entryDate: now()->format('Y-m-d'),
-            reference: AccountingEntry::generateReference().' — Paie '.($payslip->period_month?->format('m/Y') ?? ''),
+            // Quand la charge appartient à une autre date que le règlement (paie
+            // d'un mois passé, Q4), les DEUX écritures par le compte 422 sont
+            // passées plus haut (ticket EX5) ; ici, charge et règlement le même jour.
+            entryDate: $dateReglement,
+            reference: $reference,
             sourceType: 'payroll',
             sourceId: $payslip->id,
         );

@@ -2584,6 +2584,15 @@ class SyncController extends Controller
                     'vente_montant' => ['nullable', 'numeric', 'min:0'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
+                // 🔴→✅ Ticket EX5 (EF5, décision Q3 du 20/10/2026) — une fiche datée dans un exercice CLOS est refusée,
+                // avec le motif R4 des fiches du web (`saveDay`) : le stock consommé de l'exercice est figé avec son
+                // inventaire. Elle était acceptée (fiche du 22/12/2026 envoyée le 15/03/2027, 2026 clôturé).
+                if ($refusExercice = app(\App\Services\AccountingEntryService::class)->refusExerciceClos($validated['entry_date'])) {
+                    $issues[$rang] = ['ko' => ['id' => $validated['id'], 'reason' => $refusExercice]];
+
+                    continue;
+                }
+
                 // Ticket U13 — une SAISIE de l'éleveur (voir [fichesSaisiesAuPoste]) ?
                 $saisieDeLEleveur[$rang] = ! $venteSeulement
                     && (($validated['feed_qty_kg'] ?? null) !== null || $this->modifieAutreChoseQueLaVente($validated, null));
@@ -4501,7 +4510,8 @@ class SyncController extends Controller
                 // rejouait en boucle, emportant fiches et autres ventes. Même règle que les achats,
                 // avances et retours. La transaction ayant été annulée, ni stock, ni fiche, ni caisse
                 // n'ont bougé.
-                $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => 'Vente refusée : '.$e->getMessage()];
+                // Ticket EX5 (R4) — même texte que le refus d'une vente datée (`VerifySaleDateAction::prefixe`).
+                $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => \App\Actions\VerifySaleDateAction::prefixe($e->getMessage())];
                 $this->retirerDesFichesPorteuses($saleData, $fichesRecues);
             }
         }
@@ -4771,45 +4781,50 @@ class SyncController extends Controller
                     $dateDuMouvement = $instant;
                 }
 
-                app(AdjustStockAction::class)->execute(
-                    product: $product,
-                    delta: $delta,
-                    referenceType: $validated['reference_type'],
-                    // ⚠️ C'est cette trace qui rend le renvoi inoffensif.
-                    referenceId: $clientRef,
-                    // Ajout manuel : le jour choisi (U10). Inventaire compté (S-T10) : l'instant du comptage, pour
-                    // que le grand livre le place avant les mouvements qui l'ont suivi. Sinon : la réception.
-                    movementDate: $dateDuMouvement,
-                    reason: $validated['reason'] ?? null,
-                );
+                // 🔴→✅ Ticket EX5 — LE MOUVEMENT ET SA PERTE, ENSEMBLE OU PAS DU TOUT (point de sauvegarde par ligne). La
+                // perte refusée (aucun exercice ne couvre le jour du comptage) laissait le mouvement écrit, sans sa charge.
+                DB::transaction(function () use ($product, $delta, $validated, $clientRef, $dateDuMouvement, $ajoutManuel) {
+                    app(AdjustStockAction::class)->execute(
+                        product: $product,
+                        delta: $delta,
+                        referenceType: $validated['reference_type'],
+                        // ⚠️ C'est cette trace qui rend le renvoi inoffensif.
+                        referenceId: $clientRef,
+                        // Ajout manuel : le jour choisi (U10). Inventaire compté (S-T10) : l'instant du comptage, pour
+                        // que le grand livre le place avant les mouvements qui l'ont suivi. Sinon : la réception.
+                        movementDate: $dateDuMouvement,
+                        reason: $validated['reason'] ?? null,
+                    );
 
-                // Ticket U10 — l'ajout manuel du web ne passe AUCUNE écriture (ce n'est pas un écart d'inventaire)
-                // et laisse sa trace d'audit : même chose ici.
-                if ($ajoutManuel) {
-                    AuditLog::record('stock.manual_addition', 'stocks');
-                    $accepted[] = $clientRef ?? $validated['product_id'];
+                    // Ticket U10 — l'ajout manuel du web ne passe AUCUNE écriture (ce n'est pas un écart d'inventaire)
+                    // et laisse sa trace d'audit : même chose ici.
+                    if ($ajoutManuel) {
+                        AuditLog::record('stock.manual_addition', 'stocks');
 
-                    continue;
-                }
+                        return;
+                    }
 
-                // 🔴→✅ TICKET 14.67 — LA PERTE CONSTATEE HORS LIGNE ENTRE
-                // ENFIN DANS LES LIVRES.
-                //
-                // ⚠️⚠️ Le CDC exige que « toute operation financiere (vente,
-                // achat, paie, **perte**) declenche automatiquement la
-                // generation de l'ecriture ». L'ecran web le fait depuis le
-                // ticket 14.41 ; ce chemin-ci ne le faisait pas. Un manquant
-                // d'inventaire saisi sur un poste hors ligne faisait donc
-                // baisser le stock **sans jamais reduire le resultat** — le
-                // meme defaut que les ventes (14.52), la ponte (14.59) et les
-                // depenses (14.62), sur le quatrieme flux.
-                //
-                // ⚠️ L'Action porte deja la regle et ses garde-fous : un
-                // EXCEDENT ne produit aucune ecriture (ce n'est pas un profit
-                // mais le signe d'une entree non saisie), et un produit sans
-                // PMP est ignore plutot que valorise au hasard.
-                app(RecordStockAdjustmentEntryAction::class)
-                    ->execute($product->fresh(), $delta, $validated['reason'] ?? null);
+                    // 🔴→✅ TICKET 14.67 — LA PERTE CONSTATEE HORS LIGNE ENTRE
+                    // ENFIN DANS LES LIVRES.
+                    //
+                    // ⚠️⚠️ Le CDC exige que « toute operation financiere (vente,
+                    // achat, paie, **perte**) declenche automatiquement la
+                    // generation de l'ecriture ». L'ecran web le fait depuis le
+                    // ticket 14.41 ; ce chemin-ci ne le faisait pas. Un manquant
+                    // d'inventaire saisi sur un poste hors ligne faisait donc
+                    // baisser le stock **sans jamais reduire le resultat** — le
+                    // meme defaut que les ventes (14.52), la ponte (14.59) et les
+                    // depenses (14.62), sur le quatrieme flux.
+                    //
+                    // ⚠️ L'Action porte deja la regle et ses garde-fous : un
+                    // EXCEDENT ne produit aucune ecriture (ce n'est pas un profit
+                    // mais le signe d'une entree non saisie), et un produit sans
+                    // PMP est ignore plutot que valorise au hasard.
+                    // Ticket EX5 — la perte est datée du COMPTAGE (S-T10 : son instant), comme le mouvement ; un poste ancien
+                    // sans `counted_at` garde la date de réception (`$dateDuMouvement` nul).
+                    app(RecordStockAdjustmentEntryAction::class)
+                        ->execute($product->fresh(), $delta, $validated['reason'] ?? null, $dateDuMouvement);
+                });
 
                 // ⚠️ ON ACQUITTE L'IDENTIFIANT DE LA LIGNE DU POSTE. Le repli
                 // sur `product_id` etait le defaut : deux ajustements sur le

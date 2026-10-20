@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/pagination_agri.dart';
 import 'transferts_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -28,6 +31,9 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
   List<LivestockTransfer> _transferts = const [];
   List<LivestockLot> _aRattacher = const [];
 
+  /// Ticket EX7 (EF9) — page de l'historique (25 transferts), dans l'exercice affiché.
+  int _page = 1;
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +41,10 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
   }
 
   Future<void> _charger() async {
+    // Ticket EX7 (EF9) — l'historique de l'exercice AFFICHÉ, sans plafond (web : `paginate(25)` dans l'exercice).
+    final bornes = PorteeExerciceChoisi.lire(context)?.bornes;
     final bandes = await widget.depot.bandes();
-    final transferts = await widget.depot.transferts();
+    final transferts = await widget.depot.transferts(bornes: bornes);
     final aRattacher = await widget.depot.bandesARattacher();
     if (!mounted) return;
     setState(() {
@@ -121,7 +129,12 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
       );
     }
 
-    final maintenant = HeureBenin.maintenant();
+    // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+    final etat = PorteeExerciceChoisi.lire(context);
+    final maintenant = etat?.moisDeReference ?? HeureBenin.maintenant();
+    // Ticket EX7 (EF10) — exercice affiché clos : saisies grisées, motif en info-bulle (`@lectureSeule` du web).
+    final verrou = LectureSeule.motif(context);
+    final page = etat == null ? _transferts : PaginationAgri.tranche(_transferts, _page);
     final duMois = _transferts.where(
       (t) =>
           t.isActive &&
@@ -150,12 +163,15 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                     ),
                   ),
                 ),
-                FilledButton.icon(
-                  key: const Key('transfert-nouveau'),
-                  style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
-                  onPressed: () => _ouvrirFormulaire(),
-                  icon: const Icon(SymbolesAgri.add_circle, size: 18),
-                  label: const Text('Nouveau Transfert'),
+                LectureSeule.infobulle(
+                  verrou,
+                  FilledButton.icon(
+                    key: const Key('transfert-nouveau'),
+                    style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
+                    onPressed: verrou != null ? null : () => _ouvrirFormulaire(),
+                    icon: const Icon(SymbolesAgri.add_circle, size: 18),
+                    label: const Text('Nouveau Transfert'),
+                  ),
                 ),
               ],
             ),
@@ -225,10 +241,13 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                         b.createdDate == null ? '—' : _fr(b.createdDate!),
                         '${b.initialQuantity} sujet(s)',
                       ],
-                      action: TextButton(
-                        key: Key('rattacher-${b.id}'),
-                        onPressed: () => _ouvrirFormulaire(aRattacher: b),
-                        child: const Text("Rattacher à sa bande d'origine"),
+                      action: LectureSeule.infobulle(
+                        verrou,
+                        TextButton(
+                          key: Key('rattacher-${b.id}'),
+                          onPressed: verrou != null ? null : () => _ouvrirFormulaire(aRattacher: b),
+                          child: const Text("Rattacher à sa bande d'origine"),
+                        ),
                       ),
                     ),
                 ],
@@ -248,7 +267,7 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                       ),
                     ]
                   : [
-                      for (final t in _transferts)
+                      for (final t in page)
                         _ligne(
                           cle: 'ligne-transfert-${t.id}',
                           attenue: !t.isActive,
@@ -267,18 +286,29 @@ class _TransfertsBandesScreenState extends State<TransfertsBandesScreen> {
                                 : 'En attente d\'envoi',
                           ],
                           action: t.isActive
-                              ? TextButton(
-                                  key: Key('annuler-${t.id}'),
-                                  onPressed: () => _annuler(t),
-                                  child: const Text(
-                                    'Annuler',
-                                    style: TextStyle(color: AgriColors.errorDeep),
+                              ? LectureSeule.infobulle(
+                                  verrou,
+                                  TextButton(
+                                    key: Key('annuler-${t.id}'),
+                                    onPressed: verrou != null ? null : () => _annuler(t),
+                                    child: Text(
+                                      'Annuler',
+                                      style: TextStyle(color: verrou != null ? AgriColors.outline : AgriColors.errorDeep),
+                                    ),
                                   ),
                                 )
                               : null,
                         ),
                     ],
             ),
+            if (etat != null)
+              PaginationAgri(
+                nom: 'transferts',
+                total: _transferts.length,
+                page: _page,
+                annee: etat.annee,
+                onPage: (p) => setState(() => _page = p),
+              ),
           ],
         ),
       ),

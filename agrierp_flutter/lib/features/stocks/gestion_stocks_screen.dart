@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
+import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'journal_stocks.dart';
 import 'pmp_service.dart';
 import 'stocks_repository.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 
 /// `prototype_html/gestion-stocks.html` → Gestion Stocks.
 ///
@@ -116,8 +120,13 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     super.dispose();
   }
 
+  /// Ticket EX7 (EF9) — page du Journal des Mouvements (25 mouvements), dans l'exercice affiché.
+  int _pageJournal = 1;
+
   Future<void> _charger() async {
-    final donnees = await widget.depot.charger();
+    // Ticket EX7 (EF9) — le Journal des Mouvements de l'exercice AFFICHÉ (web : `paginate(25)` dans l'exercice).
+    final exercice = PorteeExerciceChoisi.lire(context);
+    final donnees = await widget.depot.charger(exercice: exercice);
     if (!mounted) return;
     setState(() => _donnees = donnees);
   }
@@ -474,10 +483,11 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                 ),
               ),
               // 🔴→✅ Ticket U10 — `@can('manage-stocks')` puis `openAddStockModal()`.
+              // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
               if (widget.peutGerer)
-                ElevatedButton.icon(
+                LectureSeule.infobulle(LectureSeule.motif(context), ElevatedButton.icon(
                   key: const Key('stocks-ajouter'),
-                  onPressed: () => _ouvrirAjouterStock(d),
+                  onPressed: LectureSeule.motif(context) == null ? () => _ouvrirAjouterStock(d) : null,
                   icon: const Icon(SymbolesAgri.add_circle, size: 16),
                   label: const Text(
                     'Ajouter Stock',
@@ -497,7 +507,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       borderRadius: BorderRadius.circular(AgriRadius.lg),
                     ),
                   ),
-                ),
+                )),
             ],
           ),
         ),
@@ -860,13 +870,25 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                       ),
                     ),
                   ),
-                for (var i = 0; i < d.journal.length; i++)
-                  _ligneMouvement(d.journal[i], i),
+                for (final (i, l) in (PorteeExerciceChoisi.lire(context) == null
+                        ? d.journal
+                        : PaginationAgri.tranche(d.journal, _pageJournal))
+                    .indexed)
+                  _ligneMouvement(l, i),
               ],
             ),
           ),
         ),
       ),
+      // Ticket EX7 (EF9) — `<x-pagination>` du web, sous le tableau.
+      if (PorteeExerciceChoisi.lire(context) case final etat?)
+        PaginationAgri(
+          nom: 'mouvements',
+          total: d.journal.length,
+          page: _pageJournal,
+          annee: etat.annee,
+          onPage: (p) => setState(() => _pageJournal = p),
+        ),
     ],
   );
 
@@ -1173,9 +1195,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
               ),
               const SizedBox(height: AgriSpacing.md),
               // `w-full py-sm rounded-lg bg-brand-emerald … font-bold text-xs`.
-              ElevatedButton(
+              LectureSeule.infobulle(LectureSeule.motif(context), ElevatedButton(
                 key: const Key('adj-valider'),
-                onPressed: _validerAjustement,
+                onPressed: LectureSeule.motif(context) == null ? _validerAjustement : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AgriColors.brandEmerald,
                   foregroundColor: Colors.white,
@@ -1191,7 +1213,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+              )),
               const SizedBox(height: AgriSpacing.md),
               // Texte d'aide du Blade, mot pour mot (`gestion_stocks_u11_test.dart` le lit dans la vue).
               const Text(
@@ -1269,11 +1291,21 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
               InkWell(
                 key: const Key('ajout-date'),
                 onTap: () async {
+                  // Ticket EX6 (EF7) — borné au lendemain du dernier exercice CLOS connu (`min` du web).
+                  final premier = await widget.depot.premierJourAjout();
+                  if (!context.mounted) return;
+                  final dernier = DateTime(HeureBenin.maintenant().year + 5, 12, 31);
+                  final bornes = ExerciceDeSaisie.calendrier(
+                    premier: premier,
+                    repli: DateTime(2020),
+                    dernier: dernier,
+                    initial: date,
+                  );
                   final choisie = await showDatePicker(
                     context: context,
-                    initialDate: date,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
+                    initialDate: bornes.initial,
+                    firstDate: bornes.premier,
+                    lastDate: dernier,
                   );
                   if (choisie != null) rafraichir(() => date = choisie);
                 },
@@ -1286,6 +1318,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   ),
                 ),
               ),
+              // 🔴→✅ Ticket EX6 — `@error('addDate')` : exercice clos, le motif R4 sous « Date ».
+              if (erreurs['date'] != null)
+                _erreurChamp('ajout-erreur-date', erreurs['date']!),
               const SizedBox(height: AgriSpacing.md),
               _etiquette('Produit *'),
               DropdownButtonFormField<String>(
@@ -1351,6 +1386,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   );
                 } on ArgumentError catch (e) {
                   rafraichir(() => erreurs = {'produit': '${e.message}'});
+                  return;
+                } on RefusExercice catch (e) {
+                  rafraichir(() => erreurs = {'date': e.motif});
                   return;
                 }
                 if (context.mounted) Navigator.of(context).pop(true);
@@ -1427,6 +1465,10 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
       );
     } on ArgumentError catch (e) {
       setState(() => _erreursAjustement = {'produit': '${e.message}'});
+      return;
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `validateAdjustment()` : exercice clos ou absent, motif R4 en toast d'erreur.
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
       return;
     }
     final comptes = await widget.depot.comptesDePerte();

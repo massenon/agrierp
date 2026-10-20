@@ -60,6 +60,15 @@ Schedule::job(new \App\Jobs\DailyElevageAlertsJob())
     ->timezone('Africa/Porto-Novo')
     ->onOneServer();
 
+// Ticket EX3 (PRD exercices comptables, R2) — OUVERTURE DE L'EXERCICE DE L'ANNÉE, le 1er janvier à 00:00 heure du
+// Bénin. Sans elle, l'exercice N+1 n'existait qu'après la clôture de N (mars, après le bilan) : toute vente, dépense,
+// achat ou paie du 1er janvier finissait en erreur. Idempotente ; si elle ne tourne pas (cron absent), la première
+// saisie de l'année ouvre l'exercice (filet, `AccountingEntryService::exerciceOuvertPour`).
+Schedule::command('agrierp:ouvrir-exercice')
+    ->yearlyOn(1, 1, '00:00')
+    ->timezone('Africa/Porto-Novo')
+    ->onOneServer();
+
 // Nettoyage des sessions expirées — hebdomadaire.
 Schedule::command('session:gc')->weekly();
 

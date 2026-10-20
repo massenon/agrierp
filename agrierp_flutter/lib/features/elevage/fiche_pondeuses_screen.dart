@@ -7,6 +7,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../../core/export/document_officiel.dart';
+import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, MoisDeFiche;
 import 'fiche_journaliere_repository.dart';
 import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'mois_pondeuses.dart';
@@ -16,6 +17,7 @@ import 'soins_repository.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 
 /// `fiche-pondeuses.blade.php` (web, `FichePondeuses`) → Fiches Pondeuses - Aviculture.
 ///
@@ -119,6 +121,9 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// Ticket U11 — indicateurs, tableau et PDF du mois ([MoisPondeuses]).
   DonneesMoisPondeuses? _mois;
 
+  /// Ticket EX8 (EF12) — motif R4 de la lecture seule (exercice clos), `null` quand le jour se saisit.
+  LectureSeuleDuJour? _lectureSeule;
+
   ProtocoleDuJour? _protocole;
   final _traitementsCoches = <String>{};
   final _observations = TextEditingController();
@@ -173,16 +178,20 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     final produits = await widget.depot.database
         .select(widget.depot.database.products)
         .get();
+    // Ticket EX8 (EF12) : le mois AFFICHÉ est celui du jour choisi (`AvecMoisDeFiche` du web).
     final mois = await MoisPondeuses.charger(
       widget.depot.database,
       bandes: _bandes,
       bande: bande,
-      maintenant: _maintenant,
+      maintenant: _jour,
     );
+    // Ticket EX8 (EF12) : un jour d'un exercice CLOS se consulte en lecture seule ; fusion EX7 + EX8 : bandeau d'EX7.
+    final lectureSeule = await LectureSeuleDuJour.charger(widget.depot.database, _jour, maintenant: _maintenant);
     if (bande == null) {
       if (!mounted) return;
       setState(() {
         _mois = mois;
+        _lectureSeule = lectureSeule;
         _produitOeufs = JournalStocks.produitOeufs(produits);
         _chargement = false;
       });
@@ -204,6 +213,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     setState(() {
       _effectifPrecedent = precedent;
       _mois = mois;
+      _lectureSeule = lectureSeule;
       _journal = grandLivre.journal;
       _produitGrandLivre = grandLivre.produit;
       _produitOeufs = JournalStocks.produitOeufs(produits);
@@ -524,6 +534,17 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       children: [
         _enTeteSaisie(),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX8 (EF12) — `<x-bandeau-lecture-seule>` (le bandeau d'EX7, fusion EX7 + EX8) puis
+        // `<fieldset disabled>` du Blade.
+        if (_lectureSeule != null && _lectureSeule!.bandeauVisible(context)) ...[
+          _lectureSeule!.bandeau(_ouvrirJour),
+          const SizedBox(height: AgriSpacing.md),
+        ],
+        FormulaireFiche(
+          lectureSeule: _lectureSeule != null,
+          enfant: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
         if (_transfertEntree > 0 || _transfertSortie > 0) ...[
           _transfertsDuJour(),
           const SizedBox(height: AgriSpacing.md),
@@ -571,6 +592,9 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         _traitementsEtRappels(),
         const SizedBox(height: AgriSpacing.md),
         _boutons(),
+            ],
+          ),
+        ),
       ],
     ),
   );
@@ -656,6 +680,16 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                   ),
                 ),
               ),
+            ),
+            // Ticket EX8 (EF12) — `<x-mois-de-fiche>` : consulter un mois passé.
+            MoisDeFiche(
+              jour: _jour,
+              maintenant: _maintenant,
+              onPrecedent: () => _ouvrirJour(MoisDeFiche.precedent(_jour)),
+              onSuivant: () {
+                final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+                if (suivant != null) _ouvrirJour(suivant);
+              },
             ),
           ],
         ),
@@ -1936,20 +1970,27 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     // chaque correction du même jour.
     final creation = await widget.depot.chargerJour(bande.id, _jour) == null;
 
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _ne,
-      mort: _totalMorts,
-      don: _totalDons,
-      ponteTotal: _oeufsRecoltes,
-      ponteCasses: _oeufsCasses,
-      poidsMoyen: FicheJournaliereRepository.poidsMoyen(
-        poidsTotalG: _poidsTotalPese,
-        tailleEchantillon: _effectifFinal,
-      ),
-    );
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _ne,
+        mort: _totalMorts,
+        don: _totalDons,
+        ponteTotal: _oeufsRecoltes,
+        ponteCasses: _oeufsCasses,
+        poidsMoyen: FicheJournaliereRepository.poidsMoyen(
+          poidsTotalG: _poidsTotalPese,
+          tailleEchantillon: _effectifFinal,
+        ),
+      );
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur ; les plateaux
+      // n'entrent pas au stock (rien n'a été écrit).
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
 
     await widget.production.entrerAuStock(
       bande: bande,

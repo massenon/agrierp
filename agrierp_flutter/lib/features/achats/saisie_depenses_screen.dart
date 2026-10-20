@@ -2,14 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/pmp_service.dart';
 import 'depenses_repository.dart';
 
@@ -51,6 +55,10 @@ class SaisieDepensesScreen extends StatefulWidget {
   static const legendeEnAttente =
       'Disponible après Aucun champ Fixe/Variable dans le formulaire source';
 
+  /// Ticket EX7 (réponse à EX-Q5, décision D-U14-1) — info-bulle du champ « Date » GRISÉ d'une dépense comptabilisée :
+  /// `SaisieDepenseAction::MOTIF_DATE_VERROUILLEE` du web, mot pour mot. Le refus à l'enregistrement reste la garantie.
+  static const motifDateVerrouillee = 'Dépense déjà comptabilisée : sa date ne peut plus être modifiée.';
+
   @override
   State<SaisieDepensesScreen> createState() => _SaisieDepensesScreenState();
 }
@@ -63,6 +71,12 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   /// `editingExpenseId` du composant : `null` = « Nouvelle Dépense ».
   String? _enModification;
+
+  /// Ticket EX7 (EX-Q5) — la dépense en modification est comptabilisée (`accounting_entry_id`) : sa date est grisée.
+  bool _dateVerrouillee = false;
+
+  /// Ticket EX7 (EF9) — page affichée (25 dépenses), dans l'exercice affiché.
+  int _page = 1;
 
   DateTime _date = HeureBenin.aujourdhui();
   final _libelle = TextEditingController();
@@ -94,13 +108,16 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   }
 
   Future<void> _charger() async {
+    // Ticket EX7 (EF9) — les dépenses de l'exercice AFFICHÉ ; « Dépenses du mois » sur son mois de référence.
+    final etat = PorteeExerciceChoisi.lire(context);
     final categories = await widget.depot.categories();
     final comptes = await widget.depot.comptesTresorerie();
     final depenses = await widget.depot.depenses(
       recherche: _rechercheAppliquee,
       statut: _statut,
+      bornes: etat?.bornes,
     );
-    final total = await widget.depot.totalDuMois(HeureBenin.maintenant());
+    final total = await widget.depot.totalDuMois(etat?.moisDeReference ?? HeureBenin.maintenant());
 
     if (!mounted) return;
 
@@ -352,9 +369,12 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
           const SizedBox(height: AgriSpacing.md),
           Align(
             alignment: Alignment.centerRight,
-            child: FilledButton.icon(
+            // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
+            child: LectureSeule.infobulle(
+              LectureSeule.motif(context),
+              FilledButton.icon(
               key: const Key('bouton-enregistrer-depense'),
-              onPressed: _enregistrement ? null : _enregistrer,
+              onPressed: _enregistrement || LectureSeule.motif(context) != null ? null : _enregistrer,
               icon: const Icon(SymbolesAgri.save, size: 18),
               label: const Text('Enregistrer la Dépense'),
               style: FilledButton.styleFrom(
@@ -372,6 +392,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   borderRadius: BorderRadius.circular(AgriRadius.lg),
                 ),
               ),
+            ),
             ),
           ),
         ],
@@ -419,20 +440,32 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     borderRadius: BorderRadius.circular(AgriRadius.lg),
   );
 
-  /// « Date de la Transaction * » — `type="date"` du web : toute date (le web n'en borne aucune).
+  /// « Date de la Transaction * » — `type="date"` du web, borné (ticket EX6) au plus ancien exercice OUVERT connu
+  /// (`min` du web, `AccountingEntryService::premierJourSaisissable`).
   Widget _champDate() {
     String deux(int n) => n.toString().padLeft(2, '0');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _etiquette('Date de la Transaction *'),
-        InkWell(
+        // Ticket EX7 (EX-Q5) — dépense comptabilisée en modification : date grisée, motif du web en info-bulle.
+        LectureSeule.infobulle(
+          _dateVerrouillee ? SaisieDepensesScreen.motifDateVerrouillee : null,
+          InkWell(
           key: const Key('champ-date'),
-          onTap: () async {
+          onTap: _dateVerrouillee ? null : () async {
+            final premier = await widget.depot.premierJourSaisissable();
+            if (!mounted) return;
+            final bornes = ExerciceDeSaisie.calendrier(
+              premier: premier,
+              repli: DateTime(2000),
+              dernier: DateTime(2100),
+              initial: _date,
+            );
             final choisie = await showDatePicker(
               context: context,
-              initialDate: _date,
-              firstDate: DateTime(2000),
+              initialDate: bornes.initial,
+              firstDate: bornes.premier,
               lastDate: DateTime(2100),
             );
             if (choisie != null) setState(() => _date = choisie);
@@ -444,9 +477,13 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
             decoration: _cadre('date'),
             child: Text(
               '${deux(_date.day)}/${deux(_date.month)}/${_date.year}',
-              style: const TextStyle(fontSize: AgriTypography.sm),
+              style: TextStyle(
+                fontSize: AgriTypography.sm,
+                color: _dateVerrouillee ? AgriColors.outline : null,
+              ),
             ),
           ),
+        ),
         ),
         _erreur('date'),
       ],
@@ -746,7 +783,17 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                 ),
               ),
             ),
-          for (var i = 0; i < _depenses.length; i++) _ligne(_depenses[i], i),
+          for (final (i, l) in (PorteeExerciceChoisi.lire(context) == null ? _depenses : PaginationAgri.tranche(_depenses, _page)).indexed)
+            _ligne(l, i),
+          // Ticket EX7 (EF9) — `<x-pagination>` du web, sous le tableau.
+          if (PorteeExerciceChoisi.lire(context) case final etat?)
+            PaginationAgri(
+              nom: 'depenses',
+              total: _depenses.length,
+              page: _page,
+              annee: etat.annee,
+              onPage: (p) => setState(() => _page = p),
+            ),
         ],
       ),
     );
@@ -822,6 +869,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   icone: SymbolesAgri.edit,
                   couleur: AgriColors.brandEmerald,
                   surAppui: () => _modifier(d),
+                  verrou: LectureSeule.motif(context),
                 ),
                 _action(
                   cle: 'depense-archiver-${d.id}',
@@ -829,6 +877,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   icone: SymbolesAgri.delete,
                   couleur: AgriColors.outline,
                   surAppui: () => _archiver(d),
+                  verrou: LectureSeule.motif(context),
                 ),
               ],
             ),
@@ -911,15 +960,17 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     required IconData icone,
     required Color couleur,
     required VoidCallback surAppui,
+    String? verrou,
   }) => Tooltip(
-    message: infobulle,
+    // Ticket EX7 (EF10) — exercice affiché clos : grisé, le motif remplace l'info-bulle.
+    message: verrou ?? infobulle,
     child: InkWell(
       key: Key(cle),
-      onTap: surAppui,
+      onTap: verrou == null ? surAppui : null,
       borderRadius: BorderRadius.circular(AgriRadius.full),
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Icon(icone, size: 18, color: couleur),
+        child: Icon(icone, size: 18, color: verrou == null ? couleur : AgriColors.outlineVariant),
       ),
     ),
   );
@@ -928,6 +979,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   void _modifier(Expense d) {
     setState(() {
       _enModification = d.id;
+      _dateVerrouillee = d.accountingEntryId != null;
       _date = d.expenseDate;
       _libelle.text = d.label;
       _categorie = d.category;
@@ -965,7 +1017,14 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     );
     if (confirme != true) return;
 
-    await widget.depot.archiver(d.id);
+    try {
+      await widget.depot.archiver(d.id);
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `archiveExpense()` : dépense d'un exercice clos, motif R4 en toast d'erreur.
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
     await _charger();
     if (!mounted) return;
     ToastAgri.afficher(
@@ -999,6 +1058,14 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
         _enregistrement = false;
       });
       return;
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `submitExpense()` : exercice clos ou absent, le motif R4 sous « Date ».
+      if (!mounted) return;
+      setState(() {
+        _erreurs = {'date': e.motif};
+        _enregistrement = false;
+      });
+      return;
     }
 
     if (!mounted) return;
@@ -1006,6 +1073,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     _montant.clear();
     setState(() {
       _enModification = null;
+      _dateVerrouillee = false;
       _categorie = null;
       _date = HeureBenin.aujourdhui();
       _enregistrement = false;
