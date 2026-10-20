@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Parametres;
 
+use App\Services\ViderSessionsService;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
@@ -200,7 +201,10 @@ class GestionUtilisateurs extends Component
             return;
         }
 
-        User::findOrFail($id)->update(['is_active' => false]);
+        $utilisateur = User::findOrFail($id);
+        $utilisateur->update(['is_active' => false]);
+        // Ticket S3 — les jetons de ses postes sont révoqués : la désactivation vaut aussi hors du web.
+        $utilisateur->tokens()->delete();
         AuditLog::record('user.archived', 'parametres');
         $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
     }
@@ -212,6 +216,22 @@ class GestionUtilisateurs extends Component
         User::findOrFail($id)->update(['is_active' => true]);
         AuditLog::record('user.reactivated', 'parametres');
         $this->dispatch('toast', message: 'Utilisateur réactivé avec succès.', type: 'success');
+    }
+
+    /**
+     * Ticket 15.54 — déconnecte tout le monde (sessions web, jetons des postes), sauf la session en cours.
+     * Journalisé ; le nombre réel est annoncé.
+     */
+    public function viderSessions(): void
+    {
+        $this->authorize('manage-users');
+
+        $resultat = app(ViderSessionsService::class)->vider(session()->getId());
+        AuditLog::record('sessions.videes', 'administration');
+
+        $this->dispatch('close-modal', name: 'modal-vider-sessions');
+        $this->dispatch('toast', type: 'success', message: "{$resultat['sessions']} session(s) web fermée(s), "
+            ."{$resultat['jetons']} poste(s) déconnecté(s). Votre session est conservée.");
     }
 
     public function render()

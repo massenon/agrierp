@@ -103,8 +103,10 @@ class GlobalSearch extends Component
             return [];
         }
 
-        return VeterinaryRecord::where('product_used', 'like', "%{$this->query}%")
-            ->orWhere('vet_name', 'like', "%{$this->query}%")
+        // 🔴→✅ Ticket U3 — les deux critères sont GROUPÉS : `A OR B AND actif` se lisait `A OR (B AND actif)`, et un soin
+        // archivé trouvé par son produit remontait dans la recherche. Soins actifs seulement, comme au poste.
+        return VeterinaryRecord::where(fn ($q) => $q->where('product_used', 'like', "%{$this->query}%")
+            ->orWhere('vet_name', 'like', "%{$this->query}%"))
             ->where('is_active', true)
             ->limit(5)->get()
             ->map(fn ($v) => [

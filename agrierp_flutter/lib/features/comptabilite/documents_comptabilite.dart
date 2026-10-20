@@ -120,6 +120,7 @@ class DocumentsComptabilite {
   static DocumentOfficiel plan(DonneesComptabilite d, {required DateTime le}) =>
       DocumentOfficiel(
         titre: 'Plan Comptable SYSCOHADA',
+        fichier: 'plan-comptable-{jour}.pdf',
         sousTitre: etatAu(le),
         entetes: const ['N° Compte', 'Intitulé', 'Classe'],
         lignes: [
@@ -145,6 +146,7 @@ class DocumentsComptabilite {
 
     return DocumentOfficiel(
       titre: 'Journal Comptable',
+      fichier: 'journal-comptable-{jour}.pdf',
       sousTitre: etatAu(le),
       entetes: const [
         'N° Pièce',
@@ -195,6 +197,8 @@ class DocumentsComptabilite {
           ? 'Grand Livre'
           : 'Grand Livre — Compte ${c.code} — ${c.label}',
       sousTitre: 'Période du ${jour(debut)} au ${jour(fin)}',
+      // Ticket U11 — `'grand-livre-'.($account?->code ?? 'compte').'-'.now()->format('Y-m-d').'.pdf'` du web.
+      fichier: 'grand-livre-${c?.code ?? 'compte'}-{jour}.pdf',
       entetes: const [
         'Date',
         'N° Pièce',
@@ -260,6 +264,7 @@ class DocumentsComptabilite {
 
     return DocumentOfficiel(
       titre: 'Balance Générale',
+      fichier: 'balance-generale-{jour}.pdf',
       sousTitre: periode,
       entetes: const [
         'N° Compte',

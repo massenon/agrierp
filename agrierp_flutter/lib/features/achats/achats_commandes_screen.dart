@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -10,6 +11,7 @@ import 'achats_modales.dart';
 import 'achats_repository.dart';
 import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/achats-commandes.html` → Achats & Commandes.
 ///
@@ -72,9 +74,9 @@ class AchatsCommandesScreen extends StatefulWidget {
 class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// Les trois onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Enregistrer un Achat', Icons.add_shopping_cart),
-    ("Liste d'Achats", Icons.receipt_long),
-    ('Bons de Commande', Icons.assignment),
+    ('Enregistrer un Achat', SymbolesAgri.add_shopping_cart),
+    ("Liste d'Achats", SymbolesAgri.receipt_long),
+    ('Bons de Commande', SymbolesAgri.assignment),
   ];
 
   /// Modes de paiement — **les trois de la maquette** (l.174-177), avec ses
@@ -111,7 +113,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// `null` : le hub.
   String? _profilFournisseur;
 
-  DateTime get _maintenant => (widget.maintenant ?? DateTime.now)();
+  DateTime get _maintenant => (widget.maintenant ?? HeureBenin.maintenant)();
 
   @override
   void initState() {
@@ -261,7 +263,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
             ElevatedButton.icon(
               key: const Key('detail-retour'),
               onPressed: () => Navigator.of(contexte).pop('retour'),
-              icon: const Icon(Icons.cancel, size: 16),
+              icon: const Icon(SymbolesAgri.cancel, size: 16),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AgriColors.errorRed,
                 foregroundColor: Colors.white,
@@ -284,7 +286,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               Navigator.of(contexte).pop('imprimer');
               _editer(DocumentsAchats.bonReception(ligne));
             },
-            icon: const Icon(Icons.print, size: 16),
+            icon: const Icon(SymbolesAgri.print, size: 16),
             style: OutlinedButton.styleFrom(
               foregroundColor: AgriColors.brandForest,
               side: const BorderSide(color: AgriColors.outlineVariant),
@@ -398,7 +400,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           "« — » : le poste ne détient pas cette information. Aucune "
           "référence d'achat ni opérateur ne descend du serveur ; la TVA "
           'récupérable se ventile là-bas, ligne par ligne, selon le taux de '
-          "chaque produit — les lignes d'un achat reçu ne descendent pas.",
+          'chaque produit.',
           cle: const Key('legende-detail-achat'),
         ),
       ],
@@ -676,7 +678,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         OutlinedButton.icon(
           key: const Key('ajouter-au-bon'),
           onPressed: () => _ajouterAuPanier(d),
-          icon: const Icon(Icons.add_circle_outline, size: 18),
+          icon: const Icon(SymbolesAgri.add_circle_outline, size: 18),
           style: OutlinedButton.styleFrom(
             foregroundColor: AgriColors.brandEmerald,
             side: const BorderSide(color: AgriColors.brandEmerald, width: 2),
@@ -739,7 +741,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                     child: IconButton(
                       key: Key('retirer-ligne-$i'),
                       onPressed: () => setState(() => _panier.removeAt(i)),
-                      icon: const Icon(Icons.delete_outline, size: 16),
+                      icon: const Icon(SymbolesAgri.delete_outline, size: 16),
                       color: AgriColors.errorDeep,
                       tooltip: 'Retirer du bon',
                       padding: EdgeInsets.zero,
@@ -806,7 +808,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         FilledButton.icon(
           key: const Key('enregistrer-achat'),
           onPressed: _enregistrer,
-          icon: const Icon(Icons.save, size: 18),
+          icon: const Icon(SymbolesAgri.save, size: 18),
           style: FilledButton.styleFrom(
             backgroundColor: AgriColors.brandEmerald,
             padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
@@ -850,7 +852,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               FilledButton.icon(
                 key: const Key('exporter-pdf-achats'),
                 onPressed: () => _exporterListe(d),
-                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
                 style: FilledButton.styleFrom(
                   backgroundColor: AgriColors.brandEmerald,
                   shape: const StadiumBorder(),
@@ -867,7 +869,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               OutlinedButton.icon(
                 key: const Key('ajouter-remboursement'),
                 onPressed: () => _demanderRemboursement(d),
-                icon: const Icon(Icons.payments, size: 18),
+                icon: const Icon(SymbolesAgri.payments, size: 18),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AgriColors.errorDeep,
                   side: const BorderSide(color: AgriColors.outlineVariant),
@@ -904,7 +906,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               : 'dont ${_montant(d.depensesRetournees)} FCFA retournés '
                     '(comptés comme sur le serveur)',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.payments,
+          icone: SymbolesAgri.payments,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -913,7 +915,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           valeur: '${d.achatsRegles}',
           legende: 'Statut arrêté par le serveur',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.task_alt,
+          icone: SymbolesAgri.task_alt,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -927,22 +929,21 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                     "servie par le serveur : reste dû inconnu du poste"
               : null,
           couleurLisere: AgriColors.errorRed,
-          icone: Icons.warning,
+          icone: SymbolesAgri.warning,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
           key: const Key('kpi-achats-ecarts'),
           libelle: 'Écarts / Retours',
-          // ⚠️ CALCULABLE DEPUIS F0.74 (`returned_at` descend, les retours du poste sont
-          // acquittés) : plus de tiret. Des ACHATS retournés, pas des lignes de retour
-          // comme sur la page web — les lignes d'un achat reçu ne descendent pas.
+          // Ticket U8 — des LIGNES de retour, comme la page web
+          // (`PurchaseReturn::count()`) : `purchase_returns` descend au tirage.
           valeur: '${d.ecartsEtRetours}',
           legende: d.retoursEnAttente > 0
-              ? 'achats retournés · ${d.retoursEnAttente} demande(s) en attente '
+              ? '${d.retoursEnAttente} demande(s) en attente '
                     "d'envoi, non comptée(s)"
-              : 'achats retournés',
+              : null,
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.assignment_return,
+          icone: SymbolesAgri.assignment_return,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -972,9 +973,12 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
                 4,
               ),
+              // Ticket U8 — catégorie de PRODUIT de la première ligne, comme le
+              // web (`ListeAchats`), et non celle du fournisseur.
               (
                 Text(
-                  d.achats[i].achat.supplierCategory ?? '—',
+                  d.achats[i].categorie ?? '—',
+                  key: Key('categorie-achat-$i'),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -1450,7 +1454,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         IconButton(
           key: Key('voir-achat-$index'),
           onPressed: () => _voir(ligne),
-          icon: const Icon(Icons.visibility, size: 18),
+          icon: const Icon(SymbolesAgri.visibility, size: 18),
           color: AgriColors.infoBlue,
           tooltip: 'Voir',
           padding: EdgeInsets.zero,
@@ -1461,7 +1465,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           IconButton(
             key: Key('retour-achat-$index'),
             onPressed: () => _demanderRetour(ligne),
-            icon: const Icon(Icons.cancel, size: 18),
+            icon: const Icon(SymbolesAgri.cancel, size: 18),
             color: AgriColors.errorDeep,
             tooltip: 'Retour fournisseur',
             padding: EdgeInsets.zero,
@@ -1476,7 +1480,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -1493,7 +1497,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

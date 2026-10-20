@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ouvre « Générer un Document » (`existant == null`) ou « Modifier — Documents
 /// Administratifs » (`documents-administratifs.html`).
@@ -79,7 +81,7 @@ class _ModaleDocumentState extends State<_ModaleDocument> {
   bool get _creation => widget.existant == null;
 
   static DateTime _aujourdhui() {
-    final n = DateTime.now();
+    final n = HeureBenin.maintenant();
     return DateTime(n.year, n.month, n.day);
   }
 
@@ -159,7 +161,7 @@ class _ModaleDocumentState extends State<_ModaleDocument> {
 
   Future<DateTime?> _choisir(DateTime? depart) => showDatePicker(
     context: context,
-    initialDate: depart ?? DateTime.now(),
+    initialDate: depart ?? HeureBenin.maintenant(),
     firstDate: DateTime(2000),
     lastDate: DateTime(2100),
   );
@@ -303,7 +305,7 @@ class _ModaleRetraitDocument extends StatelessWidget {
       message:
           "L'enregistrement sera marqué comme archivé (statut inactif). "
           "Aucune suppression définitive n'est effectuée.",
-      icone: Icons.archive,
+      icone: SymbolesAgri.archive,
       couleurIcone: AgriColors.errorDeep,
       actions: [
         BoutonModaleSecondaire(

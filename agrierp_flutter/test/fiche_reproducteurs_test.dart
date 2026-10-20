@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_reproducteurs_screen.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
@@ -7,16 +8,17 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.16 — FICHE REPRODUCTEURS (`fiche-volailles-reproducteurs.html`).
+/// Ticket F0.16 — FICHE REPRODUCTEURS (`fiche-volailles-reproducteurs.html`), 🔁 ticket U12a : mise en page du Blade
+/// (`fiche-reproducteurs.blade.php`).
 ///
 /// ⚠️⚠️ Deux pièges propres à cette fiche.
 ///
 /// 1. **La correspondance des colonnes** : `ponte_total` porte les œufs
 ///    **couvés**, `ne` les poussins **nés**. Les inverser ferait passer une
 ///    couvée pour des naissances — et gonflerait l'effectif.
-/// 2. **Le taux d'éclosion** : rien de couvé n'est PAS un taux de 0 %, encore
-///    moins de 85 % (la valeur de démonstration que le serveur affichait, cf.
-///    ticket 14.61). Une couvée entièrement perdue, elle, vaut bien 0 %.
+/// 2. **Le taux d'éclosion** : jamais 85 % sans œuf couvé (la valeur de démonstration que le serveur affichait,
+///    cf. ticket 14.61). 🔁 U12a : le taux DU JOUR suit le web (`getEclosionRateCalcProperty`, « 0,0 % » sans œuf,
+///    règle de la maquette retenue en 14.61) ; le taux du MOIS (carte) est « — » sans œuf (corrigé au web).
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
@@ -38,7 +40,7 @@ void main() {
             speciesId: 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee',
             speciesCode: Value(codeEspece),
             stage: Value(stade),
-            createdDate: Value(DateTime.now()),
+            createdDate: Value(HeureBenin.maintenant()),
             initialQuantity: Value(effectif),
             currentQuantity: Value(effectif),
           ),
@@ -79,12 +81,12 @@ void main() {
       tester.getTopLeft(find.text(texte)).dy;
 
   String? lecture(WidgetTester tester, String cle) =>
-      tester.widget<Text>(find.byKey(Key('lecture-$cle'))).data;
+      tester.widget<Text>(find.byKey(Key('champ-$cle'))).data;
 
-  // ── Conformité à la maquette ───────────────────────────────────────────
+  // ── Conformité au Blade (ticket U12a) ──────────────────────────────────
 
   testWidgets(
-    'les quatre cartes KPI sont celles de la maquette, dans son ordre',
+    'les quatre cartes KPI sont celles du Blade, dans son ordre',
     (tester) async {
       await afficher(tester);
 
@@ -103,50 +105,41 @@ void main() {
     },
   );
 
-  testWidgets("⚠️ l'ordre des sections suit la maquette", (tester) async {
+  testWidgets("⚠️ l'ordre des sections suit le Blade", (tester) async {
     await afficher(tester);
 
     final positions = [
+      y(tester, 'Saisie Journalière Couvoir & Suivi Chair'),
       y(tester, 'BANDE / LOT CONCERNÉ'),
       y(tester, 'ŒUFS COUVÉS (MIS EN INCUBATION)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
-      y(tester, 'EFFECTIF FINAL DU JOUR (CALCULÉ DYNAMIQUE)'),
+      y(tester, 'EFFECTIF FINAL'),
       y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
-      y(tester, 'Traitements & Vaccins Avicoles Automatiques Prévus'),
-      y(
-        tester,
-        'Attribution Bâtiments & Parcs Volailles Traités (Cochés par défaut)',
-      ),
+      y(tester, 'TRAITEMENTS & PROPHYLAXIE'),
+      y(tester, 'Enregistrer ce Jour'),
     ];
 
-    expect(
-      positions,
-      equals([...positions]..sort()),
-      reason:
-          'ordre maquette : Bande, Couvoir, Morts, Dons, Effectif, '
-          'Rationnement, Pesée, Vaccins, Attribution',
-    );
+    expect(positions, equals([...positions]..sort()), reason: 'ordre du Blade');
   });
 
-  testWidgets('les trois catégories de la maquette sont celles des compteurs', (
+  // 🔁 F0.99 — catégories des morts du WEB (`fiche-reproducteurs.blade.php`), Dons sur les mêmes catégories (15.56).
+  testWidgets('les trois catégories du web portent les morts ET les dons', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['REPRODUCTEUR', 'POULET', 'POUSSIN']) {
-      expect(
-        find.text(categorie),
-        findsNWidgets(2),
-        reason: '$categorie apparaît en Morts ET en Dons',
-      );
+    for (final categorie in ['REPRO', 'POULET', 'POUSSIN']) {
+      expect(find.text(categorie), findsNWidgets(2), reason: '$categorie : Morts et Dons');
     }
+    expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
   });
 
   // ── Le taux d'éclosion ─────────────────────────────────────────────────
 
-  testWidgets("⚠️⚠️ sans œuf couvé, le taux d'éclosion affiche un tiret", (
+  // 🔴→✅ Ticket U14 — règle « inconnu = — » : le web affichait « 0,0 % » ; corrigé au web d'abord (`FichesEspecesU12aTest`).
+  testWidgets("⚠️⚠️ U14 — sans œuf couvé, le taux d'éclosion du jour est « — » comme au web, jamais 85 % ni 0 %", (
     tester,
   ) async {
     await afficher(tester);
@@ -154,19 +147,24 @@ void main() {
     expect(
       lecture(tester, 'taux-eclosion'),
       '—',
-      reason: 'ni 0 %, ni surtout les 85 % de démonstration du serveur',
+      reason: 'rien en incubation : inconnu, surtout pas les 85 % de démonstration (14.61) ni 0 %',
+    );
+    // Le taux du MOIS, lui, est inconnu sans œuf couvé : « — » (🔴→✅ U12a, le web affichait 85,0 %).
+    expect(
+      find.descendant(of: find.byKey(const Key("kpi-Taux d'Éclosion Couvoir")), matching: find.text('—')),
+      findsOneWidget,
     );
   });
 
   testWidgets('34 poussins nés de 40 œufs couvés font 85,0 %', (tester) async {
     await afficher(tester);
 
-    await tester.enterText(find.byKey(const Key('champ-oeufs-couves-0')), '40');
+    await tester.enterText(find.byKey(const Key('champ-oeufs-couves')), '40');
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('champ-poussins-nes-0')), '34');
+    await tester.enterText(find.byKey(const Key('champ-poussins-nes')), '34');
     await tester.pumpAndSettle();
 
-    expect(lecture(tester, 'taux-eclosion'), '85.0 %');
+    expect(lecture(tester, 'taux-eclosion'), '85,0 %');
   });
 
   testWidgets(
@@ -175,17 +173,15 @@ void main() {
       await afficher(tester);
 
       await tester.enterText(
-        find.byKey(const Key('champ-oeufs-couves-0')),
+        find.byKey(const Key('champ-oeufs-couves')),
         '40',
       );
       await tester.pumpAndSettle();
 
       expect(
         lecture(tester, 'taux-eclosion'),
-        '0.0 %',
-        reason:
-            'un fait clinique, tout différent d une absence de mise en '
-            'incubation',
+        '0,0 %',
+        reason: 'un fait clinique : la couvée entière est perdue',
       );
     },
   );
@@ -198,12 +194,12 @@ void main() {
       await afficher(tester);
 
       await tester.enterText(
-        find.byKey(const Key('champ-oeufs-couves-0')),
+        find.byKey(const Key('champ-oeufs-couves')),
         '40',
       );
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byKey(const Key('champ-poussins-nes-0')),
+        find.byKey(const Key('champ-poussins-nes')),
         '34',
       );
       await tester.pumpAndSettle();
@@ -213,9 +209,11 @@ void main() {
       await tester.tap(bouton);
       await tester.pumpAndSettle();
 
-      final fiche = await depot.chargerJour(bandeId, DateTime.now());
+      final fiche = await depot.chargerJour(bandeId, HeureBenin.maintenant());
       expect(fiche?.ponteTotal, 40, reason: 'les œufs mis en incubation');
       expect(fiche?.ne, 34, reason: 'les naissances du jour');
+      expect(find.text('Jour enregistré avec succès.'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
     },
   );
 
@@ -228,7 +226,7 @@ void main() {
         .widget<Text>(find.byKey(const Key('effectif-final')))
         .data;
 
-    await tester.enterText(find.byKey(const Key('champ-poussins-nes-0')), '10');
+    await tester.enterText(find.byKey(const Key('champ-poussins-nes')), '10');
     await tester.pumpAndSettle();
 
     final apres = tester
@@ -246,9 +244,9 @@ void main() {
         .data;
 
     await tester.ensureVisible(
-      find.byKey(const Key('pas-mort-Reproducteur-1')),
+      find.byKey(const Key('pas-mort-repro-1')),
     );
-    await tester.tap(find.byKey(const Key('pas-mort-Reproducteur-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-repro-1')));
     await tester.pumpAndSettle();
 
     final apres = tester
@@ -286,16 +284,14 @@ void main() {
     },
   );
 
-  testWidgets("la section Attribution dit que son référentiel manque", (
+  testWidgets("la section Attribution de la maquette n'est plus rendue (absente du Blade)", (
     tester,
   ) async {
     await afficher(tester);
 
-    expect(
-      find.textContaining('Aucun référentiel de bâtiments'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Aucun référentiel de bâtiments'), findsNothing);
     expect(find.textContaining('Parc R1'), findsNothing);
+    expect(find.text('Réinitialiser'), findsNothing);
   });
 
   testWidgets('sans bande avicole hors ponte, l écran le dit', (tester) async {
@@ -303,10 +299,7 @@ void main() {
 
     await afficher(tester);
 
-    expect(
-      find.textContaining('Aucune bande avicole hors ponte'),
-      findsOneWidget,
-    );
+    expect(find.text('Aucune bande active (Reproducteurs/Goliath/Poussins) pour le moment.'), findsOneWidget);
   });
 
   testWidgets(
@@ -320,11 +313,21 @@ void main() {
 
       await afficher(tester);
 
-      expect(
-        find.textContaining('Aucune bande avicole hors ponte'),
-        findsNothing,
-      );
+      expect(find.textContaining('Aucune bande active'), findsNothing);
       expect(find.byKey(const Key('effectif-final')), findsOneWidget);
     },
   );
+
+  // 🔁 15.56 — un don fait quitter le sujet : l'effectif final baisse aussitôt, comme sur le web.
+  testWidgets('un don saisi réduit aussitôt l effectif final', (tester) async {
+    await afficher(tester);
+
+    final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+    await tester.ensureVisible(find.byKey(const Key('pas-don-poulet-1')));
+    await tester.tap(find.byKey(const Key('pas-don-poulet-1')));
+    await tester.pumpAndSettle();
+    final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
+
+    expect(int.parse(apres!), int.parse(avant!) - 1);
+  });
 }

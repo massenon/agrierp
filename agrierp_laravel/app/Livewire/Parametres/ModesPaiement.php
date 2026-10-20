@@ -108,6 +108,7 @@ class ModesPaiement extends Component
 
     public function saveBank(): void
     {
+        $this->authorize('manage-comptabilite');
         $this->validate([
             'bankName' => ['required', 'string'],
             'rib' => ['required', 'string', 'max:100'],
@@ -139,6 +140,7 @@ class ModesPaiement extends Component
 
     public function saveMomo(): void
     {
+        $this->authorize('manage-comptabilite');
         $this->validate([
             'operatorName' => ['required', 'string'],
             'phoneNumber' => ['required', 'string', 'max:30'],

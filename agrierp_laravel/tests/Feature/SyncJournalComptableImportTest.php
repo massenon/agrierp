@@ -59,10 +59,12 @@ class SyncJournalComptableImportTest extends TestCase
         DB::statement('PRAGMA defer_foreign_keys = ON');
         Carbon::setTestNow('2026-10-10 10:00:00');
 
-        foreach (['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite'] as $nom) {
+        // Ticket S2 : `close-fiscal-year` — la confirmation de clôture exige désormais son autorisation.
+        $permissions = ['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite', 'close-fiscal-year'];
+        foreach ($permissions as $nom) {
             Permission::findOrCreate($nom, 'web');
         }
-        Role::findOrCreate('admin', 'web')->givePermissionTo(['view-parametres', 'manage-parametres', 'view-comptabilite', 'manage-comptabilite']);
+        Role::findOrCreate('admin', 'web')->givePermissionTo($permissions);
         $this->admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
@@ -114,7 +116,7 @@ class SyncJournalComptableImportTest extends TestCase
         app(AccountingEntryService::class)->updateManual(
             $e, $this->caisse->id, $this->ventes->id, 4_000, '2026-10-05', $e->reference,
         );
-        $curseur = '2026-10-10T10:06:00+00:00';
+        $curseur = '2026-10-10T10:06:00';
 
         // 10:10 : restauration de la sauvegarde (retour aux anciennes lignes, ancien updated_at du fichier).
         Carbon::setTestNow('2026-10-10 10:10:00');
@@ -172,7 +174,7 @@ class SyncJournalComptableImportTest extends TestCase
             ->set('moduleAImporter', 'comptabilite')
             ->call('importerModule');
 
-        $ids = array_column($this->tirer('2026-10-10T10:10:00+00:00')->json('accounting_entries'), 'id');
+        $ids = array_column($this->tirer('2026-10-10T10:10:00')->json('accounting_entries'), 'id');
         $this->assertSame([$e->id], $ids);
     }
 
@@ -186,7 +188,7 @@ class SyncJournalComptableImportTest extends TestCase
 
         app(ReinitialisationDonneesService::class)->executer();
 
-        $corps = $this->tirer('2026-10-10T12:00:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T12:00:00')->assertOk()->json();
         $this->assertSame([], $corps['accounting_entry_ids']);
         $this->assertSame([], $corps['accounting_entries']);
         $this->assertSame([], $corps['accounting_entry_lines']);
@@ -212,7 +214,7 @@ class SyncJournalComptableImportTest extends TestCase
 
         $this->assertSame('cloture', FiscalYear::where('year', 2026)->first()->status, "l'écran a bien clôturé");
 
-        $corps = $this->tirer('2026-10-10T10:01:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T10:01:00')->assertOk()->json();
 
         $servie = collect($corps['accounting_entries'])->firstWhere('id', $e->id);
         $this->assertNotNull($servie, "L'écriture verrouillée par la clôture DOIT être servie (updated_at mis à jour).");

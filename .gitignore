@@ -1,0 +1,27 @@
+# Fichiers système et éditeurs (les règles propres à chaque projet
+# vivent dans agrierp_laravel/.gitignore et agrierp_flutter/.gitignore)
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+.fleet/
+.zed/
+
+# Python (outils/ et manuel/build.py)
+__pycache__/
+*.pyc
+
+# Sorties générées du manuel
+/manuel/*.pdf
+
+# Exports de base de données et archives de déploiement : jamais versionnés (ils ont contenu des hash de mots
+# de passe, des jetons et un .env ; retirés de tout l'historique le 17/10/2026).
+/database/*.sql
+*.zip
+.env.dusk.local
+
+# Copies de travail des agents Claude Code (worktrees) : jamais versionnées.
+.claude/worktrees/

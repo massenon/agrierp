@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Comptabilite;
 
+use App\Actions\ReopenFiscalYearAction;
 use App\Models\AccountingEntry;
 use App\Models\AccountingEntryLine;
 use App\Models\AuditLog;
@@ -36,8 +37,8 @@ use Livewire\Component;
  * dans le grand livre.
  *
  * Étape 3 (Clôture définitive) : RÉEL — verrouille (`is_locked = true`)
- * TOUTES les écritures actives de l'exercice clôturé (irréversible,
- * fidèle à l'avertissement du prototype), crée le nouvel exercice
+ * TOUTES les écritures actives de l'exercice clôturé (🔁 ticket 15.53 : plus
+ * irréversible — `rouvrirExercice`, administrateur, journalisé), crée le nouvel exercice
  * (statut ouvert), génère les écritures de report à nouveau (RAN) pour
  * les comptes de bilan (classes 1 à 5) au 1er janvier du nouvel exercice.
  *
@@ -296,8 +297,36 @@ class ClotureExercice extends Component
         unset($this->closures, $this->periodeDejaCloturee);
     }
 
+    /**
+     * Ticket 15.53 — réouverture d'un exercice clôturé. Action EXCEPTIONNELLE réservée à l'administrateur
+     * (même droit que la déclôture d'un mois), journalisée ; la logique vit dans `ReopenFiscalYearAction`.
+     */
+    public function rouvrirExercice(): void
+    {
+        $this->authorize('manage-modules');
+        $year = $this->fiscalYear;
+
+        if (! $year) {
+            return;
+        }
+
+        try {
+            app(ReopenFiscalYearAction::class)->execute($year);
+        } catch (\DomainException $e) {
+            $this->dispatch('close-modal', name: 'modal-confirm-reouverture');
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
+
+        $this->dispatch('close-modal', name: 'modal-confirm-reouverture');
+        $this->dispatch('toast', message: "Exercice {$year->year} rouvert — report à nouveau contre-passé, action journalisée dans les Logs d'Audit.", type: 'warning');
+        $this->refreshComputed();
+    }
+
     public function confirmStep1(): void
     {
+        $this->authorize('close-fiscal-year');
         $year = $this->fiscalYear;
         if (! $year) {
             return;
@@ -360,12 +389,14 @@ class ClotureExercice extends Component
 
             $this->dispatch('toast', message: 'Comptes de charges et produits soldés — résultat net calculé : '.number_format($resultat, 0, ',', ' ').' FCFA.', type: 'success');
         } catch (\Throwable $e) {
-            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+            // Ticket U5 : le motif d'une exception du framework (SQL…) n'est pas montré en anglais.
+            $this->dispatch('toast', message: \App\Support\MessagesErreurFr::pourUtilisateur($e), type: 'error');
         }
     }
 
     public function confirmCloture(): void
     {
+        $this->authorize('close-fiscal-year');
         $year = $this->fiscalYear;
 
         if (! $year || $year->status !== 'ouvert') {

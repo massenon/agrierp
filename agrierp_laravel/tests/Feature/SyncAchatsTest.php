@@ -51,6 +51,12 @@ class SyncAchatsTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->utilisateur->assignRole('admin');
+
         $this->fournisseur = Supplier::create([
             'name' => 'Provenderie du Plateau', 'category' => 'Aliments',
             'phone' => '+22997000000', 'is_active' => true,

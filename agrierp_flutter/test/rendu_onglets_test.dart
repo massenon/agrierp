@@ -218,7 +218,10 @@ void main() {
       ),
       'rapports-exports': (
         'onglet-rapports-',
-        RapportsExportsScreen(depot: RapportsRepository(database: db)),
+        RapportsExportsScreen(
+          depot: RapportsRepository(database: db),
+          peutExporter: true,
+        ),
       ),
       'administration': (
         'onglet-administration-',

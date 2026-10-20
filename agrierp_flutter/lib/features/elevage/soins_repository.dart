@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/sync/gestes_importants.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Soins vétérinaires saisis au poste.
 ///
@@ -66,22 +68,56 @@ class SoinsRepository {
     required AppDatabase database,
     required String deviceId,
     Uuid? uuid,
+    GestesImportants? gestes,
   }) : _db = database,
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
-       _uuid = uuid ?? const Uuid();
+       _uuid = uuid ?? const Uuid(),
+       // ignore: prefer_initializing_formals
+       _gestes = gestes;
 
   final AppDatabase _db;
   final String _deviceId;
   final Uuid _uuid;
 
+  /// Ticket S-T3 — un soin enregistré est un geste important (voir [GestesImportants]). `null` : aucun signal.
+  final GestesImportants? _gestes;
+
+  /// Identifiant du poste — repris par `SoinsVaccinsRepository` pour l'infirmerie et le calendrier (H8b).
+  String get deviceId => _deviceId;
+
+  /// `archiveSoin()` du web (ticket U3, décision client D-U3 du 19/10/2026) : `is_active = false`, la ligne
+  /// RESTE (archivage logique) et repart à l'envoi (`pending`), où le serveur l'archive et journalise
+  /// `veterinary_record.archived`. ⚠️ La période de rémanence créée par le soin n'est PAS touchée : au web non
+  /// plus, archiver un soin ne rend pas la bande vendable.
+  ///
+  /// Ticket S-T7 — déplacé de `SoinsVaccinsRepository` (qui délègue) : ce dépôt est le SEUL écrivain de
+  /// `veterinary_records` au poste (garde-fou `test/ecrivain_unique_test.dart`).
+  Future<void> archiverSoin(String id, {DateTime? quand}) =>
+      (_db.update(
+        _db.veterinaryRecords,
+      )..where((t) => t.id.equals(id))).write(
+        VeterinaryRecordsCompanion(
+          isActive: const Value(false),
+          syncStatus: const Value(SyncStatus.pending),
+          updatedAt: Value(quand ?? DateTime.now()),
+        ),
+      );
+
   /// Protocole prévu pour une espèce, tel que le serveur le sert.
   ///
   /// ⚠️ Jamais de traitement codé en dur : le protocole est éditable depuis
   /// l'écran Paramètres > Élevage, et le figer proposerait un soin périmé.
+  ///
+  /// ⚠️ Ticket H9b — une échéance ARCHIVÉE (au poste ou ailleurs) ne se propose plus.
   Future<List<ProphylaxisScheduleStandard>> protocole(String codeEspece) {
     return (_db.select(_db.prophylaxisScheduleStandards)
-          ..where((t) => t.speciesCode.equals(codeEspece))
+          ..where(
+            (t) => Expression.and([
+              t.speciesCode.equals(codeEspece),
+              t.isActive.equals(true),
+            ]),
+          )
           ..orderBy([(t) => OrderingTerm(expression: t.periodLabel)]))
         .get();
   }
@@ -116,7 +152,7 @@ class SoinsRepository {
     required String codeEspece,
     DateTime? quand,
   }) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
 
     final standards = await protocole(codeEspece);
@@ -182,10 +218,12 @@ class SoinsRepository {
     // l'égalité d'instant : un soin daté avec une heure (10 h 15) est bien du
     // jour, et l'égalité stricte le faisait proposer une seconde fois.
     final lendemain = DateTime(jour.year, jour.month, jour.day + 1);
+    // Ticket U3 — « Un soin archivé ne compte pas » (`ProtocoleDuJourService::soinsDuJour`, `is_active`).
     final soinsDuJour =
         await (_db.select(_db.veterinaryRecords)..where(
               (t) => Expression.and([
                 t.lotId.equals(bande.id),
+                t.isActive.equals(true),
                 t.recordDate.isBiggerOrEqualValue(jour),
                 t.recordDate.isSmallerThanValue(lendemain),
               ]),
@@ -248,10 +286,12 @@ class SoinsRepository {
     a.day,
   ).difference(DateTime.utc(de.year, de.month, de.day)).inDays;
 
-  /// Soins déjà administrés à une bande, le plus récent d'abord.
+  /// Soins déjà administrés à une bande, le plus récent d'abord — ACTIFS seulement (ticket U3, comme au web).
   Future<List<VeterinaryRecord>> historique(String lotId) {
     return (_db.select(_db.veterinaryRecords)
-          ..where((t) => t.lotId.equals(lotId))
+          ..where(
+            (t) => Expression.and([t.lotId.equals(lotId), t.isActive.equals(true)]),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.recordDate, mode: OrderingMode.desc),
@@ -278,7 +318,7 @@ class SoinsRepository {
     int delaiAttenteJours = 0,
     DateTime? quand,
   }) async {
-    final jour = quand ?? DateTime.now();
+    final jour = quand ?? HeureBenin.maintenant();
     late final String soinId;
 
     await _db.transaction(() async {
@@ -294,6 +334,9 @@ class SoinsRepository {
         jour: jour,
       );
     });
+
+    // Ticket S-T3 — APRÈS la transaction : le soin et sa rémanence sont écrits.
+    _gestes?.signaler();
 
     return (await (_db.select(
       _db.veterinaryRecords,
@@ -360,6 +403,8 @@ class SoinsRepository {
     });
 
     if (crees.isEmpty) return const [];
+    // Ticket S-T3 — des soins viennent d'être écrits (rien n'est signalé si tout était déjà administré).
+    _gestes?.signaler();
     return (_db.select(
       _db.veterinaryRecords,
     )..where((t) => t.id.isIn(crees))).get();
@@ -387,7 +432,7 @@ class SoinsRepository {
             id: soinId,
             deviceId: _deviceId,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: jour,
+            updatedAt: HeureBenin.versInstant(jour),
             lotId: lotId,
             actionType: typeAction,
             productUsed: Value(produit),
@@ -410,7 +455,7 @@ class SoinsRepository {
               id: soinId,
               lotId: lotId,
               productUsed: Value(produit),
-              endDate: date.add(Duration(days: delaiAttenteJours)),
+              endDate: HeureBenin.plusJours(date, delaiAttenteJours),
             ),
           );
     }

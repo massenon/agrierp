@@ -29,10 +29,31 @@ class Notification extends Model
      * (Africa/Porto-Novo, UTC+1) : entre 00:00 et 01:00 heure du Bénin, la déduplication des alertes ne
      * reconnaissait plus sa propre ligne. Même convention que les colonnes écrites par Eloquent.
      */
+    /**
+     * Ticket 15.49 — valeurs AUTORISÉES par les colonnes `type` et `severity` (énumérations de la base). MySQL strict
+     * refuse toute autre valeur ; SQLite (tests) l'acceptait en silence : trois écritures fautives étaient passées
+     * inaperçues (`warning`, `error`, `backup.reminder`). Le modèle les refuse désormais partout.
+     */
+    public const TYPES = [
+        'stock_low', 'high_mortality', 'payment_due', 'fiscal_year_reminder', 'prophylaxis_due', 'system',
+        'sale_under_withdrawal', 'reproduction_echec',
+    ];
+
+    public const SEVERITES = ['critique', 'moyen', 'info'];
+
     protected static function booted(): void
     {
         static::creating(function (self $notification) {
             $notification->created_at ??= now();
+        });
+
+        static::saving(function (self $notification) {
+            if (! in_array($notification->type, self::TYPES, true)) {
+                throw new \InvalidArgumentException("Type de notification inconnu : « {$notification->type} ».");
+            }
+            if (! in_array($notification->severity, self::SEVERITES, true)) {
+                throw new \InvalidArgumentException("Gravité de notification inconnue : « {$notification->severity} ».");
+            }
         });
     }
 
@@ -62,6 +83,9 @@ class Notification extends Model
         'stock_low' => 'Stocks',
         'high_mortality' => 'Élevage',
         'prophylaxis_due' => 'Élevage',
+        // Ticket 15.49 — `sale_under_withdrawal` tombait dans « Système » faute d'entrée.
+        'sale_under_withdrawal' => 'Élevage',
+        'reproduction_echec' => 'Élevage',
         'payment_due' => 'Finance',
         'fiscal_year_reminder' => 'Finance',
         'system' => 'Système',

@@ -57,6 +57,16 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   28: [d.supplierPayments],
   31: [d.advanceImputations],
   32: [d.purchaseReturns, d.supplierRefunds, d.supplierCredits],
+  // Ticket 15.46 — transferts entre bandes.
+  39: [d.livestockTransfers],
+  // Ticket H8b (D-H8) — infirmerie et calendrier vétérinaire planifié.
+  41: [d.infirmaryRecords, d.veterinaryCalendarEvents],
+  // Ticket U2 (D-U2) — objectifs de GMQ tirés du serveur.
+  43: [d.growthStandards],
+  // Ticket U9 — grand livre des stocks du serveur, en lecture seule.
+  44: [d.stockMovements],
+  // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
+  47: [d.payslips],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -138,6 +148,64 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
       d.livestockDailyEntries.effectifSmeres,
     ])
       (d.livestockDailyEntries, c),
+  ],
+  // Ticket 15.46 — transferts entre bandes : colonnes dérivées des fiches, bande d'origine.
+  39: [
+    for (final c in [
+      d.livestockDailyEntries.transfertEntree,
+      d.livestockDailyEntries.transfertSortie,
+      d.livestockDailyEntries.transfertEntreeRepro,
+      d.livestockDailyEntries.transfertEntreeSevre,
+      d.livestockDailyEntries.transfertEntreeJeune,
+      d.livestockDailyEntries.transfertSortieRepro,
+      d.livestockDailyEntries.transfertSortieSevre,
+      d.livestockDailyEntries.transfertSortieJeune,
+    ])
+      (d.livestockDailyEntries, c),
+    (d.livestockLots, d.livestockLots.lotSourceId),
+  ],
+  // Ticket H2 — instant de la dernière synchronisation aboutie.
+  40: [(d.syncState, d.syncState.lastSucceededAt)],
+  // Ticket H9b (D-H9) — Paramètres Élevage modifiables au poste : archivage logique, statut d'envoi, instant
+  // de saisie ; délai du rappel des soins ; instant de création de la prophylaxie (tri du web, H9).
+  42: [
+    (d.feedRationStandards, d.feedRationStandards.isActive),
+    (d.feedRationStandards, d.feedRationStandards.syncStatus),
+    (d.feedRationStandards, d.feedRationStandards.updatedAt),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.isActive),
+    (
+      d.prophylaxisScheduleStandards,
+      d.prophylaxisScheduleStandards.syncStatus,
+    ),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.updatedAt),
+    (d.prophylaxisScheduleStandards, d.prophylaxisScheduleStandards.createdAt),
+    (d.feedTypes, d.feedTypes.isActive),
+    (d.feedTypes, d.feedTypes.syncStatus),
+    (d.feedTypes, d.feedTypes.updatedAt),
+    (d.elevageNumberingSettings, d.elevageNumberingSettings.syncStatus),
+    (d.elevageNumberingSettings, d.elevageNumberingSettings.updatedAt),
+    (d.companySettings, d.companySettings.rappelSoinsJours),
+    (d.companySettings, d.companySettings.syncStatus),
+    (d.companySettings, d.companySettings.updatedAt),
+  ],
+  // Ticket U3 (D-U3) — archivage logique des soins au poste comme au web.
+  43: [(d.veterinaryRecords, d.veterinaryRecords.isActive)],
+  // Ticket U10 — colonnes de la fiche reçues pour le Rapport Élevage (Tableau 2, CA Ventes du Lot).
+  45: [
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteSexe),
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteMontant),
+    (d.livestockDailyEntries, d.livestockDailyEntries.treatmentProductId),
+    (d.livestockDailyEntries, d.livestockDailyEntries.treatmentDose),
+    (d.livestockDailyEntries, d.livestockDailyEntries.symptomes),
+  ],
+  // Ticket S-T10 — quantité comptée d'un inventaire.
+  46: [(d.stockAdjustments, d.stockAdjustments.countedQuantity)],
+  // Ticket U13 — archivage des dépenses, descendu du serveur.
+  47: [(d.expenses, d.expenses.isActive)],
+  // Ticket U14 — statut et écriture comptable des dépenses (badge, filtre, règle de modification du web).
+  48: [
+    (d.expenses, d.expenses.status),
+    (d.expenses, d.expenses.accountingEntryId),
   ],
 };
 

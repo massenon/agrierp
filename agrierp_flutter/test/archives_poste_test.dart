@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
 import 'package:agrierp/features/administration/administration_screen.dart';
@@ -13,6 +14,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Serveur de synchronisation feint : sert, tirage après tirage, les blocs [tirages]
 /// (le dernier se répète), répond [reponsePush] à l'envoi et note ce qui est envoyé.
@@ -114,7 +116,7 @@ void main() {
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
   DateTime jourLocal() {
-    final n = DateTime.now();
+    final n = HeureBenin.maintenant();
     return DateTime(n.year, n.month, n.day);
   }
 
@@ -1689,7 +1691,7 @@ void main() {
       '⚠️⚠️ les libellés de cartes de l’écran sont ceux de archivage-documents.html (lus dans la maquette)',
       () {
         final maquette = File(
-          'C:/Projects/agrierp_laravel/prototype_html/archivage-documents.html',
+          '$dossierPrototype/archivage-documents.html',
         );
         if (!maquette.existsSync()) {
           markTestSkipped('maquette absente de ce poste de travail');

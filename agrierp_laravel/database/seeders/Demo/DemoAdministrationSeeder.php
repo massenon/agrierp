@@ -51,7 +51,7 @@ class DemoAdministrationSeeder extends Seeder
             'promoter_name' => 'Cabinet FAGUEZ SARL',
             'address' => 'Ikpinlè, Commune d\'Adja-Ouèrè, Département du Plateau, Bénin',
             'phone' => '+229 97 00 00 00',
-            'email' => 'contact@olouwachegoun.bj',
+            'email' => 'contact@fermeolouwachegoun.com',
             'ifu' => '3202512345678',
             'rccm' => 'RB/PTN/26 B 1234',
         ]);

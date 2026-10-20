@@ -49,7 +49,11 @@ class SyncMotifsRefusFrancaisTest extends TestCase
 
         Carbon::setTestNow('2026-10-14 12:00:00');
 
-        $permissions = ['view-ventes', 'manage-ventes', 'manage-achats', 'manage-stocks', 'manage-administration'];
+        // Ticket S1 : `manage-elevage` et `manage-rh` — l'envoi contrôle désormais le rôle de chaque table.
+        $permissions = [
+            'view-ventes', 'manage-ventes', 'manage-achats', 'manage-stocks', 'manage-administration',
+            'manage-elevage', 'manage-rh',
+        ];
         foreach ($permissions as $nom) {
             Permission::findOrCreate($nom, 'web');
         }

@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/stocks/gestion_stocks_screen.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
@@ -18,10 +19,9 @@ import 'cartes_attendues.dart';
 /// existait sans producteur : un inventaire physique constaté au magasin
 /// n'avait aucun moyen d'être saisi hors ligne.
 ///
-/// ⚠️⚠️ **TOUTE LA VALORISATION EST HORS DE PORTÉE.** Le PMP se calcule côté
-/// serveur par moyenne pondérée des lignes d'achat ; `purchase_lines` ne
-/// descend pas et `products` ne porte aucune colonne de coût. L'estimer depuis
-/// le prix de VENTE gonflerait l'actif.
+/// Ticket U8 — la valorisation (PMP, valeurs, écarts en FCFA) est désormais celle
+/// du web, sur les lignes d'achat descendues depuis U4 : voir
+/// `valorisation_stocks_test.dart` (jeu fait à la main et parité exécutée PHP).
 void main() {
   late AppDatabase db;
   late StocksRepository depot;
@@ -90,6 +90,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Ticket U11 — l'onglet Ajustement s'ouvre sur « -- Sélectionner -- » : le produit se choisit.
+  Future<void> choisir(WidgetTester tester, String libelle) async {
+    await tester.tap(find.byKey(const Key('adj-produit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(libelle).last);
+    await tester.pumpAndSettle();
+  }
+
   group('dépôt', () {
     /// ⚠️⚠️ LE CŒUR DU TICKET : le poste sait enfin saisir un écart.
     test('⚠️⚠️ un manquant produit une SORTIE en file d envoi', () async {
@@ -149,15 +157,16 @@ void main() {
       );
     });
 
-    test('le motif est obligatoire', () async {
-      expect(
-        () => depot.enregistrerEcart(
-          productId: provende,
-          stockPhysique: 40,
-          motif: '',
-        ),
-        throwsA(isA<ArgumentError>()),
+    /// 🔴→✅ Ticket U11 — le web ne valide pas le motif (`$this->adjReason ?: null`) : le poste non plus.
+    test('U11 — le motif est facultatif, comme au web', () async {
+      final ecart = await depot.enregistrerEcart(
+        productId: provende,
+        stockPhysique: 40,
+        motif: '',
       );
+
+      expect(ecart.type, 'sortie');
+      expect(ecart.quantity, 5);
     });
 
     /// 🔴→✅ Le badge « en attente » compte l'ajustement : la table figure
@@ -224,7 +233,10 @@ void main() {
       );
     });
 
-    testWidgets('⚠️⚠️ la valorisation dit pourquoi elle est absente', (
+    /// Ticket U8 — la valorisation est celle du web (voir `valorisation_stocks_test`) : sans aucune
+    /// ligne d'achat, aucun produit n'a de PMP, et le web affiche « 0 FCFA » (un produit sans PMP est
+    /// exclu de la somme), PMP et valeur « — » sur chaque ligne.
+    testWidgets('⚠️⚠️ sans achat, la valorisation vaut 0 FCFA et chaque PMP est un tiret', (
       tester,
     ) async {
       await afficher(tester);
@@ -232,11 +244,15 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('kpi-Valorisation Stocks')),
-          matching: find.text('—'),
+          matching: find.text('0 FCFA'),
         ),
         findsOneWidget,
       );
-      expect(find.text('Prix de revient absent du catalogue'), findsOneWidget);
+      expect(find.text('Basée sur le PMP réel (achats)'), findsOneWidget);
+      for (var i = 0; i < 2; i++) {
+        expect(tester.widget<Text>(find.byKey(Key('pmp-$i'))).data, '—');
+        expect(tester.widget<Text>(find.byKey(Key('valeur-$i'))).data, '—');
+      }
     });
 
     testWidgets('les alertes de seuil comptent les produits sous leur seuil', (
@@ -245,13 +261,109 @@ void main() {
       await afficher(tester);
 
       // Œufs : 8 pour un seuil de 30. La provende, elle, est à 45 pour 15.
+      // Ticket U9 — `$kpis['alertes'].' réf.'` du Blade.
       expect(
         find.descendant(
           of: find.byKey(const Key('kpi-Alertes de Seuil')),
-          matching: find.text('1'),
+          matching: find.text('1 réf.'),
         ),
         findsOneWidget,
       );
+    });
+
+    /// 🔴→✅ Ticket U9 — `urgence = alert_threshold > 0 && stock <= alert_threshold` : un seuil NUL ne déclenche
+    /// rien au web. Le poste comptait « Sous seuil » un produit à 0 dont le seuil valait 0.
+    testWidgets('U9 — un seuil nul n est jamais une alerte, comme au web', (
+      tester,
+    ) async {
+      await (db.update(db.products)..where((t) => t.id.equals(oeufs))).write(
+        const ProductsCompanion(stockQty: Value(0), alertThreshold: Value(0)),
+      );
+      await afficher(tester);
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kpi-Alertes de Seuil')),
+          matching: find.text('0 réf.'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Critique'), findsNothing);
+      expect(find.text('Normal'), findsNWidgets(2));
+    });
+
+    /// 🔴→✅ Ticket U9 — `Product::where('is_active', true)->orderBy('name')` : le poste triait par CODE.
+    testWidgets('U9 — le tableau est trié par NOM, comme au web (pas par code)', (
+      tester,
+    ) async {
+      // Code « AAA-000 » (premier par code), nom « Zinc… » (dernier par nom) ; « Bâche » s'intercale par sa
+      // collation (accent ignoré), pas après « Œufs ».
+      for (final (id, sku, nom) in [
+        ('dddddddd-0000-4000-8000-dddddddddddd', 'AAA-000', 'Zinc oxyde 1kg'),
+        ('eeeeeeee-0000-4000-8000-eeeeeeeeeeee', 'ZZZ-999', 'bâche agricole'),
+      ]) {
+        await db
+            .into(db.products)
+            .insert(
+              ProductsCompanion.insert(
+                id: id,
+                sku: sku,
+                name: nom,
+                unit: 'u',
+                pricingMode: 'fixe',
+              ),
+            );
+      }
+      await afficher(tester);
+
+      String texte(String cle) =>
+          tester.widget<Text>(find.byKey(Key(cle))).data!;
+      expect([for (var i = 0; i < 4; i++) texte('designation-$i')], [
+        'Aliment ponte 25kg',
+        'bâche agricole',
+        'Œufs de table (plateau)',
+        'Zinc oxyde 1kg',
+      ]);
+      expect(texte('code-0'), 'ALI-001');
+    });
+
+    /// Ticket U9 — `rtrim(rtrim(number_format($stock, 2, '.', ''), '0'), '.')` : « 12.5 », jamais « 12.50 ».
+    testWidgets('U9 — la quantité en stock suit le format du Blade', (
+      tester,
+    ) async {
+      await (db.update(db.products)..where((t) => t.id.equals(provende)))
+          .write(const ProductsCompanion(stockQty: Value(12.5)));
+      await afficher(tester);
+
+      expect(tester.widget<Text>(find.byKey(const Key('stock-0'))).data,
+          '12.5 sac');
+      expect(tester.widget<Text>(find.byKey(const Key('stock-1'))).data,
+          '8 plateau');
+    });
+
+    /// Ticket U9 — le filtre « Catégorie » du web porte sur les catégories ACTIVES, par identifiant.
+    testWidgets('U9 — le filtre de catégorie ne propose que les catégories actives', (
+      tester,
+    ) async {
+      await db
+          .into(db.productCategories)
+          .insert(
+            ProductCategoriesCompanion.insert(
+              id: 'ffffffff-0000-4000-8000-ffffffffffff',
+              label: 'Archivée',
+              isActive: const Value(false),
+            ),
+          );
+      await afficher(tester);
+
+      await tester.tap(find.byKey(const Key('stock-categorie')));
+      await tester.pumpAndSettle();
+      expect(find.text('Archivée'), findsNothing);
+      await tester.tap(find.text('Aliments').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aliment ponte 25kg'), findsOneWidget);
+      expect(find.text('Œufs de table (plateau)'), findsNothing);
     });
 
     testWidgets('le tableau porte les huit colonnes de la maquette', (
@@ -264,8 +376,8 @@ void main() {
       // prototype, reproduite et signalée, jamais harmonisée en silence.
       for (final colonne in [
         'CODE',
-        'DESIGNATION',
-        'CATEGORIE',
+        'DÉSIGNATION',
+        'CATÉGORIE',
         'STOCK',
         'PMP UNIT.',
         'VALEUR',
@@ -276,11 +388,21 @@ void main() {
       }
     });
 
+    /// 🔴→✅ Ticket U9 — les deux pastilles du Blade : « Critique » et « Normal » (ni « Sous seuil » ni « Négatif »).
     testWidgets("l'urgence signale le produit sous seuil", (tester) async {
       await afficher(tester);
 
-      expect(find.text('Sous seuil'), findsOneWidget);
+      expect(find.text('Critique'), findsOneWidget);
       expect(find.text('Normal'), findsOneWidget);
+      expect(find.text('Sous seuil'), findsNothing);
+      // Les œufs (8 pour un seuil de 30) sont la deuxième ligne (tri par nom).
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('urgence-1')),
+          matching: find.text('Critique'),
+        ),
+        findsOneWidget,
+      );
     });
 
     /// ⚠️ Un stock négatif n'est pas une fraude : c'est une ENTRÉE NON SAISIE,
@@ -292,7 +414,15 @@ void main() {
 
       await afficher(tester);
 
-      expect(find.text('Négatif'), findsOneWidget);
+      // Ticket U9 — comme le Blade : la cellule Stock en rouge gras et la mention « Entrée non saisie », jamais une
+      // pastille « Négatif » (l'urgence reste celle du seuil).
+      expect(find.text('Négatif'), findsNothing);
+      expect(find.byKey(const Key('entree-non-saisie-1')), findsOneWidget);
+      expect(find.text('ENTRÉE NON SAISIE'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('stock-1'))).data,
+        '-3 plateau',
+      );
     });
 
     testWidgets('la recherche filtre par nom et par code', (tester) async {
@@ -315,6 +445,7 @@ void main() {
     ) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       // ⚠️ Le libellé porte le théorique, comme dans la maquette : l'opérateur
       // compare sans changer d'écran.
@@ -331,32 +462,28 @@ void main() {
     testWidgets("l'écart se calcule à la saisie", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(
-          of: find.byKey(const Key('adj-ecart')),
-          matching: find.text('-5'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('adj-ecart'))).data,
+        '-5',
       );
     });
 
     testWidgets("un excédent s'affiche avec son signe", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '52');
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(
-          of: find.byKey(const Key('adj-ecart')),
-          matching: find.text('+7'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('adj-ecart'))).data,
+        '+7',
       );
     });
 
@@ -372,24 +499,28 @@ void main() {
       }
     });
 
-    testWidgets("sans motif, l'ajustement est refusé avec sa raison", (
+    /// 🔴→✅ Ticket U11 — le motif est facultatif au web : sans motif, l'ajustement passe.
+    testWidgets("U11 — sans motif, l'ajustement est accepté comme au web", (
       tester,
     ) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('adj-valider')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('adj-erreur')), findsOneWidget);
-      expect(await db.select(db.stockAdjustments).get(), isEmpty);
+      expect(find.byKey(const Key('adj-erreur-produit')), findsNothing);
+      expect(await db.select(db.stockAdjustments).get(), hasLength(1));
+      ToastAgri.toutRetirer();
     });
 
     testWidgets("l'ajustement validé apparaît au journal", (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Ajustement / Correction');
+      await choisir(tester, 'Aliment ponte 25kg (Théorique : 45)');
 
       await tester.enterText(find.byKey(const Key('adj-physique')), '40');
       await tester.pumpAndSettle();
@@ -399,28 +530,59 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('adj-valider')));
       await tester.pumpAndSettle();
+      // Le toast du web se retire seul après 3,5 s.
+      await tester.pump(ToastAgri.duree);
 
       await ouvrir(tester, 'Journal des Mouvements');
 
       expect(find.byKey(const Key('mouvement-0')), findsOneWidget);
       expect(find.text('Sortie'), findsOneWidget);
-      expect(find.text('Vol / Disparition'), findsOneWidget);
+      // Ticket U9 — motif du Blade : `referenceLabel('inventaire')` (« Inventaire ») — motif ; quantité signée.
+      expect(find.text('Inventaire — Vol / Disparition'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('quantite-mouvement-0'))).data,
+        '-5',
+      );
     });
 
     // ── Onglet Journal ──────────────────────────────────────────────────────
 
-    /// ⚠️⚠️ Présenter ces seules lignes comme « le journal » ferait croire à
-    /// un magasin sans mouvement.
-    testWidgets('⚠️⚠️ le journal dit qu il ne voit que ce poste', (
+    /// 🔴→✅ Ticket U9 — le journal est celui de la FERME : les mouvements descendus du serveur (ventes, achats,
+    /// production, ajustements du web), plus les ajustements de ce poste en attente d'envoi.
+    testWidgets('U9 — le journal montre le grand livre de la ferme et les saisies en attente', (
       tester,
     ) async {
+      await db
+          .into(db.stockMovements)
+          .insert(
+            StockMovementsCompanion.insert(
+              id: '11111111-0000-4000-8000-111111111111',
+              productId: oeufs,
+              type: 'sortie',
+              quantity: 2.5,
+              referenceType: 'sale',
+              referenceId: const Value('abcdef12-3456-4789-8abc-def123456789'),
+              movementDate: DateTime(2026, 10, 3, 9, 15),
+            ),
+          );
+      await depot.enregistrerEcart(
+        productId: provende,
+        stockPhysique: 40,
+        motif: 'Casse de matériel',
+      );
       await afficher(tester);
       await ouvrir(tester, 'Journal des Mouvements');
 
-      expect(
-        find.textContaining("Ajustements d'inventaire saisis sur ce poste"),
-        findsOneWidget,
-      );
+      String texte(String cle) =>
+          tester.widget<Text>(find.byKey(Key(cle))).data!;
+      // Le plus récent d'abord : l'ajustement en attente (daté de maintenant), puis la vente du 3.
+      expect(texte('motif-mouvement-0'), 'Inventaire — Casse de matériel');
+      expect(texte('quantite-mouvement-0'), '-5');
+      expect(texte('motif-mouvement-1'), 'Vente');
+      expect(texte('quantite-mouvement-1'), '-2.5');
+      expect(texte('reference-mouvement-1'), 'ABCDEF12');
+      expect(find.text('03/10/2026 09:15'), findsOneWidget);
+      expect(find.byKey(const Key('mouvement-2')), findsNothing);
     });
 
     testWidgets('le journal porte les sept colonnes de la maquette', (
@@ -431,11 +593,12 @@ void main() {
 
       for (final colonne in [
         'DATE / HEURE',
-        'REFERENCE',
+        // Ticket U11 — accentués comme le Blade.
+        'RÉFÉRENCE',
         'PRODUIT',
         'TYPE',
         'MOTIF',
-        'QUANTITE',
+        'QUANTITÉ',
         'VALEUR',
       ]) {
         expect(find.text(colonne), findsOneWidget, reason: colonne);
@@ -447,7 +610,7 @@ void main() {
       await ouvrir(tester, 'Journal des Mouvements');
 
       expect(
-        find.text('— Aucun ajustement saisi sur ce poste —'),
+        find.text('Aucun mouvement enregistré pour le moment.'),
         findsOneWidget,
       );
     });

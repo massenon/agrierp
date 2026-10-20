@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/tableau_mensuel.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_reproducteurs_screen.dart';
@@ -8,22 +9,20 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.29 — TABLEAU MENSUEL DE LA FICHE REPRODUCTEURS.
+/// Ticket F0.29 — TABLEAU MENSUEL DE LA FICHE REPRODUCTEURS, 🔁 F0.99 / U12a : celui du Blade
+/// (`fiche-reproducteurs.blade.php`) — Date | Couvoir (Couvés, Nés) | Morts (total) (Repro+Poulet+Poussin) | Effectif
+/// Final | Taux Mort % | Poids Général (g), TOUS les jours du mois, et la note du Blade sous le tableau.
 ///
-/// ⚠️ **« LOT / SOUCHE » EST PLACÉ AVANT LES GROUPES**, exactement comme dans
-/// `fiche-volailles-reproducteurs.html`. C'est la seule des cinq fiches à
-/// intercaler une colonne entre la date et le premier groupe.
-///
-/// ⚠️⚠️ **REPRO / POULET / POUSSIN AFFICHENT UN TIRET.** La ventilation des
-/// morts n'existe qu'à la saisie : la table n'a qu'une colonne `mort`. La
-/// mortalité reste lisible dans « Taux Mort % », colonne de la maquette — rien
-/// n'a été ajouté pour compenser.
+/// ⚠️⚠️ La ventilation Repro / Poulet / Poussin des morts n'est pas conservée : la colonne porte le TOTAL enregistré.
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
   late SoinsRepository soins;
 
   const bandeId = 'dddddddd-1111-4111-8111-dddddddddddd';
+  final maintenant = HeureBenin.maintenant();
+  final joursDuMois = DateTime(maintenant.year, maintenant.month + 1, 0).day;
+  String deux(int n) => n.toString().padLeft(2, '0');
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -48,15 +47,7 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<void> journee(
-    int jour, {
-    int couves = 0,
-    int nes = 0,
-    int mort = 0,
-    int effectif = 200,
-    double? moyenneG,
-  }) async {
-    final maintenant = DateTime.now();
+  Future<void> journee(int jour, {int couves = 0, int nes = 0, int mort = 0, int effectif = 200, double? moyenneG}) async {
     await db
         .into(db.livestockDailyEntries)
         .insert(
@@ -77,52 +68,32 @@ void main() {
 
   final tableau = find.byType(TableauMensuel);
 
+  /// `hidden lg:block` : le tableau n'existe qu'à partir de 1 024 px, comme au web.
   Future<void> afficher(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: FicheReproducteursScreen(depot: depot, soins: soins),
-      ),
-    );
+    tester.view.physicalSize = const Size(1600, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: FicheReproducteursScreen(depot: depot, soins: soins)));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('⚠️ les groupes de la maquette sont présents', (tester) async {
+  Finder ligne(int index) => find.byKey(Key('ligne-mois-$index'));
+
+  testWidgets('⚠️ les groupes du Blade sont présents', (tester) async {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
-    // ⚠️ PORTÉE LIMITÉE AU TABLEAU : « Morts par Catégorie » titre aussi une
-    // section du formulaire, plus haut dans la fiche.
-    for (final g in ['COUVOIR', 'MORTS PAR CATÉGORIE']) {
-      expect(
-        find.descendant(of: tableau, matching: find.text(g)),
-        findsOneWidget,
-        reason: g,
-      );
+    for (final g in ['COUVOIR', 'MORTS (TOTAL)']) {
+      expect(find.descendant(of: tableau, matching: find.text(g)), findsOneWidget, reason: g);
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
+  testWidgets('toutes les colonnes du web sont là, dans le libellé du Blade', (tester) async {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
-    for (final c in [
-      'DATE',
-      'LOT / SOUCHE',
-      'COUVÉS',
-      'NÉS',
-      'REPRO',
-      'POULET',
-      'POUSSIN',
-      'EFFECTIF FINAL',
-      'TAUX MORT %',
-      'POIDS GÉNÉRAL (G)',
-      'TRAITEMENTS & PROPHYLAXIE',
-    ]) {
-      expect(
-        find.descendant(of: tableau, matching: find.text(c)),
-        findsOneWidget,
-        reason: c,
-      );
+    for (final c in ['DATE', 'Couvés', 'Nés', 'Repro+Poulet+Poussin', 'EFFECTIF FINAL', 'TAUX MORT %', 'POIDS GÉNÉRAL (G)']) {
+      expect(find.descendant(of: tableau, matching: find.text(c)), findsOneWidget, reason: c);
     }
   });
 
@@ -131,19 +102,19 @@ void main() {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
-    expect(find.text('120'), findsWidgets);
-    expect(find.text('96'), findsWidgets);
+    expect(find.descendant(of: ligne(2), matching: find.text('120')), findsOneWidget);
+    expect(find.descendant(of: ligne(2), matching: find.text('96')), findsOneWidget);
   });
 
-  testWidgets('⚠️ le lot est rappelé sur chaque ligne', (tester) async {
+  // 🔁 F0.99 — ni « Lot / Souche » ni « Traitements & Prophylaxie » : le web n'a pas ces colonnes.
+  testWidgets('les colonnes absentes du web ne sont pas affichées, la note du Blade l est', (tester) async {
     await journee(3, couves: 120);
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('AVI-REP-01')),
-      findsOneWidget,
-    );
+    for (final c in ['LOT / SOUCHE', 'TRAITEMENTS & PROPHYLAXIE']) {
+      expect(find.descendant(of: tableau, matching: find.text(c)), findsNothing, reason: c);
+    }
+    expect(find.byKey(const Key('note-ventilation-morts')), findsOneWidget);
   });
 
   /// ⚠️ 200 g de moyenne × 200 sujets = 40 000 g pesés, pas 200.
@@ -151,31 +122,23 @@ void main() {
     await journee(3, effectif: 200, moyenneG: 200);
     await afficher(tester);
 
-    expect(find.text('40000'), findsOneWidget);
+    expect(find.descendant(of: ligne(2), matching: find.text('40000')), findsOneWidget);
   });
 
-  testWidgets('⚠️⚠️ les trois catégories de morts affichent un tiret', (
-    tester,
-  ) async {
+  testWidgets('⚠️⚠️ la colonne des morts porte le total enregistré', (tester) async {
     await journee(3, couves: 120, mort: 4, effectif: 200, moyenneG: 200);
     await afficher(tester);
 
-    // Repro, Poulet, Poussin + Traitements & Prophylaxie.
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('—')),
-      findsNWidgets(4),
-    );
+    expect(find.descendant(of: ligne(2), matching: find.text('4')), findsOneWidget);
+    expect(find.descendant(of: ligne(2), matching: find.text('—')), findsNothing);
   });
 
-  /// 200 fin + 4 morts = 204 au départ → 4/204 = 2,0 %.
-  testWidgets('le taux de mortalité reste lisible malgré les tirets', (
-    tester,
-  ) async {
-    await journee(3, mort: 4, effectif: 200);
+  /// 4 morts ÷ 200 (effectif initial, `previousEffectif()`) = 2,0 %.
+  testWidgets('le taux de mortalité est lisible', (tester) async {
+    await journee(3, mort: 4, effectif: 196);
     await afficher(tester);
 
-    expect(find.text('2.0'), findsWidgets);
+    expect(find.descendant(of: ligne(2), matching: find.text('2.0')), findsOneWidget);
   });
 
   testWidgets('toucher une ligne charge cette journée', (tester) async {
@@ -184,17 +147,20 @@ void main() {
 
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    await tester.ensureVisible(ligne);
-    await tester.tap(ligne);
+    await tester.ensureVisible(ligne(2));
+    await tester.tap(ligne(2));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Jour 3 ('), findsWidgets);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('date-choisie'))).data,
+      '03/${deux(maintenant.month)}/${maintenant.year}',
+    );
   });
 
-  testWidgets('sans journée saisie, le tableau le dit', (tester) async {
+  testWidgets('🔁 U12a — sans journée saisie, tous les jours du mois sont listés', (tester) async {
     await afficher(tester);
 
-    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsOneWidget);
+    expect(ligne(joursDuMois - 1), findsOneWidget);
+    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsNothing);
   });
 }

@@ -27,7 +27,7 @@ class NotificationsSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::where('email', 'dg@olouwachegoun.bj')->first();
+        $admin = User::where('username', 'admin')->first();
 
         if (! $admin) {
             return;

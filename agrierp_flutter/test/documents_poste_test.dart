@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/widgets/modale_agri.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
@@ -14,6 +15,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Serveur de synchronisation feint : sert, tirage après tirage, les blocs [tirages]
 /// (le dernier se répète), répond [reponsePush] à l'envoi et note ce qui est envoyé.
@@ -115,7 +117,7 @@ void main() {
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
   DateTime jourLocal() {
-    final n = DateTime.now();
+    final n = HeureBenin.maintenant();
     return DateTime(n.year, n.month, n.day);
   }
 
@@ -482,7 +484,7 @@ void main() {
     test(
       '⚠️⚠️ « Générés (mois) » et « En attente » recalculés INDÉPENDAMMENT (valeurs écrites à la main)',
       () async {
-        final n = DateTime.now();
+        final n = HeureBenin.maintenant();
         final a = n.year;
         final m = n.month;
         // (clé, date, statut, actif, synchro)
@@ -1052,7 +1054,7 @@ void main() {
     test(
       '⚠️⚠️ un retrait REFUSÉ reste visible : ligne conservée, motif mot pour mot, hors des cartes',
       () async {
-        final n = DateTime.now();
+        final n = HeureBenin.maintenant();
         await document('d1', date: DateTime(n.year, n.month, 5));
         await document('d2', date: DateTime(n.year, n.month, 6));
         await depot.retirerDocument(uuid('d1'));
@@ -1642,7 +1644,7 @@ void main() {
     testWidgets(
       '⚠️⚠️ CARTES : « Modèles disponibles » est un TIRET (jamais 0), « Générés (mois) » et « En attente » recalculés',
       (tester) async {
-        final n = DateTime.now();
+        final n = HeureBenin.maintenant();
         await document(
           'a',
           date: DateTime(n.year, n.month, 3),
@@ -1711,7 +1713,7 @@ void main() {
       '⚠️⚠️ les libellés de cartes de l’écran sont ceux de documents-administratifs.html (lus dans la maquette)',
       () {
         final maquette = File(
-          'C:/Projects/agrierp_laravel/prototype_html/documents-administratifs.html',
+          '$dossierPrototype/documents-administratifs.html',
         );
         if (!maquette.existsSync()) {
           markTestSkipped('maquette absente de ce poste de travail');

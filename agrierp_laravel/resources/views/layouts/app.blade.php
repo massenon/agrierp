@@ -171,6 +171,11 @@
             <div class="flex items-center gap-sm md:gap-md">
                 <livewire:shared.global-search />
 
+                {{-- Ticket H3 — état de synchronisation des postes (administrateur). --}}
+                @can('manage-users')
+                    <livewire:shared.etat-synchronisation-postes />
+                @endcan
+
                 <livewire:shared.notification-bell />
 
                 <div x-data="{ open: false }" class="relative" @click.outside="open = false">

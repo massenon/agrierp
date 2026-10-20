@@ -164,13 +164,15 @@ void main() {
       'lib/features/stocks/catalogue_produits_screen.dart',
     ],
     'historique-ventes.html': ['lib/features/ventes/ventes_devis_screen.dart'],
-    'suivi-reproduction.html': [
-      'lib/features/elevage/suivi_reproduction_screen.dart',
-    ],
+    // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
+    // maquette : titres, colonnes, statuts, KPI, modales et messages sont lus dans
+    // `suivi-reproduction.blade.php` par `suivi_reproduction_blade_test.dart`.
     'vms-registre.html': ['lib/features/elevage/soins_vaccins_screen.dart'],
     'vms-calendrier.html': ['lib/features/elevage/soins_vaccins_screen.dart'],
     'elevage-dashboard.html': [
       'lib/features/elevage/dashboard_elevage_screen.dart',
+      // Ticket H6 : les titres des cartes de filière viennent du repository (espèces activées).
+      'lib/features/elevage/dashboard_elevage_repository.dart',
     ],
     'dashboard.html': ['lib/features/pilotage/tableau_de_bord_screen.dart'],
     // Mon Profil (ticket F0.57).
@@ -293,10 +295,9 @@ void main() {
       'lib/features/achats/achats_modales.dart',
     ],
     'bons-commande.html': ['lib/features/achats/achats_commandes_screen.dart'],
-    'parametres-elevage.html': [
-      'lib/features/elevage/parametres_elevage_screen.dart',
-      'lib/features/elevage/parametres_elevage_repository.dart',
-    ],
+    // Ticket H9 : le Blade fait foi. `parametres-elevage.html` ne se compare plus à la maquette : onglets,
+    // titres, colonnes, modales, boutons et messages sont lus dans `parametres-elevage.blade.php` et
+    // `ParametresElevage.php` par `parametres_elevage_blade_test.dart`.
     // Les quatre onglets du hub Clients et Créances (ticket F0.43).
     'liste-clients.html': [
       'lib/features/clients/clients_creances_screen.dart',
@@ -322,7 +323,7 @@ void main() {
     //    suivant (ticket F0.39). ⚠️ Depuis F0.67, créer et modifier un produit
     //    PASSE PAR LE SERVEUR (en ligne) : « Nouveau Produit » et « Modifier le
     //    Produit » sont portés. Restent en lecture seule : archivage, seuils.
-    'Ajouter Stock': 'référentiel en lecture seule au poste',
+    // Ticket U10 — « Ajouter Stock » est porté (modale du Blade, envoi rejoué par le serveur) : exemption retirée.
     'Confirmer la Suppression ?': 'référentiel en lecture seule au poste',
     'Oui, Supprimer définitivement': 'référentiel en lecture seule au poste',
     'Configurer un Seuil': 'référentiel en lecture seule au poste',
@@ -335,50 +336,16 @@ void main() {
     'Importer des Soins (CSV/Excel)': 'import de fichier non embarqué',
     'Télécharger PDF': "chaîne d'édition non embarquée",
 
-    // ── Correction d'un cycle de reproduction : le poste ne DÉCLARE que la
-    //    saillie ; palpation, mise bas et sevrage corrigent un cycle que le
-    //    serveur a pu faire évoluer (ticket F0.35).
-    'Modifier la Fiche Lapine': 'correction de cycle réservée au web',
-    'Modifier la Fiche Truie': 'correction de cycle réservée au web',
-    "Modifier le Lot d'Incubation": 'correction de cycle réservée au web',
-    'Modifier le Bac de Ponte': 'correction de cycle réservée au web',
-    'Saisir Sevrage': 'correction de cycle réservée au web',
-    'Saisir Mise Bas': 'correction de cycle réservée au web',
-    'Enregistrer le Résultat': 'correction de cycle réservée au web',
-    'Enregistrer la Mise Bas': 'correction de cycle réservée au web',
-    'Enregistrer le Sevrage': 'correction de cycle réservée au web',
+    // ── Ticket H7 : le Blade fait foi. Suivi Reproduction ne se compare plus à la maquette :
+    //    les 28 exemptions qui ne concernaient que `suivi-reproduction.html` (corrections de
+    //    cycle, panneaux Volailles / Escargots, accordéon des KPI) sont retirées avec la page.
+    //    « Enregistrer les Modifications » reste : d'autres pages portées la contiennent.
     'Enregistrer les Modifications': 'correction de cycle réservée au web',
-    // ⚠️ Le titre porte un emplacement de nom de truie (« — ») que la
-    //    maquette remplit en JavaScript.
-    'Enregistrer la Mise Bas — —': 'correction de cycle réservée au web',
-
-    // ── Panneaux Volailles et Escargots : rendus en RÉSUMÉ, jamais en second
-    //    formulaire — la donnée se saisit sur la fiche d'espèce (F0.34).
-    "Lancer un Lot d'Incubation": 'saisie faite sur la fiche espèce',
-    "Lancer un Lot d'Incubation (Couvoir)": 'saisie faite sur la fiche espèce',
-    "Lancer l'Incubation": 'saisie faite sur la fiche espèce',
-    'Déclarer un Bac de Ponte': 'saisie faite sur la fiche espèce',
-    'Placer un Bac de Ponte (Héliciculture)':
-        'saisie faite sur la fiche espèce',
-    'Enregistrer le Bac de Ponte': 'saisie faite sur la fiche espèce',
-    'Code Incubation': 'onglet rendu en résumé',
-    'Bande Reproducteurs': 'onglet rendu en résumé',
-    'Date Incubation (J0)': 'onglet rendu en résumé',
-    'Éclosion Attendue (J+21)': 'onglet rendu en résumé',
-    'Taux Éclosion (%)': 'onglet rendu en résumé',
-    'Code Bac Ponte': 'onglet rendu en résumé',
-    'Date Placement': 'onglet rendu en résumé',
-    'Œufs Pondus (terre)': 'onglet rendu en résumé',
-    'Éclosion Attendue (J+25)': 'onglet rendu en résumé',
-    'Parc / Bâtiment': 'référentiel des emplacements absent du schéma',
-    'Parc / Fosse': 'référentiel des emplacements absent du schéma',
 
     // ── Accordéon des KPI : repli propre au mobile ; le poste est un écran de
     //    bureau, où le panneau est toujours déplié.
     'Indicateurs de performance': 'accordéon mobile sans objet au poste',
-    'Indicateurs de Reproduction & Éclosion (Replier / Déplier)':
-        'accordéon mobile sans objet au poste',
-    'Résumé sanitaire': 'accordéon mobile sans objet au poste',
+    // Ticket H8 : « Résumé sanitaire » est désormais rendu (accordéon `x-kpi-accordion`, sous md) — retiré.
 
     // ── Modules non embarqués, déjà annoncés à l'écran (tickets F0.33, F0.37).
     'Détail de la Vente': 'module non embarqué au poste',
@@ -387,8 +354,11 @@ void main() {
     'Relancer': 'module non embarqué au poste',
     'Détail des Coûts': 'bilan technico-économique non embarqué',
     'Détail des Revenus': 'bilan technico-économique non embarqué',
-    'Dossier Clinique': 'infirmerie non synchronisée',
-    'Alertes Sanitaires du Jour': 'infirmerie non synchronisée',
+    // Ticket H8 : l'infirmerie descend au poste depuis H8b (19/10/2026) ; ces deux libellés restent absents
+    // pour d'autres raisons, dites ici.
+    'Dossier Clinique': 'absent du Blade maître (H8 : le Blade fait foi)',
+    'Alertes Sanitaires du Jour':
+        "infirmerie pas encore raccordée au tableau de bord élevage",
     'Maladies les Plus Fréquentes — 2026 vs 2025':
         "historique de l'an dernier non synchronisé",
     'Cas 2025': "historique de l'an dernier non synchronisé",
@@ -409,11 +379,10 @@ void main() {
     //    l'onglet Calendrier rend déjà (ticket F0.36).
     'Rappel de Prophylaxie du Jour': 'rendu par le Calendrier Vétérinaire',
     "Détail de l'Intervention": 'rendu par le Calendrier Vétérinaire',
-    'Planifier une Intervention':
-        'calendrier calculé depuis le protocole, non saisi',
-    // ⚠️ Confirmer l'administration d'un soin, c'est l'écrire au registre —
-    //    ce que fait la modale « Nouveau Soin » de l'onglet précédent.
-    'Confirmer Administration': 'porté par la modale Nouveau Soin',
+    // Ticket H8b : « Planifier une Intervention » est porté (modale du Blade) — exemption retirée.
+    // ⚠️ Comme au Blade, un clic sur la case planifiée confirme l'administration
+    //    (`confirmAdministration`) : le libellé de la modale de la maquette n'existe pas au web.
+    'Confirmer Administration': 'clic sur la case, comme au Blade (H8b)',
 
     // ── Colonnes et libellés du détail d'une vente, non embarqué.
     'Qté': 'module non embarqué au poste',
@@ -692,11 +661,15 @@ void main() {
     //    poste volé une clé d'accès à la boîte mail de la ferme :
     //    `smtp_password_encrypted` reste sur le serveur, et le poste n'a même
     //    pas de colonne où le ranger.
-    'Serveur SMTP': "configuration technique gardée sur le serveur",
-    'Port': "configuration technique gardée sur le serveur",
-    'Utilisateur SMTP': "configuration technique gardée sur le serveur",
+    // 🔁 Tickets CFG-1 / CFG-2 : le bloc SMTP de `parametres.html` a quitté
+    //    « Données de l'Entreprise » au web comme au poste, pour l'onglet
+    //    « Email (SMTP) » — réglage LOCAL au poste, mot de passe au coffre —
+    //    contrôlé contre son Blade par `email_smtp_blade_test.dart`.
+    'Serveur SMTP': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
+    'Port': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
+    'Utilisateur SMTP': "configuration SMTP déplacée dans l'onglet Email (SMTP)",
     'Envoyer un e-mail de test':
-        "configuration technique gardée sur le serveur",
+        "configuration SMTP déplacée dans l'onglet Email (SMTP)",
 
     // ⚠️ L'ASTÉRISQUE MARQUE UNE SAISIE OBLIGATOIRE : le poste affiche ces
     //    deux champs en lecture seule, l'identité de la ferme se modifiant sur
@@ -770,6 +743,22 @@ void main() {
   /// ⚠️ Une exemption n'est donc globale que si elle vaut VRAIMENT partout.
   /// Dans le doute, elle va ici.
   const exemptionsParPage = <String, Map<String, String>>{
+    // ── Ticket 15.48 — « Bilan Technico-Économique » devient « Rentabilité » (onglet et titre),
+    //    décision client du 17/10/2026, appliquée d'abord sur le web. Écart ASSUMÉ au prototype.
+    'elevage-dashboard.html': {
+      'Bilan Technico-Économique': 'renommé « Rentabilité » (décision client du 17/10/2026)',
+      // Ticket H6 : le Blade fait foi — le tableau GMQ est celui de `dashboard-elevage.blade.php`
+      // (six colonnes, GMQ cumulé depuis la PREMIÈRE pesée, sans statut), vérifié par
+      // `dashboard_elevage_blade_test.dart`.
+      'Dernière Pesée': 'Ticket H6 : le Blade fait foi — colonne absente du tableau GMQ du Blade',
+      'Poids Précédent (g)': 'Ticket H6 : le Blade fait foi — « Poids Initial (g) » (GMQ cumulé)',
+      'Jours Écoulés': 'Ticket H6 : le Blade fait foi — « Jours »',
+      'Statut vs Objectif': 'Ticket H6 : le Blade fait foi — colonne absente du tableau GMQ du Blade',
+    },
+    'bilan-technico-economique.html': {
+      'Bilan Technico-Économique de Lot':
+          'renommé « Rentabilité de Lot » (décision client du 17/10/2026)',
+    },
     // ── Ticket F0.73 — les exemptions GLOBALES de l'écran Historique Avances
     //    (« Nouvelle Avance », « Imputer un Acompte », « Affecter », « Client * »,
     //    « Mode de Paiement »…) disaient « encaissement non embarqué » : fausses depuis
@@ -829,9 +818,8 @@ void main() {
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
-    'parametres-elevage.html': {
-      'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-    },
+    // Ticket H9 : `parametres-elevage.html` est contrôlée contre le Blade — son exemption « Exporter PDF »
+    // (bouton absent du Blade) part avec la page.
     // ── Ticket F0.65 — Fiche Sujet. Les écarts sont ceux de la page web (ticket
     //    Laravel 14.16), qui a construit l'écran « après arbitrage explicite du
     //    client » en écartant ce qui n'a aucune source réelle.
@@ -1088,24 +1076,55 @@ void main() {
           'création à la volée non portée ici : elle se fait au Catalogue Produits',
     },
 
+    // Ticket U10 — le Blade fait foi (`elevage-synth.blade.php`) : Tableau 1 aux dix colonnes que la fiche porte
+    // (la maquette en montre treize, sans données au web comme au poste), libellés des pilules du Blade.
+    'rapport-elevage-synth.html': {
+      'Mères Couveuses': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Mères Éleveuses': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Poussins S/Mères': 'Ticket U10 : le Blade fait foi — « Sous Mères »',
+      'Sevrés M': 'Ticket U10 : le Blade fait foi — « Sevrés »',
+      'Sevrés F': 'Ticket U10 : le Blade fait foi — « Sevrés »',
+      'Morts M': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Morts F': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Morts SM': 'Ticket U10 : le Blade fait foi — « Morts »',
+      'Effectif Malade': 'Ticket U10 : le Blade fait foi — colonne absente du Tableau 1 du Blade',
+      'Tableau 1 : Recensement Hebdomadaire': 'Ticket U10 : le Blade fait foi — « Tableau 1 : Recensement »',
+      'Tableau 3 : Suivi Intégral de la Ponte': 'Ticket U10 : le Blade fait foi — « Tableau 3 : Suivi de la Ponte »',
+      // Ticket U11 — l'onglet du Blade n'a ni bouton « Filtrer la Période » ni sa modale : la période se règle dans la
+      // barre du hub, l'export par ses boutons.
+      'Filtrer la Période': 'Ticket U11 : le Blade fait foi — bouton absent de l onglet web (période réglée par le hub)',
+      'Générer': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Période — Du *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Période — Au *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Format *': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+      'Annuler': 'Ticket U11 : le Blade fait foi — modale « Filtrer la Période » absente du web',
+    },
+
     'gestion-stocks.html': {
+      // Décision client du 19/10/2026 : en-têtes accentués comme le Blade (« Désignation », « Catégorie »).
+      'Designation': 'accentué comme le Blade (décision client du 19/10/2026)',
+      'Categorie': 'accentué comme le Blade (décision client du 19/10/2026)',
+      // Ticket U11 — même décision pour les en-têtes du Journal des Mouvements (« Référence », « Quantité » au Blade).
+      'Reference': 'accentué comme le Blade (décision client du 19/10/2026, ticket U11)',
+      'Quantite': 'accentué comme le Blade (décision client du 19/10/2026, ticket U11)',
       // « Il n'y a rien à recalculer au poste » : le PMP est tenu par le
       // serveur.
       'Recalculer PMP': 'le PMP est calculé par le serveur, pas au poste',
       'Modifier le Produit':
           'la modification se fait au Catalogue Produits, pas depuis ce hub',
+      // Ticket U9 — article 5 : le Blade (`gestion-stocks.blade.php`) n'a pas de bouton « Importer » (aucun import
+      // réel au web, « zéro placeholder » de `GestionStocks`) ; le poste le retire comme lui.
+      'Importer': 'absent de la vue web, qui fait foi (aucun import au web)',
     },
 
     'parametres.html': {
-      // « NI MOT DE PASSE NI JETON NE DESCENDENT. »
-      'Mot de Passe': 'aucun secret ne descend au poste',
+      // « NI MOT DE PASSE NI JETON NE DESCENDENT. » Le mot de passe SMTP du
+      // poste se saisit dans l'onglet Email (SMTP) (CFG-2), au coffre du système.
+      'Mot de Passe': "aucun secret ne descend au poste ; celui du poste se saisit dans l'onglet Email (SMTP)",
     },
 
-    'vms-calendrier.html': {
-      // « Le calendrier du poste est CALCULÉ depuis le protocole
-      // prophylactique servi par le serveur. »
-      'Planifier': 'calendrier calculé depuis le protocole, non saisi',
-    },
+    // Ticket H8b : « Planifier » est porté (bouton de la modale du Blade) — exemption de
+    // `vms-calendrier.html` retirée.
 
     'vms-registre.html': {
       'Imprimer': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
@@ -1133,7 +1152,15 @@ void main() {
   };
 
   /// Dette chiffrée : voir le test « ne monte pas ». Valeur cible après F0.81.
-  const plafondManquesMasques = 268;
+  ///
+  /// Ticket H7 : le Blade fait foi — 268 → 239. Les 29 couples masqués de
+  /// `suivi-reproduction.html` sortent du compte avec la page (contrôlée contre le Blade).
+  /// H8 / H8b (19/10/2026) : 239 → 237 (« Résumé sanitaire » et « Planifier une Intervention » portés).
+  /// H9 / H9b (19/10/2026) : 237 → 210. Les 27 couples masqués de `parametres-elevage.html` sortent du compte
+  /// avec la page (contrôlée contre le Blade).
+  /// U10 (19/10/2026) : 210 → 207 — boutons de modale (« Annuler », « Enregistrer »…) désormais affichés par
+  /// Gestion des Stocks (modale « Ajouter Stock » du Blade).
+  const plafondManquesMasques = 207;
 
   for (final entree in portages.entries) {
     final page = entree.key;
@@ -1335,6 +1362,9 @@ void main() {
     final absentes = <String>[];
     for (final page in portages.keys) {
       if (!inventaireMaquette[page]!.contains(libelle)) continue;
+      // Ticket U11 — une absence EXPLIQUÉE par une exemption de la page (« le Blade fait foi ») n'est pas masquée
+      // par l'exemption globale : elle ne compte ni présente ni absente.
+      if (exemptionsParPage[page]?.containsKey(libelle) ?? false) continue;
       final code = portages[page]!
           .map((c) => chainesDe(File(c).readAsStringSync()))
           .join('\n');

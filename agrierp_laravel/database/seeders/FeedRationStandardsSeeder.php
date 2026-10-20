@@ -35,6 +35,9 @@ use Illuminate\Support\Str;
  * 2026_10_14_000001 fait le même renommage sur une base déjà peuplée ; la fiche
  * retrouve les rations par la clé stable de CategorieRationLapin, ancien OU
  * nouveau libellé.
+ *
+ * 🔁 Décision client du 17/10/2026 : Reproducteur / Jeune / Sous-mères. « Jeune » (30 g) devient
+ * « Sous-mères » et « Lapin de Chair » (60 g) devient « Jeune » (migration 2026_10_17_000001).
  */
 class FeedRationStandardsSeeder extends Seeder
 {
@@ -46,8 +49,8 @@ class FeedRationStandardsSeeder extends Seeder
             ['species_code' => 'aviculture', 'stage_label' => 'Poulette (4 à 5.5 mois)', 'ration_g_per_day' => 80],
             ['species_code' => 'aviculture', 'stage_label' => 'Pondeuse (6 à 18 mois)', 'ration_g_per_day' => 110],
             ['species_code' => 'cuniculture', 'stage_label' => 'Lapine Mère / Reproducteur', 'ration_g_per_day' => 120],
-            ['species_code' => 'cuniculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 30],
-            ['species_code' => 'cuniculture', 'stage_label' => 'Lapin de Chair', 'ration_g_per_day' => 60],
+            ['species_code' => 'cuniculture', 'stage_label' => 'Sous-mères', 'ration_g_per_day' => 30],
+            ['species_code' => 'cuniculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 60],
             ['species_code' => 'porciculture', 'stage_label' => 'Porcelet', 'ration_g_per_day' => 300],
             ['species_code' => 'porciculture', 'stage_label' => 'Jeune porc', 'ration_g_per_day' => 600],
             ['species_code' => 'porciculture', 'stage_label' => 'Porc reproducteur', 'ration_g_per_day' => 2000],

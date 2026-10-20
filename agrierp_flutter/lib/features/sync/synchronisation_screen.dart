@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/sync/sync_engine.dart';
+import '../../core/sync/synchronisation_automatique.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/theme/symboles_agri.dart';
+import '../../core/widgets/toast_agri.dart';
+import 'coherence_repository.dart';
 
 /// Écran de synchronisation — ce qui attend, ce qui est parti, ce qui a été
 /// refusé.
@@ -22,10 +28,14 @@ class SynchronisationScreen extends StatefulWidget {
     super.key,
     required this.database,
     required this.engine,
+    this.coherence,
   });
 
   final AppDatabase database;
   final SyncEngine engine;
+
+  /// Ticket S-T6 — contrôle de cohérence ; `null` : celui du moteur ([SyncEngine.coherenceDuServeur]).
+  final ControleCoherenceRepository? coherence;
 
   @override
   State<SynchronisationScreen> createState() => _SynchronisationScreenState();
@@ -36,6 +46,18 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
   List<SyncConflict> _conflits = const [];
   SyncStateData? _etat;
   bool _enCours = false;
+
+  late final ControleCoherenceRepository _depotCoherence =
+      widget.coherence ??
+      ControleCoherenceRepository(
+        database: widget.database,
+        serveur: widget.engine.coherenceDuServeur,
+      );
+  ResultatCoherence? _coherence;
+  bool _verification = false;
+
+  /// Tables dont les jours conformes sont dépliés.
+  final Set<String> _deplies = {};
 
   @override
   void initState() {
@@ -83,7 +105,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AgriColors.errorDeep,
-            content: Text('Synchronisation impossible — $e'),
+            // Ticket U5 : jamais l'exception brute (anglaise) à l'écran.
+            content: Text('Synchronisation impossible — ${messageErreur(e)}'),
           ),
         );
       }
@@ -140,6 +163,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
             _etatDuPoste(),
             const SizedBox(height: AgriSpacing.lg),
             _blocConflits(),
+            const SizedBox(height: AgriSpacing.lg),
+            _blocCoherence(),
           ],
         ),
       ),
@@ -209,7 +234,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
                               color: AgriColors.brandForest,
                             ),
                           )
-                        : const Icon(Icons.sync, size: 18),
+                        : const Icon(SymbolesAgri.sync, size: 18),
                     label: const Text('Synchroniser'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AgriColors.accentYellow,
@@ -265,7 +290,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
           child: Row(
             children: [
               Icon(
-                Icons.check_circle,
+                SymbolesAgri.check_circle,
                 color: AgriColors.brandEmerald,
                 size: 20,
               ),
@@ -291,7 +316,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
             Row(
               children: [
                 const Icon(
-                  Icons.error_outline,
+                  SymbolesAgri.error_outline,
                   color: AgriColors.errorDeep,
                   size: 20,
                 ),
@@ -372,6 +397,252 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     );
   }
 
+  // ── Ticket S-T6 : contrôle de cohérence ───────────────────────────────────────────────────────────────────
+
+  /// « Vérifier la cohérence » : comptes du poste et du serveur, comparés. Hors ligne ou serveur injoignable :
+  /// un avertissement (jamais une erreur rouge, c'est l'état normal de la ferme) ; refus du serveur : une erreur
+  /// avec son message français.
+  Future<void> _verifierCoherence() async {
+    if (_verification) return;
+    if (!await widget.engine.estEnLigne()) {
+      if (mounted) {
+        ToastAgri.afficher(
+          context,
+          'Hors ligne — le contrôle de cohérence demande le serveur.',
+          type: TypeToast.avertissement,
+        );
+      }
+      return;
+    }
+
+    setState(() => _verification = true);
+    try {
+      final resultat = await _depotCoherence.verifier();
+      if (!mounted) return;
+      setState(() => _coherence = resultat);
+      final n = resultat.nombreEcarts;
+      ToastAgri.afficher(
+        context,
+        n == 0
+            ? 'Contrôle de cohérence : aucun écart.'
+            : 'Contrôle de cohérence : $n jour(s) en écart.',
+        type: n == 0 ? TypeToast.succes : TypeToast.avertissement,
+      );
+    } catch (e) {
+      if (mounted) {
+        final reseau = SynchronisationAutomatique.estEchecReseau(e);
+        ToastAgri.afficher(
+          context,
+          reseau
+              ? 'Serveur injoignable — contrôle impossible pour le moment.'
+              : 'Contrôle de cohérence impossible — ${messageErreur(e)}',
+          type: reseau ? TypeToast.avertissement : TypeToast.erreur,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _verification = false);
+    }
+  }
+
+  Widget _blocCoherence() {
+    final resultat = _coherence;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AgriSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(SymbolesAgri.fact_check, color: AgriColors.brandForest, size: 20),
+                const SizedBox(width: AgriSpacing.sm),
+                const Expanded(
+                  child: Text(
+                    'Contrôle de cohérence',
+                    style: TextStyle(
+                      fontSize: AgriTypography.sm,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.brandForest,
+                    ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('bouton-verifier-coherence'),
+                  onPressed: _verification ? null : _verifierCoherence,
+                  icon: _verification
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(SymbolesAgri.sync, size: 16),
+                  label: const Text(
+                    'Vérifier la cohérence',
+                    style: TextStyle(fontSize: AgriTypography.xs),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AgriSpacing.xs),
+            const Text(
+              'Compare, table par table et jour par jour, le nombre de lignes et leur total sur ce poste '
+              '(lignes déjà envoyées ou reçues) et sur le serveur, sur les '
+              '${ControleCoherenceRepository.joursParDefaut} derniers jours.',
+              style: TextStyle(fontSize: 11, color: AgriColors.outline),
+            ),
+            const Divider(),
+            if (resultat == null)
+              const Text(
+                'Aucun contrôle effectué pendant cette session.',
+                key: Key('coherence-aucun-controle'),
+                style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+              )
+            else ...[
+              Text(
+                resultat.nombreEcarts == 0
+                    ? 'Depuis le ${_jourFr(ControleCoherenceRepository.cleJour(resultat.depuis))} : aucun écart.'
+                    : 'Depuis le ${_jourFr(ControleCoherenceRepository.cleJour(resultat.depuis))} : '
+                          '${resultat.nombreEcarts} jour(s) en écart.',
+                key: const Key('coherence-synthese'),
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: resultat.nombreEcarts == 0
+                      ? AgriColors.brandEmerald
+                      : AgriColors.errorDeep,
+                ),
+              ),
+              for (final t in resultat.tables) _tableCoherence(t),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tableCoherence(TableCoherence t) {
+    final deplie = _deplies.contains(t.table);
+
+    return Padding(
+      key: Key('coherence-${t.table}'),
+      padding: const EdgeInsets.only(top: AgriSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.libelle,
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                t.ecarts.isEmpty ? 'Conforme' : '${t.ecarts.length} écart(s)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: t.ecarts.isEmpty ? AgriColors.brandEmerald : AgriColors.errorDeep,
+                ),
+              ),
+            ],
+          ),
+          if (t.ecarts.isNotEmpty || deplie) _enteteCoherence(),
+          for (final l in t.ecarts) _ligneCoherence(t.table, l),
+          if (t.conformes.isNotEmpty)
+            TextButton.icon(
+              key: Key('coherence-deplier-${t.table}'),
+              onPressed: () => setState(
+                () => deplie ? _deplies.remove(t.table) : _deplies.add(t.table),
+              ),
+              icon: Icon(
+                deplie ? SymbolesAgri.expand_less : SymbolesAgri.expand_more,
+                size: 16,
+              ),
+              label: Text(
+                '${t.conformes.length} jour(s) conforme(s)',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+          if (deplie)
+            for (final l in t.conformes) _ligneCoherence(t.table, l),
+          if (t.ecarts.isEmpty && t.conformes.isEmpty)
+            const Text(
+              'Aucune ligne sur la période, ni au poste ni au serveur.',
+              style: TextStyle(fontSize: 11, color: AgriColors.outline),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _enteteCoherence() {
+    const style = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.bold,
+      color: AgriColors.outline,
+    );
+    return const Padding(
+      padding: EdgeInsets.only(top: AgriSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: Text('Jour', style: style)),
+          Expanded(flex: 3, child: Text('Poste', style: style)),
+          Expanded(flex: 3, child: Text('Serveur', style: style)),
+          Expanded(flex: 3, child: Text('Écart', style: style)),
+        ],
+      ),
+    );
+  }
+
+  Widget _ligneCoherence(String table, LigneCoherence l) {
+    final couleur = l.conforme ? AgriColors.onSurface : AgriColors.errorDeep;
+    final style = TextStyle(fontSize: 11, color: couleur);
+
+    return Padding(
+      key: Key('coherence-$table-${l.jour}'),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: Text(_jourFr(l.jour), style: style)),
+          Expanded(flex: 3, child: Text(_totaux(l.poste), style: style)),
+          Expanded(flex: 3, child: Text(_totaux(l.serveur), style: style)),
+          Expanded(
+            flex: 3,
+            child: Text(
+              l.conforme
+                  ? '—'
+                  : '${_signe(l.ecartNombre.toDouble())} ligne(s) · ${_signe(l.ecartTotal)}',
+              style: style.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// « 3 · 3 500,5 » ; aucune ligne : « — » (le poste ou le serveur n'a rien ce jour-là).
+  static String _totaux(TotauxJour? t) =>
+      t == null ? '—' : '${t.nombre} · ${_nombre(t.total)}';
+
+  static String _signe(double v) => v > 0 ? '+${_nombre(v)}' : _nombre(v);
+
+  static String _nombre(double v) {
+    final entier = v == v.roundToDouble();
+    final texte = entier ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    return texte.replaceAll('.', ',');
+  }
+
+  /// `AAAA-MM-JJ` → `JJ/MM/AAAA`.
+  static String _jourFr(String jour) {
+    final p = jour.split('-');
+    return p.length == 3 ? '${p[2]}/${p[1]}/${p[0]}' : jour;
+  }
+
   static String _libelleTable(String table) => switch (table) {
     'livestock_daily_entries' => 'Fiche journalière d\'élevage',
     'sales' => 'Vente',
@@ -382,11 +653,18 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'mails' => 'Courrier',
     'archived_documents' => 'Document archivé',
     'administrative_documents' => 'Document administratif',
+    // Ticket H9b — Paramètres Élevage modifiés au poste.
+    'feed_ration_standards' => 'Ration (Paramètres Élevage)',
+    'prophylaxis_schedule_standards' => 'Échéance de prophylaxie',
+    'feed_types' => 'Type de provende',
+    'elevage_numbering' => 'Numérotation des bandes et sujets',
+    'company_settings' => 'Rappel des soins planifiés',
     _ => table,
   };
 
+  /// Un instant technique, affiché à l'heure du Bénin quel que soit le réglage de Windows (S-T11).
   static String _horodatage(DateTime d) {
-    final l = d.toLocal();
+    final l = HeureBenin.depuisInstant(d);
     return '${l.day.toString().padLeft(2, '0')}/'
         '${l.month.toString().padLeft(2, '0')}/${l.year} '
         '${l.hour.toString().padLeft(2, '0')}:'

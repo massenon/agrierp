@@ -43,6 +43,7 @@ class CarteKpi extends StatelessWidget {
     required this.couleurLisere,
     this.unite,
     this.legende,
+    this.iconeLegende,
     this.icone,
     this.couleurIcone = AgriColors.brandEmerald,
     this.couleurValeur = AgriColors.onSurface,
@@ -59,6 +60,10 @@ class CarteKpi extends StatelessWidget {
 
   /// Ligne de commentaire sous la valeur.
   final String? legende;
+
+  /// Ticket U10 — petite icône (12 px) devant la légende : le sablier `hourglass_empty` de la carte « en attente »
+  /// du web (`x-kpi-card :pending`, « Disponible après … »).
+  final IconData? iconeLegende;
 
   final IconData? icone;
   final Color couleurIcone;
@@ -143,15 +148,40 @@ class CarteKpi extends StatelessWidget {
                   ),
                   if (legende != null && legende!.isNotEmpty) ...[
                     const SizedBox(height: AgriSpacing.xs),
-                    Text(
-                      legende!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AgriColors.outline,
+                    // Sans icône : le texte seul, comme avant (une `Row` à enfant flexible refuserait une largeur
+                    // non bornée).
+                    if (iconeLegende == null)
+                      Text(
+                        legende!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AgriColors.outline,
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Icon(
+                            iconeLegende,
+                            size: 12,
+                            color: AgriColors.outline,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              legende!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AgriColors.outline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
                   ],
                 ],
               ),

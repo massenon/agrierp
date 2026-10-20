@@ -114,7 +114,7 @@ class SyncEcrituresDateCreationTest extends TestCase
         Carbon::setTestNow('2026-10-10 12:00:00');
         $b = $this->ecrire('2026-10-06', 'OD-0002 — B');
 
-        $servies = $this->tirer('2026-10-10T11:00:00+00:00')->assertOk()->json('accounting_entries');
+        $servies = $this->tirer('2026-10-10T11:00:00')->assertOk()->json('accounting_entries');
 
         $this->assertCount(1, $servies);
         $this->assertSame($b->id, $servies[0]['id']);

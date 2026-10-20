@@ -130,6 +130,13 @@
                 <span class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold border bg-error-bg text-error-deep border-error-deep/30">
                     <span class="material-symbols-outlined text-[16px]">lock</span>EXERCICE {{ $selectedYear }} — CLOS (Lecture Seule)
                 </span>
+                {{-- Ticket 15.53 — réouverture exceptionnelle, administrateur seulement. --}}
+                @can('manage-modules')
+                    <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-confirm-reouverture' })" dusk="rouvrir-exercice"
+                        class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold bg-accent-yellow text-brand-forest">
+                        <span class="material-symbols-outlined text-[16px]">lock_open</span>Rouvrir l'Exercice {{ $selectedYear }}
+                    </button>
+                @endcan
             @endif
         @else
             <span class="inline-flex items-center gap-xs px-md py-2 rounded-full text-xs font-bold border bg-surface-zebra text-outline border-outline-variant">
@@ -227,11 +234,23 @@
         </div>
     </x-modal>
 
+    <x-modal name="modal-confirm-reouverture" max-width="sm">
+        <div class="text-center">
+            <span class="material-symbols-outlined text-accent-yellow" style="font-size:48px;">lock_open</span>
+            <h3 class="font-bold text-lg text-brand-forest mt-sm">Rouvrir l'Exercice {{ $selectedYear }} ?</h3>
+            <p class="text-xs text-outline mt-xs">Action exceptionnelle r&eacute;serv&eacute;e aux Administrateurs &mdash; journalis&eacute;e dans les Logs d'Audit. Le report &agrave; nouveau de {{ (int)$selectedYear + 1 }} est contre-pass&eacute; (il reste lisible au journal) et les &eacute;critures de {{ $selectedYear }} redeviennent modifiables. Une nouvelle cl&ocirc;ture repassera le report sur les soldes corrig&eacute;s.</p>
+            <div class="flex justify-center gap-sm mt-lg">
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-confirm-reouverture' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                <button type="button" wire:click="rouvrirExercice" dusk="reouverture-confirm" class="px-md py-sm rounded-lg bg-accent-yellow text-brand-forest text-sm font-bold">Confirmer la R&eacute;ouverture</button>
+            </div>
+        </div>
+    </x-modal>
+
     <x-modal name="modal-confirm-cloture" max-width="sm">
         <div class="text-center">
             <span class="material-symbols-outlined text-error-deep" style="font-size:48px;">warning</span>
             <h3 class="font-bold text-lg text-error-deep mt-sm">Clôturer l'Exercice {{ $selectedYear }} ?</h3>
-            <p class="text-xs text-outline mt-xs">Cette action verrouille définitivement toutes les écritures de {{ $selectedYear }} (lecture seule) et ouvre l'exercice {{ (int)$selectedYear + 1 }} avec les écritures de report à nouveau. Cette action est irréversible.</p>
+            <p class="text-xs text-outline mt-xs">Cette action verrouille toutes les écritures de {{ $selectedYear }} (lecture seule) et ouvre l'exercice {{ (int)$selectedYear + 1 }} avec les écritures de report à nouveau. Seul un administrateur pourra la défaire, par une réouverture exceptionnelle journalisée.</p>
             <div class="flex justify-center gap-sm mt-lg">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-confirm-cloture' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
                 <button type="button" wire:click="confirmCloture" dusk="cloture-confirm" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold hover:bg-red-800">Confirmer la Clôture</button>

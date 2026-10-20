@@ -23,8 +23,8 @@ import json
 import os
 import re
 import sys
+from chemins import PROTO  # A7 : chemins résolus, plus de C:/ en dur
 
-PROTO = r'C:/Projects/agrierp_laravel/prototype_html'
 
 SCRIPTS = re.compile(r'<script\b.*?</script>', re.S | re.I)
 CHROME = re.compile(r'<(aside|nav)\b.*?</\1>|<header\b.*?</header>', re.S | re.I)

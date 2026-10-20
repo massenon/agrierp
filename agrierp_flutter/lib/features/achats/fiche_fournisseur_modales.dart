@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'fournisseurs_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ouvre « Nouveau Fournisseur » (`existant == null`) ou « Modifier » une fiche.
 ///
@@ -217,7 +218,7 @@ class _ModaleArchivage extends StatelessWidget {
       message:
           "L'enregistrement sera marqué comme archivé (statut inactif). "
           "Aucune suppression définitive n'est effectuée.",
-      icone: Icons.archive,
+      icone: SymbolesAgri.archive,
       actions: [
         BoutonModaleSecondaire(
           libelle: 'Annuler',

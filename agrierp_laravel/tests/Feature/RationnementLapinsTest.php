@@ -37,6 +37,15 @@ class RationnementLapinsTest extends TestCase
     {
         parent::setUp();
 
+        // Ticket S2 : l'enregistrement exige désormais `authorize()` ; l'écran est utilisé par un compte animalier.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $compte = \App\Models\User::create([
+            'name' => 'Animalier', 'username' => 'animalier-test',
+            'email' => 'animalier-test@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $compte->assignRole('animalier');
+        $this->actingAs($compte);
+
         $species = LivestockSpecies::create(['code' => 'cuniculture', 'label' => 'Lapins', 'is_enabled' => true]);
 
         $this->lot = LivestockLot::create([
@@ -144,16 +153,16 @@ class RationnementLapinsTest extends TestCase
         $this->assertSame([20, 32, 40], [$cat['repro'], $cat['sevre'], $cat['jeune']]);
     }
 
-    /** Sans historique (aucun départ), l'effectif n'est plus une saisie : « — », et le départ est proposé. */
-    public function test_without_history_the_breeder_line_is_unknown_and_the_departure_is_offered(): void
+    /** 🔁 17/10/2026 — sans historique, le départ est DÉDUIT du stade (« engraissement » = Jeune) : 0 / 0 / 100, sans saisie. */
+    public function test_without_history_the_departure_is_deduced_from_the_band_stage(): void
     {
         $component = Livewire::test(FicheLapins::class)->set('selectedDate', '2026-07-10');
 
         $cat = $component->instance()->categoriesJour;
-        $this->assertNull($cat['repro']);
-        $this->assertNull($cat['sevre']);
-        $this->assertNull($cat['jeune']);
-        $this->assertTrue($cat['depart_requis']);
+        $this->assertSame(0, $cat['repro']);
+        $this->assertSame(0, $cat['sevre']);
+        $this->assertSame(100, $cat['jeune']);
+        $this->assertTrue($cat['depart_requis'], 'le départ déduit reste affiché, corrigeable, tant qu\'il n\'est pas enregistré');
     }
 
     /** L'effectif calculé alimente réellement le rationnement. */

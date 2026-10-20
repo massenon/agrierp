@@ -80,22 +80,22 @@ class MotifsRefusPush
             'check_out' => 'heure de départ', 'status' => 'statut', 'record_date' => 'date du soin',
             'action_type' => 'type de soin', 'withdrawal_days' => 'jours de retrait',
             'product_id' => 'produit', 'type' => 'type', 'quantity' => 'quantité', 'reference_type' => 'type de référence',
-            'client_ref' => 'référence du poste', 'name' => 'nom', 'phone' => 'téléphone', 'email' => 'courriel',
+            'client_ref' => 'référence du poste', 'movement_date' => 'date du mouvement', 'counted_quantity' => 'quantité comptée', 'counted_at' => 'instant du comptage', 'name' => 'nom', 'phone' => 'téléphone', 'email' => 'courriel',
             'subject' => 'objet', 'party' => 'correspondant', 'mail_date' => 'date du courrier',
             'title' => 'titre', 'archived_date' => 'date d\'archivage', 'expiry_date' => 'date d\'expiration',
             'beneficiary' => 'bénéficiaire', 'doc_date' => 'date du document', 'is_active' => 'actif',
             'achat' => 'achats', 'ne' => 'naissances', 'mort' => 'mortalité', 'vente' => 'ventes', 'don' => 'dons',
             'ponte_total' => 'ponte totale', 'ponte_casses' => 'œufs cassés', 'feed_qty_kg' => 'aliment (kg)',
             'weight_sample_avg_g' => 'poids moyen (g)', 'motif' => 'motif',
-            // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12) : la 2e catégorie est
-            // Jeune (lapins) ou Porcelet (porcs), la 3e Lapin de Chair ou Porc Marchand.
-            'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts jeunes ou porcelets',
-            'mort_jeune' => 'morts lapins de chair ou porcs marchands',
-            'don_repro' => 'dons reproducteurs', 'don_sevre' => 'dons jeunes ou porcelets',
-            'don_jeune' => 'dons lapins de chair ou porcs marchands',
+            // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12), glossaire du 17/10/2026
+            // (F0.99) : la 2e catégorie est Sous-mères (lapins) ou Porcelet (porcs), la 3e Jeune ou Porc Marchand.
+            'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts sous-mères ou porcelets',
+            'mort_jeune' => 'morts jeunes lapins ou porcs marchands',
+            'don_repro' => 'dons reproducteurs', 'don_sevre' => 'dons sous-mères ou porcelets',
+            'don_jeune' => 'dons jeunes lapins ou porcs marchands',
             'passage_sevre_jeune' => 'passage de stade',
-            'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ jeunes ou porcelets',
-            'cat_depart_jeune' => 'effectif de départ lapins de chair ou porcs marchands',
+            'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ sous-mères ou porcelets',
+            'cat_depart_jeune' => 'effectif de départ jeunes lapins ou porcs marchands',
         ];
     }
 
@@ -154,5 +154,75 @@ class MotifsRefusPush
     public static function departEspeceNonPrise(): string
     {
         return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins et les porcs.";
+    }
+
+    /** Ticket S1 : un compte de vente envoie une fiche qui contient des saisies d'élevage. */
+    public static function ficheEleveurRequise(): string
+    {
+        return "Fiche refusée : elle contient des saisies d'élevage (morts, naissances, achats, alimentation…) que "
+            .'votre rôle ne permet pas d\'envoyer. Elle reste sur le poste : un compte animalier doit la synchroniser.';
+    }
+
+    /**
+     * Ticket S-T9 : deux saisies d'élevage DIFFÉRENTES pour la même (bande, jour), venues de deux postes (texte
+     * d'origine, inchangé : le poste le montre tel quel).
+     */
+    public static function ficheEnDouble(): string
+    {
+        return 'Une fiche existe deja pour cette bande a cette date, '
+            .'saisie depuis un autre poste. Comparez les deux avant de trancher.';
+    }
+
+    /** Ticket S-T9 : motif d'une fiche du poste fusionnée dans celle que le serveur tient pour la même (bande, jour). */
+    public static function ficheFusionnee(): string
+    {
+        return 'Fiche du jour réunie avec celle que le serveur tient déjà pour cette bande et ce jour.';
+    }
+
+    /**
+     * Ticket 15.50 : le poste n'a pas encore tiré la réinitialisation des données — ses saisies en attente datent
+     * d'une base effacée depuis.
+     */
+    public static function reinitialisationNonVue(\DateTimeInterface $le): string
+    {
+        return 'Envoi refusé : les données du serveur ont été réinitialisées le '
+            .$le->format('d/m/Y à H:i').'. Mettez à jour le poste puis synchronisez : il effacera ses données '
+            .'antérieures avant tout nouvel envoi.';
+    }
+
+    /**
+     * Ticket S-T2 (méthode TATACORA) : le `device_id` envoyé n'est pas le poste auquel le jeton a été délivré — un
+     * poste ne signe pas au nom d'un autre.
+     */
+    public static function posteDifferentDuJeton(string $envoye, string $jeton): string
+    {
+        return 'Synchronisation refusée : ce jeton a été délivré au poste « '.$jeton.' », mais la requête se '
+            .'présente comme le poste « '.$envoye.' ». Un poste ne peut pas synchroniser au nom d\'un autre : '
+            .'reconnectez-vous depuis ce poste. Les saisies en attente restent sur le poste.';
+    }
+
+    /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
+    public static function roleInsuffisant(string $table): string
+    {
+        $objet = [
+            'livestock_daily_entries' => 'saisir une fiche d\'élevage',
+            'livestock_transfers' => 'transférer des sujets entre bandes',
+            'livestock_reproduction_events' => 'enregistrer un événement de reproduction',
+            'veterinary_records' => 'enregistrer un soin vétérinaire',
+            'infirmary_records' => 'enregistrer une entrée d\'infirmerie',
+            'veterinary_calendar_events' => 'planifier une intervention vétérinaire',
+            'feed_ration_standards' => 'modifier le barème de rationnement',
+            'prophylaxis_schedule_standards' => 'modifier le calendrier de prophylaxie',
+            'feed_types' => 'modifier les types de provende',
+            'elevage_numbering' => 'modifier la numérotation des bandes et sujets',
+            'company_settings' => 'modifier le délai de rappel des soins',
+            'expenses' => 'enregistrer une dépense',
+            'purchases' => 'enregistrer un achat',
+            'attendance_records' => 'enregistrer un pointage',
+            'sales' => 'enregistrer une vente',
+            'stock_adjustments' => 'ajuster le stock',
+        ][$table] ?? 'écrire ces données';
+
+        return "Refusé : votre rôle ne permet pas de {$objet}. Connectez-vous au poste avec un compte autorisé.";
     }
 }

@@ -13,7 +13,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-lg">
         <x-kpi-card label="Effectif Total Vivant" icon="grid_view" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" caption="Reproducteurs, Poussins & Goliath" />
-        <x-kpi-card label="Taux d'Éclosion Couvoir" icon="egg" color="blue" :value="number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" caption="Ratio : Poussins Nés ÷ Œufs Couvés" />
+        <x-kpi-card label="Taux d'Éclosion Couvoir" icon="egg" color="blue" :value="$this->kpis['taux_eclosion'] === null ? '—' : number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" caption="Ratio : Poussins Nés ÷ Œufs Couvés" />
         <x-kpi-card label="Poussins Nés (Éclosion)" icon="child_care" color="maize" :value="$this->kpis['poussins_nes']" caption="Cumul naissances au couvoir" />
         <x-kpi-card label="Taux de Mortalité" icon="trending_down" color="red" :value="number_format($this->kpis['taux_mortalite_mois'], 1, ',', ' ').' %'" caption="Seuil critique < 5%" />
     </div>
@@ -38,6 +38,7 @@
         </div>
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande / Lot Concerné</label>
@@ -70,13 +71,16 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taux d'Éclosion Calculé (%)</label>
-                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ number_format($this->eclosionRateCalc, 1, ',', ' ') }} %</div>
+                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ $this->eclosionRateCalc === null ? '—' : number_format($this->eclosionRateCalc, 1, ',', ' ').' %' }}</div>
                     </div>
                 </div>
             </div>
 
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
+                @if($mortEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
                         <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Repro</label>
@@ -105,10 +109,44 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.56 — dons par catégorie : un don réduit l'effectif et sort du stock du produit de la bande. --}}
+            <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
+                <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">redeem</span>Dons par catégorie</p>
+                @if($donEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
+                <div class="grid grid-cols-3 gap-sm">
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Repro</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donRepro', {{ max(0, $donRepro - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donRepro', {{ $donRepro + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poulet</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donPoulet', {{ max(0, $donPoulet - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donPoulet" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donPoulet', {{ $donPoulet + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poussin</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donPoussin', {{ max(0, $donPoussin - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donPoussin" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donPoussin', {{ $donPoussin + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Poussins Nés − Morts</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Poussins Nés − (Morts + Ventes + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>
@@ -118,16 +156,28 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.57 — rationnement par stade : section du poste, désormais des deux côtés. --}}
+            <x-ration-volaille :tableau="$this->rationnement" ligne-cle="des reproducteurs" />
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
-                    <input wire:model="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
                 </div>
             </div>
 
             <div class="border-t border-outline-variant pt-md">
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">vaccines</span>Traitements &amp; Prophylaxie</p>
-                <x-module-pending label="Le protocole de prophylaxie du jour de cette fiche" since="à planifier — le moteur existe (ticket 3.11 terminé) et alimente déjà les fiches Lapins et Porcs ; son raccordement à cette fiche n'est pas fait" />
+                @php $protocoleDuJour = $this->protocoleDuJour; @endphp
+                @if($protocoleDuJour)
+                    <x-prophylaxie-du-jour :protocole="$protocoleDuJour" />
+                @endif
                 <div class="mt-sm">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Observations</label>
                     <input wire:model="observations" type="text" placeholder="ex : RAS" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
@@ -173,7 +223,7 @@
                             <td class="px-sm py-xs text-center border-r border-outline-variant {{ ($entry?->mort ?? 0) > 0 ? 'text-error-deep font-bold' : '' }}">{{ $entry?->mort ?? '—' }}</td>
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
-                            <td class="px-sm py-xs text-right">{{ $entry?->weight_sample_avg_g ?? '—' }}</td>
+                            <td class="px-sm py-xs text-right">{{ $entry?->poids_general_g ?? '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

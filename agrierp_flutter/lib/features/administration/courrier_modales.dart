@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ouvre « Nouveau Courrier » (`existant == null`) ou « Modifier — Gestion des Courriers ».
 ///
@@ -188,7 +190,7 @@ class _ModaleCourrierState extends State<_ModaleCourrier> {
               onPressed: () async {
                 final choisie = await showDatePicker(
                   context: context,
-                  initialDate: _date ?? DateTime.now(),
+                  initialDate: _date ?? HeureBenin.maintenant(),
                   firstDate: DateTime(2000),
                   lastDate: DateTime(2100),
                 );
@@ -244,7 +246,7 @@ class _ModaleArchivageCourrier extends StatelessWidget {
       message:
           "L'enregistrement sera marqué comme archivé (statut inactif). "
           "Aucune suppression définitive n'est effectuée.",
-      icone: Icons.archive,
+      icone: SymbolesAgri.archive,
       couleurIcone: AgriColors.errorDeep,
       actions: [
         BoutonModaleSecondaire(

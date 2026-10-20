@@ -39,6 +39,11 @@ use Livewire\Component;
  * Trésorerie : "reconstruit l'ouverture via solde courant moins flux de
  * la période, pas d'historique daté"). Ce rapport ne les invente pas.
  *
+ * 🔴→✅ Ticket U12b — ORDRE DÉTERMINÉ : sans second critère, deux pièces de la même date (deux achats du même
+ * jour, deux ventes de la même seconde) sortaient dans l'ordre du moteur de base, qui n'est garanti nulle part ;
+ * le poste ne pouvait pas le reproduire. Chaque source est désormais lue par identifiant croissant (`orderBy('id')`)
+ * et la fusion reste un tri STABLE par date (`sortByDesc`) : à date égale, achats, puis dépenses, puis paie.
+ *
  * Export ciblé par le hub (`RapportsExportsHub`, ticket 12.1) via
  * événement Livewire `export-report` — ce composant reste seul
  * responsable de sa propre mise en page d'export (PDF/CSV), jamais une
@@ -70,27 +75,45 @@ class RecettesDepenses extends Component
             ->where('payment_mode', '!=', 'credit')
             ->whereDate('purchase_date', '>=', $this->startDate)
             ->whereDate('purchase_date', '<=', $this->endDate)
+            ->orderBy('id')
             ->get()
             ->map(fn ($p) => ['date' => $p->purchase_date, 'label' => 'Achat — '.($p->supplier?->name ?? 'Fournisseur'), 'amount' => (float) $p->total]);
 
-        $expenses = Expense::whereDate('expense_date', '>=', $this->startDate)
+        // 🔴→✅ Ticket U12b — une dépense ARCHIVÉE n'est plus une dépense : `SaisieDepenses::archiveExpense()` réintègre
+        // son montant en trésorerie et contre-passe sa charge (« archiver une dépense la retire des états »). Ce rapport
+        // la comptait encore, sortie d'argent fantôme.
+        $expenses = Expense::where('is_active', true)
+            ->whereDate('expense_date', '>=', $this->startDate)
             ->whereDate('expense_date', '<=', $this->endDate)
+            ->orderBy('id')
             ->get()
             ->map(fn ($e) => ['date' => $e->expense_date, 'label' => $e->label, 'amount' => (float) $e->amount]);
 
+        // 🔴→✅ Ticket U13 — LIBELLÉ « Paie — Employé » ENFIN ATTEIGNABLE. En PHP, `.` lie plus fort que `??` :
+        // `'Paie — '.($nom.' '.$prenom ?? 'Employé')` concaténait d'abord (une chaîne, jamais `null`), et un bulletin
+        // sans employé sortait « Paie —   » (deux espaces). Le repli s'applique désormais quand l'employé manque.
         $payslips = Payslip::with('employee')
             ->whereDate('created_at', '>=', $this->startDate)
             ->whereDate('created_at', '<=', $this->endDate)
+            ->orderBy('id')
             ->get()
-            ->map(fn ($p) => ['date' => $p->created_at->toDateString(), 'label' => 'Paie — '.($p->employee?->last_name.' '.$p->employee?->first_name ?? 'Employé'), 'amount' => (float) $p->net_salary]);
+            ->map(fn ($p) => ['date' => $p->created_at->toDateString(), 'label' => self::libellePaie($p), 'amount' => (float) $p->net_salary]);
 
         return $purchases->concat($expenses)->concat($payslips)
             ->sortByDesc('date')->values()->all();
     }
 
+    /** Ticket U13 — « Paie — {Nom Prénom} », « Paie — Employé » sans employé (même règle au poste). */
+    public static function libellePaie(Payslip $bulletin): string
+    {
+        $employe = $bulletin->employee;
+
+        return 'Paie — '.($employe === null ? 'Employé' : $employe->last_name.' '.$employe->first_name);
+    }
+
     public function getRecettesProperty()
     {
-        return $this->recettesQuery()->orderByEffectiveDate()->get()->map(fn ($s) => [
+        return $this->recettesQuery()->orderByEffectiveDate()->orderBy('id')->get()->map(fn ($s) => [
             'date' => $s->date_effective->toDateString(),
             'label' => 'Vente — '.($s->customer?->name ?? 'Client comptant'),
             'amount' => (float) $s->total,

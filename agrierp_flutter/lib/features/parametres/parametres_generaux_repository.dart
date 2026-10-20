@@ -1,4 +1,5 @@
 import '../../core/database/app_database.dart';
+import '../stocks/pmp_service.dart';
 
 /// Les quatre modules d'espèce, tels que la maquette les nomme.
 enum ModuleEspece {
@@ -87,8 +88,32 @@ class DonneesParametresGeneraux {
   /// ⚠️ `login.failed` est le nom que le serveur donne à une tentative
   /// refusée. Compter sur le libellé affiché ferait dépendre une alerte de
   /// sécurité d'une traduction.
-  int get connexionsEchouees =>
-      audit.where((l) => l.action == 'login.failed').length;
+  ///
+  /// 🔴→✅ Ticket U14 — sur les dernières 24 h, comme le web (`AuditLogs::getKpisProperty()`) : le poste comptait toutes
+  /// les tentatives reçues, quelle que soit leur date.
+  int get connexionsEchouees => audit
+      .where((l) => l.action == 'login.failed' && l.createdAt != null && _dansLes24h(l.createdAt!))
+      .length;
+
+  /// 🔴→✅ Ticket U14 — « Rechercher... » de l'onglet du web (`AuditLogs::getLogsProperty()`) : `action LIKE '%…%'` OU
+  /// `module LIKE '%…%'`, sur les CLÉS techniques (`sale.created`, `ventes`) et non sur les libellés, sous la collation
+  /// du serveur (ni casse ni accents ; `%` et `_` sont des jokers) ; « 0 » ne filtre pas (`when()` le lit faux).
+  static List<AuditLog> filtrerAudit(List<AuditLog> lignes, String recherche) {
+    if (recherche.isEmpty || recherche == '0') return lignes;
+    final motif = StringBuffer();
+    for (final c in cleCommeLeServeur(recherche).split('')) {
+      motif.write(switch (c) {
+        '%' => '.*',
+        '_' => '.',
+        _ => RegExp.escape(c),
+      });
+    }
+    final like = RegExp(motif.toString(), dotAll: true);
+    return [
+      for (final l in lignes)
+        if (like.hasMatch(cleCommeLeServeur(l.action)) || like.hasMatch(cleCommeLeServeur(l.module ?? ''))) l,
+    ];
+  }
 
   static bool _dansLes24h(DateTime instant) =>
       DateTime.now().difference(instant).inHours.abs() < 24;

@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 // Drift exporte `isNull` / `isNotNull` (expressions SQL) : masques ici pour
 // laisser accessibles les matchers homonymes de `flutter_test`.
@@ -146,7 +147,7 @@ void main() {
   /// ⚠️ LA FICHE EST COMPLÉTÉE, JAMAIS ÉCRASÉE : les morts déjà saisis par
   /// l'animalier doivent survivre au passage en caisse.
   test('la vente n efface pas ce que l animalier a deja saisi', () async {
-    final aujourdhui = DateTime.now();
+    final aujourdhui = HeureBenin.maintenant();
     final jour = DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
 
     await db
@@ -174,7 +175,7 @@ void main() {
 
   /// ⚠️⚠️ LE SEUL REFUS DUR DE CETTE CAISSE — santé publique.
   test('une bande sous remanence ne vend rien', () async {
-    await poserRemanence(DateTime.now().add(const Duration(days: 5)));
+    await poserRemanence(HeureBenin.maintenant().add(const Duration(days: 5)));
 
     expect(
       () => caisse.enregistrerVente(panier: panier(), modePaiement: 'especes'),
@@ -190,7 +191,7 @@ void main() {
 
   /// ⚠️ UN REFUS NE LAISSE AUCUNE TRACE PARTIELLE : ni vente, ni stock entamé.
   test('une vente refusee ne laisse aucune trace', () async {
-    await poserRemanence(DateTime.now().add(const Duration(days: 5)));
+    await poserRemanence(HeureBenin.maintenant().add(const Duration(days: 5)));
 
     try {
       await caisse.enregistrerVente(panier: panier(), modePaiement: 'especes');
@@ -209,7 +210,7 @@ void main() {
 
   /// Une rémanence expirée ne bloque plus rien.
   test('une remanence expiree ne bloque plus', () async {
-    await poserRemanence(DateTime.now().subtract(const Duration(days: 1)));
+    await poserRemanence(HeureBenin.maintenant().subtract(const Duration(days: 1)));
 
     final vente = await caisse.enregistrerVente(
       panier: panier(),
@@ -222,7 +223,7 @@ void main() {
   /// Une rémanence qui se termine AUJOURD'HUI bloque encore : le délai
   /// d'attente court jusqu'à la fin de la journée.
   test('une remanence qui finit aujourd hui bloque encore', () async {
-    await poserRemanence(DateTime.now());
+    await poserRemanence(HeureBenin.maintenant());
 
     expect(
       () => caisse.enregistrerVente(panier: panier(), modePaiement: 'especes'),

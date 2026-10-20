@@ -11,6 +11,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.82 — « Exporter PDF » des trois pages du hub Administration
 /// (`gestion-courriers.html`, `archivage-documents.html`, `documents-administratifs.html`).
@@ -389,7 +390,7 @@ void main() {
     test(
       'les titres, sous-titres et colonnes sont ceux des fonctions de la maquette',
       () {
-        const dossier = 'C:/Projects/agrierp_laravel/prototype_html/';
+        final dossier = '$dossierPrototype/';
         if (!File('${dossier}gestion-courriers.html').existsSync()) {
           markTestSkipped('maquette absente de ce poste de travail');
           return;

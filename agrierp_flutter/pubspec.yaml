@@ -9,6 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # ─── Localisation française des composants Material (ticket U5, D-U5) ───
+  # Sélecteurs de date, boutons « ANNULER » / « OK », infobulles : sans elle,
+  # Flutter les affiche en anglais (« Select date », « CANCEL »). Paquet du SDK
+  # Flutter : aucun téléchargement à l'installation.
+  flutter_localizations:
+    sdk: flutter
 
   # ─── Persistance locale offline-first ────────────────────────────────────
   # Drift sur SQLite : le CDC impose un fonctionnement local prioritaire, la
@@ -36,7 +42,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
 
   # ─── Présentation ────────────────────────────────────────────────────────
-  intl: ^0.19.0
+  # ⚠️ ^0.20.2 : `flutter_localizations` (ticket U5) épingle intl 0.20.x selon
+  # la version du SDK (0.20.2 ou 0.20.3) ; ^0.20.2 convient aux deux.
+  intl: ^0.20.2
 
   # ─── Édition des rapports (ticket F0.52) ─────────────────────────────────
   # ⚠️ TOUTES TROIS SONT DU DART PUR OU UN GREFFON WINDOWS LOCAL : rien ne
@@ -52,6 +60,8 @@ dependencies:
   # ⚠️ Le QR de la fiche sujet encode l'IDENTIFIANT lisible, comme le web.
   qr_flutter: ^4.1.0
   excel: ^4.0.6
+  # Ticket CFG-2 — « Envoyer un e-mail de test » RÉEL depuis l'onglet Email (SMTP) du poste.
+  mailer: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -78,3 +88,12 @@ flutter:
     - assets/images/logo.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+
+  # Ticket H1 — LES ICÔNES DU WEB : Material Symbols Outlined (style `material-symbols-outlined`, FILL 0), et
+  # non les Material Icons pleines de Flutter. Sous-ensemble tiré de la fonte complète du web par
+  # `outils/icones_poste.py` (classe `SymbolesAgri`), axes figés au réglage du web (FILL 0, wght 400).
+  # Licence Apache 2.0, comme au web.
+  fonts:
+    - family: MaterialSymbolsOutlined
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsOutlined.ttf

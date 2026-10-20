@@ -5,8 +5,8 @@
 // (jamais verts à vide, jamais rouges hors ligne).
 import 'dart:convert';
 import 'dart:io';
+import 'chemins_depot.dart';
 
-const dossierLaravel = 'C:/laragon/www/agrierp';
 
 /// Exécutable PHP trouvé (PATH puis Laragon), ou null.
 String? executablePhp() {

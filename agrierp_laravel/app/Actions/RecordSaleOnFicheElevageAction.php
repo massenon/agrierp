@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Services\EffectifParCategorieService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -75,21 +76,18 @@ class RecordSaleOnFicheElevageAction
                 $defauts += EffectifParCategorieService::MOUVEMENTS_CONNUS_A_ZERO;
             }
 
-            $entry = LivestockDailyEntry::firstOrCreate(
-                ['lot_id' => $lotId, 'entry_date' => $jour],
-                $defauts,
-            );
+            $entry = $this->ficheDuJour($lotId, $jour, $defauts);
 
             if (! isset($fichesPortantDejaLaVente[$lotId.'|'.$jour])) {
+                // 🔴→✅ TICKET S-T12 (trouvé par l'essai à plusieurs postes, graine 7, sur MariaDB) — LA FICHE EST RELUE
+                // SOUS VERROU AVANT L'INCRÉMENT. Deux caisses qui vendent dans la même bande le même jour envoient en
+                // même temps : chaque transaction lisait `vente` = 5 (lecture cohérente, sans verrou), écrivait 6, et la
+                // seconde écrasait la première — une vente comptée ZÉRO fois sur la fiche, sans erreur (5 → 6 au lieu de
+                // 7). La lecture verrouillante attend la transaction concurrente et rend la valeur à jour. (SQLite
+                // sérialise tout : invisible dans la suite Feature, d'où le garde-fou qui lit ce code.)
+                $entry = LivestockDailyEntry::query()->whereKey($entry->getKey())->lockForUpdate()->first() ?? $entry;
                 $entry->vente = (int) $entry->vente + $qty;
-                $entry->effectif_final = LivestockDailyEntry::computeEffectifFinal(
-                    $entry->previousEffectif(),
-                    (int) $entry->achat,
-                    (int) $entry->ne,
-                    (int) $entry->mort,
-                    (int) $entry->vente,
-                    (int) $entry->don,
-                );
+                $entry->effectif_final = $entry->effectifFinalDepuis($entry->previousEffectif());
                 $entry->save();
             }
 
@@ -105,6 +103,31 @@ class RecordSaleOnFicheElevageAction
         }
 
         return $bandesTouchees;
+    }
+
+    /**
+     * La fiche (bande, jour) que la vente met à jour — créée si elle n'existe pas.
+     *
+     * 🔴→✅ TICKET S-T12 (trouvé par l'essai à plusieurs postes, graine 314, sur MariaDB) — DEUX CRÉATIONS SIMULTANÉES DE
+     * LA MÊME FICHE. `firstOrCreate` lit, ne trouve rien, insère : quand un poste envoie au même instant une vente (ou
+     * une fiche) de la même bande pour un jour encore sans fiche, les deux transactions insèrent, et la seconde tombe sur
+     * l'unicité (bande, jour) — `SQLSTATE 1062`. L'envoi d'un poste repartait en 500 (renvoyé plus tard) ; la caisse du
+     * WEB, elle, affichait l'erreur et la vente était perdue. L'insertion qui heurte l'unicité relit désormais la fiche
+     * que l'autre vient de créer, SOUS VERROU (une lecture cohérente ne la verrait pas encore), et la vente s'y ajoute.
+     */
+    private function ficheDuJour(string $lotId, string $jour, array $defauts): LivestockDailyEntry
+    {
+        $cle = ['lot_id' => $lotId, 'entry_date' => $jour];
+        $existante = LivestockDailyEntry::where($cle)->first();
+        if ($existante !== null) {
+            return $existante;
+        }
+
+        try {
+            return LivestockDailyEntry::create($cle + $defauts);
+        } catch (UniqueConstraintViolationException) {
+            return LivestockDailyEntry::where($cle)->lockForUpdate()->firstOrFail();
+        }
     }
 
     /**
@@ -144,14 +167,8 @@ class RecordSaleOnFicheElevageAction
                 ->get();
 
             foreach ($suivantes as $fiche) {
-                $juste = LivestockDailyEntry::computeEffectifFinal(
-                    $courant,
-                    (int) $fiche->achat,
-                    (int) $fiche->ne,
-                    (int) $fiche->mort,
-                    (int) $fiche->vente,
-                    (int) $fiche->don,
-                );
+                // Ticket 15.46 : transferts entre bandes compris (`effectifFinalDepuis`).
+                $juste = $fiche->effectifFinalDepuis($courant);
 
                 if ((int) $fiche->effectif_final !== $juste) {
                     $fiche->effectif_final = $juste;

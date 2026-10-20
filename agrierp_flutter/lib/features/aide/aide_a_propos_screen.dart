@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'aide_a_propos_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/aide-a-propos.html` → Aide & À Propos.
 ///
@@ -44,18 +45,18 @@ class AideAProposScreen extends StatefulWidget {
 
 class _AideAProposScreenState extends State<AideAProposScreen> {
   static const _icones = <EcranPoste, IconData>{
-    EcranPoste.tableauDeBord: Icons.dashboard,
-    EcranPoste.gestionElevage: Icons.pets,
-    EcranPoste.soinsEtVaccins: Icons.vaccines,
-    EcranPoste.ventesEtDevis: Icons.point_of_sale,
-    EcranPoste.clientsEtCreances: Icons.payments,
-    EcranPoste.achatsEtCommandes: Icons.local_shipping,
-    EcranPoste.gestionStocks: Icons.inventory_2,
-    EcranPoste.facturation: Icons.receipt_long,
-    EcranPoste.personnelEtStages: Icons.badge,
-    EcranPoste.comptabilite: Icons.account_balance,
-    EcranPoste.administrationEtDocument: Icons.folder_shared,
-    EcranPoste.rapportsEtExports: Icons.picture_as_pdf,
+    EcranPoste.tableauDeBord: SymbolesAgri.dashboard,
+    EcranPoste.gestionElevage: SymbolesAgri.pets,
+    EcranPoste.soinsEtVaccins: SymbolesAgri.vaccines,
+    EcranPoste.ventesEtDevis: SymbolesAgri.point_of_sale,
+    EcranPoste.clientsEtCreances: SymbolesAgri.payments,
+    EcranPoste.achatsEtCommandes: SymbolesAgri.local_shipping,
+    EcranPoste.gestionStocks: SymbolesAgri.inventory_2,
+    EcranPoste.facturation: SymbolesAgri.receipt_long,
+    EcranPoste.personnelEtStages: SymbolesAgri.badge,
+    EcranPoste.comptabilite: SymbolesAgri.account_balance,
+    EcranPoste.administrationEtDocument: SymbolesAgri.folder_shared,
+    EcranPoste.rapportsEtExports: SymbolesAgri.picture_as_pdf,
   };
 
   final _recherche = TextEditingController();
@@ -123,7 +124,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.support_agent,
+                        SymbolesAgri.support_agent,
                         size: 18,
                         color: AgriColors.brandEmerald,
                       ),
@@ -157,7 +158,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.help, size: 26, color: AgriColors.brandEmerald),
+            const Icon(SymbolesAgri.help, size: 26, color: AgriColors.brandEmerald),
             const SizedBox(width: AgriSpacing.xs),
             Text(
               'Aide & À Propos',
@@ -236,7 +237,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
     );
 
     const icone = Icon(
-      Icons.agriculture,
+      SymbolesAgri.agriculture,
       size: 64,
       color: AgriColors.brandEmerald,
     );
@@ -329,7 +330,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
       decoration: InputDecoration(
         hintText: "Rechercher dans l'aide (ex : facture, stock, paie...)",
         hintStyle: const TextStyle(fontSize: AgriTypography.sm),
-        prefixIcon: const Icon(Icons.search, size: 18),
+        prefixIcon: const Icon(SymbolesAgri.search, size: 18),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 12),
         border: OutlineInputBorder(
@@ -393,7 +394,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
                     ),
                   ),
                   Icon(
-                    ouverte ? Icons.expand_less : Icons.expand_more,
+                    ouverte ? SymbolesAgri.expand_less : SymbolesAgri.expand_more,
                     color: AgriColors.outline,
                   ),
                 ],

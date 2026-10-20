@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Mecef\FakeMecefGateway;
 use App\Services\Mecef\MecefGatewayInterface;
+use App\Support\DatesValidationFr;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -39,5 +40,9 @@ class AppServiceProvider extends ServiceProvider
         // regle de securite qui bloque l'exploitation hors ligne serait
         // contraire a la nature meme de ce projet.
         Password::defaults(fn () => Password::min(8)->letters()->numbers()->symbols());
+
+        // Ticket U5 (D-U5) — « :date » des règles de date en français (« aujourd'hui », jj/mm/aaaa)
+        // : les phrases viennent de `lang/fr/validation.php`, mais Laravel y collait « today ».
+        DatesValidationFr::enregistrer();
     }
 }

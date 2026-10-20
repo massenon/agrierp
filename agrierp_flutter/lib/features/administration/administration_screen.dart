@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
@@ -11,6 +12,7 @@ import 'archive_modales.dart';
 import 'courrier_modales.dart';
 import 'document_modales.dart';
 import 'documents_administration.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/administration.html` → Administration & Document.
 ///
@@ -41,9 +43,9 @@ class AdministrationScreen extends StatefulWidget {
 class _AdministrationScreenState extends State<AdministrationScreen> {
   /// Les trois onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Gestion des Courriers', Icons.mail),
-    ('Archivage des Documents', Icons.inventory),
-    ('Documents Administratifs', Icons.description),
+    ('Gestion des Courriers', SymbolesAgri.mail),
+    ('Archivage des Documents', SymbolesAgri.inventory),
+    ('Documents Administratifs', SymbolesAgri.description),
   ];
 
   String _onglet = onglets.first.$1;
@@ -177,7 +179,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
             ElevatedButton.icon(
               key: const Key('nouveau-courrier'),
               onPressed: () => _ouvrirCourrier(null),
-              icon: const Icon(Icons.add_circle, size: 18),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
               label: const Text(
                 'Nouveau Courrier',
                 style: TextStyle(
@@ -202,13 +204,13 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
           libelle: 'Reçus (mois)',
           valeur: '${d.recus}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.mark_email_read,
+          icone: SymbolesAgri.mark_email_read,
         ),
         CarteKpi(
           libelle: 'Envoyés (mois)',
           valeur: '${d.envoyes}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.send,
+          icone: SymbolesAgri.send,
         ),
         // ⚠️ UN TIRET, JAMAIS 0 : aucun statut de courrier n'existe en base. « 0 » dirait
         // qu'aucun courrier n'attend de réponse ; le poste ne le sait simplement pas.
@@ -217,7 +219,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
           valeur: d.enAttente == null ? '—' : '${d.enAttente}',
           legende: 'Aucun statut de courrier en base',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.pending,
+          icone: SymbolesAgri.pending,
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
@@ -325,14 +327,14 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
         tooltip: 'Modifier',
         visualDensity: VisualDensity.compact,
         onPressed: () => _ouvrirCourrier(c),
-        icon: const Icon(Icons.edit, size: 18, color: AgriColors.infoBlue),
+        icon: const Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue),
       ),
       IconButton(
         key: Key('archiver-courrier-${c.id}'),
         tooltip: 'Archiver',
         visualDensity: VisualDensity.compact,
         onPressed: () => _archiverCourrier(c),
-        icon: const Icon(Icons.archive, size: 18, color: AgriColors.errorDeep),
+        icon: const Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorDeep),
       ),
     ],
   );
@@ -343,7 +345,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
     padding: const EdgeInsets.all(AgriSpacing.xl),
     child: Column(
       children: [
-        const Icon(Icons.inbox, size: 44, color: AgriColors.outlineVariant),
+        const Icon(SymbolesAgri.inbox, size: 44, color: AgriColors.outlineVariant),
         const SizedBox(height: AgriSpacing.sm),
         const Text(
           'Aucun résultat trouvé',
@@ -408,7 +410,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
 
   /// Le jour LOCAL du poste, sans heure : la règle de statut du serveur compte en jours
   /// calendaires (F0.79).
-  DateTime get _maintenant => widget.maintenant?.call() ?? DateTime.now();
+  DateTime get _maintenant => widget.maintenant?.call() ?? HeureBenin.maintenant();
 
   DateTime _aujourdhui() {
     final n = _maintenant;
@@ -457,7 +459,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
       OutlinedButton.icon(
         key: Key(cle),
         onPressed: onPressed,
-        icon: const Icon(Icons.picture_as_pdf, size: 18),
+        icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
         style: OutlinedButton.styleFrom(
           foregroundColor: AgriColors.brandForest,
           side: const BorderSide(color: AgriColors.outlineVariant),
@@ -499,7 +501,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
               ElevatedButton.icon(
                 key: const Key('nouveau-archive'),
                 onPressed: () => _ouvrirArchive(null),
-                icon: const Icon(Icons.add_circle, size: 18),
+                icon: const Icon(SymbolesAgri.add_circle, size: 18),
                 label: const Text(
                   'Archiver un Document',
                   style: TextStyle(
@@ -526,14 +528,14 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
             libelle: 'Documents archivés',
             valeur: '${actives.length}',
             couleurLisere: AgriColors.brandEmerald,
-            icone: Icons.folder,
+            icone: SymbolesAgri.folder,
           ),
           CarteKpi(
             libelle: 'Expirant sous 30j',
             valeur: '${bientot.length}',
             legende: 'Bientôt expiré : 1 à 30 jours',
             couleurLisere: AgriColors.accentYellow,
-            icone: Icons.event_busy,
+            icone: SymbolesAgri.event_busy,
             couleurIcone: AgriColors.brandForest,
           ),
           // ⚠️⚠️ UNE ARCHIVE EXPIRÉE EST UN AGRÉMENT PÉRIMÉ, pas une ligne de tableau : un
@@ -544,7 +546,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
             valeur: '${expirees.length}',
             legende: 'Échéance atteinte ou dépassée',
             couleurLisere: AgriColors.errorRed,
-            icone: Icons.event_busy,
+            icone: SymbolesAgri.event_busy,
             couleurIcone: AgriColors.errorRed,
           ),
         ]),
@@ -642,7 +644,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => _ouvrirArchive(a),
               icon: const Icon(
-                Icons.edit,
+                SymbolesAgri.edit,
                 size: 18,
                 color: AgriColors.infoBlue,
               ),
@@ -653,7 +655,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => _retirerArchive(a),
               icon: const Icon(
-                Icons.archive,
+                SymbolesAgri.archive,
                 size: 18,
                 color: AgriColors.errorDeep,
               ),
@@ -670,7 +672,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
     padding: const EdgeInsets.all(AgriSpacing.xl),
     child: Column(
       children: [
-        const Icon(Icons.inbox, size: 44, color: AgriColors.outlineVariant),
+        const Icon(SymbolesAgri.inbox, size: 44, color: AgriColors.outlineVariant),
         const SizedBox(height: AgriSpacing.sm),
         const Text(
           'Aucun résultat trouvé',
@@ -780,7 +782,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
             ElevatedButton.icon(
               key: const Key('nouveau-document'),
               onPressed: () => _ouvrirDocument(null),
-              icon: const Icon(Icons.add_circle, size: 18),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
               label: const Text(
                 'Générer un Document',
                 style: TextStyle(
@@ -810,21 +812,21 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
           valeur: '—',
           legende: 'Aucun catalogue de modèles',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.description,
+          icone: SymbolesAgri.description,
         ),
         CarteKpi(
           libelle: 'Générés (mois)',
           valeur: '${d.generesDuMois}',
           legende: 'Documents enregistrés ce mois',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.edit_note,
+          icone: SymbolesAgri.edit_note,
         ),
         CarteKpi(
           libelle: 'En attente',
           valeur: '${d.documentsEnAttente}',
           legende: 'Signature du DG',
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.pending,
+          icone: SymbolesAgri.pending,
           couleurIcone: AgriColors.brandForest,
         ),
       ]),
@@ -946,7 +948,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => _ouvrirDocument(doc),
               icon: const Icon(
-                Icons.edit,
+                SymbolesAgri.edit,
                 size: 18,
                 color: AgriColors.infoBlue,
               ),
@@ -957,7 +959,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => _retirerDocument(doc),
               icon: const Icon(
-                Icons.archive,
+                SymbolesAgri.archive,
                 size: 18,
                 color: AgriColors.errorDeep,
               ),
@@ -975,7 +977,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
     padding: const EdgeInsets.all(AgriSpacing.xl),
     child: Column(
       children: [
-        const Icon(Icons.inbox, size: 44, color: AgriColors.outlineVariant),
+        const Icon(SymbolesAgri.inbox, size: 44, color: AgriColors.outlineVariant),
         const SizedBox(height: AgriSpacing.sm),
         const Text(
           'Aucun résultat trouvé',
@@ -1151,7 +1153,7 @@ class _AdministrationScreenState extends State<AdministrationScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

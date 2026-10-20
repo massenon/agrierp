@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/toast_agri.dart';
 import 'notifications_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/notifications.html` → Centre de Notifications.
 ///
@@ -51,8 +56,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String _categorie = '';
   String _statut = '';
 
-  /// Dernier retour d'action : (réussi, message).
-  (bool, String)? _retour;
+  /// Ticket U14 — `wire:model.live.debounce.300ms="search"` : la recherche appliquée 300 ms après la frappe.
+  String _rechercheAppliquee = '';
+  Timer? _attenteRecherche;
 
   @override
   void initState() {
@@ -62,6 +68,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   void dispose() {
+    _attenteRecherche?.cancel();
     _recherche.dispose();
     super.dispose();
   }
@@ -72,20 +79,52 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _donnees = donnees);
   }
 
+  /// 🔴→✅ Ticket U14 — les TOASTS du web (`markAsRead` : succès « Notification marquée comme lue. » ; `delete` :
+  /// avertissement « Notification supprimée. ») ; un échec (réseau, session) en toast d'erreur. Le poste affichait un
+  /// bandeau sous les filtres.
   Future<void> _agir(
     Future<void> Function() action,
     String messageReussi,
+    TypeToast type,
   ) async {
     try {
       await action();
       if (!mounted) return;
-      _retour = (true, messageReussi);
+      ToastAgri.afficher(context, messageReussi, type: type);
       widget.onModifie?.call();
     } on EchecNotification catch (e) {
       if (!mounted) return;
-      _retour = (false, e.message);
+      ToastAgri.afficher(context, e.message, type: TypeToast.erreur);
     }
     await _charger();
+  }
+
+  /// `wire:confirm="Supprimer cette notification ?"` du web : la question, puis « Annuler » ou la suppression.
+  Future<void> _supprimer(LigneNotification n) async {
+    final confirme = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (contexte) => ModaleConfirmation(
+        icone: SymbolesAgri.delete,
+        couleurIcone: AgriColors.errorRed,
+        titre: 'Supprimer cette notification ?',
+        message: n.message,
+        actions: [
+          BoutonModaleSecondaire(
+            libelle: 'Annuler',
+            onPressed: () => Navigator.of(contexte).pop(false),
+          ),
+          BoutonModalePrimaire(
+            key: const Key('suppr-confirmer'),
+            libelle: 'Supprimer',
+            couleur: AgriColors.errorRed,
+            onPressed: () => Navigator.of(contexte).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+    await _agir(() => widget.depot.supprimer(n.id), 'Notification supprimée.', TypeToast.avertissement);
   }
 
   @override
@@ -101,7 +140,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 final large = AgriBreakpoints.large(context);
                 final lignes = NotificationsRepository.filtrer(
                   d.lignes,
-                  recherche: _recherche.text,
+                  recherche: _rechercheAppliquee,
                   categorie: _categorie,
                   statut: _statut,
                 );
@@ -118,10 +157,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _cartes(d, large),
                       const SizedBox(height: AgriSpacing.lg),
                       _filtres(),
-                      if (_retour != null) ...[
-                        const SizedBox(height: AgriSpacing.md),
-                        _bandeau(_retour!.$1, _retour!.$2),
-                      ],
                       const SizedBox(height: AgriSpacing.md),
                       _tableau(lignes),
                       const SizedBox(height: AgriSpacing.sm),
@@ -153,7 +188,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Row(
           children: [
             const Icon(
-              Icons.notifications,
+              SymbolesAgri.notifications,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -194,21 +229,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         libelle: 'Non Lues',
         valeur: '${d.nonLues}',
         couleurLisere: AgriColors.errorRed,
-        icone: Icons.mark_email_unread,
+        icone: SymbolesAgri.mark_email_unread,
         couleurIcone: AgriColors.errorRed,
       ),
       CarteKpi(
         libelle: 'Critiques',
         valeur: '${d.critiques}',
         couleurLisere: AgriColors.accentYellow,
-        icone: Icons.warning,
+        icone: SymbolesAgri.warning,
         couleurIcone: AgriColors.brandForest,
       ),
       CarteKpi(
         libelle: 'Total (30 jours)',
         valeur: '${d.total30Jours}',
         couleurLisere: AgriColors.brandEmerald,
-        icone: Icons.notifications,
+        icone: SymbolesAgri.notifications,
       ),
     ],
   );
@@ -233,12 +268,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               child: TextField(
                 key: const Key('notif-recherche'),
                 controller: _recherche,
-                onChanged: (_) => setState(() {}),
+                onChanged: (texte) {
+                  _attenteRecherche?.cancel();
+                  _attenteRecherche = Timer(const Duration(milliseconds: 300), () {
+                    if (mounted) setState(() => _rechercheAppliquee = texte);
+                  });
+                },
                 style: const TextStyle(fontSize: AgriTypography.xs),
                 decoration: InputDecoration(
                   hintText: 'Rechercher un message...',
                   hintStyle: const TextStyle(fontSize: AgriTypography.xs),
-                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIcon: const Icon(SymbolesAgri.search, size: 18),
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   border: OutlineInputBorder(
@@ -309,40 +349,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     ),
   );
 
-  Widget _bandeau(bool reussi, String message) {
-    final couleur = reussi ? AgriColors.brandEmerald : AgriColors.errorRed;
-
-    return Container(
-      key: Key(reussi ? 'notif-reussi' : 'notif-echec'),
-      padding: const EdgeInsets.all(AgriSpacing.sm),
-      decoration: BoxDecoration(
-        color: couleur.withValues(alpha: 0.10),
-        border: Border.all(color: couleur.withValues(alpha: 0.30)),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            reussi ? Icons.check_circle : Icons.error,
-            size: 18,
-            color: couleur,
-          ),
-          const SizedBox(width: AgriSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: AgriTypography.gras,
-                color: couleur,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Tableau ───────────────────────────────────────────────────────────────
 
   static const _colonnes = <(String, int)>[
@@ -361,7 +367,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
     clipBehavior: Clip.antiAlias,
-    child: SingleChildScrollView(
+    // Ticket U14 — `@if($this->notifications->isEmpty())` : la phrase SEULE, sans en-tête de tableau.
+    child: lignes.isEmpty
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: AgriSpacing.xl),
+            child: Text(
+              'Aucune notification pour le moment.',
+              key: Key('notif-vide'),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+          )
+        : SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SizedBox(
         width: 960,
@@ -393,19 +410,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
             ),
-            if (lignes.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(AgriSpacing.lg),
-                child: Text(
-                  'Aucune notification à afficher.',
-                  key: Key('notif-vide'),
-                  style: TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontStyle: FontStyle.italic,
-                    color: AgriColors.outline,
-                  ),
-                ),
-              ),
             for (var i = 0; i < lignes.length; i++) _ligne(i, lignes[i]),
           ],
         ),
@@ -461,33 +465,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _action(
-                  Key('lue-$i'),
-                  Icons.check_circle,
-                  'Marquer comme lue',
-                  AgriColors.brandEmerald,
-                  () => _agir(
-                    () => widget.depot.marquerLue(n.id),
-                    'Notification marquée comme lue.',
+                // Ticket U14 — `@if(!$notif->is_read)` : pas de « Marquer comme lue » sur une notification déjà lue.
+                if (!n.lue)
+                  _action(
+                    Key('lue-$i'),
+                    SymbolesAgri.check_circle,
+                    'Marquer comme lue',
+                    AgriColors.brandEmerald,
+                    () => _agir(
+                      () => widget.depot.marquerLue(n.id),
+                      'Notification marquée comme lue.',
+                      TypeToast.succes,
+                    ),
                   ),
-                ),
                 if (ecran != null && widget.onOuvrir != null)
                   _action(
                     Key('resoudre-$i'),
-                    Icons.arrow_forward,
+                    SymbolesAgri.arrow_forward,
                     'Résoudre',
                     AgriColors.infoBlue,
                     () => widget.onOuvrir!(ecran),
                   ),
                 _action(
                   Key('suppr-$i'),
-                  Icons.delete,
+                  SymbolesAgri.delete,
                   'Supprimer',
                   AgriColors.outline,
-                  () => _agir(
-                    () => widget.depot.supprimer(n.id),
-                    'Notification supprimée.',
-                  ),
+                  () => _supprimer(n),
                 ),
               ],
             ),

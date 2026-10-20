@@ -142,6 +142,8 @@ void main() {
         EcranPoste.aideEtAPropos,
         EcranPoste.contactEditeur,
         EcranPoste.synchronisation,
+        // Ticket 15.46 — hors maquette : mêmes rôles que `manage-elevage` (admin, animalier).
+        EcranPoste.transfertsBandes,
       ]);
 
       // ⚠️⚠️ **LE TICKET F0.52 DONNE ENFIN AU COMPTABLE UN ÉCRAN MÉTIER.**

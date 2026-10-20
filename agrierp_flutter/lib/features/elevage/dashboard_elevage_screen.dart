@@ -5,36 +5,79 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
-/// `prototype_html/elevage-dashboard.html` → Dashboard Élevage.
+/// Dashboard Élevage — le maître est `Livewire\Elevage\DashboardElevage` et sa vue
+/// `dashboard-elevage.blade.php` (Doctrine, article 5 ; ticket H6).
 ///
-/// ⚠️⚠️ **LA MAQUETTE EST LA RÉFÉRENCE DE MISE EN PAGE.** En-tête, puis les
-/// **cinq onglets** dans SON ordre : Synthèse Globale · GMQ & Croissance ·
-/// Bilan Technico-Économique · Analyse Sanitaire · Prévision de Croissance.
+/// ⚠️⚠️ **LE BLADE FAIT FOI.** Les **cinq onglets** dans son ordre et avec ses icônes, puis, dans
+/// chaque panneau, ses titres, cartes, blocs et tableaux. Les AJOUTS du poste absents du web
+/// (courbes GMQ, cartes et filtre d'espèce de l'onglet GMQ, sélecteur, horizons et cartes de
+/// prévision, liste des rappels VMS, note « 2026 vs 2025 »…) sont CONSERVÉS par décision client du
+/// 19/10/2026, en plus du Blade : ils seront construits au web (ticket H11).
 ///
-/// ⚠️ **L'ONGLET « BILAN TECHNICO-ÉCONOMIQUE » EST PORTÉ (ticket F0.63).** Il
-/// disait « module non embarqué » en invoquant les achats et les centres de coût
-/// — mais le bilan de Laravel n'utilise NI l'un NI l'autre : acquisition,
-/// provende au prix indicatif, soins et ventes de la bande. Le motif était faux
-/// depuis le départ. Voir [BilanTechnicoEconomiqueVue].
+/// ⚠️ **L'ONGLET « RENTABILITÉ » EST PORTÉ (ticket F0.63)** : voir [BilanTechnicoEconomiqueVue].
 class DashboardElevageScreen extends StatefulWidget {
-  const DashboardElevageScreen({super.key, required this.depot});
+  const DashboardElevageScreen({
+    super.key,
+    required this.depot,
+    this.quand,
+    this.onOuvrirSoins,
+  });
 
   final DashboardElevageRepository depot;
+
+  /// Instant de calcul (tests) ; `null` = maintenant.
+  final DateTime? quand;
+
+  /// Lien « Voir le calendrier complet → » du Blade : ouvre Soins et vaccins.
+  final VoidCallback? onOuvrirSoins;
+
+  /// Les cinq onglets du Blade, dans son ordre, avec ses icônes.
+  ///
+  /// ⚠️ `monitoring` (Material Symbols) n'existe pas dans `Icons` : `ssid_chart`, axes et ligne
+  /// brisée, est le glyphe le plus proche.
+  static const onglets = <(String, IconData)>[
+    ('Synthèse Globale', SymbolesAgri.dashboard),
+    ('GMQ & Croissance', SymbolesAgri.ssid_chart),
+    // Libellé « Rentabilité » : décision client du 17/10/2026 (prototype : « Bilan Technico-Économique »).
+    ('Rentabilité', SymbolesAgri.account_balance_wallet),
+    ('Analyse Sanitaire', SymbolesAgri.coronavirus),
+    ('Prévision de Croissance', SymbolesAgri.query_stats),
+  ];
+
+  /// Colonnes du tableau « GMQ & Croissance » du Blade (`<th>`), dans son ordre.
+  static const colonnesGmq = <(String, int)>[
+    ('Bande', 3),
+    ('Filière', 3),
+    ('Poids Initial (g)', 2),
+    ('Poids Actuel (g)', 2),
+    ('Jours', 1),
+    ('GMQ (g/jour)', 2),
+  ];
+
+  /// Colonnes du tableau « Prévision de Croissance » du Blade, dans son ordre.
+  static const colonnesPrevision = <(String, int)>[
+    ('Bande', 3),
+    ('Poids Actuel (g)', 2),
+    ('Tendance (g/j)', 2),
+    ('Projection à 30 jours (g)', 2),
+  ];
+
+  /// Colonnes du tableau « Analyse Sanitaire » du Blade, dans son ordre.
+  static const colonnesSanitaire = <(String, int)>[
+    ('Filière', 3),
+    ('Nb Traitements (mois)', 2),
+    ('Coût Total', 2),
+    ('Taux de Morbidité %', 2),
+  ];
 
   @override
   State<DashboardElevageScreen> createState() => _DashboardElevageScreenState();
 }
 
 class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
-  /// Les cinq onglets de la maquette, dans son ordre, avec leurs icônes.
-  static const onglets = <(String, IconData)>[
-    ('Synthèse Globale', Icons.dashboard),
-    ('GMQ & Croissance', Icons.show_chart),
-    ('Bilan Technico-Économique', Icons.account_balance_wallet),
-    ('Analyse Sanitaire', Icons.coronavirus),
-    ('Prévision de Croissance', Icons.query_stats),
-  ];
+  static const onglets = DashboardElevageScreen.onglets;
 
   String _onglet = onglets.first.$1;
 
@@ -52,7 +95,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
 
   Future<void> _charger() async {
     setState(() => _chargement = true);
-    final donnees = await widget.depot.charger();
+    final donnees = await widget.depot.charger(quand: widget.quand);
     if (!mounted) return;
     setState(() {
       _donnees = donnees;
@@ -87,7 +130,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
                         'GMQ & Croissance' => _ongletGmq(large),
-                        'Bilan Technico-Économique' => _ongletBilan(),
+                        'Rentabilité' => _ongletBilan(),
                         'Analyse Sanitaire' => _ongletSanitaire(large),
                         'Prévision de Croissance' => _ongletPrevision(),
                         _ => _ongletSynthese(large),
@@ -113,7 +156,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         Row(
           children: [
             const Icon(
-              Icons.dashboard,
+              SymbolesAgri.dashboard,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -215,9 +258,11 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           children: [
             _carteKpi(
               libelle: 'Effectif Total Vivant',
-              valeur: '${d.effectifTotal}',
+              valeur: DashboardElevageRepository.milliers(
+                d.effectifTotal.toDouble(),
+              ),
               legende: 'Toutes espèces actives',
-              icone: Icons.pets,
+              icone: SymbolesAgri.pets,
               barre: AgriColors.brandEmerald,
             ),
             // ⚠️⚠️ NON CALCULABLE, ET DÉJÀ CONSTATÉ CÔTÉ WEB (carte marquée
@@ -229,32 +274,30 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Autonomie Aliment Min.',
               valeur: '—',
               legende: 'Conditionnement (kg/unité) absent du catalogue',
-              icone: Icons.inventory_2,
+              icone: SymbolesAgri.inventory_2,
               barre: AgriColors.accentYellow,
               couleurIcone: AgriColors.brandForest,
             ),
+            // GMQ CUMULÉ consolidé (moyenne des bandes actives), écrit comme PHP écrit un flottant.
             _carteKpi(
               libelle: 'GMQ Moyen',
               valeur: d.gmqMoyen == null
                   ? '—'
-                  : '${d.gmqMoyen!.toStringAsFixed(0)} g/j',
+                  : '${DashboardElevageRepository.nombrePhp(d.gmqMoyen!)} g/j',
               legende: d.gmqMoyen == null
                   ? 'Moins de 2 pesées enregistrées'
                   : 'Consolidé, toutes bandes',
-              icone: Icons.trending_up,
+              icone: SymbolesAgri.trending_up,
               barre: AgriColors.infoBlue,
               couleurIcone: AgriColors.infoBlue,
             ),
-            // ⚠️ LIBELLÉ ET PÉRIODE DE LA MAQUETTE : « (mois) ». Le composant
-            // Livewire a renommé la carte en « (7j) » et calcule sur sept
-            // jours : même écran, deux périodes. Signalé, non tranché.
+            // Ticket H6 : sept jours (`now()->subDays(6)` → `now()`), dénominateur
+            // `previousEffectif()`, « 0,0 % » sans dénominateur — comme le web.
             _carteKpi(
-              libelle: 'Mortalité Cumulée (mois)',
-              valeur: d.mortaliteMois == null
-                  ? '—'
-                  : '${d.mortaliteMois!.toStringAsFixed(1)}%',
+              libelle: 'Mortalité Cumulée (7j)',
+              valeur: DashboardElevageRepository.pourcent(d.mortalite7j),
               legende: 'Alerte si > 10%/semaine',
-              icone: Icons.health_and_safety,
+              icone: SymbolesAgri.health_and_safety,
               barre: AgriColors.errorRed,
               couleurIcone: AgriColors.errorRed,
             ),
@@ -263,21 +306,25 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         const SizedBox(height: AgriSpacing.lg),
         _cartesEspeces(large),
         const SizedBox(height: AgriSpacing.lg),
-        _croissanceEtRappels(large),
+        _resumeEtRappels(large),
+        const SizedBox(height: AgriSpacing.lg),
+        _courbeEspeces(),
       ],
     );
   }
 
+  /// Icônes du semis des espèces (`livestock_species.icon`), par code.
   static const _iconesEspeces = {
-    'Cuniculture': Icons.cruelty_free,
-    'Aviculture': Icons.egg,
-    'Porciculture': Icons.pets,
-    'Héliciculture': Icons.bug_report,
+    'cuniculture': SymbolesAgri.cruelty_free,
+    'aviculture': SymbolesAgri.egg,
+    'porciculture': SymbolesAgri.pets,
+    'helico': SymbolesAgri.bug_report,
   };
 
   Widget _cartesEspeces(bool large) {
     final cartes = _donnees!.especes.map((carte) {
       return Container(
+        key: Key('carte-espece-${carte.code}'),
         padding: const EdgeInsets.all(AgriSpacing.md),
         decoration: BoxDecoration(
           color: AgriColors.surfaceCard,
@@ -291,17 +338,19 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
             Row(
               children: [
                 Icon(
-                  _iconesEspeces[carte.titre] ?? Icons.pets,
+                  _iconesEspeces[carte.code] ?? SymbolesAgri.pets,
                   size: 20,
                   color: AgriColors.brandEmerald,
                 ),
                 const SizedBox(width: AgriSpacing.xs),
-                Text(
-                  carte.titre,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
+                Flexible(
+                  child: Text(
+                    carte.titre,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.brandForest,
+                    ),
                   ),
                 ),
               ],
@@ -313,20 +362,26 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      libelle,
-                      style: const TextStyle(
-                        fontSize: AgriTypography.xs,
-                        color: AgriColors.outline,
+                    Flexible(
+                      child: Text(
+                        libelle,
+                        style: const TextStyle(
+                          fontSize: AgriTypography.xs,
+                          color: AgriColors.outline,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: AgriSpacing.xs),
                     Text(
                       valeur,
                       style: TextStyle(
                         fontSize: AgriTypography.xs,
                         fontWeight: FontWeight.bold,
+                        // « Autonomie aliment » : `text-outline` dans le Blade.
                         color: critique
                             ? AgriColors.errorDeep
+                            : valeur == '—'
+                            ? AgriColors.outline
                             : AgriColors.onSurface,
                       ),
                     ),
@@ -360,40 +415,89 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     );
   }
 
-  /// Grille 65 % / 35 % de la maquette.
-  Widget _croissanceEtRappels(bool large) {
+  /// Grille 65 % / 35 % du Blade : « GMQ par Bande — Résumé » et « Rappels VMS à venir ».
+  Widget _resumeEtRappels(bool large) {
     final d = _donnees!;
+    final avecGmq = d.lignesGmq.where((l) => l.gmq != null).toList();
 
-    final courbe = _bloc(
-      titre: 'Croissance (GMQ) par Espèce - 4 dernières semaines',
+    final resume = _bloc(
+      titre: 'GMQ par Bande — Résumé',
+      cle: 'bloc-resume-gmq',
       enfant: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 192,
-            child: CustomPaint(
-              painter: _CourbesGmqPainter(d.gmqParEspeceParSemaine),
-              child: const SizedBox.expand(),
-            ),
+          const Text(
+            'Le graphique de croissance du prototype est remplacé par un '
+            'tableau réel (aucune librairie de graphiques disponible côté vue à '
+            "ce stade) — voir l'onglet « GMQ & Croissance » pour le détail "
+            'complet.',
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
           ),
           const SizedBox(height: AgriSpacing.sm),
-          Row(
-            children: [
-              _legende(AgriColors.brandEmerald, 'Cuniculture'),
-              const SizedBox(width: AgriSpacing.lg),
-              _legende(AgriColors.infoBlue, 'Aviculture'),
-              const SizedBox(width: AgriSpacing.lg),
-              _legende(AgriColors.accentYellow, 'Porciculture'),
-            ],
-          ),
+          if (avecGmq.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AgriSpacing.lg),
+              child: Text(
+                'Aucune donnée de croissance suffisante pour le moment (2 '
+                'pesées minimum par bande).',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.outline,
+                ),
+              ),
+            )
+          else
+            for (final l in avecGmq)
+              Container(
+                key: Key('resume-gmq-${l.code}'),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: AgriColors.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      l.code,
+                      style: const TextStyle(
+                        fontSize: AgriTypography.xs,
+                        fontWeight: FontWeight.bold,
+                        color: AgriColors.brandForest,
+                      ),
+                    ),
+                    Text(
+                      '${DashboardElevageRepository.nombrePhp(l.gmq!)} g/j',
+                      style: TextStyle(
+                        fontSize: AgriTypography.xs,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: l.gmq! < 0
+                            ? AgriColors.errorDeep
+                            : AgriColors.brandEmerald,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         ],
       ),
     );
 
     final rappels = _bloc(
       titre: 'Rappels VMS à venir',
-      enfant: d.rappels.isEmpty
-          ? const Text(
+      cle: 'bloc-rappels-vms',
+      enfant: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // AJOUT du poste conservé (décision client du 19/10/2026) : la liste calculée des
+          // rappels des 7 prochains jours, au-dessus du texte et du lien du Blade.
+          if (d.rappels.isEmpty)
+            const Text(
               '— Aucun rappel dans les 7 prochains jours —',
               style: TextStyle(
                 fontSize: AgriTypography.xs,
@@ -401,84 +505,156 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
                 color: AgriColors.outline,
               ),
             )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final r in d.rappels.take(6)) ...[
-                  Container(
-                    padding: const EdgeInsets.all(AgriSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: r.enRetard
-                          ? AgriColors.errorBg
-                          : AgriColors.accentYellow.withValues(alpha: 0.10),
-                      border: Border.all(
-                        color: r.enRetard
-                            ? AgriColors.errorDeep.withValues(alpha: 0.20)
-                            : AgriColors.accentYellow.withValues(alpha: 0.30),
-                      ),
-                      borderRadius: BorderRadius.circular(AgriRadius.lg),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          r.enRetard ? Icons.warning : Icons.event,
-                          size: 18,
-                          color: r.enRetard
-                              ? AgriColors.errorDeep
-                              : AgriColors.brandForest,
-                        ),
-                        const SizedBox(width: AgriSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                r.libelle,
-                                style: const TextStyle(
-                                  fontSize: AgriTypography.xs,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                r.echeance,
-                                style: const TextStyle(
-                                  fontSize: AgriTypography.xs,
-                                  color: AgriColors.outline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+          else
+            for (final r in d.rappels.take(6)) ...[
+              Container(
+                padding: const EdgeInsets.all(AgriSpacing.sm),
+                decoration: BoxDecoration(
+                  color: r.enRetard
+                      ? AgriColors.errorBg
+                      : AgriColors.accentYellow.withValues(alpha: 0.10),
+                  border: Border.all(
+                    color: r.enRetard
+                        ? AgriColors.errorDeep.withValues(alpha: 0.20)
+                        : AgriColors.accentYellow.withValues(alpha: 0.30),
                   ),
-                  const SizedBox(height: AgriSpacing.sm),
-                ],
-              ],
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      r.enRetard ? SymbolesAgri.warning : SymbolesAgri.event,
+                      size: 18,
+                      color: r.enRetard
+                          ? AgriColors.errorDeep
+                          : AgriColors.brandForest,
+                    ),
+                    const SizedBox(width: AgriSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.libelle,
+                            style: const TextStyle(
+                              fontSize: AgriTypography.xs,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            r.echeance,
+                            style: const TextStyle(
+                              fontSize: AgriTypography.xs,
+                              color: AgriColors.outline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+            ],
+          // Texte et lien du Blade.
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AgriSpacing.md),
+            child: Text(
+              'Le calendrier complet (réel) est disponible dans Soins et '
+              'Vaccins.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                color: AgriColors.outline,
+              ),
             ),
+          ),
+          Center(
+            child: InkWell(
+              key: const Key('lien-calendrier-soins'),
+              onTap: widget.onOuvrirSoins,
+              child: const Text(
+                'Voir le calendrier complet →',
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandEmerald,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     if (!large) {
       return Column(
         children: [
-          courbe,
+          resume,
           const SizedBox(height: AgriSpacing.md),
           rappels,
         ],
       );
     }
 
-    // ⚠️ 65 % / 35 % — le rapport exact de la maquette, pas une moitié chacun.
+    // ⚠️ 65 % / 35 % — `lg:grid-cols-[65%_35%]` du Blade.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 65, child: courbe),
+        Expanded(flex: 65, child: resume),
         const SizedBox(width: AgriSpacing.md),
         Expanded(flex: 35, child: rappels),
       ],
     );
   }
+
+  /// AJOUT du poste conservé (décision client du 19/10/2026) : courbe hebdomadaire du GMQ cumulé
+  /// par espèce, absente du web (ticket H11).
+  Widget _courbeEspeces() => _bloc(
+    titre: 'Croissance (GMQ) par Espèce - 4 dernières semaines',
+    enfant: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 192,
+          child: CustomPaint(
+            painter: _CourbesGmqPainter(_donnees!.gmqParEspeceParSemaine),
+            child: const SizedBox.expand(),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        Row(
+          children: [
+            _legende(AgriColors.brandEmerald, 'Cuniculture'),
+            const SizedBox(width: AgriSpacing.lg),
+            _legende(AgriColors.infoBlue, 'Aviculture'),
+            const SizedBox(width: AgriSpacing.lg),
+            _legende(AgriColors.accentYellow, 'Porciculture'),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  /// Titre `<h2>` d'un panneau du Blade : icône émeraude et texte `text-lg font-bold`.
+  Widget _titrePanneau(String titre, IconData icone) => Row(
+    key: const Key('titre-panneau'),
+    children: [
+      Icon(icone, size: 22, color: AgriColors.brandEmerald),
+      const SizedBox(width: AgriSpacing.xs),
+      Flexible(
+        child: Text(
+          titre,
+          style: const TextStyle(
+            fontSize: AgriTypography.lg,
+            fontWeight: FontWeight.bold,
+            color: AgriColors.onSurface,
+          ),
+        ),
+      ),
+    ],
+  );
 
   // ── Onglet 2 : GMQ & Croissance ───────────────────────────────────────────
 
@@ -491,35 +667,26 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Titre de `analyse-croissance.html`, dont cet onglet est le contenu.
-        const Padding(
-          padding: EdgeInsets.only(bottom: AgriSpacing.xs),
-          child: Row(
-            children: [
-              Icon(Icons.show_chart, size: 20, color: AgriColors.brandEmerald),
-              SizedBox(width: AgriSpacing.xs),
-              Text(
-                'Analyse des Croissances — GMQ',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AgriColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Titre et aide du Blade ; le filtre d'espèce est un AJOUT du poste conservé.
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              child: Text(
-                'Gain Moyen Quotidien = (Poids actuel − Poids précédent) ÷ '
-                'Jours écoulés. Calculé automatiquement à partir des pesées '
-                'enregistrées.',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.outline,
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _titrePanneau('GMQ & Croissance', SymbolesAgri.ssid_chart),
+                  const SizedBox(height: AgriSpacing.xs),
+                  const Text(
+                    'GMQ (g/j) = (Poids Final − Poids Initial) ÷ Nombre de '
+                    'Jours entre les deux pesées, calculé par bande à partir '
+                    'des pesées déjà saisies dans les fiches journalières.',
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      color: AgriColors.outline,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: AgriSpacing.sm),
@@ -527,6 +694,8 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           ],
         ),
         const SizedBox(height: AgriSpacing.md),
+        // AJOUTS du poste conservés (décision client du 19/10/2026) : cartes par espèce et courbe
+        // de la bande suivie, sur le MÊME GMQ cumulé que le tableau du Blade.
         GridView.count(
           crossAxisCount: large ? 4 : 2,
           shrinkWrap: true,
@@ -557,7 +726,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               libelle: 'Lots Suivis (Pesées ≥ 2)',
               valeur: '${d.lotsSuivis}',
               legende: '',
-              icone: Icons.checklist,
+              icone: SymbolesAgri.checklist,
               barre: AgriColors.infoBlue,
               couleurIcone: AgriColors.infoBlue,
             ),
@@ -619,17 +788,17 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   );
 
   Widget _carteGmq(String libelle, double? valeur, String code, Color barre) {
-    final objectif = DashboardElevageRepository.objectifs[code];
+    // Ticket U2 (D-U2) — objectif lu dans `growth_standards` (même règle que le web) ; sans barème : « — ».
+    final objectif = _donnees!.objectifsGmq[code];
     final legende = objectif == null
-        ? ''
-        : 'Objectif : ${objectif.$1.toStringAsFixed(0)}-'
-              '${objectif.$2.toStringAsFixed(0)} g/j';
+        ? 'Objectif : —'
+        : 'Objectif : ${objectif.$1}-${objectif.$2} g/j';
 
     return _carteKpi(
       libelle: libelle,
       valeur: valeur == null ? '—' : '${valeur.toStringAsFixed(0)} g/j',
       legende: valeur == null ? 'Moins de 2 pesées enregistrées' : legende,
-      icone: Icons.trending_up,
+      icone: SymbolesAgri.trending_up,
       barre: barre,
     );
   }
@@ -640,193 +809,127 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     color: AgriColors.outline,
   );
 
-  Widget _tableauGmq(List<LigneGmq> lignes) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AgriColors.surfaceCard,
-        border: Border.all(color: AgriColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
+  /// En-tête d'un tableau du Blade (`bg-surface-zebra`, `text-[10px] uppercase`) : colonne 1 à
+  /// gauche, les suivantes à droite (`text-right`).
+  Widget _enteteTableau(List<(String, int)> colonnes, {int aGauche = 1}) =>
+      Container(
+    color: AgriColors.surfaceZebra,
+    padding: const EdgeInsets.symmetric(
+      horizontal: AgriSpacing.md,
+      vertical: AgriSpacing.sm,
+    ),
+    child: Row(
+      children: [
+        for (final (i, (libelle, flex)) in colonnes.indexed)
+          Expanded(
+            flex: flex,
+            child: Text(
+              libelle.toUpperCase(),
+              textAlign: i < aGauche ? TextAlign.left : TextAlign.right,
+              style: _enteteGmq,
+            ),
+          ),
+      ],
+    ),
+  );
+
+  /// Ligne d'un tableau du Blade : zébrée une ligne sur deux.
+  Widget _ligneTableau(Key cle, int i, List<Widget> cellules) => Container(
+    key: cle,
+    decoration: BoxDecoration(
+      color: i.isOdd ? AgriColors.surfaceZebra : AgriColors.surfaceCard,
+      border: const Border(
+        bottom: BorderSide(color: AgriColors.outlineVariant),
       ),
+    ),
+    padding: const EdgeInsets.symmetric(
+      horizontal: AgriSpacing.md,
+      vertical: AgriSpacing.sm,
+    ),
+    child: Row(children: cellules),
+  );
+
+  Widget _cellule(
+    String texte,
+    int flex, {
+    TextAlign alignement = TextAlign.right,
+    FontWeight? graisse,
+    Color? couleur,
+  }) => Expanded(
+    flex: flex,
+    child: Text(
+      texte,
+      textAlign: alignement,
+      style: TextStyle(
+        fontSize: AgriTypography.xs,
+        fontWeight: graisse,
+        color: couleur,
+      ),
+    ),
+  );
+
+  Widget _videTableau(String texte) => Padding(
+    padding: const EdgeInsets.all(AgriSpacing.lg),
+    child: Text(
+      texte,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        fontSize: AgriTypography.xs,
+        color: AgriColors.outline,
+      ),
+    ),
+  );
+
+  BoxDecoration _cadreTableau() => BoxDecoration(
+    color: AgriColors.surfaceCard,
+    border: Border.all(color: AgriColors.outlineVariant),
+    borderRadius: BorderRadius.circular(AgriRadius.lg),
+    boxShadow: AgriShadows.sm,
+  );
+
+  /// Tableau « GMQ & Croissance » du Blade : six colonnes, une ligne par bande active.
+  Widget _tableauGmq(List<LigneGmq> lignes) {
+    const c = DashboardElevageScreen.colonnesGmq;
+    String nombre(double? v) =>
+        v == null ? '—' : DashboardElevageRepository.nombrePhp(v);
+
+    return Container(
+      decoration: _cadreTableau(),
+      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: SizedBox(
           width: 980,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                color: AgriColors.surfaceZebra,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AgriSpacing.sm,
-                  vertical: AgriSpacing.sm,
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(flex: 3, child: Text('BANDE', style: _enteteGmq)),
-                    Expanded(flex: 2, child: Text('ESPÈCE', style: _enteteGmq)),
-                    Expanded(
-                      flex: 2,
-                      child: Text('DERNIÈRE PESÉE', style: _enteteGmq),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'POIDS PRÉCÉDENT (G)',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'POIDS ACTUEL (G)',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'JOURS ÉCOULÉS',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'GMQ (G/JOUR)',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text('STATUT VS OBJECTIF', style: _enteteGmq),
-                    ),
-                  ],
-                ),
-              ),
-              if (lignes.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(AgriSpacing.lg),
-                  child: Text(
-                    '— Aucune bande ne compte deux pesées : le GMQ n\'est pas '
-                    'calculable —',
-                    style: TextStyle(
-                      fontSize: AgriTypography.xs,
-                      fontStyle: FontStyle.italic,
-                      color: AgriColors.outline,
-                    ),
+              _enteteTableau(c, aGauche: 2),
+              if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
+              for (final (i, l) in lignes.indexed)
+                _ligneTableau(Key('ligne-gmq-${l.code}'), i, [
+                  _cellule(
+                    l.code,
+                    c[0].$2,
+                    alignement: TextAlign.left,
+                    graisse: FontWeight.bold,
+                    couleur: AgriColors.brandForest,
                   ),
-                ),
-              for (var i = 0; i < lignes.length; i++)
-                Container(
-                  key: Key('ligne-gmq-$i'),
-                  color: i.isOdd
-                      ? AgriColors.surfaceZebra
-                      : AgriColors.surfaceCard,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AgriSpacing.sm,
-                    vertical: AgriSpacing.sm,
+                  _cellule(l.libelleEspece, c[1].$2, alignement: TextAlign.left),
+                  _cellule(nombre(l.poidsInitial), c[2].$2),
+                  _cellule(nombre(l.poidsActuel), c[3].$2),
+                  _cellule(l.jours == null ? '—' : '${l.jours}', c[4].$2),
+                  _cellule(
+                    l.gmq == null
+                        ? 'Pesées insuffisantes'
+                        : '${DashboardElevageRepository.nombrePhp(l.gmq!)} g/j',
+                    c[5].$2,
+                    graisse: FontWeight.bold,
+                    couleur: l.gmq != null && l.gmq! < 0
+                        ? AgriColors.errorDeep
+                        : AgriColors.brandEmerald,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          lignes[i].code,
-                          style: const TextStyle(
-                            fontSize: AgriTypography.xs,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          lignes[i].libelleEspece,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          _date(lignes[i].datePesee),
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          lignes[i].poidsPrecedent.toStringAsFixed(0),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          lignes[i].poidsActuel.toStringAsFixed(0),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          '${lignes[i].jours}',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          lignes[i].gmq.toStringAsFixed(1),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: AgriTypography.xs,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(flex: 2, child: _pastille(lignes[i].statut)),
-                    ],
-                  ),
-                ),
+                ]),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// ⚠️ Trois statuts dans la maquette, et un quatrième nécessaire : une
-  /// espèce sans barème (héliciculture) n'est ni dans la cible ni hors cible.
-  /// Le JS du prototype retombe sur `{min:0, max:9999}` et affiche « Dans la
-  /// cible » — un satisfecit délivré sans objectif.
-  Widget _pastille(StatutGmq statut) {
-    final (libelle, couleur) = switch (statut) {
-      StatutGmq.sousObjectif => ('Sous objectif', AgriColors.errorDeep),
-      StatutGmq.auDessusObjectif => ('Au-dessus objectif', AgriColors.infoBlue),
-      StatutGmq.dansLaCible => ('Dans la cible', AgriColors.brandEmerald),
-      StatutGmq.sansObjectif => ('Sans objectif défini', AgriColors.outline),
-    };
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AgriSpacing.sm,
-          vertical: 2,
-        ),
-        decoration: BoxDecoration(
-          color: couleur.withValues(alpha: 0.10),
-          border: Border.all(color: couleur.withValues(alpha: 0.30)),
-          borderRadius: BorderRadius.circular(AgriRadius.full),
-        ),
-        child: Text(
-          libelle,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: couleur,
           ),
         ),
       ),
@@ -845,10 +948,17 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
 
   Widget _ongletSanitaire(bool large) {
     final d = _donnees!;
+    const c = DashboardElevageScreen.colonnesSanitaire;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _titrePanneau(
+          'Analyse Sanitaire — Fréquence des Maladies',
+          SymbolesAgri.coronavirus,
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        // Les trois cartes du Blade : soins du mois des bandes actives.
         GridView.count(
           crossAxisCount: large ? 3 : 2,
           shrinkWrap: true,
@@ -858,127 +968,62 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           childAspectRatio: large ? 2.6 : 1.5,
           children: [
             _carteKpi(
-              libelle: 'Traitements du Mois',
+              libelle: 'Traitements Administrés (mois)',
               valeur: '${d.traitementsDuMois}',
               legende: '',
-              icone: Icons.vaccines,
-              barre: AgriColors.infoBlue,
-              couleurIcone: AgriColors.infoBlue,
+              icone: SymbolesAgri.vaccines,
+              barre: AgriColors.brandEmerald,
             ),
             _carteKpi(
-              libelle: 'Coût Sanitaire du Mois',
-              valeur: '${d.coutSanitaireDuMois.round()} F',
+              libelle: 'Coût Sanitaire Total (mois)',
+              valeur:
+                  '${DashboardElevageRepository.milliers(d.coutSanitaireDuMois)} FCFA',
               legende: '',
-              icone: Icons.payments,
-              barre: AgriColors.accentYellow,
-              couleurIcone: AgriColors.brandForest,
+              icone: SymbolesAgri.payments,
+              barre: AgriColors.errorRed,
+              couleurIcone: AgriColors.errorRed,
             ),
             _carteKpi(
               libelle: 'Traitement le Plus Fréquent',
               valeur: d.traitementLePlusFrequent ?? '—',
-              legende: d.traitementLePlusFrequent == null
-                  ? 'Aucun soin enregistré ce mois-ci'
-                  : '',
-              icone: Icons.coronavirus,
-              barre: AgriColors.errorRed,
-              couleurIcone: AgriColors.errorRed,
+              legende: '',
+              icone: SymbolesAgri.star,
+              barre: AgriColors.infoBlue,
+              couleurIcone: AgriColors.infoBlue,
             ),
           ],
         ),
-        const SizedBox(height: AgriSpacing.lg),
-        _bloc(
-          titre: 'Analyse Sanitaire — Fréquence des Maladies',
-          icone: Icons.coronavirus,
-          enfant: Column(
+        const SizedBox(height: AgriSpacing.md),
+        Container(
+          decoration: _cadreTableau(),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                color: AgriColors.surfaceZebra,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AgriSpacing.sm,
-                  vertical: AgriSpacing.sm,
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Text('FILIÈRE', style: _enteteGmq),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'NB TRAITEMENTS (MOIS)',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'COÛT TOTAL',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'TAUX DE MORBIDITÉ %',
-                        textAlign: TextAlign.right,
-                        style: _enteteGmq,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              for (final l in d.sanitaire)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AgriSpacing.sm,
-                    vertical: AgriSpacing.sm,
+              _enteteTableau(c),
+              for (final (i, l) in d.sanitaire.indexed)
+                _ligneTableau(Key('ligne-sanitaire-${l.code}'), i, [
+                  _cellule(
+                    l.libelleEspece,
+                    c[0].$2,
+                    alignement: TextAlign.left,
+                    graisse: FontWeight.bold,
+                    couleur: AgriColors.brandForest,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          l.libelleEspece,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          '${l.nombreDeTraitements}',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          '${l.coutTotal.round()} F',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      // ⚠️ TOUJOURS UN TIRET : le taux de morbidité se lit sur
-                      // `infirmary_records`, table absente de la base du poste.
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          '—',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                    ],
+                  _cellule('${l.nombreDeTraitements}', c[1].$2),
+                  _cellule(
+                    '${DashboardElevageRepository.milliers(l.coutTotal)} FCFA',
+                    c[2].$2,
                   ),
-                ),
+                  // ⚠️ TOUJOURS UN TIRET, JAMAIS « 0,0 % » : le taux de morbidité se lit sur
+                  // `infirmary_records`, table absente de la base du poste (D-H8, ticket H8b).
+                  _cellule('—', c[3].$2),
+                ]),
             ],
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // AJOUT du poste conservé (décision client du 19/10/2026).
         const Text(
           '⚠️ La comparaison « 2026 vs 2025 » de la maquette demande '
           'l\'historique de l\'an dernier, que le tirage ne descend pas.',
@@ -1025,16 +1070,22 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Titre, méthode et tableau du Blade.
+        _titrePanneau('Prévision de Croissance', SymbolesAgri.query_stats),
+        const SizedBox(height: AgriSpacing.xs),
         const Text(
-          "Projection basée sur le GMQ moyen observé (7 derniers jours) "
-          "appliqué de manière linéaire jusqu'à la date cible. Anticipez les "
-          "besoins en alimentation et la date de commercialisation.",
+          "Régression linéaire simple sur l'historique des pesées (minimum 3 "
+          'points requis).',
           style: TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,
           ),
         ),
-        const SizedBox(height: AgriSpacing.xs),
+        const SizedBox(height: AgriSpacing.md),
+        _tableauPrevision(d.lignesPrevision),
+        const SizedBox(height: AgriSpacing.lg),
+        // AJOUTS du poste conservés (décision client du 19/10/2026) : sélecteur de bande,
+        // horizons, trois cartes et projection par horizon — même régression que le tableau.
         const Text(
           'Calcul du poste : droite de régression sur toutes les pesées de la '
           'bande (trois au minimum), comme le serveur.',
@@ -1047,8 +1098,8 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         const SizedBox(height: AgriSpacing.md),
         if (selection == null) ...[
           _bloc(
-            titre: 'Prévision de Croissance',
-            icone: Icons.query_stats,
+            titre: 'Paramètres de la projection',
+            icone: SymbolesAgri.tune,
             enfant: const Padding(
               padding: EdgeInsets.all(AgriSpacing.lg),
               child: Text(
@@ -1066,7 +1117,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         ] else ...[
           _bloc(
             titre: 'Paramètres de la projection',
-            icone: Icons.tune,
+            icone: SymbolesAgri.tune,
             enfant: Wrap(
               spacing: AgriSpacing.md,
               runSpacing: AgriSpacing.md,
@@ -1133,11 +1184,69 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           const SizedBox(height: AgriSpacing.md),
           _bloc(
             titre: 'Courbe de Croissance — Historique et Projection',
-            icone: Icons.show_chart,
+            icone: SymbolesAgri.show_chart,
             enfant: _tableauProjection(selection),
           ),
         ],
       ],
+    );
+  }
+
+  /// Tableau « Prévision de Croissance » du Blade : une ligne par bande active ; sous trois
+  /// pesées, une seule cellule « Historique insuffisant… » sur les trois colonnes de valeurs.
+  Widget _tableauPrevision(List<LignePrevision> lignes) {
+    const c = DashboardElevageScreen.colonnesPrevision;
+    final valeurs = c[1].$2 + c[2].$2 + c[3].$2;
+
+    return Container(
+      decoration: _cadreTableau(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _enteteTableau(c),
+          if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
+          for (final (i, l) in lignes.indexed)
+            _ligneTableau(Key('ligne-prevision-${l.code}'), i, [
+              _cellule(
+                l.code,
+                c[0].$2,
+                alignement: TextAlign.left,
+                graisse: FontWeight.bold,
+                couleur: AgriColors.brandForest,
+              ),
+              if (l.insuffisant)
+                Expanded(
+                  flex: valeurs,
+                  child: const Text(
+                    'Historique insuffisant (3 pesées minimum requises)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontStyle: FontStyle.italic,
+                      color: AgriColors.outline,
+                    ),
+                  ),
+                )
+              else ...[
+                _cellule('${l.poidsActuel}', c[1].$2),
+                _cellule(
+                  '${DashboardElevageRepository.nombrePhp(l.tendance!)} g/j',
+                  c[2].$2,
+                  graisse: FontWeight.bold,
+                  couleur: l.tendance! < 0
+                      ? AgriColors.errorDeep
+                      : AgriColors.brandEmerald,
+                ),
+                _cellule(
+                  DashboardElevageRepository.nombrePhp(l.projection30j!),
+                  c[3].$2,
+                  graisse: FontWeight.bold,
+                ),
+              ],
+            ]),
+        ],
+      ),
     );
   }
 
@@ -1159,7 +1268,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         legende: p == null
             ? 'Trois pesées au minimum'
             : 'À $_horizon jours, ${p.nbPesees} pesées retenues',
-        icone: Icons.trending_up,
+        icone: SymbolesAgri.trending_up,
         barre: AgriColors.brandEmerald,
       ),
       // ⚠️⚠️ AUCUN POIDS CIBLE N'EXISTE hors de la maquette : ses 2 200 g,
@@ -1170,7 +1279,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         libelle: 'Poids Cible de Commercialisation',
         valeur: '—',
         legende: "Aucun poids cible n'est paramétré",
-        icone: Icons.flag,
+        icone: SymbolesAgri.flag,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.outline,
       ),
@@ -1178,7 +1287,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         libelle: "Date Estimée d'Atteinte de la Cible",
         valeur: '—',
         legende: 'Dépend du poids cible',
-        icone: Icons.event,
+        icone: SymbolesAgri.event,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.outline,
       ),
@@ -1319,7 +1428,9 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     required String titre,
     required Widget enfant,
     IconData? icone,
+    String? cle,
   }) => Container(
+    key: cle == null ? null : Key(cle),
     padding: const EdgeInsets.all(AgriSpacing.md),
     decoration: BoxDecoration(
       color: AgriColors.surfaceCard,
@@ -1372,10 +1483,6 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
       ),
     ],
   );
-
-  static String _date(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
 }
 
 /// Courbes de GMQ hebdomadaire — une par espèce, aux couleurs de la maquette.

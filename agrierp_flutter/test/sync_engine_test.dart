@@ -707,8 +707,10 @@ void main() {
     expect(saillie['mother_ref'], 'R8');
     expect(saillie['sire_ref'], 'M2');
     expect(saillie['saillie_date'], '2026-08-12');
-    expect(saillie.containsKey('status'), isFalse);
-    expect(saillie.containsKey('mise_bas_date_actual'), isFalse);
+    // Ticket H7 — les étapes du cycle partent aussi (le serveur les applique à un cycle connu) ; vides ici.
+    expect(saillie['status'], 'en_cours');
+    expect(saillie['mise_bas_date_actual'], isNull);
+    expect(saillie['palpation_date'], isNull);
   });
 
   /// ⚠️⚠️ **UNE DÉCLARATION EN ATTENTE SURVIT AU TIRAGE.** Elle n'existe pas

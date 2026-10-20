@@ -14,9 +14,10 @@ qui ajoute une cle.
 """
 import re
 import sys
+from chemins import LARAVEL, RACINE  # A7 : chemins résolus, plus de C:/ en dur
 
-PHP = 'C:/laragon/www/agrierp/app/Models/AuditLog.php'
-DART = 'C:/Projects/agrierp_flutter/lib/core/audit/libelles_audit.dart'
+PHP = LARAVEL + '/app/Models/AuditLog.php'
+DART = RACINE + '/lib/core/audit/libelles_audit.dart'
 
 # 'cle' => 'libelle'  ou  'cle' => "libelle"
 PAIRE = re.compile(

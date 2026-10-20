@@ -67,7 +67,7 @@ class SuiviDettes extends Component
             ? round(($facturesDuMois->sum('amount_paid') / $facturesDuMois->sum('amount')) * 100, 1)
             : 0.0;
 
-        $acomptesRecus = (float) CustomerAdvance::where('advance_date', '>=', $monthStart)->sum('amount');
+        $acomptesRecus = (float) CustomerAdvance::where('is_active', true)->where('advance_date', '>=', $monthStart)->sum('amount');   // avance archivée exclue
 
         return [
             'encours_global' => $encoursGlobal,

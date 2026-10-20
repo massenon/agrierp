@@ -1,0 +1,208 @@
+import 'package:agrierp/core/auth/auth_service.dart';
+import 'package:agrierp/core/config/parametres_poste.dart';
+import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/features/auth/login_screen.dart';
+import 'package:agrierp/features/demarrage/premier_demarrage_repository.dart';
+import 'package:agrierp/features/demarrage/premier_demarrage_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Ticket F0.98 — PREMIER DÉMARRAGE DU POSTE.
+///
+/// Un poste neuf (jamais tiré, rien en attente) montre son serveur dès la connexion, peut en changer
+/// sans administrateur, puis guide la première synchronisation. Un poste en service ne peut PAS changer
+/// de serveur depuis l'écran de connexion.
+class _Connectivite implements Connectivity {
+  _Connectivite(this.resultat);
+
+  final ConnectivityResult resultat;
+
+  @override
+  Future<List<ConnectivityResult>> checkConnectivity() async => [resultat];
+
+  @override
+  Stream<List<ConnectivityResult>> get onConnectivityChanged => const Stream.empty();
+}
+
+class _Serveur extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: options.path.contains('push')
+            ? <String, dynamic>{}
+            : {'server_time': '2026-10-17T12:00:00Z'},
+      ),
+    );
+  }
+}
+
+void main() {
+  late AppDatabase db;
+  late Dio client;
+  late PremierDemarrageRepository depot;
+
+  setUp(() {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    client = Dio(BaseOptions(baseUrl: ParametresPoste.adresseParDefaut))..interceptors.add(_Serveur());
+    depot = PremierDemarrageRepository(
+      database: db,
+      parametres: ParametresPoste(database: db),
+      client: client,
+    );
+  });
+
+  tearDown(() async => db.close());
+
+  SyncEngine moteur({ConnectivityResult reseau = ConnectivityResult.wifi}) => SyncEngine(
+    database: db,
+    client: client,
+    deviceId: 'poste-test',
+    connectivity: _Connectivite(reseau),
+    maintenant: () => DateTime(2026, 10, 17, 16),
+  );
+
+  group('dépôt', () {
+    test('un poste jamais tiré et sans attente est neuf ; un tirage le fait sortir', () async {
+      expect(await depot.posteNeuf(), isTrue);
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+      expect(await depot.posteNeuf(), isFalse);
+    });
+
+    test('une saisie en attente suffit à ne plus être neuf', () async {
+      await db.into(db.livestockDailyEntries).insert(
+        LivestockDailyEntriesCompanion.insert(
+          id: 'dddddddd-1510-4000-8000-000000000001',
+          deviceId: 'poste-test',
+          updatedAt: DateTime(2026, 10, 17),
+          lotId: 'bbbbbbbb-1510-4000-8000-000000000001',
+          entryDate: DateTime(2026, 10, 17),
+          mort: const Value(1),
+        ),
+      );
+      expect(await depot.posteNeuf(), isFalse);
+    });
+
+    test('poste neuf : la nouvelle adresse est normalisée ET appliquée au client partagé', () async {
+      final enregistree = await depot.changerAdresse('192.168.1.10:8002/');
+
+      expect(enregistree, 'http://192.168.1.10:8002');
+      expect(client.options.baseUrl, 'http://192.168.1.10:8002');
+      expect(await depot.adresse(), 'http://192.168.1.10:8002');
+    });
+
+    test('⚠️ poste en service : changer d\'adresse est refusé, rien n\'est écrit', () async {
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+
+      await expectLater(depot.changerAdresse('http://ailleurs'), throwsStateError);
+      expect(client.options.baseUrl, ParametresPoste.adresseParDefaut);
+      expect(await depot.adresse(), ParametresPoste.adresseParDefaut);
+    });
+  });
+
+  Future<void> afficher(WidgetTester tester, Widget ecran) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: ecran));
+    await tester.pumpAndSettle();
+  }
+
+  group('écran de premier démarrage', () {
+    testWidgets('la première synchronisation est lancée, rendue, puis « Continuer »', (tester) async {
+      var termine = false;
+      await afficher(
+        tester,
+        PremierDemarrageScreen(
+          depot: depot,
+          engine: moteur(),
+          utilisateur: 'Directeur',
+          onTermine: () => termine = true,
+        ),
+      );
+
+      expect(find.textContaining(ParametresPoste.adresseParDefaut), findsOneWidget);
+      expect(find.byKey(const Key('premier-continuer')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('premier-synchroniser')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('premier-compte-rendu')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('premier-continuer')));
+      expect(termine, isTrue);
+    });
+
+    testWidgets('hors ligne : le message le dit, l\'étape reste à faire', (tester) async {
+      await afficher(
+        tester,
+        PremierDemarrageScreen(
+          depot: depot,
+          engine: moteur(reseau: ConnectivityResult.none),
+          utilisateur: 'Directeur',
+          onTermine: () {},
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('premier-synchroniser')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('premier-echec')), findsOneWidget);
+      expect(find.byKey(const Key('premier-continuer')), findsNothing);
+    });
+
+    testWidgets('« Plus tard » ouvre l\'application sans synchroniser', (tester) async {
+      var termine = false;
+      await afficher(
+        tester,
+        PremierDemarrageScreen(
+          depot: depot,
+          engine: moteur(),
+          utilisateur: 'Directeur',
+          onTermine: () => termine = true,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('premier-plus-tard')));
+      expect(termine, isTrue);
+      expect(await depot.posteNeuf(), isTrue);
+    });
+  });
+
+  group('écran de connexion', () {
+    LoginScreen connexion() => LoginScreen(
+      auth: AuthService(client: client, deviceName: 'poste-test'),
+      onConnecte: () {},
+      demarrage: depot,
+    );
+
+    testWidgets('poste neuf : le serveur est affiché et se change avant la connexion', (tester) async {
+      await afficher(tester, connexion());
+
+      expect(find.byKey(const Key('login-serveur')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('login-modifier-serveur')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('login-adresse-serveur')), 'http://10.0.0.5:8002');
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Serveur : http://10.0.0.5:8002'), findsOneWidget);
+      expect(client.options.baseUrl, 'http://10.0.0.5:8002');
+    });
+
+    testWidgets('poste en service : aucune adresse ni bouton « Modifier »', (tester) async {
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+
+      await afficher(tester, connexion());
+
+      expect(find.byKey(const Key('login-serveur')), findsNothing);
+    });
+  });
+}

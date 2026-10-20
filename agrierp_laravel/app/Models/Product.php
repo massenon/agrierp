@@ -63,7 +63,9 @@ class Product extends Model
             return $quantite;
         }
 
-        $poidsSac = (float) (\DB::table('feed_types')->value('standard_bag_weight_kg') ?: 25);
+        // 🔴→✅ Ticket U14 — le poids du sac du PREMIER type de provende PAR IDENTIFIANT : sans `orderBy`, `value()` lisait
+        // la ligne que MySQL rendait en premier (approximé au poste depuis U12a, qui prend le plus petit identifiant).
+        $poidsSac = (float) (\DB::table('feed_types')->orderBy('id')->value('standard_bag_weight_kg') ?: 25);
 
         return round($quantite * $poidsSac, 2);
     }

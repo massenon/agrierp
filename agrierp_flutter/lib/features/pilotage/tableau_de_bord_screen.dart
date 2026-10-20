@@ -1,75 +1,91 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/permissions_poste.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'tableau_de_bord_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
-/// `prototype_html/dashboard.html` → Tableau de Bord.
+/// Tableau de Bord — ticket H5 : **la vue Blade `livewire/dashboard/index.blade.php` fait foi** (article 5).
 ///
-/// ⚠️⚠️ **LA MAQUETTE EST LA RÉFÉRENCE DE MISE EN PAGE.** Sections dans SON
-/// ordre, libellés au mot près :
-///   1. en-tête « Bienvenue… » + deux actions (Enregistrer une Vente ·
-///      Élevage) ;
-///   2. filtre de dates (du · au) + sélecteur d'état + bouton PDF ;
+/// Sections dans SON ordre, libellés au mot près (verrouillés par `test/tableau_de_bord_blade_test.dart`, qui
+/// les lit dans le Blade) :
+///   1. en-tête « Bienvenue… » + deux actions (Enregistrer une Vente · Élevage) ;
+///   2. période « Du / au » DÉSACTIVÉE (mois courant) + sélecteur d'état (8 options) + bouton PDF ;
 ///   3. huit cartes KPI ;
-///   4. « CA vs Dépenses — 6 derniers mois » (8/12) + « Alertes Critiques »
-///      (4/12) ;
+///   4. « CA vs Dépenses — 6 derniers mois » (8/12) + « Alertes Critiques » (4/12) ;
 ///   5. trois cartes espèces — Lapins · Volailles · Porcs ;
-///   6. « Statistiques de Ventes » + « Transactions Récentes » (cinq
-///      onglets : Vente · Achat · Devis · Dépenses · Factures) ;
+///   6. « Statistiques de Ventes » + « Transactions Récentes » (cinq onglets : Vente · Achat · Devis ·
+///      Dépenses · Factures) ;
 ///   7. « Activités du Jour » + « Top 5 Produits du Mois ».
 ///
-/// ⚠️⚠️ **CINQ BLOCS NE PEUVENT PAS PARLER DE LA FERME ENTIÈRE.** Le tirage ne
-/// descend ni `sales` ni `expenses` : le CA, les dépenses, les deux courbes,
-/// les transactions et le top produits ne portent QUE ce que ce poste a saisi.
-/// La mention est portée à l'écran, sous chaque bloc concerné — un gérant qui
-/// compare deux postes doit le lire, pas le deviner.
+/// Ajouts du poste absents du web, GARDÉS par décision client du 19/10/2026 : « · Exercice {année} actif »
+/// dans l'en-tête, les sous-textes Caisse / Banque de la Trésorerie, les noms des produits du Stock Critique,
+/// « Au dernier tirage » sous l'Effectif.
 class TableauDeBordScreen extends StatefulWidget {
   const TableauDeBordScreen({
     super.key,
     required this.depot,
     this.onEnregistrerVente,
     this.onElevage,
+    this.onOuvrir,
     this.nomUtilisateur = 'Manager Olouwachegoun',
   });
 
   final TableauDeBordRepository depot;
   final VoidCallback? onEnregistrerVente;
   final VoidCallback? onElevage;
+
+  /// Ouvre un écran du poste : alerte cliquée, état choisi (bouton PDF), « Voir tout ». `null` : rien ne
+  /// navigue (tests, aperçu).
+  final ValueChanged<EcranPoste>? onOuvrir;
   final String nomUtilisateur;
+
+  /// Le `<select>` du Blade : `(libellé, adresse web)`, dans son ordre. Deux options pointent la même adresse
+  /// (Recettes / Dépenses) : la valeur retenue à l'écran est donc le LIBELLÉ.
+  static const etats = <(String, String)>[
+    ('État des Recettes', '/rapports-exports?tab=recettes-depenses'),
+    ('État des Dépenses', '/rapports-exports?tab=recettes-depenses'),
+    ('État de Trésorerie', '/rapports-exports?tab=tresorerie'),
+    ('Bilan Simplifié', '/rapport-bilan'),
+    ('État des Créances', '/rapports-exports?tab=creances'),
+    ('État des Dettes', '/rapports-exports?tab=dettes'),
+    ('Rapport Élevage', '/rapports-exports?tab=elevage-synth'),
+    ('Rapport de Stocks', '/rapports-exports?tab=stocks-synth'),
+  ];
 
   @override
   State<TableauDeBordScreen> createState() => _TableauDeBordScreenState();
 }
 
 class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
-  late DateTime _du;
-  late DateTime _au;
-
   DonneesTableauDeBord? _donnees;
   bool _chargement = true;
 
   /// Onglet actif de « Transactions Récentes ».
   String _ongletTx = 'Vente';
 
+  /// État choisi dans le sélecteur (libellé), `null` : « -- Choisir un état / rapport -- ».
+  String? _etat;
+
   @override
   void initState() {
     super.initState();
-    final maintenant = DateTime.now();
-    _du = DateTime(maintenant.year, maintenant.month, 1);
-    _au = maintenant;
     _charger();
   }
 
   Future<void> _charger() async {
     setState(() => _chargement = true);
-    final donnees = await widget.depot.charger(du: _du, au: _au);
+    final donnees = await widget.depot.charger();
     if (!mounted) return;
     setState(() {
       _donnees = donnees;
       _chargement = false;
     });
   }
+
+  static String _nombre(double v) => TableauDeBordRepository.nombre(v, 0);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -85,9 +101,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
               // celle du contenu. Retirer les contraintes de la portée
               // interdit la rechute.
               builder: (context) {
-                // ⚠️ MÊMES POINTS DE RUPTURE QUE LA MAQUETTE : `md:` à 768,
-                // `lg:` à 1024. Les inventer ferait diverger la mise en page
-                // du navigateur et du poste sur les mêmes largeurs.
+                // ⚠️ MÊMES POINTS DE RUPTURE QUE LE WEB : `md:` à 768,
+                // `lg:` à 1024.
                 final large = AgriBreakpoints.large(context);
                 final moyen = AgriBreakpoints.moyen(context);
 
@@ -122,6 +137,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   // ── 1. En-tête ────────────────────────────────────────────────────────────
 
   Widget _entete(bool large) {
+    final exercice = _donnees?.exerciceOuvert;
     final titre = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -135,8 +151,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         ),
         const SizedBox(height: AgriSpacing.xs),
         Text(
-          'Rapport généré le ${_dateCourte(DateTime.now())} '
-          'à ${_heure(DateTime.now())} · Exercice ${DateTime.now().year} actif',
+          'Rapport généré le ${_dateCourte(HeureBenin.maintenant())} '
+          'à ${_heure(HeureBenin.maintenant())} · '
+          '${exercice == null ? 'Aucun exercice ouvert' : 'Exercice $exercice actif'}',
           style: const TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,
@@ -151,13 +168,13 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       children: [
         _boutonPlein(
           key: const Key('action-vente'),
-          icone: Icons.point_of_sale,
+          icone: SymbolesAgri.point_of_sale,
           libelle: 'Enregistrer une Vente',
           onPressed: widget.onEnregistrerVente,
         ),
         _boutonClair(
           key: const Key('action-elevage'),
-          icone: Icons.pets,
+          icone: SymbolesAgri.pets,
           libelle: 'Élevage',
           onPressed: widget.onElevage,
         ),
@@ -190,19 +207,28 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     );
   }
 
-  // ── 2. Filtre de dates + export ───────────────────────────────────────────
+  // ── 2. Période + sélecteur d'état ─────────────────────────────────────────
 
-  /// ⚠️ **LE SÉLECTEUR D'ÉTAT ET LE BOUTON PDF SONT INERTES**, et visiblement.
-  /// Les neuf états de la maquette (Recettes, Dépenses, Trésorerie, Bilan
-  /// Simplifié…) se lisent au grand livre, que le poste ne tient pas. Même
-  /// traitement que le champ de recherche de la barre supérieure : présents,
-  /// désactivés — plutôt qu'absents de la maquette, ou faussement actifs.
+  /// Écran du poste ouvert par l'état choisi, `null` si aucun état ou si le poste n'a pas la page
+  /// (`/rapport-bilan`) : aucune cible inventée, le bouton PDF reste alors désactivé.
+  EcranPoste? get _cibleEtat {
+    final choisi = _etat;
+    if (choisi == null) return null;
+    final adresse = TableauDeBordScreen.etats
+        .firstWhere((e) => e.$1 == choisi)
+        .$2;
+    return TableauDeBordRepository.ecranDuLien(adresse);
+  }
+
+  /// ⚠️ **PÉRIODE DÉSACTIVÉE, COMME LE WEB** (`<input type="date" … disabled>`) : le tableau de bord est calé
+  /// sur le mois courant. Le sélecteur d'état navigue, comme `window.location.href = report`.
   Widget _filtreEtExport(bool large) {
+    final d = _donnees!;
     final dates = Row(
       children: [
-        const Icon(Icons.calendar_month, size: 18, color: AgriColors.outline),
+        const Icon(SymbolesAgri.calendar_month, size: 18, color: AgriColors.outline),
         const SizedBox(width: AgriSpacing.xs),
-        Expanded(child: _champDate(const Key('date-du'), _du, (d) => _du = d)),
+        Expanded(child: _champDate(const Key('date-du'), d.debutPeriode)),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: AgriSpacing.xs),
           child: Text(
@@ -213,42 +239,59 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             ),
           ),
         ),
-        Expanded(child: _champDate(const Key('date-au'), _au, (d) => _au = d)),
+        Expanded(child: _champDate(const Key('date-au'), d.finPeriode)),
       ],
     );
 
+    final cible = _cibleEtat;
     final exports = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: large ? 224 : 180,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AgriSpacing.sm,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
           decoration: BoxDecoration(
-            color: AgriColors.surfaceZebra,
+            color: AgriColors.surfaceCard,
             border: Border.all(color: AgriColors.outlineVariant),
             borderRadius: BorderRadius.circular(AgriRadius.lg),
           ),
-          child: const Text(
-            '-- Choisir un état / rapport --',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              key: const Key('choix-etat'),
+              value: _etat,
+              isExpanded: true,
+              isDense: true,
+              hint: const Text(
+                '-- Choisir un état / rapport --',
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.outline,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                color: AgriColors.onSurface,
+              ),
+              items: [
+                for (final (libelle, _) in TableauDeBordScreen.etats)
+                  DropdownMenuItem(
+                    value: libelle,
+                    child: Text(libelle, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (v) => setState(() => _etat = v),
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: AgriSpacing.xs),
-        Opacity(
-          opacity: 0.5,
-          child: _boutonPlein(
-            key: const Key('export-pdf'),
-            icone: Icons.picture_as_pdf,
-            libelle: 'PDF',
-            onPressed: null,
-          ),
+        _boutonPlein(
+          key: const Key('export-pdf'),
+          icone: SymbolesAgri.picture_as_pdf,
+          libelle: 'PDF',
+          onPressed: cible == null || widget.onOuvrir == null
+              ? null
+              : () => widget.onOuvrir!(cible),
         ),
       ],
     );
@@ -279,36 +322,24 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     );
   }
 
-  Widget _champDate(
-    Key cle,
-    DateTime valeur,
-    void Function(DateTime) affecter,
-  ) {
-    return InkWell(
+  /// Champ de date DÉSACTIVÉ : aucun sélecteur ne s'ouvre, fond grisé.
+  Widget _champDate(Key cle, DateTime valeur) {
+    return Container(
       key: cle,
-      onTap: () async {
-        final choisi = await showDatePicker(
-          context: context,
-          initialDate: valeur,
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2100),
-        );
-        if (choisi == null) return;
-        setState(() => affecter(choisi));
-        await _charger();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AgriSpacing.sm,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(
-          border: Border.all(color: AgriColors.outlineVariant),
-          borderRadius: BorderRadius.circular(AgriRadius.lg),
-        ),
-        child: Text(
-          _dateCourte(valeur),
-          style: const TextStyle(fontSize: AgriTypography.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AgriSpacing.sm,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AgriColors.surfaceZebra,
+        border: Border.all(color: AgriColors.outlineVariant),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      child: Text(
+        _dateCourte(valeur),
+        style: const TextStyle(
+          fontSize: AgriTypography.xs,
+          color: AgriColors.outline,
         ),
       ),
     );
@@ -320,26 +351,26 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final d = _donnees!;
     final caisse = d.tresorerieParType['caisse'] ?? 0;
     final banque = d.tresorerieParType['banque'] ?? 0;
+    final mobileMoney = d.tresorerieParType['mobile_money'] ?? 0;
 
     final cartes = <Widget>[
       _carteKpi(
         libelle: "Chiffre d'Affaires",
         mesure: d.chiffreAffaires,
         unite: 'FCFA',
-        // ⚠️ LA MAQUETTE COMPARE AU MOIS PRÉCÉDENT. Le poste ne peut pas :
-        // il ne détient que ses propres ventes, et seulement depuis sa
-        // dernière remise à zéro. Dire d'où vient le chiffre vaut mieux
-        // qu'une variation calculée sur une base incomplète.
-        detail: 'Ce poste uniquement · ${d.nombreDeVentes} vente(s)',
-        icone: Icons.trending_up,
+        detail: d.legendeChiffreAffaires ?? '',
+        icone: SymbolesAgri.trending_up,
         barre: AgriColors.brandEmerald,
       ),
       _carteKpi(
         libelle: 'Trésorerie',
         mesure: d.tresorerie,
         unite: 'FCFA',
-        detail: 'Caisse : ${_montant(caisse)} · Banque : ${_montant(banque)}',
-        icone: Icons.account_balance_wallet,
+        // Ajout du poste, construit au web (H11) ; Mobile Money en troisième ligne (D-U8). Même texte que la
+        // légende du web (`dashboard/index.blade.php`), « F » compris.
+        detail: 'Caisse : ${_nombre(caisse)} F · Banque : ${_nombre(banque)} F · '
+            'Mobile Money : ${_nombre(mobileMoney)} F',
+        icone: SymbolesAgri.account_balance_wallet,
         barre: AgriColors.infoBlue,
         couleurIcone: AgriColors.infoBlue,
       ),
@@ -347,8 +378,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         libelle: 'Dépenses',
         mesure: d.depenses,
         unite: 'FCFA',
-        detail: 'Ce poste uniquement',
-        icone: Icons.shopping_cart,
+        detail: d.legendeDepenses ?? '',
+        icone: SymbolesAgri.shopping_cart,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.brandForest,
       ),
@@ -356,8 +387,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         libelle: 'Résultat Net',
         mesure: d.resultatNet,
         unite: 'FCFA',
-        detail: '',
-        icone: Icons.savings,
+        detail: d.legendeResultatNet ?? '',
+        icone: SymbolesAgri.savings,
         barre: AgriColors.brandEmerald,
       ),
       _carteKpi(
@@ -365,7 +396,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.creances,
         unite: 'FCFA',
         detail: '',
-        icone: Icons.request_quote,
+        icone: SymbolesAgri.request_quote,
         barre: AgriColors.errorRed,
         couleurIcone: AgriColors.errorRed,
       ),
@@ -374,7 +405,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         mesure: d.dettes,
         unite: 'FCFA',
         detail: '',
-        icone: Icons.local_shipping,
+        icone: SymbolesAgri.local_shipping,
         barre: AgriColors.accentYellow,
         couleurIcone: AgriColors.brandForest,
       ),
@@ -382,10 +413,11 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         libelle: 'Stock Critique',
         mesure: Mesure.chiffre(d.produitsSousSeuil.length.toDouble()),
         unite: 'produits',
+        // Ajout du poste, gardé (décision client du 19/10/2026).
         detail: d.produitsSousSeuil.isEmpty
             ? 'Aucun produit sous son seuil'
             : d.produitsSousSeuil.take(3).map((p) => p.name).join(', '),
-        icone: Icons.warning,
+        icone: SymbolesAgri.warning,
         barre: AgriColors.errorRed,
         couleurIcone: AgriColors.errorRed,
       ),
@@ -393,23 +425,25 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         libelle: 'Effectif Animaux',
         mesure: d.effectifAnimaux,
         unite: 'têtes',
-        // ⚠️ Pas de comparaison au mois précédent : l'effectif d'un mois
-        // révolu ne se reconstitue pas depuis le seul solde courant des
-        // bandes — c'est la même erreur que le « stock reporté » du grand
-        // livre d'œufs (ticket 14.13).
+        // Ajout du poste, gardé (décision client du 19/10/2026).
         detail: 'Au dernier tirage',
-        icone: Icons.pets,
+        icone: SymbolesAgri.pets,
         barre: AgriColors.brandEmerald,
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: moyen ? 4 : 2,
+    // ⚠️ HAUTEUR FIXE, PAS UN RAPPORT LARGEUR / HAUTEUR. Une carte KPI garde la hauteur de son contenu quelle que
+    // soit sa largeur (la grille web n'impose aucun rapport) : avec `childAspectRatio`, la barre latérale passée à
+    // 288 px comme au web (ticket H1) rétrécissait les cartes en 1280 px et leur contenu débordait.
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: moyen ? 1.9 : 1.5,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: moyen ? 4 : 2,
+        mainAxisSpacing: AgriSpacing.md,
+        crossAxisSpacing: AgriSpacing.md,
+        mainAxisExtent: 160,
+      ),
       children: cartes,
     );
   }
@@ -426,7 +460,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     libelle: libelle,
     // ⚠️ TIRET, JAMAIS ZÉRO : « — » dit « le poste ne sait pas », « 0 »
     // dirait « la ferme n'en a pas ».
-    valeur: mesure.disponible ? _montant(mesure.valeur!) : '—',
+    valeur: mesure.disponible ? _nombre(mesure.valeur!) : '—',
     unite: mesure.disponible ? unite : null,
     legende: mesure.disponible ? detail : mesure.motifAbsence,
     icone: icone,
@@ -457,15 +491,6 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
               _legende(AgriColors.errorRed, 'Dépenses'),
             ],
           ),
-          const SizedBox(height: AgriSpacing.xs),
-          const Text(
-            'Ventes et dépenses saisies sur ce poste',
-            style: TextStyle(
-              fontSize: 10,
-              fontStyle: FontStyle.italic,
-              color: AgriColors.outline,
-            ),
-          ),
         ],
       ),
     );
@@ -473,55 +498,13 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final alertes = _bloc(
       titre: 'Alertes Critiques',
       enfant: _donnees!.alertes.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: AgriSpacing.sm),
-              child: Text(
-                '— Aucune alerte sur les données du poste —',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontStyle: FontStyle.italic,
-                  color: AgriColors.outline,
-                ),
-              ),
-            )
+          ? _messageVide('Aucune alerte critique pour le moment.', centre: true)
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final a in _donnees!.alertes) ...[
-                  Container(
-                    padding: const EdgeInsets.all(AgriSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: a.grave
-                          ? AgriColors.errorBg
-                          : AgriColors.accentYellow.withValues(alpha: 0.20),
-                      borderRadius: BorderRadius.circular(AgriRadius.lg),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          a.grave ? Icons.inventory_2 : Icons.request_quote,
-                          size: 18,
-                          color: a.grave
-                              ? AgriColors.errorDeep
-                              : AgriColors.brandForest,
-                        ),
-                        const SizedBox(width: AgriSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            a.message,
-                            style: TextStyle(
-                              fontSize: AgriTypography.xs,
-                              color: a.grave
-                                  ? AgriColors.errorDeep
-                                  : AgriColors.brandForest,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AgriSpacing.sm),
+                for (var i = 0; i < _donnees!.alertes.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AgriSpacing.sm),
+                  _alerte(i, _donnees!.alertes[i]),
                 ],
               ],
             ),
@@ -537,7 +520,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       );
     }
 
-    // ⚠️ RAPPORT 8/12 – 4/12 DE LA MAQUETTE, pas une demi-largeur chacun.
+    // ⚠️ RAPPORT 8/12 – 4/12 DU WEB, pas une demi-largeur chacun.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -545,6 +528,53 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         const SizedBox(width: AgriSpacing.md),
         Expanded(flex: 4, child: alertes),
       ],
+    );
+  }
+
+  /// Une alerte : icône `warning`, fond rouge (critique) ou jaune (moyen), et lien vers l'écran du poste quand
+  /// il existe (`<a href="{{ $alert['link'] }}">`). `/gestion-bandes` n'a pas d'écran au poste : pas de lien.
+  Widget _alerte(int i, AlerteCritique a) {
+    final ecran = TableauDeBordRepository.ecranDuLien(a.lien);
+    final couleur = a.grave ? AgriColors.errorDeep : AgriColors.brandForest;
+    final rayon = BorderRadius.circular(AgriRadius.lg);
+
+    return Material(
+      color: a.grave
+          ? AgriColors.errorBg
+          : AgriColors.accentYellow.withValues(alpha: 0.20),
+      shape: RoundedRectangleBorder(
+        borderRadius: rayon,
+        side: a.grave
+            ? BorderSide(color: AgriColors.errorDeep.withValues(alpha: 0.20))
+            : BorderSide.none,
+      ),
+      child: InkWell(
+        key: Key('alerte-$i'),
+        borderRadius: rayon,
+        onTap: ecran == null || widget.onOuvrir == null
+            ? null
+            : () => widget.onOuvrir!(ecran),
+        child: Padding(
+          padding: const EdgeInsets.all(AgriSpacing.sm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(SymbolesAgri.warning, size: 18, color: couleur),
+              const SizedBox(width: AgriSpacing.xs),
+              Expanded(
+                child: Text(
+                  a.message,
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: FontWeight.w600,
+                    color: couleur,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -567,7 +597,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     ],
   );
 
-  // ── 5. Élevage en temps réel ──────────────────────────────────────────────
+  // ── 5. Cartes espèces ─────────────────────────────────────────────────────
 
   Widget _cartesEspeces(bool moyen) {
     final cartes = _donnees!.especes.map(_carteEspece).toList();
@@ -595,27 +625,21 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   }
 
   static const _iconesEspeces = {
-    'Lapins': Icons.cruelty_free,
-    'Volailles': Icons.egg,
-    'Porcs': Icons.pets,
+    'Lapins': SymbolesAgri.cruelty_free,
+    'Volailles': SymbolesAgri.egg,
+    'Porcs': SymbolesAgri.pets,
   };
 
   Widget _carteEspece(CarteEspece carte) {
-    // ⚠️ SEUIL DE 5 %, ET IL VIENT DU PROTOTYPE : `gestion-elevage.html` écrit
-    // « Seuil normal < 5% » et bascule en rouge à partir de 5. La maquette du
-    // tableau de bord, elle, colore 3,2 % en rouge — chiffre de démonstration
-    // codé en dur, incohérent avec sa propre page sœur. C'est la RÈGLE qui est
-    // reprise, pas la couleur d'un exemple.
+    // ⚠️ `$x['mortalite'] > 5` dans le Blade : STRICTEMENT au-dessus de 5 (5,0 % reste vert).
     final critique =
-        (carte.mortalite ?? 0) >= TableauDeBordRepository.seuilMortalite;
+        carte.mortalite > TableauDeBordRepository.seuilMortaliteCarte;
 
     final mesures = [
       ...carte.mesures,
       (
         'Mortalité',
-        carte.mortalite == null
-            ? '—'
-            : '${carte.mortalite!.toStringAsFixed(1)}%',
+        '${TableauDeBordRepository.nombre(carte.mortalite, 1)}%',
       ),
     ];
 
@@ -633,7 +657,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           Row(
             children: [
               Icon(
-                _iconesEspeces[carte.titre] ?? Icons.pets,
+                _iconesEspeces[carte.titre] ?? SymbolesAgri.pets,
                 size: 20,
                 color: AgriColors.brandEmerald,
               ),
@@ -648,13 +672,16 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             ],
           ),
           const SizedBox(height: AgriSpacing.sm),
-          GridView.count(
-            crossAxisCount: 2,
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AgriSpacing.sm,
-            crossAxisSpacing: AgriSpacing.sm,
-            childAspectRatio: 2.6,
+            // Hauteur fixe, même raison que la grille des KPI.
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: AgriSpacing.sm,
+              crossAxisSpacing: AgriSpacing.sm,
+              mainAxisExtent: 68,
+            ),
             children: [
               for (var i = 0; i < mesures.length; i++)
                 Column(
@@ -715,14 +742,19 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     );
   }
 
+  /// Tuiles « Revenu » / « Dépenses » du mois courant (dernier point de la série, achats en dépenses) et
+  /// histogramme des SIX mois de la courbe, comme le web.
   Widget _statistiquesDeVentes() {
-    final d = _donnees!;
+    final serie = _donnees!.serie;
+    final courant = serie.last;
+    final (suffixeCa, suffixeDep) =
+        TableauDeBordRepository.variationStatistique(serie);
 
     return _bloc(
       titre: 'Statistiques de Ventes',
-      icone: Icons.bar_chart,
+      icone: SymbolesAgri.bar_chart,
       apresTitre: Text(
-        '${DateTime.now().year}',
+        '${HeureBenin.maintenant().year}',
         style: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -736,16 +768,16 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             children: [
               Expanded(
                 child: _tuile(
-                  '${_montant(d.chiffreAffaires.valeur ?? 0)} F',
-                  'Revenu',
+                  '${_nombre(courant.chiffreAffaires)} F',
+                  'Revenu$suffixeCa',
                   AgriColors.brandEmerald,
                 ),
               ),
               const SizedBox(width: AgriSpacing.sm),
               Expanded(
                 child: _tuile(
-                  '${_montant(d.depenses.valeur ?? 0)} F',
-                  'Dépenses',
+                  '${_nombre(courant.depenses)} F',
+                  'Dépenses$suffixeDep',
                   AgriColors.errorRed,
                 ),
               ),
@@ -755,7 +787,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           SizedBox(
             height: 128,
             child: CustomPaint(
-              painter: _HistogrammePainter(d.serieAnnuelle),
+              painter: _HistogrammePainter(serie),
               child: const SizedBox.expand(),
             ),
           ),
@@ -763,9 +795,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              for (final m in ['Jan', 'Mar', 'Mai', 'Jul', 'Sep', 'Nov'])
+              for (final m in serie)
                 Text(
-                  m,
+                  m.libelle,
                   style: const TextStyle(
                     fontSize: 9,
                     color: AgriColors.outline,
@@ -808,32 +840,54 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     ),
   );
 
-  /// ⚠️ **LES CINQ ONGLETS DE LA MAQUETTE SONT LÀ**, dans son ordre. Trois
-  /// n'ont aucun module embarqué au poste (Achat, Devis, Factures) : ils le
-  /// disent au lieu de disparaître, sans quoi la structure de l'écran
-  /// divergerait de la maquette selon ce qui est construit.
-  static const _ongletsTx = ['Vente', 'Achat', 'Devis', 'Dépenses', 'Factures'];
+  /// Les cinq onglets du web, dans son ordre, avec leurs messages vides exacts.
+  ///
+  /// ⚠️ ÉCART (donnée absente) : l'onglet Devis n'a pas de table au poste (`quotes` ne descend pas). Il reste
+  /// à sa place et affiche le message vide du web plutôt que de disparaître.
+  static const _ongletsTx = <(String, String)>[
+    ('Vente', 'Aucune vente récente.'),
+    ('Achat', 'Aucun achat récent.'),
+    ('Devis', 'Aucun devis récent.'),
+    ('Dépenses', 'Aucune dépense récente.'),
+    ('Factures', 'Aucune facture récente.'),
+  ];
+
+  static Color _couleurTon(TonMontant ton) => switch (ton) {
+    TonMontant.emeraude => AgriColors.brandEmerald,
+    TonMontant.foret => AgriColors.brandForest,
+    TonMontant.jaune => AgriColors.accentYellow,
+    TonMontant.bleu => AgriColors.infoBlue,
+    TonMontant.rouge => AgriColors.errorRed,
+  };
 
   Widget _transactionsRecentes() {
     final d = _donnees!;
 
     final lignes = switch (_ongletTx) {
       'Vente' => d.ventesRecentes,
+      'Achat' => d.achatsRecents,
       'Dépenses' => d.depensesRecentes,
+      'Factures' => d.facturesRecentes,
       _ => const <LigneTransaction>[],
     };
-
-    final embarque = _ongletTx == 'Vente' || _ongletTx == 'Dépenses';
+    final messageVide = _ongletsTx.firstWhere((o) => o.$1 == _ongletTx).$2;
 
     return _bloc(
       titre: 'Transactions Récentes',
-      icone: Icons.receipt_long,
-      apresTitre: const Text(
-        'Voir tout',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: AgriColors.brandEmerald,
+      icone: SymbolesAgri.receipt_long,
+      // `<a href="/ventes-devis">Voir tout</a>`.
+      apresTitre: InkWell(
+        key: const Key('tx-voir-tout'),
+        onTap: widget.onOuvrir == null
+            ? null
+            : () => widget.onOuvrir!(EcranPoste.ventesEtDevis),
+        child: const Text(
+          'Voir tout',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: AgriColors.brandEmerald,
+          ),
         ),
       ),
       enfant: Column(
@@ -843,7 +897,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final onglet in _ongletsTx)
+                for (final (onglet, _) in _ongletsTx)
                   InkWell(
                     key: Key('onglet-tx-$onglet'),
                     onTap: () => setState(() => _ongletTx = onglet),
@@ -879,56 +933,34 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           ),
           const Divider(height: 1, color: AgriColors.outlineVariant),
           const SizedBox(height: AgriSpacing.sm),
-          if (!embarque)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AgriSpacing.sm),
-              child: Text(
-                '— Module non embarqué au poste —',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontStyle: FontStyle.italic,
-                  color: AgriColors.outline,
-                ),
-              ),
-            )
-          else if (lignes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AgriSpacing.sm),
-              child: Text(
-                '— Aucune écriture sur la période —',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontStyle: FontStyle.italic,
-                  color: AgriColors.outline,
-                ),
-              ),
-            )
+          if (lignes.isEmpty)
+            _messageVide(messageVide, centre: true)
           else
-            for (final l in lignes)
+            for (var i = 0; i < lignes.length; i++)
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AgriColors.outlineVariant),
-                  ),
+                decoration: BoxDecoration(
+                  border: i < lignes.length - 1
+                      ? const Border(
+                          bottom: BorderSide(color: AgriColors.outlineVariant),
+                        )
+                      : null,
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        l.libelle,
+                        lignes[i].libelle,
                         style: const TextStyle(fontSize: AgriTypography.xs),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
-                      '${_montant(l.montant ?? 0)} F',
+                      '${_nombre(lignes[i].montant)} F',
                       style: TextStyle(
                         fontSize: AgriTypography.xs,
                         fontWeight: FontWeight.bold,
-                        color: _ongletTx == 'Dépenses'
-                            ? AgriColors.errorRed
-                            : AgriColors.brandEmerald,
+                        color: _couleurTon(lignes[i].ton),
                       ),
                     ),
                   ],
@@ -945,13 +977,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final gauche = _bloc(
       titre: 'Activités du Jour',
       enfant: _donnees!.activitesDuJour.isEmpty
-          ? const Text(
-              '— Aucune écriture aujourd\'hui sur ce poste —',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                fontStyle: FontStyle.italic,
-                color: AgriColors.outline,
-              ),
+          ? _messageVide(
+              "Aucune activité enregistrée aujourd'hui pour le moment.",
+              centre: true,
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -982,7 +1010,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
                               ),
                             ),
                             Text(
-                              a.horodatage ?? '',
+                              a.detail,
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: AgriColors.outline,
@@ -999,112 +1027,128 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
             ),
     );
 
+    final top = _donnees!.topProduits;
     final droite = _bloc(
       titre: 'Top 5 Produits du Mois',
-      enfant: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: 420,
-          child: Column(
-            children: [
-              Container(
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AgriColors.outlineVariant),
-                  ),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: AgriSpacing.xs),
-                child: const Row(
+      enfant: top.isEmpty
+          ? _messageVide('Aucune vente ce mois-ci.', centre: true)
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: 420,
+                child: Column(
                   children: [
-                    Expanded(
-                      flex: 4,
-                      child: Text('Produit', style: _enteteTop),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Qté',
-                        textAlign: TextAlign.right,
-                        style: _enteteTop,
+                    Container(
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: AgriColors.outlineVariant),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AgriSpacing.xs,
+                      ),
+                      child: const Row(
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: Text('Produit', style: _enteteTop),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Qté',
+                              textAlign: TextAlign.right,
+                              style: _enteteTop,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'CA',
+                              textAlign: TextAlign.right,
+                              style: _enteteTop,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Marge',
+                              textAlign: TextAlign.right,
+                              style: _enteteTop,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'CA',
-                        textAlign: TextAlign.right,
-                        style: _enteteTop,
+                    for (var i = 0; i < top.length; i++)
+                      Container(
+                        // `$i % 2 === 1 ? 'bg-surface-zebra'` : la DEUXIÈME ligne est zébrée.
+                        decoration: BoxDecoration(
+                          color: i.isOdd
+                              ? AgriColors.surfaceZebra
+                              : Colors.transparent,
+                          border: const Border(
+                            bottom: BorderSide(
+                              color: AgriColors.outlineVariant,
+                            ),
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AgriSpacing.xs,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: Text(
+                                top[i].produit,
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                TableauDeBordRepository.quantiteTop(
+                                  top[i].quantite,
+                                ),
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                _nombre(top[i].chiffreAffaires),
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                ),
+                              ),
+                            ),
+                            // Marge en émeraude, « — » en gris sans PMP (voir le dépôt).
+                            Expanded(
+                              child: Text(
+                                top[i].margePct == null
+                                    ? '—'
+                                    : '${top[i].margePct}%',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                  color: top[i].margePct == null
+                                      ? AgriColors.outline
+                                      : AgriColors.brandEmerald,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Marge',
-                        textAlign: TextAlign.right,
-                        style: _enteteTop,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              if (_donnees!.topProduits.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: AgriSpacing.sm),
-                  child: Text(
-                    '— Aucune vente sur la période —',
-                    style: TextStyle(
-                      fontSize: AgriTypography.xs,
-                      fontStyle: FontStyle.italic,
-                      color: AgriColors.outline,
-                    ),
-                  ),
-                ),
-              for (var i = 0; i < _donnees!.topProduits.length; i++)
-                Container(
-                  color: i.isEven
-                      ? AgriColors.surfaceZebra
-                      : Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: AgriSpacing.xs),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 4,
-                        child: Text(
-                          _donnees!.topProduits[i].produit,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          _montant(_donnees!.topProduits[i].quantite),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          _montant(_donnees!.topProduits[i].chiffreAffaires),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                      // ⚠️ MARGE VIDE : elle suppose un prix de revient, que le
-                      // poste ne reçoit pas. Un pourcentage calculé sur le prix
-                      // de vente ne serait pas une marge.
-                      const Expanded(
-                        child: Text(
-                          '—',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(fontSize: AgriTypography.xs),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
 
     if (!large) {
@@ -1133,6 +1177,19 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   );
 
   // ── Briques communes ──────────────────────────────────────────────────────
+
+  /// Message vide du web : `text-xs text-outline text-center`.
+  Widget _messageVide(String message, {bool centre = false}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: AgriSpacing.md),
+    child: Text(
+      message,
+      textAlign: centre ? TextAlign.center : TextAlign.start,
+      style: const TextStyle(
+        fontSize: AgriTypography.xs,
+        color: AgriColors.outline,
+      ),
+    ),
+  );
 
   Widget _bloc({
     required String titre,
@@ -1196,6 +1253,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     style: ElevatedButton.styleFrom(
       backgroundColor: AgriColors.brandEmerald,
       foregroundColor: Colors.white,
+      // `disabled:bg-surface-zebra disabled:text-outline`.
+      disabledBackgroundColor: AgriColors.surfaceZebra,
+      disabledForegroundColor: AgriColors.outline,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AgriRadius.full),
       ),
@@ -1237,16 +1297,6 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   );
 
   // ── Formats ───────────────────────────────────────────────────────────────
-
-  /// Milliers séparés par une espace, comme la maquette : « 850 000 ».
-  static String _montant(double valeur) {
-    final entier = valeur.round().abs().toString();
-    final morceaux = <String>[];
-    for (var i = entier.length; i > 0; i -= 3) {
-      morceaux.insert(0, entier.substring(i - 3 < 0 ? 0 : i - 3, i));
-    }
-    return '${valeur.round() < 0 ? '-' : ''}${morceaux.join(' ')}';
-  }
 
   static String _dateCourte(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/'

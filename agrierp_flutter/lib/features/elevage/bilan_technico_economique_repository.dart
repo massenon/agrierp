@@ -83,7 +83,7 @@ class BilanLot {
 ///
 /// ⚠️⚠️ **LES RÈGLES SONT CELLES DE `Livewire\Elevage\BilanTechnicoEconomique`**
 /// (tickets 3.14 et 14.44), recopiées ici sans rien inventer :
-///  * **Acquisition initiale** : `acquisition_cost` de la bande ; absent → « — ».
+///  * **Acquisition initiale** : `acquisition_cost` de la bande ; absent → « En attente » (Blade).
 ///  * **Provende servie** : Σ `feed_qty_kg` des fiches de la bande × PRIX MOYEN
 ///    INDICATIF des types de provende de l'espèce. Ce n'est PAS le prix d'achat —
 ///    le prix du catalogue.
@@ -180,8 +180,10 @@ class BilanTechnicoEconomiqueRepository {
     )..where((f) => f.lotId.equals(lotId))).get();
     final provendeKg = fiches.fold<double>(0, (t, f) => t + (f.feedQtyKg ?? 0));
 
+    // ⚠️ Ticket H9b — types ACTIFS seulement, comme avant H9b (le tirage effaçait alors les archivés) : un
+    // type archivé au poste reste en base pour son libellé, il ne pèse pas sur le prix moyen.
     final prix = (await database.select(database.feedTypes).get())
-        .where((p) => p.speciesId == lot.speciesId)
+        .where((p) => p.isActive && p.speciesId == lot.speciesId)
         .map((p) => p.pricePerKg)
         .whereType<double>()
         .toList();
@@ -189,19 +191,18 @@ class BilanTechnicoEconomiqueRepository {
         ? null
         : prix.fold<double>(0, (t, p) => t + p) / prix.length;
 
-    final soins = await (database.select(
-      database.veterinaryRecords,
-    )..where((s) => s.lotId.equals(lotId))).get();
+    // Le web ne somme que les soins ACTIFS (`is_active = true`, soin archivé = supprimé). Ticket U3 : le poste
+    // porte `is_active` (tiré, et archivé ici comme au web) — même filtre.
+    final soins = await (database.select(database.veterinaryRecords)..where(
+          (s) => Expression.and([s.lotId.equals(lotId), s.isActive.equals(true)]),
+        ))
+        .get();
     final coutVeterinaire = soins.fold<double>(0, (t, s) => t + (s.cost ?? 0));
 
     final couts = [
-      LigneBilan(
-        libelle: 'Acquisition initiale',
-        montant: lot.acquisitionCost,
-        motif: lot.acquisitionCost == null
-            ? "Coût d'acquisition non renseigné pour cette bande."
-            : null,
-      ),
+      // Ticket H6 : le Blade fait foi — sans coût d'acquisition, le web écrit « En attente »
+      // (`$cout['motif'] ?? 'En attente'`, aucun motif pour cette ligne) : pas de motif ici non plus.
+      LigneBilan(libelle: 'Acquisition initiale', montant: lot.acquisitionCost),
       LigneBilan(
         libelle: 'Provende servie (cumul, prix indicatif)',
         // ⚠️ Pas de prix de provende → « — », pas 0 (voir l'en-tête de classe).

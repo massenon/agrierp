@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'caisse_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/pos-interface.html` → Caisse (POS) Desktop.
 ///
@@ -190,7 +191,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
       confirmation: true,
       constructeur: (contexte) => ModaleConfirmation(
         key: const Key('modale-vente-enregistree'),
-        icone: Icons.check_circle,
+        icone: SymbolesAgri.check_circle,
         titre: 'Vente Enregistrée',
         message:
             'Enregistrée sur ce poste — elle partira à la prochaine '
@@ -317,7 +318,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             decoration: const InputDecoration(
               hintText: 'Rechercher un produit...',
               hintStyle: TextStyle(fontSize: AgriTypography.xs),
-              prefixIcon: Icon(Icons.search, size: 18),
+              prefixIcon: Icon(SymbolesAgri.search, size: 18),
             ),
           ),
         ),
@@ -608,7 +609,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                     ),
                   ),
                   const Icon(
-                    Icons.calendar_today,
+                    SymbolesAgri.calendar_today,
                     size: 16,
                     color: AgriColors.outline,
                   ),
@@ -689,7 +690,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.shopping_cart,
+                SymbolesAgri.shopping_cart,
                 size: 48,
                 color: AgriColors.outlineVariant,
               ),
@@ -748,7 +749,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             ),
             IconButton(
               key: Key('retirer-$i'),
-              icon: const Icon(Icons.close, size: 16),
+              icon: const Icon(SymbolesAgri.close, size: 16),
               color: AgriColors.errorDeep,
               onPressed: () => setState(() => _panier.removeAt(i)),
             ),
@@ -884,7 +885,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
             child: FilledButton.icon(
               key: const Key('valider-vente'),
               onPressed: (_panier.isEmpty || _enCours) ? null : _valider,
-              icon: const Icon(Icons.point_of_sale, size: 18),
+              icon: const Icon(SymbolesAgri.point_of_sale, size: 18),
               label: const Text('Valider la Vente'),
               style: FilledButton.styleFrom(
                 backgroundColor: AgriColors.brandEmerald,

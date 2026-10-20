@@ -231,6 +231,78 @@ class SyncReproductionTest extends TestCase
         $this->assertEquals(1, LivestockReproductionEvent::count());
     }
 
+    /**
+     * Ticket H7 — 🔴 LES ETAPES DU CYCLE SAISIES AU POSTE ETAIENT IGNOREES : un renvoi d'un cycle connu etait acquitte
+     * sans rien appliquer. Palpation negative, puis mise bas 7 vivants / 1 mort, puis cloture : memes valeurs que les
+     * actions de l'ecran web.
+     */
+    public function test_les_etapes_du_cycle_envoyees_par_le_poste_sont_appliquees(): void
+    {
+        $this->pousserSaillie()->assertOk();
+        $hier = now()->subDay()->format('Y-m-d');
+
+        $this->pousserSaillie(['palpation_date' => $hier, 'status' => 'echec'])->assertOk()
+            ->assertJsonPath('livestock_reproduction_events.accepted.0', '22222222-2222-4222-8222-222222222222');
+        $cycle = LivestockReproductionEvent::findOrFail('22222222-2222-4222-8222-222222222222');
+        $this->assertSame([$hier, 'echec'], [$cycle->palpation_date->format('Y-m-d'), $cycle->status]);
+
+        $this->pousserSaillie(['status' => 'en_cours', 'mise_bas_date_actual' => $hier, 'nes_vivants' => 7, 'nes_morts' => 1])->assertOk();
+        $cycle->refresh();
+        $this->assertSame([7, 1, 'en_cours'], [(int) $cycle->nes_vivants, (int) $cycle->nes_morts, $cycle->status]);
+        // Une etape non renseignee n'efface pas ce que le serveur sait deja.
+        $this->assertSame($hier, $cycle->palpation_date->format('Y-m-d'));
+
+        $this->pousserSaillie(['status' => 'termine'])->assertOk();
+        $this->assertSame('termine', $cycle->fresh()->status);
+        $this->assertSame(1, LivestockReproductionEvent::count());
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T12 (trouvé par l'essai à plusieurs postes) — LES ÉTAPES SAISIES AVANT LE PREMIER ENVOI. L'animalier,
+     * hors ligne plusieurs jours, déclare la saillie puis la palpe (négative) avant que rien ne parte : une seule ligne,
+     * envoyée une fois. La création n'en gardait que la saillie (`en_cours`, sans palpation) ; le poste, acquitté,
+     * recevait au tirage suivant la ligne du serveur — la palpation perdue sans un mot.
+     */
+    public function test_les_etapes_saisies_avant_le_premier_envoi_sont_gardees(): void
+    {
+        $hier = now()->subDay()->format('Y-m-d');
+
+        $this->pousserSaillie(['palpation_date' => $hier, 'status' => 'echec'])->assertOk()
+            ->assertJsonPath('livestock_reproduction_events.accepted.0', '22222222-2222-4222-8222-222222222222');
+
+        $cycle = LivestockReproductionEvent::findOrFail('22222222-2222-4222-8222-222222222222');
+        $this->assertSame([$hier, 'echec'], [$cycle->palpation_date?->format('Y-m-d'), $cycle->status]);
+
+        // Mise bas et clôture saisies avant le premier envoi d'une autre femelle.
+        $this->pousserSaillie([
+            'id' => '33333333-3333-4333-8333-333333333333', 'mother_ref' => 'R9', 'palpation_date' => $hier,
+            'mise_bas_date_actual' => $hier, 'nes_vivants' => 6, 'nes_morts' => 2, 'status' => 'termine',
+        ])->assertOk();
+        $autre = LivestockReproductionEvent::findOrFail('33333333-3333-4333-8333-333333333333');
+        $this->assertSame([6, 2, 'termine', $hier], [(int) $autre->nes_vivants, (int) $autre->nes_morts, $autre->status, $autre->mise_bas_date_actual?->format('Y-m-d')]);
+    }
+
+    /** Une étape invalide à la création refuse la saillie entière (rien d'écrit), avec son motif. */
+    public function test_une_etape_invalide_a_la_creation_refuse_la_saillie(): void
+    {
+        $reponse = $this->pousserSaillie(['mise_bas_date_actual' => now()->addDays(3)->format('Y-m-d')]);
+
+        $reponse->assertOk();
+        $this->assertCount(1, $reponse->json('livestock_reproduction_events.rejected'));
+        $this->assertSame(0, LivestockReproductionEvent::count());
+    }
+
+    /** Ticket H7 — une etape invalide (statut inconnu, mise bas future) est refusee avec son motif. */
+    public function test_une_etape_invalide_est_refusee(): void
+    {
+        $this->pousserSaillie()->assertOk();
+
+        $reponse = $this->pousserSaillie(['mise_bas_date_actual' => now()->addDays(3)->format('Y-m-d')]);
+        $reponse->assertOk();
+        $this->assertCount(1, $reponse->json('livestock_reproduction_events.rejected'));
+        $this->assertNull(LivestockReproductionEvent::sole()->mise_bas_date_actual);
+    }
+
     /** ⚠️ Une saillie datee du futur n'a pas eu lieu. */
     public function test_a_saillie_dated_in_the_future_is_refused(): void
     {

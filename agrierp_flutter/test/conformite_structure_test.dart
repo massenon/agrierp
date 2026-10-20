@@ -38,14 +38,17 @@ void main() {
     'catalogue-view.html': 'lib/features/stocks/catalogue_produits_screen.dart',
     'seuils-alerte.html': 'lib/features/stocks/catalogue_produits_screen.dart',
     'historique-ventes.html': 'lib/features/ventes/ventes_devis_screen.dart',
-    'suivi-reproduction.html':
-        'lib/features/elevage/suivi_reproduction_screen.dart',
+    // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
+    // maquette : ses colonnes sont celles de `suivi-reproduction.blade.php` (neuf, puis les
+    // ajouts du poste), vérifiées dans cet ordre par `suivi_reproduction_blade_test.dart`.
     'vms-registre.html': 'lib/features/elevage/soins_vaccins_screen.dart',
     'vms-calendrier.html': 'lib/features/elevage/soins_vaccins_screen.dart',
-    'elevage-dashboard.html':
-        'lib/features/elevage/dashboard_elevage_screen.dart',
-    'parametres-elevage.html':
-        'lib/features/elevage/parametres_elevage_screen.dart',
+    // Ticket H6 : le Blade fait foi — `elevage-dashboard.html` n'est plus comparé à la maquette :
+    // ses tableaux (GMQ, Analyse Sanitaire, Prévision) suivent `dashboard-elevage.blade.php`, colonne
+    // par colonne et dans l'ordre, dans `dashboard_elevage_blade_test.dart`.
+    // Ticket H9 : le Blade fait foi — `parametres-elevage.html` n'est plus comparé à la maquette (« Ration
+    // (g/tête/jour) », « Prix Indicatif (FCFA/Kg) ») : ses trois tableaux suivent `parametres-elevage.blade.php`,
+    // colonne par colonne et dans l'ordre, dans `parametres_elevage_blade_test.dart`.
     'liste-clients.html': 'lib/features/clients/clients_creances_screen.dart',
     'suivi-dettes.html': 'lib/features/clients/clients_creances_screen.dart',
     'historique-avances.html':
@@ -106,12 +109,8 @@ void main() {
     // vérifier. C'est le garde-fou des exemptions orphelines, en bas de ce
     // fichier, qui les a signalées.
 
-    // ⚠️ LES DEUX PANNEAUX VOLAILLES ET ESCARGOTS de Suivi Reproduction sont
-    //    rendus EN RÉSUMÉ, pas en second formulaire : la donnée se saisit sur
-    //    la fiche d'espèce (exemption déjà posée au ticket F0.42, ici pour la
-    //    structure).
-    'Code Incubation': 'onglet rendu en résumé, pas en tableau',
-    'Parc / Fosse': 'onglet rendu en résumé, pas en tableau',
+    // Ticket H7 : le Blade fait foi — les exemptions « Code Incubation » et « Parc / Fosse »
+    //    (panneaux Volailles et Escargots de Suivi Reproduction) sont retirées avec la page.
 
     // ⚠️ LE GANTT DU CALENDRIER VÉTÉRINAIRE porte une colonne par jour de la
     //    semaine de démonstration : ce sont des DONNÉES figées, pas une
@@ -135,6 +134,36 @@ void main() {
     //    aucune ligne à montrer — et son bouton de téléchargement, rien à
     //    télécharger.
     'Fichier': 'sauvegardes produites et gardées sur le serveur',
+  };
+
+  /// ⚠️⚠️ **TICKET H8 — LE BLADE FAIT FOI** (doctrine, article 5). Pour ces pages, la vue Blade (maître)
+  /// diverge de la maquette et l'écran suit le Blade : la suite attendue est celle du BLADE (plus les ajouts du
+  /// poste gardés par décision client, à leur place), au lieu de celle de la maquette. Les colonnes du Blade
+  /// sont en outre LUES dans le Blade par `test/soins_infirmerie_calendrier_test.dart`.
+  const bladeFaitFoi = <String, List<List<String>>>{
+    // Blade : six colonnes, sans le « Statut » de la maquette ; « Statut » du poste gardé APRÈS elles.
+    'vms-registre.html': [
+      ['Date', 'Lot / Espèce', "Type d'action", 'Produit', 'Dose', 'Actions', 'Statut'],
+    ],
+    // Ticket U9 — Tableau 3 du Blade (`elevage-synth.blade.php`) : la colonne « Lot » s'ajoute après « Jour »
+    // (le rapport couvre plusieurs bandes). Ticket U10 — Tableau 1 du Blade (dix colonnes portées par la fiche) ;
+    // Tableau 2 : celui du Blade, identique à la maquette. Les trois sont en outre LUS dans le Blade par
+    // `rapport_elevage_blade_test.dart`.
+    'rapport-elevage-synth.html': [
+      [
+        'Date', 'Lot / Souche', 'Effectif M', 'Effectif F', 'Sous Mères', 'Sevrés', 'Achats', 'Nés', 'Morts',
+        'Effectif Final',
+      ],
+      [
+        'Date', 'Lot', 'Sexe Vendu', 'Qté Vendue', 'Montant Vente (FCFA)', 'Effectif Final',
+        'Traitement Administré', 'Dose', 'Signes de Maladie Observés',
+      ],
+      [
+        'Âge (Sem.)', 'Jour', 'Lot', 'Total Œufs Récoltés (OR)', 'Taux Ponte %', 'Cassés/Fêlés (OF)',
+        'Commercialisables (OR-OF)', 'Stock Restant Hier (SRH)', 'Total Stock (TS)', 'Sorties Vente OS (Plateaux)',
+        'Stock Final (Plateaux + Vrac)',
+      ],
+    ],
   };
 
   /// Colonnes déclarées par un écran, sous ses DEUX formes.
@@ -244,8 +273,8 @@ void main() {
   }
 
   /// Deux libellés se comparent sans accent ni casse : la maquette écrit
-  /// « Designation » ici et « Désignation » là, et cet écart-là est déjà suivi
-  /// par l'arbitrage client ouvert sur les huit `<th>` de `gestion-stocks`.
+  /// « Designation » ici et « Désignation » là ; l'arbitrage sur les `<th>` de `gestion-stocks` est tranché
+  /// (décision client du 19/10/2026 : accentués comme le Blade — tableau, puis journal au ticket U11).
   String normaliser(String libelle) {
     const accents = {
       'à': 'a',
@@ -272,7 +301,8 @@ void main() {
 
   for (final entree in portages.entries) {
     final page = entree.key;
-    final attendus = tableauxMaquette[page];
+    // Ticket H8 : quand le Blade fait foi, c'est SA suite qui est attendue, pas celle de la maquette.
+    final attendus = bladeFaitFoi[page] ?? tableauxMaquette[page];
 
     if (attendus == null) continue;
 
@@ -314,6 +344,14 @@ void main() {
       );
     });
   }
+
+  /// Une page « le Blade fait foi » doit exister au portage, et son test de remplacement aussi.
+  test('⚠️ chaque page « le Blade fait foi » est portée et contrôlée ailleurs', () {
+    for (final page in bladeFaitFoi.keys) {
+      expect(portages.containsKey(page), isTrue, reason: page);
+    }
+    expect(File('test/soins_infirmerie_calendrier_test.dart').existsSync(), isTrue);
+  });
 
   /// ⚠️ Une exemption qui ne correspond plus à aucun tableau laisse croire
   /// qu'un écart est couvert alors qu'il a disparu — ou pire, qu'un tableau

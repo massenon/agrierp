@@ -17,6 +17,11 @@ part 'app_database.g.dart';
 // plutôt que d'accepter puis d'écraser au pull suivant. Les rendre modifiables
 // localement produirait une saisie que l'utilisateur verrait disparaître sans
 // explication à la synchronisation suivante.
+//
+// ⚠️ EXCEPTION (ticket H9b, décision client D-H9 du 19/10/2026) : les barèmes
+// d'élevage (rations, prophylaxie, provendes, numérotation, délai du rappel des
+// soins) sont désormais ACCEPTÉS par le serveur (`manage-elevage`) et envoyés
+// par le poste — voir [BaremeElevageSynchronisable].
 
 class ProductCategories extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
@@ -110,7 +115,10 @@ class SupplierPayments extends Table with SyncColumns {
 ///
 /// ⚠️ **JAMAIS d'ajustement de stock pour un retour** : le serveur rejette toute sortie qui
 /// le désigne, et décrémenter ici ferait un double décrément silencieux.
-/// Cette table ne descend pas du serveur : `purchases.returned_at` en est l'écho.
+/// Ticket U8 — la table reçoit AUSSI les LIGNES de retour servies par le serveur (`purchase_returns`, une
+/// ligne par ligne d'achat retournée, `device_id` = `serveur`, `synced`) : la carte « Écarts / Retours »
+/// les compte comme le web. Une demande `pending`/`conflict` du poste n'est jamais touchée par le tirage ;
+/// une demande acquittée est remplacée par les lignes que le serveur a créées. Aucune colonne ajoutée.
 @DataClassName('RetourFournisseur')
 class PurchaseReturns extends Table with SyncColumns {
   TextColumn get purchaseId => text().withLength(min: 36, max: 36)();
@@ -174,8 +182,36 @@ class LivestockLots extends Table {
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
+  /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
+  TextColumn get lotSourceId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Ticket H9b (décision client D-H9 du 19/10/2026 : « Paramètres Élevage modifiables sur le poste et le web »)
+/// — colonnes communes aux trois barèmes d'élevage désormais ENVOYÉS par le poste (rations, prophylaxie,
+/// provendes).
+///
+/// ⚠️ Ce n'est pas [SyncColumns] : ces tables existaient avant la décision, leurs lignes tirées n'ont ni
+/// appareil d'origine ni instant de saisie, et le serveur (`RecordParametresElevageFromDeviceAction`) n'en lit
+/// aucun. Elles reçoivent donc, comme `customers` au ticket F0.72, un statut de synchronisation par défaut
+/// `synced` (tout ce qui descend du serveur l'est) et un instant de saisie NULLABLE.
+///
+/// ⚠️⚠️ **SUPPRIMER = ARCHIVER** (ticket 14.55 du web) : `is_active = false`, la ligne disparaît de l'écran
+/// et des calculs (provende, protocole) mais reste restaurable côté serveur. Un barème effacé faisait
+/// disparaître la provende calculée de toute une catégorie sans que rien ne l'explique.
+mixin BaremeElevageSynchronisable on Table {
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 }
 
 /// Ration normative par espèce et par stade, en grammes par jour.
@@ -187,11 +223,38 @@ class LivestockLots extends Table {
 ///
 /// ⚠️ Ils sont servis SANS filtre `since`, pour qu'un poste resté longtemps
 /// hors ligne ne garde pas un grammage périmé qui fausserait tous ses calculs.
-class FeedRationStandards extends Table {
+///
+/// Ticket H9b (décision client D-H9 du 19/10/2026) — **MODIFIABLE AU POSTE COMME AU WEB** : création,
+/// modification et archivage (`is_active = false`, jamais de suppression) partent en `pending` vers
+/// `RecordParametresElevageFromDeviceAction` (droit `manage-elevage`). Voir [BaremeElevageSynchronisable].
+class FeedRationStandards extends Table with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get speciesCode => text()();
   TextColumn get stageLabel => text()();
   RealColumn get rationGPerDay => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket U2 (décision client D-U2 du 19/10/2026 : « objectifs de GMQ, une seule source ») — barème des
+/// OBJECTIFS DE CROISSANCE par espèce et par stade (`growth_standards` du serveur, modèle `GrowthStandard`).
+///
+/// ⚠️⚠️ **RÉFÉRENTIEL EN LECTURE SEULE** : le poste ne l'écrit jamais (pas de [SyncColumns], le serveur ignore
+/// tout envoi et le compte dans `referentiels_ignored`). Servi COMPLET à chaque tirage et remplacé tel quel :
+/// c'est la seule source des objectifs du Dashboard Élevage, qui portait jusqu'ici des constantes (15-20,
+/// 20-55, 400-650 g/j) recopiées ensuite au web. Règle d'agrégation par espèce :
+/// `DashboardElevageRepository.objectifPour` (= `GrowthAnalysisService::objectifPour` du serveur).
+class GrowthStandards extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get speciesCode => text()();
+  TextColumn get stageLabel => text()();
+
+  /// Objectif minimal, en g/jour (`unsignedInteger` au serveur).
+  IntColumn get gmqMinGPerDay => integer()();
+
+  /// Objectif maximal, en g/jour.
+  IntColumn get gmqMaxGPerDay => integer()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -213,7 +276,10 @@ class FeedRationStandards extends Table {
 ///
 /// ⚠️ Le libellé de l'espèce voyage avec le type — le poste n'a pas de table
 /// des espèces, exactement comme pour le code espèce des bandes (F0.14).
-class FeedTypes extends Table {
+///
+/// Ticket H9b (D-H9) — modifiable au poste comme au web, archivage logique : voir
+/// [BaremeElevageSynchronisable].
+class FeedTypes extends Table with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get name => text()();
   TextColumn get speciesId => text().nullable()();
@@ -237,8 +303,21 @@ class FeedTypes extends Table {
 ///
 /// ⚠️ **UNE SEULE LIGNE, `id = 'unique'`.** Le serveur sert un objet, pas une
 /// collection : la clé fixe évite qu'un tirage n'empile des variantes.
+///
+/// Ticket H9b (D-H9) — les neuf formats s'enregistrent au poste comme au web (`saveNumbering()`) et partent
+/// sous la clé `elevage_numbering`. ⚠️ PAS de `is_active` : la table est un singleton, jamais archivé (le
+/// serveur n'en a pas non plus).
 class ElevageNumberingSettings extends Table {
   TextColumn get id => text().withDefault(const Constant('unique'))();
+
+  /// Ticket H9b — `pending` tant que l'enregistrement du poste n'est pas acquitté ; `conflict` s'il est
+  /// refusé (motif dans `sync_conflicts`). Défaut `synced` : ce qui descend du serveur l'est.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket H9b — instant de la SAISIE au poste (nul pour une ligne tirée) : seule la version partie est
+  /// acquittée.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 
   TextColumn get bandeFormat => text().nullable()();
   TextColumn get lapinePrefix => text().nullable()();
@@ -260,7 +339,11 @@ class ElevageNumberingSettings extends Table {
 /// d'attente se corrigent depuis l'écran Paramètres > Élevage. Servi sans
 /// filtre `since` pour qu'un poste longtemps hors ligne ne propose pas un
 /// protocole périmé — sur un sujet sanitaire, la valeur périmée est le pire cas.
-class ProphylaxisScheduleStandards extends Table {
+///
+/// Ticket H9b (D-H9) — modifiable au poste comme au web, archivage logique : voir
+/// [BaremeElevageSynchronisable].
+class ProphylaxisScheduleStandards extends Table
+    with BaremeElevageSynchronisable {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get speciesCode => text()();
   TextColumn get periodLabel => text()();
@@ -279,6 +362,11 @@ class ProphylaxisScheduleStandards extends Table {
   TextColumn get productRecommended => text().nullable()();
   TextColumn get dosage => text().nullable()();
   IntColumn get withdrawalDays => integer().withDefault(const Constant(0))();
+
+  /// Ticket H9 — instant de création côté serveur (`created_at`), pour TRIER COMME LE WEB
+  /// (`getProphylaxiesProperty` : `orderBy('created_at')`). Une échéance créée au poste prend l'instant de sa
+  /// saisie ; nul pour une ligne tirée d'un serveur qui ne le sert pas.
+  DateTimeColumn get createdAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -513,6 +601,19 @@ class CompanySettings extends Table {
   BoolColumn get tvaEnabled => boolean().withDefault(const Constant(false))();
   RealColumn get tvaDefaultRate => real().nullable()();
 
+  /// Ticket H9b (D-H9) — délai du rappel des soins planifiés (règle R-SOINS-01), en jours (0 à 30), servi
+  /// au tirage et réglé au poste comme au web (`ParametresElevage::saveRappelSoins()`). Nul tant que rien
+  /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
+  IntColumn get rappelSoinsJours => integer().nullable()();
+
+  /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
+  /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket H9b — instant de la saisie du délai au poste (nul pour une ligne tirée).
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -563,7 +664,7 @@ class Utilisateurs extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Ligne du journal d'audit — les cent dernières actions de la ferme.
+/// Ligne du journal d'audit — les deux cents dernières actions de la ferme (U14 : la liste du web).
 class AuditLogs extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get userName => text().nullable()();
@@ -1004,6 +1105,24 @@ class CustomerReminders extends Table {
 //  TABLES SYNCHRONISABLES — SAISIES LOCALEMENT, POUSSÉES AU SERVEUR
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Ticket 15.46 (schéma v39) — TRANSFERT DE SUJETS ENTRE DEUX BANDES, miroir de `livestock_transfers`.
+///
+/// Source de vérité des colonnes `transfert_*` des fiches. Créé ou annulé au poste (`pending`), le serveur le
+/// REJOUE avec ses propres contrôles d'effectif ; jamais supprimé, annulé (`isActive = false`).
+/// `constitution` : la bande cible a été créée avec ces sujets (seule la sortie de la source est inscrite).
+class LivestockTransfers extends Table with SyncColumns {
+  TextColumn get sourceLotId => text().withLength(min: 36, max: 36)();
+  TextColumn get targetLotId => text().withLength(min: 36, max: 36)();
+  DateTimeColumn get transferDate => dateTime()();
+  IntColumn get quantity => integer()();
+
+  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  TextColumn get categorie => text().nullable()();
+  BoolColumn get constitution => boolean().withDefault(const Constant(false))();
+  TextColumn get motif => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
 /// Fiche journalière d'élevage. Règle serveur : **dernier écrivain gagne**,
 /// upsert sur l'UUID client.
 ///
@@ -1031,8 +1150,8 @@ class LivestockDailyEntries extends Table with SyncColumns {
   //
   // ⚠️⚠️ TOUTES NULLABLES, SANS DÉFAUT : `null` = « non ventilé / inconnu », JAMAIS 0 (un 0 dirait
   // « rien ne s'est passé dans cette catégorie »). Types : `unsignedInteger` nullable au serveur.
-  // Emplacements génériques : `repro` = Reproducteur ; `sevre` = Jeune (lapins) / Porcelet (porcs) ;
-  // `jeune` = Lapin de Chair (lapins) / Porc Marchand (porcs).
+  // Emplacements génériques : `repro` = Reproducteur ; `sevre` = Sous-mères (lapins) / Porcelet (porcs) ;
+  // `jeune` = Jeune (lapins) / Porc Marchand (porcs) — glossaire du 17/10/2026.
 
   /// Morts et dons PAR CATÉGORIE (saisis). Le total `mort` / `don` doit en être la somme.
   IntColumn get mortRepro => integer().nullable()();
@@ -1065,6 +1184,43 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get effectifF => integer().nullable()();
   IntColumn get effectifSevres => integer().nullable()();
   IntColumn get effectifSmeres => integer().nullable()();
+
+  // ── Ticket U10 (schéma v45) — colonnes du Tableau 2 et de « CA Ventes du Lot » du Rapport Élevage ──
+  //
+  // REÇUES du serveur, JAMAIS envoyées : le poste ne les saisit pas (`fill()` du serveur ne réécrit que les clés
+  // reçues, elles y restent intactes). Toutes nullables : `null` = « le serveur n'en a pas » (le web affiche alors
+  // « — », « RAS » ou « 0 », comme son Blade).
+
+  /// `vente_sexe` : M, F ou Mixte.
+  TextColumn get venteSexe => text().nullable()();
+
+  /// `vente_montant` (FCFA), posé par la vente qui touche la fiche (`RecordSaleOnFicheElevageAction`).
+  RealColumn get venteMontant => real().nullable()();
+
+  /// `treatment_product_id` : produit du traitement administré (nom lu dans `products`).
+  TextColumn get treatmentProductId => text().nullable()();
+
+  TextColumn get treatmentDose => text().nullable()();
+  TextColumn get symptomes => text().nullable()();
+
+  // ── Ticket 15.46 (schéma v39) — TRANSFERTS ENTRE BANDES, DÉRIVÉS de `LivestockTransfers` ──
+  //
+  // Comme `effectif_final` : jamais saisis dans la fiche, jamais envoyés au serveur (il les recalcule).
+  // NOT NULL à 0 : une fiche sans transfert garde exactement son effectif.
+  IntColumn get transfertEntree => integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortie => integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeRepro =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeSevre =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertEntreeJeune =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieRepro =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieSevre =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get transfertSortieJeune =>
+      integer().withDefault(const Constant(0))();
 
   @override
   List<String> get customConstraints => ['UNIQUE (lot_id, entry_date)'];
@@ -1218,6 +1374,48 @@ class VeterinaryRecords extends Table with SyncColumns {
   RealColumn get cost => real().nullable()();
   DateTimeColumn get recordDate => dateTime()();
   IntColumn get withdrawalDays => integer().withDefault(const Constant(0))();
+
+  /// Ticket U3 (décision client D-U3 du 19/10/2026) — ARCHIVAGE LOGIQUE, au poste comme au web
+  /// (`SoinsVaccinsHub::archiveSoin()`). Un soin archivé (`false`) quitte le registre et tout calcul (KPI,
+  /// Dashboard Élevage, Bilan, protocole du jour, recherche) ; la ligne reste, et la rémanence qu'il a créée
+  /// reste en vigueur, exactement comme au web. Servi au tirage, envoyé (`pending`) à l'archivage.
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
+/// Ticket H8b (décision client D-H8 du 19/10/2026) — ENTRÉE D'INFIRMERIE (`infirmary_records` du serveur),
+/// saisie au poste comme au web (`SoinsVaccinsHub::saveInfirmaryEntry()`, `reintegrer()`, `declarerDeces()`).
+///
+/// ⚠️ Reçue ET envoyée. Le serveur (`SyncController::pushInfirmerie`) crée l'entrée inconnue, puis ne change
+/// plus que le `status` d'une entrée connue (dernier écrivain gagne) : bande, motif et date d'entrée sont figés.
+/// Ticket U6 (décision client D-U6 du 19/10/2026) — `entry_date` peut être FUTURE, comme au web
+/// (`saveInfirmaryEntry()` : `required|date`) ; l'envoi l'accepte aussi.
+class InfirmaryRecords extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+
+  /// Sujet isolé (« #A-204 ») — optionnel : l'entrée peut viser la bande entière.
+  TextColumn get sujetRef => text().nullable()();
+  TextColumn get motif => text()();
+
+  /// `Quarantaine stricte` | `Infirmerie` | `Simple surveillance` (nullable au serveur).
+  TextColumn get isolationLevel => text().nullable()();
+  DateTimeColumn get entryDate => dateTime()();
+
+  /// `en_cours` | `reintegre` | `deces` (enum du serveur).
+  TextColumn get status => text().withDefault(const Constant('en_cours'))();
+}
+
+/// Ticket H8b (D-H8) — INTERVENTION PLANIFIÉE du calendrier vétérinaire (`veterinary_calendar_events` du
+/// serveur) : `SoinsVaccinsHub::savePlan()` (statut `planned`) et `confirmAdministration()` (statut `done`).
+///
+/// ⚠️ « En retard » n'est JAMAIS stocké par le poste : c'est un affichage (`display_status` du modèle web,
+/// `planned` dont la date est passée). Le serveur refuse `late` à l'envoi.
+class VeterinaryCalendarEvents extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+  TextColumn get taskType => text()();
+  DateTimeColumn get scheduledDate => dateTime()();
+
+  /// `planned` | `done` | `late` | `inprogress` (enum du serveur ; le poste n'écrit que les deux premiers).
+  TextColumn get status => text().withDefault(const Constant('planned'))();
 }
 
 /// Ajustement de stock saisi hors ligne.
@@ -1234,7 +1432,48 @@ class StockAdjustments extends Table with SyncColumns {
   RealColumn get quantity => real()();
   TextColumn get referenceType => text()();
   TextColumn get reason => text().nullable()();
+
+  /// Écart d'inventaire : l'INSTANT du comptage (heure murale du Bénin, S-T11). Ajout manuel : le jour choisi.
   DateTimeColumn get movementDate => dateTime()();
+
+  /// Ticket S-T10 — inventaire : la QUANTITÉ COMPTÉE. Le serveur calcule l'écart contre SON stock à l'instant du
+  /// comptage (`InventaireAuComptageService`) ; `type` + `quantity` (écart contre le stock LOCAL) ne servent plus qu'à
+  /// l'affichage et à un serveur ancien. `null` : ajout manuel, ou inventaire saisi avant S-T10.
+  RealColumn get countedQuantity => real().nullable()();
+}
+
+/// Ticket U9 — LE GRAND LIVRE DES STOCKS du serveur (`stock_movements`), tiré au poste.
+///
+/// ⚠️⚠️ **JOURNAL EN LECTURE SEULE, ÉCRIT PAR LE SERVEUR SEUL** (`AdjustStockAction`, point de passage unique de
+/// toute mutation de `products.stock_qty`). Pas de [SyncColumns] : le poste ne l'écrit jamais et ne l'envoie jamais
+/// (le serveur ignorerait l'envoi et le compterait dans `referentiels_ignored`). Un ajustement saisi ici part dans
+/// [StockAdjustments] ; le serveur le rejoue, et le mouvement qui en naît redescend ici avec `reference_id` =
+/// identifiant de la ligne du poste.
+///
+/// Il alimente, comme au web : « Rotation du Stock » (`StockRotationService`), « Écarts d'Inventaire »
+/// (`GestionStocks`), le Journal des Mouvements et le Tableau 3 de la ponte (`EggStockLedgerService`). Les saisies
+/// encore EN ATTENTE d'envoi y sont ajoutées par `JournalStocks` (`lib/features/stocks/journal_stocks.dart`), jamais
+/// écrites dans cette table.
+class StockMovements extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+
+  /// `entree`, `sortie` ou `ajustement` (enum du serveur) ; la quantité est toujours positive.
+  TextColumn get type => text()();
+  RealColumn get quantity => real()();
+
+  /// `sale`, `purchase`, `daily_entry`, `adjustment`, `inventaire`… (motif du journal du web).
+  TextColumn get referenceType => text()();
+
+  /// Pièce d'origine (vente, achat, fiche, ligne d'ajustement du poste) ; `null` pour un ajustement du web.
+  TextColumn get referenceId => text().nullable()();
+  TextColumn get reason => text().nullable()();
+
+  /// Heure MURALE du serveur : le web compare des JOURS (`whereDate`).
+  DateTimeColumn get movementDate => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// Enregistrement REFUSÉ par le serveur, avec son motif.
@@ -1315,12 +1554,51 @@ class ExpenseCategories extends Table {
 /// C'est une difference assumee avec les ventes et la ponte, ou l'effet local
 /// existe parce que le poste EN A BESOIN tout de suite (vendre, servir la
 /// provende). Ici, personne au poste ne decide sur la foi du solde.
+///
+/// Ticket U13 — TABLE MIXTE, comme les clients ou les achats : les dépenses du serveur (web, autres postes) y
+/// DESCENDENT, au curseur, avec leur archivage (`is_active`) ; une saisie locale `pending` ou `conflict` n'est jamais
+/// écrasée par le tirage (`SyncEngine._absorberDepenses`).
 class Expenses extends Table with SyncColumns {
   DateTimeColumn get expenseDate => dateTime()();
   TextColumn get label => text()();
   TextColumn get category => text()();
   RealColumn get amount => real()();
   TextColumn get treasuryAccountId => text()();
+
+  /// Ticket U13 — archivage logique du web (`SaisieDepenses::archiveExpense()` : montant réintégré, charge
+  /// contre-passée). Une dépense archivée n'est plus une dépense : aucun écran ni rapport ne la compte. Défaut `true` :
+  /// toute dépense saisie ici, ou déjà présente avant U13, est active (comme au serveur à sa création).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Ticket U14 — `expenses.status` du serveur (`payee` / `en_attente`) : le badge et le filtre « Statut » du Blade.
+  /// Défaut `payee` : une dépense saisie est immédiatement décaissée (le serveur la crée `payee`, toujours).
+  TextColumn get status => text().withDefault(const Constant('payee'))();
+
+  /// Ticket U14 — `expenses.accounting_entry_id` du serveur : une dépense COMPTABILISÉE ne change plus de montant, de
+  /// compte de charge ni de compte de trésorerie (`SaisieDepenseAction`). Le poste refuse avant d'écrire, comme le web.
+  /// `null` : pas d'écriture connue (saisie de ce poste pas encore reçue, ou plan comptable incomplet au serveur).
+  TextColumn get accountingEntryId => text().nullable()();
+}
+
+/// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
+/// et Dépenses » du web lit (`RecettesDepenses::depensesRows()`) descendent — l'instant du règlement, le nom de
+/// l'employé et le net versé. ⚠️ RIEN D'AUTRE SUR LA PAIE (protections S3 sur les salaires) : ni brut, ni retenues,
+/// ni charges patronales, ni période. Servie aux comptes qui lisent les rapports (`view-rapports`), qui voient ces
+/// mêmes lignes au web. Jamais écrite ici, jamais envoyée.
+class Payslips extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `last_name.' '.first_name` de l'employé ; `null` : employé introuvable (« Employé » au rapport).
+  TextColumn get employeeName => text().nullable()();
+
+  /// Net versé (`net_salary`).
+  RealColumn get netSalary => real()();
+
+  /// Instant du règlement (`created_at`), en HEURE MURALE du serveur (Bénin) : le jour du rapport est son jour.
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 class AppSettings extends Table {
@@ -1342,6 +1620,10 @@ class SyncState extends Table {
   DateTimeColumn get lastPulledAt => dateTime().nullable()();
   DateTimeColumn get lastPushedAt => dateTime().nullable()();
 
+  /// Ticket H2 — fin de la dernière synchronisation ABOUTIE (tirage puis envoi, refus compris : la liaison a
+  /// marché). À l'heure du SERVEUR : c'est l'instant du tirage de cette synchronisation, jamais l'horloge du poste.
+  DateTimeColumn get lastSucceededAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1352,6 +1634,7 @@ class SyncState extends Table {
     Products,
     LivestockLots,
     FeedRationStandards,
+    GrowthStandards,
     VeterinaryWithdrawalPeriods,
     LivestockReproductionEvents,
     Customers,
@@ -1391,15 +1674,20 @@ class SyncState extends Table {
     Purchases,
     PurchaseLines,
     LivestockDailyEntries,
+    LivestockTransfers,
     ProphylaxisScheduleStandards,
     VeterinaryRecords,
+    InfirmaryRecords,
+    VeterinaryCalendarEvents,
     Sales,
     SaleLines,
     StockAdjustments,
+    StockMovements,
     SyncConflicts,
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    Payslips,
     AppSettings,
     SyncState,
   ],
@@ -1416,7 +1704,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 48;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1771,8 +2059,160 @@ class AppDatabase extends _$AppDatabase {
           await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
         }
       }
+
+      // v39 — transferts entre bandes (ticket 15.46) : table, colonnes dérivées des fiches, bande d'origine.
+      if (from < 39) {
+        if (!await _tableExiste(m, livestockTransfers)) {
+          await m.createTable(livestockTransfers);
+        }
+        for (final colonne in [
+          livestockDailyEntries.transfertEntree,
+          livestockDailyEntries.transfertSortie,
+          livestockDailyEntries.transfertEntreeRepro,
+          livestockDailyEntries.transfertEntreeSevre,
+          livestockDailyEntries.transfertEntreeJeune,
+          livestockDailyEntries.transfertSortieRepro,
+          livestockDailyEntries.transfertSortieSevre,
+          livestockDailyEntries.transfertSortieJeune,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
+        }
+        await _ajouterColonneSiAbsente(
+          m,
+          livestockLots,
+          livestockLots.lotSourceId,
+        );
+      }
+
+      // v40 — ticket H2 : instant de la dernière synchronisation aboutie (modale « Synchronisation »).
+      if (from < 40) {
+        await _ajouterColonneSiAbsente(m, syncState, syncState.lastSucceededAt);
+      }
+
+      // v41 — ticket H8b (D-H8) : infirmerie et calendrier vétérinaire planifié, saisis au poste.
+      if (from < 41) {
+        if (!await _tableExiste(m, infirmaryRecords)) {
+          await m.createTable(infirmaryRecords);
+        }
+        if (!await _tableExiste(m, veterinaryCalendarEvents)) {
+          await m.createTable(veterinaryCalendarEvents);
+        }
+      }
+
+      // v42 — ticket H9b (D-H9) : Paramètres Élevage modifiables au poste comme au web. Les trois barèmes
+      // reçoivent l'archivage logique et leur statut de synchronisation ; la numérotation et l'entreprise
+      // (délai du rappel des soins) leur statut ; la prophylaxie son instant de création (tri du web, H9).
+      if (from < 42) {
+        for (final (table, colonnes) in <(TableInfo, List<GeneratedColumn>)>[
+          (
+            feedRationStandards,
+            [
+              feedRationStandards.isActive,
+              feedRationStandards.syncStatus,
+              feedRationStandards.updatedAt,
+            ],
+          ),
+          (
+            prophylaxisScheduleStandards,
+            [
+              prophylaxisScheduleStandards.isActive,
+              prophylaxisScheduleStandards.syncStatus,
+              prophylaxisScheduleStandards.updatedAt,
+              prophylaxisScheduleStandards.createdAt,
+            ],
+          ),
+          (
+            feedTypes,
+            [feedTypes.isActive, feedTypes.syncStatus, feedTypes.updatedAt],
+          ),
+          (
+            elevageNumberingSettings,
+            [
+              elevageNumberingSettings.syncStatus,
+              elevageNumberingSettings.updatedAt,
+            ],
+          ),
+          (
+            companySettings,
+            [
+              companySettings.rappelSoinsJours,
+              companySettings.syncStatus,
+              companySettings.updatedAt,
+            ],
+          ),
+        ]) {
+          for (final colonne in colonnes) {
+            await _ajouterColonneSiAbsente(m, table, colonne);
+          }
+        }
+      }
+
+      // v43 — tickets U2 et U3 (décisions client du 19/10/2026, « uniformiser web et poste ») : barème des
+      // objectifs de GMQ tiré du serveur ; archivage logique des soins (défaut `true` : tout soin existant est
+      // actif, comme au serveur où la colonne existe depuis l'origine).
+      if (from < 43) {
+        if (!await _tableExiste(m, growthStandards)) {
+          await m.createTable(growthStandards);
+        }
+        await _ajouterColonneSiAbsente(
+          m,
+          veterinaryRecords,
+          veterinaryRecords.isActive,
+        );
+      }
+
+      // v44 — ticket U9 : grand livre des stocks du serveur (`stock_movements`), en lecture seule.
+      if (from < 44) {
+        if (!await _tableExiste(m, stockMovements)) {
+          await m.createTable(stockMovements);
+        }
+      }
+
+      // v45 — ticket U10 : colonnes de la fiche reçues du serveur pour le Rapport Élevage (Tableau 2, CA Ventes).
+      if (from < 45) {
+        for (final colonne in [
+          livestockDailyEntries.venteSexe,
+          livestockDailyEntries.venteMontant,
+          livestockDailyEntries.treatmentProductId,
+          livestockDailyEntries.treatmentDose,
+          livestockDailyEntries.symptomes,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
+        }
+      }
+
+      // v46 — ticket S-T10 : quantité comptée d'un inventaire (l'écart est calculé par le serveur).
+      if (from < 46) {
+        await _ajouterColonneSiAbsente(m, stockAdjustments, stockAdjustments.countedQuantity);
+      }
+
+      // v47 — ticket U13 : les dépenses du serveur descendent avec leur archivage (défaut `true` : toute dépense déjà
+      // présente est active) ; la paie réglée (`payslips`) descend en lecture seule pour « Recettes et Dépenses ».
+      if (from < 47) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.isActive);
+        if (!await _tableExiste(m, payslips)) {
+          await m.createTable(payslips);
+        }
+      }
+
+      // v48 — ticket U14 : statut (badge et filtre du Blade) et écriture comptable de la dépense (règle de modification).
+      if (from < 48) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.status);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.accountingEntryId);
+      }
     },
   );
+
+  /// Vrai si [table] existe déjà (un `createTable` d'un palier antérieur pose le schéma COURANT).
+  Future<bool> _tableExiste(Migrator m, TableInfo table) async {
+    final lignes = await m.database
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          variables: [Variable.withString(table.actualTableName)],
+        )
+        .get();
+    return lignes.isNotEmpty;
+  }
 
   /// État du moteur de synchronisation, **toutes lignes fusionnées**.
   ///
@@ -1812,6 +2252,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> noterEtatDeSynchronisation({
     DateTime? tire,
     DateTime? envoye,
+    DateTime? reussi,
   }) async {
     await transaction(() async {
       final actuel = await etatDeSynchronisation();
@@ -1822,53 +2263,138 @@ class AppDatabase extends _$AppDatabase {
           id: const Value(1),
           lastPulledAt: Value(tire ?? actuel?.lastPulledAt),
           lastPushedAt: Value(envoye ?? actuel?.lastPushedAt),
+          lastSucceededAt: Value(reussi ?? actuel?.lastSucceededAt),
         ),
       );
     });
   }
 
+  /// Ticket H2 — TABLES QUE LE POSTE ENVOIE au serveur (`SyncEngine._pousser`), nom SQL.
+  ///
+  /// 🔴 Le compteur « en attente » était une liste tenue à la main, ajoutée table par table (F0.35, F0.45,
+  /// F0.48, F0.78…) : huit tables envoyées y manquaient (produits, fournisseurs, clients, règlements, avances,
+  /// imputations, retours, remboursements). Un client ou un article créé hors ligne affichait « 0 en
+  /// attente », et la confirmation de fermeture laissait quitter sans prévenir. Un test compare désormais
+  /// cette liste aux tables lues par `_pousser` : la prochaine table envoyée ne peut plus être oubliée ici.
+  static const tablesEnvoyees = <String>[
+    'livestock_daily_entries',
+    'sales',
+    'stock_adjustments',
+    'veterinary_records',
+    'expenses',
+    'livestock_reproduction_events',
+    'purchases',
+    'attendance_records',
+    'products',
+    'suppliers',
+    'supplier_payments',
+    'customers',
+    'mails',
+    'archived_documents',
+    'administrative_documents',
+    'customer_advances',
+    'advance_imputations',
+    'purchase_returns',
+    'supplier_refunds',
+    'livestock_transfers',
+    // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
+    'infirmary_records',
+    'veterinary_calendar_events',
+    // Ticket H9b (D-H9) — Paramètres Élevage modifiables au poste (le délai du rappel des soins vit dans
+    // `company_settings`).
+    'feed_ration_standards',
+    'prophylaxis_schedule_standards',
+    'feed_types',
+    'elevage_numbering_settings',
+    'company_settings',
+  ];
+
   /// Nombre d'enregistrements en attente d'envoi, toutes tables confondues.
   /// C'est le chiffre porté par le badge du bouton « Synchroniser ».
+  ///
+  /// ⚠️ LES REFUSÉS COMPTENT AUSSI. Un enregistrement en conflit n'est PAS
+  /// arrivé au serveur : l'exclure du compteur afficherait « 0 en attente »
+  /// alors que des ventes n'existent que sur ce poste — et l'utilisateur
+  /// éteindrait la machine en croyant son travail à l'abri.
   Future<int> pendingCount() async {
-    // ⚠️ LES REFUSÉS COMPTENT AUSSI. Un enregistrement en conflit n'est PAS
-    // arrivé au serveur : l'exclure du compteur afficherait « 0 en attente »
-    // alors que des ventes n'existent que sur ce poste — et l'utilisateur
-    // éteindrait la machine en croyant son travail à l'abri.
-    final enAttente = await customSelect(
+    final c = await compteursSynchronisation();
+    return c.aEnvoyer + c.refuses;
+  }
+
+  /// Ticket H2 — enregistrements non synchronisés, séparés en « à envoyer » (`pending`) et « refusés par le
+  /// serveur » (`conflict`), sur toutes les [tablesEnvoyees]. Lu par la modale « Synchronisation ».
+  Future<({int aEnvoyer, int refuses})> compteursSynchronisation() async {
+    final unions = tablesEnvoyees
+        .map((t) => "SELECT sync_status FROM $t WHERE sync_status <> 'synced'")
+        .join(' UNION ALL ');
+    final ligne = await customSelect(
       "SELECT "
-      "(SELECT COUNT(*) FROM livestock_daily_entries WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM sales WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM stock_adjustments WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM veterinary_records WHERE sync_status <> 'synced') + "
-      // 🔴→✅ TICKET F0.35 — `expenses` MANQUAIT A CE COMPTE depuis le ticket
-      // F0.18 qui l'a rendue envoyable. Une depense saisie hors ligne
-      // n'apparaissait donc PAS dans le badge « en attente » : c'est
-      // exactement le cas que le commentaire ci-dessus decrit, et il vivait
-      // deux lignes plus bas.
-      "(SELECT COUNT(*) FROM expenses WHERE sync_status <> 'synced') + "
-      "(SELECT COUNT(*) FROM livestock_reproduction_events "
-      "WHERE sync_status <> 'synced') + "
-      // 🔴 TICKET F0.45 — un achat saisi hors ligne engage la ferme (stock,
-      // caisse, dette) : l'omettre du badge afficherait « 0 en attente » alors
-      // qu'une livraison n'existe que sur ce poste.
-      "(SELECT COUNT(*) FROM purchases WHERE sync_status <> 'synced') + "
-      // 🔴 TICKET F0.48 — un pointage saisi a 7 h n'existe que sur ce poste
-      // tant qu'il n'est pas parti : la paie du mois se calcule dessus.
-      "(SELECT COUNT(*) FROM attendance_records "
-      "WHERE sync_status <> 'synced') + "
-      // TICKET F0.78 — un courrier saisi au poste n'existe que sur ce poste tant que le
-      // serveur ne l'a pas acquitté (et ne lui a pas attribué sa référence).
-      "(SELECT COUNT(*) FROM mails WHERE sync_status <> 'synced') + "
-      // TICKET F0.79 — un document archivé saisi ou retiré au poste n'existe (ou n'est
-      // retiré) que sur ce poste tant que le serveur ne l'a pas acquitté.
-      "(SELECT COUNT(*) FROM archived_documents WHERE sync_status <> 'synced') + "
-      // TICKET F0.80 — un document administratif saisi ou retiré au poste n'existe (ou n'est
-      // retiré) que sur ce poste tant que le serveur ne l'a pas acquitté.
-      "(SELECT COUNT(*) FROM administrative_documents WHERE sync_status <> 'synced') "
-      "AS total",
+      "COALESCE(SUM(CASE WHEN sync_status = 'conflict' THEN 0 ELSE 1 END), 0) AS a_envoyer, "
+      "COALESCE(SUM(CASE WHEN sync_status = 'conflict' THEN 1 ELSE 0 END), 0) AS refuses "
+      "FROM ($unions)",
     ).getSingle();
 
-    return enAttente.read<int>('total');
+    return (aEnvoyer: ligne.read<int>('a_envoyer'), refuses: ligne.read<int>('refuses'));
+  }
+
+  /// Ticket 15.50 — tables d'ACTIVITÉ effacées quand le serveur a été réinitialisé : le miroir de
+  /// `ReinitialisationDonneesService::tablesTransactionnelles()`, plus les tables du poste qui en
+  /// dérivent (créances fournisseurs, revenus de bande, conflits de synchronisation).
+  ///
+  /// ⚠️ LISTE EXPLICITE, comme au serveur : chaque table du schéma est classée dans
+  /// [tablesDActivite] OU [tablesConservees] — un test le vérifie, pour que la prochaine table
+  /// ajoutée ne soit pas oubliée sans bruit.
+  static const tablesDActivite = [
+    'livestock_lots', 'livestock_daily_entries', 'livestock_transfers',
+    'livestock_reproduction_events', 'veterinary_records', 'veterinary_withdrawal_periods',
+    'infirmary_records', 'veterinary_calendar_events', // H8b
+    'animals', 'lot_revenues',
+    'customers', 'receivables', 'customer_advances', 'customer_reminders',
+    'advance_imputations', 'sales', 'sale_lines',
+    'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
+    'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
+    'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'payslips', // U13
+    'employees', 'internships', 'attendance_records',
+    'accounting_entries', 'accounting_entry_lines',
+    'mails', 'administrative_documents', 'archived_documents', 'notifications',
+    'sync_conflicts',
+  ];
+
+  /// Référentiels et réglages CONSERVÉS (préservés au serveur ; les comptes restent pour que la
+  /// connexion hors ligne survive à une purge suivie d'un tirage interrompu).
+  static const tablesConservees = [
+    'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
+    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
+    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories',
+    'company_settings', 'modules_config', 'attestation_templates',
+    'roles_applicatifs', 'utilisateurs', 'audit_logs',
+    'app_settings', 'sync_state',
+  ];
+
+  /// Efface les données d'activité, remet à zéro les soldes qui en dérivent (stock, trésorerie,
+  /// comme le serveur) et le curseur de tirage. Rend le nombre d'enregistrements EN ATTENTE perdus.
+  ///
+  /// ⚠️ Ticket H9b — SEULES LES TABLES EFFACÉES COMPTENT : un barème d'élevage (ou un produit) en attente est
+  /// conservé par la purge et repartira ; le compter dans « saisies perdues » annoncerait une perte qui n'a pas
+  /// eu lieu.
+  Future<int> purgerDonneesDActivite() async {
+    final effacees = tablesEnvoyees.where(tablesDActivite.contains);
+    final perdus = effacees.isEmpty
+        ? 0
+        : (await customSelect(
+            'SELECT COUNT(*) AS n FROM ('
+            '${effacees.map((t) => "SELECT 1 FROM $t WHERE sync_status <> 'synced'").join(' UNION ALL ')})',
+          ).getSingle()).read<int>('n');
+    await transaction(() async {
+      for (final table in tablesDActivite) {
+        await customStatement('DELETE FROM $table');
+      }
+      await customStatement('UPDATE products SET stock_qty = 0');
+      await customStatement('UPDATE treasury_accounts SET balance = 0');
+      await delete(syncState).go();
+    });
+    return perdus;
   }
 }
 

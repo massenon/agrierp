@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'mon_profil_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/mon-profil.html` → Mon Profil.
 ///
@@ -42,6 +44,17 @@ class MonProfilScreen extends StatefulWidget {
 
   /// Session ouverte, `null` si aucun utilisateur n'est connecté.
   final SessionUtilisateur? session;
+
+  /// `->created_at->format('d/m/Y H:i')` du web (« Dernière connexion », « Date / Heure » du journal). 🔴→✅ Ticket
+  /// U12b (reste de S-T11) — un instant du journal d'audit, affiché à l'heure du Bénin quel que soit le réglage de
+  /// Windows.
+  static String dateHeure(DateTime d) {
+    final l = HeureBenin.depuisInstant(d);
+    return '${l.day.toString().padLeft(2, '0')}/'
+        '${l.month.toString().padLeft(2, '0')}/${l.year} '
+        '${l.hour.toString().padLeft(2, '0')}:'
+        '${l.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   State<MonProfilScreen> createState() => _MonProfilScreenState();
@@ -206,7 +219,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.person, size: 26, color: AgriColors.brandEmerald),
+            const Icon(SymbolesAgri.person, size: 26, color: AgriColors.brandEmerald),
             const SizedBox(width: AgriSpacing.xs),
             Text(
               'Mon Profil',
@@ -422,7 +435,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.lock, size: 18, color: AgriColors.brandForest),
+            const Icon(SymbolesAgri.lock, size: 18, color: AgriColors.brandForest),
             const SizedBox(width: AgriSpacing.xs),
             Text(
               'Modifier le Mot de Passe'.toUpperCase(),
@@ -583,7 +596,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            reussi ? Icons.check_circle : Icons.error,
+            reussi ? SymbolesAgri.check_circle : SymbolesAgri.error,
             size: 18,
             color: couleur,
           ),
@@ -632,11 +645,11 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
           ),
         ),
         _tableauJournal(d),
-        // ⚠️ DIT CE QUE LE POSTE DÉTIENT : cent actions pour toute la ferme.
+        // ⚠️ DIT CE QUE LE POSTE DÉTIENT : deux cents actions pour toute la ferme (U14 : la liste du web, `limit(200)`).
         Padding(
           padding: const EdgeInsets.all(AgriSpacing.sm),
           child: Text(
-            "Le poste ne détient que les 100 dernières actions de l'ensemble "
+            "Le poste ne détient que les 200 dernières actions de l'ensemble "
             "de la ferme : ce journal peut compter moins de dix lignes.",
             key: const Key('journal-portee'),
             style: const TextStyle(fontSize: 10, color: AgriColors.outline),
@@ -750,9 +763,5 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     color: AgriColors.onSurface,
   );
 
-  static String _dateHeure(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year} '
-      '${d.hour.toString().padLeft(2, '0')}:'
-      '${d.minute.toString().padLeft(2, '0')}';
+  static String _dateHeure(DateTime d) => MonProfilScreen.dateHeure(d);
 }

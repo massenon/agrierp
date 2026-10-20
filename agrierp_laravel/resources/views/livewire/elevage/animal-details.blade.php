@@ -183,7 +183,7 @@
     @if(in_array($tab, ['alimentation', 'production', 'documents'], true))
         @php
             $motifs = [
-                'alimentation' => "Le rationnement est calculé PAR BANDE et par catégorie (par exemple, pour les lapins : Reproducteur / Jeune / Lapin de Chair), jamais par sujet. Afficher une ration individuelle supposerait de diviser arbitrairement la provende de la bande — un chiffre qui n'aurait aucune valeur zootechnique.",
+                'alimentation' => "Le rationnement est calculé PAR BANDE et par catégorie (par exemple, pour les lapins : Reproducteur / Jeune / Sous-mères), jamais par sujet. Afficher une ration individuelle supposerait de diviser arbitrairement la provende de la bande — un chiffre qui n'aurait aucune valeur zootechnique.",
                 'production' => "La ponte est relevée par bande dans la fiche journalière (œufs récoltés, cassés, commercialisables). Aucune source ne rattache une production à une poule donnée.",
                 'documents' => "Aucune table de pièces jointes par sujet n'existe dans le schéma. Le module Administration gère les documents de la ferme, pas ceux d'un animal.",
             ];

@@ -66,6 +66,14 @@ void main() {
             ),
           );
     }
+    // 🔁 U12a — la fiche Escargots suit `ModuleConfig::isEnabled('helico')` du web : module activé ici.
+    await db.into(db.modulesConfig).insert(
+      ModulesConfigCompanion.insert(
+        id: 'dddddddd-1111-4111-8111-dddddddddddd',
+        speciesCode: 'helico',
+        isEnabled: const Value(true),
+      ),
+    );
   });
 
   tearDown(() async => db.close());
@@ -87,7 +95,8 @@ void main() {
 
     final codes = <String>[];
     for (final (_, code, _, _) in bandes) {
-      if (find.text(code).evaluate().isNotEmpty) codes.add(code);
+      // 🔁 U12a — la fiche Reproducteurs affiche « code (Stade — N têtes) », comme le Blade.
+      if (find.textContaining(code).evaluate().isNotEmpty) codes.add(code);
     }
 
     return codes;

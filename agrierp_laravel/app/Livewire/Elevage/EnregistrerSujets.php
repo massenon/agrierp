@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -90,7 +92,7 @@ class EnregistrerSujets extends Component
         return [
             'naissances_mois' => (int) (clone $entries)->sum('ne'),
             'acquisitions_mois' => (int) (clone $entries)->sum('achat'),
-            'effectif_total' => (int) LivestockLot::where('status', 'actif')->sum('current_quantity'),
+            'effectif_total' => (int) LivestockLot::vivantes()->sum('current_quantity'),   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
         ];
     }
 
@@ -150,8 +152,6 @@ class EnregistrerSujets extends Component
             'entry_date' => ['required', 'date'],
         ]);
 
-        $lot = LivestockLot::findOrFail($this->lot_id);
-
         $field = match ($this->origine) {
             'Naissance' => 'ne',
             'Achat' => 'achat',
@@ -163,20 +163,23 @@ class EnregistrerSujets extends Component
             'entry_date' => $this->entry_date,
         ]);
 
-        $previousEffectif = $entry->exists ? $entry->previousEffectif() : $lot->current_quantity;
+        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — une NOUVELLE fiche partait de
+        // `current_quantity`, c'est-à-dire de l'effectif d'AUJOURD'HUI : une entrée antidatée
+        // comptait donc aussi les mouvements des jours suivants. La veille réelle de la date
+        // saisie fait foi, que la fiche existe ou non.
+        $previousEffectif = $entry->previousEffectif();
 
         $entry->$field = ($entry->$field ?? 0) + $this->quantite;
-        $entry->effectif_final = LivestockDailyEntry::computeEffectifFinal(
-            $previousEffectif,
-            $entry->achat ?? 0,
-            $entry->ne ?? 0,
-            $entry->mort ?? 0,
-            $entry->vente ?? 0,
-            $entry->don ?? 0,
-        );
-        $entry->save();
-
-        $lot->increment('current_quantity', $this->quantite);
+        // Ticket 15.46 : transferts entre bandes compris.
+        $entry->effectif_final = $entry->effectifFinalDepuis($previousEffectif);
+        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — `increment()` ajoutait la quantité à la
+        // bande quelle que soit la date, sans recalculer les fiches suivantes : une entrée
+        // antidatée laissait les jours postérieurs (et donc la bande) désaccordés. Cascade
+        // commune à toutes les fiches : jours suivants recalculés, bande = DERNIÈRE fiche.
+        DB::transaction(function () use ($entry) {
+            $entry->save();
+            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($this->lot_id, $this->entry_date);
+        });
 
         AuditLog::record('livestock_entry.recorded', 'elevage');
         $this->dispatch('close-modal', name: 'modal-create-sujet');

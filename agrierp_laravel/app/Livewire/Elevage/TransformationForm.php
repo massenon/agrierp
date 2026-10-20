@@ -3,11 +3,14 @@
 namespace App\Livewire\Elevage;
 
 use App\Actions\AdjustStockAction;
+use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\Transformation;
 use Illuminate\Support\Facades\Auth;
+use App\Support\OrdreDesVerrous;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -118,20 +121,36 @@ class TransformationForm extends Component
         $lot = $this->selectedLot;
         $product = Product::findOrFail($this->productId);
 
-        $transformation = Transformation::create([
-            'lot_id' => $this->lotId,
-            'product_id' => $this->productId,
-            'qty_animals' => $this->qtyAnimals,
-            'qty_produced' => $this->qtyProduced,
-            'operator_id' => Auth::id(),
-            'transformation_date' => $this->transformationDate,
-        ]);
+        // 🔴→✅ CORRECTIF « TRANSFORMATION EFFACÉE » — l'abattage faisait `decrement('current_quantity')` sans
+        // écrire dans la fiche du jour : la prochaine sauvegarde de fiche (ou une vente) réalignait la bande sur
+        // la dernière fiche et EFFAÇAIT la transformation. Décision client du 17/10/2026 : une transformation est
+        // une VENTE de sujets vifs. Elle passe donc par le même point d'entrée que la caisse : « Vente » de la
+        // fiche du jour de transformation, cascade des jours suivants, bande = dernière fiche.
+        DB::transaction(function () use ($lot, $product) {
+            // 🔴→✅ Ticket U14 — ORDRE DES VERROUS : le stock (produit fini, et ce que la fiche de la bande mouvemente)
+            // AVANT la fiche du jour, comme la caisse et l'envoi des postes (`OrdreDesVerrous`).
+            OrdreDesVerrous::stock([$product->id, ...OrdreDesVerrous::produitsDesFiches([$lot->id])]);
 
-        // 1. Élevage — Décrémentation
-        $lot->decrement('current_quantity', $this->qtyAnimals);
+            $transformation = Transformation::create([
+                'lot_id' => $this->lotId,
+                'product_id' => $this->productId,
+                'qty_animals' => $this->qtyAnimals,
+                'qty_produced' => $this->qtyProduced,
+                'operator_id' => Auth::id(),
+                'transformation_date' => $this->transformationDate,
+            ]);
 
-        // 2. Stock Produits Finis — Incrémentation
-        app(AdjustStockAction::class)->execute($product, (float) $this->qtyProduced, 'transformation', $transformation->id);
+            // 1. Élevage — sortie des sujets, comme une vente, dans la fiche du jour.
+            app(RecordSaleOnFicheElevageAction::class)->execute(
+                [['lot_id' => $lot->id, 'qty' => (int) $this->qtyAnimals]],
+                \Carbon\Carbon::parse($this->transformationDate)->format('Y-m-d'),
+            );
+
+            // 2. Stock Produits Finis — Incrémentation
+            app(AdjustStockAction::class)->execute($product, (float) $this->qtyProduced, 'transformation', $transformation->id);
+
+            return $transformation;
+        });
 
         AuditLog::record('transformation.recorded', 'elevage');
         $this->dispatch('toast', message: "Transformation validée — {$this->qtyAnimals} sujet(s) transformé(s) en {$product->name}.", type: 'success');

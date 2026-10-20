@@ -48,6 +48,8 @@ class Creances extends Component
             ->whereDate('due_date', '>=', $this->startDate)
             ->whereDate('due_date', '<=', $this->endDate)
             ->orderBy('due_date')
+            // Ticket U12b — deux créances de la même échéance : ordre déterminé (identifiant), repris par le poste.
+            ->orderBy('id')
             ->get();
     }
 

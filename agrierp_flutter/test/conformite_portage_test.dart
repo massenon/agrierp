@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.40 — GARDE-FOUS DE LA DOCTRINE DE PORTAGE.
 ///
@@ -81,14 +82,20 @@ void main() {
   /// serveur quand le dépôt Laravel est présent : une table ajoutée côté serveur le fait échouer.
   const tablesServies = {
     'server_time',
+    'data_reset_at',
     'products',
     'product_categories',
     'livestock_lots',
     'livestock_daily_entries',
+    'livestock_transfers',
     'feed_ration_standards',
+    // Ticket U2 (D-U2) — objectifs de GMQ.
+    'growth_standards',
     'veterinary_withdrawal_periods',
     'prophylaxis_schedule_standards',
     'veterinary_records',
+    'infirmary_records',
+    'veterinary_calendar_events',
     'livestock_reproduction_events',
     'customers',
     'receivables',
@@ -124,13 +131,26 @@ void main() {
     'attestation_templates',
     'attestation_counts',
     'sales',
+    // Ticket U4 (D-U4) — lignes des ventes et des achats servis, avec leur pièce.
+    'sale_lines',
+    'purchase_lines',
+    // Ticket U8 — lignes de retour des achats servis, avec leur achat.
+    'purchase_returns',
+    // Ticket U9 — grand livre des stocks, en lecture seule au poste.
+    'stock_movements',
     'treasury_accounts',
     'expense_categories',
+    // Ticket U13 — dépenses (table mixte) et paie réglée (lecture seule), pour « Recettes et Dépenses ».
+    'expenses',
+    'payslips',
   };
 
   const ignorees = {
     'server_time':
         'curseur du tirage (horloge du serveur), noté par noterEtatDeSynchronisation : '
+        'ce n est pas une table',
+    'data_reset_at':
+        'marque de réinitialisation (15.50), lue en tête de _tirer pour purger le poste : '
         'ce n est pas une table',
   };
 
@@ -176,24 +196,37 @@ void main() {
   );
 
   final controleur = File(
-    'C:/laragon/www/agrierp/app/Http/Controllers/Api/SyncController.php',
+    '$dossierLaravel/app/Http/Controllers/Api/SyncController.php',
   );
   test(
     '⚠️ la liste des tables servies est celle du serveur (SyncController::pull)',
     () {
       final source = controleur.readAsStringSync();
       final debut = source.indexOf('public function pull(');
-      final reponse = source.indexOf('return response()->json([', debut);
-      final fin = source.indexOf(']);', reponse);
+      // Ticket H3 : le corps du tirage est construit dans `$reponse = [ … ];` (journalisé avant d'être renvoyé).
+      final reponse = source.indexOf(r'$reponse = [', debut);
+      final fin = source.indexOf('];', reponse);
       expect(debut, greaterThan(-1));
       expect(reponse, greaterThan(debut));
       final bloc = source.substring(reponse, fin);
+      // Ticket S-T4 : les TABLES sont nommées une fois, dans `PERMISSIONS_DE_TIRAGE` (une entrée par table servie,
+      // dans l'ordre de la réponse) ; `$reponse = [ … ]` ne porte plus que le curseur et la marque de
+      // réinitialisation.
+      final debutTables = source.indexOf(
+        'public const PERMISSIONS_DE_TIRAGE = [',
+      );
+      expect(debutTables, greaterThan(-1));
+      final tables = source.substring(
+        debutTables,
+        source.indexOf('];', debutTables),
+      );
       final servies = {
-        for (final m in RegExp(
-          r"^\s*'(\w+)'\s*=>",
-          multiLine: true,
-        ).allMatches(bloc))
-          m.group(1)!,
+        for (final texte in [bloc, tables])
+          for (final m in RegExp(
+            r"^\s*'(\w+)'\s*=>",
+            multiLine: true,
+          ).allMatches(texte))
+            m.group(1)!,
       };
 
       expect(
@@ -206,7 +239,7 @@ void main() {
     },
     skip: controleur.existsSync()
         ? false
-        : 'dépôt Laravel absent (C:/laragon/www/agrierp) : comparaison au serveur impossible',
+        : 'dépôt Laravel absent ($dossierLaravel) : comparaison au serveur impossible',
   );
 
   test('⚠️⚠️ aucune disposition ne se décide sur constraints.maxWidth', () {

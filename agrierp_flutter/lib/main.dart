@@ -1,17 +1,35 @@
+import 'dart:ui' show AppExitResponse;
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 import 'core/auth/auth_service.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
+import 'core/config/envoi_email_test.dart';
 import 'core/config/parametres_poste.dart';
+import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
+import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
-import 'core/sync/sync_button.dart';
+import 'core/sync/gestes_importants.dart';
+import 'core/sync/modale_synchronisation.dart';
+import 'core/sync/synchronisation_automatique.dart';
+import 'core/widgets/acces_rapide.dart';
+import 'features/recherche/recherche_globale_champ.dart';
+import 'features/recherche/recherche_globale_repository.dart';
+import 'core/widgets/modale_agri.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/theme/agri_theme.dart';
 import 'core/widgets/barre_superieure.dart';
+import 'core/widgets/rafraichissement_periodique.dart';
+import 'core/widgets/toast_agri.dart';
 import 'core/theme/agri_tokens.dart';
+import 'features/demarrage/premier_demarrage_repository.dart';
+import 'features/demarrage/premier_demarrage_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/elevage/fiche_journaliere_repository.dart';
 import 'features/achats/achats_commandes_screen.dart';
@@ -21,6 +39,8 @@ import 'features/achats/fournisseurs_screen.dart';
 import 'features/achats/depenses_repository.dart';
 import 'features/achats/saisie_depenses_screen.dart';
 import 'features/elevage/dashboard_elevage_repository.dart';
+import 'features/elevage/transferts_bandes_screen.dart';
+import 'features/elevage/transferts_repository.dart';
 import 'features/elevage/dashboard_elevage_screen.dart';
 import 'features/elevage/fiche_escargots_screen.dart';
 import 'features/elevage/soins_vaccins_repository.dart';
@@ -31,6 +51,7 @@ import 'features/elevage/fiche_sujet_screen.dart';
 import 'features/elevage/sujets_repository.dart';
 import 'features/elevage/suivi_reproduction_repository.dart';
 import 'features/elevage/suivi_reproduction_screen.dart';
+import 'features/elevage/gestion_elevage_repository.dart';
 import 'features/elevage/gestion_elevage_screen.dart';
 import 'features/elevage/fiche_pondeuses_screen.dart';
 import 'features/elevage/fiche_porcs_screen.dart';
@@ -52,7 +73,8 @@ import 'features/rh/personnel_repository.dart';
 import 'features/rh/personnel_stages_screen.dart';
 import 'features/ventes/facturation_repository.dart';
 import 'features/ventes/facturation_screen.dart';
-import 'features/parametres/parametres_poste_screen.dart';
+import 'features/parametres/appairage_poste.dart';
+import 'features/parametres/reinitialisation_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
 import 'features/stocks/produits_repository.dart';
@@ -72,6 +94,7 @@ import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
+import 'core/theme/symboles_agri.dart';
 
 /// AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
 ///
@@ -83,6 +106,11 @@ import 'features/ventes/ventes_devis_screen.dart';
 /// envoi parti entre-temps porterait l'ancienne valeur.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Ticket U5 (D-U5) : dates d'`intl` en français (données embarquées, aucun
+  // accès réseau) — tout `DateFormat` sans locale explicite écrit « octobre ».
+  Intl.defaultLocale = 'fr_FR';
+  await initializeDateFormatting('fr_FR');
 
   final db = AppDatabase();
   final parametres = ParametresPoste(database: db);
@@ -141,24 +169,48 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
   );
 
+  /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).
+  late final PremierDemarrageRepository _demarrage = PremierDemarrageRepository(
+    database: _db,
+    parametres: widget.parametres,
+    client: _client,
+  );
+
   late final AuthService _auth = AuthService(
     client: _client,
     deviceName: widget.identifiantPoste,
   );
 
+  /// Ticket R-1 — onglet « Réinitialisation » de Paramètres : la route du serveur (même service que le web), par
+  /// le client partagé (il porte le jeton), puis la purge immédiate de ce poste par le moteur (mécanisme 15.50)
+  /// et un tirage complet. Le droit est celui du rôle de la session ouverte.
+  late final ReinitialisationPoste _reinitialisation = ReinitialisationPoste(
+    database: _db,
+    client: _client,
+    engine: _engine,
+    role: () => _auth.utilisateur?.role ?? '',
+  );
+
+  /// Ticket S-T3 — point unique des gestes importants (vente, fiche journalière, soin) : les dépôts le
+  /// signalent, la synchronisation automatique de la session l'écoute.
+  final GestesImportants _gestes = GestesImportants();
+
   late final FicheJournaliereRepository _fiches = FicheJournaliereRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final CaisseRepository _caisse = CaisseRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final SoinsRepository _soins = SoinsRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    gestes: _gestes,
   );
 
   late final ProductionOeufsService _production = ProductionOeufsService(
@@ -224,6 +276,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final DashboardElevageRepository _dashboardElevage =
       DashboardElevageRepository(database: _db, soins: _soins);
 
+  late final TransfertsRepository _transferts = TransfertsRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+  );
+
   late final TableauDeBordRepository _tableauDeBord = TableauDeBordRepository(
     database: _db,
   );
@@ -269,6 +326,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// utilisateur déjà authentifié.
   bool? _sessionOuverte;
 
+  /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
+  /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
+  bool _premierDemarrage = false;
+
+  /// Ticket S-T3 — l'accueil synchronise à son ouverture, sauf juste après l'écran de premier démarrage, qui
+  /// vient de proposer (et le plus souvent de faire) cette synchronisation.
+  bool _synchroniserALOuverture = true;
+
   @override
   void initState() {
     super.initState();
@@ -277,11 +342,30 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   Future<void> _reprendre() async {
     final ouverte = await _auth.reprendreSession();
-    if (mounted) setState(() => _sessionOuverte = ouverte);
+    final neuf = ouverte && await _demarrage.posteNeuf();
+    if (mounted) {
+      setState(() {
+        _sessionOuverte = ouverte;
+        _premierDemarrage = neuf;
+        _synchroniserALOuverture = true;
+      });
+    }
+  }
+
+  Future<void> _connecte() async {
+    final neuf = await _demarrage.posteNeuf();
+    if (mounted) {
+      setState(() {
+        _sessionOuverte = true;
+        _premierDemarrage = neuf;
+        _synchroniserALOuverture = true;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _gestes.dispose();
     _db.close();
     super.dispose();
   }
@@ -292,6 +376,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
       title: 'AgriERP — Ferme École OLOUWACHEGOUN',
       debugShowCheckedModeBanner: false,
       theme: AgriTheme.light,
+      // Ticket U5 (D-U5) : composants Material en français (sélecteurs de date,
+      // « ANNULER » / « OK », infobulles). Voir `LocalisationPoste`.
+      locale: LocalisationPoste.locale,
+      supportedLocales: LocalisationPoste.locales,
+      localizationsDelegates: LocalisationPoste.delegues,
       home: switch (_sessionOuverte) {
         null => const Scaffold(
           backgroundColor: AgriColors.surfaceBg,
@@ -299,12 +388,23 @@ class _AgriErpAppState extends State<AgriErpApp> {
         ),
         false => LoginScreen(
           auth: _auth,
-          onConnecte: () => setState(() => _sessionOuverte = true),
+          demarrage: _demarrage,
+          onConnecte: _connecte,
+        ),
+        true when _premierDemarrage => PremierDemarrageScreen(
+          depot: _demarrage,
+          engine: _engine,
+          utilisateur: _auth.utilisateur?.nom ?? '—',
+          onTermine: () => setState(() {
+            _premierDemarrage = false;
+            _synchroniserALOuverture = false;
+          }),
         ),
         true => SocleAccueil(
           database: _db,
           engine: _engine,
           auth: _auth,
+          reinitialisation: _reinitialisation,
           fiches: _fiches,
           caisse: _caisse,
           soins: _soins,
@@ -320,6 +420,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           rapports: _rapports,
           tableauDeBord: _tableauDeBord,
           dashboardElevage: _dashboardElevage,
+          transferts: _transferts,
           reproduction: _reproduction,
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
@@ -333,6 +434,10 @@ class _AgriErpAppState extends State<AgriErpApp> {
           sujets: _sujets,
           parametres: widget.parametres,
           identifiantPoste: widget.identifiantPoste,
+          onDeconnecte: () => setState(() => _sessionOuverte = false),
+          changementsReseau: Connectivity().onConnectivityChanged,
+          gestes: _gestes,
+          synchroniserALOuverture: _synchroniserALOuverture,
         ),
       },
     );
@@ -367,6 +472,7 @@ class SocleAccueil extends StatefulWidget {
     required this.rapports,
     required this.tableauDeBord,
     required this.dashboardElevage,
+    required this.transferts,
     required this.reproduction,
     required this.soinsVaccins,
     required this.parametresElevage,
@@ -380,7 +486,30 @@ class SocleAccueil extends StatefulWidget {
     required this.sujets,
     required this.parametres,
     required this.identifiantPoste,
+    this.reinitialisation,
+    this.onDeconnecte,
+    this.changementsReseau,
+    this.gestes,
+    this.synchroniserALOuverture = true,
   });
+
+  /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
+  final VoidCallback? onDeconnecte;
+
+  /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
+  final ReinitialisationPoste? reinitialisation;
+
+  /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
+  /// châssis, qui n'ont pas de plateforme native pour la connectivité).
+  final Stream<List<ConnectivityResult>>? changementsReseau;
+
+  /// Ticket S-T3 — gestes importants signalés par les dépôts (vente, fiche, soin) : chacun déclenche la
+  /// synchronisation automatique, après son délai d'agrégation.
+  final Listenable? gestes;
+
+  /// Ticket S-T3 — synchronisation automatique dès l'ouverture de l'accueil (session ouverte). Faux juste après
+  /// l'écran de premier démarrage, qui synchronise déjà.
+  final bool synchroniserALOuverture;
 
   final AppDatabase database;
   final SyncEngine engine;
@@ -400,6 +529,7 @@ class SocleAccueil extends StatefulWidget {
   final RapportsRepository rapports;
   final TableauDeBordRepository tableauDeBord;
   final DashboardElevageRepository dashboardElevage;
+  final TransfertsRepository transferts;
   final SuiviReproductionRepository reproduction;
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
@@ -442,12 +572,60 @@ class _SocleAccueilState extends State<SocleAccueil> {
   String? _sujetId;
   EcranPoste _avantSujet = EcranPoste.suiviReproduction;
 
+  /// Ticket U10 — arrivée au Catalogue Produits DEPUIS Gestion des Stocks : onglet (« Seuils d'Alerte ») ou produit
+  /// à modifier, lus une fois par l'écran à sa création ([_versionCatalogue] le recrée), puis oubliés — une arrivée
+  /// ordinaire par la barre latérale ouvre le catalogue comme avant.
+  String? _catalogueOnglet;
+  String? _catalogueProduit;
+  int _versionCatalogue = 0;
+
+  void _ouvrirCatalogue({String? onglet, String? produit}) {
+    setState(() {
+      _catalogueOnglet = onglet;
+      _catalogueProduit = produit;
+      _versionCatalogue++;
+      _ecran = EcranPoste.catalogueProduits;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _catalogueOnglet = null;
+      _catalogueProduit = null;
+    });
+  }
+
   /// Brouillon de « Contactez l'Éditeur », possédé ICI pour survivre aux
   /// changements d'écran : un texte rédigé hors ligne ne doit pas disparaître
   /// parce qu'on est allé vérifier une information ailleurs.
   final _brouillonContact = BrouillonContact();
 
   String get _role => widget.auth.utilisateur?.role ?? '';
+
+  late final _recherche = RechercheGlobaleRepository(database: widget.database);
+
+  /// Ticket CFG-2 — réglages SMTP de ce poste (mot de passe au coffre du système, jamais en base) et e-mail de test.
+  late final _smtp = ParametresSmtp(database: widget.database);
+  late final _envoiEmail = EnvoiEmailTest(parametres: _smtp);
+
+  /// Ticket CFG-2 — onglet « Appairage » : réglages du poste, session, état du jeton (S-T1 : synchronisation
+  /// automatique suspendue sur 401 / 403) et réappairage (= la « Déconnexion » du menu du compte).
+  AppairagePoste get _appairage => AppairagePoste(
+    parametres: widget.parametres,
+    identifiant: widget.identifiantPoste,
+    auth: widget.auth,
+    sessionSuspendue: () => _automatique?.suspendue ?? false,
+    reappairer: widget.onDeconnecte == null ? null : _deconnecter,
+  );
+
+  /// Ticket CFG-2 — hub Paramètres, ouvert sur [ongletInitial] (« Appairage » depuis « Paramètres du poste »).
+  Widget _parametresGeneraux({String? ongletInitial}) => ParametresGenerauxScreen(
+    // Une clé par point d'entrée : passer de « Paramètres du poste » à « Paramètres » rouvre le bon onglet.
+    key: ValueKey('parametres-${ongletInitial ?? 'hub'}'),
+    depot: widget.parametresGeneraux,
+    smtp: _smtp,
+    envoiEmail: _envoiEmail,
+    appairage: _appairage,
+    reinitialisation: widget.reinitialisation,
+    ongletInitial: ongletInitial,
+  );
 
   @override
   void initState() {
@@ -460,49 +638,63 @@ class _SocleAccueilState extends State<SocleAccueil> {
     _ecran = accessibles.isEmpty
         ? EcranPoste.synchronisation
         : accessibles.first;
+
+    _demarrerSynchronisationAutomatique();
   }
 
-  /// Groupe et libellé de l'écran courant, pour le fil d'Ariane.
-  ///
-  /// ⚠️ LUS DANS L'ARBORESCENCE DE LA BARRE, jamais recopiés : deux libellés
-  /// séparés divergeraient au premier renommage, et le fil d'Ariane
-  /// annoncerait un écran qui ne porte plus ce nom.
-  (String, String) get _situation {
-    // ⚠️ « Mon Profil » s'ouvre depuis le menu du compte, pas depuis la barre
-    // latérale : la maquette n'y met aucun groupe, son fil d'Ariane se réduit à
-    // l'écran. Un groupe vide le dit à `BarreSuperieure`.
-    if (_ecran == EcranPoste.monProfil) return ('', 'Mon Profil');
-    // ⚠️ Le fil d'Ariane de la maquette dit « Notifications », pas le titre de
-    // la page (« Centre de Notifications »).
-    if (_ecran == EcranPoste.notifications) return ('', 'Notifications');
-    if (_ecran == EcranPoste.aideEtAPropos) return ('', 'Aide & À Propos');
-    if (_ecran == EcranPoste.ficheSujet) return ('Élevage', 'Fiche Sujet');
-    if (_ecran == EcranPoste.contactEditeur) {
-      return ('', "Contactez l'Éditeur");
-    }
+  /// Ticket H13 (B2) — synchronisation automatique de la session : retour du réseau, intervalle réglé dans
+  /// Paramètres du poste, réessais après un échec réseau. Arrêtée à la déconnexion (le socle est démonté).
+  /// S-T3 : aussi à l'ouverture de la session et après un geste important. S-T1 : un 401 / 403 la suspend
+  /// jusqu'à la fin de CETTE session — la reconnexion monte un socle neuf, donc une instance neuve.
+  SynchronisationAutomatique? _automatique;
 
-    for (final (titre, entrees) in _BarreLaterale.arborescence) {
-      for (final (_, libelle, ecran) in entrees) {
-        if (ecran == _ecran) return (titre, libelle);
-      }
-    }
+  /// Ticket H13 — la fermeture par le système (Alt+F4) envoie aussi ce qui attend.
+  AppLifecycleListener? _cycleDeVie;
 
-    // ⚠️ Les fiches d'espèce ne figurent pas dans la barre — la maquette non
-    // plus ne les y met pas : elles s'ouvrent depuis « Gestion Élevage ».
-    return ('PRODUCTION ÉLEVAGE & SOINS', _libelleFiche(_ecran));
+  Future<void> _demarrerSynchronisationAutomatique() async {
+    final reseau = widget.changementsReseau;
+    if (reseau == null) return;
+    final intervalle = await widget.parametres.intervalleSynchronisation();
+    if (!mounted) return;
+    _automatique = SynchronisationAutomatique(
+      synchroniser: widget.engine.synchroniser,
+      changementsReseau: reseau,
+      intervalle: intervalle,
+      // Ticket S-T6 — « Demander la synchronisation des postes » du web, lue toutes les 30 s.
+      demandeDuServeur: widget.engine.demandeDuServeur,
+      // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
+      onTermine: () {
+        if (mounted) setState(() => _versionTirage++);
+      },
+      gestes: widget.gestes,
+    )..demarrer(aussitot: widget.synchroniserALOuverture);
+    _cycleDeVie = AppLifecycleListener(
+      onExitRequested: () async {
+        if ((await _restantsAEnvoyer()) > 0) await _automatique?.avantFermeture();
+        return AppExitResponse.exit;
+      },
+    );
   }
 
-  static String _libelleFiche(EcranPoste e) => switch (e) {
-    EcranPoste.ficheElevage => 'Fiches Lapins',
-    EcranPoste.fichePondeuses => 'Fiches Pondeuses',
-    EcranPoste.ficheReproducteurs => 'Fiches Reproducteurs',
-    EcranPoste.fichePorcs => 'Fiches Porcs',
-    EcranPoste.ficheEscargots => 'Fiches Escargots',
-    _ => e.name,
-  };
+  Future<int> _restantsAEnvoyer() async {
+    final c = await widget.database.compteursSynchronisation();
+    return c.aEnvoyer + c.refuses;
+  }
+
+  /// Ticket H13 — synchronisation de fermeture (bouton ✕) : rend ce qui reste à envoyer ensuite.
+  Future<int> _avantFermeture() async {
+    await _automatique?.avantFermeture();
+    if (mounted) setState(() => _versionTirage++);
+    return _restantsAEnvoyer();
+  }
+
+  /// Titre de la barre supérieure (groupe vide : `BarreSuperieure` affiche alors le seul titre).
+  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran));
 
   @override
   void dispose() {
+    _automatique?.arreter();
+    _cycleDeVie?.dispose();
     _brouillonContact.dispose();
     super.dispose();
   }
@@ -518,23 +710,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // comme `menu` / `menu_open` dans la maquette.
           if (_menuOuvert)
             _BarreLaterale(
-              database: widget.database,
-              engine: widget.engine,
               auth: widget.auth,
               actif: _ecran,
               ecrans: PermissionsPoste.ecransDe(_role),
               onNaviguer: (e) => setState(() => _ecran = e),
-              onSynchronise: () => setState(() => _versionTirage++),
-              onIndisponible: (libelle) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '« $libelle » vit sur l\'application web : ce poste '
-                      "n'embarque que la saisie de terrain.",
-                    ),
-                  ),
-                );
-              },
             ),
           Expanded(
             child: Column(
@@ -542,24 +721,35 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 // ⚠️ LE COMPTEUR EST LU EN DIRECT : figer sa valeur au
                 // montage laisserait la pastille annoncer « Sync » alors
                 // qu'une journée vient d'être saisie.
-                FutureBuilder<(int, DonneesNotifications)>(
+                // 🔴→✅ Ticket U14 — et relu toutes les 30 s, comme `wire:poll.30s` de la cloche du web : non lues,
+                // quatre dernières, « il y a … » recalculé (la minuterie s'arrête avec le socle).
+                RafraichissementPeriodique(
+                  intervalle: BarreSuperieure.rafraichissementCloche,
+                  builder: (context) => FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
                   future: _etatDeLaBarre(),
                   builder: (context, instantane) => BarreSuperieure(
                     groupe: groupe,
                     ecran: ecranCourant,
-                    enAttente: instantane.data?.$1 ?? 0,
+                    enAttente: (instantane.data?.$1.aEnvoyer ?? 0) + (instantane.data?.$1.refuses ?? 0),
+                    refuses: instantane.data?.$1.refuses ?? 0,
+                    onSynchroniser: _ouvrirSynchronisation,
+                    avantFermeture: widget.changementsReseau == null ? null : _avantFermeture,
                     nonLues: instantane.data?.$2.nonLues,
                     recentes: [
                       for (final n in (instantane.data?.$2.lignes ?? []).take(
                         4,
                       ))
                         ApercuNotification(
-                          message: n.message,
-                          dateTexte: n.dateTexte,
+                          id: n.id,
+                          // Ticket U14 — le TITRE, comme la cloche du web (`$notif->title`).
+                          titre: n.titre,
+                          // Ticket U13 — « il y a … » comme la cloche du web (`diffForHumans`), à l'heure du Bénin.
+                          dateTexte: n.dateRelative(instantane.data!.$2.maintenant),
                           lue: n.lue,
-                          critique: n.gravite == 'critique',
                         ),
                     ],
+                    // Ticket U14 — `markAsRead($id)` de la cloche du web (réseau exigé, comme au Centre).
+                    onMarquerLue: _marquerLue,
                     onAide:
                         PermissionsPoste.autorise(
                           _role,
@@ -586,21 +776,81 @@ class _SocleAccueilState extends State<SocleAccueil> {
                         : null,
                     onBasculerMenu: () =>
                         setState(() => _menuOuvert = !_menuOuvert),
+                    // Ticket H1 — comme au web, « Paramètres » mène à Paramètres Général : l'écran se garde
+                    // lui-même (`GardeEcran`) si le rôle n'y a pas droit, comme la route web refuse.
+                    onParametres: () => setState(() => _ecran = EcranPoste.parametresGeneraux),
+                    // Ticket H1b — recherche globale sur la base locale, avec les droits du web.
+                    recherche: RechercheGlobaleChamp(
+                      depot: _recherche,
+                      role: _role,
+                      onNaviguer: (e) => setState(() => _ecran = e),
+                    ),
+                    onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
+                  ),
                   ),
                 ),
-                Expanded(child: _contenu()),
+                // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _contenu()),
+                      BoutonAccesRapide(onNaviguer: (e) => setState(() => _ecran = e)),
+                    ],
+                  ),
+                ),
               ],
             ),
+          ),
+          // Ticket H1 — RUBAN DE LA BARRE REPLIÉE (`app.blade.php:149-160`) : à droite, 64 px, fond
+          // `rgba(5,46,22,0.95)`, six raccourcis puis « Réafficher le menu ».
+          if (!_menuOuvert) _RubanReplie(
+            onNaviguer: (e) => setState(() => _ecran = e),
+            onReafficher: () => setState(() => _menuOuvert = true),
           ),
         ],
       ),
     );
   }
 
-  /// Ce que lit la barre supérieure : la file d'attente et les notifications.
-  Future<(int, DonneesNotifications)> _etatDeLaBarre() async => (
-    await widget.database.pendingCount(),
+  /// Ticket H1 — « Déconnexion » du menu du compte. Les saisies en attente RESTENT sur le poste (elles partiront
+  /// à la prochaine session) : la session se ferme, la base locale ne bouge pas.
+  Future<void> _deconnecter() async {
+    await widget.auth.deconnecter();
+    widget.onDeconnecte?.call();
+  }
+
+  /// Ticket U14 — « Marquer comme lue » de la cloche : le serveur d'abord (le dépôt ne touche la base locale qu'après
+  /// sa confirmation) ; un échec (hors ligne, session expirée) est dit en toast d'erreur, avec la phrase du dépôt.
+  Future<void> _marquerLue(String id) async {
+    try {
+      await widget.notifications.marquerLue(id);
+    } on EchecNotification catch (e) {
+      if (mounted) ToastAgri.afficher(context, e.message, type: TypeToast.erreur);
+    }
+    if (mounted) setState(() => _versionTirage++);
+  }
+
+  /// Ce que lit la barre supérieure : la file d'attente (à envoyer, refusés) et les notifications.
+  Future<(({int aEnvoyer, int refuses}), DonneesNotifications)> _etatDeLaBarre() async => (
+    await widget.database.compteursSynchronisation(),
     await widget.notifications.charger(),
+  );
+
+  /// Ticket H2 — bouton « Synchroniser » de la barre supérieure : ouvre la modale, ouverte à TOUS les rôles
+  /// (un caissier doit pouvoir pousser ses ventes, comme sur l'écran Synchronisation).
+  Future<void> _ouvrirSynchronisation() => afficherModale<void>(
+    context: context,
+    constructeur: (_) => ModaleSynchronisation(
+      engine: widget.engine,
+      database: widget.database,
+      onVoirDetail: PermissionsPoste.autorise(_role, EcranPoste.synchronisation)
+          ? () => setState(() => _ecran = EcranPoste.synchronisation)
+          : null,
+      // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
+      onTermine: () {
+        if (mounted) setState(() => _versionTirage++);
+      },
+    ),
   );
 
   /// ⚠️ SECOND NIVEAU : la garde est posée sur l'écran, pas seulement sur
@@ -619,6 +869,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
               widget.auth.utilisateur?.nom ?? 'Manager Olouwachegoun',
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),
           onElevage: () => setState(() => _ecran = EcranPoste.gestionElevage),
+          onOuvrir: (e) => setState(() => _ecran = e),
         ),
         EcranPoste.monProfil => MonProfilScreen(
           depot: MonProfilRepository(database: widget.database),
@@ -644,8 +895,13 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // La cloche relit la base à chaque reconstruction : on la provoque.
           onModifie: () => setState(() {}),
         ),
+        EcranPoste.transfertsBandes => TransfertsBandesScreen(
+          depot: widget.transferts,
+        ),
         EcranPoste.dashboardElevage => DashboardElevageScreen(
           depot: widget.dashboardElevage,
+          onOuvrirSoins: () =>
+              setState(() => _ecran = EcranPoste.soinsEtVaccins),
         ),
         EcranPoste.suiviReproduction => SuiviReproductionScreen(
           depot: widget.reproduction,
@@ -654,6 +910,12 @@ class _SocleAccueilState extends State<SocleAccueil> {
             _avantSujet = EcranPoste.suiviReproduction;
             _ecran = EcranPoste.ficheSujet;
           }),
+          // Ticket H7 — « Saisir le Couvoir du Jour → » : les deux `route()` du Blade.
+          onSaisirCouvoir: (espece) => setState(
+            () => _ecran = espece == 'aviculture'
+                ? EcranPoste.ficheReproducteurs
+                : EcranPoste.ficheEscargots,
+          ),
         ),
         EcranPoste.ficheSujet => FicheSujetScreen(
           // ⚠️ Une clé PAR SUJET : sans elle, passer d'une fiche à une autre
@@ -673,17 +935,30 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.parametresElevage => ParametresElevageScreen(
           depot: widget.parametresElevage,
+          // Ticket H9b — modifier les barèmes = droit `manage-elevage` du web (sinon l'envoi serait refusé).
+          peutModifier: PermissionsPoste.peut(_role, 'manage-elevage'),
         ),
         EcranPoste.clientsEtCreances => ClientsCreancesScreen(
           depot: widget.clients,
           imprimer: EditeursRapports.imprimer,
         ),
-        EcranPoste.gestionStocks => GestionStocksScreen(depot: widget.stocks),
+        // Ticket U10 — « Exporter », « Ajouter Stock » (`manage-stocks`), « Configurer les Seuils d'Alerte » et
+        // l'icône Modifier, comme au web.
+        EcranPoste.gestionStocks => GestionStocksScreen(
+          depot: widget.stocks,
+          imprimer: EditeursRapports.imprimer,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-stocks'),
+          onConfigurerSeuils: () => _ouvrirCatalogue(onglet: "Seuils d'Alerte"),
+          onModifierProduit: (id) => _ouvrirCatalogue(produit: id),
+        ),
         // ⚠️ MEME DEPOT que Gestion Stocks : deux lecteurs paralleles
         // des memes tables finiraient par diverger.
         EcranPoste.catalogueProduits => CatalogueProduitsScreen(
+          key: ValueKey('catalogue-$_versionCatalogue'),
           depot: widget.stocks,
           produits: widget.produits,
+          ongletInitial: _catalogueOnglet,
+          produitAModifier: _catalogueProduit,
         ),
         EcranPoste.ventesEtDevis => VentesDevisScreen(
           depot: widget.ventesDevis,
@@ -694,27 +969,33 @@ class _SocleAccueilState extends State<SocleAccueil> {
           database: widget.database,
           engine: widget.engine,
         ),
-        EcranPoste.parametres => ParametresPosteScreen(
-          parametres: widget.parametres,
-          identifiantActuel: widget.identifiantPoste,
+        // 🔁 Ticket CFG-2 — l'écran isolé « Paramètres du poste » est devenu l'onglet « Appairage » du hub.
+        EcranPoste.parametres => _parametresGeneraux(
+          ongletInitial: ParametresGenerauxScreen.ongletAppairage,
         ),
+        // Ticket U12a — « Exporter PDF », lien « Transferts entre Bandes » et « Commander Stock » du Blade.
         EcranPoste.ficheElevage => FicheLapinsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
         EcranPoste.gestionElevage => GestionElevageScreen(
           onOuvrir: (e) => setState(() => _ecran = e),
-          modules: widget.parametresGeneraux,
+          depot: GestionElevageRepository(database: widget.database),
         ),
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
           imprimer: EditeursRapports.imprimer,
         ),
-        EcranPoste.parametresGeneraux => ParametresGenerauxScreen(
-          depot: widget.parametresGeneraux,
-        ),
+        EcranPoste.parametresGeneraux => _parametresGeneraux(),
         EcranPoste.rapportsEtExports => RapportsExportsScreen(
           depot: widget.rapports,
+          // Ticket U12b — `@can('export-rapports')` du hub web (seeder : admin et comptable).
+          peutExporter: PermissionsPoste.peut(_role, 'export-rapports'),
           imprimer: EditeursRapports.imprimer,
           enregistrer: EditeursRapports.enregistrer,
         ),
@@ -741,22 +1022,40 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.saisieDepenses => SaisieDepensesScreen(
           depot: widget.depenses,
         ),
+        // Ticket U12a — « Exporter PDF », liens du Blade (transferts, retour à Gestion Élevage, commande de stock).
         EcranPoste.ficheEscargots => FicheEscargotsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onRetourGestion: () =>
+              setState(() => _ecran = EcranPoste.gestionElevage),
         ),
         EcranPoste.ficheReproducteurs => FicheReproducteursScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
         ),
         EcranPoste.fichePorcs => FichePorcsScreen(
           depot: widget.fiches,
           soins: widget.soins,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
+        // Ticket U11 — « Exporter PDF » et le lien « Transferts entre Bandes » du Blade.
         EcranPoste.fichePondeuses => FichePondeusesScreen(
           depot: widget.fiches,
           soins: widget.soins,
           production: widget.production,
+          imprimer: EditeursRapports.imprimer,
+          onOuvrirTransferts: () =>
+              setState(() => _ecran = EcranPoste.transfertsBandes),
         ),
       },
     );
@@ -850,50 +1149,30 @@ class EtatDuSocle extends StatelessWidget {
 
 class _BarreLaterale extends StatelessWidget {
   const _BarreLaterale({
-    required this.database,
-    required this.engine,
     required this.auth,
     required this.actif,
     required this.ecrans,
     required this.onNaviguer,
-    required this.onIndisponible,
-    this.onSynchronise,
   });
 
-  /// Appelé à la fin d'une synchronisation : le tirage a pu apporter de
-  /// nouvelles notifications, que la cloche doit montrer.
-  final VoidCallback? onSynchronise;
-
-  final AppDatabase database;
-  final SyncEngine engine;
   final AuthService auth;
   final EcranPoste actif;
   final List<EcranPoste> ecrans;
   final void Function(EcranPoste) onNaviguer;
 
-  /// Appelé quand l'utilisateur touche une entrée dont le poste n'embarque pas
-  /// l'écran — pour le dire, plutôt que de ne rien faire du tout.
-  final void Function(String libelle) onIndisponible;
-
-  /// Arborescence **complète** de la barre latérale de la maquette
-  /// (`assets/js/sidebar.js`) : chaque groupe, chaque entrée, chaque icône,
-  /// dans l'ordre exact.
+  /// Arborescence **complète** de la barre latérale (`layouts/app.blade.php`, et avant lui
+  /// `assets/js/sidebar.js` de la maquette) : chaque groupe, chaque entrée, chaque icône, dans l'ordre exact.
   ///
-  /// ⚠️⚠️ **TOUTES LES ENTRÉES SONT RENDUES, PAS SEULEMENT LES ÉCRANS DU
-  /// POSTE.** J'avais d'abord retenu l'inverse — n'afficher que les écrans
-  /// construits, pour ne pas promettre d'écran inexistant. Le client a tranché
-  /// autrement : la maquette est la référence de mise en page, et sa barre se
-  /// reproduit intégralement. Les entrées sans écran embarqué restent donc
-  /// visibles, **estompées**, et disent au clic qu'elles vivent sur
-  /// l'application web — c'est la seule façon de tenir la mise en page sans
-  /// mentir sur ce que le poste sait faire.
+  /// ⚠️ Ticket H1 — ce qui est AFFICHÉ suit le web : seules les entrées autorisées au rôle, et un groupe sans
+  /// entrée autorisée est masqué (`@hasanyrole`). Les entrées « estompées » (écran non embarqué) n'ont plus lieu
+  /// d'être : tous les écrans de la barre web sont embarqués au poste.
   ///
-  /// ⚠️ Le troisième champ est l'écran atteint, `null` si le poste ne
-  /// l'embarque pas.
+  /// ⚠️ Le troisième champ est l'écran atteint, `null` si le poste ne l'embarque pas (l'entrée n'est alors pas
+  /// affichée).
   static const arborescence = <(String, List<(IconData, String, EcranPoste?)>)>[
     (
       'PILOTAGE',
-      [(Icons.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord)],
+      [(SymbolesAgri.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord)],
     ),
     (
       'PRODUCTION ÉLEVAGE & SOINS',
@@ -901,52 +1180,52 @@ class _BarreLaterale extends StatelessWidget {
         // ⚠️ « Gestion Élevage » mène aux fiches, exactement comme dans la
         // maquette : celle-ci ne liste AUCUNE fiche dans sa barre, elles
         // s'ouvrent depuis cet écran.
-        (Icons.pets, 'Gestion Élevage', EcranPoste.gestionElevage),
-        (Icons.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
-        (Icons.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
-        (Icons.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
-        (Icons.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
+        (SymbolesAgri.pets, 'Gestion Élevage', EcranPoste.gestionElevage),
+        (SymbolesAgri.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
+        (SymbolesAgri.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
+        (SymbolesAgri.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
+        (SymbolesAgri.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
       ],
     ),
     (
       'VENTES FERME',
       [
-        (Icons.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
-        (Icons.payments, 'Clients et Créances', EcranPoste.clientsEtCreances),
+        (SymbolesAgri.point_of_sale, 'Ventes & Devis', EcranPoste.ventesEtDevis),
+        (SymbolesAgri.payments, 'Clients et Créances', EcranPoste.clientsEtCreances),
       ],
     ),
     (
       'ACHATS & CHARGES',
       [
         (
-          Icons.local_shipping,
+          SymbolesAgri.local_shipping,
           'Achats & Commandes',
           EcranPoste.achatsEtCommandes,
         ),
-        (Icons.contact_page, 'Fournisseurs', EcranPoste.fournisseurs),
-        (Icons.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
+        (SymbolesAgri.contact_page, 'Fournisseurs', EcranPoste.fournisseurs),
+        (SymbolesAgri.receipt, 'Saisie Dépenses', EcranPoste.saisieDepenses),
       ],
     ),
     (
       'STOCKS & PRODUITS',
       [
-        (Icons.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
-        (Icons.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
+        (SymbolesAgri.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
+        (SymbolesAgri.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
       ],
     ),
     (
       'FACTURATION',
-      [(Icons.receipt_long, 'Facturation & MeCeF', EcranPoste.facturation)],
+      [(SymbolesAgri.receipt_long, 'Facturation & MeCeF', EcranPoste.facturation)],
     ),
     (
       'RESSOURCES HUMAINES',
-      [(Icons.badge, 'Personnel & Stages', EcranPoste.personnelEtStages)],
+      [(SymbolesAgri.badge, 'Personnel & Stages', EcranPoste.personnelEtStages)],
     ),
     (
       'ADMINISTRATION',
       [
         (
-          Icons.folder_shared,
+          SymbolesAgri.folder_shared,
           'Administration & Document',
           EcranPoste.administrationEtDocument,
         ),
@@ -955,15 +1234,15 @@ class _BarreLaterale extends StatelessWidget {
     (
       'COMPTABILITÉ & ADMIN',
       [
-        (Icons.account_balance, 'Comptabilité', EcranPoste.comptabilite),
-        (Icons.settings, 'Paramètres Général', EcranPoste.parametresGeneraux),
+        (SymbolesAgri.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+        (SymbolesAgri.settings, 'Paramètres Général', EcranPoste.parametresGeneraux),
       ],
     ),
     (
       'EDITIONS',
       [
         (
-          Icons.picture_as_pdf,
+          SymbolesAgri.picture_as_pdf,
           'Rapports & Exports',
           EcranPoste.rapportsEtExports,
         ),
@@ -976,9 +1255,9 @@ class _BarreLaterale extends StatelessWidget {
     (
       'POSTE',
       [
-        (Icons.sync, 'Synchronisation', EcranPoste.synchronisation),
+        (SymbolesAgri.sync, 'Synchronisation', EcranPoste.synchronisation),
         (
-          Icons.settings_applications,
+          SymbolesAgri.settings_applications,
           'Paramètres du poste',
           EcranPoste.parametres,
         ),
@@ -986,73 +1265,58 @@ class _BarreLaterale extends StatelessWidget {
     ),
   ];
 
-  /// En-tête de groupe — même graisse et même casse que la maquette.
+  /// En-tête de groupe : `text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm`.
   Widget _titreGroupe(String titre) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: AgriSpacing.xs,
-        top: AgriSpacing.sm,
-        bottom: 2,
-      ),
+      padding: const EdgeInsets.only(left: AgriSpacing.xs, top: AgriSpacing.sm, bottom: AgriSpacing.xs),
       child: Text(
         titre,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          letterSpacing: 0.8,
-          color: Colors.white38,
+          letterSpacing: 0.5,
+          color: Colors.white.withValues(alpha: 0.40),
         ),
       ),
     );
   }
 
-  Widget _entree(IconData icone, String libelle, EcranPoste? ecran) {
-    final selectionne = ecran != null && ecran == actif;
+  /// Lien de `components/sidebar-link.blade.php` : `flex items-center gap-sm px-sm py-xs rounded-lg`, icône
+  /// `text-[20px]`, libellé `text-[13px]`. Actif : `bg-white/10 font-bold text-accent-yellow` ; sinon
+  /// `text-white/90`.
+  Widget _entree(IconData icone, String libelle, EcranPoste ecran) {
+    final selectionne = ecran == actif;
+    final couleur = selectionne ? AgriColors.accentYellow : Colors.white.withValues(alpha: 0.90);
 
-    // ⚠️ TROIS ÉTATS, PAS DEUX. Une entrée peut être : active, disponible, ou
-    // **présente mais non embarquée**. Ce dernier cas est celui de la plupart
-    // des écrans de la maquette : le poste n'en porte que quelques-uns.
-    final embarque = ecran != null && ecrans.contains(ecran);
-
-    return InkWell(
-      key: Key('nav-${ecran?.name ?? libelle}'),
-      onTap: () {
-        if (embarque) {
-          onNaviguer(ecran);
-          return;
-        }
-        onIndisponible(libelle);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AgriSpacing.md,
-          vertical: 9,
-        ),
-        margin: const EdgeInsets.only(bottom: 2),
-        decoration: BoxDecoration(
-          color: selectionne ? Colors.white.withValues(alpha: 0.14) : null,
-          borderRadius: BorderRadius.circular(AgriRadius.lg),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icone,
-              size: 18,
-              // Estompé quand l'écran n'est pas embarqué.
-              color: embarque ? Colors.white : Colors.white30,
-            ),
-            const SizedBox(width: AgriSpacing.sm),
-            Expanded(
-              child: Text(
-                libelle,
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontWeight: selectionne ? FontWeight.bold : FontWeight.w500,
-                  color: embarque ? Colors.white : Colors.white38,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
+      child: InkWell(
+        key: Key('nav-${ecran.name}'),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+        hoverColor: Colors.white.withValues(alpha: 0.10),
+        onTap: () => onNaviguer(ecran),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: AgriSpacing.xs),
+          decoration: BoxDecoration(
+            color: selectionne ? Colors.white.withValues(alpha: 0.10) : null,
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            children: [
+              Icon(icone, size: 20, color: couleur),
+              const SizedBox(width: AgriSpacing.sm),
+              Expanded(
+                child: Text(
+                  libelle,
+                  style: TextStyle(
+                    fontSize: AgriTypography.lienBarreLaterale,
+                    fontWeight: selectionne ? FontWeight.bold : FontWeight.w500,
+                    color: couleur,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1060,100 +1324,230 @@ class _BarreLaterale extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ticket H1 — valeurs de `layouts/app.blade.php` (le maître) : `w-72` (288 px), dégradé `sidebar-gradient`
+    // (#052e16 → #00210d, `app.css`), en-tête `px-md py-lg border-b border-white/10`, navigation
+    // `flex-1 overflow-y-auto px-md py-md`, pied `p-md border-t border-white/10`.
+    //
+    // 🔴 La navigation ne DÉFILAIT PAS (`Column` + `Spacer`) : avec ses onze groupes, la barre débordait sur un
+    // petit écran et le bouton « Synchroniser » du pied devenait inatteignable. Le bouton est passé dans la barre
+    // supérieure (ticket H2), et la navigation défile.
     return Container(
-      width: 240,
-      color: AgriColors.brandForest,
+      key: const Key('barre-laterale'),
+      width: 288,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AgriColors.brandForest, AgriColors.brandForestDark],
+        ),
+      ),
       child: Column(
         children: [
-          const SizedBox(height: AgriSpacing.lg),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-            child: Row(
-              children: [
-                Icon(Icons.agriculture, color: AgriColors.accentYellow),
-                SizedBox(width: AgriSpacing.sm),
-                Text(
-                  'AgriERP',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.lg),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.10))),
             ),
-          ),
-          const SizedBox(height: AgriSpacing.lg),
-          // ⚠️ REGROUPÉES COMME DANS LA MAQUETTE. Seuls les écrans autorisés
-          // par le rôle sont proposés, et un groupe dont aucun écran ne l'est
-          // ne s'affiche pas du tout — plutôt qu'un titre suivi du vide.
-          // ⚠️ TOUS LES GROUPES ET TOUTES LES ENTRÉES DE LA MAQUETTE, dans son
-          // ordre. Une entrée dont le poste n'embarque pas l'écran reste
-          // visible mais estompée — la mise en page est tenue sans mentir sur
-          // ce que l'application sait faire.
-          for (final (titre, entrees) in arborescence) ...[
-            _titreGroupe(titre),
-            for (final (icone, libelle, ecran) in entrees)
-              _entree(icone, libelle, ecran),
-          ],
-          const Spacer(),
-          // Pied de barre latérale : le bouton « Synchroniser » y est placé
-          // exactement comme dans la maquette, au-dessus du bloc utilisateur.
-          Padding(
-            padding: const EdgeInsets.all(AgriSpacing.md),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SyncButton(
-                  engine: engine,
-                  pendingCount: database.pendingCount,
-                  onTermine: onSynchronise,
-                ),
-                const SizedBox(height: AgriSpacing.sm),
-                // Bloc utilisateur, sous le bouton comme dans la maquette.
                 Row(
                   children: [
-                    const CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.white24,
-                      child: Icon(
-                        Icons.account_circle,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
+                    const Icon(SymbolesAgri.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
+                    RichText(
+                      key: const Key('barre-laterale-marque'),
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: AgriTypography.lg, fontWeight: FontWeight.w800, color: Colors.white),
                         children: [
-                          Text(
-                            auth.utilisateur?.nom ?? 'Utilisateur',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: AgriTypography.xs,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            (auth.utilisateur?.roleLibelle ?? '').toUpperCase(),
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              letterSpacing: 1,
-                              color: Colors.white54,
-                            ),
-                          ),
+                          TextSpan(text: 'Agri'),
+                          TextSpan(text: 'ERP', style: TextStyle(color: AgriColors.accentYellow)),
                         ],
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: AgriSpacing.xs),
+                Text(
+                  'Ferme École Olouwachegoun'.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                    color: Colors.white.withValues(alpha: 0.50),
+                  ),
+                ),
               ],
+            ),
+          ),
+          // ⚠️ SEULS LES ÉCRANS AUTORISÉS SONT PROPOSÉS, ET UN GROUPE SANS ÉCRAN AUTORISÉ N'EST PAS AFFICHÉ —
+          // comme les `@hasanyrole` du web, qui masquent les sections. Toutes les entrées du web sont désormais
+          // embarquées au poste : une entrée « estompée » ne pouvait plus signifier qu'un refus de droit, et
+          // annonçait à tort « vit sur l'application web ». L'écran se garde lui-même (`GardeEcran`).
+          Expanded(
+            child: SingleChildScrollView(
+              key: const Key('barre-laterale-navigation'),
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (titre, entrees) in arborescence)
+                    if (entrees.any((e) => e.$3 != null && ecrans.contains(e.$3))) ...[
+                      _titreGroupe(titre),
+                      for (final (icone, libelle, ecran) in entrees)
+                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, libelle, ecran),
+                      const SizedBox(height: AgriSpacing.sm),
+                    ],
+                ],
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.10))),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AgriSpacing.xs),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
+                    child: const Icon(SymbolesAgri.account_circle, size: 18, color: Colors.white),
+                  ),
+                  const SizedBox(width: AgriSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.utilisateur?.nom ?? '—',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // Le web affiche le NOM TECHNIQUE du rôle (`roles->first()?->name`), en capitales.
+                        Text(
+                          (auth.utilisateur?.role ?? '').toUpperCase(),
+                          key: const Key('barre-laterale-role'),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            letterSpacing: 0.45,
+                            color: Colors.white.withValues(alpha: 0.50),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Ticket H1 — ruban affiché à droite quand la barre latérale est masquée (`app.blade.php:149-160`).
+class _RubanReplie extends StatelessWidget {
+  const _RubanReplie({required this.onNaviguer, required this.onReafficher});
+
+  final void Function(EcranPoste) onNaviguer;
+  final VoidCallback onReafficher;
+
+  /// Les six liens du web, dans l'ordre, avec leur `title` exact.
+  static const liens = <(IconData, String, EcranPoste)>[
+    (SymbolesAgri.dashboard, 'Tableau de Bord', EcranPoste.tableauDeBord),
+    (SymbolesAgri.point_of_sale, 'Caisse POS', EcranPoste.ventesEtDevis),
+    (SymbolesAgri.pets, 'Élevage', EcranPoste.gestionElevage),
+    (SymbolesAgri.inventory_2, 'Stocks', EcranPoste.gestionStocks),
+    (SymbolesAgri.badge, 'Ressources Humaines', EcranPoste.personnelEtStages),
+    (SymbolesAgri.account_balance, 'Comptabilité', EcranPoste.comptabilite),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('ruban-replie'),
+      width: 64,
+      padding: const EdgeInsets.symmetric(vertical: AgriSpacing.md),
+      color: const Color(0xF2052E16),
+      child: Column(
+        children: [
+          for (final (icone, titre, ecran) in liens)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
+              child: IconButton(
+                key: Key('ruban-${ecran.name}'),
+                tooltip: titre,
+                icon: Icon(icone, color: Colors.white.withValues(alpha: 0.80)),
+                hoverColor: Colors.white.withValues(alpha: 0.10),
+                onPressed: () => onNaviguer(ecran),
+              ),
+            ),
+          const Spacer(),
+          IconButton(
+            key: const Key('ruban-reafficher'),
+            tooltip: 'Réafficher le menu',
+            icon: const Icon(SymbolesAgri.menu_open, color: AgriColors.accentYellow),
+            hoverColor: Colors.white.withValues(alpha: 0.10),
+            onPressed: onReafficher,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Titres de la barre supérieure du poste, alignés sur le web.
+class SocleAccueilTitres {
+  SocleAccueilTitres._();
+
+  /// Ticket H1 — TITRE DE LA BARRE SUPÉRIEURE, celui que le web affiche (`$title` de chaque composant Livewire,
+  /// relevé le 19/10/2026), et non plus « GROUPE > écran » reconstitué depuis la barre latérale. Les écrans propres
+  /// au poste (Synchronisation, Paramètres du poste) portent leur nom.
+  static const titresDuWeb = <EcranPoste, String>{
+    EcranPoste.tableauDeBord: 'Tableau de Bord',
+    EcranPoste.gestionElevage: 'Gestion Élevage',
+    EcranPoste.dashboardElevage: 'Élevage > Dashboard Élevage',
+    EcranPoste.suiviReproduction: 'Élevage > Suivi Reproduction',
+    EcranPoste.soinsEtVaccins: 'Élevage > Soins et Vaccins',
+    EcranPoste.parametresElevage: 'Paramètres Élevage',
+    EcranPoste.ficheElevage: 'Élevage > Fiches Lapins',
+    EcranPoste.fichePondeuses: 'Élevage > Fiches Pondeuses',
+    EcranPoste.ficheReproducteurs: 'Élevage > Fiches Volailles Reproducteurs',
+    EcranPoste.fichePorcs: 'Élevage > Fiches Porcs',
+    EcranPoste.ficheEscargots: 'Élevage > Fiches Escargots',
+    EcranPoste.ficheSujet: 'Élevage > Fiche Sujet',
+    EcranPoste.transfertsBandes: 'Élevage > Transferts entre Bandes',
+    EcranPoste.ventesEtDevis: 'Ventes & Devis',
+    EcranPoste.clientsEtCreances: 'Créances Clients',
+    EcranPoste.achatsEtCommandes: 'Achats & Commandes',
+    EcranPoste.fournisseurs: 'Fournisseurs',
+    EcranPoste.saisieDepenses: 'Achats > Saisie des Dépenses',
+    EcranPoste.gestionStocks: 'Gestion des Stocks',
+    EcranPoste.catalogueProduits: 'Stocks & Produits > Catalogue Produits',
+    EcranPoste.facturation: 'Facturation & MeCeF',
+    EcranPoste.personnelEtStages: 'Personnel & Stages',
+    EcranPoste.administrationEtDocument: 'Administration & Documents',
+    EcranPoste.comptabilite: 'Comptabilité',
+    EcranPoste.parametresGeneraux: 'Paramètres',
+    EcranPoste.rapportsEtExports: 'Rapports & Exports',
+    EcranPoste.monProfil: 'Mon Profil',
+    EcranPoste.notifications: 'Centre de Notifications',
+    EcranPoste.aideEtAPropos: 'Aide & À Propos',
+    EcranPoste.contactEditeur: 'Ferme École Olouwachegoun',
+    EcranPoste.synchronisation: 'Synchronisation',
+    EcranPoste.parametres: 'Paramètres du poste',
+  };
+
+  /// Titre affiché pour [ecran] ; le défaut du web (`$title ?? 'Ferme École Olouwachegoun'`) sinon.
+  static String titre(EcranPoste ecran) => titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
 }

@@ -233,7 +233,9 @@
                     </select>
                 </div>
                 <button type="button" wire:click="validateAdjustment" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Valider l'ajustement</button>
-                <p class="text-[10px] text-outline">Si l'écart est négatif, une écriture de charge exceptionnelle (compte 657) sera générée automatiquement dès la Comptabilité (Sprint 10) — pas encore active.</p>
+                {{-- Ticket U11 : l'aide annonçait l'écriture « pas encore active » ; elle l'est depuis le ticket 14.41
+                     (`RecordStockAdjustmentEntryAction`). Même texte au poste (`gestion_stocks_screen.dart`). --}}
+                <p class="text-[10px] text-outline">Si l'écart est négatif, une écriture de charge exceptionnelle (compte 657) est générée automatiquement, valorisée au PMP.</p>
             </div>
         </div>
     @endif

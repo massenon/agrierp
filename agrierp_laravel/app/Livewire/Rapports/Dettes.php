@@ -51,6 +51,8 @@ class Dettes extends Component
             ->whereDate('due_date', '<=', $this->endDate)
             ->when($this->search, fn ($q) => $q->whereHas('supplier', fn ($q2) => $q2->where('name', 'like', '%'.$this->search.'%')))
             ->orderBy('due_date')
+            // Ticket U12b — deux dettes de la même échéance : ordre déterminé (identifiant), repris par le poste.
+            ->orderBy('id')
             ->get();
     }
 

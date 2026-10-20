@@ -154,6 +154,7 @@ class Devis extends Component
 
     public function saveQuote(): void
     {
+        $this->authorize('manage-ventes');
         $this->validate([
             'customerId' => ['required', 'exists:customers,id'],
             'articlesDescription' => ['required', 'string', 'max:2000'],
@@ -192,6 +193,7 @@ class Devis extends Component
 
     public function markAsSent(string $id): void
     {
+        $this->authorize('manage-ventes');
         Quote::findOrFail($id)->update(['status' => 'envoye']);
         AuditLog::record('quote.sent', 'ventes');
         $this->dispatch('toast', message: 'Devis marqué comme envoyé.', type: 'success');
@@ -199,6 +201,7 @@ class Devis extends Component
 
     public function markAsAccepted(string $id): void
     {
+        $this->authorize('manage-ventes');
         Quote::findOrFail($id)->update(['status' => 'accepte']);
         AuditLog::record('quote.accepted', 'ventes');
         $this->dispatch('toast', message: 'Devis marqué comme accepté.', type: 'success');
@@ -206,6 +209,7 @@ class Devis extends Component
 
     public function markAsRefused(string $id): void
     {
+        $this->authorize('manage-ventes');
         Quote::findOrFail($id)->update(['status' => 'refuse']);
         AuditLog::record('quote.refused', 'ventes');
         $this->dispatch('toast', message: 'Devis marqué comme refusé.', type: 'warning');
@@ -218,6 +222,7 @@ class Devis extends Component
 
     public function archiveQuote(string $id): void
     {
+        $this->authorize('manage-ventes');
         Quote::findOrFail($id)->update(['is_active' => false]);
         AuditLog::record('quote.archived', 'ventes');
         $this->dispatch('toast', message: 'Devis archivé avec succès.', type: 'warning');

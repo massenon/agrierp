@@ -98,7 +98,8 @@ class FlagSaleUnderWithdrawalAction
             Notification::create([
                 'target_role' => 'admin',
                 'type' => 'sale_under_withdrawal',
-                'severity' => 'error',
+                // Ticket 15.49 — `error` est hors des gravités autorisées par la colonne : incident sanitaire = critique.
+                'severity' => 'critique',
                 'title' => 'Vente reçue sur une bande sous délai d\'attente',
                 'message' => "Bande {$code} — vente {$vente->id} encaissée hors ligne alors "
                     ."que le délai d'attente vétérinaire courait. La vente est enregistrée "

@@ -49,12 +49,13 @@
         @php $cat = $this->categoriesJour; $provende = $this->provendeCalculation; @endphp
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             @if($cat['depart_requis'] && $cat['ancien'])
-                {{-- D6 : une bande déjà saisie à la main n'est JAMAIS migrée automatiquement ; le départ reste à saisir. --}}
+                {{-- D6 : les effectifs saisis à la main ne sont jamais repris ; le départ est déduit du stade de la bande (17/10/2026). --}}
                 <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest">
                     Cette bande porte déjà des effectifs par catégorie saisis à la main (fiche du {{ \Carbon\Carbon::parse($cat['ancien']['date'])->format('d/m/Y') }} :
                     Reproducteur {{ $cat['ancien']['categories']['repro'] }}, Porcelet {{ $cat['ancien']['categories']['sevre'] }}, Porc Marchand {{ $cat['ancien']['categories']['jeune'] }}).
-                    Ils ne sont pas repris automatiquement comme effectif de départ : saisissez l'effectif de départ ci-dessous (décision de migration à prendre avec le client).
+                    Ils ne sont pas repris comme effectif de départ : l'effectif de départ ci-dessous est déduit du stade de la bande, corrigez-le si besoin avant d'enregistrer.
                 </div>
             @endif
 
@@ -142,10 +143,10 @@
             </div>
 
             @if($cat['depart_requis'])
-                {{-- Effectif de DÉPART (D4) : saisi UNE seule fois, au DÉBUT du jour, puis verrouillé (D5 non tranché : aucun déverrouillage). --}}
+                {{-- Effectif de DÉPART (D4) : DÉDUIT du stade de la bande (AvecDepartAutomatique), corrigeable avant le premier enregistrement, puis verrouillé. --}}
                 <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
-                    <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">edit_note</span>Effectif de départ par catégorie (saisi une seule fois)</p>
-                    <p class="text-[10px] text-outline mb-xs">Effectif au DÉBUT du jour, avant les mouvements du jour. La somme des trois catégories doit égaler l'effectif total au début du jour (effectif total au début du jour : {{ $this->previousEffectif }}). Une fois enregistré, il est verrouillé.</p>
+                    <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">edit_note</span>Effectif de départ par catégorie (déduit du stade de la bande)</p>
+                    <p class="text-[10px] text-outline mb-xs">Effectif au DÉBUT du jour, avant les mouvements du jour, pré-rempli automatiquement depuis le stade de la bande. La somme des trois catégories doit égaler l'effectif total au début du jour ({{ $this->previousEffectif }}). Corrigez-le seulement pour une bande mixte ; il est verrouillé au premier enregistrement.</p>
                     <div class="grid grid-cols-3 gap-sm">
                         <div>
                             <label for="depart-repro" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
@@ -273,30 +274,7 @@
                     </div>
                 </div>
 
-                @if($this->feedAutonomy['available'] ?? false)
-                    @if($this->feedAutonomy['inconnu'] ?? false)
-                        <div class="bg-surface-zebra border border-outline-variant rounded-lg p-sm text-xs text-brand-forest">
-                            Autonomie alimentaire : <strong>—</strong> ({{ $this->feedAutonomy['product']->name }}, {{ $this->feedAutonomy['stock_kg'] }} Kg en stock) — la consommation du jour est inconnue tant que les effectifs par catégorie le sont.
-                        </div>
-                    @elseif($this->feedAutonomy['critique'])
-                        <div class="bg-error-bg border border-error-deep/30 rounded-lg p-md flex items-start justify-between gap-sm shadow-sm flex-wrap">
-                            <div class="flex items-start gap-sm">
-                                <span class="material-symbols-outlined text-error-deep text-[22px] flex-shrink-0 mt-0.5">warning</span>
-                                <div class="text-xs text-error-deep">
-                                    <p class="font-bold text-sm">Alerte critique - Autonomie alimentaire</p>
-                                    <p>Le stock de {{ $this->feedAutonomy['product']->name }} ne couvre plus que {{ $this->feedAutonomy['autonomie_jours'] }} jours de consommation théorique du cheptel actif !</p>
-                                </div>
-                            </div>
-                            <a href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
-                        </div>
-                    @else
-                        <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm text-xs text-brand-forest">
-                            Autonomie alimentaire : <strong>{{ $this->feedAutonomy['autonomie_jours'] }} jours</strong> ({{ $this->feedAutonomy['product']->name }}, {{ $this->feedAutonomy['stock_kg'] }} Kg en stock).
-                        </div>
-                    @endif
-                @else
-                    <x-module-pending label="Le suivi d'autonomie alimentaire" since="qu'un produit de provende porcine existe en catalogue avec un stock suivi" />
-                @endif
+                <x-autonomie-alimentaire :autonomie="$this->feedAutonomy" filiere="porcine" />
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-md border-t border-outline-variant pt-md">
                     <div>
@@ -310,7 +288,8 @@
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté</label>
                         <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
-                            {{ $peseeTotalKg && $this->effectifFinalCalc > 0 ? number_format($peseeTotalKg / $this->effectifFinalCalc, 1) : 0 }} Kg
+                            {{-- Ticket U12a : « — » sans pesée (comme Lapins), jamais « 0 Kg » — un zéro se lit comme un poids mesuré. --}}
+                            {{ $peseeTotalKg && $this->effectifFinalCalc > 0 ? number_format($peseeTotalKg / $this->effectifFinalCalc, 1).' Kg' : '—' }}
                         </div>
                     </div>
                 </div>
@@ -383,7 +362,7 @@
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
                             <td class="px-sm py-xs text-right">{{ $poidsKg ?? '—' }}</td>
-                            <td class="px-sm py-xs text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ?: '—') }}</td>
+                            <td class="px-sm py-xs text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

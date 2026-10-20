@@ -1,5 +1,6 @@
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Statut de normalisation fiscale d'une facture, tel que la maquette le nomme.
 enum StatutMecef {
@@ -83,7 +84,7 @@ class FacturationRepository {
     final ventes = await database.select(database.sales).get();
 
     return DonneesFacturation(
-      mois: mois ?? DateTime.now(),
+      mois: mois ?? HeureBenin.maintenant(),
       factures: (ventes.toList()..sort((a, b) => b.soldAt.compareTo(a.soldAt)))
           .map(
             (v) => LigneFacture(

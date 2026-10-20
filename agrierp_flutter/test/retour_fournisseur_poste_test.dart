@@ -1577,10 +1577,42 @@ void main() {
     testWidgets('⚠️⚠️ « Écarts / Retours » : plus de tiret, recalculé '
         'indépendamment', (tester) async {
       await jeu();
-      // a1 retourné d'après le serveur ; a2 retourné d'après un accusé du poste ; a3 en
-      // attente (non compté).
+      // Ticket U8 — la carte compte des LIGNES de retour, comme le web (`PurchaseReturn::count()`).
+      // a1 retourné d'après le serveur, ses 2 lignes de retour SERVIES ; a2 retourné d'après un accusé du poste,
+      // lignes de retour pas encore servies → ses 3 lignes d'achat (une ligne de retour par ligne d'achat) ;
+      // a3 en attente (non compté).
+      Future<void> lignesAchat(String achat, int n) async {
+        for (var i = 0; i < n; i++) {
+          await db.into(db.purchaseLines).insert(
+            PurchaseLinesCompanion.insert(
+              id: uuid('la-$achat-$i'),
+              purchaseId: uuid(achat),
+              productId: uuid('p1'),
+              qty: 1,
+              unitPrice: 1000,
+            ),
+          );
+        }
+      }
+
+      await lignesAchat('a1', 2);
+      await lignesAchat('a2', 3);
+      await lignesAchat('a3', 4);
       await (db.update(db.purchases)..where((t) => t.id.equals(uuid('a1'))))
           .write(PurchasesCompanion(returnedAt: Value(DateTime(2026, 10, 5))));
+      for (var i = 0; i < 2; i++) {
+        await db.into(db.purchaseReturns).insert(
+          PurchaseReturnsCompanion.insert(
+            id: uuid('rs-a1-$i'),
+            deviceId: 'serveur',
+            syncStatus: const Value(SyncStatus.synced),
+            updatedAt: DateTime(2026, 10, 5),
+            purchaseId: uuid('a1'),
+            reason: 'Avarie',
+            returnDate: DateTime(2026, 10, 5),
+          ),
+        );
+      }
       final r2 = await depot.enregistrerRetour(achatId: uuid('a2'), motif: 'x');
       await (db.update(
         db.purchaseReturns,
@@ -1592,13 +1624,16 @@ void main() {
       final attendu =
           (await db
                   .customSelect(
-                    'SELECT COUNT(*) AS n FROM purchases p WHERE p.returned_at IS NOT NULL '
-                    'OR EXISTS (SELECT 1 FROM purchase_returns r '
-                    "WHERE r.purchase_id = p.id AND r.sync_status = 'synced')",
+                    "SELECT (SELECT COUNT(*) FROM purchase_returns WHERE device_id = 'serveur' "
+                    "AND sync_status = 'synced') + (SELECT COUNT(*) FROM purchase_lines l "
+                    'JOIN purchases p ON p.id = l.purchase_id WHERE (p.returned_at IS NOT NULL '
+                    'OR EXISTS (SELECT 1 FROM purchase_returns r WHERE r.purchase_id = p.id '
+                    "AND r.sync_status = 'synced')) AND NOT EXISTS (SELECT 1 FROM purchase_returns s "
+                    "WHERE s.purchase_id = p.id AND s.device_id = 'serveur')) AS n",
                   )
                   .getSingle())
               .read<int>('n');
-      expect(attendu, 2);
+      expect(attendu, 5);
 
       await afficher(tester);
 

@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/tableau_mensuel.dart';
 import 'package:agrierp/features/elevage/fiche_escargots_screen.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
@@ -8,21 +9,22 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.30 — TABLEAU MENSUEL DE LA FICHE ESCARGOTS.
+/// Ticket F0.30 — TABLEAU MENSUEL DE LA FICHE ESCARGOTS, 🔁 ticket U12a : celui du Blade (TOUS les jours du mois).
 ///
-/// ⚠️ **« NAISSAIN NÉ » AU SINGULIER EN ENTRÉE, « NAISSAINS » AU PLURIEL EN
-/// EFFECTIF** : deux libellés distincts dans `fiche-escargots.html`, recopiés
-/// tels quels. C'est l'un des arbitrages client encore ouverts — les
-/// harmoniser ici serait trancher à la place du client.
+/// ⚠️ **« NAISSAIN NÉ » AU SINGULIER EN ENTRÉE, « NAISSAINS » AU PLURIEL EN EFFECTIF** : deux libellés distincts du
+/// Blade, repris tels quels.
 ///
-/// ⚠️⚠️ **NAISSAINS / ENGRAISS. / BORDÉS AFFICHENT UN TIRET** : la ventilation
-/// par stade n'existe qu'à la saisie ; la table ne porte que l'effectif total.
+/// ⚠️⚠️ **NAISSAINS / ENGRAISS. / BORDÉS** (`effectif_m/f/sevres`, saisis, synchronisés depuis 15.57) : « — » quand ils
+/// sont inconnus.
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
   late SoinsRepository soins;
 
   const bandeId = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
+  final maintenant = HeureBenin.maintenant();
+  final joursDuMois = DateTime(maintenant.year, maintenant.month + 1, 0).day;
+  String deux(int n) => n.toString().padLeft(2, '0');
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -43,21 +45,19 @@ void main() {
             currentQuantity: const Value(1500),
           ),
         );
+    // `ModuleConfig::isEnabled('helico')` : la fiche n'existe qu'une fois le module activé.
+    await db.into(db.modulesConfig).insert(
+      ModulesConfigCompanion.insert(
+        id: 'dddddddd-1111-4111-8111-dddddddddddd',
+        speciesCode: 'helico',
+        isEnabled: const Value(true),
+      ),
+    );
   });
 
   tearDown(() async => db.close());
 
-  Future<void> journee(
-    int jour, {
-    int achat = 0,
-    int ne = 0,
-    int mort = 0,
-    int vente = 0,
-    int don = 0,
-    int effectif = 1500,
-    double? moyenneG,
-  }) async {
-    final maintenant = DateTime.now();
+  Future<void> journee(int jour, {int ne = 0, int mort = 0, int effectif = 1500, double? moyenneG}) async {
     await db
         .into(db.livestockDailyEntries)
         .insert(
@@ -67,11 +67,8 @@ void main() {
             updatedAt: maintenant,
             lotId: bandeId,
             entryDate: DateTime(maintenant.year, maintenant.month, jour),
-            achat: Value(achat),
             ne: Value(ne),
             mort: Value(mort),
-            vente: Value(vente),
-            don: Value(don),
             effectifFinal: Value(effectif),
             weightSampleAvgG: Value(moyenneG),
           ),
@@ -80,93 +77,73 @@ void main() {
 
   final tableau = find.byType(TableauMensuel);
 
+  /// `hidden lg:block` : le tableau n'existe qu'à partir de 1 024 px, comme au web.
   Future<void> afficher(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: FicheEscargotsScreen(depot: depot, soins: soins),
-      ),
-    );
+    tester.view.physicalSize = const Size(1600, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: FicheEscargotsScreen(depot: depot, soins: soins)));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('⚠️ les groupes de la maquette sont présents', (tester) async {
+  Finder ligne(int index) => find.byKey(Key('ligne-mois-$index'));
+
+  testWidgets('⚠️ les groupes du Blade sont présents', (tester) async {
     await journee(5, ne: 40);
     await afficher(tester);
 
     for (final g in ['ENTRÉES', 'SORTIES', 'EFFECTIF FINAL DU JOUR']) {
-      expect(
-        find.descendant(of: tableau, matching: find.text(g)),
-        findsOneWidget,
-        reason: g,
-      );
+      expect(find.descendant(of: tableau, matching: find.text(g)), findsOneWidget, reason: g);
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
+  testWidgets('toutes les colonnes du web sont là, dans le libellé du Blade', (tester) async {
     await journee(5, ne: 40);
     await afficher(tester);
 
     for (final c in [
       'DATE',
-      'ACHAT',
-      'NAISSAIN NÉ',
-      'MORT',
-      'VENTE',
-      'DON',
-      'NAISSAINS',
-      'ENGRAISS.',
-      'BORDÉS',
-      'TOTAL',
+      'Achat',
+      'Naissain Né',
+      'Mort',
+      'Vente',
+      'Don',
+      'Naissains',
+      'Engraiss.',
+      'Bordés',
+      'Total',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (G)',
-      'ENTRETIEN & HYGROMÉTRIE',
+      'TRAITEMENTS & PROPHYLAXIE',
     ]) {
-      expect(
-        find.descendant(of: tableau, matching: find.text(c)),
-        findsOneWidget,
-        reason: c,
-      );
+      expect(find.descendant(of: tableau, matching: find.text(c)), findsOneWidget, reason: c);
     }
   });
 
-  /// ⚠️ 12 g de moyenne × 1 500 sujets = 18 000 g pesés, pas 12.
+  /// ⚠️ 12 g de moyenne × 1 500 sujets = 18 000 g pesés, pas 12 (`poids_general_g`).
   testWidgets('la pesée se reconstitue en grammes', (tester) async {
     await journee(5, effectif: 1500, moyenneG: 12);
     await afficher(tester);
 
-    expect(
-      find.descendant(of: tableau, matching: find.text('18000')),
-      findsOneWidget,
-    );
+    expect(find.descendant(of: ligne(4), matching: find.text('18000')), findsOneWidget);
   });
 
-  testWidgets('⚠️⚠️ les trois stades non synchronisés affichent un tiret', (
-    tester,
-  ) async {
+  testWidgets('⚠️⚠️ les trois effectifs saisis inconnus affichent un tiret', (tester) async {
     await journee(5, effectif: 1500, moyenneG: 12);
     await afficher(tester);
 
-    // Naissains, Engraiss., Bordés + Entretien & Hygrométrie.
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('—')),
-      findsNWidgets(4),
-    );
+    // Naissains, Engraiss., Bordés + Traitements & Prophylaxie.
+    expect(find.descendant(of: ligne(4), matching: find.text('—')), findsNWidgets(4));
   });
 
-  /// 1 500 fin + 30 morts = 1 530 au départ → 30/1530 = 2,0 %.
-  testWidgets(
-    'le taux de mortalité du jour se calcule sur l effectif de début',
-    (tester) async {
-      await journee(5, mort: 30, effectif: 1500);
-      await afficher(tester);
+  /// 🔁 U12a — `mortality_rate` du web : morts ÷ `previousEffectif()` (sans fiche antérieure, l'effectif INITIAL de la
+  /// bande : 1 500) — 30 ÷ 1 500 = 2,0 %.
+  testWidgets('le taux de mortalité du jour se calcule sur l effectif de début du web', (tester) async {
+    await journee(5, mort: 30, effectif: 1470);
+    await afficher(tester);
 
-      expect(
-        find.descendant(of: tableau, matching: find.text('2.0')),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.descendant(of: ligne(4), matching: find.text('2.0')), findsOneWidget);
+  });
 
   testWidgets('toucher une ligne charge cette journée', (tester) async {
     await journee(5);
@@ -174,17 +151,20 @@ void main() {
 
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    await tester.ensureVisible(ligne);
-    await tester.tap(ligne);
+    await tester.ensureVisible(ligne(4));
+    await tester.tap(ligne(4));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Jour 5 ('), findsWidgets);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('date-choisie'))).data,
+      '05/${deux(maintenant.month)}/${maintenant.year}',
+    );
   });
 
-  testWidgets('sans journée saisie, le tableau le dit', (tester) async {
+  testWidgets('🔁 U12a — sans journée saisie, tous les jours du mois sont listés', (tester) async {
     await afficher(tester);
 
-    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsOneWidget);
+    expect(ligne(joursDuMois - 1), findsOneWidget);
+    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsNothing);
   });
 }

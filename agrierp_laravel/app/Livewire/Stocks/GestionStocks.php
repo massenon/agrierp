@@ -110,6 +110,9 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class GestionStocks extends Component
 {
+    /** Ticket U8 — les mouvements qui sont des écarts d'inventaire : cet écran (`adjustment`) et le poste (`inventaire`). */
+    public const TYPES_ECART_INVENTAIRE = ['adjustment', 'inventaire'];
+
     #[Url]
     public string $tab = 'tableau';
 
@@ -208,7 +211,12 @@ class GestionStocks extends Component
         $valorisation = $rows->sum(fn ($r) => $r['valeur'] ?? 0);
         $alertes = $rows->filter(fn ($r) => $r['urgence'])->count();
 
-        $ecartsMois = StockMovement::where('reference_type', 'adjustment')
+        // 🔴→✅ TICKET U8 — L'INVENTAIRE SAISI AU POSTE EST UN ÉCART D'INVENTAIRE. Le poste envoie ses ajustements
+        // (`stock_adjustments`) avec `reference_type = 'inventaire'`, rejoués par `AdjustStockAction` ET passés en
+        // perte comme ceux de cet écran (`RecordStockAdjustmentEntryAction`) — mais cette carte ne lisait que
+        // `adjustment` : un manquant constaté hors ligne n'apparaissait jamais dans les « Écarts d'Inventaire » de
+        // la ferme, alors que le poste, lui, le compte.
+        $ecartsMois = StockMovement::whereIn('reference_type', self::TYPES_ECART_INVENTAIRE)
             ->whereMonth('movement_date', now()->month)->whereYear('movement_date', now()->year)
             ->get();
 

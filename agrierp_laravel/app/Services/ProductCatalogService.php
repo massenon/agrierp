@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Actions\AdjustStockAction;
 use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ticket 15.15 — CRÉATION ET MODIFICATION D'UN PRODUIT : UNE SEULE FABRIQUE.
@@ -15,7 +17,7 @@ use App\Models\ProductCategory;
  * (Document 03 §3.6), SKU engendré par catégorie, trace d'audit. Deux validations
  * qui divergent laisseraient un produit passer d'un côté et pas de l'autre.
  *
- * ⚠️ LA QUANTITÉ EN STOCK N'EST ÉCRITE QU'À LA CRÉATION. La page web laisse aussi
+ * ⚠️ LA QUANTITÉ EN STOCK N'EST ÉCRITE QU'À LA CRÉATION (ticket S-T12 : par un mouvement « Stock initial »). La page web laisse aussi
  * modifier `stock_qty` en édition — ce qui change un solde SANS journaliser de
  * mouvement ni passer par l'action d'ajustement. L'API ne le permet pas : un
  * poste corrige un stock par un AJUSTEMENT, que le serveur rejoue en recalculant
@@ -103,18 +105,33 @@ class ProductCatalogService
         $payload['sku'] = Product::generateSku($categorie);
         $payload['is_active'] = true;
 
-        $produit = new Product();
-        // ⚠️ `id` n'est pas remplissable : `create(['id' => …])` l'ignorerait EN
-        // SILENCE et le serveur forgerait son propre UUID (piège des achats, 14.78).
-        if ($id !== null) {
-            $produit->id = $id;
-        }
-        $produit->fill($payload);
-        $produit->save();
+        // 🔴→✅ TICKET S-T12 (trouvé par l'essai à plusieurs postes) — LE STOCK INITIAL PASSE PAR LE GRAND LIVRE. Il était
+        // écrit dans `stock_qty` sans mouvement : le produit naissait avec un stock que `stock_movements` ignorait, et
+        // tout ce qui reconstruit le stock depuis le grand livre (rotation, « Stock Final » des fiches, l'invariant
+        // stock = grand livre de l'essai) se trompait de ce montant, au web comme au poste. Le produit est créé à 0,
+        // puis le stock initial entre par `AdjustStockAction` (point unique, 6.1), en « Ajout Manuel » daté de la
+        // création — comme l'onglet « Ajouter Stock », sans écriture comptable (ce n'est pas un écart d'inventaire).
+        $initial = (float) ($payload['stock_qty'] ?? 0);
+        $payload['stock_qty'] = 0;
 
-        AuditLog::record('product.created', 'stocks');
+        return DB::transaction(function () use ($payload, $id, $initial) {
+            $produit = new Product();
+            // ⚠️ `id` n'est pas remplissable : `create(['id' => …])` l'ignorerait EN
+            // SILENCE et le serveur forgerait son propre UUID (piège des achats, 14.78).
+            if ($id !== null) {
+                $produit->id = $id;
+            }
+            $produit->fill($payload);
+            $produit->save();
 
-        return $produit;
+            if ($initial > 0) {
+                app(AdjustStockAction::class)->execute($produit, $initial, 'manual_addition', null, null, 'Stock initial');
+            }
+
+            AuditLog::record('product.created', 'stocks');
+
+            return $produit->fresh();
+        });
     }
 
     /** @param array<string, mixed> $v */

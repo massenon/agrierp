@@ -3,7 +3,8 @@
         :tabs="[
             ['key' => 'synthese', 'label' => 'Synthèse Globale', 'icon' => 'dashboard'],
             ['key' => 'gmq', 'label' => 'GMQ & Croissance', 'icon' => 'monitoring'],
-            ['key' => 'bilan', 'label' => 'Bilan Technico-Économique', 'icon' => 'account_balance_wallet'],
+            {{-- Libellé « Rentabilité » : décision client du 17/10/2026 (le prototype dit « Bilan Technico-Économique »). --}}
+            ['key' => 'bilan', 'label' => 'Rentabilité', 'icon' => 'account_balance_wallet'],
             ['key' => 'sanitaire', 'label' => 'Analyse Sanitaire', 'icon' => 'coronavirus'],
             ['key' => 'prevision', 'label' => 'Prévision de Croissance', 'icon' => 'query_stats'],
         ]"
@@ -31,6 +32,10 @@
                                 <div class="flex justify-between"><span class="text-outline">Effectif vivant</span><span class="font-bold">{{ $row['effectif'] }}</span></div>
                                 <div class="flex justify-between"><span class="text-outline">Taux mortalité (mois)</span><span class="font-bold {{ $row['taux_mortalite'] > 5 ? 'text-error-deep' : '' }}">{{ number_format($row['taux_mortalite'], 1, ',', ' ') }} %</span></div>
                                 <div class="flex justify-between"><span class="text-outline">Autonomie aliment</span><span class="font-bold text-outline">—</span></div>
+                                {{-- Ticket H11 — ligne propre à la filière (ajout du poste, décision client du 19/10/2026). --}}
+                                @if($row['ligne_poste'])
+                                    @include('livewire.elevage.ajouts-poste.dashboard-ligne-filiere', ['ligne' => $row['ligne_poste']])
+                                @endif
                             </div>
                         </div>
                     @endforeach
@@ -55,19 +60,31 @@
                     </div>
                     <div class="bg-white border border-outline-variant rounded-lg p-md">
                         <h3 class="text-sm font-bold text-brand-forest mb-md">Rappels VMS à venir</h3>
+                        {{-- Ticket H11 — liste calculée des rappels des 7 prochains jours (ajout du poste), au-dessus du texte et du lien. --}}
+                        @include('livewire.elevage.ajouts-poste.dashboard-rappels-vms', ['rappels' => $this->rappelsVms])
                         <p class="text-xs text-outline text-center py-md">Le calendrier complet (réel) est disponible dans Soins et Vaccins.</p>
                         <a href="{{ route('elevage.soins-vaccins') }}" class="block text-center mt-md text-xs font-bold text-brand-emerald hover:underline">Voir le calendrier complet →</a>
                     </div>
                 </div>
+
+                {{-- Ticket H11 — courbe hebdomadaire du GMQ cumulé par espèce (ajout du poste). --}}
+                @include('livewire.elevage.ajouts-poste.dashboard-courbe-especes', ['series' => $this->gmqParEspeceParSemaine])
             </div>
         @endif
 
         @if($tab === 'gmq')
             <div class="mt-md space-y-md">
-                <div>
-                    <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">monitoring</span>GMQ &amp; Croissance</h2>
-                    <p class="text-xs text-outline mt-xs">GMQ (g/j) = (Poids Final − Poids Initial) ÷ Nombre de Jours entre les deux pesées, calculé par bande à partir des pesées déjà saisies dans les fiches journalières.</p>
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-sm">
+                    <div>
+                        <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">monitoring</span>GMQ &amp; Croissance</h2>
+                        <p class="text-xs text-outline mt-xs">GMQ (g/j) = (Poids Final − Poids Initial) ÷ Nombre de Jours entre les deux pesées, calculé par bande à partir des pesées déjà saisies dans les fiches journalières.</p>
+                    </div>
+                    {{-- Ticket H11 — filtre d'espèce du poste. --}}
+                    @include('livewire.elevage.ajouts-poste.dashboard-filtre-espece')
                 </div>
+
+                {{-- Ticket H11 — cartes et courbe du poste, sur le MÊME GMQ cumulé que le tableau. --}}
+                @include('livewire.elevage.ajouts-poste.dashboard-gmq', ['cartes' => $this->gmqCartes, 'suivie' => $this->bandeSuivie, 'evolution' => $this->evolutionGmq])
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full rtable text-xs">
@@ -82,7 +99,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($this->gmqTable as $i => $row)
+                                @forelse($this->gmqTableFiltree as $i => $row)
                                     <tr class="rrow border-b border-outline-variant {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                                         <td data-label="Bande" class="px-md py-sm font-bold text-brand-forest">{{ $row['lot']->code }}</td>
                                         <td data-label="Filière" class="px-md py-sm">{{ $row['lot']->species?->label }}</td>
@@ -180,6 +197,9 @@
                         </table>
                     </div>
                 </div>
+
+                {{-- Ticket H11 — ajouts du poste : sélecteur de bande, horizons, trois cartes et projection par horizon. --}}
+                @include('livewire.elevage.ajouts-poste.dashboard-prevision', ['choisie' => $this->previsionChoisie, 'projetables' => $this->previsionsProjetables, 'horizon' => $horizon])
             </div>
         @endif
     </x-tab-page>

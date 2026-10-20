@@ -64,7 +64,7 @@
                         <tr wire:click="view('{{ $lot->id }}')" class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 cursor-pointer {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                             <td data-label="Code Bande" class="px-md py-sm text-xs font-bold text-brand-emerald">{{ $lot->code }}</td>
                             <td data-label="Espèce" class="px-md py-sm text-xs">{{ $lot->species?->label }}</td>
-                            <td data-label="Stade" class="px-md py-sm"><span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">{{ ucfirst($lot->stage) }}</span></td>
+                            <td data-label="Stade" class="px-md py-sm"><span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">{{ $lot->libelleStade() }}</span></td>
                             <td data-label="Date Création" class="px-md py-sm text-xs">{{ $lot->created_date->format('d/m/Y') }}</td>
                             <td data-label="Effectif Initial" class="px-md py-sm text-xs text-right">{{ $lot->initial_quantity }}</td>
                             <td data-label="Effectif Actuel" class="px-md py-sm text-xs text-right font-bold">{{ $lot->current_quantity }}</td>
@@ -119,7 +119,9 @@
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Stade Initial</label>
                 <select wire:model="stage" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
-                    <option>Reproduction</option><option>Croissance</option><option>Ponte</option><option>Engraissement</option>
+                    @foreach($this->stades as $valeurStade => $libelleStade)
+                        <option value="{{ $valeurStade }}">{{ $libelleStade }}</option>
+                    @endforeach
                 </select>
             </div>
             <div>
@@ -146,6 +148,17 @@
                 @error('product_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 <p class="text-[10px] text-outline mt-xs">Les naissances entreront en stock sur ce produit ; mortalité et dons l'en retireront. Sélectionnez d'abord la filière.</p>
             </div>
+            <div>
+                <label for="bande-origine" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande d'Origine</label>
+                <select id="bande-origine" wire:model="lot_origine_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('lot_origine_id') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <option value="">-- Aucune (achat, animaux extérieurs) --</option>
+                    @foreach($this->bandesOriginePossibles as $origine)
+                        <option value="{{ $origine->id }}">{{ $origine->code }} ({{ number_format($origine->current_quantity, 0, ',', ' ') }})</option>
+                    @endforeach
+                </select>
+                @error('lot_origine_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                <p class="text-[10px] text-outline mt-xs">Portée ou sevrés déjà comptés dans une autre bande : ils en sortent le jour de création, pour n'être comptés qu'une fois.</p>
+            </div>
             <p class="text-[10px] text-outline bg-surface-zebra rounded-lg p-sm">Le suivi individuel par sujet (N° Lapine, etc.) se paramètre depuis Enregistrer Sujets, une fois la bande créée.</p>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
@@ -168,7 +181,9 @@
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Stade *</label>
                 <select wire:model="stage" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
-                    <option>Reproduction</option><option>Croissance</option><option>Ponte</option><option>Engraissement</option>
+                    @foreach($this->stades as $valeurStade => $libelleStade)
+                        <option value="{{ $valeurStade }}">{{ $libelleStade }}</option>
+                    @endforeach
                 </select>
             </div>
             <div>
@@ -200,19 +215,46 @@
             <div class="p-lg space-y-md">
                 <div class="grid grid-cols-2 gap-sm text-xs">
                     <div><span class="text-outline block">Espèce</span><span class="font-bold">{{ $this->viewingLot->species?->label }}</span></div>
-                    <div><span class="text-outline block">Stade</span><span class="font-bold">{{ ucfirst($this->viewingLot->stage) }}</span></div>
+                    <div><span class="text-outline block">Stade</span><span class="font-bold">{{ $this->viewingLot->libelleStade() }}</span></div>
                     <div><span class="text-outline block">Date Création</span><span class="font-bold">{{ $this->viewingLot->created_date->format('d/m/Y') }}</span></div>
                     <div><span class="text-outline block">Statut</span><span class="font-bold">{{ $this->viewingLot->status === 'actif' ? 'Actif' : 'Clôturé' }}</span></div>
                     <div><span class="text-outline block">Effectif Initial</span><span class="font-bold">{{ $this->viewingLot->initial_quantity }}</span></div>
                     <div><span class="text-outline block">Effectif Actuel</span><span class="font-bold">{{ $this->viewingLot->current_quantity }}</span></div>
                 </div>
-                <div class="border-t border-outline-variant pt-md">
+                @php $autonomie = $this->autonomieBande; $sanitaire = $this->suiviSanitaireBande; @endphp
+                <div class="border-t border-outline-variant pt-md space-y-xs">
                     <p class="text-xs font-bold text-brand-forest uppercase mb-xs">Autonomie Alimentaire</p>
-                    <x-module-pending label="Ce calcul" since="Sprint 6 (Stocks) — suivi de stock d'aliment réel" />
+                    <x-autonomie-alimentaire :autonomie="$autonomie['filiere'] ?? null" :filiere="'de la filière '.($this->viewingLot->species?->label ?? '')" />
+                    <p class="text-[11px] text-outline">
+                        Provende servie à cette bande :
+                        <strong class="text-brand-forest">{{ ($autonomie['provende_bande_kg'] ?? null) === null ? '—' : number_format($autonomie['provende_bande_kg'], 2, ',', ' ').' Kg/j' }}</strong>
+                        @if($autonomie['date_fiche'] ?? null)
+                            (fiche du {{ $autonomie['date_fiche']->format('d/m/Y') }})
+                        @endif
+                    </p>
                 </div>
-                <div class="border-t border-outline-variant pt-md">
+                <div class="border-t border-outline-variant pt-md space-y-xs text-xs">
                     <p class="text-xs font-bold text-brand-forest uppercase mb-xs">Suivi Sanitaire</p>
-                    <x-module-pending label="Les alertes sanitaires" since="Sprint 3, ticket 3.12 (Soins et Vaccins)" />
+                    @if($sanitaire['remanence'] ?? null)
+                        <div class="bg-error-bg border border-error-deep/30 rounded-lg p-sm text-error-deep" role="alert">
+                            <p class="font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">block</span>Délai d'attente en cours</p>
+                            <p>{{ $sanitaire['remanence']->product_used }} — vente interdite jusqu'au {{ $sanitaire['remanence']->end_date->format('d/m/Y') }}.</p>
+                        </div>
+                    @else
+                        <p class="text-brand-emerald font-semibold">Aucun délai d'attente en cours : vente autorisée.</p>
+                    @endif
+                    <div class="grid grid-cols-2 gap-sm">
+                        <div><span class="text-outline block">En infirmerie</span><span class="font-bold">{{ $sanitaire['infirmerie'] ?? 0 }} sujet(s)</span></div>
+                        <div><span class="text-outline block">Mortalité 7 jours</span><span class="font-bold">{{ $sanitaire['morts_7j'] ?? 0 }} mort(s){{ ($sanitaire['mortalite_7j'] ?? null) === null ? '' : ' — '.number_format($sanitaire['mortalite_7j'], 1, ',', ' ').' %' }}</span></div>
+                    </div>
+                    <div>
+                        <span class="text-outline block mb-xs">Derniers soins</span>
+                        @forelse($sanitaire['derniers_soins'] ?? [] as $soin)
+                            <p>{{ $soin->record_date->format('d/m/Y') }} — {{ $soin->action_type }}{{ $soin->product_used ? ' ('.$soin->product_used.')' : '' }}</p>
+                        @empty
+                            <p class="text-outline">—</p>
+                        @endforelse
+                    </div>
                 </div>
             </div>
         </div>

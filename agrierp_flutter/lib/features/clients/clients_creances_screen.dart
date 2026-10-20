@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart' show Customer;
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'avances_modales.dart';
 import 'clients_creances_repository.dart';
 import 'fiche_client_modales.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/creances-clients.html` → Clients et Créances.
 ///
@@ -30,7 +32,7 @@ class ClientsCreancesScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.imprimer,
-    this.maintenant = DateTime.now,
+    this.maintenant = HeureBenin.maintenant,
   });
 
   final ClientsCreancesRepository depot;
@@ -50,10 +52,10 @@ class ClientsCreancesScreen extends StatefulWidget {
 class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   /// Les quatre onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Liste des Clients', Icons.groups),
-    ('Suivi des Dettes', Icons.request_quote),
-    ('Relances Clients', Icons.campaign),
-    ('Historique Avances', Icons.savings),
+    ('Liste des Clients', SymbolesAgri.groups),
+    ('Suivi des Dettes', SymbolesAgri.request_quote),
+    ('Relances Clients', SymbolesAgri.campaign),
+    ('Historique Avances', SymbolesAgri.savings),
   ];
 
   String _onglet = onglets.first.$1;
@@ -232,7 +234,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       children: [
         _entete(
           'Liste des Clients',
-          Icons.groups,
+          SymbolesAgri.groups,
           'Répertoire des clients de la ferme et de leur situation commerciale.',
           large,
         ),
@@ -242,7 +244,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           child: ElevatedButton.icon(
             key: const Key('nouveau-client'),
             onPressed: () => _ouvrirFiche(null),
-            icon: const Icon(Icons.add_circle, size: 18),
+            icon: const Icon(SymbolesAgri.add_circle, size: 18),
             label: const Text(
               'Nouveau Client',
               style: TextStyle(
@@ -263,7 +265,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             libelle: 'Clients actifs',
             valeur: '${d.clientsActifs}',
             couleurLisere: AgriColors.brandEmerald,
-            icone: Icons.groups,
+            icone: SymbolesAgri.groups,
           ),
           // ⚠️⚠️ TIRET, JAMAIS ZÉRO : `customers` descend sans sa date de
           // création. « 0 nouveau ce mois-ci » affirmerait qu'aucun client
@@ -273,7 +275,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: '—',
             legende: 'Date de création non synchronisée',
             couleurLisere: AgriColors.infoBlue,
-            icone: Icons.person_add,
+            icone: SymbolesAgri.person_add,
             couleurIcone: AgriColors.infoBlue,
           ),
           CarteKpi(
@@ -281,7 +283,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: _montant(d.encoursGlobal),
             unite: 'FCFA',
             couleurLisere: AgriColors.errorRed,
-            icone: Icons.request_quote,
+            icone: SymbolesAgri.request_quote,
             couleurIcone: AgriColors.errorRed,
           ),
         ]),
@@ -529,7 +531,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         key: Key('modifier-client-${c.id}'),
         tooltip: 'Modifier',
         onPressed: () => _ouvrirFiche(c),
-        icon: const Icon(Icons.edit, size: 16),
+        icon: const Icon(SymbolesAgri.edit, size: 16),
         padding: const EdgeInsets.all(6),
         constraints: const BoxConstraints(),
         color: AgriColors.infoBlue,
@@ -538,7 +540,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         key: Key('archiver-client-${c.id}'),
         tooltip: 'Archiver',
         onPressed: () => _archiver([c]),
-        icon: const Icon(Icons.archive, size: 16),
+        icon: const Icon(SymbolesAgri.archive, size: 16),
         padding: const EdgeInsets.all(6),
         constraints: const BoxConstraints(),
         color: AgriColors.outline,
@@ -549,7 +551,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   // ── Onglet 2 : Suivi des Dettes ───────────────────────────────────────────
 
   Widget _ongletDettes(DonneesClients d, bool large) {
-    final jour = DateTime.now();
+    final jour = HeureBenin.maintenant();
     final terme = _recherche.trim().toLowerCase();
 
     final lignes = d.creances.where((l) {
@@ -562,7 +564,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       children: [
         _entete(
           'Suivi des Dettes Clients',
-          Icons.request_quote,
+          SymbolesAgri.request_quote,
           'Encours, échéances et recouvrement.',
           large,
         ),
@@ -573,7 +575,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: _montant(d.encoursGlobal),
             unite: 'FCFA',
             couleurLisere: AgriColors.errorRed,
-            icone: Icons.account_balance_wallet,
+            icone: SymbolesAgri.account_balance_wallet,
             couleurIcone: AgriColors.errorRed,
           ),
           CarteKpi(
@@ -583,7 +585,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             ),
             unite: 'FCFA',
             couleurLisere: AgriColors.accentYellow,
-            icone: Icons.schedule,
+            icone: SymbolesAgri.schedule,
             couleurIcone: AgriColors.brandForest,
           ),
           // ⚠️⚠️ LE TAUX DE RECOUVREMENT SUPPOSE CE QUI A ÉTÉ SOLDÉ. Le serveur
@@ -596,7 +598,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: '—',
             legende: 'Créances soldées non synchronisées',
             couleurLisere: AgriColors.infoBlue,
-            icone: Icons.trending_up,
+            icone: SymbolesAgri.trending_up,
             couleurIcone: AgriColors.infoBlue,
           ),
           CarteKpi(
@@ -604,7 +606,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: _montant(d.avancesEnCours),
             unite: 'FCFA',
             couleurLisere: AgriColors.brandEmerald,
-            icone: Icons.savings,
+            icone: SymbolesAgri.savings,
           ),
         ]),
         const SizedBox(height: AgriSpacing.md),
@@ -704,7 +706,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   /// depuis le web le lendemain. Le motif est affiché à l'écran, pas seulement
   /// ici.
   Widget _ongletRelances(DonneesClients d, bool large) {
-    final jour = DateTime.now();
+    final jour = HeureBenin.maintenant();
     final file = d.fileDeRelance(jour);
 
     return Column(
@@ -712,7 +714,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       children: [
         _entete(
           'Relances & Recouvrement',
-          Icons.campaign,
+          SymbolesAgri.campaign,
           'Moteur de relance multi-canal intelligent des créances clients.',
           large,
         ),
@@ -733,7 +735,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             unite: 'FCFA',
             legende: 'Retards de plus de 30 jours',
             couleurLisere: AgriColors.errorRed,
-            icone: Icons.event_busy,
+            icone: SymbolesAgri.event_busy,
             couleurIcone: AgriColors.errorRed,
           ),
           CarteKpi(
@@ -742,7 +744,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             unite: 'env.',
             legende: 'WhatsApp, SMS & Mail',
             couleurLisere: AgriColors.infoBlue,
-            icone: Icons.campaign,
+            icone: SymbolesAgri.campaign,
             couleurIcone: AgriColors.infoBlue,
           ),
           // ⚠️⚠️ LE TAUX DE RÉPONSE SE MESURE SUR CE QUI A ÉTÉ PAYÉ. Le web le
@@ -756,7 +758,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: '—',
             legende: 'Créances soldées non synchronisées',
             couleurLisere: AgriColors.brandEmerald,
-            icone: Icons.check_circle,
+            icone: SymbolesAgri.check_circle,
           ),
           // ⚠️⚠️ MÊME CAUSE : le montant recouvré somme les règlements des
           // créances relancées. Celles qui ont été soldées ont quitté le
@@ -767,7 +769,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             valeur: '—',
             legende: 'Règlements soldés non synchronisés',
             couleurLisere: AgriColors.brandForest,
-            icone: Icons.trending_up,
+            icone: SymbolesAgri.trending_up,
             couleurIcone: AgriColors.brandForest,
           ),
         ]),
@@ -1009,7 +1011,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     children: [
       _entete(
         'Historique des Avances',
-        Icons.savings,
+        SymbolesAgri.savings,
         'Acomptes versés par les clients.',
         large,
       ),
@@ -1023,7 +1025,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             OutlinedButton.icon(
               key: const Key('exporter-avances'),
               onPressed: () => _exporterAvances(d),
-              icon: const Icon(Icons.picture_as_pdf, size: 18),
+              icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
               label: const Text(
                 'Exporter',
                 style: TextStyle(
@@ -1040,7 +1042,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             ElevatedButton.icon(
               key: const Key('nouvelle-avance'),
               onPressed: () => _nouvelAcompte(d),
-              icon: const Icon(Icons.add_circle, size: 18),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
               label: const Text(
                 'Nouvelle Avance',
                 style: TextStyle(
@@ -1064,13 +1066,13 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           valeur: _montant(d.avancesEnCours),
           unite: 'FCFA',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.savings,
+          icone: SymbolesAgri.savings,
         ),
         CarteKpi(
           libelle: 'Clients concernés',
           valeur: '${d.clientsAvecAvance}',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.groups,
+          icone: SymbolesAgri.groups,
           couleurIcone: AgriColors.infoBlue,
         ),
         // ⚠️ Le serveur ne sert que les avances ACTIVES : une avance
@@ -1081,7 +1083,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           valeur: '—',
           legende: 'Avances closes non synchronisées',
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.done_all,
+          icone: SymbolesAgri.done_all,
           couleurIcone: AgriColors.brandForest,
         ),
       ]),
@@ -1225,14 +1227,14 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     children: [
       const Opacity(
         opacity: 0.4,
-        child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+        child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
       ),
       if (!l.soldee && !l.refusee)
         IconButton(
           key: Key('imputer-avance-${l.avance.id}'),
           tooltip: 'Imputer',
           onPressed: () => _imputer(d, l),
-          icon: const Icon(Icons.sync, size: 16),
+          icon: const Icon(SymbolesAgri.sync, size: 16),
           padding: const EdgeInsets.all(6),
           constraints: const BoxConstraints(),
           color: AgriColors.brandForest,
@@ -1382,7 +1384,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       key: const Key('clients-recherche'),
       decoration: InputDecoration(
         isDense: true,
-        prefixIcon: const Icon(Icons.search, size: 18),
+        prefixIcon: const Icon(SymbolesAgri.search, size: 18),
         hintText: invite,
         hintStyle: const TextStyle(fontSize: AgriTypography.xs),
         border: const OutlineInputBorder(),
@@ -1497,7 +1499,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -1514,7 +1516,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

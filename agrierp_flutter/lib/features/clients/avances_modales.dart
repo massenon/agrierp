@@ -4,6 +4,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'clients_creances_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// Ce que « Nouvel Acompte » rend à l'écran une fois l'avance ÉCRITE en local : de quoi
 /// émettre le reçu (jamais avant — un reçu pour une saisie perdue serait un faux).
@@ -516,7 +517,7 @@ class _ModaleImputationState extends State<_ModaleImputation> {
                       _creanceId = '';
                       _refus = null;
                     }),
-                    icon: const Icon(Icons.link, size: 14),
+                    icon: const Icon(SymbolesAgri.link, size: 14),
                     label: const Text(
                       'Affecter',
                       style: TextStyle(
@@ -536,7 +537,7 @@ class _ModaleImputationState extends State<_ModaleImputation> {
           const SizedBox(height: AgriSpacing.sm),
           const Row(
             children: [
-              Icon(Icons.payments, size: 18, color: AgriColors.brandForest),
+              Icon(SymbolesAgri.payments, size: 18, color: AgriColors.brandForest),
               SizedBox(width: AgriSpacing.xs),
               Text(
                 "IMPUTER L'ACOMPTE",

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/bilan-technico-economique.html` → onglet « Bilan
 /// Technico-Économique » du Dashboard Élevage.
@@ -121,14 +122,14 @@ class _BilanTechnicoEconomiqueVueState
         const Row(
           children: [
             Icon(
-              Icons.account_balance_wallet,
+              SymbolesAgri.account_balance_wallet,
               size: 24,
               color: AgriColors.brandEmerald,
             ),
             SizedBox(width: AgriSpacing.xs),
             Flexible(
               child: Text(
-                'Bilan Technico-Économique de Lot',
+                'Rentabilité de Lot',
                 style: TextStyle(
                   fontSize: AgriTypography.lg,
                   fontWeight: AgriTypography.gras,
@@ -209,7 +210,7 @@ class _BilanTechnicoEconomiqueVueState
     decoration: _carte(),
     child: const Column(
       children: [
-        Icon(Icons.inbox, size: 44, color: AgriColors.outlineVariant),
+        Icon(SymbolesAgri.inbox, size: 44, color: AgriColors.outlineVariant),
         SizedBox(height: AgriSpacing.sm),
         Text(
           'Aucune bande pour le moment.',
@@ -289,9 +290,8 @@ class _BilanTechnicoEconomiqueVueState
           valeur: parSujet == null ? '—' : _montant(parSujet),
           unite: parSujet == null ? null : 'FCFA',
           couleurLisere: AgriColors.errorRed,
-          legende: parSujet == null
-              ? "Effectif initial de la bande inconnu"
-              : 'Sur coûts connus ÷ effectif initial',
+          // Ticket H6 : le Blade fait foi — même légende, que la valeur soit connue ou « — ».
+          legende: 'Sur coûts connus ÷ effectif initial',
         ),
       ],
     );
@@ -302,7 +302,7 @@ class _BilanTechnicoEconomiqueVueState
   Widget _details(BilanLot b, bool large) {
     final couts = _carteDetail(
       titre: 'Détail des Coûts',
-      icone: Icons.trending_down,
+      icone: SymbolesAgri.trending_down,
       couleurIcone: AgriColors.errorDeep,
       lignes: b.couts,
       vide: '',
@@ -313,7 +313,7 @@ class _BilanTechnicoEconomiqueVueState
 
     final revenus = _carteDetail(
       titre: 'Détail des Revenus',
-      icone: Icons.trending_up,
+      icone: SymbolesAgri.trending_up,
       couleurIcone: AgriColors.brandEmerald,
       lignes: b.revenus,
       vide: b.revenusRecus
@@ -470,7 +470,7 @@ class _BilanTechnicoEconomiqueVueState
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 16, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 16, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.xs),
         Expanded(
           child: Text(

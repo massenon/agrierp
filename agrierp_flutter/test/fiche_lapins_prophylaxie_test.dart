@@ -1,5 +1,6 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_lapins_screen.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
@@ -9,6 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket F0.12 — SECTION « TRAITEMENTS & PROPHYLAXIE » DE LA FICHE LAPINS.
+///
+/// 🔁 Ticket U12a — la section est celle du Blade (`fiche-lapins.blade.php` + `x-prophylaxie-du-jour`) : titre
+/// « Traitements & Prophylaxie », badge « N Prévu(s) », « Protocole non calculable — … », bouton actif sans case
+/// cochée (le web n'a pas de garde ; le dépôt n'écrit alors rien et le toast le dit).
 ///
 /// ⚠️⚠️ Le test qui compte est le dernier : valider un traitement rémanent
 /// doit **écrire un vrai soin et une vraie période de rémanence**. Une case
@@ -22,7 +27,7 @@ void main() {
   const bandeId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
   // La bande est mise en lot le jour même du test : le protocole borné à J1
   // est donc dû aujourd'hui, sans dépendre de la date réelle d'exécution.
-  final aujourdHui = DateTime.now();
+  final aujourdHui = HeureBenin.maintenant();
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -80,16 +85,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('la section porte le titre de la maquette', (tester) async {
+  testWidgets('la section porte le titre du Blade', (tester) async {
     await afficher(tester);
 
     expect(
-      find.text('Traitements & Prophylaxie Automatiques Prévus pour ce Jour'),
+      find.text('TRAITEMENTS & PROPHYLAXIE'),
       findsOneWidget,
     );
   });
 
-  testWidgets('sans traitement du jour, la maquette affiche « Libre »', (
+  testWidgets('sans traitement du jour, le Blade affiche « Libre »', (
     tester,
   ) async {
     await afficher(tester);
@@ -107,10 +112,10 @@ void main() {
     await protocole(traitement: 'Anticoccidien', remanence: 7);
     await afficher(tester);
 
-    expect(find.text('Anticoccidien'), findsOneWidget);
-    expect(find.text('(Ivermectine — 0,2 ml / kg)'), findsOneWidget);
+    // Une seule ligne du Blade : traitement en gras, puis « (produit — posologie) ».
+    expect(find.text('Anticoccidien (Ivermectine — 0,2 ml / kg)', findRichText: true), findsOneWidget);
     expect(find.text('Rémanence 7j'), findsOneWidget);
-    expect(find.text('Prévus'), findsOneWidget);
+    expect(find.text('1 Prévu(s)'), findsOneWidget);
     expect(find.text('Indice Rouge : 1 soin(s) en attente'), findsOneWidget);
   });
 
@@ -128,7 +133,7 @@ void main() {
         findsNothing,
         reason: 'une inconnue ne doit pas se lire comme une absence de soin',
       );
-      expect(find.textContaining('non calculable au poste'), findsOneWidget);
+      expect(find.textContaining('Protocole non calculable —'), findsOneWidget);
       expect(find.textContaining('aucune saillie'), findsOneWidget);
       expect(find.textContaining('hors ligne'), findsNothing);
     },
@@ -165,9 +170,9 @@ void main() {
       await afficher(tester);
 
       expect(find.text('Indéterminé'), findsNothing);
-      expect(find.textContaining('non calculable au poste'), findsNothing);
-      expect(find.text('Vitamines'), findsOneWidget);
-      expect(find.text('Prévus'), findsOneWidget);
+      expect(find.textContaining('Protocole non calculable'), findsNothing);
+      expect(find.textContaining('Vitamines', findRichText: true), findsOneWidget);
+      expect(find.text('1 Prévu(s)'), findsOneWidget);
     },
   );
 
@@ -177,7 +182,7 @@ void main() {
       await protocole(traitement: 'Désinfection', debut: null, fin: null);
       await afficher(tester);
 
-      expect(find.textContaining('suivent le calendrier'), findsOneWidget);
+      expect(find.textContaining('sans jour de cycle (calendaires, ex. « Le 1er du mois ») ne sont pas évaluées ici.'), findsOneWidget);
     },
   );
 
@@ -187,12 +192,9 @@ void main() {
       await protocole(traitement: 'Anticoccidien', remanence: 7);
       await afficher(tester);
 
-      // Le bouton reste inerte tant que rien n'est coché.
-      final bouton = find.widgetWithText(
-        FilledButton,
-        "Valider l'Administration de tous ces Traitements Aujourd'hui",
-      );
-      expect(tester.widget<FilledButton>(bouton).onPressed, isNull);
+      // Le bouton est actif sans case cochée, comme au web.
+      final bouton = find.byKey(const Key('bouton-valider-traitements'));
+      expect(tester.widget<ElevatedButton>(bouton).onPressed, isNotNull);
 
       await tester.ensureVisible(find.byType(Checkbox).last);
       await tester.tap(find.byType(Checkbox).last);
@@ -215,6 +217,8 @@ void main() {
         reason: 'sans elle, la caisse du poste vendrait une bande traitée',
       );
       expect(remanences.single.lotId, bandeId);
+      expect(find.text('1 traitement(s) enregistré(s) au registre vétérinaire.'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
     },
   );
 
@@ -231,15 +235,13 @@ void main() {
     await tester.tap(find.byType(Checkbox).last);
     await tester.pumpAndSettle();
 
-    final bouton = find.widgetWithText(
-      FilledButton,
-      "Valider l'Administration de tous ces Traitements Aujourd'hui",
-    );
+    final bouton = find.byKey(const Key('bouton-valider-traitements'));
     await tester.ensureVisible(bouton);
     await tester.tap(bouton);
     await tester.pumpAndSettle();
 
     expect(find.text('Validé / Effectué'), findsOneWidget);
     expect(find.text('Indice Rouge : 0 soin(s) en attente'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
   });
 }

@@ -222,7 +222,11 @@ enum EcranPoste {
   /// Ces deux-là ne figurent donc dans AUCUNE liste de `RBAC_PAGE_MAP` — leur
   /// règle est décidée ici, et dite (voir [_horsMaquette]).
   synchronisation(null),
-  parametres(null);
+  parametres(null),
+
+  /// ⚠️ Hors maquette (ticket 15.46, décision client du 17/10/2026) : écran dédié des transferts entre
+  /// bandes, construit d'abord sur le web. Ouvert depuis « Gestion Élevage », comme les fiches.
+  transfertsBandes(null);
 
   const EcranPoste(this.page);
 
@@ -346,10 +350,42 @@ class PermissionsPoste {
   static bool _horsMaquette(String role, EcranPoste ecran) => switch (ecran) {
     EcranPoste.synchronisation => true,
     EcranPoste.parametres => role == 'admin',
+    // Ticket 15.46 — mêmes rôles que `manage-elevage` sur le web (seeder : admin et animalier).
+    EcranPoste.transfertsBandes => role == 'admin' || role == 'animalier',
     _ => true,
   };
 
   /// Écrans réellement accessibles, dans l'ordre de la barre latérale.
   static List<EcranPoste> ecransDe(String role) =>
       EcranPoste.values.where((e) => autorise(role, e)).toList();
+
+  /// Ticket H9b — PERMISSIONS DU WEB par rôle, transposées de `RolesAndPermissionsSeeder` (Laravel) : l'administrateur
+  /// a tout (`Permission::all()`), les trois autres rôles leur liste. Un test relit le seeder et compare : une
+  /// permission ajoutée côté web sans l'être ici le fait échouer.
+  ///
+  /// ⚠️ Ce n'est pas l'accès aux ÉCRANS ([carte], la maquette) : c'est le droit d'ÉCRIRE, celui que le serveur
+  /// vérifie à l'envoi (`$user->can(...)`). Un bouton montré à un rôle sans ce droit produirait une saisie
+  /// refusée à la synchronisation.
+  static const Map<String, Set<String>> permissionsDuRole = {
+    'comptable': {
+      'view-comptabilite',
+      'manage-comptabilite',
+      'close-fiscal-year',
+      'view-rapports',
+      'export-rapports',
+    },
+    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes'},
+    'animalier': {
+      'view-elevage',
+      'manage-elevage',
+      'archive-elevage',
+      'export-elevage',
+    },
+  };
+
+  /// `$user->can($permission)` du web, pour le rôle de la session du poste. Rôle inconnu : aucun droit
+  /// d'écriture (le serveur refuserait de toute façon).
+  static bool peut(String role, String permission) =>
+      role == 'admin' ||
+      (permissionsDuRole[role]?.contains(permission) ?? false);
 }

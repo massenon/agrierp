@@ -35,13 +35,23 @@
                 <span class="material-symbols-outlined text-brand-emerald">edit_note</span>
                 <h3 class="font-bold text-base text-brand-forest">Saisie Journalière Ponte &amp; Cheptel</h3>
             </div>
-            <div class="flex items-center gap-xs">
+            <div class="flex items-center gap-xs flex-wrap">
+                @if($this->lots->count() > 1)
+                    {{-- Ticket 15.47 (A11) : LA bande de la fiche, comme Lapins et Porcs. --}}
+                    <span class="text-xs text-outline font-semibold">Bande :</span>
+                    <select wire:model.live="bandeId" id="bande-fiche" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
+                        @foreach($this->lots as $lotChoix)
+                            <option value="{{ $lotChoix->id }}" @selected($lotChoix->id === $this->bande?->id)>{{ $lotChoix->code }}</option>
+                        @endforeach
+                    </select>
+                @endif
                 <span class="text-xs text-outline font-semibold">Date :</span>
                 <input type="date" wire:model.live="selectedDate" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
             </div>
         </div>
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Achats / Entrées du jour</label>
@@ -93,6 +103,9 @@
 
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
+                @if($mortEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
                         <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Pondeuse / Repro</label>
@@ -121,16 +134,70 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.56 — dons par catégorie : un don réduit l'effectif et sort du stock du produit de la bande. --}}
+            <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
+                <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">redeem</span>Dons par catégorie</p>
+                @if($donEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
+                <div class="grid grid-cols-3 gap-sm">
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Pondeuse / Repro</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donRepro', {{ max(0, $donRepro - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donRepro', {{ $donRepro + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poulette</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donPoulette', {{ max(0, $donPoulette - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donPoulette" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donPoulette', {{ $donPoulette + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poussin</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donPoussin', {{ max(0, $donPoussin - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donPoussin" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donPoussin', {{ $donPoussin + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final du Jour</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Nés − (Morts + Ventes)</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Nés − (Morts + Ventes + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Taux de Mortalité du Jour (%)</p>
                     <p class="text-[10px] text-outline">= (Morts du Jour ÷ Effectif J-1) × 100</p>
                     <div class="h-10 px-md rounded-lg text-base font-black text-error-deep bg-white shadow-sm flex items-center mt-1">{{ number_format($this->mortalityRateCalc, 1, ',', ' ') }} %</div>
+                </div>
+            </div>
+
+            {{-- Ticket 15.57 — sections du poste, désormais des deux côtés : rationnement par stade et pesée. --}}
+            <x-ration-volaille :tableau="$this->rationnement" ligne-cle="du stade de la bande (Pondeuse)" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 1800" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taille Échantillon</label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold">{{ $this->effectifFinalCalc }}</div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
                 </div>
             </div>
 
@@ -146,7 +213,10 @@
 
             <div class="border-t border-outline-variant pt-md">
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">vaccines</span>Traitements &amp; Rappels</p>
-                <x-module-pending label="Le protocole de prophylaxie du jour de cette fiche" since="à planifier — le moteur existe (ticket 3.11 terminé) et alimente déjà les fiches Lapins et Porcs ; son raccordement à cette fiche n'est pas fait" />
+                @php $protocoleDuJour = $this->protocoleDuJour; @endphp
+                @if($protocoleDuJour)
+                    <x-prophylaxie-du-jour :protocole="$protocoleDuJour" />
+                @endif
                 <div class="mt-sm">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Observations</label>
                     <input wire:model="observations" type="text" placeholder="ex : RAS" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
@@ -210,7 +280,7 @@
                             <td class="px-1.5 py-1 text-center text-outline">{{ $isToday ? $this->stockToday['ts'] : '—' }}</td>
                             <td class="px-1.5 py-1 text-center text-outline">{{ $isToday ? $this->stockToday['os'] : '—' }}</td>
                             <td class="px-1.5 py-1 text-center font-bold text-brand-emerald">{{ $isToday ? $this->stockToday['final'] : '—' }}</td>
-                            <td class="px-2 py-1 text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ?: '—') }}</td>
+                            <td class="px-2 py-1 text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

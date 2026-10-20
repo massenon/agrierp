@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/agri_tokens.dart';
+import '../theme/symboles_agri.dart';
 
 /// Largeurs de modale du prototype — `max-w-sm`, `max-w-md`, `max-w-lg`.
 ///
@@ -151,7 +152,7 @@ class ModaleAgri extends StatelessWidget {
                       child: const Padding(
                         padding: EdgeInsets.all(AgriSpacing.xs),
                         child: Icon(
-                          Icons.close,
+                          SymbolesAgri.close,
                           size: 20,
                           color: AgriColors.outline,
                         ),
@@ -367,17 +368,22 @@ class BoutonModalePrimaire extends StatelessWidget {
     super.key,
     required this.libelle,
     required this.onPressed,
+    this.couleur = AgriColors.brandEmerald,
   });
 
   final String libelle;
   final VoidCallback? onPressed;
+
+  /// Fond du bouton : `bg-brand-emerald` par défaut ; `bg-error-red` pour le « Archiver » de
+  /// `modal-confirm-delete.blade.php` (ticket U3).
+  final Color couleur;
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AgriColors.brandEmerald,
+        backgroundColor: couleur,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(

@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
@@ -26,7 +27,7 @@ void main() {
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
-  final aujourdhui = DateTime.now();
+  final aujourdhui = HeureBenin.maintenant();
   final jourSeul = DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
 
   setUp(() async {

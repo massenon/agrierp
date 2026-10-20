@@ -22,7 +22,7 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-lg">
         <x-kpi-card label="Effectif Total Vivant" icon="bug_report" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" />
         <x-kpi-card label="Naissains Nés (mois)" icon="child_care" color="blue" :value="$this->kpis['naissains_mois']" />
-        <x-kpi-card label="Taux d'Éclosion Naissains" icon="egg_alt" color="maize" :value="number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" />
+        <x-kpi-card label="Taux d'Éclosion Naissains" icon="egg_alt" color="maize" :value="$this->kpis['taux_eclosion'] === null ? '—' : number_format($this->kpis['taux_eclosion'], 1, ',', ' ').' %'" />
         <x-kpi-card label="Taux de Mortalité" icon="trending_down" color="red" :value="number_format($this->kpis['taux_mortalite_mois'], 1, ',', ' ').' %'" />
     </div>
 
@@ -39,13 +39,23 @@
                 <span class="material-symbols-outlined text-brand-emerald">edit_note</span>
                 <h3 class="font-bold text-base text-brand-forest">Saisie Journalière du Cheptel</h3>
             </div>
-            <div class="flex items-center gap-xs">
+            <div class="flex items-center gap-xs flex-wrap">
+                @if($this->lots->count() > 1)
+                    {{-- Ticket 15.47 (A11) : LA bande de la fiche, comme Lapins et Porcs. --}}
+                    <span class="text-xs text-outline font-semibold">Bande :</span>
+                    <select wire:model.live="bandeId" id="bande-fiche" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
+                        @foreach($this->lots as $lotChoix)
+                            <option value="{{ $lotChoix->id }}" @selected($lotChoix->id === $this->bande?->id)>{{ $lotChoix->code }}</option>
+                        @endforeach
+                    </select>
+                @endif
                 <span class="text-xs text-outline font-semibold">Date :</span>
                 <input type="date" wire:model.live="selectedDate" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
             </div>
         </div>
 
         <form wire:submit="saveDay" class="space-y-md">
+            <x-transferts-du-jour :transferts="$this->transfertsDuJour" />
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Achats du jour</label>
@@ -70,13 +80,16 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taux d'Éclosion Naissains (%)</label>
-                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ number_format($this->eclosionRateCalc, 1, ',', ' ') }} %</div>
+                        <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">{{ $this->eclosionRateCalc === null ? '—' : number_format($this->eclosionRateCalc, 1, ',', ' ').' %' }}</div>
                     </div>
                 </div>
             </div>
 
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
+                @if($mortEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
                         <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur (Bordé)</label>
@@ -105,6 +118,40 @@
                 </div>
             </div>
 
+            {{-- Ticket 15.56 — dons par catégorie : un don réduit l'effectif et sort du stock du produit de la bande. --}}
+            <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
+                <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">redeem</span>Dons par catégorie</p>
+                @if($donEnregistre !== null)
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                @endif
+                <div class="grid grid-cols-3 gap-sm">
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur (Bordé)</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donBorde', {{ max(0, $donBorde - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donBorde" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donBorde', {{ $donBorde + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Engraissement</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donEngraissement', {{ max(0, $donEngraissement - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donEngraissement" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donEngraissement', {{ $donEngraissement + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Naissain</label>
+                        <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
+                            <button type="button" wire:click="$set('donNaissain', {{ max(0, $donNaissain - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
+                            <input wire:model.live="donNaissain" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
+                            <button type="button" wire:click="$set('donNaissain', {{ $donNaissain + 1 }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-3 gap-sm">
                 <div>
                     <label class="block text-[9px] text-outline font-bold uppercase mb-xs">Naissains</label>
@@ -123,7 +170,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final du Jour</p>
-                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − Morts</p>
+                    <p class="text-[10px] text-outline">= Effectif (J-1) + Achats/Naissains − (Morts + Ventes + Dons)</p>
                     <div class="w-full h-10 px-md rounded-lg text-base font-black text-brand-emerald bg-white shadow-sm mt-1 flex items-center">{{ $this->effectifFinalCalc }}</div>
                 </div>
                 <div>
@@ -141,7 +188,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
-                    <input wire:model="peseeTotal" type="number" min="0" placeholder="ex : 4500" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 4500" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
+                    <div class="h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center font-bold text-brand-emerald">
+                        {{ $peseeTotal && $this->effectifFinalCalc > 0 ? round($peseeTotal / $this->effectifFinalCalc).' g' : '—' }}
+                    </div>
                 </div>
             </div>
 
@@ -205,8 +258,8 @@
                             <td class="px-sm py-xs text-center">{{ $entry?->effectif_sevres ?? '—' }}</td>
                             <td class="px-sm py-xs text-center font-bold border-r border-outline-variant">{{ $entry?->effectif_final ?? '—' }}</td>
                             <td class="px-sm py-xs text-center {{ $entry && $entry->mortality_rate > 0 ? 'text-error-deep font-bold' : '' }} border-r border-outline-variant">{{ $entry ? number_format($entry->mortality_rate, 1) : '—' }}</td>
-                            <td class="px-sm py-xs text-right">{{ $entry?->weight_sample_avg_g ?? '—' }}</td>
-                            <td class="px-sm py-xs text-left text-outline">{{ $entry?->treatmentProduct?->name ?? ($entry?->symptomes ?: '—') }}</td>
+                            <td class="px-sm py-xs text-right">{{ $entry?->poids_general_g ?? '—' }}</td>
+                            <td class="px-sm py-xs text-left text-outline">{{ $this->traitementsDuJour($dateStr, $entry) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

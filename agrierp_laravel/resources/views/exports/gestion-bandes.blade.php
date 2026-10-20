@@ -19,7 +19,7 @@
             <tr>
                 <td>{{ $lot->code }}</td>
                 <td>{{ $lot->species?->label }}</td>
-                <td>{{ ucfirst($lot->stage) }}</td>
+                <td>{{ $lot->libelleStade() }}</td>
                 <td>{{ $lot->created_date->format('d/m/Y') }}</td>
                 <td style="text-align:right;">{{ $lot->initial_quantity }}</td>
                 <td style="text-align:right;">{{ $lot->current_quantity }}</td>

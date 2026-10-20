@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/fiche_porcs_screen.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
@@ -7,24 +8,24 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ticket F0.28 — TABLEAU MENSUEL DE LA FICHE PORCS.
+/// Ticket F0.28 — TABLEAU MENSUEL DE LA FICHE PORCS, 🔁 ticket U12a : celui du Blade (TOUS les jours du mois, taux de
+/// mortalité `mortality_rate` sur l'effectif de début `previousEffectif()`).
 ///
-/// ⚠️⚠️ **LA COLONNE DE POIDS EST EN KILOS, seule fiche à cette échelle.** La
-/// base stocke la MOYENNE par sujet en grammes (`weight_sample_avg_g`, colonne
-/// commune aux cinq fiches) ; la maquette annonce le TOTAL pesé en kilos. La
-/// reconstitution `moyenne × effectif ÷ 1000` est exactement l'aller-retour
-/// corrigé côté serveur au ticket 14.60 — recopier la moyenne afficherait 45
-/// là où 540 Kg ont été pesés.
+/// ⚠️⚠️ **LA COLONNE DE POIDS EST EN KILOS, seule fiche à cette échelle.** La base stocke la MOYENNE par sujet en
+/// grammes (`weight_sample_avg_g`) ; le Blade affiche le TOTAL pesé en kilos, `round(moyenne × effectif ÷ 1000, 1)`
+/// tel que PHP l'écrit (« 540 », « 85.5 »). Recopier la moyenne afficherait 45 là où 540 Kg ont été pesés (14.60).
 ///
-/// ⚠️ **TRUIES GEST. / VERRATS / PORCELETS / ENGRAISS. AFFICHENT UN TIRET** :
-/// le serveur les tient dans `effectif_f`, `effectif_m`, `effectif_sevres` et
-/// `effectif_smeres`, que le contrat de synchronisation ne descend pas.
+/// ⚠️ Truies Gest. / Verrats / Porcelets / Engraiss. (`effectif_f`, `effectif_m`, `effectif_sevres`,
+/// `effectif_smeres`, saisis, synchronisés depuis 15.57) : « — » quand ils sont inconnus.
 void main() {
   late AppDatabase db;
   late FicheJournaliereRepository depot;
   late SoinsRepository soins;
 
   const bandeId = 'cccccccc-1111-4111-8111-cccccccccccc';
+  final maintenant = HeureBenin.maintenant();
+  final joursDuMois = DateTime(maintenant.year, maintenant.month + 1, 0).day;
+  String deux(int n) => n.toString().padLeft(2, '0');
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -49,17 +50,7 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<void> journee(
-    int jour, {
-    int achat = 0,
-    int ne = 0,
-    int mort = 0,
-    int vente = 0,
-    int don = 0,
-    int effectif = 12,
-    double? moyenneG,
-  }) async {
-    final maintenant = DateTime.now();
+  Future<void> journee(int jour, {int mort = 0, int effectif = 12, double? moyenneG}) async {
     await db
         .into(db.livestockDailyEntries)
         .insert(
@@ -69,28 +60,26 @@ void main() {
             updatedAt: maintenant,
             lotId: bandeId,
             entryDate: DateTime(maintenant.year, maintenant.month, jour),
-            achat: Value(achat),
-            ne: Value(ne),
             mort: Value(mort),
-            vente: Value(vente),
-            don: Value(don),
             effectifFinal: Value(effectif),
             weightSampleAvgG: Value(moyenneG),
           ),
         );
   }
 
+  /// `hidden lg:block` : le tableau n'existe qu'à partir de 1 024 px, comme au web.
   Future<void> afficher(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: FichePorcsScreen(depot: depot, soins: soins),
-      ),
-    );
+    tester.view.physicalSize = const Size(1600, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: FichePorcsScreen(depot: depot, soins: soins)));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('⚠️ les groupes de la maquette sont présents', (tester) async {
-    await journee(6, ne: 2);
+  Finder ligne(int index) => find.byKey(Key('ligne-mois-$index'));
+
+  testWidgets('⚠️ les groupes du Blade sont présents', (tester) async {
+    await journee(6);
     await afficher(tester);
 
     for (final g in ['ENTRÉES', 'SORTIES', 'EFFECTIF FINAL DU JOUR']) {
@@ -98,85 +87,65 @@ void main() {
     }
   });
 
-  testWidgets('toutes les colonnes de la maquette sont là', (tester) async {
-    await journee(6, ne: 2);
+  testWidgets('toutes les colonnes du web sont là, dans le libellé du Blade', (tester) async {
+    await journee(6);
     await afficher(tester);
 
     for (final c in [
       'DATE',
-      'ACHAT',
-      'NÉ',
-      'MORT',
-      'VENTE',
-      'DON',
-      'TRUIES GEST.',
-      'VERRATS',
-      'PORCELETS',
-      'ENGRAISS.',
-      'TOTAL',
+      'Achat',
+      'Né',
+      'Mort',
+      'Vente',
+      'Don',
+      'Truies Gest.',
+      'Verrats',
+      'Porcelets',
+      'Engraiss.',
+      'Total',
       'TAUX MORT %',
       'POIDS GÉNÉRAL (KG)',
-      'SUIVI CLINIQUE & PROPHYLAXIE',
+      'TRAITEMENTS & PROPHYLAXIE',
     ]) {
       expect(find.text(c), findsOneWidget, reason: c);
     }
   });
 
-  /// ⚠️⚠️ LE CŒUR DU TICKET : 45 000 g de moyenne × 12 sujets = 540,0 Kg.
-  /// Afficher « 45,0 » serait la moyenne prise pour un total.
-  testWidgets('la pesée se reconstitue en kilos, pas en moyenne', (
-    tester,
-  ) async {
+  /// ⚠️⚠️ 45 000 g de moyenne × 12 sujets = 540 Kg (PHP écrit « 540 », sans décimale nulle).
+  testWidgets('la pesée se reconstitue en kilos, pas en moyenne', (tester) async {
     await journee(6, effectif: 12, moyenneG: 45000);
     await afficher(tester);
 
-    expect(find.text('540.0'), findsOneWidget);
+    expect(find.descendant(of: ligne(5), matching: find.text('540')), findsOneWidget);
     expect(find.text('45.0'), findsNothing);
+    expect(find.text('45'), findsNothing);
   });
 
-  /// ⚠️ SANS PESÉE, LA CELLULE PORTE UN TIRET, jamais « 0.0 » : un zéro se
-  /// lirait comme un cheptel pesé à vide. La ligne compte alors six tirets —
-  /// les quatre catégories, le poids, le suivi clinique. Le « 0.0 » restant
-  /// est le taux de mortalité, qui lui vaut bien zéro.
-  testWidgets('sans pesée, la colonne poids reste vide et non nulle', (
-    tester,
-  ) async {
+  /// ⚠️ SANS PESÉE, LA CELLULE PORTE UN TIRET, jamais « 0 » : six tirets — les quatre effectifs saisis inconnus, le
+  /// poids, les traitements.
+  testWidgets('sans pesée, la colonne poids porte un tiret', (tester) async {
     await journee(6, effectif: 12);
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    expect(
-      find.descendant(of: ligne, matching: find.text('—')),
-      findsNWidgets(6),
-    );
+    expect(find.descendant(of: ligne(5), matching: find.text('—')), findsNWidgets(6));
   });
 
-  testWidgets(
-    '⚠️⚠️ les quatre catégories non synchronisées affichent un tiret',
-    (tester) async {
-      await journee(6, effectif: 12, moyenneG: 45000);
-      await afficher(tester);
+  testWidgets('⚠️⚠️ les quatre effectifs saisis inconnus affichent un tiret', (tester) async {
+    await journee(6, effectif: 12, moyenneG: 45000);
+    await afficher(tester);
 
-      // Truies Gest., Verrats, Porcelets, Engraiss. + Suivi Clinique — la
-      // colonne poids, elle, est renseignée.
-      final ligne = find.byKey(const Key('ligne-mois-0'));
-      expect(
-        find.descendant(of: ligne, matching: find.text('—')),
-        findsNWidgets(5),
-      );
-    },
-  );
+    // Truies Gest., Verrats, Porcelets, Engraiss. + Traitements — la colonne poids, elle, est renseignée.
+    expect(find.descendant(of: ligne(5), matching: find.text('—')), findsNWidgets(5));
+  });
 
-  testWidgets(
-    'le taux de mortalité du jour se calcule sur l effectif de début',
-    (tester) async {
-      // 12 fin + 1 mort = 13 au départ → 1/13 = 7,7 %.
-      await journee(6, mort: 1, effectif: 12);
-      await afficher(tester);
+  /// 🔁 U12a — `mortality_rate` du web : morts ÷ `previousEffectif()` (fiche précédente, sinon effectif INITIAL de la
+  /// bande : 12), et non plus un effectif de début reconstitué (12 + 1 = 13, soit 7,7 %) : 1 ÷ 12 = 8,33 → « 8.3 ».
+  testWidgets('le taux de mortalité se calcule sur l effectif de début du web', (tester) async {
+    await journee(6, mort: 1, effectif: 11);
+    await afficher(tester);
 
-      expect(find.text('7.7'), findsOneWidget);
-    },
-  );
+    expect(find.descendant(of: ligne(5), matching: find.text('8.3')), findsOneWidget);
+  });
 
   testWidgets('toucher une ligne charge cette journée', (tester) async {
     await journee(6);
@@ -184,17 +153,20 @@ void main() {
 
     await afficher(tester);
 
-    final ligne = find.byKey(const Key('ligne-mois-0'));
-    await tester.ensureVisible(ligne);
-    await tester.tap(ligne);
+    await tester.ensureVisible(ligne(5));
+    await tester.tap(ligne(5));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Jour 6 ('), findsWidgets);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('date-choisie'))).data,
+      '06/${deux(maintenant.month)}/${maintenant.year}',
+    );
   });
 
-  testWidgets('sans journée saisie, le tableau le dit', (tester) async {
+  testWidgets('🔁 U12a — sans journée saisie, tous les jours du mois sont listés', (tester) async {
     await afficher(tester);
 
-    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsOneWidget);
+    expect(ligne(joursDuMois - 1), findsOneWidget);
+    expect(find.text('— Aucune journée saisie ce mois-ci —'), findsNothing);
   });
 }

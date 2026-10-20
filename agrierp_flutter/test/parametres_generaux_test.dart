@@ -1,6 +1,8 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
+import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_screen.dart';
 import 'package:agrierp/features/parametres/parametres_generaux_repository.dart';
 import 'package:agrierp/features/parametres/parametres_generaux_screen.dart';
@@ -10,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'cartes_attendues.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket F0.51 — PARAMÈTRES GÉNÉRAL (`parametres-hub.html`, six onglets).
 ///
@@ -281,7 +284,10 @@ void main() {
   });
 
   group('écran', () {
-    testWidgets('les six onglets du hub sont présents, dans son ordre', (
+    // Ticket CFG-2 — les six onglets de la maquette, plus « Email (SMTP) » et « Appairage » aux places que
+    // le web donne à « Email (SMTP) » et « Postes & Appairage » (CFG-1). Ticket R-1 : « Réinitialisation » après
+    // « Audit Logs », comme au web.
+    testWidgets('les neuf onglets du hub sont présents, dans son ordre', (
       tester,
     ) async {
       await fermeComplete();
@@ -290,10 +296,13 @@ void main() {
       expect(ParametresGenerauxScreen.onglets.map((o) => o.$1).toList(), [
         'Rôles & Permissions',
         "Données de l'Entreprise",
+        'Email (SMTP)',
         'Modules Actifs',
         'Gestion Utilisateurs',
+        'Appairage',
         'Modes de Paiement',
         'Audit Logs',
+        'Réinitialisation',
       ]);
 
       for (final (titre, _) in ParametresGenerauxScreen.onglets) {
@@ -363,7 +372,7 @@ void main() {
       await afficher(tester);
 
       // `comptable` : Dashboard (commun) + Comptabilité, rien d'autre.
-      expect(find.byIcon(Icons.check_circle), findsNWidgets(9 + 2));
+      expect(find.byIcon(SymbolesAgri.check_circle), findsNWidgets(9 + 2));
     });
 
     testWidgets('⚠️ la dernière sauvegarde porte un tiret motivé', (
@@ -415,8 +424,8 @@ void main() {
         expect(find.byKey(Key('module-${module.code}')), findsOne);
       }
       expect(find.text('FUTUR'), findsOne);
-      expect(find.byIcon(Icons.toggle_on), findsNWidgets(3));
-      expect(find.byIcon(Icons.toggle_off), findsOne);
+      expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(3));
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsOne);
     });
 
     testWidgets('un utilisateur désactivé porte le mot de la maquette', (
@@ -445,6 +454,65 @@ void main() {
       expect(find.text('2 340 000'), findsOne);
     });
 
+    // 🔴→✅ Ticket U14 — l'onglet du Blade (`audit-logs.blade.php`, `AuditLogs.php`).
+    test('U14 — connexions échouées sur 24 h, comme le web', () async {
+      await trace('a1', 'login.failed');
+      await trace('a2', 'login.failed', quand: DateTime.now().subtract(const Duration(days: 2)));
+
+      expect((await depot.charger()).connexionsEchouees, 1);
+    });
+
+    test('U14 — « Rechercher... » : clés techniques de l action OU du module, comme `LIKE`', () async {
+      await trace('a1', 'sale.created', module: 'ventes');
+      await trace('a2', 'expense.archived', module: 'achats');
+      await trace('a3', 'login.failed', module: 'auth');
+      final lignes = (await depot.charger()).audit;
+      List<String> chercher(String r) => [
+        for (final l in DonneesParametresGeneraux.filtrerAudit(lignes, r)) l.action,
+      ]..sort();
+
+      expect(chercher('SALE'), ['sale.created']);
+      expect(chercher('achat'), ['expense.archived'], reason: 'le module');
+      expect(chercher('Vente enregistrée'), isEmpty, reason: 'le libellé n est pas cherché, comme au web');
+      expect(chercher('e_p'), ['expense.archived'], reason: '`_` : un caractère');
+      expect(chercher('0'), hasLength(3));
+    });
+
+    testWidgets('U14 — libellés, info-bulle, carte bleue « Sur les dernières 24 h », recherche à 300 ms, état vide', (
+      tester,
+    ) async {
+      await fermeComplete();
+      await trace('a1', 'sale.created', module: 'ventes');
+      await trace('a2', 'login.failed', module: 'auth');
+      await afficher(tester);
+      await ouvrir(tester, 'Audit Logs');
+
+      expect(find.text('Vente enregistrée'), findsOne, reason: '`action_label`');
+      expect(find.text('Ventes & Devis'), findsOne, reason: '`module_label`');
+      expect(find.text('sale.created'), findsNothing);
+      expect(find.text('Sur les dernières 24 h'), findsOne);
+      final carte = tester.widget<CarteKpi>(
+        find.ancestor(of: find.text('CONNEXIONS ÉCHOUÉES'), matching: find.byType(CarteKpi)),
+      );
+      expect((carte.valeur, carte.couleurLisere), ('1', AgriColors.infoBlue));
+      expect(
+        find.byTooltip("Les journaux d'audit sont immuables : aucune modification ni suppression n'est possible."),
+        findsNWidgets(2),
+      );
+
+      await tester.enterText(find.byKey(const Key('audit-recherche')), 'login');
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Vente enregistrée'), findsOne, reason: 'pas avant 300 ms');
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.text('Vente enregistrée'), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('audit-recherche')), 'zzz');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.text('Aucun événement pour le moment.'), findsOne);
+    });
+
     testWidgets('la trace d audit porte les cinq colonnes de la maquette', (
       tester,
     ) async {
@@ -468,7 +536,11 @@ void main() {
     /// ⚠️⚠️ LE DÉFAUT QUE CE TICKET CORRIGE : le poste proposait « Fiches
     /// Escargots » à une ferme dont l'héliciculture est éteinte. La carte
     /// menait à une fiche vide, sans dire pourquoi.
-    testWidgets('⚠️⚠️ Gestion Élevage masque une espèce désactivée', (
+    ///
+    /// Ticket H4 : le Blade fait foi — `gestion-elevage.blade.php` GRISE la
+    /// carte (« Héliciculture — module désactivé ») au lieu de la masquer, et
+    /// ne conditionne que l'héliciculture : la carte dit désormais pourquoi.
+    testWidgets('⚠️⚠️ Gestion Élevage grise une espèce désactivée (Blade)', (
       tester,
     ) async {
       await fermeComplete();
@@ -479,20 +551,32 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: GestionElevageScreen(onOuvrir: (_) {}, modules: depot),
+          home: GestionElevageScreen(
+            onOuvrir: (_) {},
+            depot: GestionElevageRepository(database: db),
+          ),
         ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Fiches Escargots'), findsNothing);
+      final escargots = find.byKey(
+        Key('carte-${EcranPoste.ficheEscargots.name}'),
+      );
+      expect(escargots, findsOne);
       expect(
-        find.byKey(Key('carte-${EcranPoste.ficheEscargots.name}')),
-        findsNothing,
+        find.descendant(
+          of: escargots,
+          matching: find.text('Héliciculture — module désactivé'),
+        ),
+        findsOne,
       );
       // Les trois espèces exploitées restent, dont les DEUX fiches avicoles.
       expect(find.text('Fiches Lapins'), findsOne);
       expect(find.text('Fiches Pondeuses'), findsOne);
-      expect(find.text('Fiches Reproducteurs'), findsOne);
+      expect(find.text('Fiches Volailles'), findsOne);
       expect(find.text('Fiches Porcs'), findsOne);
     });
   });

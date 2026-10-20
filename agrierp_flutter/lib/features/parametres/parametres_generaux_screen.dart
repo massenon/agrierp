@@ -1,9 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/audit/libelles_audit.dart';
+
+import '../../core/config/envoi_email_test.dart';
+import '../../core/config/parametres_smtp.dart';
 import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import 'appairage_poste.dart';
+import 'onglet_appairage.dart';
+import 'onglet_email_smtp.dart';
+import 'onglet_reinitialisation.dart';
 import 'parametres_generaux_repository.dart';
+import 'reinitialisation_poste.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/parametres-hub.html` → Paramètres Général.
 ///
@@ -13,29 +26,71 @@ import 'parametres_generaux_repository.dart';
 /// (`gestion-utilisateurs.html`) · Modes de Paiement (`modes-paiement.html`) ·
 /// Audit Logs (`audit-logs.html`).
 ///
+/// 🔁 Ticket CFG-2 (décision client du 19/10/2026) — HUIT ONGLETS. Comme au web
+/// (ticket CFG-1), « Email (SMTP) » suit « Données de l'Entreprise » et
+/// l'appairage suit « Gestion Utilisateurs » ([OngletEmailSmtp],
+/// [OngletAppairage]). L'onglet « Appairage » remplace l'écran isolé
+/// « Paramètres du poste » : l'entrée de la barre latérale ouvre ce hub sur lui
+/// ([ongletInitial]).
+///
+/// 🔁 Ticket R-1 (demande du client : « sur le web et le poste ») — NEUF ONGLETS.
+/// « Réinitialisation » suit « Audit Logs », comme au web (où « Restauration »,
+/// absent du poste, les sépare) : [OngletReinitialisation], en ligne seulement.
+///
 /// ⚠️⚠️ **AUCUN SECRET NE DESCEND AU POSTE.** `company_settings` porte côté
 /// serveur les mots de passe SMTP et les jetons SMS (Twilio, Vonage), chiffrés.
 /// Un poste volé donnerait accès au compte SMS et à la boîte mail de la ferme :
 /// seuls l'identité et les taux sont servis, et le poste n'a **pas de colonne**
-/// où ranger un secret. Le bloc « Configuration Email (SMTP) » de
-/// `parametres.html` n'est donc pas porté — pas « plus tard », jamais.
+/// où ranger un secret. Le SMTP DU POSTE est un réglage LOCAL (onglet
+/// « Email (SMTP) ») : son mot de passe va au coffre du système, jamais en base
+/// (`ParametresSmtp`).
 ///
 /// ⚠️ **CONSULTATION PURE.** Modifier un rôle, une permission, un utilisateur
 /// ou un compte de trésorerie depuis un poste changerait les règles de toute la
 /// ferme depuis une machine qui n'a pas les derniers mouvements.
 class ParametresGenerauxScreen extends StatefulWidget {
-  const ParametresGenerauxScreen({super.key, required this.depot});
+  const ParametresGenerauxScreen({
+    super.key,
+    required this.depot,
+    this.smtp,
+    this.envoiEmail,
+    this.appairage,
+    this.reinitialisation,
+    this.ongletInitial,
+  });
 
   final ParametresGenerauxRepository depot;
 
-  /// Les six onglets du hub, dans son ordre.
+  /// Ticket CFG-2 — réglages SMTP de ce poste et e-mail de test ; `null` : l'onglet le dit.
+  final ParametresSmtp? smtp;
+  final EnvoiEmailTest? envoiEmail;
+
+  /// Ticket CFG-2 — appairage de ce poste (session, réglages du poste) ; `null` : l'onglet le dit.
+  final AppairagePoste? appairage;
+
+  /// Ticket R-1 — réinitialisation des données par le serveur, puis purge de ce poste ; `null` : l'onglet le dit.
+  final ReinitialisationPoste? reinitialisation;
+
+  /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
+  final String? ongletInitial;
+
+  static const ongletEmailSmtp = 'Email (SMTP)';
+  static const ongletAppairage = 'Appairage';
+  static const ongletReinitialisation = 'Réinitialisation';
+
+  /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
+  /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
+  /// « Réinitialisation » (R-1) après « Audit Logs », avec l'icône du web (`restart_alt`).
   static const onglets = <(String, IconData)>[
-    ('Rôles & Permissions', Icons.admin_panel_settings),
-    ("Données de l'Entreprise", Icons.domain),
-    ('Modules Actifs', Icons.tune),
-    ('Gestion Utilisateurs', Icons.manage_accounts),
-    ('Modes de Paiement', Icons.account_balance_wallet),
-    ('Audit Logs', Icons.security),
+    ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
+    ("Données de l'Entreprise", SymbolesAgri.domain),
+    (ongletEmailSmtp, SymbolesAgri.mail),
+    ('Modules Actifs', SymbolesAgri.tune),
+    ('Gestion Utilisateurs', SymbolesAgri.manage_accounts),
+    (ongletAppairage, SymbolesAgri.settings_applications),
+    ('Modes de Paiement', SymbolesAgri.account_balance_wallet),
+    ('Audit Logs', SymbolesAgri.security),
+    (ongletReinitialisation, SymbolesAgri.restart_alt),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -84,13 +139,30 @@ class ParametresGenerauxScreen extends StatefulWidget {
 }
 
 class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
-  String _onglet = ParametresGenerauxScreen.onglets.first.$1;
+  late String _onglet = ParametresGenerauxScreen.onglets
+      .map((o) => o.$1)
+      .firstWhere(
+        (o) => o == widget.ongletInitial,
+        orElse: () => ParametresGenerauxScreen.onglets.first.$1,
+      );
   DonneesParametresGeneraux? _donnees;
+
+  /// Ticket U14 — « Rechercher... » de l'onglet Audit Logs (`wire:model.live.debounce.300ms="search"`).
+  final _rechercheAudit = TextEditingController();
+  String _filtreAudit = '';
+  Timer? _attenteAudit;
 
   @override
   void initState() {
     super.initState();
     _charger();
+  }
+
+  @override
+  void dispose() {
+    _attenteAudit?.cancel();
+    _rechercheAudit.dispose();
+    super.dispose();
   }
 
   Future<void> _charger() async {
@@ -125,10 +197,16 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                           d,
                           large,
                         ),
+                        ParametresGenerauxScreen.ongletEmailSmtp =>
+                          _ongletEmailSmtp(),
                         'Modules Actifs' => _ongletModules(d, large),
+                        ParametresGenerauxScreen.ongletAppairage =>
+                          _ongletAppairage(),
                         'Gestion Utilisateurs' => _ongletUtilisateurs(d, large),
                         'Modes de Paiement' => _ongletPaiement(d, large),
                         'Audit Logs' => _ongletAudit(d, large),
+                        ParametresGenerauxScreen.ongletReinitialisation =>
+                          _ongletReinitialisation(),
                         _ => _ongletRoles(d, large),
                       },
                     ],
@@ -211,20 +289,20 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           libelle: 'Rôles configurés',
           valeur: '${d.roles.length}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.shield,
+          icone: SymbolesAgri.shield,
         ),
         CarteKpi(
           libelle: 'Utilisateurs assignés',
           valeur: '${d.utilisateurs.length}',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.group,
+          icone: SymbolesAgri.group,
           couleurIcone: AgriColors.infoBlue,
         ),
         CarteKpi(
           libelle: 'Modules couverts',
           valeur: '${ParametresGenerauxScreen.permissionsMatrice.length}',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.apps,
+          icone: SymbolesAgri.apps,
           couleurIcone: AgriColors.brandForest,
         ),
         // ⚠️ LES SAUVEGARDES NE DESCENDENT PAS : ce sont des fichiers `.sql`
@@ -236,7 +314,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: '—',
           legende: 'Sauvegardes gardées sur le serveur',
           couleurLisere: AgriColors.outline,
-          icone: Icons.backup,
+          icone: SymbolesAgri.backup,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -305,7 +383,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   Widget _droit(bool accorde) => Align(
     alignment: Alignment.centerLeft,
     child: Icon(
-      accorde ? Icons.check_circle : Icons.remove,
+      accorde ? SymbolesAgri.check_circle : SymbolesAgri.remove,
       size: 16,
       color: accorde ? AgriColors.brandEmerald : AgriColors.outline,
     ),
@@ -360,15 +438,18 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ),
         ],
         const SizedBox(height: AgriSpacing.md),
-        // ⚠️⚠️ LA CONFIGURATION TECHNIQUE N'EST PAS « À FAIRE PLUS TARD ».
-        // SMTP porte un mot de passe : le descendre ferait d'un poste volé une
-        // clé d'accès à la messagerie de la ferme. Le logo et le favicon, eux,
-        // se téléversent — le poste n'a pas de canal pour remonter un fichier.
+        // ⚠️⚠️ LE SMTP DU SITE NE DESCEND PAS : il porte un mot de passe, et le
+        // descendre ferait d'un poste volé une clé d'accès à la messagerie de la
+        // ferme. Comme au web depuis CFG-1, la configuration SMTP a son onglet ;
+        // celle du poste est LOCALE, mot de passe au coffre du système (CFG-2).
+        // Le logo et le favicon se téléversent — le poste n'a pas de canal pour
+        // remonter un fichier.
         _mentionPoste(
-          "Serveur d'envoi (SMTP), logo et favicon ne descendent pas au "
-          'poste : le premier porte un mot de passe, les deux autres se '
-          "téléversent. Un poste perdu ne doit pas ouvrir la boîte mail de la "
-          'ferme. Ces réglages se font sur la surface web.',
+          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email "
+          '(SMTP) ; son mot de passe reste dans le coffre du système. Celui du '
+          'site, le logo et le favicon ne descendent pas au poste : le premier '
+          'porte un mot de passe, les deux autres se téléversent. Ils se règlent '
+          'sur la surface web.',
           cle: 'entreprise-technique',
         ),
       ],
@@ -435,7 +516,50 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     ),
   );
 
-  // ── Onglet 3 : Modules Actifs ─────────────────────────────────────────────
+  // ── Onglet 3 : Email (SMTP) — ticket CFG-2 ───────────────────────────────
+
+  Widget _ongletEmailSmtp() {
+    final smtp = widget.smtp;
+    final envoi = widget.envoiEmail;
+    if (smtp == null || envoi == null) {
+      return _mentionPoste(
+        'Réglage SMTP indisponible dans cette vue : il se fait depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'smtp-indisponible',
+      );
+    }
+    return OngletEmailSmtp(parametres: smtp, envoi: envoi);
+  }
+
+  // ── Onglet 6 : Appairage — ticket CFG-2 ──────────────────────────────────
+
+  Widget _ongletAppairage() {
+    final appairage = widget.appairage;
+    if (appairage == null) {
+      return _mentionPoste(
+        'Appairage indisponible dans cette vue : il se consulte depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'appairage-indisponible',
+      );
+    }
+    return OngletAppairage(appairage: appairage);
+  }
+
+  // ── Onglet 9 : Réinitialisation — ticket R-1 ──────────────────────────────
+
+  Widget _ongletReinitialisation() {
+    final reinitialisation = widget.reinitialisation;
+    if (reinitialisation == null) {
+      return _mentionPoste(
+        'Réinitialisation indisponible dans cette vue : elle se fait depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'reinitialisation-indisponible',
+      );
+    }
+    return OngletReinitialisation(depot: reinitialisation);
+  }
+
+  // ── Onglet 4 : Modules Actifs ─────────────────────────────────────────────
 
   /// Le sous-titre de chaque module, mot pour mot comme la maquette.
   static const _descriptionsModules = <ModuleEspece, String>{
@@ -446,10 +570,10 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   };
 
   static const _iconesModules = <ModuleEspece, IconData>{
-    ModuleEspece.cuniculture: Icons.cruelty_free,
-    ModuleEspece.aviculture: Icons.egg,
-    ModuleEspece.porciculture: Icons.pets,
-    ModuleEspece.helico: Icons.bug_report,
+    ModuleEspece.cuniculture: SymbolesAgri.cruelty_free,
+    ModuleEspece.aviculture: SymbolesAgri.egg,
+    ModuleEspece.porciculture: SymbolesAgri.pets,
+    ModuleEspece.helico: SymbolesAgri.bug_report,
   };
 
   Widget _ongletModules(DonneesParametresGeneraux d, bool large) => Column(
@@ -528,7 +652,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                 ),
                 const SizedBox(width: AgriSpacing.sm),
                 Icon(
-                  d.moduleActif(module) ? Icons.toggle_on : Icons.toggle_off,
+                  d.moduleActif(module) ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
                   size: 28,
                   color: d.moduleActif(module)
                       ? AgriColors.brandEmerald
@@ -571,13 +695,13 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           libelle: 'Utilisateurs actifs',
           valeur: '${d.utilisateursActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.group,
+          icone: SymbolesAgri.group,
         ),
         CarteKpi(
           libelle: 'Rôles définis',
           valeur: '${d.roles.length}',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.badge,
+          icone: SymbolesAgri.badge,
           couleurIcone: AgriColors.infoBlue,
         ),
       ]),
@@ -657,16 +781,16 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   /// Les trois familles de comptes, dans l'ordre de la maquette, avec le
   /// `type` que le serveur leur donne.
   static const _famillesTresorerie = <(String, String, IconData)>[
-    ('Caisse Physique (531)', 'caisse', Icons.payments),
+    ('Caisse Physique (531)', 'caisse', SymbolesAgri.payments),
     (
       'Comptes Bancaires - Multi-Banques (521)',
       'banque',
-      Icons.account_balance,
+      SymbolesAgri.account_balance,
     ),
     (
       'Mobile Money - Multi-Opérateurs (5212)',
       'mobile_money',
-      Icons.smartphone,
+      SymbolesAgri.smartphone,
     ),
   ];
 
@@ -688,14 +812,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: _montant(d.soldeDe('caisse')),
           unite: 'F',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.payments,
+          icone: SymbolesAgri.payments,
         ),
         CarteKpi(
           libelle: 'Solde Banques (521)',
           valeur: _montant(d.soldeDe('banque')),
           unite: 'F',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.account_balance,
+          icone: SymbolesAgri.account_balance,
           couleurIcone: AgriColors.infoBlue,
         ),
         CarteKpi(
@@ -703,7 +827,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: _montant(d.soldeDe('mobile_money')),
           unite: 'F',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.smartphone,
+          icone: SymbolesAgri.smartphone,
           couleurIcone: AgriColors.brandForest,
         ),
       ]),
@@ -823,23 +947,69 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           valeur: d.auditRecent ? '${d.evenements24h}' : '—',
           legende: d.auditRecent ? null : 'Dernier tirage il y a plus de 24 h',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.history,
+          icone: SymbolesAgri.history,
         ),
+        // 🔴→✅ Ticket U14 — la carte du Blade : `color="blue"`, légende « Sur les dernières 24 h », compte sur 24 h (le
+        // poste comptait toutes les traces reçues, en rouge). Même tiret que la carte voisine quand le poste ne sait pas.
         CarteKpi(
           libelle: 'Connexions échouées',
-          valeur: '${d.connexionsEchouees}',
-          legende: 'Sur les traces reçues',
-          couleurLisere: d.connexionsEchouees > 0
-              ? AgriColors.errorRed
-              : AgriColors.outline,
-          icone: Icons.lock,
-          couleurIcone: d.connexionsEchouees > 0
-              ? AgriColors.errorRed
-              : AgriColors.outline,
+          valeur: d.auditRecent ? '${d.connexionsEchouees}' : '—',
+          legende: d.auditRecent ? 'Sur les dernières 24 h' : 'Dernier tirage il y a plus de 24 h',
+          couleurLisere: AgriColors.infoBlue,
+          icone: SymbolesAgri.lock,
+          couleurIcone: AgriColors.infoBlue,
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
-      _tableau(
+      // 🔴→✅ Ticket U14 — « Rechercher... » du Blade (en tête du tableau, `max-w-xs`), 300 ms d'attente.
+      Align(
+        alignment: Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: SizedBox(
+            height: 36,
+            child: TextField(
+              key: const Key('audit-recherche'),
+              controller: _rechercheAudit,
+              onChanged: (texte) {
+                _attenteAudit?.cancel();
+                _attenteAudit = Timer(const Duration(milliseconds: 300), () {
+                  if (mounted) setState(() => _filtreAudit = texte);
+                });
+              },
+              style: const TextStyle(fontSize: AgriTypography.xs),
+              decoration: InputDecoration(
+                hintText: 'Rechercher...',
+                isDense: true,
+                prefixIcon: const Icon(SymbolesAgri.search, size: 18, color: AgriColors.outline),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  borderSide: const BorderSide(color: AgriColors.outlineVariant),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.sm),
+      _tableauAudit(DonneesParametresGeneraux.filtrerAudit(d.audit, _filtreAudit)),
+      const SizedBox(height: AgriSpacing.md),
+      // ⚠️ DEUX CENTS LIGNES, comme la liste du web (`limit(200)`) : la table grossit d'une ligne par action et n'a
+      // d'intérêt, au poste, que pour les dernières.
+      _mentionPoste(
+        'Les deux cents dernières actions de la ferme, comme la liste du web. La trace complète vit sur le '
+        "serveur : elle grossit d'une ligne à chaque opération, et un poste "
+        "n'a pas à en porter des années. L'export du journal se fait sur la "
+        'surface web.',
+        cle: 'audit',
+      ),
+    ],
+  );
+
+  /// Le tableau du Blade : Horodatage · Utilisateur · Action · Module · Actions, LIBELLÉS de l'action et du module
+  /// (`action_label`, `module_label ?? '—'`), « Lecture seule » en italique avec son info-bulle, et l'état vide du web.
+  Widget _tableauAudit(List<AuditLog> lignes) => _tableau(
         largeur: 980,
         colonnes: const [
           ('Horodatage', 3),
@@ -848,14 +1018,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ('Module', 3),
           ('Actions', 3),
         ],
-        vide: '— Aucune trace synchronisée —',
+        vide: 'Aucun événement pour le moment.',
         lignes: [
-          for (var i = 0; i < d.audit.length; i++)
+          for (var i = 0; i < lignes.length; i++)
             _ligne(i, [
-              (Text(_dateHeure(d.audit[i].createdAt), style: _cellule), 3),
+              (Text(_dateHeure(lignes[i].createdAt), style: _cellule), 3),
               (
                 Text(
-                  d.audit[i].userName ?? 'Inconnu',
+                  lignes[i].userName ?? 'Inconnu',
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -863,47 +1033,36 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               ),
               (
                 Text(
-                  d.audit[i].action,
+                  LibellesAudit.action(lignes[i].action),
+                  key: Key('audit-action-$i'),
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                  ),
+                  style: _cellule,
                 ),
                 5,
               ),
               (
                 Text(
-                  d.audit[i].module ?? '—',
+                  LibellesAudit.module(lignes[i].module) ?? '—',
+                  key: Key('audit-module-$i'),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
                 3,
               ),
-              // La maquette écrit « Lecture seule » dans cette colonne : une
-              // trace d'audit ne se modifie ni ne s'efface, par définition.
+              // Une trace d'audit ne se modifie ni ne s'efface, par définition.
               (
-                const Text(
-                  'Lecture seule',
-                  style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                const Tooltip(
+                  message: "Les journaux d'audit sont immuables : aucune modification ni suppression n'est possible.",
+                  child: Text(
+                    'Lecture seule',
+                    style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AgriColors.outline),
+                  ),
                 ),
                 3,
               ),
             ]),
         ],
-      ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️ CENT LIGNES, PAS TOUT L'HISTORIQUE : la table grossit d'une ligne
-      // par action et n'a d'intérêt, au poste, que pour les dernières.
-      _mentionPoste(
-        'Les cent dernières actions de la ferme. La trace complète vit sur le '
-        "serveur : elle grossit d'une ligne à chaque opération, et un poste "
-        "n'a pas à en porter des années. L'export du journal se fait sur la "
-        'surface web.',
-        cle: 'audit',
-      ),
-    ],
-  );
+      );
 
   // ── Briques communes ──────────────────────────────────────────────────────
 
@@ -1066,7 +1225,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -1087,7 +1246,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(
@@ -1111,10 +1270,16 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     return '${valeur.round() < 0 ? '-' : ''}${morceaux.join(' ')}';
   }
 
-  static String _dateHeure(DateTime? d) => d == null
-      ? '—'
-      : '${d.day.toString().padLeft(2, '0')}/'
-            '${d.month.toString().padLeft(2, '0')}/${d.year} '
-            '${d.hour.toString().padLeft(2, '0')}:'
-            '${d.minute.toString().padLeft(2, '0')}';
+  /// « Horodatage » du journal d'audit : `$log->created_at->format('d/m/Y H:i')` du web, serveur en
+  /// `Africa/Porto-Novo`. 🔴→✅ Ticket U12b (reste de S-T11) — `created_at` est un INSTANT : il s'affiche à l'heure du
+  /// Bénin ([HeureBenin.depuisInstant]), jamais à celle de Windows (un poste réglé à New York montrait 18:30 la veille
+  /// d'une action faite à 00:30).
+  static String _dateHeure(DateTime? d) {
+    if (d == null) return '—';
+    final l = HeureBenin.depuisInstant(d);
+    return '${l.day.toString().padLeft(2, '0')}/'
+        '${l.month.toString().padLeft(2, '0')}/${l.year} '
+        '${l.hour.toString().padLeft(2, '0')}:'
+        '${l.minute.toString().padLeft(2, '0')}';
+  }
 }

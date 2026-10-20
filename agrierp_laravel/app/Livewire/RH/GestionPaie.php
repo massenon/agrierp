@@ -95,6 +95,7 @@ class GestionPaie extends Component
             $gross = (float) ($employee->base_salary ?? 0);
             $absenceDays = AttendanceRecord::where('employee_id', $employee->id)
                 ->where('status', 'absent')
+                ->where('is_active', true)   // un pointage archivé ne retient plus d'absence sur la paie
                 ->whereYear('attendance_date', substr($period, 0, 4))
                 ->whereMonth('attendance_date', substr($period, 5, 2))
                 ->count();
@@ -175,6 +176,7 @@ class GestionPaie extends Component
         $gross = (float) ($employee->base_salary ?? 0);
         $absenceDays = AttendanceRecord::where('employee_id', $employee->id)
             ->where('status', 'absent')
+            ->where('is_active', true)   // un pointage archivé ne retient plus d'absence sur la paie
             ->whereYear('attendance_date', substr($period, 0, 4))
             ->whereMonth('attendance_date', substr($period, 5, 2))
             ->count();

@@ -145,7 +145,7 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Titulaire de la Ligne</label>
-                <input wire:model="holderName" type="text" placeholder="ex : OLOUKOUNLE H." class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="holderName" type="text" placeholder="ex : M. Olouchègoun" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Numéro de Série SIM</label>

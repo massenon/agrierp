@@ -20,6 +20,10 @@
                 $isLapins = $tab === 'lapins';
                 $offsets = $isLapins ? ['check' => 14, 'misebas' => 30, 'sevrage' => 60] : ['check' => 21, 'misebas' => 114, 'sevrage' => 42];
                 $checkLabel = $isLapins ? 'Palpation' : 'Retour Chaleur';
+                // Ticket H11 — en-têtes des colonnes ajoutées du poste ; cellules et sujets calculés une fois.
+                $colonnesPoste = $isLapins ? ['Sevrés (M/F)', 'Morts S/Mère', 'Poids Moyen (g)', 'Cages'] : ['Sevrage (J+42)'];
+                $cellulesPoste = $this->colonnesPoste;
+                $sujets = $this->sujetsConnus;
             @endphp
             <div class="space-y-md mt-md">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
@@ -41,6 +45,10 @@
                     ['label' => 'Mise bas J+'.$offsets['misebas'], 'active' => true],
                     ['label' => 'Sevrage J+'.$offsets['sevrage']],
                 ]" />
+                {{-- Ticket H11 — jalon annexe du poste (lapins) : informatif, sans colonne ni action. --}}
+                @if($isLapins)
+                    <p class="text-xs text-outline -mt-sm pl-md">Jalon intermédiaire : Boîte à nid J+28 (informatif, sans action de suivi).</p>
+                @endif
 
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="overflow-x-auto">
@@ -56,6 +64,8 @@
                                     <th class="px-sm py-sm text-right text-[10px] text-outline font-bold uppercase">Nés (Vivants)</th>
                                     <th class="px-sm py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
                                     <th class="px-sm py-sm text-right text-[10px] text-outline font-bold uppercase">Action</th>
+                                    {{-- Ticket H11 — colonnes du poste, après les neuf du Blade, dans leur ordre d'origine. --}}
+                                    @include('livewire.elevage.ajouts-poste.suivi-entetes', ['colonnes' => $colonnesPoste])
                                 </tr>
                             </thead>
                             <tbody>
@@ -66,9 +76,10 @@
                                     @endphp
                                     <tr class="rrow border-b border-outline-variant {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                                         <td data-label="Bande" class="px-sm py-sm font-bold text-brand-forest">{{ $event->lot?->code }}</td>
-                                        <td data-label="N°" class="px-sm py-sm font-mono font-bold text-brand-emerald">{{ $event->mother_ref }}</td>
+                                        {{-- Ticket H11 — N° de femelle / de mâle : lien vers la fiche du sujet quand il est enregistré (ajout du poste). --}}
+                                        <td data-label="N°" class="px-sm py-sm font-mono font-bold text-brand-emerald">@include('livewire.elevage.ajouts-poste.suivi-ref-sujet', ['ref' => $event->mother_ref, 'sujets' => $sujets])</td>
                                         <td data-label="Saillie" class="px-sm py-sm">{{ $event->saillie_date->format('d/m/Y') }}</td>
-                                        <td data-label="Mâle" class="px-sm py-sm font-mono">{{ $event->sire_ref ?? '—' }}</td>
+                                        <td data-label="Mâle" class="px-sm py-sm font-mono">@include('livewire.elevage.ajouts-poste.suivi-ref-sujet', ['ref' => $event->sire_ref, 'sujets' => $sujets])</td>
                                         <td data-label="{{ $checkLabel }}" class="px-sm py-sm">
                                             @if($event->palpation_date)
                                                 {{ $event->palpation_date->format('d/m/Y') }} ({{ $event->status === 'echec' ? 'Négatif' : 'Positif' }})
@@ -99,9 +110,10 @@
                                                 <button type="button" wire:click="closeCycle('{{ $event->id }}')" class="text-[10px] font-bold bg-brand-forest text-white px-2 py-1 rounded-full shadow-sm">Clôturer (Sevrage)</button>
                                             @endif
                                         </td>
+                                        @include('livewire.elevage.ajouts-poste.suivi-cellules', ['colonnes' => $colonnesPoste, 'cellules' => $cellulesPoste[$event->id] ?? []])
                                     </tr>
                                 @empty
-                                    <tr><td colspan="9" class="px-sm py-lg text-center text-outline">Aucune saillie déclarée pour le moment.</td></tr>
+                                    <tr><td colspan="9" class="px-sm py-lg text-center text-outline">Aucune saillie déclarée pour le moment.</td>@include('livewire.elevage.ajouts-poste.suivi-cellules', ['colonnes' => $colonnesPoste, 'cellules' => null])</tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -138,8 +150,12 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de Saillie *</label>
-                        <input wire:model="saillieDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                        <input wire:model.live="saillieDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                     </div>
+                    {{-- Ticket H11 — « Cages Occupées » (désactivé) et aperçu des échéances : ajouts du poste, lapins seulement. --}}
+                    @if($isLapins)
+                        @include('livewire.elevage.ajouts-poste.suivi-modale-lapin', ['saillieDate' => $saillieDate])
+                    @endif
                     <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                         <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-saillie' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
                         <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer la Saillie</button>
@@ -180,14 +196,18 @@
                     </h2>
                     <p class="text-xs text-outline mt-xs">La saisie quotidienne du couvoir se fait depuis la fiche journalière dédiée — résumé réel du mois affiché ci-dessous, un seul point de vérité pour cette donnée.</p>
                 </div>
-                <div class="grid grid-cols-3 gap-md">
+                {{-- Ticket H11 — quatre colonnes : la carte « Bandes suivies » du poste suit les trois du Blade. --}}
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
                     <x-kpi-card label="Œufs Couvés (mois)" icon="egg" color="blue" :value="$this->incubationSummary['couves'] ?? 0" />
                     <x-kpi-card label="Naissains Nés (mois)" icon="child_care" color="emerald" :value="$this->incubationSummary['nes'] ?? 0" />
-                    <x-kpi-card label="Taux d'Éclosion" icon="egg_alt" color="maize" :value="number_format($this->incubationSummary['taux_eclosion'] ?? 0, 1, ',', ' ').' %'" />
+                    <x-kpi-card label="Taux d'Éclosion" icon="egg_alt" color="maize" :value="($this->incubationSummary['taux_eclosion'] ?? null) === null ? '—' : number_format($this->incubationSummary['taux_eclosion'], 1, ',', ' ').' %'" />
+                    @include('livewire.elevage.ajouts-poste.suivi-couvoir-carte', ['lots' => $this->incubationSummary['lots'] ?? 0])
                 </div>
                 <a href="{{ $tab === 'volailles' ? route('elevage.fiche-reproducteurs') : route('elevage.fiche-escargots') }}" class="inline-flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">edit_note</span>Saisir le Couvoir du Jour →
                 </a>
+                {{-- Ticket H11 — bandeau du cycle d'incubation (ajout du poste). --}}
+                @include('livewire.elevage.ajouts-poste.suivi-couvoir-cycle', ['volailles' => $tab === 'volailles'])
             </div>
         @endif
     </x-tab-page>

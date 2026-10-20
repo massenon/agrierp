@@ -3,7 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
-import 'achats_repository.dart' show LigneAchat;
+import '../../core/temps/heure_benin.dart';
+import 'achats_repository.dart' show AchatsRepository, LigneAchat;
 
 /// Une ligne de « Fiches Fournisseurs » et de « Ajouter Fournisseur ».
 class LigneFournisseur {
@@ -117,9 +118,9 @@ class ProfilFournisseur {
 
   /// Catégorie de PRODUIT de la première ligne de l'achat, comme Laravel.
   ///
-  /// ⚠️ Les lignes d'un achat ne descendent pas du serveur : seuls les achats saisis
-  /// sur CE poste en ont une. Les autres n'ont pas de catégorie ici — l'écran met un
-  /// tiret, il ne la devine pas à partir de la catégorie du fournisseur.
+  /// Ticket U4 (D-U4) — les lignes d'un achat descendent avec lui : tout achat servi a
+  /// les siennes. Un achat SANS ligne n'a pas de catégorie — l'écran met un tiret, il ne la
+  /// devine pas à partir de la catégorie du fournisseur.
   final Map<String, String> categorieParAchat;
 
   /// « Solde Global Dû » : reste dû, règlements en attente déduits.
@@ -431,25 +432,11 @@ class FournisseursRepository {
               ..limit(20))
             .get();
 
-    final categorieParAchat = <String, String>{};
-    for (final a in achats) {
-      final lignes =
-          await (database.select(database.purchaseLines)
-                ..where((l) => l.purchaseId.equals(a.id))
-                ..limit(1))
-              .get();
-      if (lignes.isEmpty) continue;
-
-      final produit = await (database.select(
-        database.products,
-      )..where((p) => p.id.equals(lignes.first.productId))).getSingleOrNull();
-      final categorie = produit?.categoryId == null
-          ? null
-          : await (database.select(database.productCategories)
-                  ..where((c) => c.id.equals(produit!.categoryId!)))
-                .getSingleOrNull();
-      if (categorie != null) categorieParAchat[a.id] = categorie.label;
-    }
+    // Ticket U8 — un seul calcul de la « première ligne » pour la liste des achats et ce profil.
+    final toutes = await AchatsRepository.categoriesDesAchats(database);
+    final categorieParAchat = {
+      for (final a in achats) a.id: ?toutes[a.id],
+    };
 
     return ProfilFournisseur(
       categorieParAchat: categorieParAchat,
@@ -466,7 +453,7 @@ class FournisseursRepository {
   }
 
   Future<DonneesFournisseurs> charger({DateTime? jour}) async {
-    final aujourdhui = jour ?? DateTime.now();
+    final aujourdhui = jour ?? HeureBenin.maintenant();
 
     final fournisseurs = await (database.select(
       database.suppliers,

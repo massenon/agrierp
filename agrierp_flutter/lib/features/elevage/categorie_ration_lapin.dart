@@ -8,9 +8,17 @@ import '../../core/database/app_database.dart';
 /// `test/categorie_ration_lapin_test.dart`, sur le jeu de libellés du test
 /// serveur `GlossaireFicheLapinsTest`.
 ///
-///   reproducteur  → « Reproducteur »      (secours 120 g/j)
-///   jeune         → « Jeune »             (secours 30 g/j)  — ex-« Sevré »
-///   chair         → « Lapin de Chair »    (secours 60 g/j)  — ex-« Jeune (engraissement) »
+/// 🔁 TICKET F0.96 — GLOSSAIRE DU 17/10/2026 (remplace celui du 14/10/2026), aligné sur le serveur :
+///
+///   reproducteur  → « Reproducteur »  (secours 120 g/j)
+///   sous_meres    → « Sous-mères »    (secours 30 g/j)  — ex-« Jeune » (14/10), ex-« Sevré »
+///   chair         → « Jeune »         (secours 60 g/j)  — ex-« Lapin de Chair », ex-« Jeune (engraissement) »
+///
+/// ⚠️⚠️ « JEUNE » CHANGE DE CATÉGORIE : le 14/10 il désignait les 30 g/j, il désigne désormais les 60 g/j.
+/// La migration serveur `2026_10_17_000001` renomme le barème (Jeune → Sous-mères, PUIS Lapin de Chair →
+/// Jeune). Le poste lisait encore « Jeune » comme la catégorie à 30 g : après la migration, il aurait
+/// classé le barème « Jeune » (60 g) dans la petite catégorie et ignoré « Sous-mères » — rations fausses,
+/// sans message. Emplacements de synchronisation inchangés : `*_sevre` = Sous-mères, `*_jeune` = Jeune.
 ///
 /// ⚠️⚠️ **POURQUOI UNE CLÉ.** Le poste rattachait l'effectif de la bande à une
 /// ligne du barème par `stageLabel.toLowerCase().contains(stade)`. Après la
@@ -23,31 +31,32 @@ import '../../core/database/app_database.dart';
 /// ou l'autre). Aucune colonne n'est ajoutée ni renommée — le contrat
 /// `/api/sync/pull` (`feed_ration_standards`) est inchangé.
 ///
-/// ⚠️ **ORDRE VOLONTAIRE** : « Jeune Lapin (engraissement) » contient
-/// « jeune » ; `chair` est donc testé AVANT `jeune`.
+/// ⚠️ **ORDRE DU SERVEUR** : `reproducteur`, puis `sous_meres` (« Sous-mères », l'ancien « Sevré »), puis
+/// `chair` (« engraissement », « chair », ou « Jeune » en égalité stricte).
 ///
 /// ⚠️ « jeune » n'est reconnu qu'en ÉGALITÉ STRICTE (comme `$l === 'jeune'`
 /// du serveur) : « Jeunes » ou « Jeune porc » ne sont PAS la catégorie Jeune.
 abstract final class CategorieRationLapin {
   static const reproducteur = 'reproducteur';
-  static const jeune = 'jeune';
+  static const sousMeres = 'sous_meres';
   static const chair = 'chair';
 
-  /// Ordre d'affichage du web (`fiche-lapins.blade.php`).
-  static const ordre = [reproducteur, jeune, chair];
+  /// Ordre d'affichage du web (`fiche-lapins.blade.php`, tableau du rationnement) :
+  /// Reproducteur, Jeune, Sous-mères.
+  static const ordre = [reproducteur, chair, sousMeres];
 
-  /// Libellés affichés — décision client du 14/10/2026.
+  /// Libellés affichés — décision client du 17/10/2026 (`LIBELLES` du serveur).
   static const libelles = {
     reproducteur: 'Reproducteur',
-    jeune: 'Jeune',
-    chair: 'Lapin de Chair',
+    sousMeres: 'Sous-mères',
+    chair: 'Jeune',
   };
 
   /// Valeurs de secours (g/j) — UNIQUEMENT si le barème ne porte pas la
   /// catégorie (`RATIONS_DE_SECOURS` du serveur).
   static const rationsDeSecours = <String, double>{
     reproducteur: 120,
-    jeune: 30,
+    sousMeres: 30,
     chair: 60,
   };
 
@@ -64,17 +73,23 @@ abstract final class CategorieRationLapin {
   /// serveur est la RÉFÉRENCE (figée par le test 15.37) : c'est le poste qui
   /// s'aligne.
   static String? cle(String? libelle) {
-    final l = _plier(_trimPhp(libelle ?? ''));
+    final l = normaliser(libelle);
 
     if (l.isEmpty) return null;
 
     if (l.contains('reproducteur')) return reproducteur;
 
-    // AVANT `jeune` : l'ancien « Jeune Lapin (engraissement) » contient « jeune ».
-    if (l.contains('engraissement') || l.contains('chair')) return chair;
+    // AVANT « jeune » : « Sous-mères » et l'ancien « Lapin Sevré » sont la petite catégorie.
+    if (l.contains('sous-mere') ||
+        l.contains('sous mere') ||
+        l.contains('sevre')) {
+      return sousMeres;
+    }
 
-    // « Lapin Sevré », « Sevré » (anciens) ou « Jeune » seul (nouveau).
-    if (l.contains('sevre') || l == 'jeune') return jeune;
+    // « Jeune » en ÉGALITÉ STRICTE, et les anciens libellés de l'engraissement.
+    if (l.contains('engraissement') || l.contains('chair') || l == 'jeune') {
+      return chair;
+    }
 
     return null;
   }
@@ -82,16 +97,20 @@ abstract final class CategorieRationLapin {
   /// Catégorie qui porte l'effectif d'une bande, d'après son STADE technique
   /// (`livestock_lots.stage` : reproduction, croissance, ponte, engraissement).
   ///
-  /// ⚠️ RÈGLE DU POSTE, SANS ÉQUIVALENT SERVEUR : le web saisit l'effectif PAR
-  /// CATÉGORIE (`cat_eff_*`), colonnes que le poste ne porte pas. Le poste
-  /// affiche donc l'effectif total sur la ligne du stade de la bande. La règle
-  /// est la MÊME fonction [cle] appliquée au stade : elle reproduit exactement
-  /// l'ancien `stageLabel.contains(stade)` sur les anciens libellés
-  /// (`engraissement` → chair ; `reproduction` et `croissance` → aucune
-  /// ligne), sans inventer de correspondance nouvelle. Rattacher
-  /// `reproduction` à Reproducteur ou `croissance` à Jeune est une décision
-  /// client OUVERTE (ticket F0.92).
-  static String? cleDuStade(String? stade) => cle(stade);
+  /// `Str::lower(Str::ascii(trim($libelle)))` du serveur — partagé avec `CategorieRationPorc` (F0.99) :
+  /// une seule transposition de la normalisation PHP, jamais deux.
+  static String normaliser(String? libelle) => _plier(_trimPhp(libelle ?? ''));
+
+  /// 🔁 TICKET F0.96 — RÈGLE DU SERVEUR (`STADE_VERS_CATEGORIE`, rationnement automatique du
+  /// 17/10/2026) : reproduction → Reproducteur, croissance → Sous-mères, engraissement → Jeune.
+  /// L'ancienne règle du poste (seul `engraissement` rattaché) laissait sans ration les bandes en
+  /// reproduction et en croissance. `ponte` (et un stade inconnu) : aucune catégorie.
+  static String? cleDuStade(String? stade) => switch (stade) {
+    'reproduction' => reproducteur,
+    'croissance' => sousMeres,
+    'engraissement' => chair,
+    _ => null,
+  };
 
   /// Première ligne du barème relevant de la catégorie, ou `null`.
   ///

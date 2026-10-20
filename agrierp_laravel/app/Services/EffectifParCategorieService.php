@@ -16,8 +16,8 @@ use InvalidArgumentException;
  * par catégorie et un DÉPART, et DÉRIVE `cat_eff_*` (comme `effectif_final`). Ce service n'a
  * AUCUNE interface ni push : tickets 15.40 à 15.42.
  *
- * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Jeune (lapins) /
- * Porcelet (porcs) ; `jeune` = Lapin de Chair (lapins) / Marchand (porcs).
+ * Emplacements génériques (14.11 / 14.12) : `repro` = Reproducteur ; `sevre` = Sous-mères (lapins) /
+ * Porcelet (porcs) ; `jeune` = Jeune (lapins) / Marchand (porcs) — glossaire du 17/10/2026.
  *
  * FORMULES (chaque catégorie bornée à 0 ; v = dernière fiche ANTÉRIEURE de la même bande, un jour
  * sauté est franchi ; p = passage de stade) :
@@ -79,12 +79,22 @@ class EffectifParCategorieService
         }
         $lapins = $espece === self::LAPINS;
         $m = fn (string $cle): ?int => $mouvements[$cle] ?? null;
+        // Ticket 15.46 — transferts entre bandes : dérivés de `livestock_transfers`, donc toujours CONNUS (absents = 0).
+        $t = fn (string $cle): int => (int) ($mouvements[$cle] ?? 0);
 
         // Reproducteur : ne change jamais de stade (14.11). Les achats de porcs lui reviennent (D11).
-        $repro = self::appliquer($veille['repro'] ?? null, $lapins ? [] : [$m('achat')], [$m('mort_repro'), $m('don_repro')]);
+        $repro = self::appliquer(
+            $veille['repro'] ?? null,
+            array_merge($lapins ? [] : [$m('achat')], [$t('transfert_entree_repro')]),
+            [$m('mort_repro'), $m('don_repro'), $t('transfert_sortie_repro')],
+        );
 
         // Catégorie « sevre » (Jeune / Porcelet), avant passage : les lapins achetés y entrent (D11), les nés aussi.
-        $avant = self::brut($veille['sevre'] ?? null, $lapins ? [$m('achat'), $m('ne')] : [$m('ne')], [$m('mort_sevre'), $m('don_sevre')]);
+        $avant = self::brut(
+            $veille['sevre'] ?? null,
+            array_merge($lapins ? [$m('achat'), $m('ne')] : [$m('ne')], [$t('transfert_entree_sevre')]),
+            [$m('mort_sevre'), $m('don_sevre'), $t('transfert_sortie_sevre')],
+        );
 
         $passage = $m('passage');
         $refus = null;
@@ -100,7 +110,11 @@ class EffectifParCategorieService
         }
 
         $sevre = ($avant === null || $passageApplique === null) ? null : max(0, $avant - $passageApplique);
-        $jeune = self::appliquer($veille['jeune'] ?? null, [$passageApplique], [$m('vente'), $m('mort_jeune'), $m('don_jeune')]);
+        $jeune = self::appliquer(
+            $veille['jeune'] ?? null,
+            [$passageApplique, $t('transfert_entree_jeune')],
+            [$m('vente'), $m('mort_jeune'), $m('don_jeune'), $t('transfert_sortie_jeune')],
+        );
 
         $sommeDifferente = null;
         if ($repro !== null && $sevre !== null && $jeune !== null && $totalFinal !== null) {
@@ -156,6 +170,40 @@ class EffectifParCategorieService
     }
 
     // ====================================================================== ESPÈCE / CHAÎNE
+
+    /**
+     * Stade de bande → emplacement de catégorie. Lapins : Reproducteur / Sous-mères / Jeune ;
+     * porcs : Reproducteur / Porcelet / Porc Marchand. `ponte` ne relève d'aucune catégorie.
+     */
+    private const STADE_VERS_CATEGORIE = ['reproduction' => 'repro', 'croissance' => 'sevre', 'engraissement' => 'jeune'];
+
+    /**
+     * 🔴→✅ RATIONNEMENT AUTOMATIQUE — effectif de départ DÉDUIT du stade de la bande, sans saisie.
+     *
+     * Le départ par catégorie devait être saisi à la main avant que la moindre ration ne se calcule :
+     * tant qu'il ne l'était pas, « Rationnement & Provende Servie » restait à « — ». Une bande est créée
+     * avec un stade (« Stade Initial ») : tout son effectif relève de la catégorie de ce stade, les deux
+     * autres valent 0. La somme vaut donc toujours l'effectif total au début du jour (contrôle de
+     * `verifierDepart` respecté). Null : espèce sans catégories ou stade sans catégorie (ponte).
+     *
+     * @return array{repro: int, sevre: int, jeune: int}|null
+     */
+    public static function departDepuisStade(LivestockLot $lot, int $totalDebutJour): ?array
+    {
+        $emplacement = self::STADE_VERS_CATEGORIE[$lot->stage] ?? null;
+
+        if (self::especeDuLot($lot) === null || $emplacement === null) {
+            return null;
+        }
+
+        return array_merge(['repro' => 0, 'sevre' => 0, 'jeune' => 0], [$emplacement => max(0, $totalDebutJour)]);
+    }
+
+    /** Ticket 15.46 — catégorie (repro / sevre / jeune) d'un stade de bande ; null pour `ponte` ou un stade inconnu. */
+    public static function categorieDuStade(?string $stade): ?string
+    {
+        return self::STADE_VERS_CATEGORIE[$stade] ?? null;
+    }
 
     public static function especeDuLot(LivestockLot $lot): ?string
     {
@@ -334,12 +382,7 @@ class EffectifParCategorieService
         $veille = ['repro' => (int) $tete->cat_depart_repro, 'sevre' => (int) $tete->cat_depart_sevre, 'jeune' => (int) $tete->cat_depart_jeune];
 
         foreach ($fiches->slice($indexTete)->values() as $f) {
-            $r = self::calculerJour($espece, $veille, [
-                'achat' => $f->achat, 'ne' => $f->ne, 'vente' => $f->vente,
-                'mort_repro' => $f->mort_repro, 'mort_sevre' => $f->mort_sevre, 'mort_jeune' => $f->mort_jeune,
-                'don_repro' => $f->don_repro, 'don_sevre' => $f->don_sevre, 'don_jeune' => $f->don_jeune,
-                'passage' => $f->passage_sevre_jeune,
-            ]);
+            $r = self::calculerJour($espece, $veille, $f->mouvementsParCategorie());
             if ($f->id === $proposee->id) {
                 return $r->refus;
             }
@@ -507,12 +550,7 @@ class EffectifParCategorieService
     /** Calcule une fiche, enregistre le résultat dans `$sortie`, rend les catégories de fin de journée. */
     private function jour(string $espece, LivestockDailyEntry $f, array $veille, array &$sortie): array
     {
-        $r = self::calculerJour($espece, $veille, [
-            'achat' => $f->achat, 'ne' => $f->ne, 'vente' => $f->vente,
-            'mort_repro' => $f->mort_repro, 'mort_sevre' => $f->mort_sevre, 'mort_jeune' => $f->mort_jeune,
-            'don_repro' => $f->don_repro, 'don_sevre' => $f->don_sevre, 'don_jeune' => $f->don_jeune,
-            'passage' => $f->passage_sevre_jeune,
-        ], (int) $f->effectif_final);
+        $r = self::calculerJour($espece, $veille, $f->mouvementsParCategorie(), (int) $f->effectif_final);
 
         if ($r->refus !== null) {
             $sortie['avertissements'][] = "Fiche du {$f->entry_date->format('d/m/Y')} : {$r->refus} Passage ramené à la catégorie source pour le calcul (saisie conservée).";

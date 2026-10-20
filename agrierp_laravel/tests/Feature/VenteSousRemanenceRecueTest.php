@@ -50,6 +50,12 @@ class VenteSousRemanenceRecueTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->utilisateur->assignRole('admin');
+
         $espece = LivestockSpecies::firstOrCreate(
             ['code' => 'cuniculture'],
             ['label' => 'Cuniculture', 'is_active' => true],
@@ -127,7 +133,8 @@ class VenteSousRemanenceRecueTest extends TestCase
         // ⚠️ SIGNALEE : sinon l'incident sanitaire reste muet.
         $alerte = Notification::where('type', 'sale_under_withdrawal')->first();
         $this->assertNotNull($alerte);
-        $this->assertEquals('error', $alerte->severity);
+        // Ticket 15.49 : `error` n'existe pas dans la colonne (MySQL strict refusait l'écriture) ; incident = critique.
+        $this->assertEquals('critique', $alerte->severity);
         $this->assertStringContainsString('CUN-2026-01', $alerte->message);
         $this->assertStringContainsString('rappel', $alerte->message);
     }

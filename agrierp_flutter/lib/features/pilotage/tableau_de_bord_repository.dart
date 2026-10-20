@@ -1,5 +1,11 @@
+import 'dart:math' as math;
+
+import '../../core/audit/libelles_audit.dart';
+import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
-import '../elevage/production_oeufs_service.dart';
+import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
+import '../stocks/pmp_service.dart';
 
 /// Une mesure du tableau de bord : un chiffre, ou une absence assumée.
 ///
@@ -20,20 +26,24 @@ class Mesure {
   bool get disponible => valeur != null;
 }
 
-/// Une alerte de la colonne « Alertes Critiques ».
+/// Une alerte de la colonne « Alertes Critiques » — `Index::getAlertesCritiquesProperty()`.
 class AlerteCritique {
-  const AlerteCritique({required this.message, required this.grave});
+  const AlerteCritique({
+    required this.message,
+    required this.grave,
+    required this.lien,
+  });
 
   final String message;
 
-  /// Rouge (fond `error-bg`) plutôt que jaune, comme dans la maquette.
+  /// Sévérité `critique` du web (fond `error-bg`) ; sinon `moyen` (fond jaune).
   final bool grave;
+
+  /// Adresse web de l'alerte (`link`), d'où le poste déduit l'écran à ouvrir.
+  final String lien;
 }
 
-/// Une carte de la bande « Élevage en temps réel ».
-///
-/// Les quatre mesures diffèrent d'une espèce à l'autre dans la maquette : la
-/// liste est donc portée telle quelle, dans SON ordre.
+/// Une carte de la bande Lapins · Volailles · Porcs — `Index::getCartesElevageProperty()`.
 class CarteEspece {
   const CarteEspece({
     required this.titre,
@@ -43,15 +53,15 @@ class CarteEspece {
 
   final String titre;
 
-  /// Trois premières mesures, `(libellé, valeur affichable)`.
+  /// Trois premières mesures, `(libellé, valeur affichable)`, dans l'ordre du Blade.
   final List<(String, String)> mesures;
 
-  /// Quatrième mesure de la maquette, toujours « Mortalité ». Séparée parce
-  /// que sa couleur dépend du seuil.
-  final double? mortalite;
+  /// Quatrième mesure, toujours « Mortalité » : `round(…, 1)` du PHP, 0,0 sans fiche. Séparée parce que sa
+  /// couleur dépend du seuil (`> 5`).
+  final double mortalite;
 }
 
-/// Un mois de la courbe « CA vs Dépenses ».
+/// Un mois de la courbe « CA vs Dépenses » et des « Statistiques de Ventes ».
 class PointMensuel {
   const PointMensuel({
     required this.libelle,
@@ -64,17 +74,43 @@ class PointMensuel {
   final double depenses;
 }
 
-/// Une ligne des « Transactions Récentes » ou des « Activités du Jour ».
+/// Couleur du montant d'une ligne de « Transactions Récentes », reprise des classes du Blade.
+enum TonMontant {
+  /// `text-brand-emerald` : vente ou facture hors crédit.
+  emeraude,
+
+  /// `text-brand-forest` : achat au comptant.
+  foret,
+
+  /// `text-accent-yellow` : vente à crédit, achat non comptant.
+  jaune,
+
+  /// `text-info-blue` : devis.
+  bleu,
+
+  /// `text-error-red` : dépense.
+  rouge,
+}
+
+/// Une ligne des « Transactions Récentes ».
 class LigneTransaction {
   const LigneTransaction({
     required this.libelle,
     required this.montant,
-    this.horodatage,
+    required this.ton,
   });
 
   final String libelle;
-  final double? montant;
-  final String? horodatage;
+  final double montant;
+  final TonMontant ton;
+}
+
+/// Une ligne des « Activités du Jour » : l'action, puis « HH:mm — auteur · module ».
+class LigneActivite {
+  const LigneActivite({required this.libelle, required this.detail});
+
+  final String libelle;
+  final String detail;
 }
 
 /// Une ligne du « Top 5 Produits du Mois ».
@@ -83,137 +119,180 @@ class LigneTopProduit {
     required this.produit,
     required this.quantite,
     required this.chiffreAffaires,
+    required this.margePct,
   });
 
+  /// Nom du produit, « — » s'il est inconnu du poste (`$row['product']?->name ?? '—'`).
   final String produit;
   final double quantite;
   final double chiffreAffaires;
+
+  /// Marge en %, `null` → « — ».
+  final int? margePct;
 }
 
-/// Tout ce que la maquette `dashboard.html` demande, dans son ordre.
+/// Tout ce que la vue Blade du tableau de bord affiche, dans son ordre.
 class DonneesTableauDeBord {
   const DonneesTableauDeBord({
+    required this.debutPeriode,
+    required this.finPeriode,
     required this.chiffreAffaires,
-    required this.nombreDeVentes,
+    required this.legendeChiffreAffaires,
     required this.tresorerie,
     required this.tresorerieParType,
     required this.depenses,
+    required this.legendeDepenses,
     required this.resultatNet,
+    required this.legendeResultatNet,
     required this.creances,
     required this.dettes,
     required this.produitsSousSeuil,
     required this.effectifAnimaux,
-    required this.effectifPrecedentConnu,
     required this.alertes,
     required this.especes,
     required this.serie,
-    required this.serieAnnuelle,
     required this.ventesRecentes,
+    required this.achatsRecents,
     required this.depensesRecentes,
+    required this.facturesRecentes,
     required this.activitesDuJour,
     required this.topProduits,
+    this.exerciceOuvert,
   });
 
+  /// Ticket H5 — année de l'exercice OUVERT (`FiscalYear::current()` : statut `ouvert`, le plus récent), affichée
+  /// « · Exercice {année} actif » comme au web ; `null` : « · Aucun exercice ouvert ». 🔴 Le poste affichait l'année
+  /// du CALENDRIER, même sans exercice ouvert.
+  final int? exerciceOuvert;
+
+  /// Période AFFICHÉE (champs désactivés du Blade) : 1er du mois → aujourd'hui.
+  final DateTime debutPeriode;
+  final DateTime finPeriode;
+
   final Mesure chiffreAffaires;
-  final int nombreDeVentes;
+
+  /// « Mois précédent : X F (±y,z%) », `null` sans valeur.
+  final String? legendeChiffreAffaires;
   final Mesure tresorerie;
   final Map<String, double> tresorerieParType;
   final Mesure depenses;
+  final String? legendeDepenses;
   final Mesure resultatNet;
+
+  /// « Marge nette : X% », `null` quand le CA n'est pas positif.
+  final String? legendeResultatNet;
   final Mesure creances;
   final Mesure dettes;
   final List<Product> produitsSousSeuil;
   final Mesure effectifAnimaux;
-  final bool effectifPrecedentConnu;
   final List<AlerteCritique> alertes;
   final List<CarteEspece> especes;
-  final List<PointMensuel> serie;
 
-  /// Douze mois, pour l'histogramme de « Statistiques de Ventes ».
-  final List<PointMensuel> serieAnnuelle;
+  /// Les six derniers mois, le courant en dernier (courbe ET histogramme, comme le web).
+  final List<PointMensuel> serie;
   final List<LigneTransaction> ventesRecentes;
+  final List<LigneTransaction> achatsRecents;
   final List<LigneTransaction> depensesRecentes;
-  final List<LigneTransaction> activitesDuJour;
+  final List<LigneTransaction> facturesRecentes;
+  final List<LigneActivite> activitesDuJour;
   final List<LigneTopProduit> topProduits;
 }
 
-/// Lectures du Tableau de Bord — `prototype_html/dashboard.html`.
+/// Lectures du Tableau de Bord — ticket H5 : **la vue Blade et `Dashboard/Index.php` font foi.**
 ///
-/// ⚠️⚠️ **LE TIRAGE NE DESCEND NI LES VENTES NI LES DÉPENSES.** Vérifié dans
-/// `SyncController::pull()` : la charge utile porte les produits, les bandes,
-/// les fiches, les référentiels, les comptes de trésorerie et les catégories
-/// de charge — **jamais `sales`, jamais `expenses`**. Ces deux tables ne
-/// contiennent donc, au poste, que ce que CE poste a saisi.
+/// Chaque calcul ci-dessous est la transposition d'une méthode du composant Livewire, citée à son endroit, avec
+/// SES filtres et SES arrondis — y compris là où ils surprennent (vente annulée comptée au CA, jours de retard
+/// signés) : ces deux-là sont marqués « reproduit, signalé au web » à leur endroit, le web corrige d'abord.
 ///
-/// Conséquence directe : « Chiffre d'Affaires » et « Dépenses » ne sont pas
-/// ceux de la ferme, et l'écran doit le dire. Les afficher sans mention
-/// tromperait un gérant qui compare deux postes.
+/// ⚠️ **TOUT EST CALÉ SUR LE MOIS COURANT**, comme le web : sa période « Du / au » est désactivée. Le poste
+/// affiche les mêmes deux champs, désactivés aussi.
 ///
-/// ⚠️ **SEUIL DE MORTALITÉ : 5 %**, et il n'est pas inventé — c'est celui du
-/// prototype lui-même, `gestion-elevage.html` : « Attention : Seuil critique
-/// dépassé ! » à partir de `>= 5`, « Seuil normal < 5% » en dessous. La même
-/// formule y est écrite noir sur blanc : *(Cumul des Morts du Mois / Effectif
-/// Initial Cumulé) × 100*.
+/// ⚠️ Depuis 14.79/14.80, `sales`, `purchases`, `payables`, `receivables`, `customers` et
+/// `livestock_reproduction_events` descendent au poste : les mentions « Ce poste uniquement » et « Table non
+/// synchronisée » étaient fausses. Depuis U4 (D-U4), `sale_lines` et `purchase_lines` descendent aussi, avec leur
+/// pièce : le Top 5 (marge comprise) et « Ventes (mois) » portent sur TOUTES les ventes de la ferme, comme au web.
+/// Depuis U13, `expenses` descend aussi (dépenses du web et des autres postes, archivage compris).
 class TableauDeBordRepository {
-  TableauDeBordRepository({required this.database});
+  TableauDeBordRepository({required this.database, DateTime Function()? horloge})
+    : _horloge = horloge ?? HeureBenin.maintenant;
 
   final AppDatabase database;
+  final DateTime Function() _horloge;
 
-  /// Seuil critique de mortalité, en pourcentage — `gestion-elevage.html`.
-  static const double seuilMortalite = 5;
+  /// Seuil de couleur des cartes espèces : `$x['mortalite'] > 5` dans le Blade (strict).
+  static const double seuilMortaliteCarte = 5;
 
-  /// Les cinq stades qui alimentent le « porc marchand » / « lapin marchand ».
-  ///
-  /// ⚠️ Même correspondance que `_correspondAuStade()` sur la fiche Porcs :
-  /// la ferme ne stocke pas de catégorie commerciale, elle stocke un STADE.
-  static bool _estMarchand(String? stade) {
-    final s = (stade ?? '').toLowerCase();
-    return s.contains('engraissement') || s.contains('croissance');
-  }
+  /// Seuil de l'alerte « Mortalité anormale » : `AlertesElevageService::SEUIL_MORTALITE_JOUR`, comparé par `>=`.
+  static const double seuilMortaliteAlerte = 5;
 
-  Future<DonneesTableauDeBord> charger({
-    required DateTime du,
-    required DateTime au,
-  }) async {
-    final finDeJournee = DateTime(au.year, au.month, au.day, 23, 59, 59);
-    final debut = DateTime(du.year, du.month, du.day);
+  Future<DonneesTableauDeBord> charger() async {
+    final maintenant = _horloge();
+    final debutMois = DateTime(maintenant.year, maintenant.month);
+    // `now()->subMonthNoOverflow()->startOfMonth()` / `->endOfMonth()` (23:59:59.999999).
+    final debutPrecedent = DateTime(maintenant.year, maintenant.month - 1);
+    final finPrecedent = debutMois.subtract(const Duration(microseconds: 1));
 
-    final ventes = await database.select(database.sales).get();
+    // 🔴→✅ TICKET U8 — RÈGLE UNIQUE DU TABLEAU DE BORD : CE QUE LE WEB COMPTE, PLUS CE QUI PART VERS LUI.
+    // Toute pièce du poste entre aux calculs ET aux listes si elle est connue du serveur (`synced`) ou saisie ici
+    // et en attente d'envoi (`pending` : un fait de la ferme que le web aura à la synchronisation — le poste
+    // travaille hors ligne, l'en exclure ferait mentir le tableau précisément quand il sert). Une pièce REFUSÉE
+    // par le serveur (`conflict`) n'existe que sur ce poste et n'entrera jamais au web : elle ne compte NULLE PART
+    // — ni au CA, ni aux Dépenses, ni au Résultat Net, ni à la courbe, ni aux ventes porcines, ni au Top 5 (ses
+    // lignes de vente, et les lignes d'achat d'un achat refusé au PMP de la marge), ni aux transactions récentes.
+    // Elle reste visible là où elle se corrige : l'écran Synchronisation et la liste de son module.
+    // ⚠️ La règle vise les PIÈCES, jamais modifiées après leur création : leur refus veut dire « absente du web ».
+    // Une fiche journalière, un cycle de reproduction ou un produit refusés peuvent être la MODIFICATION d'un
+    // enregistrement que le web garde dans sa version précédente, que le poste n'a pas : les exclure ne
+    // reproduirait pas davantage le web — ils restent comptés dans leur version locale.
+    final ventes = (await database.select(database.sales).get())
+        .where((v) => compteAuWeb(v.syncStatus))
+        .toList();
+    // Ticket H5 — `Sale::nonAnnulees()` du web (corrigé au web d'abord) : une vente annulée ne compte ni au CA, ni à
+    // la courbe, ni aux ventes du mois, ni au Top 5. Les LISTES (transactions récentes, factures) la montrent encore.
+    final ventesValides = ventes.where((v) => v.status != 'annulee').toList();
     final lignes = await database.select(database.saleLines).get();
     final produits = await database.select(database.products).get();
-    final depenses = await database.select(database.expenses).get();
+    final categories = await database.select(database.productCategories).get();
+    final tousAchats = await database.select(database.purchases).get();
+    final achats = tousAchats.where((a) => compteAuWeb(a.syncStatus)).toList();
+    // Ticket U4 — lignes d'achat de la ferme (descendues avec leurs achats) : PMP de la marge du Top 5. U8 : même
+    // règle que la Gestion des Stocks ([PmpService.lignesRetenues]) — sans les lignes d'un achat refusé.
+    final lignesAchat = PmpService.lignesRetenues(
+      tousAchats,
+      await database.select(database.purchaseLines).get(),
+    );
+    final depenses = (await database.select(database.expenses).get())
+        .where((d) => compteAuWeb(d.syncStatus))
+        .toList();
     final comptes = await database.select(database.treasuryAccounts).get();
     final creances = await database.select(database.receivables).get();
-    final bandes = await (database.select(
-      database.livestockLots,
-    )..where((t) => t.isActive.equals(true))).get();
+    final dettes = await database.select(database.payables).get();
+    final clients = await database.select(database.customers).get();
+    final toutesBandes = await database.select(database.livestockLots).get();
     final fiches = await database.select(database.livestockDailyEntries).get();
+    final cycles = await database
+        .select(database.livestockReproductionEvents)
+        .get();
+    final journal = await database.select(database.auditLogs).get();
 
-    final ventesRetenues =
-        ventes
-            .where((v) => v.status != 'annulee')
-            .where(
-              (v) =>
-                  !v.soldAt.isBefore(debut) && !v.soldAt.isAfter(finDeJournee),
-            )
-            .toList()
-          ..sort((a, b) => b.soldAt.compareTo(a.soldAt));
+    // ── KPI (`getKpisProperty`) ─────────────────────────────────────────────────────────────────────────
+    double caEntre(DateTime du, DateTime? au) => ventesValides
+        .where((v) => !v.soldAt.isBefore(du) && (au == null || !v.soldAt.isAfter(au)))
+        .fold<double>(0, (t, v) => t + v.total);
+    double achatsEntre(DateTime du, DateTime? au) => achats
+        .where(
+          (a) =>
+              !a.purchaseDate.isBefore(du) &&
+              (au == null || !a.purchaseDate.isAfter(au)),
+        )
+        .fold<double>(0, (t, a) => t + a.total);
 
-    final depensesRetenues =
-        depenses
-            .where(
-              (d) =>
-                  !d.expenseDate.isBefore(debut) &&
-                  !d.expenseDate.isAfter(finDeJournee),
-            )
-            .toList()
-          ..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
-
-    final ca = ventesRetenues.fold<double>(0, (t, v) => t + v.total);
-    final totalDepenses = depensesRetenues.fold<double>(
-      0,
-      (t, d) => t + d.amount,
-    );
+    final ca = caEntre(debutMois, null);
+    final caPrecedent = caEntre(debutPrecedent, finPrecedent);
+    // ⚠️ « Dépenses » = ACHATS (`Purchase.total`), pas les charges (`expenses`) : c'est le KPI du web.
+    final totalAchats = achatsEntre(debutMois, null);
+    final achatsPrecedents = achatsEntre(debutPrecedent, finPrecedent);
+    final resultat = ca - totalAchats;
 
     final parType = <String, double>{};
     for (final c in comptes) {
@@ -221,6 +300,8 @@ class TableauDeBordRepository {
           (parType[c.type ?? 'autre'] ?? 0) + c.balance;
     }
 
+    // `Product::where('is_active', true)->whereColumn('stock_qty', '<=', 'alert_threshold')` — un seuil NULL
+    // ne compare jamais en SQL.
     final sousSeuil = produits
         .where(
           (p) =>
@@ -230,371 +311,503 @@ class TableauDeBordRepository {
         )
         .toList();
 
-    final effectif = bandes.fold<int>(0, (t, b) => t + b.currentQuantity);
+    // `LivestockLot::where('is_active', true)->where('status', 'actif')`.
+    final bandesActives = toutesBandes.where(_vivante).toList();
+    final effectif = bandesActives.fold<int>(0, (t, b) => t + b.currentQuantity);
+
+    final nomsClients = {for (final c in clients) c.id: c.name};
+
+    final exercices = await (database.select(database.fiscalYears)..where((e) => e.status.equals('ouvert'))).get();
+    final exerciceOuvert = exercices.isEmpty ? null : exercices.map((e) => e.year).reduce((a, b) => a > b ? a : b);
 
     return DonneesTableauDeBord(
+      exerciceOuvert: exerciceOuvert,
+      debutPeriode: debutMois,
+      finPeriode: maintenant,
       chiffreAffaires: Mesure.chiffre(ca),
-      nombreDeVentes: ventesRetenues.length,
+      legendeChiffreAffaires: legendeMoisPrecedent(ca, caPrecedent),
       tresorerie: Mesure.chiffre(
         comptes.fold<double>(0, (t, c) => t + c.balance),
       ),
       tresorerieParType: parType,
-      depenses: Mesure.chiffre(totalDepenses),
-      // ⚠️ PAS « CA − DÉPENSES ». Le résultat net d'un exercice se lit au
-      // grand livre : produits et charges y comprennent l'amortissement, les
-      // variations de stock et les écritures d'inventaire, dont le poste n'a
-      // rien. Le soustraire ici donnerait un chiffre plausible et faux, sur
-      // deux agrégats qui ne couvrent déjà que CE poste.
-      resultatNet: const Mesure.absente('Sans comptabilité au poste'),
-      // 🔴→✅ TICKET F0.43 — L'ENCOURS EST ENFIN CALCULABLE. `receivables`
-      // descend au poste depuis le ticket 14.75 ; cette carte portait un
-      // tiret parce que la table n'arrivait pas, pas parce que la donnée
-      // n'existait pas.
-      //
-      // ⚠️ **LE RESTE DÛ, PAS LE MONTANT FACTURÉ** : `amount - amount_paid`.
-      // Sommer `amount` compterait deux fois ce qui a déjà été réglé.
+      depenses: Mesure.chiffre(totalAchats),
+      legendeDepenses: legendeMoisPrecedent(totalAchats, achatsPrecedents),
+      // `$ca['value'] - $depenses['value']` : CA du mois − achats du mois.
+      resultatNet: Mesure.chiffre(resultat),
+      legendeResultatNet: legendeMargeNette(resultat, ca),
+      // ⚠️ LE RESTE DÛ, PAS LE MONTANT FACTURÉ, et seulement `amount_paid < amount` (`Receivable::balance`).
       creances: Mesure.chiffre(
-        creances.fold<double>(0, (t, c) => t + (c.amount - c.amountPaid)),
+        creances
+            .where((c) => c.amountPaid < c.amount)
+            .fold<double>(0, (t, c) => t + _arrondi(c.amount - c.amountPaid, 2)),
       ),
-      dettes: const Mesure.absente('Table non synchronisée'),
+      // 🔴→✅ H5 — `payables` descend depuis 14.79 : « Table non synchronisée » était faux. Même règle.
+      dettes: Mesure.chiffre(
+        dettes
+            .where((d) => d.amountPaid < d.amount)
+            .fold<double>(0, (t, d) => t + _arrondi(d.amount - d.amountPaid, 2)),
+      ),
       produitsSousSeuil: sousSeuil,
       effectifAnimaux: Mesure.chiffre(effectif.toDouble()),
-      effectifPrecedentConnu: false,
-      alertes: _alertes(sousSeuil, bandes, fiches),
-      especes: _cartesEspeces(bandes, fiches, au),
-      serie: _serie(ventes, depenses, au, mois: 6),
-      serieAnnuelle: _serie(ventes, depenses, au, mois: 12),
-      ventesRecentes: _ventesRecentes(ventesRetenues),
-      depensesRecentes: _depensesRecentes(depensesRetenues),
-      activitesDuJour: _activites(ventes, depenses, fiches, au),
-      topProduits: _topProduits(ventesRetenues, lignes, produits),
+      alertes: _alertes(
+        maintenant,
+        sousSeuil,
+        toutesBandes,
+        fiches,
+        creances,
+        nomsClients,
+      ),
+      especes: _cartesEspeces(
+        debutMois,
+        toutesBandes,
+        fiches,
+        cycles,
+        ventesValides,
+        lignes,
+        produits,
+        categories,
+      ),
+      serie: _serie(ventesValides, achats, maintenant),
+      ventesRecentes: _ventes(ventes, nomsClients),
+      achatsRecents: _achats(achats),
+      depensesRecentes: _depenses(depenses),
+      // Facturation = `Sale` dont `mecef_status = 'transmise'` (pas de modèle `Invoice`).
+      facturesRecentes: _ventes(
+        ventes.where((v) => v.mecefStatus == 'transmise').toList(),
+        nomsClients,
+      ),
+      activitesDuJour: _activites(journal, maintenant),
+      topProduits: _topProduits(
+        debutMois,
+        ventesValides,
+        lignes,
+        produits,
+        lignesAchat,
+      ),
     );
   }
 
-  // ── Alertes ───────────────────────────────────────────────────────────────
+  /// Ticket U8 — une pièce synchronisable compte au Tableau de bord si le web la connaît ou la connaîtra : tout
+  /// sauf `conflict` (voir la règle en tête de [charger]).
+  static bool compteAuWeb(SyncStatus statut) => statut != SyncStatus.conflict;
 
-  /// ⚠️ **DEUX FAMILLES SUR QUATRE.** La maquette en montre quatre : stock sous
-  /// seuil, mortalité anormale, **créance en retard**, **péremption proche**.
-  /// Les deux dernières demandent des tables que le poste ne reçoit pas
-  /// (`receivables`) ou qui n'existent nulle part (date de péremption d'un
-  /// produit vétérinaire). Elles sont absentes, pas simulées.
+  /// `is_active = true` ET `status = 'actif'` — le scope `vivantes()` et les filtres du tableau de bord.
+  static bool _vivante(LivestockLot b) => b.isActive && b.status == 'actif';
+
+  // ── Alertes (`getAlertesCritiquesProperty`) ─────────────────────────────────────────────────────────
+
   List<AlerteCritique> _alertes(
+    DateTime maintenant,
     List<Product> sousSeuil,
     List<LivestockLot> bandes,
     List<LivestockDailyEntry> fiches,
+    List<Receivable> creances,
+    Map<String, String> nomsClients,
   ) {
     final alertes = <AlerteCritique>[];
 
-    for (final p in sousSeuil) {
+    // 1. Stock : `->limit(5)`, libellé `{$product->stock_qty}` — cast `decimal:2`, donc « 5.00 » (point).
+    for (final p in sousSeuil.take(5)) {
       alertes.add(
         AlerteCritique(
-          message: '${p.name} sous le seuil critique',
+          message:
+              'Stock critique — ${p.name} '
+              '(${p.stockQty.toStringAsFixed(2)} ${p.unit} restant(s))',
           grave: true,
+          lien: '/gestion-stocks',
         ),
       );
     }
 
-    // Mortalité anormale sur les sept derniers jours, bande par bande.
-    final reference = fiches.isEmpty
-        ? DateTime.now()
-        : fiches.map((f) => f.entryDate).reduce((a, b) => a.isAfter(b) ? a : b);
-    final depuis = reference.subtract(const Duration(days: 7));
-
-    for (final bande in bandes) {
-      final duLot = fiches.where(
-        (f) => f.lotId == bande.id && !f.entryDate.isBefore(depuis),
-      );
-      if (duLot.isEmpty) continue;
-
-      final morts = duLot.fold<int>(0, (t, f) => t + f.mort);
-      final base = bande.initialQuantity;
-      if (base <= 0 || morts <= 0) continue;
-
-      final taux = (morts / base) * 100;
-      if (taux >= seuilMortalite) {
-        alertes.add(
-          AlerteCritique(
-            message:
-                'Mortalité anormale — Lot ${bande.code} '
-                '(${taux.toStringAsFixed(1)} %)',
-            grave: true,
-          ),
-        );
+    // 2. Mortalité : `AlertesElevageService::mortalitesAnormales()` — fiches du jour J−7 et après, bandes
+    //    vivantes, PIRE JOUR par bande (taux rapporté à la fiche précédente ou à l'effectif initial), ≥ 5 %.
+    final parId = {for (final b in bandes) b.id: b};
+    final depuis = DateTime(maintenant.year, maintenant.month, maintenant.day - 7);
+    final pires = <String, (LivestockDailyEntry, double)>{};
+    for (final f in fiches) {
+      final b = parId[f.lotId];
+      if (b == null || !_vivante(b) || _jour(f.entryDate).isBefore(depuis)) {
+        continue;
       }
+      final taux = _tauxMortalite(f, b, fiches);
+      final actuel = pires[f.lotId];
+      // `sortByDesc(...)->first()` : à égalité, la première fiche lue reste.
+      if (actuel == null || taux > actuel.$2) pires[f.lotId] = (f, taux);
+    }
+    for (final MapEntry(key: lot, value: (_, taux)) in pires.entries) {
+      if (taux < seuilMortaliteAlerte) continue;
+      alertes.add(
+        AlerteCritique(
+          message: 'Mortalité anormale — Lot ${parId[lot]!.code} (${nombre(taux, 1)}%)',
+          grave: true,
+          lien: '/gestion-bandes',
+        ),
+      );
     }
 
-    return alertes;
+    // 3. Créances en retard : solde non nul, échéance dépassée, `->limit(3)`.
+    //    Ticket H5 — le retard se compte de l'échéance à aujourd'hui, en jours calendaires (le web affichait
+    //    « (-10 jours) », corrigé au web d'abord).
+    for (final c
+        in creances
+            .where(
+              (c) =>
+                  c.amountPaid < c.amount &&
+                  c.dueDate != null &&
+                  c.dueDate!.isBefore(maintenant),
+            )
+            .take(3)) {
+      final echeance = DateTime(c.dueDate!.year, c.dueDate!.month, c.dueDate!.day);
+      final jours = DateTime(maintenant.year, maintenant.month, maintenant.day).difference(echeance).inDays;
+      alertes.add(
+        AlerteCritique(
+          message:
+              'Créance en retard — ${nomsClients[c.customerId] ?? ''} ($jours jours)',
+          grave: false,
+          lien: '/creances-clients',
+        ),
+      );
+    }
+
+    // `array_slice($alerts, 0, 6)`.
+    return alertes.take(6).toList();
   }
 
-  // ── Cartes espèces ────────────────────────────────────────────────────────
-
-  List<CarteEspece> _cartesEspeces(
-    List<LivestockLot> bandes,
+  /// `LivestockDailyEntry::mortality_rate` : `round(mort / effectif précédent × 100, 2)`, 0 sans effectif.
+  /// L'effectif précédent est celui de la DERNIÈRE fiche strictement antérieure de la bande, sinon l'effectif
+  /// initial de la bande (`previousEffectif()`).
+  static double _tauxMortalite(
+    LivestockDailyEntry f,
+    LivestockLot bande,
     List<LivestockDailyEntry> fiches,
-    DateTime mois,
   ) {
-    List<LivestockLot> de(String code) =>
-        bandes.where((b) => b.speciesCode == code).toList();
-
-    double? mortaliteDuMois(List<LivestockLot> lots) {
-      final ids = lots.map((l) => l.id).toSet();
-      final base = lots.fold<int>(0, (t, l) => t + l.initialQuantity);
-      if (base <= 0) return null;
-
-      final morts = fiches
-          .where(
-            (f) =>
-                ids.contains(f.lotId) &&
-                f.entryDate.year == mois.year &&
-                f.entryDate.month == mois.month,
-          )
-          .fold<int>(0, (t, f) => t + f.mort);
-
-      // ⚠️ Formule reprise de `gestion-elevage.html` :
-      //    (Cumul des Morts du Mois / Effectif Initial Cumulé) × 100.
-      return (morts / base) * 100;
-    }
-
-    int effectifDe(List<LivestockLot> lots) =>
-        lots.fold<int>(0, (t, l) => t + l.currentQuantity);
-
-    final lapins = de('cuniculture');
-    final volailles = de('aviculture');
-    final porcs = de('porciculture');
-
-    // Taux de ponte du mois, sur les seules bandes en ponte.
-    final pondeuses = volailles
-        .where((b) => (b.stage ?? '') == 'ponte')
-        .toList();
-    final idsPonte = pondeuses.map((l) => l.id).toSet();
-    final fichesPonte = fiches
-        .where(
-          (f) =>
-              idsPonte.contains(f.lotId) &&
-              f.entryDate.year == mois.year &&
-              f.entryDate.month == mois.month &&
-              (f.ponteTotal ?? 0) > 0,
-        )
-        .toList();
-
-    double? tauxPonte;
-    if (fichesPonte.isNotEmpty) {
-      final taux = fichesPonte
-          .map(
-            (f) => ProductionOeufsService.tauxDePonte(
-              recoltes: f.ponteTotal ?? 0,
-              effectif: f.effectifFinal,
-            ),
-          )
-          .whereType<double>()
-          .toList();
-      if (taux.isNotEmpty) {
-        tauxPonte = taux.reduce((a, b) => a + b) / taux.length;
+    LivestockDailyEntry? precedente;
+    for (final x in fiches) {
+      if (x.lotId != f.lotId || x.id == f.id) continue;
+      if (!_jour(x.entryDate).isBefore(_jour(f.entryDate))) continue;
+      if (precedente == null || x.entryDate.isAfter(precedente.entryDate)) {
+        precedente = x;
       }
     }
+    final base = precedente?.effectifFinal ?? bande.initialQuantity;
+    if (base <= 0) return 0;
+    return _arrondi(f.mort / base * 100, 2);
+  }
 
-    final idsPorcs = porcs.map((l) => l.id).toSet();
-    final ventesPorcs = fiches
+  static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  // ── Cartes espèces (`getCartesElevageProperty`) ─────────────────────────────────────────────────────
+
+  List<CarteEspece> _cartesEspeces(
+    DateTime debutMois,
+    List<LivestockLot> bandes,
+    List<LivestockDailyEntry> fiches,
+    List<LivestockReproductionEvent> cycles,
+    List<Sale> ventes,
+    List<SaleLine> lignes,
+    List<Product> produits,
+    List<ProductCategory> categories,
+  ) {
+    final especeDe = {for (final b in bandes) b.id: b.speciesCode};
+
+    // `$effectif` : bandes actives ET `status = 'actif'`.
+    int effectif(String code) => bandes
+        .where((b) => _vivante(b) && b.speciesCode == code)
+        .fold<int>(0, (t, b) => t + b.currentQuantity);
+
+    // Fiches du mois des bandes `is_active` de l'espèce — ⚠️ SANS le filtre `status` (code PHP : « bande
+    // archivée exclue », pas « vendue »).
+    List<LivestockDailyEntry> fichesDuMois(String code) {
+      final ids = bandes
+          .where((b) => b.isActive && b.speciesCode == code)
+          .map((b) => b.id)
+          .toSet();
+      return fiches
+          .where((f) => ids.contains(f.lotId) && !f.entryDate.isBefore(debutMois))
+          .toList();
+    }
+
+    // `$mortaliteMois` : Σ morts / Σ max(effectif_final − achat − né + mort + vente + don, 1) × 100, arrondi à
+    // 1 décimale ; 0,0 sans fiche (le dénominateur vaut alors 0).
+    double mortalite(String code) {
+      final du = fichesDuMois(code);
+      final morts = du.fold<int>(0, (t, f) => t + f.mort);
+      final reference = du.fold<int>(
+        0,
+        (t, f) =>
+            t +
+            math.max(
+              f.effectifFinal - f.achat - f.ne + f.mort + f.vente + f.don,
+              1,
+            ),
+      );
+      return reference > 0 ? _arrondi(morts / reference * 100, 1) : 0.0;
+    }
+
+    // `$gestantes` : cycles `en_cours` dont la bande est de l'espèce — sans filtre sur la bande.
+    int gestantes(String code) => cycles
+        .where((c) => c.status == 'en_cours' && especeDe[c.lotId] == code)
+        .length;
+
+    // « Marchands » : bandes vivantes au stade `engraissement`, et lui seul.
+    final marchands = bandes
         .where(
-          (f) =>
-              idsPorcs.contains(f.lotId) &&
-              f.entryDate.year == mois.year &&
-              f.entryDate.month == mois.month,
+          (b) =>
+              _vivante(b) &&
+              b.speciesCode == 'cuniculture' &&
+              b.stage == 'engraissement',
         )
-        .fold<int>(0, (t, f) => t + f.vente);
+        .fold<int>(0, (t, b) => t + b.currentQuantity);
+
+    final lotsActifsVolailles = bandes
+        .where((b) => _vivante(b) && b.speciesCode == 'aviculture')
+        .length;
+
+    // Taux de ponte : Σ ponte_total / Σ effectif_final des fiches du mois × 100, `round(…, 0)`.
+    final fichesVolailles = fichesDuMois('aviculture');
+    final ponte = fichesVolailles.fold<int>(0, (t, f) => t + (f.ponteTotal ?? 0));
+    final effectifPondeuses = fichesVolailles.fold<int>(
+      0,
+      (t, f) => t + f.effectifFinal,
+    );
+    final tauxPonte = effectifPondeuses > 0
+        ? _arrondi(ponte / effectifPondeuses * 100, 0).toInt()
+        : 0;
+
+    // « Ventes (mois) » porcs : lignes de vente dont le produit est de la catégorie « Porciculture », vendues
+    // depuis le 1er du mois (`SaleLine::count()`).
+    // Ticket U4 — `sale_lines` descend avec les ventes : toutes les ventes de la ferme sont comptées, comme au web.
+    final categoriePorcs = categories
+        .where((c) => c.label == 'Porciculture')
+        .map((c) => c.id)
+        .toSet();
+    final produitsPorcs = produits
+        .where((p) => categoriePorcs.contains(p.categoryId))
+        .map((p) => p.id)
+        .toSet();
+    final ventesDuMois = ventes
+        .where((v) => !v.soldAt.isBefore(debutMois))
+        .map((v) => v.id)
+        .toSet();
+    final ventesPorcs = lignes
+        .where(
+          (l) =>
+              produitsPorcs.contains(l.productId) &&
+              ventesDuMois.contains(l.saleId),
+        )
+        .length;
 
     return [
       CarteEspece(
         titre: 'Lapins',
         mesures: [
-          ('Effectif', '${effectifDe(lapins)}'),
-          // ⚠️ « GESTANTES » N'EST NULLE PART. La fiche Lapins collecte bien
-          // une ventilation par catégorie à la saisie, mais
-          // `livestock_daily_entries` ne porte qu'un effectif total et le
-          // tirage ne descend aucun décompte de gestantes. Un tiret plutôt
-          // qu'un chiffre reconstitué.
-          ('Gestantes', '—'),
-          ('Marchands', '${effectifDe(lapins.where(_marchand).toList())}'),
+          ('Effectif', nombre(effectif('cuniculture').toDouble(), 0)),
+          ('Gestantes', '${gestantes('cuniculture')}'),
+          ('Marchands', '$marchands'),
         ],
-        mortalite: mortaliteDuMois(lapins),
+        mortalite: mortalite('cuniculture'),
       ),
       CarteEspece(
         titre: 'Volailles',
         mesures: [
-          ('Lots actifs', '${volailles.length}'),
-          (
-            'Taux ponte',
-            tauxPonte == null ? '—' : '${tauxPonte.toStringAsFixed(0)}%',
-          ),
-          ('Effectif', '${effectifDe(volailles)}'),
+          ('Lots actifs', '$lotsActifsVolailles'),
+          ('Taux ponte', '$tauxPonte%'),
+          ('Effectif', nombre(effectif('aviculture').toDouble(), 0)),
         ],
-        mortalite: mortaliteDuMois(volailles),
+        mortalite: mortalite('aviculture'),
       ),
       CarteEspece(
         titre: 'Porcs',
         mesures: [
-          ('Effectif', '${effectifDe(porcs)}'),
-          // ⚠️ Même absence que chez les lapins.
-          ('Gestantes', '—'),
+          ('Effectif', nombre(effectif('porciculture').toDouble(), 0)),
+          ('Gestantes', '${gestantes('porciculture')}'),
           ('Ventes (mois)', '$ventesPorcs'),
         ],
-        mortalite: mortaliteDuMois(porcs),
+        mortalite: mortalite('porciculture'),
       ),
     ];
   }
 
-  static bool _marchand(LivestockLot l) => _estMarchand(l.stage);
+  // ── Courbe et statistiques (`getChartVentesDepensesProperty`) ────────────────────────────────────────
 
-  // ── Courbe six mois ───────────────────────────────────────────────────────
-
+  /// `translatedFormat('M')` de Carbon en français, passé par `ucfirst` dans le Blade.
   static const _moisCourts = [
-    'Jan',
-    'Fév',
-    'Mar',
-    'Avr',
+    'Janv.',
+    'Févr.',
+    'Mars',
+    'Avr.',
     'Mai',
-    'Jun',
-    'Jul',
-    'Aoû',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Déc',
+    'Juin',
+    'Juil.',
+    'Août',
+    'Sept.',
+    'Oct.',
+    'Nov.',
+    'Déc.',
   ];
 
   List<PointMensuel> _serie(
     List<Sale> ventes,
-    List<Expense> depenses,
-    DateTime fin, {
-    required int mois,
-  }) {
+    List<Purchase> achats,
+    DateTime maintenant,
+  ) {
     final points = <PointMensuel>[];
-
-    for (var i = mois - 1; i >= 0; i--) {
-      final leMois = DateTime(fin.year, fin.month - i, 1);
-
-      final ca = ventes
-          .where(
-            (v) =>
-                v.status != 'annulee' &&
-                v.soldAt.year == leMois.year &&
-                v.soldAt.month == leMois.month,
-          )
-          .fold<double>(0, (t, v) => t + v.total);
-
-      final sorties = depenses
-          .where(
-            (d) =>
-                d.expenseDate.year == leMois.year &&
-                d.expenseDate.month == leMois.month,
-          )
-          .fold<double>(0, (t, d) => t + d.amount);
+    for (var i = 5; i >= 0; i--) {
+      final debut = DateTime(maintenant.year, maintenant.month - i);
+      final fin = DateTime(
+        debut.year,
+        debut.month + 1,
+      ).subtract(const Duration(microseconds: 1));
+      bool dans(DateTime d) => !d.isBefore(debut) && !d.isAfter(fin);
 
       points.add(
         PointMensuel(
-          libelle: _moisCourts[leMois.month - 1],
-          chiffreAffaires: ca,
-          depenses: sorties,
+          libelle: _moisCourts[debut.month - 1],
+          chiffreAffaires: ventes
+              .where((v) => dans(v.soldAt))
+              .fold<double>(0, (t, v) => t + v.total),
+          depenses: achats
+              .where((a) => dans(a.purchaseDate))
+              .fold<double>(0, (t, a) => t + a.total),
         ),
       );
     }
-
     return points;
   }
 
-  // ── Transactions & activités ──────────────────────────────────────────────
+  /// Suffixes des tuiles « Revenu » et « Dépenses » : `round(… × 100, 1)` puis écrit TEL QUEL par PHP (point
+  /// décimal, « 25 » pour 25.0), précédé de « + » si positif ; vide si le mois précédent est nul.
+  static (String, String) variationStatistique(List<PointMensuel> serie) {
+    String suffixe(double courant, double precedent) {
+      if (precedent <= 0) return '';
+      final pct = _arrondi((courant - precedent) / precedent * 100, 1);
+      final texte = pct == pct.truncateToDouble()
+          ? '${pct.toInt()}'
+          : '$pct';
+      return ' (${pct >= 0 ? '+' : ''}$texte%)';
+    }
+
+    if (serie.length < 2) return ('', '');
+    final c = serie[serie.length - 1];
+    final p = serie[serie.length - 2];
+    return (
+      suffixe(c.chiffreAffaires, p.chiffreAffaires),
+      suffixe(c.depenses, p.depenses),
+    );
+  }
+
+  // ── Transactions récentes (`getTransactionsRecentesProperty`) ───────────────────────────────────────
+
+  /// `strtoupper(substr($id, 0, 8))`.
+  static String _id8(String id) =>
+      (id.length > 8 ? id.substring(0, 8) : id).toUpperCase();
+
+  /// `orderByEffectiveDate()->limit(5)` — TOUTES les ventes, pas celles du mois.
+  List<LigneTransaction> _ventes(
+    List<Sale> ventes,
+    Map<String, String> nomsClients,
+  ) {
+    final triees = [...ventes]..sort((a, b) => b.soldAt.compareTo(a.soldAt));
+    return triees
+        .take(5)
+        .map(
+          (v) => LigneTransaction(
+            libelle:
+                '${_id8(v.id)} · '
+                '${v.customerName ?? nomsClients[v.customerId] ?? 'Client Anonyme'}',
+            montant: v.total,
+            ton: v.paymentMode == 'credit' ? TonMontant.jaune : TonMontant.emeraude,
+          ),
+        )
+        .toList();
+  }
+
+  /// `latest('purchase_date')->limit(5)` ; montant `text-brand-forest` au comptant, jaune sinon.
+  List<LigneTransaction> _achats(List<Purchase> achats) {
+    final tries = [...achats]
+      ..sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
+    return tries
+        .take(5)
+        .map(
+          (a) => LigneTransaction(
+            libelle: '${_id8(a.id)} · ${a.supplierName ?? ''}',
+            montant: a.total,
+            ton: a.paymentMode == 'comptant' ? TonMontant.foret : TonMontant.jaune,
+          ),
+        )
+        .toList();
+  }
+
+  /// `Expense::where('is_active', true)->latest('expense_date')->limit(5)`.
+  /// Ticket U13 — `expenses` descend au poste (web, autres postes) avec son archivage : une dépense ARCHIVÉE au web
+  /// n'est plus listée, comme au web ; celles saisies ici comptent en attente ou acquittées (règle U8).
+  List<LigneTransaction> _depenses(List<Expense> depenses) {
+    final triees = [
+      for (final d in depenses)
+        if (d.isActive) d,
+    ]..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+    return triees
+        .take(5)
+        .map(
+          (d) => LigneTransaction(
+            libelle: d.label,
+            montant: d.amount,
+            ton: TonMontant.rouge,
+          ),
+        )
+        .toList();
+  }
+
+  // ── Activités du jour (`getActivitesJourProperty`) ──────────────────────────────────────────────────
+
+  /// `AuditLog::whereDate('created_at', today)->latest()->limit(8)`, libellés de `AuditLog` (générés au
+  /// poste dans `LibellesAudit`). ⚠️ Le tirage ne sert le journal qu'aux comptes `manage-users` : pour les
+  /// autres, la table est vide et l'écran affiche le message vide du web.
+  List<LigneActivite> _activites(List<AuditLog> journal, DateTime maintenant) {
+    final duJour =
+        journal
+            .where(
+              (j) =>
+                  j.createdAt != null &&
+                  // S-T11 : `created_at` est un INSTANT ; le « jour » du web (`whereDate`, serveur en
+                  // Africa/Porto-Novo) est son jour à l'heure du Bénin, jamais celui de Windows.
+                  _jour(HeureBenin.depuisInstant(j.createdAt!)) == _jour(maintenant),
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt!.compareTo(a.createdAt!));
+
+    return duJour.take(8).map((j) {
+      final module = LibellesAudit.module(j.module);
+      return LigneActivite(
+        libelle: LibellesAudit.action(j.action),
+        detail:
+            '${_heure(HeureBenin.depuisInstant(j.createdAt!))} — ${j.userName ?? 'Système'}'
+            '${module == null || module.isEmpty ? '' : ' · $module'}',
+      );
+    }).toList();
+  }
 
   static String _heure(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
-  /// ⚠️⚠️ **NI NUMÉRO DE VENTE NI NOM DE CLIENT.** La maquette affiche
-  /// « V-2026-0884 · AMOUSSOU Régis ». **Aucune colonne de référence n'existe
-  /// nulle part** — ni dans `sales` côté serveur, ni au poste, ni dans le POS
-  /// Livewire (vérifié au ticket 14.71) ; et la table des clients ne descend
-  /// pas au poste. La vente est donc identifiée par son heure et son mode de
-  /// règlement, qui sont réels.
-  List<LigneTransaction> _ventesRecentes(List<Sale> ventes) => ventes
-      .take(5)
-      .map(
-        (v) => LigneTransaction(
-          libelle: '${_heure(v.soldAt)} · ${v.paymentMode}',
-          montant: v.total,
-        ),
-      )
-      .toList();
+  // ── Top 5 (`getTopProduitsProperty`) ─────────────────────────────────────────────────────────────────
 
-  List<LigneTransaction> _depensesRecentes(List<Expense> depenses) => depenses
-      .take(5)
-      .map((d) => LigneTransaction(libelle: d.label, montant: d.amount))
-      .toList();
-
-  /// « Activités du Jour » reconstituées depuis les écritures du poste.
+  /// Lignes des ventes du mois, groupées par produit, triées par CA décroissant, cinq au plus.
   ///
-  /// ⚠️ **SANS AUTEUR.** La maquette nomme l'opérateur (« 09:12 — KPOSSOU
-  /// Éléonore ») ; le poste n'enregistre qu'un `device_id`, jamais l'agent.
-  /// Le journal d'audit qui porte ces noms côté serveur ne descend pas.
-  List<LigneTransaction> _activites(
-    List<Sale> ventes,
-    List<Expense> depenses,
-    List<LivestockDailyEntry> fiches,
-    DateTime jour,
-  ) {
-    bool memeJour(DateTime d) =>
-        d.year == jour.year && d.month == jour.month && d.day == jour.day;
-
-    final activites = <(DateTime, LigneTransaction)>[];
-
-    for (final v in ventes.where((v) => memeJour(v.soldAt))) {
-      activites.add((
-        v.soldAt,
-        LigneTransaction(
-          libelle: 'Vente encaissée (${v.paymentMode})',
-          montant: v.total,
-          horodatage: _heure(v.soldAt),
-        ),
-      ));
-    }
-
-    for (final d in depenses.where((d) => memeJour(d.expenseDate))) {
-      activites.add((
-        d.updatedAt,
-        LigneTransaction(
-          libelle: 'Dépense saisie — ${d.label}',
-          montant: d.amount,
-          horodatage: _heure(d.updatedAt),
-        ),
-      ));
-    }
-
-    for (final f in fiches.where((f) => memeJour(f.entryDate))) {
-      activites.add((
-        f.updatedAt,
-        LigneTransaction(
-          libelle:
-              'Fiche d\'élevage mise à jour '
-              '(${f.ne} naissances, ${f.mort} morts)',
-          montant: null,
-          horodatage: _heure(f.updatedAt),
-        ),
-      ));
-    }
-
-    activites.sort((a, b) => b.$1.compareTo(a.$1));
-    return activites.take(8).map((a) => a.$2).toList();
-  }
-
-  /// « Top 5 Produits du Mois ».
-  ///
-  /// ⚠️ **LA COLONNE « MARGE » RESTE VIDE.** Elle suppose un prix de revient ;
-  /// `products` ne porte au poste que des prix de VENTE (`price_min`,
-  /// `price_max`). Un pourcentage calculé sur un prix de vente ne serait pas
-  /// une marge.
+  /// Ticket U4 (D-U4) — `sale_lines` et `purchase_lines` descendent avec leurs pièces : le Top 5 porte sur TOUTES
+  /// les ventes de la ferme, et la MARGE se calcule comme au web — `round((CA − PMP × qté) ÷ CA × 100)` si le PMP
+  /// existe et que la quantité et le CA sont strictement positifs, « — » sinon (voir [pmp]).
   List<LigneTopProduit> _topProduits(
+    DateTime debutMois,
     List<Sale> ventes,
     List<SaleLine> lignes,
     List<Product> produits,
+    List<PurchaseLine> lignesAchat,
   ) {
-    final idsRetenus = ventes.map((v) => v.id).toSet();
+    final idsRetenus = ventes
+        .where((v) => !v.soldAt.isBefore(debutMois))
+        .map((v) => v.id)
+        .toSet();
     final parProduit = <String, (double, double)>{};
 
     for (final l in lignes.where((l) => idsRetenus.contains(l.saleId))) {
@@ -610,15 +823,116 @@ class TableauDeBordRepository {
     final top =
         parProduit.entries
             .map(
-              (e) => LigneTopProduit(
-                produit: nommes[e.key] ?? 'Produit inconnu',
-                quantite: e.value.$1,
-                chiffreAffaires: e.value.$2,
+              (e) => (
+                produit: e.key,
+                ligne: LigneTopProduit(
+                  produit: nommes[e.key] ?? '—',
+                  quantite: e.value.$1,
+                  chiffreAffaires: e.value.$2,
+                  margePct: null,
+                ),
               ),
             )
             .toList()
-          ..sort((a, b) => b.chiffreAffaires.compareTo(a.chiffreAffaires));
+          ..sort(
+            (a, b) =>
+                b.ligne.chiffreAffaires.compareTo(a.ligne.chiffreAffaires),
+          );
 
-    return top.take(5).toList();
+    // La marge n'est calculée que pour les cinq retenus (`->limit(5)->get()->map(…)` du web).
+    return [
+      for (final t in top.take(5))
+        LigneTopProduit(
+          produit: t.ligne.produit,
+          quantite: t.ligne.quantite,
+          chiffreAffaires: t.ligne.chiffreAffaires,
+          margePct: margePct(
+            pmp(t.produit, lignesAchat),
+            t.ligne.quantite,
+            t.ligne.chiffreAffaires,
+          ),
+        ),
+    ];
+  }
+
+  /// `Product::computePmp()` : Σ (qté × prix unitaire) ÷ Σ qté sur TOUTES les lignes d'achat du produit, arrondi
+  /// à 2 décimales ; `null` si la quantité achetée totale n'est pas strictement positive. Ticket U8 : un seul
+  /// calcul au poste, celui de [PmpService] (partagé avec la Gestion des Stocks).
+  static double? pmp(String produitId, List<PurchaseLine> lignesAchat) =>
+      PmpService.pmp(produitId, lignesAchat);
+
+  /// Marge du Top 5 (`getTopProduitsProperty`) : `round((CA − PMP × qté) ÷ CA × 100)` (arrondi PHP) quand le PMP
+  /// existe, que la quantité et le CA sont strictement positifs ; `null` (« — ») sinon.
+  static int? margePct(double? pmp, double quantite, double chiffreAffaires) {
+    if (pmp == null || quantite <= 0 || chiffreAffaires <= 0) return null;
+    final cout = pmp * quantite;
+    return _arrondi(
+      (chiffreAffaires - cout) / chiffreAffaires * 100,
+      0,
+    ).toInt();
+  }
+
+  // ── Formats du web ──────────────────────────────────────────────────────────────────────────────────
+
+  /// « Mois précédent : X F (±y,z%) » — sous-texte des cartes CA et Dépenses (`$pctChange` du Blade : pas de
+  /// pourcentage quand le mois précédent vaut 0).
+  static String? legendeMoisPrecedent(double? courant, double? precedent) {
+    if (precedent == null) return null;
+    var texte = 'Mois précédent : ${nombre(precedent, 0)} F';
+    if (courant != null && precedent != 0) {
+      final pct = (courant - precedent) / precedent.abs() * 100;
+      texte += ' (${pct >= 0 ? '+' : ''}${nombre(pct, 1)}%)';
+    }
+    return texte;
+  }
+
+  /// « Marge nette : X% » — seulement si le CA est strictement positif.
+  static String? legendeMargeNette(double? resultat, double? ca) {
+    if (resultat == null || ca == null || ca <= 0) return null;
+    return 'Marge nette : ${nombre(resultat / ca * 100, 0)}%';
+  }
+
+  /// `number_format($valeur, $decimales, ',', ' ')` : arrondi PHP (demi loin de zéro), espace des milliers,
+  /// virgule décimale, jamais « -0 ».
+  static String nombre(double valeur, int decimales) {
+    final arrondi = _arrondi(valeur, decimales);
+    final absolu = arrondi.abs().toStringAsFixed(decimales);
+    final morceaux = absolu.split('.');
+    final entier = morceaux[0];
+    final groupes = <String>[];
+    for (var i = entier.length; i > 0; i -= 3) {
+      groupes.insert(0, entier.substring(i - 3 < 0 ? 0 : i - 3, i));
+    }
+    final negatif = arrondi < 0 && RegExp('[1-9]').hasMatch(absolu);
+    return '${negatif ? '-' : ''}${groupes.join(' ')}'
+        '${decimales > 0 ? ',${morceaux[1]}' : ''}';
+  }
+
+  /// Quantité du Top 5 : `rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.')` — « 3.5 », « 30 ».
+  static String quantiteTop(double quantite) {
+    final arrondi = _arrondi(quantite, 2);
+    var texte = arrondi.abs().toStringAsFixed(2);
+    texte = texte.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    return '${arrondi < 0 && texte != '0' ? '-' : ''}$texte';
+  }
+
+  /// `round($valeur, $decimales)` de PHP : demi loin de zéro, après un pré-arrondi à 15 chiffres significatifs
+  /// (1,005 → 1,01, là où l'arrondi binaire brut donnerait 1,00).
+  static double _arrondi(double valeur, int decimales) {
+    final facteur = math.pow(10, decimales).toDouble();
+    final echelle = double.parse((valeur * facteur).toStringAsPrecision(15));
+    return echelle.round() / facteur;
+  }
+
+  /// Écran du poste qu'ouvre une adresse du web (`link` d'une alerte, `value` d'une option d'état), `null`
+  /// s'il n'existe pas au poste. Même règle que `LigneNotification.ecranDuLien` : le chemin web porte le nom de
+  /// la page du prototype sans `.html` ; la requête (`?tab=…`) est ignorée.
+  static EcranPoste? ecranDuLien(String lien) {
+    final chemin = Uri.tryParse(lien)?.path.replaceAll('/', '');
+    if (chemin == null || chemin.isEmpty) return null;
+    for (final e in EcranPoste.values) {
+      if (e.page == '$chemin.html') return e;
+    }
+    return null;
   }
 }

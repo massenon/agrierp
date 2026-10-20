@@ -220,6 +220,33 @@ class AuthService {
     }
   }
 
+  /// Ticket CFG-2 — adresse du serveur EN USAGE (celle du client HTTP, construit au démarrage) : l'onglet
+  /// « Appairage » la distingue de l'adresse enregistrée, qui n'agit qu'après redémarrage.
+  String get adresseServeur => _client.options.baseUrl;
+
+  /// Ticket CFG-2 — un jeton est-il conservé au coffre ? `null` : coffre illisible (aucun coffre du système,
+  /// comme dans un test de rendu) — l'écran dit alors qu'il ne sait pas, au lieu d'affirmer une absence.
+  Future<bool?> jetonPresent() async {
+    try {
+      final jeton = await _coffre.read(key: _cleJeton);
+      return jeton != null && jeton.isNotEmpty;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Ticket CFG-2 — « Tester la connexion » de l'onglet Appairage : `GET /api/auth/me` avec le jeton de la
+  /// session. Rend le compte tel que le serveur le décrit ; lève l'erreur du client HTTP sinon (hors ligne,
+  /// 401 d'un appairage révoqué, 403 d'un compte désactivé…), que l'écran traduit par `messageErreur`.
+  ///
+  /// ⚠️ La session locale n'est PAS remplacée : un test n'a pas à changer le rôle sous lequel l'écran tourne.
+  Future<SessionUtilisateur> verifierSession() async {
+    final reponse = await _client.get<Map<String, dynamic>>('/api/auth/me');
+    return SessionUtilisateur.depuisJson(
+      reponse.data ?? const <String, dynamic>{},
+    );
+  }
+
   Future<void> deconnecter() async {
     // La révocation serveur est tentée, mais son échec ne doit pas empêcher la
     // déconnexion locale : hors ligne, l'utilisateur doit pouvoir fermer sa

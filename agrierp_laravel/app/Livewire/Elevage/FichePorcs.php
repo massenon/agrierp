@@ -2,18 +2,22 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RaiseFeedAutonomyAlertAction;
 use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\SyncLotProductionStockAction;
+use App\Livewire\Elevage\Concerns\AvecDepartAutomatique;
 use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
+use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\FeedRationStandard;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
-use App\Models\Product;
+use App\Services\AutonomieAlimentaireService;
 use App\Services\EffectifParCategorieService;
 use App\Support\CategorieRationPorc;
 use Carbon\Carbon;
+use App\Support\OrdreDesVerrous;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -74,7 +78,10 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePorcs extends Component
 {
+    use AvecTransfertsDuJour;
+    use AvecDepartAutomatique;
     use AvecProphylaxieDuJour;
+    use AvecSoinsDuMois;
 
     public string $selectedDate;
 
@@ -215,6 +222,12 @@ class FichePorcs extends Component
     }
 
     /** Fiches du mois courant de LA bande de la fiche, par date (le tableau mensuel est celui d'une bande). */
+    /** Bandes du tableau mensuel (AvecSoinsDuMois). */
+    protected function lotsDuTableauMensuel(): array
+    {
+        return [$this->bande?->id];
+    }
+
     public function getMonthlyEntriesProperty()
     {
         $bande = $this->bande;
@@ -355,7 +368,8 @@ class FichePorcs extends Component
             'mort_repro' => $this->mortRepro, 'mort_sevre' => $this->mortPorcelet, 'mort_jeune' => $this->mortMarchand,
             'don_repro' => $this->donRepro, 'don_sevre' => $this->donPorcelet, 'don_jeune' => $this->donMarchand,
             'passage' => $this->passage,
-        ], $this->effectifFinalCalc);
+            // Ticket 15.46 : transferts entre bandes du jour, par catégorie (dérivés, jamais saisis ici).
+        ] + $this->transfertsDuJour, $this->effectifFinalCalc);
 
         $sortie['resultat'] = $resultat;
         $sortie['repro'] = $resultat->repro;
@@ -435,38 +449,12 @@ class FichePorcs extends Component
         ];
     }
 
-    public function getFeedAutonomyProperty(): array
+    /** Autonomie alimentaire de la filière sur la provende du jour affiché — calcul commun (AutonomieAlimentaireService). */
+    public function getFeedAutonomyProperty(): ?array
     {
-        $stockProduct = Product::whereHas('species', fn ($q) => $q->where('code', $this->speciesCode()))
-            ->where(fn ($q) => $q->where('name', 'like', '%provende%')->orWhere('name', 'like', '%aliment%'))
-            ->first();
+        $service = app(AutonomieAlimentaireService::class);
 
-        $totalProvKg = $this->provendeCalculation['total_kg'];
-
-        if (! $stockProduct) {
-            return ['available' => false];
-        }
-
-        // Ticket 15.42 : consommation inconnue (effectif d'une catégorie inconnu) → autonomie NON calculée,
-        // jamais « 99 jours » : diviser par une provende prise pour 0 masquerait une rupture réelle.
-        if ($totalProvKg === null) {
-            return ['available' => true, 'inconnu' => true, 'product' => $stockProduct, 'stock_kg' => $stockProduct->stockEnKg(), 'autonomie_jours' => null, 'critique' => false];
-        }
-
-        // ⚠️ CONVERSION OBLIGATOIRE : l'aliment est compté en SACS de 25 kg
-        // depuis le ticket 14.36, alors que la consommation est en kilos.
-        // Comparer les deux directement donnait une autonomie 25 fois trop
-        // faible, donc une alerte de rupture permanente (ticket 14.40).
-        $stockKg = $stockProduct->stockEnKg();
-        $autonomieJours = $totalProvKg > 0 ? round($stockKg / $totalProvKg, 1) : 99;
-
-        return [
-            'available' => true,
-            'product' => $stockProduct,
-            'stock_kg' => $stockKg,
-            'autonomie_jours' => $autonomieJours,
-            'critique' => $autonomieJours <= 3.0,
-        ];
+        return $service->evaluer($service->produitProvende($this->speciesCode()), $this->provendeCalculation['total_kg']);
     }
 
     /**
@@ -518,7 +506,7 @@ class FichePorcs extends Component
         $mort = $this->mortRepro + $this->mortMarchand + $this->mortPorcelet;
         $don = $this->donRepro + $this->donMarchand + $this->donPorcelet;
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $don);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $don, $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
@@ -537,6 +525,7 @@ class FichePorcs extends Component
         $this->traitementsCoches = [];
         // Le départ saisi (aperçu) est propre à un jour : il ne survit pas à un changement de jour.
         $this->reset(['departRepro', 'departSevre', 'departJeune', 'mortAncienTotal', 'donAncienTotal']);
+        $this->preremplirDepartDepuisStade();
 
         // Ticket 15.42 : la fiche de LA bande à CETTE date, quel que soit le mois (le tableau mensuel ne couvre que
         // le mois courant) — jamais la fiche d'une autre bande.
@@ -596,6 +585,7 @@ class FichePorcs extends Component
 
     public function saveDay(): void
     {
+        $this->authorize('manage-elevage');
         $lot = $this->bande;
 
         if (! $lot) {
@@ -693,6 +683,9 @@ class FichePorcs extends Component
         }
 
         DB::transaction(function () use ($lot, $donnees, $etatAvant) {
+            // 🔴→✅ Ticket U14 — ORDRE DES VERROUS : le stock que la fiche mouvemente AVANT la fiche (`OrdreDesVerrous`).
+            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$lot->id]));
+
             $entree = LivestockDailyEntry::updateOrCreate(
                 ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
                 $donnees

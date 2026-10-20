@@ -23,6 +23,10 @@ use Livewire\Component;
  * Seul l'onglet "Rôles & Permissions" est réel dans ce ticket. Les 5
  * autres ont chacun leurs propres tickets et affichent un bandeau
  * d'attente jusque-là.
+ *
+ * Ticket CFG-1 (décision client du 19/10/2026) — deux onglets HORS PROTOTYPE : « Email (SMTP) » (`email`, la seule
+ * saisie SMTP de l'application, `EmailSmtp`) et « Postes & Appairage » (`postes`, `PostesAppairage`). Chacun garde
+ * ses droits à l'ouverture (`manage-parametres`, `manage-users`) : le hub, lui, n'exige que `view-parametres`.
  */
 #[Layout('layouts.app')]
 class ParametresHub extends Component

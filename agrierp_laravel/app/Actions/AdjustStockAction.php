@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\InventaireAuComptageService;
 
 /**
  * Ticket 6.1 (Sprint 6) — point d'entrée UNIQUE pour tout changement de
@@ -35,14 +36,14 @@ class AdjustStockAction
         ?string $referenceId = null,
         ?\DateTimeInterface $movementDate = null,
         ?string $reason = null,
-    ): void {
+    ): StockMovement {
         if ($delta > 0) {
             $product->increment('stock_qty', $delta);
         } elseif ($delta < 0) {
             $product->decrement('stock_qty', abs($delta));
         }
 
-        StockMovement::create([
+        $mouvement = StockMovement::create([
             'product_id' => $product->id,
             'type' => $delta >= 0 ? 'entree' : 'sortie',
             'quantity' => abs($delta),
@@ -51,5 +52,15 @@ class AdjustStockAction
             'reason' => $reason,
             'movement_date' => $movementDate ?? now(),
         ]);
+
+        // 🔴→✅ TICKET S-T12 — UN MOUVEMENT DATÉ AVANT UN COMPTAGE DÉJÀ ENREGISTRÉ (vente d'une caisse restée hors ligne,
+        // achat du poste, vente antidatée au web) : le comptage le reflétait déjà. Une régularisation d'inventaire datée
+        // du comptage le neutralise après lui, dans ce même appel (`InventaireAuComptageService`). Un mouvement sans date
+        // (daté de maintenant) ne précède aucun comptage : rien à chercher.
+        if ($movementDate !== null) {
+            app(InventaireAuComptageService::class)->compenserMouvementAnterieur($product, $mouvement);
+        }
+
+        return $mouvement;
     }
 }

@@ -71,7 +71,10 @@ class StocksSynth extends Component
                     'negatifs' => $products->filter(fn ($p) => $p->stockEstNegatif())->count(),
                 ];
             })
-            ->filter(fn ($row) => $row['category']->products()->where('is_active', true)->exists());
+            ->filter(fn ($row) => $row['category']->products()->where('is_active', true)->exists())
+            // 🔴→✅ Ticket U12b — `filter()` GARDE LES CLÉS : une catégorie sans produit retirée laissait un trou dans
+            // les index, et le zébrage du Blade (`$i % 2`) se décalait (deux lignes blanches de suite). Réindexé.
+            ->values();
     }
 
     #[On('export-report')]

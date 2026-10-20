@@ -1,29 +1,34 @@
 import 'package:flutter/material.dart';
 
-import '../../core/database/app_database.dart';
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/toast_agri.dart';
 import 'sujets_repository.dart';
 import 'suivi_reproduction_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
-/// `prototype_html/suivi-reproduction.html` → Suivi Reproduction.
+/// `livewire/elevage/suivi-reproduction.blade.php` → Suivi Reproduction.
 ///
-/// ⚠️⚠️ **LA MAQUETTE EST LA RÉFÉRENCE DE MISE EN PAGE.** Quatre cartes KPI,
-/// puis les **quatre onglets** dans SON ordre : Lapins · Volailles · Porcs ·
-/// Escargots. Chaque onglet porte son titre, son sous-titre, son bandeau
-/// « Rappel du cycle » et son tableau.
+/// ⚠️⚠️ **TICKET H7 : LE BLADE FAIT FOI** (doctrine, art. 5). L'écran avait été porté depuis la
+/// maquette ; il suit désormais la vue web : les **quatre onglets** (`<x-tab-page>`), PUIS les
+/// quatre KPI, puis le panneau de l'onglet — titre, sous-titre, rappel du cycle à quatre étapes
+/// avec flèches, tableau de neuf colonnes et ses actions. Les ajouts du poste absents du web
+/// (lien vers la fiche sujet, bandeau de lecture seule, bandeaux de cycle Volailles / Escargots,
+/// « Bandes suivies », colonnes Sevrés / Morts S/Mère / Poids Moyen / Cages, champ Cages et
+/// aperçu des échéances) sont GARDÉS — décision client du 19/10/2026 — et placés APRÈS ce que le
+/// Blade affiche. `test/suivi_reproduction_blade_test.dart` lit le Blade et le vérifie.
 ///
-/// ⚠️⚠️ **LA SAILLIE SE DÉCLARE AU POSTE** (ticket F0.35) : c'est l'acte qui
-/// se fait au clapier, hors ligne. Palpation, mise bas et sevrage restent web
-/// — ce sont des CORRECTIONS d'un cycle que le serveur a pu faire évoluer
-/// entre-temps, et « dernier écrivain gagne » ne convient pas à une gestation
-/// de trois mois. L'écran le dit plutôt que de laisser deviner.
+/// ⚠️⚠️ **LES ACTIONS DE CYCLE SONT GRISÉES** tant que le serveur n'accepte pas la mise à jour
+/// d'un cycle envoyée par un poste (voir [SuiviReproductionRepository]) : les boutons du Blade
+/// sont là, aux mêmes conditions, mais un clic dit pourquoi au lieu d'écrire une saisie perdue.
 class SuiviReproductionScreen extends StatefulWidget {
   const SuiviReproductionScreen({
     super.key,
     required this.depot,
     this.onOuvrirSujet,
+    this.onSaisirCouvoir,
   });
 
   final SuiviReproductionRepository depot;
@@ -35,18 +40,57 @@ class SuiviReproductionScreen extends StatefulWidget {
   /// Un lien vers une fiche inexistante serait pire que du texte.
   final void Function(String sujetId)? onOuvrirSujet;
 
+  /// « Saisir le Couvoir du Jour → » : ouvre la fiche de saisie de l'espèce — `aviculture`
+  /// (Fiches Reproducteurs) ou `helico` (Fiches Escargots), comme les deux `route()` du Blade.
+  final void Function(String codeEspece)? onSaisirCouvoir;
+
   @override
   State<SuiviReproductionScreen> createState() =>
       _SuiviReproductionScreenState();
 }
 
 class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
-  /// Les quatre onglets de la maquette, dans son ordre.
+  /// Les quatre onglets du Blade, dans son ordre, avec ses icônes.
   static const onglets = <(String, IconData)>[
-    ('Lapins', Icons.cruelty_free),
-    ('Volailles', Icons.egg),
-    ('Porcs', Icons.pets),
-    ('Escargots', Icons.bug_report),
+    ('Lapins', SymbolesAgri.cruelty_free),
+    ('Volailles', SymbolesAgri.egg),
+    ('Porcs', SymbolesAgri.pets),
+    ('Escargots', SymbolesAgri.bug_report),
+  ];
+
+  /// Colonnes du tableau : les neuf du Blade, dans son ordre, PUIS les ajouts du poste.
+  ///
+  /// ⚠️ Ticket H7 : le Blade fait foi. « Sevrés (M/F) », « Morts S/Mère », « Poids Moyen (g) »
+  /// et « Cages » viennent de la maquette et n'existent pas au web : la décision du 19/10/2026
+  /// les garde, en fin de tableau, dans leur ordre relatif d'origine.
+  static const _colonnesLapins = <(String, int)>[
+    ('Bande', 3),
+    ('N° Lapine', 2),
+    ('Date Saillie', 2),
+    ('Mâle N°', 2),
+    ('Palpation', 3),
+    ('Mise Bas Attendue', 2),
+    ('Nés (Vivants)', 2),
+    ('Statut', 2),
+    ('Action', 4),
+    ('Sevrés (M/F)', 2),
+    ('Morts S/Mère', 2),
+    ('Poids Moyen (g)', 2),
+    ('Cages', 2),
+  ];
+
+  /// Même règle chez les porcs : neuf colonnes du Blade, puis « Sevrage (J+42) » (maquette).
+  static const _colonnesPorcs = <(String, int)>[
+    ('Bande', 3),
+    ('N° Truie', 2),
+    ('Date Saillie', 2),
+    ('Verrat N°', 2),
+    ('Retour Chaleur', 3),
+    ('Mise Bas Attendue', 2),
+    ('Nés (Vivants)', 2),
+    ('Statut', 2),
+    ('Action', 5),
+    ('Sevrage (J+42)', 2),
   ];
 
   String _onglet = onglets.first.$1;
@@ -64,6 +108,8 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   /// c'est-à-dire au moment le plus mal choisi.
   final _femelle = TextEditingController();
   final _male = TextEditingController();
+  final _nesVivants = TextEditingController();
+  final _nesMorts = TextEditingController();
 
   @override
   void initState() {
@@ -75,6 +121,8 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   void dispose() {
     _femelle.dispose();
     _male.dispose();
+    _nesVivants.dispose();
+    _nesMorts.dispose();
     super.dispose();
   }
 
@@ -105,7 +153,6 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
               // interdit la rechute.
               builder: (context) {
                 final large = AgriBreakpoints.large(context);
-                final moyen = AgriBreakpoints.moyen(context);
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.all(
@@ -114,116 +161,40 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _kpis(moyen),
-                      const SizedBox(height: AgriSpacing.md),
+                      // `<x-tab-page>` : la barre d'onglets, puis (`mt-md`) l'accordéon des KPI.
                       _barreOnglets(),
+                      const SizedBox(height: AgriSpacing.md),
+                      // 🔴→✅ Ticket U14 — `x-kpi-accordion` : `grid-cols-2 xl:grid-cols-4` (le poste passait à quatre
+                      // colonnes dès `md`).
+                      _kpis(AgriBreakpoints.tresLarge(context)),
                       const SizedBox(height: AgriSpacing.md),
                       switch (_onglet) {
                         'Volailles' => _ongletCouvoir(
-                          titre:
-                              'Suivi Reproduction Volailles — '
-                              "Lancement d'Incubation & Couvoir",
-                          sousTitre:
-                              "Pilotage des lots d'incubation (Ratio 1M / "
-                              "5-6F), date d'éclosion attendue (J+21) et "
-                              "taux d'éclosion %.",
+                          volailles: true,
                           jalons: const [
                             'Mise en Incubation J0',
                             'Éclosion Attendue J+21',
                           ],
                           resume: _donnees!.volailles,
-                          fiche: 'Fiches Reproducteurs',
-                          libelleNes: 'Poussins Nés',
+                          // 🔴→✅ Ticket U14 — `grid-cols-2 lg:grid-cols-4` du Blade (le poste passait à `md`).
+                          moyen: large,
                         ),
                         'Porcs' => _ongletCycles(
-                          titre: 'Suivi Reproduction — Porciculture (Porcs)',
-                          sousTitre:
-                              'Suivi par truie (T1..Tn) : saillie, retour '
-                              'chaleur J+21, mise bas J+114 (3m3s3j) et '
-                              'sevrage J+42.',
-                          jalons: const [
-                            'Saillie J0',
-                            'Retour Chaleur J+21',
-                            'Mise Bas J+114 (3m3s3j)',
-                            'Sevrage J+42',
-                          ],
-                          // ⚠️ **DIX COLONNES, COMPTÉES SUR LA MAQUETTE**
-                          // — `suivi-reproduction.html`, `#panel-porcs`.
-                          // « Statut Physio » et « Action » manquaient.
-                          //
-                          // ⚠️⚠️ **ET « Sevrage (J+42) » FIGURAIT DEUX FOIS**,
-                          // soit ONZE colonnes pour dix : la correction du
-                          // ticket F0.42 avait ajouté la colonne manquante
-                          // sans retirer sa jumelle. Ni le contrôle de
-                          // vocabulaire — le mot existe — ni un test de rendu
-                          // — le tableau s'affiche — ne pouvaient le voir. Il
-                          // a fallu comparer la SUITE ORDONNÉE des colonnes à
-                          // celle de la maquette (ticket F0.49).
-                          colonnes: const [
-                            'Bande',
-                            'N° Truie',
-                            'Date Saillie',
-                            'Verrat N°',
-                            'Retour Chaleur (J+21)',
-                            'Mise Bas Attendue (J+114)',
-                            'Porcelets Nés',
-                            'Sevrage (J+42)',
-                            'Statut Physio',
-                            'Action',
-                          ],
+                          lapins: false,
                           cycles: _donnees!.porcs,
-                          porcs: true,
                         ),
                         'Escargots' => _ongletCouvoir(
-                          titre:
-                              'Suivi Reproduction — Héliciculture (Escargots)',
-                          sousTitre:
-                              'Suivi des Bacs de Ponte en terre, éclosion '
-                              "des naissains et taux d'éclosion %.",
+                          volailles: false,
                           jalons: const [
                             'Placement Bac de Ponte J0',
                             'Éclosion Naissains Attendue J+25',
                           ],
                           resume: _donnees!.escargots,
-                          fiche: 'Fiches Escargots',
-                          libelleNes: 'Naissains Nés',
+                          moyen: large,
                         ),
                         _ => _ongletCycles(
-                          titre: 'Suivi Reproduction — Cuniculture (Lapins)',
-                          sousTitre:
-                              'Numérotation continue (R1..Rn), suivi '
-                              'multi-cages, palpation J+14, mise bas J+30 '
-                              'et alerte réforme.',
-                          jalons: const [
-                            'Saillie J0',
-                            'Palpation J+14',
-                            'Boîte à nid J+28',
-                            'Mise bas J+30',
-                            'Sevrage J+60',
-                          ],
-                          // ⚠️⚠️ **DOUZE COLONNES, COMPTÉES SUR LA
-                          // MAQUETTE** — `#panel-lapins`. Il en manquait
-                          // QUATRE : « Sevrés (M/F) », « Poids Moyen (g) »,
-                          // « Cages » et « Actions Cycle ». Une colonne
-                          // absente ne se voit pas : le tableau reste
-                          // lisible, simplement plus étroit que celui qui
-                          // a été validé.
-                          colonnes: const [
-                            'Bande',
-                            'N° Lapine',
-                            'Date Saillie',
-                            'Mâle N°',
-                            'Résultat Palpation',
-                            'Nés (Vivants)',
-                            'Sevrés (M/F)',
-                            'Morts S/Mère',
-                            'Poids Moyen (g)',
-                            'Cages',
-                            'Statut Physio',
-                            'Actions Cycle',
-                          ],
+                          lapins: true,
                           cycles: _donnees!.lapins,
-                          porcs: false,
                         ),
                       },
                     ],
@@ -236,60 +207,83 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
 
   // ── Cartes KPI ────────────────────────────────────────────────────────────
 
+  /// `<x-kpi-accordion>` : les quatre `<x-kpi-card>` du Blade, libellés, icônes et couleurs.
   Widget _kpis(bool moyen) {
     final d = _donnees!;
 
-    return GridView.count(
-      crossAxisCount: moyen ? 4 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: moyen ? 2.6 : 1.8,
-      children: [
+    return _grille(
+      colonnes: moyen ? 4 : 2,
+      enfants: [
         _carteKpi(
           'Reproductrices Gestantes',
           '${d.gestantes}',
-          AgriColors.infoBlue,
-          AgriColors.infoBlue,
+          SymbolesAgri.favorite,
+          _CouleurKpi.bleu,
         ),
         _carteKpi(
           'Palpations / Échéances dues',
           '${d.palpationsDues}',
-          AgriColors.accentYellow,
-          AgriColors.brandForest,
+          SymbolesAgri.event,
+          _CouleurKpi.mais,
         ),
         _carteKpi(
-          'Mises bas / Éclosions',
+          'Mises bas / Éclosions (mois)',
           '${d.misesBasDuMois}',
-          AgriColors.brandEmerald,
-          AgriColors.brandEmerald,
+          SymbolesAgri.child_care,
+          _CouleurKpi.emeraude,
         ),
         _carteKpi(
           'Alertes Réforme / Pertes',
           '${d.echecs}',
-          AgriColors.errorRed,
-          AgriColors.errorDeep,
+          SymbolesAgri.warning,
+          _CouleurKpi.rouge,
         ),
       ],
     );
   }
 
+  /// `kpi-card.blade.php` : liseré et icône selon `color`, valeur `text-on-surface`.
+  /// Ticket U14 — la grille CSS du Blade (`grid gap-md`) : colonnes de même largeur, cartes d'une rangée à la même
+  /// hauteur, hauteur prise sur le CONTENU. Une `GridView` à proportions fixes débordait (« RenderFlex overflowed »)
+  /// dès que la colonne rétrécissait, entre deux points de rupture.
+  Widget _grille({required int colonnes, required List<Widget> enfants}) {
+    final rangees = <Widget>[];
+    for (var i = 0; i < enfants.length; i += colonnes) {
+      if (i > 0) rangees.add(const SizedBox(height: AgriSpacing.md));
+      rangees.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var j = 0; j < colonnes; j++) ...[
+                if (j > 0) const SizedBox(width: AgriSpacing.md),
+                Expanded(child: i + j < enfants.length ? enfants[i + j] : const SizedBox.shrink()),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rangees);
+  }
+
   Widget _carteKpi(
     String libelle,
     String valeur,
-    Color barre,
-    Color couleurValeur,
+    IconData icone,
+    _CouleurKpi couleur,
   ) => CarteKpi(
     libelle: libelle,
     valeur: valeur,
-    couleurLisere: barre,
-    couleurValeur: couleurValeur,
-    tailleValeur: 20,
+    icone: icone,
+    couleurLisere: couleur.lisere,
+    couleurIcone: couleur.icone,
+    tailleValeur: AgriTypography.xxl,
   );
 
   Widget _barreOnglets() => Container(
     decoration: const BoxDecoration(
+      color: AgriColors.surfaceCard,
       border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
     ),
     child: SingleChildScrollView(
@@ -346,20 +340,34 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
 
   // ── Briques d'onglet ──────────────────────────────────────────────────────
 
-  Widget _titreOnglet(String titre, String sousTitre, {Widget? action}) => Row(
+  /// `<h2>` du Blade (icône émeraude + titre) et son `<p>` de sous-titre.
+  Widget _titreOnglet(
+    IconData icone,
+    String titre,
+    String sousTitre, {
+    Widget? action,
+  }) => Row(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              titre,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AgriColors.onSurface,
-              ),
+            Row(
+              children: [
+                Icon(icone, color: AgriColors.brandEmerald),
+                const SizedBox(width: AgriSpacing.xs),
+                Flexible(
+                  child: Text(
+                    titre,
+                    style: const TextStyle(
+                      fontSize: AgriTypography.lg,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.onSurface,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AgriSpacing.xs),
             Text(
@@ -376,9 +384,9 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     ],
   );
 
-  /// Bandeau « Rappel du cycle » — les jalons dans l'ordre, le dernier avant
-  /// la naissance étant mis en avant comme dans la maquette.
-  Widget _rappelDuCycle(List<String> jalons, String cle) => Container(
+  /// `components/cycle-reminder.blade.php` : icône, « Rappel du cycle : », puis les étapes
+  /// séparées par une flèche ; l'étape `active` en vert.
+  Widget _rappelDuCycle(List<(String, bool)> etapes, String cle) => Container(
     key: Key('rappel-cycle-$cle'),
     padding: const EdgeInsets.all(AgriSpacing.md),
     decoration: BoxDecoration(
@@ -387,11 +395,11 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
     child: Wrap(
-      spacing: AgriSpacing.xs,
+      spacing: AgriSpacing.md,
       runSpacing: AgriSpacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.event_repeat, size: 20, color: AgriColors.infoBlue),
+        const Icon(SymbolesAgri.event_repeat, size: 20, color: AgriColors.infoBlue),
         const Text(
           'Rappel du cycle :',
           style: TextStyle(
@@ -400,33 +408,46 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             color: AgriColors.brandForest,
           ),
         ),
-        for (final jalon in jalons)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AgriSpacing.sm,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color:
-                  jalon.contains('Mise bas') ||
-                      jalon.contains('Mise Bas') ||
-                      jalon.contains('Éclosion Attendue') ||
-                      jalon.contains('Éclosion Naissains')
-                  ? AgriColors.brandEmerald.withValues(alpha: 0.10)
-                  : AgriColors.surfaceCard,
-              border: Border.all(color: AgriColors.outlineVariant),
-              borderRadius: BorderRadius.circular(AgriRadius.full),
-            ),
-            child: Text(
-              jalon,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: AgriColors.brandForest,
-              ),
-            ),
-          ),
+        Wrap(
+          spacing: AgriSpacing.xs,
+          runSpacing: AgriSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (var i = 0; i < etapes.length; i++) ...[
+              if (i > 0)
+                const Icon(
+                  SymbolesAgri.arrow_forward,
+                  size: 14,
+                  color: AgriColors.outline,
+                ),
+              _etape(etapes[i].$1, active: etapes[i].$2),
+            ],
+          ],
+        ),
       ],
+    ),
+  );
+
+  Widget _etape(String libelle, {required bool active}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 4),
+    decoration: BoxDecoration(
+      color: active
+          ? AgriColors.brandEmerald.withValues(alpha: 0.10)
+          : AgriColors.surfaceCard,
+      border: Border.all(
+        color: active
+            ? AgriColors.brandEmerald.withValues(alpha: 0.30)
+            : AgriColors.outlineVariant,
+      ),
+      borderRadius: BorderRadius.circular(AgriRadius.full),
+    ),
+    child: Text(
+      libelle,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: active ? AgriColors.brandEmerald : AgriColors.brandForest,
+      ),
     ),
   );
 
@@ -439,27 +460,37 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
   // ── Onglets Lapins et Porcs ───────────────────────────────────────────────
 
   Widget _ongletCycles({
-    required String titre,
-    required String sousTitre,
-    required List<String> jalons,
-    required List<String> colonnes,
+    required bool lapins,
     required List<CycleReproduction> cycles,
-    required bool porcs,
   }) {
+    const l = SuiviReproductionRepository.cycleLapins;
+    const p = SuiviReproductionRepository.cyclePorcs;
+    final cle = lapins ? 'lapins' : 'porcs';
+    final controle = lapins ? 'Palpation' : 'Retour Chaleur';
+    final (jControle, jMiseBas, jSevrage) = lapins
+        ? (l.palpation, l.miseBas, l.sevrage)
+        : (p.retourChaleur, p.miseBas, p.sevrage);
+    final colonnes = lapins ? _colonnesLapins : _colonnesPorcs;
+    final largeur =
+        colonnes.fold<int>(0, (t, c) => t + c.$2) * 50.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _titreOnglet(
-          titre,
-          sousTitre,
+          lapins ? SymbolesAgri.cruelty_free : SymbolesAgri.pets,
+          lapins
+              ? 'Suivi Reproduction — Cuniculture (Lapins)'
+              : 'Suivi Reproduction — Porciculture (Porcs)',
+          'Suivi par ${lapins ? 'lapine' : 'truie'} nommée : saillie, '
+              '${controle.toLowerCase()} J+$jControle, mise bas J+$jMiseBas et '
+              'sevrage J+$jSevrage.',
           action: ElevatedButton.icon(
-            key: Key('declarer-saillie-${porcs ? 'porcs' : 'lapins'}'),
-            onPressed: () => _ouvrirDeclaration(porcs: porcs),
-            icon: const Icon(Icons.add_circle, size: 18),
+            key: Key('declarer-saillie-$cle'),
+            onPressed: () => _ouvrirDeclaration(porcs: !lapins),
+            icon: const Icon(SymbolesAgri.add_circle, size: 18),
             label: Text(
-              porcs
-                  ? 'Déclarer une Saillie Porc'
-                  : 'Déclarer une Saillie Lapin',
+              lapins ? 'Déclarer une Saillie Lapin' : 'Déclarer une Saillie Porc',
               style: const TextStyle(
                 fontSize: AgriTypography.xs,
                 fontWeight: FontWeight.bold,
@@ -479,7 +510,27 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.md),
-        _rappelDuCycle(jalons, porcs ? 'porcs' : 'lapins'),
+        _rappelDuCycle([
+          ('Saillie J0', false),
+          ('$controle J+$jControle', false),
+          ('Mise bas J+$jMiseBas', true),
+          ('Sevrage J+$jSevrage', false),
+        ], cle),
+        // ⚠️ AJOUT DU POSTE, GARDÉ (décision du 19/10/2026) : « Boîte à nid J+28 » n'est pas une
+        // étape du Blade. Jalon informatif, sans colonne ni action : en ligne annexe, sous le
+        // rappel du web, plutôt qu'au milieu de ses quatre étapes.
+        if (lapins)
+          const Padding(
+            key: Key('jalon-annexe-lapins'),
+            padding: EdgeInsets.only(top: AgriSpacing.xs, left: AgriSpacing.md),
+            child: Text(
+              'Jalon intermédiaire : Boîte à nid J+28 (informatif, sans action de suivi).',
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                color: AgriColors.outline,
+              ),
+            ),
+          ),
         const SizedBox(height: AgriSpacing.md),
         Container(
           decoration: BoxDecoration(
@@ -490,11 +541,11 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(
-              // ⚠️ Douze colonnes chez les lapins : la largeur suit.
-              width: 1320,
+              width: largeur,
               child: Column(
                 children: [
                   Container(
+                    key: Key('entete-cycles-$cle'),
                     color: AgriColors.surfaceZebra,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AgriSpacing.sm,
@@ -502,10 +553,18 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                     ),
                     child: Row(
                       children: [
-                        for (final c in colonnes)
+                        for (final (libelle, flex) in colonnes)
                           Expanded(
-                            flex: c == 'Bande' ? 3 : 2,
-                            child: Text(c.toUpperCase(), style: _entete),
+                            flex: flex,
+                            child: Text(
+                              libelle.toUpperCase(),
+                              style: _entete,
+                              // `text-right` du Blade sur « Nés (Vivants) » et « Action ».
+                              textAlign:
+                                  libelle == 'Nés (Vivants)' || libelle == 'Action'
+                                  ? TextAlign.right
+                                  : TextAlign.left,
+                            ),
                           ),
                       ],
                     ),
@@ -513,13 +572,13 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                   if (cycles.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(AgriSpacing.lg),
-                      child: Text(
-                        '— Aucun cycle de reproduction reçu pour cette '
-                        'filière —',
-                        style: TextStyle(
-                          fontSize: AgriTypography.xs,
-                          fontStyle: FontStyle.italic,
-                          color: AgriColors.outline,
+                      child: Center(
+                        child: Text(
+                          'Aucune saillie déclarée pour le moment.',
+                          style: TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: AgriColors.outline,
+                          ),
                         ),
                       ),
                     ),
@@ -533,26 +592,92 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                         horizontal: AgriSpacing.sm,
                         vertical: AgriSpacing.sm,
                       ),
-                      child: porcs
-                          ? _ligneTruie(cycles[i])
-                          : _ligneLapine(cycles[i]),
+                      child: _ligneCycle(cycles[i], colonnes, lapins: lapins),
                     ),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: AgriSpacing.md),
-        _mentionLectureSeule(),
+        // ⚠️ AJOUT DU POSTE, GARDÉ : le bandeau dit ce qui se saisit ici et ce qui reste web.
+        if (!widget.depot.miseAJourCycleAccepteeParServeur) ...[
+          const SizedBox(height: AgriSpacing.md),
+          _mentionLectureSeule(),
+        ],
+      ],
+    );
+  }
+
+  /// Une ligne du tableau : les neuf cellules du Blade, puis les cellules propres au poste.
+  Widget _ligneCycle(
+    CycleReproduction c,
+    List<(String, int)> colonnes, {
+    required bool lapins,
+  }) {
+    final e = c.evenement;
+    int flex(int i) => colonnes[i].$2;
+
+    return Row(
+      children: [
+        // Bande — `font-bold text-brand-forest`.
+        _cellule(
+          c.codeBande,
+          flex: flex(0),
+          gras: true,
+          couleur: AgriColors.brandForest,
+        ),
+        // N° — `font-mono font-bold text-brand-emerald` (lien vers la fiche sujet : ajout gardé).
+        _celluleRef(e.motherRef, flex: flex(1), gras: true),
+        _cellule(_date(e.saillieDate), flex: flex(2)),
+        // Mâle / Verrat — `font-mono`, `—` sans mâle.
+        e.sireRef == null
+            ? _cellule('—', flex: flex(3))
+            : _celluleRef(e.sireRef!, flex: flex(3)),
+        Expanded(flex: flex(4), child: _celluleControle(c)),
+        // Mise Bas — la date réelle, sinon l'attendue ; en gras.
+        _cellule(_date(c.miseBasAffichee), flex: flex(5), gras: true),
+        _cellule(c.libelleNes, flex: flex(6), aDroite: true),
+        Expanded(flex: flex(7), child: _pastilleStatut(c.statut)),
+        Expanded(flex: flex(8), child: _celluleAction(c)),
+        // ── Ajouts du poste (décision du 19/10/2026), après les neuf colonnes du Blade ──
+        if (lapins) ...[
+          // ⚠️⚠️ TROIS COLONNES SANS DONNÉE AU POSTE, ET C'EST DIT PAR UN TIRET.
+          // `livestock_reproduction_events` ne porte ni sevrés, ni ventilation M/F, ni pesée :
+          // elle suit un CYCLE, pas une portée. Et aucun référentiel ne modélise de cage.
+          _cellule('—', flex: flex(9)),
+          _cellule(e.nesMorts == null ? '—' : '${e.nesMorts}', flex: flex(10)),
+          _cellule('—', flex: flex(11)),
+          _cellule('—', flex: flex(12)),
+        ] else
+          // ⚠️ Sevrage : stocké, sinon déduit de la mise bas réelle (J+42).
+          _cellule(
+            e.sevrageDateExpected != null
+                ? _date(e.sevrageDateExpected)
+                : _dateDecalee(
+                    e.miseBasDateActual,
+                    SuiviReproductionRepository.cyclePorcs.sevrage,
+                  ),
+            flex: flex(9),
+          ),
       ],
     );
   }
 
   /// Référence de sujet : un LIEN vers sa fiche quand un sujet porte ce nom.
-  Widget _celluleRef(String ref, {int flex = 2, bool gras = false}) {
+  Widget _celluleRef(String ref, {required int flex, bool gras = false}) {
     final id = _sujets[ref];
+    final style = TextStyle(
+      fontSize: AgriTypography.xs,
+      fontFamily: 'monospace',
+      fontWeight: gras ? FontWeight.bold : FontWeight.normal,
+      color: gras ? AgriColors.brandEmerald : AgriColors.onSurface,
+    );
+
     if (id == null || widget.onOuvrirSujet == null) {
-      return _cellule(ref, flex: flex, gras: gras);
+      return Expanded(
+        flex: flex,
+        child: Text(ref, overflow: TextOverflow.ellipsis, style: style),
+      );
     }
 
     return Expanded(
@@ -563,9 +688,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         child: Text(
           ref,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: gras ? FontWeight.bold : FontWeight.normal,
+          style: style.copyWith(
             color: AgriColors.brandEmerald,
             decoration: TextDecoration.underline,
           ),
@@ -574,273 +697,424 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     );
   }
 
-  Widget _cellule(String texte, {int flex = 2, bool gras = false}) => Expanded(
+  Widget _cellule(
+    String texte, {
+    required int flex,
+    bool gras = false,
+    bool aDroite = false,
+    Color couleur = AgriColors.onSurface,
+  }) => Expanded(
     flex: flex,
     child: Text(
       texte,
       overflow: TextOverflow.ellipsis,
+      textAlign: aDroite ? TextAlign.right : TextAlign.left,
       style: TextStyle(
         fontSize: AgriTypography.xs,
         fontWeight: gras ? FontWeight.bold : FontWeight.normal,
+        color: couleur,
       ),
     ),
   );
 
-  Widget _ligneLapine(CycleReproduction c) {
+  /// Colonne « Palpation » / « Retour Chaleur » du Blade : `dd/mm/yyyy (Positif|Négatif)` une
+  /// fois faite, sinon `Prévue dd/mm/yyyy` — en rouge gras dès l'échéance atteinte.
+  ///
+  /// ⚠️ **TROIS ÉTATS, PAS DEUX.** `palpation_date` nulle ne veut pas dire « négative » : elle
+  /// veut dire « pas encore faite ». Confondre les deux ferait réformer une lapine jamais palpée.
+  Widget _celluleControle(CycleReproduction c) {
     final e = c.evenement;
 
-    return Row(
-      children: [
-        _cellule(c.codeBande, flex: 3, gras: true),
-        _celluleRef(e.motherRef, gras: true),
-        _cellule(_date(e.saillieDate)),
-        _celluleRef(e.sireRef ?? '—'),
-        Expanded(flex: 2, child: _pastillePalpation(c)),
-        // ⚠️ « Nés (Vivants) » : la maquette écrit « 8 (7) » — total puis
-        // vivants. La base porte `nes_vivants` et `nes_morts` ; le total est
-        // donc leur somme, jamais une colonne à part.
-        _cellule(
-          e.nesVivants == null
-              ? '—'
-              : '${(e.nesVivants ?? 0) + (e.nesMorts ?? 0)} (${e.nesVivants})',
-        ),
-        _cellule(e.nesMorts == null ? '—' : '${e.nesMorts}'),
-        // ⚠️⚠️ **TROIS COLONNES SANS DONNÉE AU POSTE, ET C'EST DIT PAR UN
-        // TIRET.** `livestock_reproduction_events` ne porte ni sevrés, ni
-        // ventilation M/F, ni pesée : elle suit un CYCLE, pas une portée. Et
-        // aucun référentiel ne modélise de cage — même constat qu'au champ
-        // « Cages Occupées » de la modale (ticket F0.35).
-        _cellule('—'),
-        _cellule('—', flex: 2),
-        _cellule('—'),
-        Expanded(flex: 2, child: _pastilleStatut(e)),
-        // ⚠️ « Actions Cycle » : « Saisir Sevrage » et « Modifier » supposent
-        // un canal d'envoi que le poste n'a pas — il ne déclare que la
-        // saillie (ticket F0.35). La colonne reste, l'action est inerte.
-        const Expanded(
-          flex: 2,
-          child: Opacity(
-            opacity: 0.4,
-            child: Icon(Icons.edit, size: 16, color: AgriColors.outline),
-          ),
-        ),
-      ],
+    if (e.palpationDate != null) {
+      return Text(
+        '${_date(e.palpationDate)} (${e.status == 'echec' ? 'Négatif' : 'Positif'})',
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: AgriTypography.xs),
+      );
+    }
+
+    final echu = c.controleEchu(HeureBenin.maintenant());
+    return Text(
+      'Prévue ${_date(c.echeanceControle)}',
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: AgriTypography.xs,
+        fontWeight: echu ? FontWeight.bold : FontWeight.normal,
+        color: echu ? AgriColors.errorDeep : AgriColors.outline,
+      ),
     );
   }
 
-  Widget _ligneTruie(CycleReproduction c) {
-    final e = c.evenement;
-    final saillie = e.saillieDate;
-
-    return Row(
-      children: [
-        _cellule(c.codeBande, flex: 3, gras: true),
-        _celluleRef(e.motherRef, gras: true),
-        _cellule(_date(saillie)),
-        _celluleRef(e.sireRef ?? '—'),
-        // ⚠️ RETOUR CHALEUR ET SEVRAGE SONT CALCULÉS, PAS STOCKÉS : aucune
-        // colonne ne les porte. Ils se déduisent de la saillie, exactement
-        // comme les bandeaux « Rappel du cycle » l'annoncent.
-        _cellule(
-          _dateDecalee(
-            saillie,
-            SuiviReproductionRepository.cyclePorcs.retourChaleur,
-          ),
-        ),
-        _cellule(
-          e.miseBasDateExpected != null
-              ? _date(e.miseBasDateExpected)
-              : _dateDecalee(
-                  saillie,
-                  SuiviReproductionRepository.cyclePorcs.miseBas,
-                ),
-        ),
-        _cellule(e.nesVivants == null ? '—' : '${e.nesVivants}'),
-        _cellule(
-          e.sevrageDateExpected != null
-              ? _date(e.sevrageDateExpected)
-              : _dateDecalee(
-                  e.miseBasDateActual,
-                  SuiviReproductionRepository.cyclePorcs.sevrage,
-                ),
-        ),
-        Expanded(flex: 2, child: _pastilleStatut(e)),
-        // ⚠️ Même colonne « Action » que chez les lapins : inerte au poste.
-        const Expanded(
-          flex: 2,
-          child: Opacity(
-            opacity: 0.4,
-            child: Icon(Icons.edit, size: 16, color: AgriColors.outline),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// ⚠️ **TROIS ÉTATS, PAS DEUX.** `palpation_date` nulle ne veut pas dire
-  /// « négative » : elle veut dire « pas encore faite ». Confondre les deux
-  /// ferait réformer une lapine qui n'a jamais été palpée.
-  Widget _pastillePalpation(CycleReproduction c) {
-    final e = c.evenement;
-
-    final (libelle, couleur) = e.palpationDate != null
-        ? (e.status == 'echec'
-              ? ('Négative (−)', AgriColors.errorDeep)
-              : ('Positive (+)', AgriColors.brandEmerald))
-        : c.palpationDue(
-            DateTime.now(),
-            SuiviReproductionRepository.cycleLapins.palpation,
-          )
-        ? ('À palper', AgriColors.accentYellow)
-        : ('En attente', AgriColors.outline);
-
-    return _pastille(libelle, couleur);
-  }
-
-  Widget _pastilleStatut(LivestockReproductionEvent e) {
-    final (libelle, couleur) = switch (e.status) {
-      'echec' => ('Échec de saillie', AgriColors.errorDeep),
-      'termine' => ('Cycle terminé', AgriColors.outline),
-      _ =>
-        e.miseBasDateActual != null
-            ? ('Mère Allaitante', AgriColors.brandEmerald)
-            : ('Gestante', AgriColors.infoBlue),
+  /// Les quatre pastilles du Blade, avec leurs couleurs.
+  Widget _pastilleStatut(StatutCycle statut) {
+    final (fond, texte, bord) = switch (statut) {
+      StatutCycle.reformeEchec => (
+        AgriColors.errorBg,
+        AgriColors.errorDeep,
+        AgriColors.errorDeep.withValues(alpha: 0.30),
+      ),
+      StatutCycle.clos => (
+        AgriColors.surfaceZebra,
+        AgriColors.outline,
+        AgriColors.outlineVariant,
+      ),
+      StatutCycle.mereAllaitante => (
+        AgriColors.brandEmerald.withValues(alpha: 0.10),
+        AgriColors.brandEmerald,
+        AgriColors.brandEmerald.withValues(alpha: 0.30),
+      ),
+      StatutCycle.gestante => (
+        AgriColors.infoBlue.withValues(alpha: 0.10),
+        AgriColors.infoBlue,
+        AgriColors.infoBlue.withValues(alpha: 0.30),
+      ),
     };
 
-    return _pastille(libelle, couleur);
-  }
-
-  Widget _pastille(String libelle, Color couleur) => Align(
-    alignment: Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AgriSpacing.sm,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: couleur.withValues(alpha: 0.10),
-        border: Border.all(color: couleur.withValues(alpha: 0.30)),
-        borderRadius: BorderRadius.circular(AgriRadius.full),
-      ),
-      child: Text(
-        libelle,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: couleur,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AgriSpacing.sm,
+          vertical: 2,
+        ),
+        decoration: BoxDecoration(
+          color: fond,
+          border: Border.all(color: bord),
+          borderRadius: BorderRadius.circular(AgriRadius.full),
+        ),
+        child: Text(
+          statut.libelle,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: texte,
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
-  // ── Onglets Volailles et Escargots ────────────────────────────────────────
+  // ── Actions de cycle ──────────────────────────────────────────────────────
 
-  /// ⚠️⚠️ **RÉSUMÉ, PAS UN SECOND FORMULAIRE.** Ces deux panneaux de la
-  /// maquette recouvrent exactement ce que les fiches Reproducteurs et
-  /// Escargots saisissent déjà. Les reconstruire créerait deux formulaires
-  /// pour la même donnée — le composant Livewire a refusé pour la même raison
-  /// (ticket 3.10), et le poste s'aligne.
-  Widget _ongletCouvoir({
-    required String titre,
-    required String sousTitre,
-    required List<String> jalons,
-    required ResumeCouvoir resume,
-    required String fiche,
-    required String libelleNes,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _titreOnglet(titre, sousTitre),
-        const SizedBox(height: AgriSpacing.md),
-        _rappelDuCycle(jalons, libelleNes),
-        const SizedBox(height: AgriSpacing.md),
-        Container(
-          padding: const EdgeInsets.all(AgriSpacing.md),
+  /// Cellule « Action » du Blade, aux mêmes conditions : `Palpation +` / `Palpation −` (ou
+  /// `Retour Chaleur`), `Saisir Mise Bas`, `Clôturer (Sevrage)`.
+  Widget _celluleAction(CycleReproduction c) {
+    final id = c.evenement.id;
+    final controle = c.libelleControle;
+
+    final boutons = switch (c.action) {
+      ActionCycle.controle => [
+        _boutonAction(
+          Key('action-plus-$id'),
+          '$controle +',
+          AgriColors.brandEmerald,
+          () => _palpation(id, positive: true),
+        ),
+        _boutonAction(
+          Key('action-moins-$id'),
+          '$controle −',
+          AgriColors.errorRed,
+          () => _palpation(id, positive: false),
+        ),
+      ],
+      ActionCycle.miseBas => [
+        _boutonAction(
+          Key('action-mise-bas-$id'),
+          'Saisir Mise Bas',
+          AgriColors.brandEmerald,
+          () => _ouvrirMiseBas(id),
+        ),
+      ],
+      ActionCycle.cloture => [
+        _boutonAction(
+          Key('action-cloturer-$id'),
+          'Clôturer (Sevrage)',
+          AgriColors.brandForest,
+          () => _cloturer(id),
+        ),
+      ],
+      ActionCycle.aucune => const <Widget>[],
+    };
+
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: 4,
+      runSpacing: 4,
+      children: boutons,
+    );
+  }
+
+  /// Pastille d'action du Blade (`text-[10px] font-bold text-white px-2 py-1 rounded-full`).
+  ///
+  /// ⚠️⚠️ Verrou fermé : le bouton reste visible — le web l'a — mais grisé ; l'info-bulle et un
+  /// toast d'avertissement disent pourquoi. Rien n'est écrit.
+  Widget _boutonAction(
+    Key cle,
+    String libelle,
+    Color couleur,
+    Future<void> Function() action,
+  ) {
+    final ouvert = widget.depot.miseAJourCycleAccepteeParServeur;
+
+    final pastille = InkWell(
+      key: cle,
+      borderRadius: BorderRadius.circular(AgriRadius.full),
+      onTap: ouvert
+          ? action
+          : () => ToastAgri.afficher(
+              context,
+              SuiviReproductionRepository.motifActionsCycleFermees,
+              type: TypeToast.avertissement,
+            ),
+      child: Opacity(
+        opacity: ouvert ? 1 : 0.4,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AgriColors.surfaceCard,
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
+            color: couleur,
+            borderRadius: BorderRadius.circular(AgriRadius.full),
+            boxShadow: AgriShadows.sm,
           ),
-          child: Column(
+          child: Text(
+            libelle,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return ouvert
+        ? pastille
+        : Tooltip(
+            message: SuiviReproductionRepository.motifActionsCycleFermees,
+            child: pastille,
+          );
+  }
+
+  Future<void> _palpation(String id, {required bool positive}) async {
+    try {
+      await widget.depot.enregistrerPalpation(id, positive: positive);
+    } on ActionCycleIndisponible catch (e) {
+      _toast(e.message, TypeToast.avertissement);
+      return;
+    }
+    await _charger();
+    _toast(SuiviReproductionRepository.messagePalpation);
+  }
+
+  Future<void> _cloturer(String id) async {
+    try {
+      await widget.depot.cloturerCycle(id);
+    } on ActionCycleIndisponible catch (e) {
+      _toast(e.message, TypeToast.avertissement);
+      return;
+    }
+    await _charger();
+    _toast(SuiviReproductionRepository.messageCloture);
+  }
+
+  /// `modal-misebas` du Blade : « Saisir la Mise Bas », Nés Vivants * / Nés Morts (0 par
+  /// défaut, comme `openMiseBasModal`), Annuler / Enregistrer.
+  Future<void> _ouvrirMiseBas(String id) async {
+    _nesVivants.text = '0';
+    _nesMorts.text = '0';
+    String? erreur;
+
+    final enregistree = await afficherModale<bool>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, rafraichir) => ModaleAgri(
+          titre: 'Saisir la Mise Bas',
+          largeur: LargeurModale.sm,
+          contenu: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: _mesure(
-                      'Œufs Couvés',
-                      '${resume.couves}',
-                      AgriColors.onSurface,
+                    child: _champ(
+                      'Nés Vivants *',
+                      TextField(
+                        key: const Key('mise-bas-vivants'),
+                        controller: _nesVivants,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontSize: AgriTypography.sm,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: _decoration(),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: AgriSpacing.sm),
                   Expanded(
-                    child: _mesure(
-                      libelleNes,
-                      '${resume.nes}',
-                      AgriColors.brandEmerald,
-                    ),
-                  ),
-                  Expanded(
-                    child: _mesure(
-                      "Taux d'Éclosion",
-                      // ⚠️ TIRET, PAS « 0,0 % » : sans mise en incubation, un
-                      // zéro se lirait comme un échec total du couvoir.
-                      resume.tauxEclosion == null
-                          ? '—'
-                          : '${resume.tauxEclosion!.toStringAsFixed(1)} %',
-                      AgriColors.brandEmerald,
-                    ),
-                  ),
-                  Expanded(
-                    child: _mesure(
-                      'Bandes suivies',
-                      '${resume.lots}',
-                      AgriColors.onSurface,
+                    child: _champ(
+                      'Nés Morts',
+                      TextField(
+                        key: const Key('mise-bas-morts'),
+                        controller: _nesMorts,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: AgriTypography.sm),
+                        decoration: _decoration(),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AgriSpacing.md),
-              Text(
-                'Agrégats du mois, lus sur les fiches journalières. '
-                'La saisie se fait sur « $fiche » — il n\'existe qu\'un seul '
-                'formulaire pour cette donnée.',
-                style: const TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontStyle: FontStyle.italic,
-                  color: AgriColors.outline,
+              if (erreur != null) ...[
+                const SizedBox(height: AgriSpacing.md),
+                Text(
+                  erreur!,
+                  key: const Key('mise-bas-erreur'),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.errorDeep,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
+          actions: [
+            BoutonModaleSecondaire(
+              libelle: 'Annuler',
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            BoutonModalePrimaire(
+              key: const Key('mise-bas-enregistrer'),
+              libelle: 'Enregistrer',
+              onPressed: () async {
+                final vivants = int.tryParse(_nesVivants.text.trim());
+                final morts = int.tryParse(_nesMorts.text.trim());
+                if (vivants == null || morts == null) {
+                  rafraichir(
+                    () => erreur =
+                        'Les nombres de nés vivants et de nés morts sont requis.',
+                  );
+                  return;
+                }
+
+                try {
+                  await widget.depot.enregistrerMiseBas(
+                    id,
+                    nesVivants: vivants,
+                    nesMorts: morts,
+                  );
+                  if (context.mounted) Navigator.of(context).pop(true);
+                } on ArgumentError catch (e) {
+                  rafraichir(() => erreur = '${e.message}');
+                } on ActionCycleIndisponible catch (e) {
+                  rafraichir(() => erreur = e.message);
+                }
+              },
+            ),
+          ],
         ),
+      ),
+    );
+
+    if (enregistree == true) {
+      await _charger();
+      _toast(SuiviReproductionRepository.messageMiseBas);
+    }
+  }
+
+  // ── Onglets Volailles et Escargots ────────────────────────────────────────
+
+  /// ⚠️⚠️ **RÉSUMÉ, PAS UN SECOND FORMULAIRE.** Ces deux panneaux recouvrent exactement ce que
+  /// les fiches Reproducteurs et Escargots saisissent déjà (composant Livewire, ticket 3.10) :
+  /// titre, texte et trois KPI du Blade, puis le lien « Saisir le Couvoir du Jour → ».
+  Widget _ongletCouvoir({
+    required bool volailles,
+    required List<String> jalons,
+    required ResumeCouvoir resume,
+    required bool moyen,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _titreOnglet(
+          volailles ? SymbolesAgri.egg : SymbolesAgri.bug_report,
+          'Suivi Reproduction ${volailles ? 'Volailles' : 'Escargots'} — '
+              'Couvoir & Éclosion',
+          'La saisie quotidienne du couvoir se fait depuis la fiche journalière dédiée — '
+              'résumé réel du mois affiché ci-dessous, un seul point de vérité pour cette '
+              'donnée.',
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        _grille(
+          colonnes: moyen ? 4 : 2,
+          enfants: [
+            _carteKpi(
+              'Œufs Couvés (mois)',
+              '${resume.couves}',
+              SymbolesAgri.egg,
+              _CouleurKpi.bleu,
+            ),
+            _carteKpi(
+              'Naissains Nés (mois)',
+              '${resume.nes}',
+              SymbolesAgri.child_care,
+              _CouleurKpi.emeraude,
+            ),
+            _carteKpi(
+              "Taux d'Éclosion",
+              resume.libelleTaux,
+              SymbolesAgri.egg_alt,
+              _CouleurKpi.mais,
+            ),
+            // ⚠️ AJOUT DU POSTE, GARDÉ (décision du 19/10/2026) : absent du Blade, après ses
+            // trois cartes.
+            _carteKpi(
+              'Bandes suivies',
+              '${resume.lots}',
+              SymbolesAgri.inventory_2,
+              _CouleurKpi.foret,
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ElevatedButton.icon(
+            key: const Key('lien-couvoir'),
+            onPressed: () =>
+                widget.onSaisirCouvoir?.call(volailles ? 'aviculture' : 'helico'),
+            icon: const Icon(SymbolesAgri.edit_note, size: 18),
+            label: const Text(
+              'Saisir le Couvoir du Jour →',
+              style: TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AgriColors.brandEmerald,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AgriRadius.full),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AgriSpacing.md,
+                vertical: AgriSpacing.sm,
+              ),
+            ),
+          ),
+        ),
+        // ⚠️ AJOUT DU POSTE, GARDÉ : le bandeau du cycle d'incubation, après le contenu du Blade.
+        const SizedBox(height: AgriSpacing.md),
+        _rappelDuCycle([
+          for (var i = 0; i < jalons.length; i++)
+            (jalons[i], i == jalons.length - 1),
+        ], volailles ? 'volailles' : 'escargots'),
       ],
     );
   }
-
-  Widget _mesure(String libelle, String valeur, Color couleur) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        libelle,
-        style: const TextStyle(
-          fontSize: AgriTypography.xs,
-          color: AgriColors.outline,
-        ),
-      ),
-      const SizedBox(height: 2),
-      Text(
-        valeur,
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          color: couleur,
-        ),
-      ),
-    ],
-  );
 
   Widget _mentionLectureSeule() => Container(
     key: const Key('mention-lecture-seule'),
@@ -852,17 +1126,15 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
       ),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
-        SizedBox(width: AgriSpacing.sm),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
+        const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(
             'La saillie se déclare ici, hors ligne : elle part au prochain '
-            'tirage. Palpation, mise bas et sevrage se saisissent sur la '
-            'surface web — ce sont des corrections du cycle, que le '
-            'serveur a pu faire évoluer entre-temps.',
+            'tirage.${widget.depot.miseAJourCycleAccepteeParServeur ? ' Palpation, mise bas et clôture aussi.' : ' ${SuiviReproductionRepository.motifActionsCycleFermees}'}',
             style: TextStyle(
               fontSize: AgriTypography.xs,
               color: AgriColors.brandForest,
@@ -875,30 +1147,25 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
 
   // ── Modale « Déclarer une Saillie » ───────────────────────────────────────
 
-  /// ⚠️⚠️ **LA MODALE DE LA MAQUETTE, CHAMP POUR CHAMP.** Cuniculture :
-  /// Bande · N° Lapine · Mâle Saillisseur N° · Date de Saillie · Cages
-  /// Occupées, puis la « Ligne du temps automatique calculée ». Porciculture :
-  /// les quatre premiers seulement, sans cages ni aperçu — c'est ce que porte
-  /// `modal-saillie-porc`, et l'aperçu n'y est pas.
+  /// `modal-saillie` du Blade (`max-width="sm"`) : Bande * (« -- Sélectionner -- » en tête),
+  /// N° Lapine * / N° Truie *, Mâle Saillisseur N° / Verrat N° — FACULTATIF (`sireRef` est
+  /// `nullable` : une insémination n'a pas de mâle) —, Date de Saillie *.
+  ///
+  /// ⚠️ AJOUTS DU POSTE, GARDÉS (décision du 19/10/2026), après les champs du Blade et chez les
+  /// lapins seulement : « Cages Occupées » (désactivé) et l'aperçu des échéances.
   Future<void> _ouvrirDeclaration({required bool porcs}) async {
     final espece = porcs ? 'porciculture' : 'cuniculture';
     final bandes = await widget.depot.bandesDeclarables(espece);
 
     if (!mounted) return;
 
-    if (bandes.isEmpty) {
-      _message('Aucune bande $espece active sur ce poste.');
-      return;
-    }
-
     _femelle.clear();
     _male.clear();
-    var bande = bandes.first.id;
-    var date = DateTime.now();
+    // `newDeclaration()` : aucune bande choisie, date du jour.
+    var bande = '';
+    var date = HeureBenin.aujourdhui();
     String? erreur;
 
-    // ⚠️ `modal-saillie-lapin` de `suivi-reproduction.html` l.388 : panneau
-    // `max-w-md`, barre de titre avec ✕, pied séparé par un filet.
     final declaree = await afficherModale<bool>(
       context: context,
       constructeur: (context) => StatefulBuilder(
@@ -906,95 +1173,110 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
           titre: porcs
               ? 'Déclarer une Saillie (Porciculture)'
               : 'Déclarer une Saillie (Cuniculture)',
+          largeur: LargeurModale.sm,
           contenu: Builder(
             builder: (context) => Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _etiquette('Bande *'),
-                DropdownButtonFormField<String>(
-                  key: const Key('saillie-bande'),
-                  initialValue: bande,
-                  decoration: _decoration(),
-                  items: [
-                    for (final b in bandes)
-                      DropdownMenuItem(value: b.id, child: Text(b.code)),
-                  ],
-                  onChanged: (v) => bande = v ?? bande,
+                _champ(
+                  'Bande *',
+                  DropdownButtonFormField<String>(
+                    key: const Key('saillie-bande'),
+                    // ⚠️ `w-full` du Blade : sans `isExpanded`, un code de bande long déborde
+                    // de la modale `max-w-sm`.
+                    isExpanded: true,
+                    initialValue: bande,
+                    decoration: _decoration(),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('-- Sélectionner --'),
+                      ),
+                      for (final b in bandes)
+                        DropdownMenuItem(value: b.id, child: Text(b.code)),
+                    ],
+                    onChanged: (v) => bande = v ?? '',
+                  ),
                 ),
                 const SizedBox(height: AgriSpacing.md),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _etiquette(
-                            porcs
-                                ? 'N° Truie (T1..Tn) *'
-                                : 'N° Lapine (R1..Rn) *',
+                      child: _champ(
+                        porcs ? 'N° Truie *' : 'N° Lapine *',
+                        TextField(
+                          key: const Key('saillie-femelle'),
+                          controller: _femelle,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.sm,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            color: AgriColors.brandEmerald,
                           ),
-                          TextField(
-                            key: const Key('saillie-femelle'),
-                            controller: _femelle,
-                            decoration: _decoration(),
+                          decoration: _decoration(
+                            exemple: porcs ? 'ex : T3' : 'ex : R8',
                           ),
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: AgriSpacing.sm),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _etiquette(
-                            porcs ? 'Verrat N° *' : 'Mâle Saillisseur N° *',
+                      child: _champ(
+                        porcs ? 'Verrat N°' : 'Mâle Saillisseur N°',
+                        TextField(
+                          key: const Key('saillie-male'),
+                          controller: _male,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.sm,
+                            fontFamily: 'monospace',
                           ),
-                          TextField(
-                            key: const Key('saillie-male'),
-                            controller: _male,
-                            decoration: _decoration(),
+                          decoration: _decoration(
+                            exemple: porcs ? 'ex : V1' : 'ex : M2',
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: AgriSpacing.md),
-                _etiquette('Date de Saillie *'),
-                InkWell(
-                  key: const Key('saillie-date'),
-                  onTap: () async {
-                    final choisie = await showDatePicker(
-                      context: context,
-                      initialDate: date,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
-                    );
-                    if (choisie != null) rafraichir(() => date = choisie);
-                  },
-                  child: InputDecorator(
-                    decoration: _decoration(),
-                    child: Text(
-                      _date(date),
-                      style: const TextStyle(fontSize: 14),
+                _champ(
+                  'Date de Saillie *',
+                  InkWell(
+                    key: const Key('saillie-date'),
+                    onTap: () async {
+                      final choisie = await showDatePicker(
+                        context: context,
+                        initialDate: date,
+                        firstDate: DateTime(2020),
+                        lastDate: HeureBenin.maintenant(),
+                      );
+                      if (choisie != null) rafraichir(() => date = choisie);
+                    },
+                    child: InputDecorator(
+                      decoration: _decoration(),
+                      child: Text(
+                        _date(date),
+                        style: const TextStyle(fontSize: AgriTypography.sm),
+                      ),
                     ),
                   ),
                 ),
                 if (!porcs) ...[
                   const SizedBox(height: AgriSpacing.md),
-                  _etiquette('Cages Occupées'),
-                  // ⚠️⚠️ CHAMP PRÉSENT ET DÉSACTIVÉ : aucune table ne
-                  // modélise de sous-division « cage » — le composant
-                  // Livewire l'avait déjà constaté au ticket 3.10, et
-                  // `cage-check` n'apparaît nulle part dans le JS du
-                  // prototype. Le laisser saisissable perdrait la valeur en
-                  // silence ; le retirer masquerait un manque du schéma.
-                  TextField(
-                    key: const Key('saillie-cages'),
-                    enabled: false,
-                    decoration: _decoration().copyWith(
-                      hintText: 'Référentiel des cages absent du schéma',
+                  // ⚠️⚠️ CHAMP PRÉSENT ET DÉSACTIVÉ : aucune table ne modélise de
+                  // sous-division « cage » — le composant Livewire l'avait déjà
+                  // constaté au ticket 3.10. Le laisser saisissable perdrait la
+                  // valeur en silence.
+                  _champ(
+                    'Cages Occupées',
+                    TextField(
+                      key: const Key('saillie-cages'),
+                      enabled: false,
+                      decoration: _decoration().copyWith(
+                        hintText: 'Référentiel des cages absent du schéma',
+                      ),
                     ),
                   ),
                   const SizedBox(height: AgriSpacing.md),
@@ -1023,10 +1305,17 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
               key: const Key('saillie-enregistrer'),
               libelle: 'Enregistrer la Saillie',
               onPressed: () async {
-                if (_femelle.text.trim().isEmpty || _male.text.trim().isEmpty) {
+                // `saveDeclaration()` : `lotId` et `motherRef` requis, `sireRef` nullable.
+                // ⚠️ Le web n'a pas de traduction (`lang/` absent) : il affiche les messages
+                // anglais par défaut de Laravel. Le poste les dit en français.
+                if (bande.isEmpty) {
+                  rafraichir(() => erreur = 'La bande est requise.');
+                  return;
+                }
+                if (_femelle.text.trim().isEmpty) {
                   rafraichir(
                     () => erreur =
-                        'Le numéro de la femelle et celui du mâle sont requis.',
+                        'Le numéro de la ${porcs ? 'truie' : 'lapine'} est requis.',
                   );
                   return;
                 }
@@ -1035,7 +1324,9 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                   await widget.depot.declarerSaillie(
                     lotId: bande,
                     numeroFemelle: _femelle.text.trim(),
-                    numeroMale: _male.text.trim(),
+                    numeroMale: _male.text.trim().isEmpty
+                        ? null
+                        : _male.text.trim(),
                     dateSaillie: date,
                   );
                   if (context.mounted) Navigator.of(context).pop(true);
@@ -1051,13 +1342,11 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
 
     if (declaree == true) {
       await _charger();
-      if (mounted) {
-        _message('Saillie enregistrée. Elle partira au prochain tirage.');
-      }
+      _toast(SuiviReproductionRepository.messageSaillie);
     }
   }
 
-  /// « Ligne du temps automatique calculée » de la maquette.
+  /// « Ligne du temps automatique calculée » de la maquette (ajout du poste, gardé).
   Widget _apercuEcheances(DateTime saillie) {
     const c = SuiviReproductionRepository.cycleLapins;
 
@@ -1074,7 +1363,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.calculate, size: 14, color: AgriColors.brandForest),
+              Icon(SymbolesAgri.calculate, size: 14, color: AgriColors.brandForest),
               SizedBox(width: 4),
               // ⚠️ `Expanded` : le titre de l'aperçu se replie, comme le
               // `<p class="font-bold flex items-center gap-xs">` du navigateur.
@@ -1096,9 +1385,8 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
               Expanded(
                 child: _echeance('Palpation (J+14)', saillie, c.palpation),
               ),
-              // ⚠️ « Boîte à nid J+28 » figure dans l'aperçu de la maquette,
-              // mais n'entre dans aucun calcul de suivi : jalon informatif,
-              // sans colonne dédiée (même constat côté Livewire).
+              // ⚠️ « Boîte à nid J+28 » : jalon informatif, sans colonne dédiée
+              // (même constat côté Livewire).
               Expanded(child: _echeance('Boîte à nid (J+28)', saillie, 28)),
             ],
           ),
@@ -1120,7 +1408,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
         text: '$libelle : ',
         children: [
           TextSpan(
-            text: _date(origine.add(Duration(days: jours))),
+            text: _date(HeureBenin.plusJours(origine, jours)),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ],
@@ -1129,20 +1417,29 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     ),
   );
 
-  Widget _etiquette(String texte) => Padding(
-    padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
-    child: Text(
-      texte.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-        color: AgriColors.brandForest,
+  /// `<label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">` + champ.
+  Widget _champ(String etiquette, Widget champ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
+        child: Text(
+          etiquette.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: AgriColors.brandForest,
+          ),
+        ),
       ),
-    ),
+      champ,
+    ],
   );
 
-  InputDecoration _decoration() => InputDecoration(
+  InputDecoration _decoration({String? exemple}) => InputDecoration(
     isDense: true,
+    hintText: exemple,
     contentPadding: const EdgeInsets.symmetric(
       horizontal: AgriSpacing.md,
       vertical: 12,
@@ -1153,8 +1450,10 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
     ),
   );
 
-  void _message(String texte) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  /// Toasts du web (`$dispatch('toast', …)`) : composant unique `ToastAgri`.
+  void _toast(String message, [TypeToast type = TypeToast.succes]) {
+    if (!mounted) return;
+    ToastAgri.afficher(context, message, type: type);
   }
 
   // ── Formats ───────────────────────────────────────────────────────────────
@@ -1165,5 +1464,19 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             '${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   static String _dateDecalee(DateTime? origine, int jours) =>
-      origine == null ? '—' : _date(origine.add(Duration(days: jours)));
+      origine == null ? '—' : _date(HeureBenin.plusJours(origine, jours));
+}
+
+/// Les variantes `color` de `kpi-card.blade.php` : liseré et icône.
+enum _CouleurKpi {
+  emeraude(AgriColors.brandEmerald, AgriColors.brandEmerald),
+  mais(AgriColors.accentYellow, AgriColors.brandForest),
+  rouge(AgriColors.errorRed, AgriColors.errorRed),
+  bleu(AgriColors.infoBlue, AgriColors.infoBlue),
+  foret(AgriColors.brandForest, AgriColors.brandForest);
+
+  const _CouleurKpi(this.lisere, this.icone);
+
+  final Color lisere;
+  final Color icone;
 }

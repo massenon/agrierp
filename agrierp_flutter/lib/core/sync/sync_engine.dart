@@ -1,9 +1,55 @@
+import 'dart:collection';
+import 'dart:convert';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../temps/heure_benin.dart';
+import 'fusion_referentiels.dart';
+import 'perimetre_tirage.dart';
+
+/// Ticket S3 — refus du serveur, avec un message que l'écran affiche tel quel.
+class EchecSynchronisation implements Exception {
+  const EchecSynchronisation(this.message, {this.statut});
+
+  final String message;
+
+  /// Ticket S-T1 — statut HTTP du refus (`null` : inconnu). La synchronisation automatique s'arrête sur un
+  /// 401 / 403 ([estSessionRefusee]) jusqu'à une nouvelle connexion.
+  final int? statut;
+
+  /// Ticket S-T1 — session expirée (401) ou accès refusé (403) : retenter sans se reconnecter ne servirait à
+  /// rien, et chaque tentative refusée serait une ligne de plus au journal du serveur.
+  bool get estSessionRefusee => statut == 401 || statut == 403;
+
+  /// Message pour un statut HTTP de refus ; `null` pour toute autre erreur (relancée telle quelle).
+  static String? motifHttp(int? statut, Object? corps) {
+    final serveur = corps is Map && corps['message'] is String
+        ? corps['message'] as String
+        : null;
+    return switch (statut) {
+      401 =>
+        'Session expirée : reconnectez-vous. Vos saisies en attente sont conservées sur ce poste.',
+      403 =>
+        serveur ??
+            'Accès refusé par le serveur : votre compte est désactivé ou n\'a pas les droits nécessaires.',
+      429 =>
+        'Trop de synchronisations rapprochées : réessayez dans une minute.',
+      // Ticket 15.50 — envoi d'un poste qui n'a pas encore appliqué la réinitialisation du serveur.
+      409 =>
+        serveur ??
+            'Envoi refusé : les données du serveur ont été réinitialisées. Synchronisez de nouveau.',
+      _ => null,
+    };
+  }
+
+  @override
+  String toString() => message;
+}
 
 /// Résultat d'une synchronisation, rendu à l'écran tel quel.
 ///
@@ -88,7 +134,83 @@ class SyncEngine {
     return etats.any((e) => e != ConnectivityResult.none);
   }
 
-  Future<SyncOutcome> synchroniser() async {
+  /// Ticket S-T6 — le serveur demande-t-il une synchronisation à ce poste (bouton « Demander la synchronisation des
+  /// postes » du web) ? La lecture marque la demande servie au serveur : elle ne sert qu'une fois.
+  ///
+  /// ⚠️ NE LÈVE JAMAIS : hors ligne, serveur injoignable, session expirée ou réponse inattendue rendent `false`. Cette
+  /// question est posée toutes les 30 s sans geste de l'utilisateur ; une erreur rouge à chaque fois apprendrait à
+  /// ignorer les alertes (`SynchronisationAutomatique`).
+  Future<bool> demandeDuServeur() async {
+    try {
+      final reponse = await _client.get<Map<String, dynamic>>('/api/sync/demande');
+      return reponse.data?['demande'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ticket S-T6 — comptes du serveur par table et par jour depuis [depuis] (`AAAA-MM-JJ`), pour le contrôle de
+  /// cohérence de l'écran Synchronisation. Lève en cas d'échec : c'est un geste de l'utilisateur, qui doit savoir
+  /// que le contrôle n'a pas pu se faire.
+  Future<Map<String, dynamic>> coherenceDuServeur(String depuis) async {
+    final reponse = await _client.get<Map<String, dynamic>>(
+      '/api/sync/coherence',
+      queryParameters: {'depuis': depuis},
+    );
+    return reponse.data ?? const <String, dynamic>{};
+  }
+
+  /// Ticket 15.50 — APPLIQUE UNE RÉINITIALISATION DU SERVEUR À CE POSTE : purge des données d'activité
+  /// ([AppDatabase.purgerDonneesDActivite] : tables d'activité, stock et trésorerie à 0, curseur effacé) puis
+  /// marque [marque] notée, celle que l'envoi renvoie et que le tirage compare. Rend le nombre de saisies
+  /// non envoyées perdues. Un seul mécanisme : le tirage qui découvre une marque inconnue (15.50) et la
+  /// réinitialisation lancée depuis ce poste (R-1, [reinitialiserDepuisCePoste]) passent par ici.
+  Future<int> appliquerReinitialisation(String marque) async {
+    final perdus = await _db.purgerDonneesDActivite();
+    await _ecrireReglage(cleReinitialisation, marque);
+    return perdus;
+  }
+
+  /// Ticket R-1 — RÉINITIALISATION LANCÉE DEPUIS CE POSTE (Paramètres > Réinitialisation).
+  ///
+  /// [reinitialiserLeServeur] appelle le serveur et rend la marque `data_reset_at` qu'il vient de poser. Après
+  /// son succès seulement, la purge est IMMÉDIATE ([appliquerReinitialisation], sans attendre le tirage suivant).
+  /// Échec : l'exception remonte et RIEN n'est purgé. Rend le nombre de saisies non envoyées perdues.
+  ///
+  /// ⚠️⚠️ AUCUNE SYNCHRONISATION NE S'INTERCALE. La tentative en cours est attendue d'abord ; pendant l'opération,
+  /// [synchroniser] (synchronisation automatique, bouton, ou l'appelant juste après) reçoit une tentative qui
+  /// attend sa fin puis tire sur la base purgée — sans `since`, le curseur ayant été effacé. Un tirage entremêlé
+  /// réabsorberait après la purge des pages servies avant la réinitialisation, et noterait leur curseur.
+  /// Si l'appel au serveur échoue alors que le serveur a pourtant réinitialisé (réponse perdue), cette tentative
+  /// découvre la nouvelle marque au tirage et purge par la règle 15.50.
+  Future<int> reinitialiserDepuisCePoste(Future<String> Function() reinitialiserLeServeur) async {
+    for (var enCours = _tentativeEnCours; enCours != null; enCours = _tentativeEnCours) {
+      try {
+        await enCours;
+      } catch (_) {
+        // L'échec de la tentative précédente a été rendu à son propre appelant.
+      }
+    }
+    final operation = (() async => appliquerReinitialisation(await reinitialiserLeServeur()))();
+    final suivante = operation
+        .then<void>((_) {}, onError: (Object _) {})
+        .then((_) => _synchroniserUneFois())
+        .whenComplete(() => _tentativeEnCours = null);
+    // Personne ne l'attend peut-être (échec de l'appel au serveur) : son échec éventuel n'est pas « non traité ».
+    suivante.ignore();
+    _tentativeEnCours = suivante;
+    return operation;
+  }
+
+  /// Ticket H13 — la tentative en cours. Un second appelant (bouton « Synchroniser maintenant » pendant une
+  /// synchronisation automatique) reçoit la MÊME tentative : deux tirages entremêlés écriraient deux fois le
+  /// curseur, et deux envois simultanés acquitteraient deux fois les mêmes lignes.
+  Future<SyncOutcome>? _tentativeEnCours;
+
+  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
+      _synchroniserUneFois().whenComplete(() => _tentativeEnCours = null);
+
+  Future<SyncOutcome> _synchroniserUneFois() async {
     if (!await estEnLigne()) {
       // ⚠️ HORS LIGNE N'EST PAS UNE ERREUR. C'est le mode de fonctionnement
       // NORMAL de cette ferme : le réseau est intermittent à Ikpinlè. Un
@@ -98,8 +220,29 @@ class SyncEngine {
     }
 
     _avertissements.clear();
-    var tire = await _tirer();
-    final (accepte, rejete, motifs) = await _pousser();
+    final int tire0;
+    final int accepte;
+    final int rejete;
+    final List<String> motifs;
+    final int saisiesDeStockAvant;
+    try {
+      tire0 = await _tirer();
+      saisiesDeStockAvant = await _saisiesDeStockEnAttente();
+      (accepte, rejete, motifs) = await _pousser();
+    } on DioException catch (e) {
+      // ⚠️ TICKET S3 — UN REFUS DU SERVEUR EST NOMMÉ. Session expirée, compte désactivé ou débit dépassé
+      // s'affichaient comme une erreur technique brute (« DioException [bad response] … ») : l'utilisateur
+      // ne savait pas qu'il lui suffisait de se reconnecter. Les saisies en attente restent conservées.
+      final motif = EchecSynchronisation.motifHttp(
+        e.response?.statusCode,
+        e.response?.data,
+      );
+      if (motif != null) {
+        throw EchecSynchronisation(motif, statut: e.response?.statusCode);
+      }
+      rethrow;
+    }
+    var tire = tire0;
 
     // ⚠️ TIRAGE DE CONFIRMATION (ticket F0.73). Le poste tire AVANT de pousser : une
     // avance ou une imputation que le serveur vient d'accepter a modifié, côté serveur,
@@ -114,15 +257,27 @@ class SyncEngine {
     // F0.79 : et pour un document archivé accepté — le tirage de confirmation montre ce que
     // le serveur a réellement retenu (le poste n'invente aucune valeur côté serveur).
     // F0.80 : et pour un document administratif accepté — même raison.
+    // U9 : et pour un ajustement d'inventaire acquitté — il n'est plus projeté par `JournalStocks`, et sans ce
+    // tirage son mouvement manquerait aux « Écarts d'Inventaire » jusqu'à la synchronisation suivante. (Ventes,
+    // achats et fiches : leur mouvement descend au tirage suivant ; voir `JournalStocks`.)
     if (_financiersAcquittes > 0 ||
+        _ventesDeBetailAcquittees > 0 ||
         _courriersAcquittes > 0 ||
         _archivesAcquittees > 0 ||
-        _documentsAcquittes > 0) {
+        _documentsAcquittes > 0 ||
+        await _saisiesDeStockEnAttente() < saisiesDeStockAvant) {
       try {
         tire += await _tirer();
       } on DioException {
         // L'affichage reste celui du tirage précédent jusqu'à la prochaine synchronisation.
       }
+    }
+
+    // Ticket H2 — la liaison a abouti (refus compris) : « Dernière synchronisation réussie » prend l'heure
+    // du SERVEUR, celle du tirage qui vient d'avoir lieu (`server_time`), jamais l'horloge du poste.
+    final etat = await _db.etatDeSynchronisation();
+    if (etat?.lastPulledAt != null) {
+      await _db.noterEtatDeSynchronisation(reussi: etat!.lastPulledAt);
     }
 
     return SyncOutcome(
@@ -134,10 +289,26 @@ class SyncEngine {
     );
   }
 
+  /// Ticket U9 — ajustements d'inventaire EN ATTENTE (`stock_adjustments`) : leur nombre baisse quand l'envoi en
+  /// acquitte (ou en refuse), et le tirage de confirmation rapporte alors le mouvement que le serveur a créé.
+  Future<int> _saisiesDeStockEnAttente() async {
+    final ligne = await _db
+        .customSelect(
+          "SELECT COUNT(*) AS n FROM stock_adjustments WHERE sync_status = 'pending'",
+        )
+        .getSingle();
+    return ligne.read<int>('n');
+  }
+
   /// Avances, imputations, retours et remboursements fournisseurs acceptés par le dernier
   /// envoi (voir [synchroniser]) : tous modifient, côté serveur, un état que le poste affiche
   /// (`amount_used`, `returned_at`, créance ouverte) et que seul un second tirage rapporte.
   int _financiersAcquittes = 0;
+
+  /// Ticket S-T9 — ventes de bétail (une ligne au moins porte une bande) acceptées par le dernier envoi : le serveur
+  /// les a inscrites sur la fiche du jour, que le poste n'a pas renvoyée si elle était déjà synchronisée
+  /// (`FicheJournaliereRepository.repercuterVente`). Le tirage de confirmation rapporte la fiche du serveur.
+  int _ventesDeBetailAcquittees = 0;
 
   /// Courriers acceptés par le dernier envoi : la référence `CR-AAAA-NNN` que le serveur
   /// vient d'attribuer ne descend qu'au tirage suivant (F0.78).
@@ -181,6 +352,49 @@ class SyncEngine {
   /// règle que [cleJournalResyncCreation]) — sinon les colonnes ne descendraient jamais.
   static const cleFichesResyncCategories = 'fiches_resync_f095';
 
+  /// Ticket U4 (D-U4) — resynchronisation UNIQUE des lignes de vente et d'achat. Avant U4 le serveur ne
+  /// servait pas `sale_lines` / `purchase_lines` ; un poste déjà en service a un curseur, et le tirage
+  /// incrémental ne resservirait JAMAIS les ventes et achats antérieurs — donc jamais leurs lignes (le Top 5
+  /// et sa marge resteraient faux pour tout l'historique). ⚠️ Écrite APRÈS tous les absorbeurs, et SEULEMENT
+  /// si le serveur sert les lignes des pièces qu'il sert : face à un serveur antérieur à U4 (ventes ou achats
+  /// servis sans leurs lignes), le tirage reste complet tant que cela dure — même règle que
+  /// [cleFichesResyncCategories].
+  static const cleLignesResync = 'lignes_resync_u4';
+
+  /// Ticket U8 — resynchronisation UNIQUE des lignes de retour fournisseur (`purchase_returns`). Avant U8 le
+  /// serveur ne les servait pas ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait
+  /// JAMAIS les achats retournés avant lui (« Écarts / Retours » compterait faux pour tout l'historique). Même
+  /// règle que [cleLignesResync] : écrite après tous les absorbeurs, et seulement si le serveur sert les retours
+  /// des achats qu'il sert.
+  static const cleRetoursResync = 'retours_resync_u8';
+
+  /// Ticket U9 — resynchronisation UNIQUE du grand livre des stocks (`stock_movements`). Avant U9 le serveur ne le
+  /// servait pas ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait JAMAIS les
+  /// mouvements antérieurs (rotation, écarts d'inventaire et soldes d'œufs faux pour tout l'historique). Même règle
+  /// que [cleLignesResync] : écrite après tous les absorbeurs, et seulement si les produits servis l'ont été avec
+  /// leur grand livre (un serveur qui sert `products` sans `stock_movements` est antérieur à U9).
+  static const cleMouvementsResync = 'mouvements_resync_u9';
+
+  /// Ticket U13 — resynchronisation UNIQUE des dépenses et de la paie. Avant U13 le serveur ne servait ni `expenses`
+  /// ni `payslips` ; un poste déjà en service a un curseur, et le tirage incrémental ne resservirait JAMAIS les
+  /// dépenses saisies au web ou sur un autre poste avant lui, ni la paie déjà réglée, ni l'archivage, fait au web, des
+  /// dépenses que CE poste a déjà acquittées (« Recettes et Dépenses » resterait faux pour tout l'historique). Même
+  /// règle que [cleMouvementsResync] : écrite après tous les absorbeurs, et seulement si le serveur sert les dépenses
+  /// (un serveur qui sert `products` sans `expenses`, sans paginer, est antérieur à U13). ⚠️ Un poste déjà paginé dont
+  /// le compte reçoit désormais ces tables repart aussi d'un tirage complet par la règle du périmètre (S-T4) ; cette
+  /// clé couvre le poste dont le périmètre est inconnu (dernier tirage non paginé).
+  static const cleDepensesResync = 'depenses_resync_u13';
+
+  /// Ticket U14 — resynchronisation UNIQUE des dépenses après le passage au schéma v48 : les dépenses `synced` absorbées
+  /// avant n'ont ni `status` (badge et filtre « Statut » du Blade) ni `accounting_entry_id` (une dépense comptabilisée ne
+  /// change plus de montant, de compte de charge ni de compte de trésorerie), et le curseur est passé. Écrite après tous
+  /// les absorbeurs, et seulement si les dépenses servies portent ces deux clés (serveur postérieur à U14).
+  static const cleDepensesResyncU14 = 'depenses_resync_u14';
+
+  /// Vrai si le dernier tirage a servi au moins une dépense SANS `status` (serveur antérieur à U14) — renseigné par
+  /// [_absorberDepenses].
+  bool _depensesSansStatut = false;
+
   /// Les dix colonnes de ventilation du serveur (migration `2026_10_15_000001`, 15.39).
   static const colonnesVentilation = [
     'mort_repro',
@@ -198,6 +412,27 @@ class SyncEngine {
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
+
+  /// Ticket U10 — resynchronisation UNIQUE des fiches après le passage au schéma v45 : les fiches `synced` absorbées
+  /// avant n'ont ni `vente_sexe`, ni `vente_montant`, ni le traitement, la dose et les symptômes (Tableau 2 et « CA
+  /// Ventes du Lot » du Rapport Élevage), et le curseur est passé. Même règle que [cleFichesResyncCategories] :
+  /// écrite après tous les absorbeurs, et seulement si les fiches servies portent ces colonnes.
+  static const cleFichesResyncU10 = 'fiches_resync_u10';
+
+  /// Les cinq colonnes de la fiche reçues pour le Rapport Élevage (ticket U10).
+  static const colonnesRapportElevage = [
+    'vente_sexe',
+    'vente_montant',
+    'treatment_product_id',
+    'treatment_dose',
+    'symptomes',
+  ];
+
+  /// Vrai si le dernier tirage a servi au moins une fiche SANS [colonnesRapportElevage].
+  bool _fichesSansColonnesRapport = false;
+  /// Ticket 15.50 — instant de la dernière réinitialisation du serveur que CE poste a appliquée
+  /// (purge faite). Renvoyé à chaque envoi : le serveur refuse (409) celui d'un poste qui ne l'a pas.
+  static const cleReinitialisation = 'donnees_reinitialisees_le';
   static const cleJournalResync = 'journal_resync_f084bis';
   static const cleJournalResyncCreation = 'journal_resync_f085';
   static const cleJournalIncomplet = 'journal_incomplet';
@@ -234,7 +469,24 @@ class SyncEngine {
   ///
   /// [complet] : tirage SANS `since`. Il sert (1) à la resynchronisation unique du journal,
   /// (2) à la relance unique quand le serveur annonce des écritures actives que le poste n'a
-  /// pas, (3) au tirage qui suit un journal resté incomplet.
+  /// pas, (3) au tirage qui suit un journal resté incomplet, (4) au tirage qui suit un
+  /// changement de périmètre (ticket S-T4, voir [PerimetreTirage]).
+  ///
+  /// 🔴→✅ TICKET S-T4 (méthode TATACORA) — TIRAGE PAGINÉ. Un poste resté longtemps hors ligne
+  /// recevait tout en UNE réponse (délai de réception de 30 s, mémoire). Le poste demande la page 1
+  /// (`page=1`), puis chaque page suivante avec le jeton que le serveur lui rend (`page_suivante`),
+  /// jusqu'à `page_suivante: null` :
+  ///  - ⚠️⚠️ CHAQUE PAGE EST ABSORBÉE DANS UNE TRANSACTION : un absorbeur strict qui refuse une
+  ///    ligne annule TOUTE la page, jamais une moitié ;
+  ///  - ⚠️⚠️ LE CURSEUR N'AVANCE QU'APRÈS LA DERNIÈRE PAGE (`server_time` n'y vient qu'elle). Un
+  ///    échec au milieu (réseau, refus) laisse le curseur précédent : le tirage suivant repart de
+  ///    lui, et ce que les pages déjà absorbées ont écrit revient, remplacé par identifiant (rien de
+  ///    perdu, aucun doublon) ;
+  ///  - une pièce descend toujours AVEC ses lignes, dans la même page (le serveur ne la coupe pas) ;
+  ///  - les resynchronisations uniques (F0.84-bis à U10) gardent leur logique : leur réglage n'est
+  ///    écrit qu'après la dernière page ;
+  ///  - un serveur antérieur à S-T4 ignore `page` et répond en une fois (sans `page_suivante`) :
+  ///    cette réponse est la seule page.
   Future<int> _tirer({bool complet = false}) async {
     // ⚠️ Lecture TOLÉRANTE : voir `etatDeSynchronisation` (table dupliquée).
     final etat = await _db.etatDeSynchronisation();
@@ -246,83 +498,115 @@ class SyncEngine {
     final resyncFichesFaite = await _lireReglage(cleFichesResync) != null;
     final resyncCategoriesFaite =
         await _lireReglage(cleFichesResyncCategories) != null;
+    final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
+    final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
+    final resyncMouvementsFaite =
+        await _lireReglage(cleMouvementsResync) != null;
+    final resyncFichesU10Faite =
+        await _lireReglage(cleFichesResyncU10) != null;
+    final resyncDepensesFaite =
+        await _lireReglage(cleDepensesResync) != null;
+    final resyncDepensesU14Faite =
+        await _lireReglage(cleDepensesResyncU14) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
         !resyncCreationFaite ||
         etaitIncomplet ||
         !resyncFichesFaite ||
-        !resyncCategoriesFaite;
+        !resyncCategoriesFaite ||
+        !resyncLignesFaite ||
+        !resyncRetoursFaite ||
+        !resyncMouvementsFaite ||
+        !resyncFichesU10Faite ||
+        !resyncDepensesFaite ||
+        !resyncDepensesU14Faite;
+    final since = !toutRedemander && etat?.lastPulledAt != null
+        ? etat!.lastPulledAt!.toUtc().toIso8601String()
+        : null;
 
-    final reponse = await _client.get<Map<String, dynamic>>(
-      '/api/sync/pull',
-      queryParameters: {
-        if (!toutRedemander && etat?.lastPulledAt != null)
-          'since': etat!.lastPulledAt!.toUtc().toIso8601String(),
-      },
-    );
-
-    final corps = reponse.data ?? const <String, dynamic>{};
     var recus = 0;
     _journalManquants = 0;
     _journalSansDateCreation = false;
     _fichesSansVentilation = false;
+    _fichesSansColonnesRapport = false;
+    _depensesSansStatut = false;
 
-    recus += await _absorberCategories(corps['product_categories']);
-    recus += await _absorberProduits(corps['products']);
-    recus += await _absorberBandes(corps['livestock_lots']);
-    // F0.94 — APRÈS les bandes : une bande créée sur le web arrive avec ses fiches dans le même
-    // tirage, et une fiche d'une bande inconnue est refusée.
-    recus += await _absorberFichesJournalieres(
-      corps['livestock_daily_entries'],
-    );
-    recus += await _absorberRations(corps['feed_ration_standards']);
-    recus += await _absorberRemanences(corps['veterinary_withdrawal_periods']);
-    recus += await _absorberProphylaxie(
-      corps['prophylaxis_schedule_standards'],
-    );
-    recus += await _absorberSoins(corps['veterinary_records']);
-    recus += await _absorberReproduction(
-      corps['livestock_reproduction_events'],
-    );
-    recus += await _absorberClients(corps['customers']);
-    recus += await _absorberCreances(corps['receivables']);
-    recus += await _absorberAvances(corps['customer_advances']);
-    recus += await _absorberRelances(corps['customer_reminders']);
-    recus += await _absorberProvendes(corps['feed_types']);
-    recus += await _absorberNumerotation(corps['elevage_numbering']);
-    recus += await _absorberFournisseurs(corps['suppliers']);
-    recus += await _absorberBonsCommande(corps['purchase_orders']);
-    recus += await _absorberAchats(corps['purchases']);
-    recus += await _absorberCreancesFournisseurs(corps['supplier_credits']);
-    recus += await _absorberDettes(corps['payables']);
-    recus += await _absorberVentes(corps['sales']);
-    recus += await _absorberEmployes(corps['employees']);
-    recus += await _absorberStagiaires(corps['internships']);
-    recus += await _absorberPointages(corps['attendance_records']);
-    recus += await _absorberCourriers(corps['mails']);
-    recus += await _absorberDocuments(corps['administrative_documents']);
-    recus += await _absorberArchives(corps['archived_documents']);
-    recus += await _absorberPlanComptable(corps['chart_of_accounts']);
-    recus += await _absorberExercices(corps['fiscal_years']);
-    recus += await _absorberJournal(
-      corps['accounting_entries'],
-      corps['accounting_entry_ids'],
-      corps['accounting_entry_lines'],
-    );
-    recus += await _absorberEntreprise(corps['company_settings']);
-    recus += await _absorberModules(corps['modules_config']);
-    recus += await _absorberRoles(corps['roles']);
-    recus += await _absorberUtilisateurs(corps['users']);
-    recus += await _absorberAudit(corps['audit_logs']);
-    recus += await _absorberNotifications(corps['notifications']);
-    recus += await _absorberRevenusDeBande(corps['lot_revenues']);
-    recus += await _absorberSujets(corps['animals']);
-    recus += await _absorberEspeces(corps['livestock_species']);
-    recus += await _absorberModelesAttestation(corps['attestation_templates']);
-    recus += await _absorberCompteursAttestation(corps['attestation_counts']);
-    recus += await _absorberComptesTresorerie(corps['treasury_accounts']);
-    recus += await _absorberCategoriesDepense(corps['expense_categories']);
+    // Ticket S-T4 — ce que les pages ont apporté : clés vues (contrôles « serveur antérieur à… »), périmètre (tables
+    // servies à TOUTES les pages), dernière page (curseur).
+    var corps = const <String, dynamic>{};
+    final cles = <String>{};
+    Set<String>? perimetre;
+    var pagine = false;
+    String? jeton;
+
+    for (var page = 1; ; page++) {
+      final reponse = await _client.get<Map<String, dynamic>>(
+        '/api/sync/pull',
+        queryParameters: {
+          'since': ?since,
+          'page': page,
+          'curseur_page': ?jeton,
+        },
+      );
+
+      corps = reponse.data ?? const <String, dynamic>{};
+      pagine = corps.containsKey('page_suivante');
+      final servies = PerimetreTirage.depuisReponse(corps);
+
+      if (page == 1) {
+        // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
+        // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
+        // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
+        // renverrait. La marque est notée aussitôt : la relance complète ci-dessous ne purge pas deux fois.
+        final reinitialisation = corps['data_reset_at'];
+        if (reinitialisation is String &&
+            reinitialisation != await _lireReglage(cleReinitialisation)) {
+          final perdus = await appliquerReinitialisation(reinitialisation);
+          final le = HeureBenin.depuisInstant(DateTime.parse(reinitialisation));
+          final date =
+              '${le.day.toString().padLeft(2, '0')}/${le.month.toString().padLeft(2, '0')}/${le.year}';
+          // Un poste neuf (jamais tiré, rien en attente) n'avait rien : aucun avertissement à lui faire lire.
+          if (perdus > 0 || etat?.lastPulledAt != null) {
+            _avertissements.add(
+              'Les données du serveur ont été réinitialisées le $date : celles de ce poste ont été '
+              'effacées${perdus > 0 ? ', dont $perdus saisie(s) qui n\'avai(en)t pas encore été envoyée(s)' : ''}.',
+            );
+          }
+          // Un tirage incrémental ne resservirait pas l'existant : tout redemander, une fois.
+          if (!toutRedemander) return _tirer(complet: true);
+        }
+
+        // Ticket S-T4 — RÈGLE DU CHANGEMENT DE RÔLE (voir [PerimetreTirage]) : une table servie maintenant et pas
+        // au tirage précédent n'a jamais été tirée jusqu'au curseur. Rien n'est absorbé de cette page : le tirage
+        // repart, complet, une fois (sans `since`, la règle ne se redéclenche pas).
+        if (since != null &&
+            servies != null &&
+            PerimetreTirage.elargi(await PerimetreTirage.lire(_db), servies)) {
+          return _tirer(complet: true);
+        }
+      }
+
+      if (servies != null) {
+        perimetre = perimetre == null ? servies : perimetre.intersection(servies);
+      }
+      cles.addAll(corps.keys);
+
+      final aAbsorber = corps;
+      await _db.transaction(() async {
+        recus += await _absorberPage(aAbsorber);
+      });
+
+      final suivante = corps['page_suivante'];
+      if (!pagine || suivante == null) break;
+      // Un jeton vide, ou le même que celui qui vient d'être servi, ferait tourner le tirage sans fin.
+      if (suivante is! String || suivante.isEmpty || suivante == jeton) {
+        throw const FormatException(
+          'Tirage refusé : jeton de la page suivante illisible.',
+        );
+      }
+      jeton = suivante;
+    }
 
     // ⚠️ F0.84-bis : le serveur annonce des écritures actives que le poste n'a pas (cas réel :
     // créée entre la requête et `server_time`, donc plus jamais servie par `since`). UNE relance,
@@ -356,16 +640,165 @@ class SyncEngine {
     if (!resyncCategoriesFaite && !_fichesSansVentilation) {
       await _ecrireReglage(cleFichesResyncCategories, '1');
     }
+    // U10 : même place, et seulement si les fiches servies portent les colonnes du Rapport Élevage.
+    if (!resyncFichesU10Faite && !_fichesSansColonnesRapport) {
+      await _ecrireReglage(cleFichesResyncU10, '1');
+    }
+    // U14 : même place, et seulement si les dépenses servies portent leur statut et leur écriture.
+    if (!resyncDepensesU14Faite && !_depensesSansStatut) {
+      await _ecrireReglage(cleDepensesResyncU14, '1');
+    }
+    // U4, U8, U9 : « serveur antérieur » se lit à une pièce servie SANS ses lignes (ou des produits sans leur
+    // grand livre). ⚠️ Ticket S-T4 — un serveur qui PAGINE est postérieur à U10 : la question ne se pose plus, et
+    // une table simplement NON SERVIE à ce compte (le grand livre des stocks n'est pas servi au caissier) ne doit
+    // pas laisser croire à un serveur ancien — la resynchronisation unique resterait sinon à refaire à chaque tirage.
+    // U4 : même place, et seulement si les ventes et achats servis l'ont été avec leurs lignes.
+    final lignesNonServies =
+        !pagine &&
+        ((cles.contains('sales') && !cles.contains('sale_lines')) ||
+            (cles.contains('purchases') && !cles.contains('purchase_lines')));
+    if (!resyncLignesFaite && !lignesNonServies) {
+      await _ecrireReglage(cleLignesResync, '1');
+    }
+    // U8 : même place, et seulement si les achats servis l'ont été avec leurs retours.
+    if (!resyncRetoursFaite &&
+        !(!pagine &&
+            cles.contains('purchases') &&
+            !cles.contains('purchase_returns'))) {
+      await _ecrireReglage(cleRetoursResync, '1');
+    }
+
+    // U9 : même place, et seulement si le serveur sert le grand livre des stocks. Un serveur qui sert les produits
+    // SANS leur grand livre est antérieur à U9 : le tirage reste complet tant que cela dure (même règle que U4 pour
+    // les pièces servies sans leurs lignes).
+    if (!resyncMouvementsFaite &&
+        !(!pagine &&
+            cles.contains('products') &&
+            !cles.contains('stock_movements'))) {
+      await _ecrireReglage(cleMouvementsResync, '1');
+    }
+
+    // U13 : même place, et seulement si le serveur sert les dépenses. Un serveur qui sert les produits SANS les
+    // dépenses (réponse non paginée) est antérieur à U13 : le tirage reste complet tant que cela dure.
+    if (!resyncDepensesFaite &&
+        !(!pagine &&
+            cles.contains('products') &&
+            !cles.contains('expenses'))) {
+      await _ecrireReglage(cleDepensesResync, '1');
+    }
+
+    // Ticket S-T4 — le périmètre de CE tirage, gardé pour le suivant. Une réponse non paginée (serveur antérieur)
+    // a servi toutes les tables : périmètre inconnu, rien à resynchroniser au prochain élargissement.
+    if (pagine && perimetre != null) {
+      await PerimetreTirage.ecrire(_db, perimetre);
+    } else if (!pagine) {
+      await PerimetreTirage.effacer(_db);
+    }
 
     // ⚠️ L'HORODATAGE VIENT DU SERVEUR (`server_time`), jamais de l'appareil.
     // Une tablette dont l'horloge retarde redemanderait sans cesse les mêmes
     // changements ; une qui avance en sauterait définitivement.
+    // Ticket S-T4 : `server_time` n'est servi qu'à la DERNIÈRE page — celle que `corps` tient ici.
     final horlogeServeur = corps['server_time'];
     if (horlogeServeur is String) {
       await _db.noterEtatDeSynchronisation(
         tire: DateTime.parse(horlogeServeur),
       );
     }
+
+    return recus;
+  }
+
+  /// Ticket S-T4 — une page du tirage, absorbée table par table dans l'ordre des dépendances (l'appelant
+  /// l'enveloppe dans UNE transaction). Une clé ABSENTE (table non servie à ce compte, ou pas sur cette page) ne
+  /// touche à rien : chaque absorbeur l'ignore.
+  Future<int> _absorberPage(Map<String, dynamic> corps) async {
+    var recus = 0;
+
+    recus += await _absorberCategories(corps['product_categories']);
+    recus += await _absorberProduits(corps['products']);
+    recus += await _absorberBandes(corps['livestock_lots']);
+    // F0.94 — APRÈS les bandes : une bande créée sur le web arrive avec ses fiches dans le même
+    // tirage, et une fiche d'une bande inconnue est refusée.
+    recus += await _absorberFichesJournalieres(
+      corps['livestock_daily_entries'],
+    );
+    // Ticket 15.46 — APRÈS les bandes : un transfert d'une bande inconnue est refusé.
+    recus += await _absorberTransferts(corps['livestock_transfers']);
+    // Ticket H8b — APRÈS les bandes : une entrée ou une intervention d'une bande inconnue est refusée.
+    recus += await _absorberInfirmerie(corps['infirmary_records']);
+    recus += await _absorberCalendrierVeterinaire(
+      corps['veterinary_calendar_events'],
+    );
+    recus += await _absorberRations(corps['feed_ration_standards']);
+    // Ticket U2 (D-U2) — objectifs de GMQ, seule source des cartes du Dashboard Élevage.
+    recus += await _absorberObjectifsCroissance(corps['growth_standards']);
+    recus += await _absorberRemanences(corps['veterinary_withdrawal_periods']);
+    recus += await _absorberProphylaxie(
+      corps['prophylaxis_schedule_standards'],
+    );
+    recus += await _absorberSoins(corps['veterinary_records']);
+    recus += await _absorberReproduction(
+      corps['livestock_reproduction_events'],
+    );
+    recus += await _absorberClients(corps['customers']);
+    recus += await _absorberCreances(corps['receivables']);
+    recus += await _absorberAvances(corps['customer_advances']);
+    recus += await _absorberRelances(corps['customer_reminders']);
+    recus += await _absorberProvendes(corps['feed_types']);
+    recus += await _absorberNumerotation(corps['elevage_numbering']);
+    recus += await _absorberFournisseurs(corps['suppliers']);
+    recus += await _absorberBonsCommande(corps['purchase_orders']);
+    recus += await _absorberAchats(corps['purchases']);
+    // Ticket U4 (D-U4) — APRÈS les achats : une ligne d'un achat non servi est refusée.
+    recus += await _absorberLignesDAchat(
+      corps['purchases'],
+      corps['purchase_lines'],
+    );
+    // Ticket U8 — APRÈS les achats : une ligne de retour d'un achat non servi est refusée.
+    recus += await _absorberRetoursDAchat(
+      corps['purchases'],
+      corps['purchase_returns'],
+    );
+    recus += await _absorberCreancesFournisseurs(corps['supplier_credits']);
+    recus += await _absorberDettes(corps['payables']);
+    recus += await _absorberVentes(corps['sales']);
+    // Ticket U4 (D-U4) — APRÈS les ventes : une ligne d'une vente non servie est refusée.
+    recus += await _absorberLignesDeVente(
+      corps['sales'],
+      corps['sale_lines'],
+    );
+    // Ticket U9 — APRÈS les produits : un mouvement d'un produit inconnu du poste est refusé.
+    recus += await _absorberMouvementsStock(corps['stock_movements']);
+    recus += await _absorberEmployes(corps['employees']);
+    recus += await _absorberStagiaires(corps['internships']);
+    recus += await _absorberPointages(corps['attendance_records']);
+    recus += await _absorberCourriers(corps['mails']);
+    recus += await _absorberDocuments(corps['administrative_documents']);
+    recus += await _absorberArchives(corps['archived_documents']);
+    recus += await _absorberPlanComptable(corps['chart_of_accounts']);
+    recus += await _absorberExercices(corps['fiscal_years']);
+    recus += await _absorberJournal(
+      corps['accounting_entries'],
+      corps['accounting_entry_ids'],
+      corps['accounting_entry_lines'],
+    );
+    recus += await _absorberEntreprise(corps['company_settings']);
+    recus += await _absorberModules(corps['modules_config']);
+    recus += await _absorberRoles(corps['roles']);
+    recus += await _absorberUtilisateurs(corps['users']);
+    recus += await _absorberAudit(corps['audit_logs']);
+    recus += await _absorberNotifications(corps['notifications']);
+    recus += await _absorberRevenusDeBande(corps['lot_revenues']);
+    recus += await _absorberSujets(corps['animals']);
+    recus += await _absorberEspeces(corps['livestock_species']);
+    recus += await _absorberModelesAttestation(corps['attestation_templates']);
+    recus += await _absorberCompteursAttestation(corps['attestation_counts']);
+    recus += await _absorberComptesTresorerie(corps['treasury_accounts']);
+    recus += await _absorberCategoriesDepense(corps['expense_categories']);
+    // Ticket U13 — dépenses du serveur (table mixte) et paie réglée (lecture seule).
+    recus += await _absorberDepenses(corps['expenses']);
+    recus += await _absorberPaie(corps['payslips']);
 
     return recus;
   }
@@ -379,7 +812,7 @@ class SyncEngine {
           id: l['id'] as String,
           label: (l['label'] ?? '') as String,
           isActive: Value(_bool(l['is_active'])),
-          updatedAt: Value(_date(l['updated_at'])),
+          updatedAt: Value(_instantTechnique(l['updated_at'])),
         );
         // Le serveur fait autorite sur les referentiels : l'existant local est
         // remplace, jamais fusionne champ par champ.
@@ -440,7 +873,7 @@ class SyncEngine {
         description: Value(l['description'] as String?),
         syncStatus: const Value(SyncStatus.synced),
         isActive: Value(_bool(l['is_active'])),
-        updatedAt: Value(_date(l['updated_at'])),
+        updatedAt: Value(_instantTechnique(l['updated_at'])),
       );
 
   Future<int> _absorberBandes(Object? brut) async {
@@ -461,13 +894,232 @@ class SyncEngine {
           productId: Value(l['product_id'] as String?),
           status: Value(l['status'] as String?),
           isActive: Value(_bool(l['is_active'])),
-          updatedAt: Value(_date(l['updated_at'])),
+          updatedAt: Value(_instantTechnique(l['updated_at'])),
+          // Ticket 15.46 — bande d'origine ; clé absente (serveur antérieur) = valeur locale gardée.
+          lotSourceId: l.containsKey('lot_source_id')
+              ? Value(l['lot_source_id'] as String?)
+              : const Value.absent(),
         );
         b.insert(_db.livestockLots, ligne, onConflict: DoUpdate((_) => ligne));
       }
     });
 
     return lignes.length;
+  }
+
+  /// Ticket 15.46 — transferts entre bandes, FUSIONNÉS par identifiant. Un transfert `pending` ou en
+  /// `conflict` (créé ou annulé sur ce poste, pas encore acquitté) n'est jamais écrasé. Strict : un élément
+  /// illisible ou une bande inconnue refuse le lot entier (le curseur n'avance pas).
+  Future<int> _absorberTransferts(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    final transferts = <LivestockTransfersCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final source = l['source_lot_id'];
+      final cible = l['target_lot_id'];
+      final date = _date(l['transfer_date']);
+      final quantite = _entier(l['quantity']);
+      if (id is! String ||
+          source is! String ||
+          cible is! String ||
+          date == null ||
+          quantite == null ||
+          quantite < 1) {
+        throw FormatException(
+          'Transfert $id refusé : élément incomplet ou illisible.',
+        );
+      }
+      final categorie = l['categorie'];
+      if (categorie != null &&
+          !const ['repro', 'sevre', 'jeune'].contains(categorie)) {
+        throw FormatException(
+          'Transfert $id refusé : catégorie inconnue ($categorie).',
+        );
+      }
+      transferts.add(
+        LivestockTransfersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          sourceLotId: source,
+          targetLotId: cible,
+          transferDate: DateTime(date.year, date.month, date.day),
+          quantity: quantite,
+          categorie: Value(categorie as String?),
+          constitution: Value(_bool(l['constitution'])),
+          motif: Value(l['motif'] as String?),
+          isActive: Value(_bool(l['is_active'])),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final t in transferts) {
+        if (!connues.contains(t.sourceLotId.value) ||
+            !connues.contains(t.targetLotId.value)) {
+          throw FormatException(
+            'Transfert ${t.id.value} refusé : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.livestockTransfers,
+        )..where((x) => x.id.equals(t.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.livestockTransfers)
+            .insert(t, onConflict: DoUpdate((_) => t));
+      }
+    });
+
+    return transferts.length;
+  }
+
+  /// Ticket H8b (D-H8) — ENTRÉES D'INFIRMERIE du serveur, FUSIONNÉES par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberTransferts] : une entrée `pending` ou en `conflict` (créée, réintégrée
+  /// ou déclarée décédée sur ce poste, pas encore acquittée) n'est JAMAIS écrasée — un upsert aveugle
+  /// effacerait une réintégration saisie hors ligne. Un élément illisible (identifiant, bande, motif, date),
+  /// un statut hors de l'enum du serveur (`en_cours`, `reintegre`, `deces`) ou une bande inconnue du poste
+  /// refuse le lot entier ([FormatException], rien n'est écrit, le curseur n'avance pas).
+  Future<int> _absorberInfirmerie(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    const statuts = ['en_cours', 'reintegre', 'deces'];
+    final entrees = <InfirmaryRecordsCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final lot = l['lot_id'];
+      final motif = l['motif'];
+      final date = _date(l['entry_date']);
+      final statut = l['status'] ?? 'en_cours';
+      final sujet = l['sujet_ref'];
+      final isolement = l['isolation_level'];
+      if (id is! String ||
+          lot is! String ||
+          motif is! String ||
+          date == null ||
+          (sujet != null && sujet is! String) ||
+          (isolement != null && isolement is! String)) {
+        throw FormatException(
+          'Entrée d\'infirmerie $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!statuts.contains(statut)) {
+        throw FormatException(
+          'Entrée d\'infirmerie $id refusée : statut inconnu ($statut).',
+        );
+      }
+      entrees.add(
+        InfirmaryRecordsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          sujetRef: Value(sujet as String?),
+          motif: motif,
+          isolationLevel: Value(isolement as String?),
+          entryDate: DateTime(date.year, date.month, date.day),
+          status: Value(statut as String),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final e in entrees) {
+        if (!connues.contains(e.lotId.value)) {
+          throw FormatException(
+            'Entrée d\'infirmerie ${e.id.value} refusée : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.infirmaryRecords,
+        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.infirmaryRecords)
+            .insert(e, onConflict: DoUpdate((_) => e));
+      }
+    });
+
+    return entrees.length;
+  }
+
+  /// Ticket H8b (D-H8) — INTERVENTIONS PLANIFIÉES du calendrier vétérinaire, FUSIONNÉES par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT**, même règle que [_absorberInfirmerie] : une intervention planifiée ou confirmée sur ce
+  /// poste (`pending`, `conflict`) n'est jamais écrasée ; statut hors de l'enum du serveur (`planned`, `done`,
+  /// `late`, `inprogress`), élément illisible ou bande inconnue → [FormatException], rien n'est écrit.
+  Future<int> _absorberCalendrierVeterinaire(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    const statuts = ['planned', 'done', 'late', 'inprogress'];
+    final evenements = <VeterinaryCalendarEventsCompanion>[];
+    for (final l in lignes) {
+      final id = l['id'];
+      final lot = l['lot_id'];
+      final tache = l['task_type'];
+      final date = _date(l['scheduled_date']);
+      final statut = l['status'] ?? 'planned';
+      if (id is! String || lot is! String || tache is! String || date == null) {
+        throw FormatException(
+          'Intervention planifiée $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!statuts.contains(statut)) {
+        throw FormatException(
+          'Intervention planifiée $id refusée : statut inconnu ($statut).',
+        );
+      }
+      evenements.add(
+        VeterinaryCalendarEventsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          taskType: tache,
+          scheduledDate: DateTime(date.year, date.month, date.day),
+          status: Value(statut as String),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final connues = {
+        for (final b in await _db.select(_db.livestockLots).get()) b.id,
+      };
+      for (final e in evenements) {
+        if (!connues.contains(e.lotId.value)) {
+          throw FormatException(
+            'Intervention planifiée ${e.id.value} refusée : bande inconnue du poste.',
+          );
+        }
+        final locale = await (_db.select(
+          _db.veterinaryCalendarEvents,
+        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db
+            .into(_db.veterinaryCalendarEvents)
+            .insert(e, onConflict: DoUpdate((_) => e));
+      }
+    });
+
+    return evenements.length;
   }
 
   /// Fiches journalières du cheptel — FUSIONNÉES par identifiant (ticket F0.94).
@@ -506,8 +1158,10 @@ class SyncEngine {
   /// pas à jour) = valeur locale gardée ; NULL explicite = inconnu. Une fiche `synced` prend les
   /// `effectif_final` et `cat_eff_*` recalculés par la cascade du serveur.
   ///
-  /// ⚠️ COLONNES DU SERVEUR TOUJOURS NON PORTÉES : `feed_product_id`, `treatment_product_id`,
-  /// `treatment_dose`, `symptomes`, `vente_sexe`, `vente_montant`. Le poste ne les envoie pas :
+  /// Ticket U10 (schéma v45) — REÇUES, jamais envoyées : `vente_sexe`, `vente_montant`, `treatment_product_id`,
+  /// `treatment_dose`, `symptomes` (Tableau 2 et « CA Ventes du Lot » du Rapport Élevage). Même règle de clé absente.
+  ///
+  /// ⚠️ COLONNE DU SERVEUR TOUJOURS NON PORTÉE : `feed_product_id`. Le poste n'envoie aucune de ces six colonnes :
   /// `fill()` du serveur ne réécrit que les clés reçues, elles y restent intactes.
   Future<int> _absorberFichesJournalieres(Object? brut) async {
     if (brut == null) return 0;
@@ -562,6 +1216,12 @@ class SyncEngine {
         ? Value(entier(l, cle, id, requis: false))
         : const Value.absent();
 
+    /// Ticket 15.46 — colonne dérivée NOT NULL : absente = valeur locale gardée, nulle = 0.
+    Value<int> derive(Map<String, dynamic> l, String cle, String id) =>
+        l.containsKey(cle)
+        ? Value(entier(l, cle, id, requis: false) ?? 0)
+        : const Value.absent();
+
     double? reel(Map<String, dynamic> l, String cle, String id) {
       final v = l[cle];
       if (v == null) return null;
@@ -577,6 +1237,26 @@ class SyncEngine {
         throw FormatException('Fiche $id refusée : « $cle » négatif ($v).');
       }
       return x;
+    }
+
+    /// Ticket U10 — texte reçu : clé absente = valeur locale gardée ; nul = inconnu ; sinon une CHAÎNE (et, s'il
+    /// y a lieu, une des [valeurs] permises ou de la [forme] attendue), sans quoi le lot est refusé.
+    Value<String?> texteOptionnel(
+      Map<String, dynamic> l,
+      String cle,
+      String id, {
+      Set<String>? valeurs,
+      RegExp? forme,
+    }) {
+      if (!l.containsKey(cle)) return const Value.absent();
+      final v = l[cle];
+      if (v == null) return const Value(null);
+      if (v is! String ||
+          (valeurs != null && !valeurs.contains(v)) ||
+          (forme != null && !forme.hasMatch(v))) {
+        throw FormatException('Fiche $id refusée : « $cle » illisible ($v).');
+      }
+      return Value(v);
     }
 
     // ── Validation complète AVANT toute écriture en base ────────────────────
@@ -629,7 +1309,7 @@ class SyncEngine {
       final horodatageBrut = l['updated_at'];
       DateTime? horodatage;
       if (horodatageBrut != null) {
-        horodatage = horodatageBrut is String ? _date(horodatageBrut) : null;
+        horodatage = horodatageBrut is String ? _instantTechnique(horodatageBrut) : null;
         if (horodatage == null) {
           throw FormatException(
             'Fiche $id refusée : horodatage illisible ($horodatageBrut).',
@@ -672,12 +1352,42 @@ class SyncEngine {
           effectifF: optionnel(l, 'effectif_f', id),
           effectifSevres: optionnel(l, 'effectif_sevres', id),
           effectifSmeres: optionnel(l, 'effectif_smeres', id),
+          // Ticket U10 — colonnes du Rapport Élevage, reçues seulement (clé absente = valeur locale gardée).
+          venteSexe: texteOptionnel(
+            l,
+            'vente_sexe',
+            id,
+            valeurs: const {'M', 'F', 'Mixte'},
+          ),
+          venteMontant: l.containsKey('vente_montant')
+              ? Value(reel(l, 'vente_montant', id))
+              : const Value.absent(),
+          treatmentProductId: texteOptionnel(
+            l,
+            'treatment_product_id',
+            id,
+            forme: formeUuid,
+          ),
+          treatmentDose: texteOptionnel(l, 'treatment_dose', id),
+          symptomes: texteOptionnel(l, 'symptomes', id),
+          // Ticket 15.46 — transferts entre bandes, dérivés au serveur (NOT NULL à 0).
+          transfertEntree: derive(l, 'transfert_entree', id),
+          transfertSortie: derive(l, 'transfert_sortie', id),
+          transfertEntreeRepro: derive(l, 'transfert_entree_repro', id),
+          transfertEntreeSevre: derive(l, 'transfert_entree_sevre', id),
+          transfertEntreeJeune: derive(l, 'transfert_entree_jeune', id),
+          transfertSortieRepro: derive(l, 'transfert_sortie_repro', id),
+          transfertSortieSevre: derive(l, 'transfert_sortie_sevre', id),
+          transfertSortieJeune: derive(l, 'transfert_sortie_jeune', id),
         ),
       );
       // F0.95 — un serveur antérieur à 15.39 ne sert pas la ventilation : la resynchronisation
       // unique `fiches_resync_f095` ne doit alors PAS être marquée faite (voir `_tirer`).
       if (!colonnesVentilation.every(l.containsKey)) {
         _fichesSansVentilation = true;
+      }
+      if (!colonnesRapportElevage.every(l.containsKey)) {
+        _fichesSansColonnesRapport = true;
       }
     }
 
@@ -772,42 +1482,163 @@ class SyncEngine {
         '$suite';
   }
 
-  /// Rations normatives : référentiel éditable, remplacé à chaque tirage.
+  // ── Ticket H9b (D-H9) — PARAMÈTRES ÉLEVAGE : barèmes reçus ET envoyés ─────────────────────────────────
+  //
+  // ⚠️⚠️ **STRICTS, COMME [_absorberInfirmerie]** : une ligne incohérente (identifiant absent ou de mauvaise
+  // longueur, champ obligatoire manquant, nombre illisible, ligne servie deux fois) refuse le LOT entier
+  // ([FormatException], rien n'est écrit, le curseur n'avance pas). Lisser — un grammage illisible devenu 0 —
+  // ferait calculer une provende nulle sans que rien ne le signale.
+  //
+  // ⚠️⚠️ **UNE SAISIE LOCALE N'EST JAMAIS ÉCRASÉE** : une ligne `pending` (créée, modifiée ou archivée sur ce
+  // poste, pas encore acquittée) ou `conflict` (refusée, en attente de correction) garde sa valeur locale ;
+  // le tirage précède toujours l'envoi. Sinon : dernière valeur du serveur, `synced`.
+  //
+  // ⚠️ **LE SERVEUR SERT L'ENSEMBLE ACTIF COMPLET** (sans filtre `since`, `where is_active`) : une ligne
+  // `synced` qu'il ne sert plus a été ARCHIVÉE ailleurs (web, autre poste) — elle est archivée ici aussi
+  // (`is_active = false`), jamais effacée, comme au serveur. Une réponse SANS la clé (serveur ancien) laisse
+  // tout intact.
+
+  /// Lignes d'un barème : une LISTE de MAPS, sinon le lot est refusé.
+  static List<Map<String, dynamic>> _lignesStrictes(
+    Object? brut,
+    String bareme,
+  ) {
+    if (brut is! List) {
+      throw FormatException('$bareme refusé : la clé n\'est pas une liste.');
+    }
+    return [
+      for (final l in brut)
+        if (l is Map)
+          l.map((c, v) => MapEntry(c.toString(), v))
+        else
+          throw FormatException('$bareme refusé : élément illisible ($l).'),
+    ];
+  }
+
+  /// Nombre strict : absent → `null`, illisible → [FormatException].
+  static double? _nombreStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    final n = v is num ? v.toDouble() : double.tryParse(v.toString());
+    if (n == null) throw FormatException('$quoi illisible ($v).');
+    return n;
+  }
+
+  /// Texte strict : absent → `null`, autre chose qu'un texte → [FormatException].
+  static String? _texteStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    if (v is! String) throw FormatException('$quoi illisible ($v).');
+    return v;
+  }
+
+  /// `is_active` servi (le tirage ne sert que des lignes actives) ; absent = actif.
+  static bool _actifStrict(Map<String, dynamic> l, String quoi) {
+    if (!l.containsKey('is_active')) return true;
+    final v = l['is_active'];
+    if (v == true || v == 1 || v == '1') return true;
+    if (v == false || v == 0 || v == '0') return false;
+    throw FormatException('$quoi : « is_active » illisible ($v).');
+  }
+
+  /// Identifiant strict d'une ligne de barème (UUID de 36 caractères, jamais servi deux fois).
+  static String _identifiantStrict(
+    Map<String, dynamic> l,
+    Set<String> vus,
+    String bareme,
+  ) {
+    final id = l['id'];
+    if (id is! String || id.length != 36) {
+      throw FormatException('$bareme refusé : identifiant invalide ($id).');
+    }
+    if (!vus.add(id)) {
+      throw FormatException('$bareme $id refusé : servi deux fois.');
+    }
+    return id;
+  }
+
+  /// Fusion commune aux trois barèmes : les lignes servies remplacent les `synced`, les `pending`/`conflict`
+  /// sont protégées, les `synced` absentes de l'ensemble actif servi sont archivées.
+  Future<void> _fusionnerBareme<T extends Table, D>({
+    required TableInfo<T, D> table,
+    required List<Insertable<D>> recues,
+    required List<String> idsServis,
+    required String Function(D) idDe,
+    required SyncStatus Function(D) statutDe,
+    required Expression<bool> Function(T) synceeHorsServis,
+    required Insertable<D> archivage,
+  }) async {
+    await _db.transaction(() async {
+      final protegees = {
+        for (final l in await _db.select(table).get())
+          if (statutDe(l) != SyncStatus.synced) idDe(l),
+      };
+      for (var i = 0; i < recues.length; i++) {
+        if (protegees.contains(idsServis[i])) continue;
+        await _db
+            .into(table)
+            .insert(recues[i], onConflict: DoUpdate((_) => recues[i]));
+      }
+      await (_db.update(
+        table,
+      )..where((t) => synceeHorsServis(t))).write(archivage);
+    });
+  }
+
+  /// Catalogue des types de provende — ensemble actif complet, FUSIONNÉ (ticket H9b).
   ///
-  /// ⚠️ Une réponse SANS la clé laisse les rations locales intactes plutôt que
-  /// de les effacer : un serveur plus ancien qui ne les sert pas encore ne doit
-  /// pas vider le référentiel d'un poste déjà à jour.
-  /// Catalogue des types de provende — référentiel remplacé à chaque tirage.
-  ///
-  /// ⚠️ **REMPLACEMENT COMPLET** : un type d'aliment archivé côté serveur ne
-  /// descend plus, et doit donc quitter l'écran du poste. Le garder ferait
-  /// figurer au catalogue une provende que la ferme ne sert plus.
+  /// ⚠️ Avant H9b la table était vidée puis réécrite : un type créé au poste et pas encore acquitté aurait
+  /// disparu au tirage suivant. Le libellé de l'espèce voyage avec le type (le poste n'a pas de table des
+  /// espèces désactivées).
   Future<int> _absorberProvendes(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
-
-    await _db.transaction(() async {
-      await _db.delete(_db.feedTypes).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.feedTypes)
-            .insert(
-              FeedTypesCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                speciesId: Value(l['species_id'] as String?),
-                speciesCode: Value(l['species_code'] as String?),
-                speciesLabel: Value(l['species_label'] as String?),
-                standardBagWeightKg: Value(_reel(l['standard_bag_weight_kg'])),
-                pricePerKg: Value(_reel(l['price_per_kg'])),
-              ),
-            );
+    final lignes = _lignesStrictes(brut, 'Type de provende');
+    final vus = <String>{};
+    final recues = <FeedTypesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Type de provende');
+      final nom = l['name'];
+      if (nom is! String || nom.isEmpty) {
+        throw FormatException('Type de provende $id refusé : nom absent.');
       }
-    });
+      recues.add(
+        FeedTypesCompanion.insert(
+          id: id,
+          name: nom,
+          speciesId: Value(_texteStrict(l['species_id'], 'Type $id : espèce')),
+          speciesCode: Value(
+            _texteStrict(l['species_code'], 'Type $id : code espèce'),
+          ),
+          speciesLabel: Value(
+            _texteStrict(l['species_label'], 'Type $id : libellé espèce'),
+          ),
+          standardBagWeightKg: Value(
+            _nombreStrict(l['standard_bag_weight_kg'], 'Type $id : poids du sac'),
+          ),
+          pricePerKg: Value(
+            _nombreStrict(l['price_per_kg'], 'Type $id : prix au kilo'),
+          ),
+          isActive: Value(_actifStrict(l, 'Type $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
 
-    return lignes.length;
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.feedTypes,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FeedType t) => t.id,
+      statutDe: (FeedType t) => t.syncStatus,
+      synceeHorsServis: ($FeedTypesTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FeedTypesCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
   }
 
   /// Préfixes de numérotation — un OBJET, pas une collection.
@@ -816,53 +1647,246 @@ class SyncEngine {
   /// préfixes, pas une liste de lignes : la passer à `_lignes()` comme les
   /// autres tables ne donnerait rien. Elle est écrite sous une clé fixe pour
   /// qu'un second tirage remplace la ligne au lieu d'en empiler une autre.
+  ///
+  /// Ticket H9b — STRICTE (un format qui n'est pas un texte refuse la ligne) et PROTÉGÉE (des formats
+  /// enregistrés au poste et pas encore acquittés ne sont pas écrasés).
   Future<int> _absorberNumerotation(Object? brut) async {
-    if (brut is! Map) return 0;
+    if (brut == null) return 0;
+    if (brut is! Map) {
+      throw FormatException('Numérotation refusée : objet attendu ($brut).');
+    }
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
+    String? format(String cle) => _texteStrict(l[cle], 'Numérotation : $cle');
 
     final ligne = ElevageNumberingSettingsCompanion.insert(
       id: const Value('unique'),
-      bandeFormat: Value(l['bande_format'] as String?),
-      lapinePrefix: Value(l['lapine_prefix'] as String?),
-      malePrefix: Value(l['male_prefix'] as String?),
-      truiePrefix: Value(l['truie_prefix'] as String?),
-      verratPrefix: Value(l['verrat_prefix'] as String?),
-      porteePrefix: Value(l['portee_prefix'] as String?),
-      volaillePrefix: Value(l['volaille_prefix'] as String?),
-      parcPrefix: Value(l['parc_prefix'] as String?),
-      escargotPrefix: Value(l['escargot_prefix'] as String?),
+      bandeFormat: Value(format('bande_format')),
+      lapinePrefix: Value(format('lapine_prefix')),
+      malePrefix: Value(format('male_prefix')),
+      truiePrefix: Value(format('truie_prefix')),
+      verratPrefix: Value(format('verrat_prefix')),
+      porteePrefix: Value(format('portee_prefix')),
+      volaillePrefix: Value(format('volaille_prefix')),
+      parcPrefix: Value(format('parc_prefix')),
+      escargotPrefix: Value(format('escargot_prefix')),
+      syncStatus: const Value(SyncStatus.synced),
+      updatedAt: const Value(null),
     );
 
-    await _db
-        .into(_db.elevageNumberingSettings)
-        .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    await _db.transaction(() async {
+      final locale = await (_db.select(
+        _db.elevageNumberingSettings,
+      )..where((t) => t.id.equals('unique'))).getSingleOrNull();
+      if (locale != null && locale.syncStatus != SyncStatus.synced) return;
+      await _db
+          .into(_db.elevageNumberingSettings)
+          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    });
 
     return 1;
   }
 
+  /// Rations normatives — ensemble actif complet, FUSIONNÉ (ticket H9b).
+  ///
+  /// ⚠️ Une réponse SANS la clé laisse les rations locales intactes plutôt que
+  /// de les effacer : un serveur plus ancien qui ne les sert pas encore ne doit
+  /// pas vider le référentiel d'un poste déjà à jour.
+  ///
+  /// 🔴→✅ Avant H9b, une ration ARCHIVÉE sur le web (ticket 14.55 : elle ne descend plus) restait active sur
+  /// le poste pour toujours — l'absorbeur ne faisait qu'ajouter. Elle s'archive désormais ici aussi.
   Future<int> _absorberRations(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    final lignes = _lignesStrictes(brut, 'Ration');
+    final vus = <String>{};
+    final recues = <FeedRationStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Ration');
+      final espece = l['species_code'];
+      final stade = l['stage_label'];
+      final grammes = _nombreStrict(l['ration_g_per_day'], 'Ration $id : grammage');
+      if (espece is! String || espece.isEmpty || stade is! String || grammes == null) {
+        throw FormatException('Ration $id refusée : élément incomplet ou illisible.');
+      }
+      recues.add(
+        FeedRationStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          stageLabel: stade,
+          rationGPerDay: grammes,
+          isActive: Value(_actifStrict(l, 'Ration $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
 
-    await _db.batch((b) {
-      for (final l in lignes) {
-        final ligne = FeedRationStandardsCompanion.insert(
-          id: l['id'] as String,
-          speciesCode: (l['species_code'] ?? '') as String,
-          stageLabel: (l['stage_label'] ?? '') as String,
-          rationGPerDay: _reel(l['ration_g_per_day']) ?? 0,
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.feedRationStandards,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FeedRationStandard r) => r.id,
+      statutDe: (FeedRationStandard r) => r.syncStatus,
+      synceeHorsServis: ($FeedRationStandardsTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FeedRationStandardsCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
+  }
+
+  /// Ticket U2 (décision client D-U2 du 19/10/2026) — OBJECTIFS DE GMQ (`growth_standards`) : référentiel en
+  /// LECTURE SEULE, servi complet à chaque tirage, dont l'ENSEMBLE est remplacé (le poste ne l'écrit jamais : rien
+  /// de local à protéger).
+  ///
+  /// ⚠️⚠️ **STRICT**, comme les barèmes de H9b : identifiant invalide ou servi deux fois, espèce ou stade absents,
+  /// objectif absent, illisible, fractionnaire ou négatif (`unsignedInteger` au serveur) → [FormatException] : RIEN
+  /// n'est écrit (le barème précédent reste), le curseur n'avance pas. Lisser — un objectif illisible devenu 0 —
+  /// afficherait « Objectif : 0-20 g/j » sur le Dashboard Élevage sans que rien ne le signale.
+  ///
+  /// Une réponse SANS la clé (serveur antérieur à U2) ne touche à rien ; une liste VIDE est une réponse : aucun
+  /// barème, les cartes disent « Objectif : — ».
+  Future<int> _absorberObjectifsCroissance(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Objectif de croissance';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final recus = <GrowthStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final espece = _texteStrict(l['species_code'], '$quoi $id : espèce');
+      final stade = _texteStrict(l['stage_label'], '$quoi $id : stade');
+      final minimum = _entierPositifStrict(
+        l['gmq_min_g_per_day'],
+        '$quoi $id : minimum',
+      );
+      final maximum = _entierPositifStrict(
+        l['gmq_max_g_per_day'],
+        '$quoi $id : maximum',
+      );
+      if (espece == null ||
+          espece.isEmpty ||
+          stade == null ||
+          stade.isEmpty ||
+          minimum == null ||
+          maximum == null) {
+        throw FormatException(
+          '$quoi $id refusé : élément incomplet ou illisible.',
         );
-        b.insert(
-          _db.feedRationStandards,
-          ligne,
-          onConflict: DoUpdate((_) => ligne),
-        );
+      }
+      recus.add(
+        GrowthStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          stageLabel: stade,
+          gmqMinGPerDay: minimum,
+          gmqMaxGPerDay: maximum,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.growthStandards).go();
+      for (final r in recus) {
+        await _db.into(_db.growthStandards).insert(r);
       }
     });
 
-    return lignes.length;
+    return recus.length;
+  }
+
+  /// Entier positif strict (Ticket U2) : absent → `null` ; illisible, fractionnaire ou négatif →
+  /// [FormatException].
+  static int? _entierPositifStrict(Object? v, String quoi) {
+    if (v == null) return null;
+    final n = v is num ? v : num.tryParse(v.toString());
+    if (n == null || n != n.truncate() || n < 0) {
+      throw FormatException('$quoi illisible ($v).');
+    }
+    return n.toInt();
+  }
+
+  /// Calendrier prophylactique — ensemble actif complet, FUSIONNÉ (ticket H9b).
+  ///
+  /// ⚠️ Les bornes de cycle ABSENTES restent NULLES, JAMAIS ZÉRO : le serveur les laisse vides pour les
+  /// entrées calendaires (« Le 1er du mois ») dont la base de calcul n'est pas le jour de cycle. Les remplacer
+  /// par 0 les rendrait dues au premier jour de chaque bande. `created_at` sert au tri du web (H9).
+  Future<int> _absorberProphylaxie(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignesStrictes(brut, 'Échéance de prophylaxie');
+    final vus = <String>{};
+    final recues = <ProphylaxisScheduleStandardsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Échéance de prophylaxie');
+      final espece = l['species_code'];
+      final periode = l['period_label'];
+      final traitement = l['treatment'];
+      if (espece is! String ||
+          espece.isEmpty ||
+          periode is! String ||
+          traitement is! String) {
+        throw FormatException(
+          'Échéance de prophylaxie $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      int? entier(String cle) {
+        final n = _nombreStrict(l[cle], 'Échéance $id : $cle');
+        if (n != null && n != n.roundToDouble()) {
+          throw FormatException('Échéance $id : $cle non entier ($n).');
+        }
+        return n?.round();
+      }
+
+      final creation = l['created_at'];
+      final creee = creation == null ? null : _instantTechnique(creation);
+      if (creation != null && creee == null) {
+        throw FormatException('Échéance $id : created_at illisible ($creation).');
+      }
+
+      recues.add(
+        ProphylaxisScheduleStandardsCompanion.insert(
+          id: id,
+          speciesCode: espece,
+          periodLabel: periode,
+          cycleDayStart: Value(entier('cycle_day_start')),
+          cycleDayEnd: Value(entier('cycle_day_end')),
+          treatment: traitement,
+          productRecommended: Value(
+            _texteStrict(l['product_recommended'], 'Échéance $id : produit'),
+          ),
+          dosage: Value(_texteStrict(l['dosage'], 'Échéance $id : posologie')),
+          withdrawalDays: Value(entier('withdrawal_days') ?? 0),
+          createdAt: Value(creee),
+          isActive: Value(_actifStrict(l, 'Échéance $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
+
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.prophylaxisScheduleStandards,
+      recues: recues,
+      idsServis: servis,
+      idDe: (ProphylaxisScheduleStandard p) => p.id,
+      statutDe: (ProphylaxisScheduleStandard p) => p.syncStatus,
+      synceeHorsServis: ($ProphylaxisScheduleStandardsTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const ProphylaxisScheduleStandardsCompanion(
+        isActive: Value(false),
+      ),
+    );
+
+    return recues.length;
   }
 
   /// Périodes de rémanence vétérinaire encore actives.
@@ -890,7 +1914,7 @@ class SyncEngine {
                 id: l['id'] as String,
                 lotId: (l['lot_id'] ?? '') as String,
                 productUsed: Value(l['product_used'] as String?),
-                endDate: _date(l['end_date']) ?? DateTime.now(),
+                endDate: _date(l['end_date']) ?? HeureBenin.aujourdhui(),
               ),
             );
       }
@@ -945,7 +1969,7 @@ class SyncEngine {
             nesVivants: Value(_entier(l['nes_vivants'])),
             nesMorts: Value(_entier(l['nes_morts'])),
             status: Value((l['status'] ?? 'en_cours') as String),
-            updatedAt: _date(l['updated_at']) ?? DateTime.now(),
+            updatedAt: _instantTechnique(l['updated_at']) ?? DateTime.now(),
           ),
           mode: InsertMode.insertOrReplace,
         );
@@ -1311,7 +2335,7 @@ class SyncEngine {
         _journalSansDateCreation = true;
       } else if (l['created_at'] != null) {
         final brute = l['created_at'];
-        creeLe = brute is String ? _date(brute) : null;
+        creeLe = brute is String ? _instantTechnique(brute) : null;
         if (creeLe == null) {
           throw FormatException(
             'Journal refusé : écriture $id, date de création illisible ($brute).',
@@ -1389,6 +2413,11 @@ class SyncEngine {
       }
     }
 
+    // ⚠️ Copie FINALE : la variable `actives`, capturée par la transaction, n'est pas promue
+    // en non-nulle par le compilateur Dart 3.13 (le build Windows échouait sur un SDK stable
+    // récent). Aucune règle changée : même valeur, même test de nullité.
+    final annoncees = actives;
+
     // ── Application, en une transaction ─────────────────────────────────────
     String? avertissementVidage;
     await _db.transaction(() async {
@@ -1409,7 +2438,7 @@ class SyncEngine {
         await _db.into(_db.accountingEntryLines).insert(c);
       }
 
-      if (actives != null) {
+      if (annoncees != null) {
         final locales = [
           for (final e in await _db.select(_db.accountingEntries).get()) e.id,
         ];
@@ -1417,7 +2446,7 @@ class SyncEngine {
         // F0.84-bis — écritures annoncées actives et toujours absentes du poste : l'appelant relance
         // UNE fois le journal complet (voir `_tirer`).
         final presentes = locales.toSet();
-        _journalManquants = actives.difference(presentes).length;
+        _journalManquants = annoncees.difference(presentes).length;
 
         // ⚠️⚠️ F0.84-bis — UNE LISTE VIDE N'EST PAS CRUE AU PREMIER TIRAGE. Un 200 avec
         // `accounting_entry_ids: []` peut venir d'un serveur branché sur une base vide ; l'avaler
@@ -1426,7 +2455,7 @@ class SyncEngine {
         // par une seconde annonce vide. Aucune règle comptable : seule la prudence sur une
         // suppression irréversible.
         var purger = true;
-        if (actives.isEmpty && locales.isNotEmpty) {
+        if (annoncees.isEmpty && locales.isNotEmpty) {
           if (await _lireReglage(cleJournalVidageAttendu) == null) {
             purger = false;
             await _ecrireReglage(cleJournalVidageAttendu, '1');
@@ -1445,7 +2474,7 @@ class SyncEngine {
 
         final retirees = [
           for (final id in locales)
-            if (!actives.contains(id)) id,
+            if (!annoncees.contains(id)) id,
         ];
         for (final morceau in _morceaux(retirees)) {
           await (_db.delete(
@@ -1493,27 +2522,57 @@ class SyncEngine {
   /// colonne où en ranger : mots de passe SMTP et jetons SMS restent sur le
   /// serveur, même chiffrés. Un poste volé ne donne pas la boîte mail de la
   /// ferme.
+  ///
+  /// Ticket H9b (D-H9) — le DÉLAI DU RAPPEL DES SOINS (`rappel_soins_jours`, 0 à 30) descend avec l'identité.
+  /// ⚠️⚠️ **STRICT** : une valeur qui n'est pas un entier de 0 à 30 refuse la ligne entière
+  /// ([FormatException], rien n'est écrit). ⚠️ Un délai réglé sur ce poste et pas encore acquitté (`pending`,
+  /// `conflict`) n'est JAMAIS écrasé ; l'identité de la ferme, elle, se met à jour. Clé absente (serveur
+  /// antérieur à H9b) : le délai local est laissé tel quel.
   Future<int> _absorberEntreprise(Object? brut) async {
     if (brut is! Map) return 0;
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
 
-    final ligne = CompanySettingsCompanion.insert(
-      id: const Value('unique'),
-      companyName: Value(l['company_name'] as String?),
-      promoterName: Value(l['promoter_name'] as String?),
-      address: Value(l['address'] as String?),
-      phone: Value(l['phone'] as String?),
-      email: Value(l['email'] as String?),
-      ifu: Value(l['ifu'] as String?),
-      rccm: Value(l['rccm'] as String?),
-      tvaEnabled: Value(_bool(l['tva_enabled'])),
-      tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
-    );
+    final delaiServi = l.containsKey('rappel_soins_jours');
+    final delai = l['rappel_soins_jours'];
+    if (delaiServi &&
+        delai != null &&
+        (delai is! int || delai < 0 || delai > 30)) {
+      throw FormatException(
+        'Paramètres de l\'entreprise refusés : délai du rappel des soins illisible ($delai).',
+      );
+    }
 
-    await _db
-        .into(_db.companySettings)
-        .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    await _db.transaction(() async {
+      final locale = await (_db.select(
+        _db.companySettings,
+      )..where((t) => t.id.equals('unique'))).getSingleOrNull();
+      final protege =
+          locale != null && locale.syncStatus != SyncStatus.synced;
+
+      final ligne = CompanySettingsCompanion.insert(
+        id: const Value('unique'),
+        companyName: Value(l['company_name'] as String?),
+        promoterName: Value(l['promoter_name'] as String?),
+        address: Value(l['address'] as String?),
+        phone: Value(l['phone'] as String?),
+        email: Value(l['email'] as String?),
+        ifu: Value(l['ifu'] as String?),
+        rccm: Value(l['rccm'] as String?),
+        tvaEnabled: Value(_bool(l['tva_enabled'])),
+        tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
+        rappelSoinsJours: delaiServi && !protege
+            ? Value(delai as int?)
+            : const Value.absent(),
+        syncStatus: delaiServi && !protege
+            ? const Value(SyncStatus.synced)
+            : const Value.absent(),
+      );
+
+      await _db
+          .into(_db.companySettings)
+          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+    });
 
     return 1;
   }
@@ -1604,7 +2663,7 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Journal d'audit — les cent dernières actions, remplacées à chaque tirage.
+  /// Journal d'audit — les deux cents dernières actions (U14 : la liste du web), remplacées à chaque tirage.
   Future<int> _absorberAudit(Object? brut) async {
     if (brut == null) return 0;
 
@@ -1623,7 +2682,7 @@ class SyncEngine {
                 action: (l['action'] ?? '') as String,
                 module: Value(l['module'] as String?),
                 ipAddress: Value(l['ip_address'] as String?),
-                createdAt: Value(_date(l['created_at'])),
+                createdAt: Value(_instantTechnique(l['created_at'])),
               ),
             );
       }
@@ -1663,7 +2722,7 @@ class SyncEngine {
                 message: l['message'] as String,
                 linkUrl: Value(l['link_url'] as String?),
                 isRead: Value(_bool(l['is_read'])),
-                createdAt: Value(_date(l['created_at'])),
+                createdAt: Value(_instantTechnique(l['created_at'])),
               ),
             );
       }
@@ -1822,7 +2881,7 @@ class SyncEngine {
 
   /// Nombre d'attestations émises, par type — ⚠️ UN DÉCOMPTE D'AUDIT DU SERVEUR.
   ///
-  /// Le poste ne détient que les cent dernières lignes d'audit de la ferme : il
+  /// Le poste ne détient que les deux cents dernières lignes d'audit de la ferme : il
   /// ne peut pas recompter. Le serveur compte sur l'historique entier ; le poste
   /// garde ce nombre tel quel, dans `app_settings`.
   Future<int> _absorberCompteursAttestation(Object? brut) async {
@@ -2247,7 +3306,7 @@ class SyncEngine {
 
       if (local != null && local.syncStatus != SyncStatus.synced) continue;
 
-      final jour = _date(l['attendance_date']) ?? DateTime.now();
+      final jour = _date(l['attendance_date']) ?? HeureBenin.aujourdhui();
 
       final ligne = AttendanceRecordsCompanion.insert(
         id: id,
@@ -2296,7 +3355,7 @@ class SyncEngine {
 
       // TICKET F0.93 (réserve 2 de l'audit indépendant) : le repli lit l'horloge INJECTÉE,
       // comme `horodatage` ci-dessous — jamais `DateTime.now()`, invisible à un test figé.
-      final vendueLe = _date(l['sold_at']) ?? _maintenant();
+      final vendueLe = _date(l['sold_at']) ?? HeureBenin.depuisInstant(_maintenant());
 
       // 🔴→✅ TICKET F0.90 (remarque B2 de l'audit) — `updatedAt` N'EST PLUS `sold_at`. Règle du
       // poste : `updatedAt` = instant de la SAISIE (ou, pour ce qui vient d'ailleurs, de la
@@ -2329,6 +3388,386 @@ class SyncEngine {
           .into(_db.sales)
           .insert(ligne, onConflict: DoUpdate((_) => ligne));
     }
+
+    return lignes.length;
+  }
+
+  /// Ticket U4 (D-U4) — LIGNES DES VENTES servies par le tirage (`sale_lines`).
+  ///
+  /// Sans elles, le Top 5 des produits et les « Ventes (mois) » porcines du Tableau de bord ne comptaient que
+  /// les ventes saisies SUR CE POSTE, quand le web les compte toutes. Règles, communes à
+  /// [_absorberLignesDAchat] (voir [_remplacerLignesDePieces]) :
+  ///  - ⚠️⚠️ une vente `pending` ou en `conflict` sur ce poste n'a JAMAIS ses lignes touchées : ce sont celles
+  ///    de la saisie, qui repartiront avec elle à l'envoi ;
+  ///  - les lignes d'une vente `synced` servie sont REMPLACÉES par celles du serveur (il sert TOUTES les lignes
+  ///    de chaque vente servie) : une ligne retirée au web disparaît ici aussi ;
+  ///  - STRICT : élément illisible, ligne d'une vente non servie par ce tirage (fuite) ou produit inconnu du
+  ///    poste → [FormatException], rien n'est écrit, le curseur n'avance pas ;
+  ///  - `manual_total_amount` est la source de vérité du montant ; `unit_price` est gardé tel que servi.
+  /// Clé absente (serveur antérieur à U4) : rien n'est touché.
+  Future<int> _absorberLignesDeVente(Object? brutPieces, Object? brut) =>
+      _remplacerLignesDePieces<SaleLinesCompanion>(
+        quoi: 'Ligne de vente',
+        brutPieces: brutPieces,
+        brut: brut,
+        cle: 'sale_id',
+        protegees: () async => {
+          for (final v in await (_db.select(
+            _db.sales,
+          )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+            v.id,
+        },
+        lire: (l, id, piece, produit) {
+          final qte = _reel(l['qty']);
+          final prix = _reel(l['unit_price']);
+          final montant = _reel(l['manual_total_amount']);
+          final lot = l['lot_id'];
+          if (qte == null ||
+              prix == null ||
+              montant == null ||
+              (lot != null && lot is! String)) {
+            return null;
+          }
+          return SaleLinesCompanion.insert(
+            id: id,
+            saleId: piece,
+            productId: produit,
+            lotId: Value(lot as String?),
+            qty: qte,
+            unitPrice: prix,
+            manualTotalAmount: montant,
+          );
+        },
+        remplacer: (pieces, lignes) async {
+          await (_db.delete(
+            _db.saleLines,
+          )..where((t) => t.saleId.isIn(pieces))).go();
+          await _db.batch((b) => b.insertAll(_db.saleLines, lignes));
+        },
+      );
+
+  /// Ticket U4 (D-U4) — LIGNES DES ACHATS servies par le tirage (`purchase_lines`). Mêmes règles que
+  /// [_absorberLignesDeVente] : un achat `pending` ou en `conflict` garde ses lignes (elles partent avec lui à
+  /// l'envoi). Elles rendent le PMP calculable au poste (`Product::computePmp()` : TOUTES les lignes d'achat).
+  Future<int> _absorberLignesDAchat(Object? brutPieces, Object? brut) =>
+      _remplacerLignesDePieces<PurchaseLinesCompanion>(
+        quoi: "Ligne d'achat",
+        brutPieces: brutPieces,
+        brut: brut,
+        cle: 'purchase_id',
+        protegees: () async => {
+          for (final a in await (_db.select(
+            _db.purchases,
+          )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+            a.id,
+        },
+        lire: (l, id, piece, produit) {
+          final qte = _reel(l['qty']);
+          final prix = _reel(l['unit_price']);
+          final nom = l['product_name'];
+          if (qte == null || prix == null || (nom != null && nom is! String)) {
+            return null;
+          }
+          return PurchaseLinesCompanion.insert(
+            id: id,
+            purchaseId: piece,
+            productId: produit,
+            productName: Value(nom as String?),
+            qty: qte,
+            unitPrice: prix,
+          );
+        },
+        remplacer: (pieces, lignes) async {
+          await (_db.delete(
+            _db.purchaseLines,
+          )..where((t) => t.purchaseId.isIn(pieces))).go();
+          await _db.batch((b) => b.insertAll(_db.purchaseLines, lignes));
+        },
+      );
+
+  /// Ticket U9 — GRAND LIVRE DES STOCKS (`stock_movements`) servi par le tirage.
+  ///
+  /// Journal écrit par le serveur SEUL (`AdjustStockAction`) : au poste, une table en LECTURE SEULE que rien
+  /// n'écrit ni n'envoie — il n'y a donc aucune saisie locale à protéger. Tout au premier tirage, puis au curseur
+  /// avec un recouvrement de deux minutes (voir `SyncController::pull`) : un mouvement déjà reçu est REMPLACÉ par
+  /// identifiant, jamais dupliqué.
+  ///
+  /// ⚠️⚠️ **STRICT** : élément illisible, identifiant invalide ou servi deux fois, produit inconnu du poste, type
+  /// hors `entree`/`sortie`/`ajustement`, quantité absente, illisible ou négative, motif de référence absent,
+  /// référence ou motif qui n'est pas un texte, date illisible → [FormatException] : RIEN n'est écrit, le curseur
+  /// n'avance pas. Lisser — une quantité illisible devenue 0, un type inconnu lu comme une entrée — fausserait en
+  /// silence la rotation, les écarts d'inventaire et le stock d'œufs de la ferme.
+  ///
+  /// Clé absente (serveur antérieur à U9) : rien n'est touché. Les saisies EN ATTENTE du poste n'y sont jamais
+  /// écrites : `JournalStocks` les ajoute à la lecture, et les retire dès que leur mouvement est redescendu.
+  Future<int> _absorberMouvementsStock(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Mouvement de stock';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final produits = {
+      for (final p in await _db.select(_db.products).get()) p.id,
+    };
+    const types = {'entree', 'sortie', 'ajustement'};
+    final vus = <String>{};
+    final recus = <StockMovementsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final produit = l['product_id'];
+      final type = l['type'];
+      final quantite = _nombreStrict(l['quantity'], '$quoi $id : quantité');
+      final referenceType = _texteStrict(
+        l['reference_type'],
+        '$quoi $id : type de référence',
+      );
+      final referenceId = _texteStrict(
+        l['reference_id'],
+        '$quoi $id : référence',
+      );
+      final motif = _texteStrict(l['reason'], '$quoi $id : motif');
+      final date = l['movement_date'] is String
+          ? HeureBenin.lire(l['movement_date'])
+          : null;
+      if (produit is! String || !produits.contains(produit)) {
+        throw FormatException(
+          "$quoi $id refusé : produit inconnu du poste ($produit).",
+        );
+      }
+      if (type is! String || !types.contains(type)) {
+        throw FormatException('$quoi $id refusé : type illisible ($type).');
+      }
+      if (quantite == null || quantite < 0) {
+        throw FormatException(
+          '$quoi $id refusé : quantité absente ou négative ($quantite).',
+        );
+      }
+      if (referenceType == null || referenceType.isEmpty) {
+        throw FormatException('$quoi $id refusé : type de référence absent.');
+      }
+      if (date == null) {
+        throw FormatException(
+          '$quoi $id refusé : date illisible (${l['movement_date']}).',
+        );
+      }
+      recus.add(
+        StockMovementsCompanion.insert(
+          id: id,
+          productId: produit,
+          type: type,
+          quantity: quantite,
+          referenceType: referenceType,
+          referenceId: Value(referenceId),
+          reason: Value(motif),
+          // ⚠️ Heure MURALE du serveur, lue telle quelle (jamais `toLocal()` : le jour du web doit rester le jour).
+          movementDate: date,
+        ),
+      );
+    }
+
+    await _db.batch(
+      (b) => b.insertAll(
+        _db.stockMovements,
+        recus,
+        mode: InsertMode.insertOrReplace,
+      ),
+    );
+
+    return recus.length;
+  }
+
+  /// Ticket U8 — LIGNES DE RETOUR FOURNISSEUR servies par le tirage (`purchase_returns`).
+  ///
+  /// Le web compte, à la carte « Écarts / Retours », les LIGNES de retour (`PurchaseReturn::count()` : une ligne
+  /// par ligne d'achat retournée) ; le poste comptait des achats. Le serveur sert TOUTES les lignes de retour de
+  /// chaque achat servi, au même curseur que lui, et aucune d'un achat non servi.
+  ///
+  /// ⚠️⚠️ **LA TABLE DU POSTE MÊLE DEUX CHOSES, DISTINGUÉES PAR `device_id`.** Une DEMANDE saisie ici (F0.74 : une
+  /// ligne par retour, `id` = identifiant du retour, `device_id` = le poste) et les LIGNES servies par le serveur
+  /// (`id` = celui de la ligne serveur, `device_id` = `serveur`, `synced`). Règles :
+  ///  - ⚠️⚠️ une demande `pending` ou en `conflict` n'est JAMAIS touchée : ni effacée, ni écrasée (elle repartira,
+  ///    ou attend sa relance) ;
+  ///  - pour chaque achat servi, les lignes `synced` du poste (lignes serveur précédentes, demande ACQUITTÉE) sont
+  ///    REMPLACÉES par celles du serveur : la demande acquittée devient les lignes que le serveur a créées ;
+  ///  - un achat `pending` ou en `conflict` sur ce poste n'a rien de touché (le serveur ne le connaît pas) ;
+  ///  - STRICT : élément illisible, ligne servie deux fois, ligne d'un achat non servi par ce tirage, identifiant
+  ///    d'une demande locale `pending`/`conflict`, date illisible → [FormatException], rien n'est écrit, le
+  ///    curseur n'avance pas.
+  /// Clé absente (serveur antérieur à U8) : rien n'est touché.
+  Future<int> _absorberRetoursDAchat(Object? brutPieces, Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    final servis = {
+      for (final p in _lignes(brutPieces))
+        if (p['id'] is String) p['id'] as String,
+    };
+    if (servis.isEmpty && lignes.isEmpty) return 0;
+
+    final locales = await _db.select(_db.purchaseReturns).get();
+    final demandesEnCours = {
+      for (final r in locales)
+        if (r.syncStatus != SyncStatus.synced) r.id,
+    };
+
+    final parAchat = <String, List<PurchaseReturnsCompanion>>{
+      for (final a in servis) a: [],
+    };
+    final vues = <String>{};
+    for (final l in lignes) {
+      final id = l['id'];
+      final achat = l['purchase_id'];
+      final motif = l['reason'];
+      final date = _date(l['return_date']);
+      if (id is! String ||
+          id.length != 36 ||
+          achat is! String ||
+          (motif != null && motif is! String)) {
+        throw FormatException(
+          'Ligne de retour $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!vues.add(id)) {
+        throw FormatException('Ligne de retour $id refusée : servie deux fois.');
+      }
+      if (!servis.contains(achat)) {
+        throw FormatException(
+          "Ligne de retour $id refusée : son achat ($achat) n'est pas servi par ce tirage.",
+        );
+      }
+      if (demandesEnCours.contains(id)) {
+        throw FormatException(
+          "Ligne de retour $id refusée : elle porte l'identifiant d'une demande de retour "
+          'du poste encore en attente ou refusée.',
+        );
+      }
+      if (date == null) {
+        throw FormatException(
+          'Ligne de retour $id refusée : date du retour illisible.',
+        );
+      }
+      parAchat[achat]!.add(
+        PurchaseReturnsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: date,
+          purchaseId: achat,
+          reason: (motif as String?) ?? '',
+          returnDate: date,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      // ⚠️ Un achat que le poste tient `pending` ou en `conflict` n'est pas celui du serveur : rien n'y est touché.
+      final achatsLocaux = {
+        for (final a in await (_db.select(
+          _db.purchases,
+        )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+          a.id,
+      };
+      final remplaces = [
+        for (final a in parAchat.keys)
+          if (!achatsLocaux.contains(a)) a,
+      ];
+      if (remplaces.isEmpty) return;
+      // ⚠️⚠️ Seules les lignes `synced` sont remplacées : une demande `pending` ou en `conflict` reste.
+      await (_db.delete(_db.purchaseReturns)..where(
+            (t) =>
+                t.purchaseId.isIn(remplaces) &
+                t.syncStatus.equalsValue(SyncStatus.synced),
+          ))
+          .go();
+      await _db.batch(
+        (b) => b.insertAll(
+          _db.purchaseReturns,
+          [for (final a in remplaces) ...parAchat[a]!],
+          mode: InsertMode.insertOrReplace,
+        ),
+      );
+    });
+
+    return lignes.length;
+  }
+
+  /// Corps commun de [_absorberLignesDeVente] et [_absorberLignesDAchat] : valide TOUT avant d'écrire, puis
+  /// remplace, dans une transaction, les lignes des pièces servies que le poste tient `synced`.
+  Future<int> _remplacerLignesDePieces<T>({
+    required String quoi,
+    required Object? brutPieces,
+    required Object? brut,
+    required String cle,
+    required Future<Set<String>> Function() protegees,
+    required T? Function(
+      Map<String, dynamic> l,
+      String id,
+      String piece,
+      String produit,
+    )
+    lire,
+    required Future<void> Function(List<String> pieces, List<T> lignes)
+    remplacer,
+  }) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    final servies = {
+      for (final p in _lignes(brutPieces))
+        if (p['id'] is String) p['id'] as String,
+    };
+    if (servies.isEmpty && lignes.isEmpty) return 0;
+
+    final produits = {
+      for (final p in await _db.select(_db.products).get()) p.id,
+    };
+    final parPiece = <String, List<T>>{for (final p in servies) p: []};
+    final vues = <String>{};
+    for (final l in lignes) {
+      final id = l['id'];
+      final piece = l[cle];
+      final produit = l['product_id'];
+      if (id is! String ||
+          id.length != 36 ||
+          piece is! String ||
+          produit is! String) {
+        throw FormatException(
+          '$quoi $id refusée : élément incomplet ou illisible.',
+        );
+      }
+      if (!vues.add(id)) {
+        throw FormatException('$quoi $id refusée : servie deux fois.');
+      }
+      if (!servies.contains(piece)) {
+        throw FormatException(
+          "$quoi $id refusée : sa pièce ($piece) n'est pas servie par ce tirage.",
+        );
+      }
+      if (!produits.contains(produit)) {
+        throw FormatException(
+          '$quoi $id refusée : produit inconnu du poste ($produit).',
+        );
+      }
+      final ligne = lire(l, id, piece, produit);
+      if (ligne == null) {
+        throw FormatException(
+          '$quoi $id refusée : quantité, prix ou montant illisible.',
+        );
+      }
+      parPiece[piece]!.add(ligne);
+    }
+
+    await _db.transaction(() async {
+      // ⚠️⚠️ Une pièce `pending` ou en `conflict` sur CE poste garde ses lignes : jamais écrasées.
+      final aProteger = await protegees();
+      final remplacees = [
+        for (final p in parPiece.keys)
+          if (!aProteger.contains(p)) p,
+      ];
+      if (remplacees.isEmpty) return;
+      await remplacer(remplacees, [
+        for (final p in remplacees) ...parPiece[p]!,
+      ]);
+    });
 
     return lignes.length;
   }
@@ -2404,8 +3843,8 @@ class SyncEngine {
   /// envoyée. L'effacer perdrait la saisie ET la marchandise entrée en stock —
   /// c'est la règle déjà posée pour les cycles de reproduction (F0.35).
   ///
-  /// ⚠️ Les lignes ne descendent pas : la liste d'achats de la maquette montre
-  /// la pièce, pas son détail. Celles d'un achat local restent intactes.
+  /// Ticket U4 (D-U4) — les lignes descendent à part, avec leur pièce : voir
+  /// [_absorberLignesDAchat]. Celles d'un achat local non acquitté restent intactes.
   Future<int> _absorberAchats(Object? brut) async {
     if (brut == null) return 0;
 
@@ -2431,7 +3870,7 @@ class SyncEngine {
         paymentMode: (l['payment_mode'] ?? 'especes') as String,
         total: _reel(l['total']) ?? 0,
         hasDebt: Value(_bool(l['has_debt'])),
-        purchaseDate: _date(l['purchase_date']) ?? DateTime.now(),
+        purchaseDate: _date(l['purchase_date']) ?? HeureBenin.aujourdhui(),
         // ⚠️ TICKET F0.74 — LE RETOUR EST SERVI PAR LE SERVEUR ET REMPLACE L'ÉTAT LOCAL.
         // `returned_at` et `supplier_credit` ne s'écrivent JAMAIS au poste. Une clé
         // ABSENTE (serveur plus ancien) laisse la colonne telle quelle ; une clé présente
@@ -2574,37 +4013,169 @@ class SyncEngine {
     return libelles.length;
   }
 
-  Future<int> _absorberProphylaxie(Object? brut) async {
+  /// 🔴→✅ Ticket U13 — LES DÉPENSES DU SERVEUR DESCENDENT AU POSTE, avec leur archivage.
+  ///
+  /// `expenses` n'était au poste qu'une table de SAISIE, jamais tirée : le rapport « Recettes et Dépenses » ne voyait
+  /// ni les dépenses saisies au web ou sur un autre poste, et une dépense de CE poste archivée ensuite au web y comptait
+  /// encore. Le serveur sert désormais, au curseur (`updated_at`), toute dépense créée, modifiée ou archivée — tout
+  /// l'historique, archivées comprises, au tirage complet (un poste en service doit apprendre l'archivage de ses
+  /// propres dépenses déjà acquittées).
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberInfirmerie] : élément illisible, identifiant invalide ou servi deux fois, date,
+  /// libellé, compte de charge, montant (absent, illisible ou négatif), compte payeur ou `is_active` illisibles →
+  /// [FormatException] : rien n'est écrit, la page est annulée, le curseur n'avance pas. Lisser — un montant illisible
+  /// devenu 0 — fausserait le total du rapport sans que rien ne le dise.
+  ///
+  /// ⚠️⚠️ **UNE DÉPENSE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (saisie ici, pas encore acquittée, ou
+  /// refusée et en attente de correction) : le tirage précède toujours l'envoi. Une dépense acquittée (`synced`) prend
+  /// la dernière version du serveur (modification ou archivage au web) et garde son `device_id` d'origine.
+  /// Clé absente (serveur antérieur à U13, ou table non servie) : rien n'est touché.
+  Future<int> _absorberDepenses(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Dépense';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
 
-    await _db.batch((b) {
-      for (final l in lignes) {
-        final ligne = ProphylaxisScheduleStandardsCompanion.insert(
-          id: l['id'] as String,
-          speciesCode: (l['species_code'] ?? '') as String,
-          periodLabel: (l['period_label'] ?? '') as String,
-          // ⚠️ ABSENTES = NULLES, JAMAIS ZERO. Le serveur laisse ces bornes
-          // vides pour les entrees calendaires (« Le 1er du mois ») dont la
-          // base de calcul n'est pas le jour de cycle. Les remplacer par 0
-          // les rendrait dues au premier jour de chaque bande.
-          cycleDayStart: Value(_entier(l['cycle_day_start'])),
-          cycleDayEnd: Value(_entier(l['cycle_day_end'])),
-          treatment: (l['treatment'] ?? '') as String,
-          productRecommended: Value(l['product_recommended'] as String?),
-          dosage: Value(l['dosage'] as String?),
-          withdrawalDays: Value(_entier(l['withdrawal_days']) ?? 0),
+    final vus = <String>{};
+    final recues = <ExpensesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final date = l['expense_date'] is String
+          ? HeureBenin.lire(l['expense_date'])
+          : null;
+      final libelle = _texteStrict(l['label'], '$quoi $id : libellé');
+      final categorie = _texteStrict(l['category'], '$quoi $id : compte de charge');
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final compte = _texteStrict(
+        l['treasury_account_id'],
+        '$quoi $id : compte de trésorerie',
+      );
+      final actif = _actifStrict(l, '$quoi $id');
+      // Ticket U14 — `status` (`payee` / `en_attente`) et `accounting_entry_id` (nul ou un identifiant). Absent : serveur
+      // antérieur à U14 (défauts du schéma, resynchronisation unique quand il les servira). Présent et illisible : refus.
+      final statut = l['status'];
+      if (!l.containsKey('status')) {
+        _depensesSansStatut = true;
+      } else if (statut != 'payee' && statut != 'en_attente') {
+        throw FormatException('$quoi $id refusée : statut illisible ($statut).');
+      }
+      final ecriture = l['accounting_entry_id'];
+      if (ecriture != null && (ecriture is! String || ecriture.isEmpty)) {
+        throw FormatException('$quoi $id refusée : écriture comptable illisible ($ecriture).');
+      }
+      if (date == null) {
+        throw FormatException(
+          '$quoi $id refusée : date illisible (${l['expense_date']}).',
         );
-        b.insert(
-          _db.prophylaxisScheduleStandards,
-          ligne,
-          onConflict: DoUpdate((_) => ligne),
+      }
+      if (libelle == null || categorie == null || compte == null || compte.isEmpty) {
+        throw FormatException(
+          '$quoi $id refusée : libellé, compte de charge ou compte de trésorerie absent.',
         );
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException(
+          '$quoi $id refusée : montant absent ou négatif ($montant).',
+        );
+      }
+      recues.add(
+        ExpensesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          // Une DATE pure, au jour du Bénin (minuit, heure murale) : celle que le web compare (`whereDate`).
+          expenseDate: DateTime(date.year, date.month, date.day),
+          label: libelle,
+          category: categorie,
+          amount: montant,
+          treasuryAccountId: compte,
+          isActive: Value(actif),
+          status: statut is String ? Value(statut) : const Value.absent(),
+          accountingEntryId: l.containsKey('accounting_entry_id')
+              ? Value(ecriture as String?)
+              : const Value.absent(),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final d in await (_db.select(
+          _db.expenses,
+        )..where((t) => t.id.isIn(vus))).get())
+          d.id: d.syncStatus,
+      };
+      for (final d in recues) {
+        final statut = locales[d.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Une dépense acquittée de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.expenses)
+            .insert(
+              d,
+              onConflict: DoUpdate(
+                (_) => d.copyWith(deviceId: const Value.absent()),
+              ),
+            );
       }
     });
 
-    return lignes.length;
+    return recues.length;
+  }
+
+  /// 🔴→✅ Ticket U13 — LA PAIE RÉGLÉE DESCEND AU POSTE (lecture seule), pour le rapport « Recettes et Dépenses ».
+  ///
+  /// Le serveur ne sert que ce que `RecettesDepenses::depensesRows()` lit : l'instant du règlement (`created_at`, heure
+  /// murale du serveur), le nom de l'employé et le net versé — rien d'autre sur la paie (S3). Servie au curseur ; un
+  /// bulletin ne se modifie ni ne s'archive au web (il disparaît seulement à la réinitialisation, purgée ici à part).
+  ///
+  /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, net absent, illisible ou négatif, instant illisible,
+  /// nom qui n'est pas un texte → [FormatException], rien n'est écrit. Aucune écriture locale à protéger : la table ne
+  /// s'écrit jamais au poste.
+  Future<int> _absorberPaie(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Bulletin de paie';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <PayslipsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final net = _nombreStrict(l['net_salary'], '$quoi $id : net versé');
+      final nom = _texteStrict(l['employee_name'], '$quoi $id : employé');
+      final instant = l['created_at'] is String
+          ? HeureBenin.lire(l['created_at'])
+          : null;
+      if (net == null || net < 0) {
+        throw FormatException(
+          '$quoi $id refusé : net versé absent ou négatif ($net).',
+        );
+      }
+      if (instant == null) {
+        throw FormatException(
+          '$quoi $id refusé : date de règlement illisible (${l['created_at']}).',
+        );
+      }
+      recus.add(
+        PayslipsCompanion.insert(
+          id: id,
+          employeeName: Value(nom),
+          netSalary: net,
+          // ⚠️ Heure MURALE du serveur, lue telle quelle : le jour du web (`toDateString()`) doit rester le jour.
+          createdAt: instant,
+        ),
+      );
+    }
+
+    await _db.batch(
+      (b) => b.insertAll(_db.payslips, recus, mode: InsertMode.insertOrReplace),
+    );
+
+    return recus.length;
   }
 
   /// Registre des soins déjà administrés.
@@ -2616,18 +4187,35 @@ class SyncEngine {
   /// ⚠️ `withdrawalDays` RESTE À ZÉRO pour un soin reçu : le délai a déjà été
   /// consommé par le serveur au moment de sa création, il n'est pas une donnée
   /// du registre.
+  ///
+  /// Ticket U3 (décision client D-U3 du 19/10/2026) — `is_active` DESCEND : un soin archivé au web (ou sur un
+  /// autre poste) est servi au tirage incrémental avec `is_active = false` et quitte ici le registre et les
+  /// calculs. Absent (serveur antérieur à U3) : actif ; illisible : [FormatException], rien n'est écrit.
+  /// ⚠️⚠️ **UNE LIGNE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (soin saisi ou archivé ici, pas encore
+  /// acquitté) : l'upsert aveugle d'avant aurait annulé un archivage fait hors ligne — le tirage précède toujours
+  /// l'envoi.
   Future<int> _absorberSoins(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    final actifs = [
+      for (final l in lignes) _actifStrict(l, 'Soin ${l['id']}'),
+    ];
+    final protegees = {
+      for (final s in await (_db.select(
+        _db.veterinaryRecords,
+      )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced).not())).get())
+        s.id,
+    };
 
     await _db.batch((b) {
-      for (final l in lignes) {
+      for (final (i, l) in lignes.indexed) {
+        if (protegees.contains(l['id'])) continue;
         final ligne = VeterinaryRecordsCompanion.insert(
           id: l['id'] as String,
           deviceId: (l['device_id'] ?? 'serveur') as String,
           syncStatus: const Value(SyncStatus.synced),
-          updatedAt: _date(l['updated_at']) ?? DateTime.now(),
+          updatedAt: _instantTechnique(l['updated_at']) ?? DateTime.now(),
           lotId: (l['lot_id'] ?? '') as String,
           actionType: (l['action_type'] ?? '') as String,
           productUsed: Value(l['product_used'] as String?),
@@ -2635,7 +4223,8 @@ class SyncEngine {
           vetName: Value(l['vet_name'] as String?),
           symptomes: Value(l['symptomes'] as String?),
           cost: Value(_reel(l['cost'])),
-          recordDate: _date(l['record_date']) ?? DateTime.now(),
+          recordDate: _date(l['record_date']) ?? HeureBenin.aujourdhui(),
+          isActive: Value(actifs[i]),
         );
         b.insert(
           _db.veterinaryRecords,
@@ -2735,12 +4324,56 @@ class SyncEngine {
       _db.supplierRefunds,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
+    final transferts = await (_db.select(
+      _db.livestockTransfers,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket H8b — infirmerie et interventions planifiées saisies au poste.
+    final infirmerie = await (_db.select(
+      _db.infirmaryRecords,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final interventions = await (_db.select(
+      _db.veterinaryCalendarEvents,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket H9b (D-H9) — Paramètres Élevage modifiés au poste (`RecordParametresElevageFromDeviceAction`).
+    final rations = await (_db.select(
+      _db.feedRationStandards,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final echeances = await (_db.select(
+      _db.prophylaxisScheduleStandards,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final provendes = await (_db.select(
+      _db.feedTypes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final numerotations = await (_db.select(
+      _db.elevageNumberingSettings,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    final entreprise = await (_db.select(
+      _db.companySettings,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     _financiersAcquittes = 0;
+    _ventesDeBetailAcquittees = 0;
     _courriersAcquittes = 0;
     _archivesAcquittees = 0;
     _documentsAcquittes = 0;
 
     if (fiches.isEmpty &&
+        transferts.isEmpty &&
+        infirmerie.isEmpty &&
+        interventions.isEmpty &&
+        rations.isEmpty &&
+        echeances.isEmpty &&
+        provendes.isEmpty &&
+        numerotations.isEmpty &&
+        entreprise.isEmpty &&
         courriers.isEmpty &&
         archives.isEmpty &&
         documents.isEmpty &&
@@ -2811,16 +4444,37 @@ class SyncEngine {
       if (tete != null) tetes.add(tete.id);
     }
 
-    final reponse = await _client.post<Map<String, dynamic>>(
-      '/api/sync/push',
-      data: {
+    final (corps, echecDeLot, pileDeLot) = await _envoyerParLots({
         'device_id': _deviceId,
+        // Ticket 15.50 — la réinitialisation que ce poste a appliquée (absente : aucune).
+        'data_reset_at': ?await _lireReglage(cleReinitialisation),
         'livestock_daily_entries': [
           for (final (f, identite) in fichesEnvoyees)
             identite
                 ? _ficheIdentiteEnJson(f)
                 : _ficheEnJson(f, tete: tetes.contains(f.id)),
         ],
+        // Ticket 15.46 — traités par le serveur APRÈS les fiches du même envoi.
+        'livestock_transfers': transferts.map(_transfertEnJson).toList(),
+        // Ticket H8b — `pushInfirmerie` / `pushCalendrierVeterinaire` (manage-elevage).
+        'infirmary_records': infirmerie.map(_infirmerieEnJson).toList(),
+        'veterinary_calendar_events': interventions
+            .map(_interventionEnJson)
+            .toList(),
+        // Ticket H9b — clés et formats de `RecordParametresElevageFromDeviceAction` (droit `manage-elevage`).
+        // ⚠️ Une clé VIDE n'est pas envoyée : le serveur répondrait par une liste vide, sans objet.
+        if (rations.isNotEmpty)
+          'feed_ration_standards': rations.map(_rationEnJson).toList(),
+        if (echeances.isNotEmpty)
+          'prophylaxis_schedule_standards': echeances
+              .map(_echeanceEnJson)
+              .toList(),
+        if (provendes.isNotEmpty)
+          'feed_types': provendes.map(_provendeEnJson).toList(),
+        if (numerotations.isNotEmpty)
+          'elevage_numbering': numerotations.map(_numerotationEnJson).toList(),
+        if (entreprise.isNotEmpty)
+          'company_settings': entreprise.map(_rappelSoinsEnJson).toList(),
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
@@ -2854,20 +4508,218 @@ class SyncEngine {
         // les deux voyagent ensemble dans le même paquet, jamais séparés.
         'customer_advances': avances.map(_avanceEnJson).toList(),
         'advance_imputations': imputations.map(_imputationEnJson).toList(),
-      },
-    );
+      });
 
-    final corps = reponse.data ?? const <String, dynamic>{};
     var accepte = 0;
     var rejete = 0;
     final motifs = <String>[];
 
+    // 🔴→✅ TICKET S-T9 — N'ACQUITTE QUE LA VERSION PARTIE (même règle que les courriers, l'infirmerie et les
+    // barèmes). Mesuré par l'essai à plusieurs postes : l'animalier corrige sa fiche (un mort de plus) PENDANT
+    // l'envoi de la version précédente ; l'accusé de cette version marquait la fiche `synced`, et la correction
+    // ne partait jamais — sans erreur, le serveur gardait un mort de moins. La fiche est comparée telle qu'elle est
+    // partie (sa SAISIE, pas `updated_at`, stocké à la seconde) : changée entre-temps, elle reste `pending` et
+    // repart. Une vente répercutée entre-temps ne compte pas : le serveur ne reprend plus la vente d'une fiche qu'il
+    // connaît, la vente l'y inscrit elle-même (sinon la fiche du comptoir repartirait avec des morts périmés). Les
+    // fiches d'identité (F0.90) sont déjà `synced` : rien à marquer.
+    final fichesParties = {
+      for (final (f, identite) in fichesEnvoyees)
+        if (!identite) f.id: _saisieDeFiche(f, tete: tetes.contains(f.id)),
+    };
     accepte += await _acquitter(
       'livestock_daily_entries',
       corps['livestock_daily_entries'],
+      (ids, statut) async {
+        for (final id in ids) {
+          final partie = fichesParties[id];
+          if (partie == null) continue;
+          final actuelle = await (_db.select(
+            _db.livestockDailyEntries,
+          )..where((t) => t.id.equals(id))).getSingleOrNull();
+          if (actuelle == null ||
+              actuelle.syncStatus != SyncStatus.pending ||
+              _saisieDeFiche(actuelle, tete: tetes.contains(id)) != partie) {
+            continue;
+          }
+          await (_db.update(_db.livestockDailyEntries)..where((t) => t.id.equals(id)))
+              .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut)));
+        }
+      },
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'livestock_transfers',
+      corps['livestock_transfers'],
       (ids, statut) =>
-          (_db.update(_db.livestockDailyEntries)..where((t) => t.id.isIn(ids)))
-              .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut))),
+          (_db.update(_db.livestockTransfers)..where((t) => t.id.isIn(ids)))
+              .write(LivestockTransfersCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket H8b — n'acquitte que la VERSION partie (voir [_marquerParStatut]).
+    accepte += await _acquitter(
+      'infirmary_records',
+      corps['infirmary_records'],
+      (ids, statut) => _marquerParStatut(
+        [for (final e in infirmerie) (e.id, e.status)],
+        ids,
+        statut,
+        (id, statutMetier) =>
+            (_db.update(_db.infirmaryRecords)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.status.equals(statutMetier),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(InfirmaryRecordsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'veterinary_calendar_events',
+      corps['veterinary_calendar_events'],
+      (ids, statut) => _marquerParStatut(
+        [for (final e in interventions) (e.id, e.status)],
+        ids,
+        statut,
+        (id, statutMetier) =>
+            (_db.update(_db.veterinaryCalendarEvents)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.status.equals(statutMetier),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  VeterinaryCalendarEventsCompanion(syncStatus: Value(statut)),
+                ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket H9b — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]).
+    accepte += await _acquitter(
+      'feed_ration_standards',
+      corps['feed_ration_standards'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final r in rations) (r.id, r.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.feedRationStandards)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FeedRationStandardsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'prophylaxis_schedule_standards',
+      corps['prophylaxis_schedule_standards'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in echeances) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.prophylaxisScheduleStandards)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  ProphylaxisScheduleStandardsCompanion(
+                    syncStatus: Value(statut),
+                  ),
+                ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'feed_types',
+      corps['feed_types'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final p in provendes) (p.id, p.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.feedTypes)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FeedTypesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // ⚠️ Lignes UNIQUES : le serveur acquitte sous le nom de la clé (`elevage_numbering`, `company_settings`),
+    // l'identifiant envoyé avec la ligne — la ligne locale porte la clé fixe `unique`.
+    accepte += await _acquitter(
+      'elevage_numbering',
+      corps['elevage_numbering'],
+      (ids, statut) => _marquerSiInchangee(
+        [
+          for (final n in numerotations)
+            (ParametresElevageCles.numerotation, n.updatedAt),
+        ],
+        ids,
+        (_, saisie) =>
+            (_db.update(_db.elevageNumberingSettings)..where(
+                  (t) => Expression.and([
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  ElevageNumberingSettingsCompanion(syncStatus: Value(statut)),
+                ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
+      'company_settings',
+      corps['company_settings'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in entreprise) (ParametresElevageCles.rappelSoins, e.updatedAt)],
+        ids,
+        (_, saisie) =>
+            (_db.update(_db.companySettings)..where(
+                  (t) => Expression.and([
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(CompanySettingsCompanion(syncStatus: Value(statut))),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -2875,8 +4727,15 @@ class SyncEngine {
     accepte += await _acquitter(
       'sales',
       corps['sales'],
-      (ids, statut) => (_db.update(_db.sales)..where((t) => t.id.isIn(ids)))
-          .write(SalesCompanion(syncStatus: Value(statut))),
+      (ids, statut) async {
+        await (_db.update(_db.sales)..where((t) => t.id.isIn(ids)))
+            .write(SalesCompanion(syncStatus: Value(statut)));
+        if (statut == SyncStatus.synced) {
+          _ventesDeBetailAcquittees += ids
+              .where((id) => (lignesDeVente[id] ?? const <SaleLine>[]).any((l) => l.lotId != null))
+              .length;
+        }
+      },
       motifs,
       (n) => rejete += n,
     );
@@ -2932,12 +4791,24 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket U3 — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un
+    // soin archivé PENDANT l'envoi de sa création reste `pending`, et son archivage part au prochain envoi.
     accepte += await _acquitter(
       'veterinary_records',
       corps['veterinary_records'],
-      (ids, statut) =>
-          (_db.update(_db.veterinaryRecords)..where((t) => t.id.isIn(ids)))
-              .write(VeterinaryRecordsCompanion(syncStatus: Value(statut))),
+      (ids, statut) => _marquerSiInchangee(
+        [for (final s in soins) (s.id, s.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.veterinaryRecords)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.updatedAt.equals(saisie!),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(VeterinaryRecordsCompanion(syncStatus: Value(statut))),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -2970,6 +4841,11 @@ class SyncEngine {
       motifs,
       (n) => rejete += n,
     );
+
+    // ⚠️⚠️ TICKET S-T5 — LE POSTE APPREND L'IDENTIFIANT DU SERVEUR. Un produit, un fournisseur ou un client créé ici
+    // que le serveur connaissait déjà (même clé naturelle) est acquitté ET rendu dans `merged` : l'identifiant local
+    // est remplacé partout (fiche et références, une transaction), APRÈS son acquittement ci-dessus.
+    await FusionReferentiels(_db).appliquerReponse(corps);
 
     // ⚠️ Un courrier accepté n'a pas encore sa référence : elle descend au tirage de
     // confirmation (voir [synchroniser]).
@@ -3068,9 +4944,304 @@ class SyncEngine {
         retoursAcceptes +
         remboursementsAcceptes;
 
+    // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
+    // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
+    if (echecDeLot != null) Error.throwWithStackTrace(echecDeLot, pileDeLot!);
+
     await _db.noterEtatDeSynchronisation(envoye: DateTime.now());
 
     return (accepte, rejete, motifs);
+  }
+
+  /// Ticket H13b (D-SYNC-2) — au plus [tailleLot] enregistrements par requête.
+  static const tailleLot = 50;
+
+  /// Ordre de traitement de `SyncController::push`, table par table. Les lots partent dans cet ordre : ce
+  /// qu'une table attend d'une autre (un fournisseur avant son achat, un achat avant son retour, une vente
+  /// avant son imputation) est déjà écrit sur le serveur quand elle arrive.
+  static const ordreDuServeur = [
+    'feed_ration_standards',
+    'prophylaxis_schedule_standards',
+    'feed_types',
+    'elevage_numbering',
+    'company_settings',
+    'suppliers',
+    'customers',
+    'mails',
+    'archived_documents',
+    'administrative_documents',
+    'customer_advances',
+    'products',
+    'livestock_daily_entries',
+    'livestock_transfers',
+    'expenses',
+    'purchases',
+    'supplier_payments',
+    'purchase_returns',
+    'supplier_refunds',
+    'attendance_records',
+    'sales',
+    'advance_imputations',
+    'livestock_reproduction_events',
+    'infirmary_records',
+    'veterinary_calendar_events',
+    'stock_adjustments',
+    'veterinary_records',
+  ];
+
+  /// ⚠️⚠️ **TABLES COUPLÉES DANS UN MÊME ENVOI, JAMAIS SÉPARÉES PAR JOUR.** Le serveur passe aux ventes les
+  /// fiches (bande, jour) ACCEPTÉES dans la même requête (15.30) : la fiche du poste porte déjà la vente, il
+  /// ne l'y rajoute pas. Une fiche partie dans un lot ANTÉRIEUR à sa vente ferait compter la vente deux fois
+  /// (2N, effectif de la bande faux de N) — sans aucune erreur. Les transferts du jour suivent ses fiches
+  /// (15.46). Ces trois tables partent donc par JOURNÉES ENTIÈRES (fiches, transferts, ventes du jour), au
+  /// rang des ventes ; une journée de plus de [tailleLot] lignes part seule.
+  static const _couplees = [
+    ('livestock_daily_entries', 'entry_date'),
+    ('livestock_transfers', 'transfer_date'),
+    ('sales', 'sold_at'),
+  ];
+
+  /// Découpe [envoi] en lots ordonnés (voir [ordreDuServeur], [_couplees]). Un envoi de [tailleLot] lignes
+  /// au plus part TEL QUEL, en une requête : rien ne change pour le cas courant.
+  @visibleForTesting
+  static List<Map<String, dynamic>> decouperEnLots(Map<String, dynamic> envoi) {
+    final lignes = envoi.values.whereType<List>().fold<int>(0, (n, l) => n + l.length);
+    if (lignes <= tailleLot) return [envoi];
+
+    final (entete, unites) = _unitesDe(envoi);
+    final lots = <Map<String, dynamic>>[];
+    var courant = <(String, Object?)>[];
+    void fermer() {
+      if (courant.isEmpty) return;
+      lots.add(_assembler(entete, courant));
+      courant = [];
+    }
+
+    for (final unite in unites) {
+      if (courant.isNotEmpty && courant.length + unite.length > tailleLot) fermer();
+      courant.addAll(unite);
+    }
+    fermer();
+    return lots;
+  }
+
+  /// En-tête (clés qui ne sont pas des listes : `device_id`, `data_reset_at`) et UNITÉS INDIVISIBLES de [envoi],
+  /// dans l'ordre du serveur : une ligne, ou une JOURNÉE couplée entière (fiches, transferts et ventes du jour,
+  /// voir [_couplees]). Ni [decouperEnLots] ni [envoyerEnIsolant] ne coupent jamais une unité.
+  static (Map<String, dynamic>, List<List<(String, Object?)>>) _unitesDe(
+    Map<String, dynamic> envoi,
+  ) {
+    final entete = {
+      for (final e in envoi.entries)
+        if (e.value is! List) e.key: e.value,
+    };
+    final unites = <List<(String, Object?)>>[];
+    final couplees = {for (final (t, _) in _couplees) t};
+    final tables = [
+      ...ordreDuServeur,
+      // Une table que cette liste ne connaît pas encore part en dernier plutôt que de se perdre.
+      for (final k in envoi.keys)
+        if (envoi[k] is List && !ordreDuServeur.contains(k)) k,
+    ];
+    for (final table in tables) {
+      if (table == 'sales') {
+        final parJour = SplayTreeMap<String, List<(String, Object?)>>();
+        for (final (t, cle) in _couplees) {
+          for (final ligne in (envoi[t] as List?) ?? const []) {
+            final date = ligne is Map ? ligne[cle]?.toString() ?? '' : '';
+            parJour
+                .putIfAbsent(date.length >= 10 ? date.substring(0, 10) : date, () => [])
+                .add((t, ligne));
+          }
+        }
+        unites.addAll(parJour.values);
+        continue;
+      }
+      if (couplees.contains(table)) continue;
+      for (final ligne in (envoi[table] as List?) ?? const []) {
+        unites.add([(table, ligne)]);
+      }
+    }
+    return (entete, unites);
+  }
+
+  /// Un lot : l'en-tête, puis chaque ligne sous sa table (une table vide ne part pas).
+  static Map<String, dynamic> _assembler(
+    Map<String, dynamic> entete,
+    Iterable<(String, Object?)> lignes,
+  ) {
+    final lot = Map<String, dynamic>.of(entete);
+    for (final (t, ligne) in lignes) {
+      (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
+    }
+    return lot;
+  }
+
+  /// Réponses des lots fusionnées table par table (acceptés et refusés mis bout à bout, compteurs additionnés),
+  /// pour l'acquittement habituel. ⚠️ Un lot en échec n'efface pas les précédents : leurs accusés sont rendus
+  /// avec l'erreur, pour être acquittés AVANT qu'elle remonte — sinon le poste renverrait ce que le serveur a
+  /// déjà écrit.
+  Future<(Map<String, dynamic>, Object?, StackTrace?)> _envoyerParLots(
+    Map<String, dynamic> envoi,
+  ) async {
+    final fusion = <String, dynamic>{};
+    var recu = false;
+    for (final lot in decouperEnLots(envoi)) {
+      try {
+        await envoyerEnIsolant(
+          lot,
+          (l) async =>
+              (await _client.post<Map<String, dynamic>>('/api/sync/push', data: l)).data ??
+              const <String, dynamic>{},
+          (reponse) {
+            recu = true;
+            fusionnerReponse(fusion, reponse);
+          },
+        );
+      } catch (e, pile) {
+        if (!recu) rethrow;
+        return (fusion, e, pile);
+      }
+    }
+    return (fusion, null, null);
+  }
+
+  /// ⚠️⚠️ Ticket S-T1 — UNE 422 OU UNE 413 SUR UN LOT ENTIER COUPE LE LOT EN DEUX, récursivement, jusqu'à isoler
+  /// la ou les unités fautives. Un refus ligne à ligne arrive en 200 avec `rejected` : ce cas-là ne passe pas ici.
+  /// Une 422 / 413 de LOT ENTIER (requête invalide dans son ensemble, corps trop gros pour le serveur) refusait
+  /// jusqu'ici les 49 lignes saines avec la fautive, à chaque tentative, sans jamais dire laquelle.
+  ///
+  /// [poster] envoie un lot et rend la réponse ; [recevoir] reçoit chaque réponse dans l'ordre d'envoi, y compris
+  /// le refus fabriqué ici ([refusDUnite]) pour une unité isolée qui provoque encore la 422 / 413 : elle passe en
+  /// `conflict` avec un motif français, et l'utilisateur la corrige puis la remet en file, comme tout refus.
+  ///
+  /// ⚠️⚠️ **LA COUPE NE PASSE JAMAIS AU MILIEU D'UNE JOURNÉE COUPLÉE** ([_unitesDe]) : une vente séparée de la
+  /// fiche de son jour serait comptée deux fois (15.30). Une journée couplée qui provoque seule la 422 passe
+  /// ENTIÈRE en `conflict`. Toute autre erreur (réseau, 5xx, 401, 403…) remonte telle quelle.
+  @visibleForTesting
+  static Future<void> envoyerEnIsolant(
+    Map<String, dynamic> lot,
+    Future<Map<String, dynamic>> Function(Map<String, dynamic> lot) poster,
+    void Function(Map<String, dynamic> reponse) recevoir,
+  ) async {
+    final Map<String, dynamic> reponse;
+    try {
+      reponse = await poster(lot);
+    } on DioException catch (e) {
+      final statut = e.response?.statusCode;
+      if (statut != 422 && statut != 413) rethrow;
+      final (entete, unites) = _unitesDe(lot);
+      if (unites.isEmpty) rethrow;
+      if (unites.length == 1) {
+        recevoir(refusDUnite(unites.single, statut!, e.response?.data));
+        return;
+      }
+      final milieu = unites.length ~/ 2;
+      await envoyerEnIsolant(
+        _assembler(entete, unites.take(milieu).expand((u) => u)),
+        poster,
+        recevoir,
+      );
+      await envoyerEnIsolant(
+        _assembler(entete, unites.skip(milieu).expand((u) => u)),
+        poster,
+        recevoir,
+      );
+      return;
+    }
+    recevoir(reponse);
+  }
+
+  /// Ticket S-T1 — réponse fabriquée pour une unité isolée que le serveur refuse encore en 422 / 413 : chaque
+  /// ligne est rendue en `rejected` sous sa table, avec « Refusée par le serveur : requête invalide (422) » (ou
+  /// « envoi trop volumineux (413) ») suivi du message du serveur s'il en donne un.
+  @visibleForTesting
+  static Map<String, dynamic> refusDUnite(
+    List<(String, Object?)> unite,
+    int statut,
+    Object? corps,
+  ) {
+    final message = corps is Map && corps['message'] is String
+        ? (corps['message'] as String).trim()
+        : '';
+    final cause = statut == 413
+        ? 'Refusée par le serveur : envoi trop volumineux (413)'
+        : 'Refusée par le serveur : requête invalide (422)';
+    final motif = message.isEmpty ? '$cause.' : '$cause — $message';
+    final reponse = <String, dynamic>{};
+    for (final (table, ligne) in unite) {
+      final cible =
+          reponse.putIfAbsent(
+                table,
+                () => <String, dynamic>{'accepted': <Object?>[], 'rejected': <Object?>[]},
+              )
+              as Map<String, dynamic>;
+      (cible['rejected'] as List).add({
+        'id': ligne is Map ? ligne['id']?.toString() : null,
+        'reason': motif,
+      });
+    }
+    return reponse;
+  }
+
+  @visibleForTesting
+  static void fusionnerReponse(Map<String, dynamic> fusion, Map<String, dynamic> reponse) {
+    for (final MapEntry(:key, :value) in reponse.entries) {
+      final deja = fusion[key];
+      if (value is Map && (value.containsKey('accepted') || value.containsKey('rejected'))) {
+        final cible = deja is Map
+            ? deja
+            : fusion[key] = <String, dynamic>{'accepted': <Object?>[], 'rejected': <Object?>[]};
+        for (final cote in const ['accepted', 'rejected']) {
+          (cible[cote] as List).addAll((value[cote] as List?) ?? const []);
+        }
+        // Ticket S-T5 — fusions par clé naturelle (`products`, `suppliers`, `customers`), mises bout à bout.
+        if (value['merged'] is List) {
+          (cible.putIfAbsent('merged', () => <Object?>[]) as List).addAll(value['merged'] as List);
+        }
+      } else if (value is num && deja is num) {
+        fusion[key] = deja + value;
+      } else if (value is List && deja is List) {
+        fusion[key] = [...deja, ...value];
+      } else {
+        fusion[key] = value;
+      }
+    }
+  }
+
+  /// Ticket H8b — acquitte ou refuse des lignes dont seul le STATUT MÉTIER change après création (infirmerie :
+  /// `en_cours` → `reintegre`/`deces` ; intervention : `planned` → `done`). [envoyes] = (id, statut métier) de
+  /// ce qui est PARTI.
+  ///
+  /// ⚠️⚠️ **LE STATUT DE SYNCHRONISATION NE CHANGE QUE SI LA LIGNE EST ENCORE CELLE QUI EST PARTIE** (même
+  /// règle que [_marquerCourriers]) : une entrée réintégrée PENDANT l'envoi de sa création serait sinon marquée
+  /// `synced` sur l'accusé de l'ancienne version, et la réintégration ne partirait jamais.
+  Future<void> _marquerParStatut(
+    List<(String, String)> envoyes,
+    List<String> ids,
+    SyncStatus statut,
+    Future<void> Function(String id, String statutMetier) marquer,
+  ) async {
+    for (final (id, statutMetier) in envoyes) {
+      if (ids.contains(id)) await marquer(id, statutMetier);
+    }
+  }
+
+  /// Ticket H9b — acquitte ou refuse des Paramètres Élevage. [envoyes] = (identifiant, instant de saisie) de ce
+  /// qui est PARTI.
+  ///
+  /// ⚠️⚠️ **LE STATUT NE CHANGE QUE SI LA LIGNE EST ENCORE CELLE QUI EST PARTIE** (même règle que
+  /// [_marquerCourriers] et [_marquerParStatut]) : une ration corrigée PENDANT l'envoi garde un instant de
+  /// saisie plus récent, reste `pending` et repart au prochain envoi — sinon l'accusé de l'ancienne version la
+  /// marquerait `synced` et la correction ne partirait jamais.
+  Future<void> _marquerSiInchangee(
+    List<(String, DateTime?)> envoyes,
+    List<String> ids,
+    Future<void> Function(String id, DateTime? saisie) marquer,
+  ) async {
+    for (final (id, saisie) in envoyes) {
+      if (ids.contains(id)) await marquer(id, saisie);
+    }
   }
 
   /// Acquitte ou refuse des courriers ([envoyes] = ce qui est PARTI, tel quel).
@@ -3235,7 +5406,10 @@ class SyncEngine {
       final motif = r['reason']?.toString() ?? 'Refus sans motif communiqué.';
       motifs.add(motif);
 
-      final id = r['id']?.toString();
+      // 🔴→✅ Ticket S-T10 (trouvé par l'essai à plusieurs postes) — `stock_adjustments` ne rendait que
+      // `client_ref` dans ses refus : l'inventaire refusé restait `pending`, renvoyé à chaque synchronisation, et
+      // son motif n'arrivait jamais à l'écran. Le serveur rend désormais aussi `id` ; un serveur ancien, non.
+      final id = (r['id'] ?? r['client_ref'])?.toString();
       if (id == null) continue;
 
       refuses.add(id);
@@ -3407,6 +5581,73 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket H8b — sans ces entrées, « Relancer » une entrée d'infirmerie ou une intervention refusée ne
+      // ferait rien (même défaut que celui des achats, F0.77).
+      'infirmary_records' =>
+        () =>
+            (_db.update(
+              _db.infirmaryRecords,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const InfirmaryRecordsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'veterinary_calendar_events' =>
+        () =>
+            (_db.update(
+              _db.veterinaryCalendarEvents,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const VeterinaryCalendarEventsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      // Ticket H9b — Paramètres Élevage refusés : « Relancer » les remet en file, comme les autres tables.
+      'feed_ration_standards' =>
+        () =>
+            (_db.update(
+              _db.feedRationStandards,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FeedRationStandardsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'prophylaxis_schedule_standards' =>
+        () =>
+            (_db.update(
+              _db.prophylaxisScheduleStandards,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ProphylaxisScheduleStandardsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      'feed_types' =>
+        () =>
+            (_db.update(
+              _db.feedTypes,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FeedTypesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Lignes uniques : le refus porte le nom de la clé, la ligne locale est `unique`.
+      'elevage_numbering' =>
+        () =>
+            (_db.update(_db.elevageNumberingSettings)..where(
+                  (t) => t.syncStatus.equalsValue(SyncStatus.conflict),
+                ))
+                .write(
+                  const ElevageNumberingSettingsCompanion(
+                    syncStatus: Value(SyncStatus.pending),
+                  ),
+                ),
+      'company_settings' =>
+        () =>
+            (_db.update(_db.companySettings)..where(
+                  (t) => t.syncStatus.equalsValue(SyncStatus.conflict),
+                ))
+                .write(
+                  const CompanySettingsCompanion(
+                    syncStatus: Value(SyncStatus.pending),
+                  ),
+                ),
       _ => null,
     };
 
@@ -3708,6 +5949,12 @@ class SyncEngine {
     };
   }
 
+  /// Ticket S-T9 — la SAISIE d'une fiche telle qu'elle part, sans la vente (que les ventes inscrivent au serveur) ni
+  /// l'horodatage et le poste : deux versions de même saisie ont la même empreinte.
+  String _saisieDeFiche(LivestockDailyEntry f, {required bool tete}) => jsonEncode(
+    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'updated_at', 'device_id'}.contains(cle)),
+  );
+
   /// F0.90 — fiche réduite à son IDENTITÉ (voir [_fichesDIdentite]). `lot_id` et `entry_date`
   /// sont exigés par le validateur du serveur ; AUCUNE autre clé : chacune écraserait la valeur
   /// serveur (`fill`), et c'est précisément ce qu'on évite.
@@ -3732,6 +5979,10 @@ class SyncEngine {
     'treasury_account_id': a.treasuryAccountId,
     'amount_paid': a.amountPaid,
     'purchase_date': _jour(a.purchaseDate),
+    // 🔴→✅ Ticket S-T12 — l'INSTANT de l'achat (heure du Bénin ramenée en UTC), comme `sold_at` pour une vente : le
+    // serveur date l'entrée en stock de l'achat, plus de sa réception. Sans lui, un achat fait AVANT un comptage et
+    // arrivé APRÈS lui entrait une seconde fois dans des rayons qui le contenaient déjà.
+    'purchased_at': HeureBenin.versInstant(a.purchaseDate).toIso8601String(),
     'lines': [
       for (final l in lignes)
         {'product_id': l.productId, 'qty': l.qty, 'unit_price': l.unitPrice},
@@ -3748,6 +5999,104 @@ class SyncEngine {
     'check_in': p.checkIn,
     'check_out': p.checkOut,
     'status': p.status,
+  };
+
+  /// Ticket 15.46 — transfert entre bandes tel que le serveur le rejoue (`TransferBetweenLotsAction`).
+  Map<String, dynamic> _transfertEnJson(LivestockTransfer t) => {
+    'id': t.id,
+    'source_lot_id': t.sourceLotId,
+    'target_lot_id': t.targetLotId,
+    'transfer_date': _jour(t.transferDate),
+    'quantity': t.quantity,
+    'categorie': t.categorie,
+    'constitution': t.constitution,
+    'motif': t.motif,
+    'is_active': t.isActive,
+    'device_id': t.deviceId,
+    'updated_at': t.updatedAt.toUtc().toIso8601String(),
+  };
+
+  /// Ticket H8b — entrée d'infirmerie telle que `SyncController::pushInfirmerie` la valide (snake_case).
+  /// Pour une entrée déjà connue du serveur, seul `status` est relu (dernier écrivain gagne).
+  Map<String, dynamic> _infirmerieEnJson(InfirmaryRecord e) => {
+    'id': e.id,
+    'lot_id': e.lotId,
+    'sujet_ref': e.sujetRef,
+    'motif': e.motif,
+    'isolation_level': e.isolationLevel,
+    'entry_date': _jour(e.entryDate),
+    'status': e.status,
+    'device_id': e.deviceId,
+    'updated_at': e.updatedAt.toUtc().toIso8601String(),
+  };
+
+  /// Ticket H8b — intervention planifiée telle que `SyncController::pushCalendrierVeterinaire` la valide.
+  Map<String, dynamic> _interventionEnJson(VeterinaryCalendarEvent e) => {
+    'id': e.id,
+    'lot_id': e.lotId,
+    'task_type': e.taskType,
+    'scheduled_date': _jour(e.scheduledDate),
+    'status': e.status,
+    'device_id': e.deviceId,
+    'updated_at': e.updatedAt.toUtc().toIso8601String(),
+  };
+
+  /// Ticket H9b — ration telle que `RecordParametresElevageFromDeviceAction::ration()` la valide :
+  /// `ration_g_per_day` ENTIER (`integer|min:1`), `is_active = false` = archivage.
+  static Map<String, dynamic> _rationEnJson(FeedRationStandard r) => {
+    'id': r.id,
+    'species_code': r.speciesCode,
+    'stage_label': r.stageLabel,
+    'ration_g_per_day': r.rationGPerDay.round(),
+    'is_active': r.isActive,
+  };
+
+  /// Ticket H9b — échéance de prophylaxie (`prophylaxie()` de l'Action). Les bornes de cycle ne partent pas :
+  /// le serveur ne les lit pas (le web ne les saisit pas non plus).
+  static Map<String, dynamic> _echeanceEnJson(ProphylaxisScheduleStandard e) => {
+    'id': e.id,
+    'species_code': e.speciesCode,
+    'period_label': e.periodLabel,
+    'treatment': e.treatment,
+    'product_recommended': e.productRecommended,
+    'dosage': e.dosage,
+    'withdrawal_days': e.withdrawalDays,
+    'is_active': e.isActive,
+  };
+
+  /// Ticket H9b — type de provende (`provende()` de l'Action) : l'espèce part par son IDENTIFIANT
+  /// (`exists:livestock_species,id`), jamais par son libellé.
+  static Map<String, dynamic> _provendeEnJson(FeedType p) => {
+    'id': p.id,
+    'name': p.name,
+    'species_id': p.speciesId,
+    'standard_bag_weight_kg': p.standardBagWeightKg,
+    'price_per_kg': p.pricePerKg,
+    'is_active': p.isActive,
+  };
+
+  /// Ticket H9b — les neuf formats (`numerotation()` de l'Action). L'`id` n'est lu par aucune règle : il
+  /// sert au serveur à nommer la ligne dans un REFUS (`rejected[].id`), sans quoi le refus n'aurait pas de
+  /// destinataire au poste.
+  static Map<String, dynamic> _numerotationEnJson(ElevageNumberingSetting n) =>
+      {
+        'id': ParametresElevageCles.numerotation,
+        'bande_format': n.bandeFormat,
+        'lapine_prefix': n.lapinePrefix,
+        'male_prefix': n.malePrefix,
+        'truie_prefix': n.truiePrefix,
+        'verrat_prefix': n.verratPrefix,
+        'portee_prefix': n.porteePrefix,
+        'volaille_prefix': n.volaillePrefix,
+        'parc_prefix': n.parcPrefix,
+        'escargot_prefix': n.escargotPrefix,
+      };
+
+  /// Ticket H9b — `{rappel_soins_jours}`, SEUL champ de l'entreprise accepté par ce canal (`rappelSoins()`).
+  /// ⚠️ Aucune donnée d'identité ne part : elle reste un référentiel du serveur.
+  static Map<String, dynamic> _rappelSoinsEnJson(CompanySetting e) => {
+    'id': ParametresElevageCles.rappelSoins,
+    'rappel_soins_jours': e.rappelSoinsJours,
   };
 
   Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {
@@ -3803,6 +6152,13 @@ class SyncEngine {
     'mother_ref': e.motherRef,
     'sire_ref': e.sireRef,
     'saillie_date': e.saillieDate == null ? null : _jour(e.saillieDate!),
+    // Ticket H7 — étapes du cycle saisies au poste, appliquées par le serveur à un cycle déjà connu (seules les
+    // valeurs renseignées : un `null` n'efface rien côté serveur).
+    'palpation_date': e.palpationDate == null ? null : _jour(e.palpationDate!),
+    'mise_bas_date_actual': e.miseBasDateActual == null ? null : _jour(e.miseBasDateActual!),
+    'nes_vivants': e.nesVivants,
+    'nes_morts': e.nesMorts,
+    'status': e.status,
     'device_id': e.deviceId,
   };
 
@@ -3816,6 +6172,9 @@ class SyncEngine {
     'category': d.category,
     'amount': d.amount,
     'treasury_account_id': d.treasuryAccountId,
+    // Ticket U14 — archivage fait au poste (`DepensesRepository.archiver`), rejoué par le serveur comme
+    // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
+    'is_active': d.isActive,
     'device_id': d.deviceId,
   };
 
@@ -3833,6 +6192,9 @@ class SyncEngine {
     // de la période de rémanence côté serveur. L'omettre laisserait la
     // bande vendable malgré le traitement.
     'withdrawal_days': s.withdrawalDays,
+    // Ticket U3 — archivage au poste : le serveur archive un soin connu, ou crée archivé un soin saisi puis
+    // archivé hors ligne (`pushVeterinaryRecords`).
+    'is_active': s.isActive,
     'device_id': s.deviceId,
     'updated_at': s.updatedAt.toUtc().toIso8601String(),
   };
@@ -3850,8 +6212,18 @@ class SyncEngine {
     'quantity': a.quantity,
     'reference_type': a.referenceType,
     'reason': a.reason,
+    // Ticket U10 — le JOUR du mouvement (`Y-m-d`, heure murale) : le serveur date un « Ajout Manuel » de ce jour,
+    // comme le web (`Carbon::parse($addDate)`) ; il ne le lit pas pour un écart d'inventaire (rejoué à réception).
+    'movement_date': _jour(a.movementDate),
     'device_id': a.deviceId,
     'updated_at': a.updatedAt.toUtc().toIso8601String(),
+    // 🔴→✅ Ticket S-T10 — inventaire : la QUANTITÉ COMPTÉE et l'INSTANT du comptage (UTC, avec son fuseau : le
+    // serveur le ramène à son heure, S-T11). Le serveur calcule l'écart contre son grand livre à cet instant ;
+    // `type` + `quantity` (écart LOCAL) ne servent plus qu'à un serveur ancien, qui ignore ces deux clés.
+    if (a.countedQuantity != null) ...{
+      'counted_quantity': a.countedQuantity,
+      'counted_at': HeureBenin.versInstant(a.movementDate).toIso8601String(),
+    },
   };
 
   static List<Map<String, dynamic>> _lignes(Object? brut) =>
@@ -3865,18 +6237,19 @@ class SyncEngine {
   static int? _entier(Object? v) =>
       v == null ? null : int.tryParse(v.toString().split('.').first);
 
-  /// ⚠️⚠️ **RAMENÉE À L'HEURE LOCALE, TOUJOURS.** Une colonne DATE pure
-  /// (`entry_date`, `record_date`) arrive en `2026-08-17` et se lit déjà en
-  /// local. Mais une date qu'Eloquent sérialise en instant — `due_date` d'une
-  /// créance, servie `2026-04-01T23:00:00Z` depuis un serveur en
-  /// Africa/Porto-Novo — se lirait **la veille** si on la gardait en UTC. Une
-  /// échéance décalée d'un jour, c'est une relance envoyée trop tôt ou une
-  /// facture crue encore à terme.
+  /// Une date MÉTIER servie, en heure murale du Bénin (ticket S-T11, [HeureBenin.lire]).
   ///
-  /// `toLocal()` est sans effet sur une date déjà locale : la correction ne
-  /// coûte rien là où elle ne sert pas.
-  static DateTime? _date(Object? v) =>
-      v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
+  /// ⚠️⚠️ Une colonne DATE pure (`entry_date`, `record_date`) arrive en `2026-08-17` et se lit telle quelle. Mais une
+  /// date qu'Eloquent sérialise en instant — `due_date` d'une créance, `advance_date` d'une avance, servies
+  /// `2026-04-01T23:00:00Z` depuis un serveur en Africa/Porto-Novo — se lirait **la veille** gardée en UTC (F0.x),
+  /// et encore la veille ramenée par `toLocal()` sur un Windows réglé en UTC ou à New York (S-T11 : écarts du
+  /// contrôle de cohérence sur les soins et les avances, vus par l'essai S-T9). Elle est donc ramenée à l'heure
+  /// du BÉNIN, jamais à celle de Windows.
+  static DateTime? _date(Object? v) => HeureBenin.lire(v);
+
+  /// Un INSTANT technique servi (`updated_at`, `created_at` du journal) : gardé comme instant — il ne sert qu'à
+  /// ordonner ou départager, jamais à dire un jour métier.
+  static DateTime? _instantTechnique(Object? v) => HeureBenin.lireInstant(v);
 
   /// Format `Y-m-d` attendu par le serveur pour une DATE pure.
   ///
@@ -3894,4 +6267,13 @@ class SyncEngine {
       '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
+}
+
+/// Ticket H9b — identifiants sous lesquels le serveur acquitte (ou refuse) les deux LIGNES UNIQUES des
+/// Paramètres Élevage (`RecordParametresElevageFromDeviceAction::numerotation()` rend `elevage_numbering`,
+/// `rappelSoins()` rend `company_settings`). Le poste les envoie aussi comme `id` de la ligne : un refus a
+/// ainsi un destinataire.
+abstract final class ParametresElevageCles {
+  static const numerotation = 'elevage_numbering';
+  static const rappelSoins = 'company_settings';
 }

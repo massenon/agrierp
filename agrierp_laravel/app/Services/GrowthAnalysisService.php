@@ -35,19 +35,25 @@ use App\Models\LivestockLot;
  */
 class GrowthAnalysisService
 {
-    /** Pesées réelles d'un lot, chronologiques. */
-    private function weighIns(string $lotId)
+    /** Pesées réelles d'un lot, chronologiques — jusqu'à `$jusquau` inclus (Y-m-d) s'il est donné. */
+    private function weighIns(string $lotId, ?string $jusquau = null)
     {
         return LivestockDailyEntry::where('lot_id', $lotId)
             ->whereNotNull('weight_sample_avg_g')
+            ->when($jusquau, fn ($q) => $q->whereDate('entry_date', '<=', $jusquau))
             ->orderBy('entry_date')
             ->get(['entry_date', 'weight_sample_avg_g']);
     }
 
-    /** GMQ depuis la première pesée du lot — formule de `DashboardElevage`. */
-    public function gmqCumule(string $lotId): ?float
+    /**
+     * GMQ depuis la première pesée du lot — formule de `DashboardElevage`.
+     *
+     * Ticket H11 — `$jusquau` (Y-m-d) donne le GMQ cumulé TEL QU'IL ÉTAIT CONNU à cette date : les courbes
+     * hebdomadaires du poste (`_serieHebdomadaire`, pesées `entry_date <= borne`) en sont faites, sur la même formule.
+     */
+    public function gmqCumule(string $lotId, ?string $jusquau = null): ?float
     {
-        $pesees = $this->weighIns($lotId);
+        $pesees = $this->weighIns($lotId, $jusquau);
 
         if ($pesees->count() < 2) {
             return null;
@@ -166,31 +172,74 @@ class GrowthAnalysisService
     }
 
     /**
+     * Ticket U2 (décision client D-U2 du 19/10/2026 : « une seule source, la table `growth_standards` ») —
+     * OBJECTIF DE GMQ D'UNE ESPÈCE pour un ensemble de bandes (carte « GMQ Moyen … » du Dashboard Élevage, cartes
+     * par espèce d'Analyse des Croissances, et `DashboardElevageRepository.objectifPour` du poste, identique).
+     *
+     * Règle : chaque bande prend le barème de SON stade, exactement comme `rows()` (`species_code` ET
+     * `stage_label === $lot->stage`, égalité stricte) ; l'objectif de l'espèce est l'ENVELOPPE des barèmes ainsi
+     * trouvés — plus petit des minima, plus grand des maxima. Une bande dont le stade n'a pas de barème n'apporte
+     * rien. Aucun barème trouvé → `null` (« — » à l'écran), jamais 0 et jamais un barème d'un autre stade :
+     * l'enveloppe de toute l'espèce mêlerait la croissance des truies (40-80 g/j) à l'engraissement (500-650 g/j),
+     * et « Objectif non défini » d'Analyse des Croissances deviendrait, sur le tableau de bord, un objectif inventé.
+     *
+     * @param  iterable<GrowthStandard|array>  $standards  barèmes (`species_code`, `stage_label`, `gmq_min_g_per_day`, `gmq_max_g_per_day`)
+     * @param  iterable<?string>  $stades  stades des bandes moyennées par la carte
+     * @return array{0: int, 1: int}|null [minimum, maximum] en g/jour
+     */
+    public static function objectifPour(iterable $standards, string $codeEspece, iterable $stades): ?array
+    {
+        $stades = collect($stades)->filter(fn ($s) => $s !== null)->unique()->values()->all();
+        $min = null;
+        $max = null;
+
+        foreach ($standards as $s) {
+            $s = is_array($s) ? (object) $s : $s;
+            if ($s->species_code !== $codeEspece || ! in_array($s->stage_label, $stades, true)) {
+                continue;
+            }
+            $min = $min === null ? (int) $s->gmq_min_g_per_day : min($min, (int) $s->gmq_min_g_per_day);
+            $max = $max === null ? (int) $s->gmq_max_g_per_day : max($max, (int) $s->gmq_max_g_per_day);
+        }
+
+        return $min === null ? null : [$min, $max];
+    }
+
+    /**
      * Moyennes par espèce, pour les cartes KPI — calculées sur les lots
      * réellement suivis, jamais sur une constante.
+     *
+     * Ticket U2 — l'objectif de la carte est `objectifPour()` sur les stades des lots moyennés. Il était celui du
+     * DERNIER lot lu de l'espèce : un lot sans barème lu en dernier effaçait l'objectif des autres.
      *
      * @return array<string, array{label: string, gmq: ?float, objectif_min: ?int, objectif_max: ?int, nb_lots: int}>
      */
     public function averagesBySpecies(): array
     {
         $rows = $this->rows();
+        $standards = GrowthStandard::all();
         $parEspece = [];
 
         foreach ($rows as $row) {
             $code = $row['species_code'] ?? '—';
             $parEspece[$code]['label'] = $row['species_label'];
             $parEspece[$code]['gmqs'][] = $row['gmq'];
-            $parEspece[$code]['objectif_min'] = $row['objectif_min'];
-            $parEspece[$code]['objectif_max'] = $row['objectif_max'];
+            $parEspece[$code]['stades'][] = $row['stage'];
         }
 
-        return array_map(fn ($e) => [
-            'label' => $e['label'],
-            'gmq' => round(array_sum($e['gmqs']) / count($e['gmqs']), 1),
-            'objectif_min' => $e['objectif_min'],
-            'objectif_max' => $e['objectif_max'],
-            'nb_lots' => count($e['gmqs']),
-        ], $parEspece);
+        $moyennes = [];
+        foreach ($parEspece as $code => $e) {
+            $objectif = self::objectifPour($standards, (string) $code, $e['stades']);
+            $moyennes[$code] = [
+                'label' => $e['label'],
+                'gmq' => round(array_sum($e['gmqs']) / count($e['gmqs']), 1),
+                'objectif_min' => $objectif[0] ?? null,
+                'objectif_max' => $objectif[1] ?? null,
+                'nb_lots' => count($e['gmqs']),
+            ];
+        }
+
+        return $moyennes;
     }
 
     /** Nombre de lots réellement suivis (au moins 2 pesées). */

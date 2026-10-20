@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/features/elevage/suivi_reproduction_repository.dart';
@@ -111,6 +112,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // 🔴→✅ Ticket U14 — points de rupture du Blade : cartes `grid-cols-2 xl:grid-cols-4` (1280 px), couvoir
+  // `grid-cols-2 lg:grid-cols-4` (1024 px). Le poste passait aux quatre colonnes dès `md` (768 px).
+  testWidgets('U14 — à 1100 px : cartes sur deux colonnes (xl), couvoir sur quatre (lg), comme le Blade', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: SuiviReproductionScreen(depot: depot)));
+    await tester.pumpAndSettle();
+
+    double y(String libelle) => tester.getTopLeft(find.text(libelle.toUpperCase())).dy;
+    expect(y('Mises bas / Éclosions (mois)'), greaterThan(y('Reproductrices Gestantes')), reason: 'deux colonnes');
+
+    await ouvrir(tester, 'Volailles');
+    expect(y('Naissains Nés (mois)'), y('Œufs Couvés (mois)'), reason: 'quatre colonnes dès lg');
+    expect(y("Taux d'Éclosion"), y('Œufs Couvés (mois)'));
+  });
+
   testWidgets('⚠️ les quatre onglets de la maquette sont là, dans son ordre', (
     tester,
   ) async {
@@ -136,7 +156,8 @@ void main() {
     );
   });
 
-  testWidgets('les quatre KPI portent les libellés de la maquette', (
+  // Ticket H7 : le Blade fait foi — « Mises bas / Éclosions (mois) ».
+  testWidgets('les quatre KPI portent les libellés du Blade', (
     tester,
   ) async {
     await afficher(tester);
@@ -144,13 +165,15 @@ void main() {
     for (final libelle in [
       'REPRODUCTRICES GESTANTES',
       'PALPATIONS / ÉCHÉANCES DUES',
-      'MISES BAS / ÉCLOSIONS',
+      'MISES BAS / ÉCLOSIONS (MOIS)',
       'ALERTES RÉFORME / PERTES',
     ]) {
       expect(find.text(libelle), findsOneWidget, reason: libelle);
     }
   });
 
+  // Ticket H7 : le Blade fait foi — quatre étapes ; « Boîte à nid J+28 » (ajout du poste,
+  // gardé) passe en ligne annexe sous le rappel.
   testWidgets('le bandeau « Rappel du cycle » porte les jalons lapins', (
     tester,
   ) async {
@@ -159,14 +182,15 @@ void main() {
     for (final jalon in [
       'Saillie J0',
       'Palpation J+14',
-      'Boîte à nid J+28',
       'Mise bas J+30',
       'Sevrage J+60',
     ]) {
       expect(find.text(jalon), findsOneWidget, reason: jalon);
     }
+    expect(find.textContaining('Boîte à nid J+28'), findsOneWidget);
   });
 
+  // Ticket H7 : le Blade fait foi — « Mise bas J+114 », sans « (3m3s3j) ».
   testWidgets('le bandeau porcs porte les jalons de la gestation porcine', (
     tester,
   ) async {
@@ -176,7 +200,7 @@ void main() {
     for (final jalon in [
       'Saillie J0',
       'Retour Chaleur J+21',
-      'Mise Bas J+114 (3m3s3j)',
+      'Mise bas J+114',
       'Sevrage J+42',
     ]) {
       expect(find.text(jalon), findsOneWidget, reason: jalon);
@@ -201,9 +225,8 @@ void main() {
     expect(find.text('R1'), findsOneWidget);
     expect(find.text('M3'), findsOneWidget);
     expect(find.text('LOT-LAP-2026-06'), findsOneWidget);
-    // ⚠️ « 8 (7) » — total puis vivants, comme la maquette : le total est la
-    // SOMME des vivants et des morts, jamais une colonne à part.
-    expect(find.text('8 (7)'), findsOneWidget);
+    // Ticket H7 : le Blade fait foi — « 7 (1 morts) » : vivants, puis morts.
+    expect(find.text('7 (1 morts)'), findsOneWidget);
   });
 
   /// ⚠️⚠️ LE CŒUR DU TICKET : trois états, jamais deux.
@@ -217,9 +240,15 @@ void main() {
 
     await afficher(tester);
 
-    expect(find.text('À palper'), findsOneWidget);
-    expect(find.text('En attente'), findsOneWidget);
-    expect(find.text('Négative (−)'), findsNothing);
+    // Ticket H7 : le Blade fait foi — « Prévue jj/mm/aaaa », en rouge une fois échue.
+    String jj(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/'
+        '${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final echue = tester.widget<Text>(find.text('Prévue ${jj(ilYA(6))}'));
+    final aVenir = tester.widget<Text>(find.text('Prévue ${jj(ilYA(-11))}'));
+    expect(echue.style?.color, AgriColors.errorDeep);
+    expect(aVenir.style?.color, AgriColors.outline);
+    expect(find.textContaining('(Négatif)'), findsNothing);
   });
 
   testWidgets('une palpation faite se lit positive ou négative', (
@@ -237,8 +266,9 @@ void main() {
 
     await afficher(tester);
 
-    expect(find.text('Positive (+)'), findsOneWidget);
-    expect(find.text('Négative (−)'), findsOneWidget);
+    // Ticket H7 : le Blade fait foi — « jj/mm/aaaa (Positif|Négatif) ».
+    expect(find.textContaining('(Positif)'), findsOneWidget);
+    expect(find.textContaining('(Négatif)'), findsOneWidget);
   });
 
   /// Le KPI compte exactement comme le serveur : cycles `en_cours` sans mise
@@ -283,9 +313,10 @@ void main() {
     await afficher(tester);
     await ouvrir(tester, 'Porcs');
 
-    final dans21 = aujourdhui.add(const Duration(days: 21));
+    // Ticket H7 : le Blade fait foi — le retour chaleur à venir s'écrit « Prévue jj/mm/aaaa ».
+    final dans21 = ilYA(-21);
     final attendu =
-        '${dans21.day.toString().padLeft(2, '0')}/'
+        'Prévue ${dans21.day.toString().padLeft(2, '0')}/'
         '${dans21.month.toString().padLeft(2, '0')}/${dans21.year}';
 
     expect(find.text(attendu), findsOneWidget);
@@ -316,20 +347,24 @@ void main() {
 
     expect(find.text('120'), findsOneWidget);
     expect(find.text('102'), findsOneWidget);
-    expect(find.text('85.0 %'), findsOneWidget);
-    expect(find.textContaining('Fiches Reproducteurs'), findsOneWidget);
+    // Ticket H7 : le Blade fait foi — `number_format(…, 1, ',', ' ')`, et le lien vers la
+    // fiche de saisie « Saisir le Couvoir du Jour → ».
+    expect(find.text('85,0 %'), findsOneWidget);
+    expect(find.text('Saisir le Couvoir du Jour →'), findsOneWidget);
   });
 
-  /// ⚠️ Sans mise en incubation, « 0,0 % » se lirait comme un échec total du
-  /// couvoir. C'est un tiret.
-  testWidgets("sans œuf couvé, le taux d'éclosion est un tiret", (
+  /// Ticket H7 : le Blade fait foi. 🔴→✅ Ticket U14 — sans œuf couvé le taux est INCONNU : « — » au web (qui
+  /// affichait « 0,0 % ») puis au poste.
+  testWidgets("U14 — sans œuf couvé, le taux d'éclosion est « — » comme au web", (
     tester,
   ) async {
     await afficher(tester);
     await ouvrir(tester, 'Volailles');
 
-    expect(find.text('—'), findsWidgets);
-    expect(find.text('0.0 %'), findsNothing);
+    expect(find.text('0,0 %'), findsNothing);
+    expect(const ResumeCouvoir(couves: 0, nes: 0, lots: 1).libelleTaux, '—');
+    expect(const ResumeCouvoir(couves: 40, nes: 0, lots: 1).libelleTaux, '0,0 %', reason: 'couvée perdue');
+    expect(const ResumeCouvoir(couves: 3, nes: 2, lots: 1).libelleTaux, '66,7 %');
   });
 
   /// ⚠️ La saillie se déclare au poste ; palpation, mise bas et sevrage
@@ -339,15 +374,16 @@ void main() {
   ) async {
     await afficher(tester);
 
-    expect(find.byKey(const Key('mention-lecture-seule')), findsOneWidget);
-    expect(find.textContaining('La saillie se déclare ici'), findsOneWidget);
+    // Ticket H7 : actions de cycle ouvertes — le bandeau de restriction n'a plus lieu d'être.
+    expect(find.byKey(const Key('mention-lecture-seule')), findsNothing);
   });
 
+  // Ticket H7 : le Blade fait foi — l'état vide du web.
   testWidgets('sans cycle reçu, la filière le dit', (tester) async {
     await afficher(tester);
 
     expect(
-      find.text('— Aucun cycle de reproduction reçu pour cette filière —'),
+      find.text('Aucune saillie déclarée pour le moment.'),
       findsOneWidget,
     );
   });

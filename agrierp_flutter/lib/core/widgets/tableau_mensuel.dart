@@ -9,7 +9,20 @@ class ColonneMensuelle {
     required this.valeur,
     this.largeur = 1,
     this.gras = false,
+    this.couleur,
+    this.grasSelon,
+    this.aGauche = false,
   });
+
+  /// Ticket U11 — cellule en gras selon sa ligne (`font-bold` d'un mort au web).
+  final bool Function(int index)? grasSelon;
+
+  /// Ticket U11 — couleur d'une cellule selon sa ligne (`text-error-deep` d'un mort au web, `text-outline` des
+  /// colonnes du grand livre…) ; `null` : couleur du texte par défaut.
+  final Color? Function(int index)? couleur;
+
+  /// Ticket U11 — cellule alignée à gauche (`text-left` du web) au lieu d'être centrée.
+  final bool aGauche;
 
   final String libelle;
 
@@ -49,16 +62,37 @@ class TableauMensuel extends StatelessWidget {
     required this.dateDe,
     required this.onOuvrirJour,
     this.jourActif,
+    this.libelleDate = 'Date',
+    this.zebre = true,
+    this.invite = inviteMaquette,
+    this.pied,
+    this.clePied,
   });
+
+  /// L'invite de la maquette, sous le tableau.
+  static const inviteMaquette =
+      'Touchez un jour pour charger sa fiche dans le formulaire';
+
+  /// Lignes zébrées (maquette). Ticket U11 : la fiche Pondeuses du web ne zèbre pas ses lignes.
+  final bool zebre;
+
+  /// Invite sous le tableau ; `null` : aucune (la fiche Pondeuses du web n'en a pas).
+  final String? invite;
+
+  /// Ticket U11 — note du web au pied du tableau (`text-[10px] text-outline p-sm border-t`), dans la carte.
+  final String? pied;
+  final Key? clePied;
+
+  /// En-tête de la colonne de date (« Date / Jour » sur la fiche Pondeuses du web, F0.99).
+  final String libelleDate;
 
   /// Colonnes regroupées sous un en-tête commun.
   final List<GroupeColonnes> groupes;
 
   /// Colonnes sans groupe placées AVANT les groupes, juste après la date.
   ///
-  /// ⚠️ La fiche Reproducteurs place « Lot / Souche » à cet endroit précis, et
-  /// la maquette est la référence de mise en page : la repousser après les
-  /// groupes serait un repositionnement.
+  /// Aucune fiche ne s'en sert depuis F0.99 (« Lot / Souche » n'existe pas au web) ; gardé pour la
+  /// mise en page de la maquette.
   final List<ColonneMensuelle> colonnesAvant;
 
   /// Colonnes sans groupe, placées après les groupes.
@@ -121,18 +155,31 @@ class TableauMensuel extends StatelessWidget {
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(AgriSpacing.sm),
-              child: Text(
-                'Touchez un jour pour charger sa fiche dans le formulaire',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontStyle: FontStyle.italic,
-                  color: AgriColors.outline,
+            if (invite != null)
+              Padding(
+                padding: const EdgeInsets.all(AgriSpacing.sm),
+                child: Text(
+                  invite!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontStyle: FontStyle.italic,
+                    color: AgriColors.outline,
+                  ),
                 ),
               ),
-            ),
+            if (pied != null)
+              Container(
+                padding: const EdgeInsets.all(AgriSpacing.sm),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: AgriColors.outlineVariant)),
+                ),
+                child: Text(
+                  pied!,
+                  key: clePied,
+                  style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+                ),
+              ),
           ],
         ],
       ),
@@ -183,16 +230,28 @@ class TableauMensuel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SizedBox(width: _largeurDate, child: _cellule('Date', entete: true)),
-          for (final c in _toutes)
-            SizedBox(
-              width: c.largeur * _uniteLargeur,
-              child: _cellule(c.libelle, entete: true, centre: true),
-            ),
+          SizedBox(width: _largeurDate, child: _cellule(libelleDate, entete: true)),
+          // 🔁 15.57 — casse du web : les colonnes SANS groupe (rowspan) en majuscules, les sous-colonnes d'un
+          // groupe en casse mixte (« Truies Gest. », « Jeunes »), comme les `<th>` des vues Blade.
+          for (final c in colonnesAvant) _enteteColonne(c, majuscules: true),
+          for (final g in groupes)
+            for (final c in g.colonnes) _enteteColonne(c, majuscules: false),
+          for (final c in colonnesSimples) _enteteColonne(c, majuscules: true),
         ],
       ),
     );
   }
+
+  Widget _enteteColonne(ColonneMensuelle c, {required bool majuscules}) =>
+      SizedBox(
+        width: c.largeur * _uniteLargeur,
+        child: _cellule(
+          c.libelle,
+          entete: true,
+          centre: true,
+          majuscules: majuscules,
+        ),
+      );
 
   Widget _ligne(int index) {
     final actif = index == jourActif;
@@ -204,7 +263,7 @@ class TableauMensuel extends StatelessWidget {
         decoration: BoxDecoration(
           color: actif
               ? AgriColors.brandEmerald.withValues(alpha: 0.10)
-              : (index.isOdd ? AgriColors.surfaceZebra : Colors.white),
+              : (zebre && index.isOdd ? AgriColors.surfaceZebra : Colors.white),
           border: const Border(
             bottom: BorderSide(color: AgriColors.outlineVariant, width: 0.5),
           ),
@@ -218,7 +277,12 @@ class TableauMensuel extends StatelessWidget {
             for (final c in _toutes)
               SizedBox(
                 width: c.largeur * _uniteLargeur,
-                child: _cellule(c.valeur(index), centre: true, gras: c.gras),
+                child: _cellule(
+                  c.valeur(index),
+                  centre: !c.aGauche,
+                  gras: c.gras || (c.grasSelon?.call(index) ?? false),
+                  couleur: c.couleur?.call(index),
+                ),
               ),
           ],
         ),
@@ -231,17 +295,19 @@ class TableauMensuel extends StatelessWidget {
     bool entete = false,
     bool centre = false,
     bool gras = false,
+    bool majuscules = true,
+    Color? couleur,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: Text(
-        entete ? texte.toUpperCase() : texte,
+        entete && majuscules ? texte.toUpperCase() : texte,
         textAlign: centre ? TextAlign.center : TextAlign.start,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: entete ? 9 : 11,
           fontWeight: (entete || gras) ? FontWeight.bold : FontWeight.normal,
-          color: entete ? AgriColors.outline : AgriColors.onSurface,
+          color: entete ? AgriColors.outline : (couleur ?? AgriColors.onSurface),
         ),
       ),
     );

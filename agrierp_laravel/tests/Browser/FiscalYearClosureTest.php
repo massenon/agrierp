@@ -70,7 +70,7 @@ class FiscalYearClosureTest extends DuskTestCase
                 ->pause(1500)
 
                 ->press('@cloture-step3')
-                ->waitForText('Cette action est irréversible', 5)
+                ->waitForText('réouverture exceptionnelle journalisée', 5)
                 ->press('@cloture-confirm')
                 ->waitForText('clôturé avec succès', 20)
                 // ⚠️ L'ecran BASCULE volontairement sur l'exercice N+1 apres la

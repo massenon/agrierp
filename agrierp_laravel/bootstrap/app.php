@@ -1,8 +1,10 @@
 <?php
 
+use App\Support\MessagesErreurFr;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,5 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Ticket U5 (D-U5) : le `message` des réponses JSON d'erreur (API du poste) en français
+        // (« Unauthenticated. » → « Session expirée… »). La forme de la réponse ne change pas.
+        $exceptions->respond(fn (Response $reponse) => MessagesErreurFr::traduireJson($reponse));
     })->create();

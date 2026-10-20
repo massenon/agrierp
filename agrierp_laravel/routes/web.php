@@ -189,6 +189,11 @@ Route::get('/transformation', \App\Livewire\Elevage\TransformationForm::class)
     ->name('elevage.transformation')
     ->middleware(['auth', 'can:view-elevage']);
 
+// Ticket 15.46 : écran dédié des transferts entre bandes (absent du prototype, décision client du 17/10/2026).
+Route::get('/transferts-bandes', \App\Livewire\Elevage\TransfertsBandes::class)
+    ->name('elevage.transferts')
+    ->middleware(['auth', 'can:view-elevage']);
+
 // Sprint 3, ticket 3.13 : elevage-dashboard.html → Livewire\Elevage\DashboardElevage
 Route::get('/elevage-dashboard', \App\Livewire\Elevage\DashboardElevage::class)
     ->name('elevage.dashboard')

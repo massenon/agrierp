@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\AnimalController;
 use App\Http\Controllers\Api\AttestationController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ReinitialisationDonneesController;
+use App\Http\Controllers\Api\SupervisionSynchronisationController;
 use App\Http\Controllers\Api\SyncController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +29,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
 
-Route::middleware('auth:sanctum')->group(function () {
+// Ticket S3 — `CompteActif` : un compte désactivé sur le web perd aussitôt l'accès de ses postes.
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // Ticket 15.9 : changement de mot de passe depuis le poste. Même limiteur
     // que la connexion : il vérifie lui aussi un mot de passe.
@@ -53,6 +56,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
-    Route::get('/sync/pull', [SyncController::class, 'pull']);
-    Route::post('/sync/push', [SyncController::class, 'push']);
+    // Ticket S1 — débit borné : un poste synchronise toutes les quelques minutes ; 30 appels par minute et par
+    // compte laissent la marge d'une relance manuelle répétée sans permettre d'épuiser le serveur.
+    // Ticket S-T4 — le tirage est PAGINÉ : un poste resté longtemps hors ligne fait une requête par page. Sous le
+    // compteur commun (30 / min, partagé avec l'envoi), son tirage tomberait en 429 au milieu, repartirait de la
+    // page 1 et ne finirait jamais. Compteur PROPRE, à 120 pages par minute (120 000 lignes au plus).
+    Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:120,1,sync-pull');
+    Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
+
+    // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du
+    // serveur pour le contrôle de cohérence. Compteurs de débit PROPRES (3e paramètre) : sans préfixe, tous les
+    // `throttle:N,1` d'un compte partagent la même clé, et l'interrogation régulière mangerait le crédit du tirage.
+    Route::get('/sync/demande', [SupervisionSynchronisationController::class, 'demande'])
+        ->middleware('throttle:6,1,sync-demande');
+    Route::get('/sync/coherence', [SupervisionSynchronisationController::class, 'coherence'])
+        ->middleware('throttle:10,1,sync-coherence');
+
+    // Ticket R-1 — « Réinitialisation des données » depuis le poste : même droit (`manage-parametres`, vérifié par
+    // le contrôleur), mêmes verrous et même service que l'onglet web. Compteur de débit propre.
+    Route::get('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'etat'])
+        ->middleware('throttle:30,1,reinitialisation');
+    Route::post('/parametres/reinitialisation/mode-demo', [ReinitialisationDonneesController::class, 'basculerModeDemo'])
+        ->middleware('throttle:10,1,reinitialisation-bascule');
+    Route::post('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'reinitialiser'])
+        ->middleware('throttle:5,1,reinitialisation-execution');
 });

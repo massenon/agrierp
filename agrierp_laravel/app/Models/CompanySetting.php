@@ -17,8 +17,16 @@ class CompanySetting extends Model
     protected $fillable = [
         // Ticket 14.56 — bascule du mode demonstration (faux par defaut).
         'demo_mode_enabled',
+        // Ticket 15.50 — instant de la dernière réinitialisation des données (servi au tirage).
+        'data_reset_at',
+        // Ticket 15.51 — assistant de démarrage marqué terminé.
+        'onboarding_completed_at',
+        // Règle R-SOINS-01 — délai du rappel des soins planifiés (jours).
+        'rappel_soins_jours',
         'company_name', 'promoter_name', 'address', 'phone', 'email', 'ifu', 'rccm',
         'smtp_host', 'smtp_port', 'smtp_security', 'smtp_user', 'smtp_password_encrypted',
+        // Ticket CFG-1 — adresse d'expédition propre (vide : l'e-mail de contact).
+        'smtp_from_address',
         'logo_path', 'favicon_path',
         'sms_provider', 'twilio_account_sid', 'twilio_auth_token_encrypted', 'twilio_from_number',
         'vonage_api_key', 'vonage_api_secret_encrypted', 'vonage_from_name',
@@ -35,6 +43,9 @@ class CompanySetting extends Model
             'twilio_auth_token_encrypted' => 'encrypted',
             'vonage_api_secret_encrypted' => 'encrypted',
             'payroll_settings_edited_at' => 'datetime',
+            'data_reset_at' => 'datetime',
+            'onboarding_completed_at' => 'datetime',
+            'rappel_soins_jours' => 'integer',
         ];
     }
 
@@ -65,10 +76,19 @@ class CompanySetting extends Model
         Config::set('mail.mailers.smtp.username', $this->smtp_user);
         Config::set('mail.mailers.smtp.password', $this->smtp_password_encrypted);
 
-        if ($this->email) {
-            Config::set('mail.from.address', $this->email);
+        if ($this->adresseExpedition()) {
+            Config::set('mail.from.address', $this->adresseExpedition());
             Config::set('mail.from.name', $this->company_name);
         }
+    }
+
+    /**
+     * Ticket CFG-1 — expéditeur des e-mails : l'adresse d'expédition de l'onglet « Email (SMTP) », sinon l'e-mail de
+     * contact (comportement d'avant l'onglet, où les deux écrans écrivaient la même colonne).
+     */
+    public function adresseExpedition(): ?string
+    {
+        return $this->smtp_from_address ?: ($this->email ?: null);
     }
 
     public function hasSmsConfigured(): bool

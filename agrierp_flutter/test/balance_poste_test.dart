@@ -10,6 +10,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.86 — BALANCE GÉNÉRALE DU POSTE (item 9, ticket T3).
 ///
@@ -1194,10 +1195,10 @@ void main() {
     // ── Fidélité à la maquette ET à la page web (lues dans les dépôts, jamais copiées) ───────────
 
     final maquette = File(
-      'C:/Projects/agrierp_laravel/prototype_html/balance-generale.html',
+      '$dossierPrototype/balance-generale.html',
     );
     final vueWeb = File(
-      'C:/laragon/www/agrierp/resources/views/livewire/comptabilite/balance-generale.blade.php',
+      '$dossierLaravel/resources/views/livewire/comptabilite/balance-generale.blade.php',
     );
     final sautMaquette = maquette.existsSync() && vueWeb.existsSync()
         ? null

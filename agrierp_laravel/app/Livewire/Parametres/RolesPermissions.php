@@ -92,7 +92,7 @@ class RolesPermissions extends Component
     {
         return [
             'roles' => Role::count(),
-            'utilisateurs' => \App\Models\User::role(Role::pluck('name'))->count(),
+            'utilisateurs' => \App\Models\User::role(Role::pluck('name'))->where('is_active', true)->count(),
             'modules' => count($this->modules()),
             'derniere_sauvegarde' => $this->backupFiles()->first()['date'] ?? 'Aucune',
         ];
@@ -109,7 +109,7 @@ class RolesPermissions extends Component
             // ⚠️ Role::withCount('users') échoue — Spatie ne porte pas de
             // relation users() sur son modèle Role (apprentissage déjà
             // documenté dans ce projet). User::role() est la seule voie fiable.
-            $usersCount = \App\Models\User::role($role->name)->count();
+            $usersCount = \App\Models\User::role($role->name)->where('is_active', true)->count();   // compte archivé exclu
 
             return ['role' => $role, 'modules' => $modulesStatus, 'users_count' => $usersCount];
         });
@@ -232,7 +232,7 @@ class RolesPermissions extends Component
 
         // ⚠️ User::role() plutôt que Role::withCount('users') — même
         // apprentissage déjà documenté que dans getRolesProperty().
-        $usersCount = \App\Models\User::role($role->name)->count();
+        $usersCount = \App\Models\User::role($role->name)->where('is_active', true)->count();   // compte archivé exclu
 
         if ($usersCount > 0) {
             $this->dispatch('toast', message: "Impossible de supprimer « {$role->name} » : {$usersCount} utilisateur(s) porte(nt) encore ce rôle.", type: 'error');
@@ -277,6 +277,7 @@ class RolesPermissions extends Component
 
     public function generateBackup(): void
     {
+        $this->authorizeAdmin();
         Artisan::call('agrierp:backup');
         $output = Artisan::output();
 

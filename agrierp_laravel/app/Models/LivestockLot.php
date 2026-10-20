@@ -14,6 +14,12 @@ class LivestockLot extends Model
         'created_date', 'acquisition_cost', 'status', 'cost_center_id', 'is_active', 'product_id',
     ];
 
+    /** Ticket 15.46 — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés). */
+    public function lotSource()
+    {
+        return $this->belongsTo(self::class, 'lot_source_id');
+    }
+
     protected function casts(): array
     {
         return [
@@ -30,6 +36,44 @@ class LivestockLot extends Model
      * peuvent avoir des destinations différentes — pondeuses contre poulets de
      * chair, par exemple.
      */
+    /**
+     * 🔴→✅ CORRECTIF « ARCHIVAGE » — les bandes VIVANTES : en cours (`status = actif`) ET non archivées
+     * (`is_active = true`).
+     *
+     * Archiver une bande (Gestion des Bandes, Corbeille) pose `is_active = false` sans toucher au statut :
+     * les indicateurs qui ne filtraient que `status = actif` comptaient donc encore la bande archivée dans
+     * « Effectif Total Vivant », les bandes actives, les alertes sanitaires… Toute statistique « actuelle »
+     * passe par ce point unique.
+     */
+    public function scopeVivantes($query)
+    {
+        return $query->where('status', 'actif')->where('is_active', true);
+    }
+
+    /**
+     * Libellés des stades par espèce (« Stade Initial » de la création de bande).
+     *
+     * ⚠️ La colonne `stage` garde ses quatre valeurs (enum) : seuls les LIBELLÉS changent. Décision client
+     * du 17/10/2026, lapins : Reproducteur (`reproduction`), Jeune (`engraissement`), Sous-mères
+     * (`croissance`) — les trois catégories de la fiche Lapins ; la ponte n'existe pas pour eux.
+     *
+     * @return array<string, string> valeur stockée => libellé affiché
+     */
+    public static function stadesPourEspece(?string $speciesCode): array
+    {
+        if ($speciesCode === 'cuniculture') {
+            return ['reproduction' => 'Reproducteur', 'engraissement' => 'Jeune', 'croissance' => 'Sous-mères'];
+        }
+
+        return ['reproduction' => 'Reproduction', 'croissance' => 'Croissance', 'ponte' => 'Ponte', 'engraissement' => 'Engraissement'];
+    }
+
+    /** Libellé du stade de cette bande, selon son espèce. */
+    public function libelleStade(): string
+    {
+        return self::stadesPourEspece($this->species?->code)[$this->stage] ?? ucfirst((string) $this->stage);
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id');

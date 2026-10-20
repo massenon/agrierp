@@ -49,8 +49,8 @@ class Index extends Component
         $prevMonthEnd = now()->subMonthNoOverflow()->endOfMonth();
 
         $ca = $this->realOrPendingKpi('sales', 'Sprint 4 (Ventes Ferme)', function () use ($monthStart, $prevMonthStart, $prevMonthEnd) {
-            $current = (float) \App\Models\Sale::soldSince($monthStart)->sum('total');
-            $previous = (float) \App\Models\Sale::soldBetweenInstants($prevMonthStart, $prevMonthEnd)->sum('total');
+            $current = (float) \App\Models\Sale::nonAnnulees()->soldSince($monthStart)->sum('total');
+            $previous = (float) \App\Models\Sale::nonAnnulees()->soldBetweenInstants($prevMonthStart, $prevMonthEnd)->sum('total');
 
             return ['value' => $current, 'previous' => $previous];
         });
@@ -119,7 +119,7 @@ class Index extends Component
         for ($i = 5; $i >= 0; $i--) {
             $monthDate = now()->subMonthsNoOverflow($i);
             $labels[] = $monthDate->translatedFormat('M');
-            $ca[] = (float) \App\Models\Sale::soldBetweenInstants($monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth())->sum('total');
+            $ca[] = (float) \App\Models\Sale::nonAnnulees()->soldBetweenInstants($monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth())->sum('total');
             $depenses[] = (float) \App\Models\Purchase::whereBetween('purchase_date', [$monthDate->copy()->startOfMonth(), $monthDate->copy()->endOfMonth()])->sum('total');
         }
 
@@ -179,21 +179,15 @@ class Index extends Component
         // Aucun document du projet ne tranche la formule de l'ALERTE (la
         // maquette du tableau de bord n'affiche qu'un texte, « >10% »). En
         // choisir une ici sans mandat serait décider à la place du client.
+        // Ticket 15.49 — la règle vit désormais dans `AlertesElevageService` (même seuil, bandes archivées exclues),
+        // que la cloche partage : l'écran et la notification ne peuvent plus diverger.
         if (Schema::hasTable('livestock_daily_entries')) {
-            $recentEntries = \App\Models\LivestockDailyEntry::with('lot')
-                ->where('entry_date', '>=', now()->subDays(7))
-                ->get()
-                ->groupBy('lot_id');
-
-            foreach ($recentEntries as $lotId => $entries) {
-                $worst = $entries->sortByDesc(fn ($e) => $e->mortality_rate)->first();
-                if ($worst && $worst->mortality_rate >= 5 && $worst->lot) {
-                    $alerts[] = [
-                        'label' => "Mortalité anormale — Lot {$worst->lot->code} (".number_format($worst->mortality_rate, 1, ',', ' ').'%)',
-                        'severity' => 'critique',
-                        'link' => '/gestion-bandes',
-                    ];
-                }
+            foreach (app(\App\Services\AlertesElevageService::class)->mortalitesAnormales() as $worst) {
+                $alerts[] = [
+                    'label' => "Mortalité anormale — Lot {$worst->lot->code} (".number_format($worst->mortality_rate, 1, ',', ' ').'%)',
+                    'severity' => 'critique',
+                    'link' => '/gestion-bandes',
+                ];
             }
         }
 
@@ -204,7 +198,9 @@ class Index extends Component
                 ->where('due_date', '<', now())
                 ->limit(3)
                 ->get() as $receivable) {
-                $days = (int) now()->diffInDays($receivable->due_date);
+                // Ticket H5 — 🔴 Carbon 3 renvoie un écart SIGNÉ : `now()->diffInDays($echeance)` donnait « (-10 jours) ».
+                // Le retard se compte de l'échéance à aujourd'hui.
+                $days = (int) $receivable->due_date->copy()->startOfDay()->diffInDays(now()->startOfDay());
                 $alerts[] = [
                     'label' => "Créance en retard — {$receivable->customer?->name} ({$days} jours)",
                     'severity' => 'moyen',
@@ -226,7 +222,7 @@ class Index extends Component
             ->whereHas('species', fn ($q) => $q->where('code', $code))->sum('current_quantity');
 
         $mortaliteMois = function (string $code) {
-            $lotIds = \App\Models\LivestockLot::whereHas('species', fn ($q) => $q->where('code', $code))->pluck('id');
+            $lotIds = \App\Models\LivestockLot::where('is_active', true)->whereHas('species', fn ($q) => $q->where('code', $code))->pluck('id');   // bande archivée exclue
             $entries = \App\Models\LivestockDailyEntry::whereIn('lot_id', $lotIds)->where('entry_date', '>=', now()->startOfMonth())->get();
             $totalMorts = $entries->sum('mort');
             $effectifRef = $entries->sum(fn ($e) => max($e->effectif_final - $e->achat - $e->ne + $e->mort + $e->vente + $e->don, 1));
@@ -254,7 +250,7 @@ class Index extends Component
             'volailles' => [
                 'lots_actifs' => \App\Models\LivestockLot::where('is_active', true)->where('status', 'actif')->whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->count(),
                 'taux_ponte' => (function () {
-                    $lotIds = \App\Models\LivestockLot::whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->pluck('id');
+                    $lotIds = \App\Models\LivestockLot::where('is_active', true)->whereHas('species', fn ($q) => $q->where('code', 'aviculture'))->pluck('id');   // bande archivée exclue
                     $entries = \App\Models\LivestockDailyEntry::whereIn('lot_id', $lotIds)->where('entry_date', '>=', now()->startOfMonth())->get();
                     $totalPonte = $entries->sum('ponte_total');
                     $effectifPondeuses = $entries->sum('effectif_final');
@@ -272,7 +268,7 @@ class Index extends Component
                 // filtre par espèce individuelle sur chaque sujet vendu
                 // (aucun lien direct vente↔lot n'existe dans le schéma).
                 'ventes_mois' => (int) \App\Models\SaleLine::whereHas('product', fn ($q) => $q->whereHas('category', fn ($q2) => $q2->where('label', 'Porciculture')))
-                    ->whereHas('sale', fn ($q) => $q->soldSince(now()->startOfMonth()))->count(),
+                    ->whereHas('sale', fn ($q) => $q->nonAnnulees()->soldSince(now()->startOfMonth()))->count(),
                 'mortalite' => $mortaliteMois('porciculture'),
             ],
         ];
@@ -305,7 +301,7 @@ class Index extends Component
         }
 
         return \App\Models\SaleLine::selectRaw('product_id, SUM(qty) as total_qty, SUM(manual_total_amount) as total_ca')
-            ->whereHas('sale', fn ($q) => $q->soldSince(now()->startOfMonth()))
+            ->whereHas('sale', fn ($q) => $q->nonAnnulees()->soldSince(now()->startOfMonth()))
             ->groupBy('product_id')
             ->orderByDesc('total_ca')
             ->with('product')
@@ -336,6 +332,31 @@ class Index extends Component
         }
 
         return ['pending' => false, 'value' => $computeValue()];
+    }
+
+    /**
+     * Ticket H11 (décision D-H-maquette du 19/10/2026) — détails que le poste affichait et que le web n'avait pas,
+     * construits ici pour que les deux côtés soient identiques : soldes Caisse / Banque sous la Trésorerie, trois
+     * premiers produits sous leur seuil sous « Stock Critique », exercice ouvert dans l'en-tête.
+     *
+     * Décision D-U8 (19/10/2026) : Mobile Money en troisième ligne, au web comme au poste.
+     *
+     * @return array{caisse: float, banque: float, mobile_money: float, produits_critiques: array<int, string>, exercice: ?int}
+     */
+    public function getDetailsProperty(): array
+    {
+        $soldes = \App\Models\TreasuryAccount::where('is_active', true)
+            ->selectRaw('type, SUM(balance) as total')->groupBy('type')->pluck('total', 'type');
+
+        return [
+            'caisse' => (float) ($soldes['caisse'] ?? 0),
+            'banque' => (float) ($soldes['banque'] ?? 0),
+            'mobile_money' => (float) ($soldes['mobile_money'] ?? 0),
+            'produits_critiques' => \App\Models\Product::where('is_active', true)
+                ->whereColumn('stock_qty', '<=', 'alert_threshold')
+                ->orderBy('name')->limit(3)->pluck('name')->all(),
+            'exercice' => \App\Models\FiscalYear::current()?->year,
+        ];
     }
 
     public function render()

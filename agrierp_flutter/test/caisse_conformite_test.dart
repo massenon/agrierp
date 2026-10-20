@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'chemins_depot.dart';
 
 /// Ticket F0.21 — CONFORMITÉ DE LA CAISSE À `pos-interface.html`.
 ///
@@ -172,7 +173,7 @@ void main() {
     "⚠️ F0.89 — la maquette n'a AUCUN champ de date : le champ du poste est un écart assumé",
     () {
       final maquette = File(
-        'C:/Projects/agrierp_laravel/prototype_html/pos-interface.html',
+        '$dossierPrototype/pos-interface.html',
       );
       if (!maquette.existsSync()) {
         markTestSkipped('SAUT : maquette absente de ce poste.');

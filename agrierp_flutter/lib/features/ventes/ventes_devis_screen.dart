@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'caisse_repository.dart';
 import 'caisse_screen.dart';
 import 'ventes_devis_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/ventes-devis.html` → Ventes & Devis.
 ///
@@ -35,10 +36,10 @@ class VentesDevisScreen extends StatefulWidget {
 class _VentesDevisScreenState extends State<VentesDevisScreen> {
   /// Les quatre onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Enregistrer Vente', Icons.point_of_sale),
-    ('Devis Prestations', Icons.description),
-    ('Historique des Ventes', Icons.receipt_long),
-    ('Retours et Avoirs', Icons.assignment_return),
+    ('Enregistrer Vente', SymbolesAgri.point_of_sale),
+    ('Devis Prestations', SymbolesAgri.description),
+    ('Historique des Ventes', SymbolesAgri.receipt_long),
+    ('Retours et Avoirs', SymbolesAgri.assignment_return),
   ];
 
   String _onglet = onglets.first.$1;
@@ -71,7 +72,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
             child: switch (_onglet) {
               'Devis Prestations' => _ongletIndisponible(
                 titre: 'Devis Prestations',
-                icone: Icons.description,
+                icone: SymbolesAgri.description,
                 sousTitre: 'Devis et proformas adressés aux clients.',
                 raison:
                     'Un devis se négocie au bureau, avec la fiche du client '
@@ -84,7 +85,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
               'Historique des Ventes' => _ongletHistorique(),
               'Retours et Avoirs' => _ongletIndisponible(
                 titre: 'Retours et Avoirs',
-                icone: Icons.assignment_return,
+                icone: SymbolesAgri.assignment_return,
                 sousTitre: 'Retours de marchandise et notes de crédit.',
                 // ⚠️ UN AVOIR N'EST PAS UNE LIGNE DE PLUS : il rend le stock,
                 // annule une créance et passe son écriture comptable. Le
@@ -207,7 +208,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
         Row(
           children: [
             const Icon(
-              Icons.receipt_long,
+              SymbolesAgri.receipt_long,
               size: 26,
               color: AgriColors.brandEmerald,
             ),
@@ -349,8 +350,8 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
             style: TextStyle(fontSize: AgriTypography.xs),
           ),
         ),
-        _boutonInerte(Icons.table_view, 'Excel (.xlsx)'),
-        _boutonInerte(Icons.picture_as_pdf, 'PDF'),
+        _boutonInerte(SymbolesAgri.table_view, 'Excel (.xlsx)'),
+        _boutonInerte(SymbolesAgri.picture_as_pdf, 'PDF'),
       ],
     ),
   );
@@ -611,7 +612,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
           child: Opacity(
             opacity: 0.4,
             child: Icon(
-              Icons.picture_as_pdf,
+              SymbolesAgri.picture_as_pdf,
               size: 16,
               color: AgriColors.outline,
             ),

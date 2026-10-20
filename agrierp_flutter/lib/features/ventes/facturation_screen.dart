@@ -4,6 +4,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'facturation_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/facturation.html` → Facturation & MeCeF.
 ///
@@ -114,7 +115,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
   Widget _entete(bool large) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Icon(Icons.receipt_long, size: 26, color: AgriColors.brandEmerald),
+      const Icon(SymbolesAgri.receipt_long, size: 26, color: AgriColors.brandEmerald),
       const SizedBox(width: AgriSpacing.xs),
       Expanded(
         child: Text(
@@ -133,7 +134,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
         FilledButton.icon(
           key: const Key('nouvelle-facture'),
           onPressed: widget.onOuvrirCaisse,
-          icon: const Icon(Icons.add, size: 18),
+          icon: const Icon(SymbolesAgri.add, size: 18),
           style: FilledButton.styleFrom(
             backgroundColor: AgriColors.brandEmerald,
           ),
@@ -161,14 +162,14 @@ class _FacturationScreenState extends State<FacturationScreen> {
         valeur: '${d.duMois.length}',
         legende: '${_montant(d.montantDuMois)} FCFA',
         couleurLisere: AgriColors.brandEmerald,
-        icone: Icons.receipt_long,
+        icone: SymbolesAgri.receipt_long,
       ),
       CarteKpi(
         libelle: 'Statut "Transmise"',
         valeur: '${d.compte(StatutMecef.transmise)}',
         legende: 'Reçues par le dispositif',
         couleurLisere: AgriColors.infoBlue,
-        icone: Icons.verified,
+        icone: SymbolesAgri.verified,
         couleurIcone: AgriColors.infoBlue,
       ),
       CarteKpi(
@@ -176,7 +177,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
         valeur: '${d.compte(StatutMecef.enAttente)}',
         legende: 'Transmission en cours',
         couleurLisere: AgriColors.accentYellow,
-        icone: Icons.schedule,
+        icone: SymbolesAgri.schedule,
         couleurIcone: AgriColors.brandForest,
       ),
       // ⚠️⚠️ DEUX COMPTES DISTINCTS, ET C'EST TOUT LE SUJET. « Erreur » = la
@@ -190,7 +191,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
             ? '${d.enAttenteDEnvoi} facture(s) pas encore envoyée(s)'
             : 'Toutes les ventes sont parties',
         couleurLisere: AgriColors.errorRed,
-        icone: Icons.error_outline,
+        icone: SymbolesAgri.error_outline,
         couleurIcone: AgriColors.errorRed,
       ),
     ],
@@ -329,7 +330,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
                         child: IconButton(
                           key: Key('voir-facture-$i'),
                           onPressed: () => _ouvrirFacture(lignes[i]),
-                          icon: const Icon(Icons.visibility, size: 16),
+                          icon: const Icon(SymbolesAgri.visibility, size: 16),
                           color: AgriColors.infoBlue,
                           tooltip: 'Facture Normalisee MeCeF',
                         ),
@@ -505,7 +506,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

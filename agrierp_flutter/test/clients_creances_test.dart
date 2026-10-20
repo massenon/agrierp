@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_screen.dart';
@@ -25,7 +26,7 @@ void main() {
 
   String uuid(String graine) => graine.padRight(36, '0').substring(0, 36);
 
-  final aujourdhui = DateTime.now();
+  final aujourdhui = HeureBenin.maintenant();
   DateTime ilYA(int jours) =>
       DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day - jours);
 

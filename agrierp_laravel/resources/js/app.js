@@ -58,4 +58,25 @@ document.addEventListener('livewire:init', () => {
     Livewire.on('toast', (event) => {
         window.dispatchEvent(new CustomEvent('toast', { detail: event }));
     });
+
+    /**
+     * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) EN FRANÇAIS.
+     *
+     * Sur un jeton CSRF expiré, Livewire 3 ouvre une boîte de confirmation ANGLAISE codée en dur
+     * dans son JavaScript (« This page has expired. Would you like to refresh the page? »), qu'aucun
+     * fichier `lang/` ne peut traduire. On la remplace par la même question, en français ; tout
+     * autre échec garde le comportement de Livewire (fenêtre avec la page d'erreur, elle-même en
+     * français : `resources/views/errors/`).
+     */
+    Livewire.hook('request', ({ fail }) => {
+        fail(({ status, preventDefault }) => {
+            if (status !== 419) {
+                return;
+            }
+            preventDefault();
+            if (window.confirm('Cette page a expiré.\nVoulez-vous la recharger ?')) {
+                window.location.reload();
+            }
+        });
+    });
 });

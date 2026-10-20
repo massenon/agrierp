@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
+import '../stocks/pmp_service.dart';
 
 /// Un cycle de reproduction, tel que l'écran l'affiche.
 class CycleReproduction {
@@ -22,8 +24,93 @@ class CycleReproduction {
   bool palpationDue(DateTime jour, int delai) {
     final saillie = evenement.saillieDate;
     if (saillie == null || evenement.palpationDate != null) return false;
-    return !jour.isBefore(saillie.add(Duration(days: delai)));
+    return !jour.isBefore(HeureBenin.plusJours(saillie, delai));
   }
+
+  bool get _porcs => codeEspece == 'porciculture';
+
+  /// Contrôle du cycle : « Palpation » (J+14) chez la lapine, « Retour Chaleur » (J+21) chez
+  /// la truie — `$checkLabel` et `$offsets['check']` du Blade.
+  String get libelleControle => _porcs ? 'Retour Chaleur' : 'Palpation';
+
+  int get _decalageControle => _porcs
+      ? SuiviReproductionRepository.cyclePorcs.retourChaleur
+      : SuiviReproductionRepository.cycleLapins.palpation;
+
+  int get _decalageMiseBas => _porcs
+      ? SuiviReproductionRepository.cyclePorcs.miseBas
+      : SuiviReproductionRepository.cycleLapins.miseBas;
+
+  /// `$checkDue` du Blade : saillie + 14 (lapins) ou + 21 (porcs).
+  DateTime? get echeanceControle =>
+      (evenement.saillieDate == null ? null : HeureBenin.plusJours(evenement.saillieDate!, _decalageControle));
+
+  /// `now()->gte($checkDue)` : l'échéance est atteinte dès son jour (« Prévue » en rouge).
+  bool controleEchu(DateTime maintenant) {
+    final echeance = echeanceControle;
+    return echeance != null && !maintenant.isBefore(echeance);
+  }
+
+  /// Colonne « Mise Bas Attendue » du Blade : la date RÉELLE quand elle existe, sinon saillie
+  /// + 30 (lapins) ou + 114 (porcs). ⚠️ Le Blade ignore `mise_bas_date_expected` ; le poste aussi.
+  DateTime? get miseBasAffichee =>
+      evenement.miseBasDateActual ??
+      (evenement.saillieDate == null ? null : HeureBenin.plusJours(evenement.saillieDate!, _decalageMiseBas));
+
+  /// Colonne « Nés (Vivants) » : `X (Y morts)`, ou `—` tant que la mise bas n'est pas saisie.
+  /// ⚠️ Concaténation PHP : des morts inconnus s'écrivent vides, pas « 0 ».
+  String get libelleNes => evenement.nesVivants == null
+      ? '—'
+      : '${evenement.nesVivants} (${evenement.nesMorts ?? ''} morts)';
+
+  /// Pastille « Statut » : l'ordre du `@if` du Blade (échec, clos, mise bas, sinon gestante).
+  StatutCycle get statut => switch (evenement.status) {
+    'echec' => StatutCycle.reformeEchec,
+    'termine' => StatutCycle.clos,
+    _ =>
+      evenement.miseBasDateActual != null
+          ? StatutCycle.mereAllaitante
+          : StatutCycle.gestante,
+  };
+
+  /// Cellule « Action » du Blade : une seule action possible selon l'état du cycle.
+  ActionCycle get action {
+    final e = evenement;
+    if (e.palpationDate == null) return ActionCycle.controle;
+    if (e.status != 'echec' && e.miseBasDateActual == null) {
+      return ActionCycle.miseBas;
+    }
+    if (e.miseBasDateActual != null && e.status != 'termine') {
+      return ActionCycle.cloture;
+    }
+    return ActionCycle.aucune;
+  }
+}
+
+/// Les quatre pastilles de statut du Blade, avec leur libellé exact.
+enum StatutCycle {
+  reformeEchec('Réforme / Échec'),
+  clos('Cycle Clôturé'),
+  mereAllaitante('Mère Allaitante'),
+  gestante('Gestante');
+
+  const StatutCycle(this.libelle);
+
+  final String libelle;
+}
+
+/// Ce que la cellule « Action » du Blade propose : « Palpation + / − » (ou « Retour Chaleur »),
+/// « Saisir Mise Bas », « Clôturer (Sevrage) », ou rien.
+enum ActionCycle { controle, miseBas, cloture, aucune }
+
+/// Refus d'une action de cycle tant que le serveur n'en accepte pas la mise à jour.
+class ActionCycleIndisponible implements Exception {
+  const ActionCycleIndisponible(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 /// Résumé d'un couvoir — volailles ou escargots.
@@ -46,9 +133,16 @@ class ResumeCouvoir {
   final int nes;
   final int lots;
 
-  /// `null` quand rien n'a été mis à couver : 0 % se lirait comme un échec
-  /// total, alors que la campagne n'a simplement pas commencé.
-  double? get tauxEclosion => couves > 0 ? (nes / couves) * 100 : null;
+  /// Ticket H7 : le Blade fait foi — `round(($nes / $couves) * 100, 1)` (arrondi de PHP, [PmpService.arrondi]).
+  /// 🔴→✅ Ticket U14 — rien de couvé dans le mois : INCONNU (`null`), comme le web désormais (il affichait « 0,0 % »).
+  double? get tauxEclosion =>
+      couves > 0 ? PmpService.arrondi(nes / couves * 100, 1) : null;
+
+  /// `number_format($taux, 1, ',', ' ') . ' %'` du Blade, « — » quand le taux est inconnu.
+  String get libelleTaux {
+    final taux = tauxEclosion;
+    return taux == null ? '—' : '${PmpService.nombre(taux, 1)} %';
+  }
 }
 
 class DonneesSuiviReproduction {
@@ -83,29 +177,47 @@ class DonneesSuiviReproduction {
 /// depuis le ticket 14.72 — avant, l'écran n'avait littéralement aucune
 /// donnée.
 ///
-/// ⚠️⚠️ **LE POSTE DÉCLARE LA SAILLIE, ET ELLE SEULE** (ticket F0.35). C'est
-/// l'acte qui se fait au clapier, hors ligne, et qui se perdait jusqu'ici sur
-/// un bout de papier. Palpation, mise bas et sevrage restent web : ils
-/// CORRIGENT un cycle que le serveur a pu faire évoluer entre-temps, et
-/// « dernier écrivain gagne » — acceptable pour une fiche journalière qui se
-/// corrige dans la journée — ne l'est pas sur une gestation de trois mois.
+/// ⚠️⚠️ **LE POSTE DÉCLARE LA SAILLIE** (ticket F0.35). C'est l'acte qui se fait au clapier,
+/// hors ligne, et qui se perdait jusqu'ici sur un bout de papier.
+///
+/// ⚠️⚠️ **PALPATION, MISE BAS ET CLÔTURE SE SAISISSENT AU POSTE (ticket H7).** Le dépôt écrit la ligne comme
+/// `SuiviReproduction::recordPalpation` / `saveMiseBas` / `closeCycle` (même UUID, `pending`, `updated_at` = instant
+/// de saisie) ; le moteur envoie ces étapes (`_saillieEnJson`) et le serveur les applique depuis le ticket H7
+/// (`pushReproductionEvents` : avant, un id connu était acquitté sans rien appliquer — la saisie se serait perdue).
+/// [miseAJourCycleAccepteeParServeur] reste un verrou de sécurité, ouvert par défaut.
 class SuiviReproductionRepository {
   SuiviReproductionRepository({
     required this.database,
     this.deviceId = 'poste',
     Uuid? uuid,
+    this.miseAJourCycleAccepteeParServeur = true,
   }) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
   final String deviceId;
   final Uuid _uuid;
 
+  /// Verrou des actions de cycle — voir la documentation de la classe. Ouvert depuis que le serveur applique les
+  /// étapes du cycle (ticket H7) ; un test le ferme pour vérifier qu'alors rien n'est écrit.
+  final bool miseAJourCycleAccepteeParServeur;
+
+  /// Pourquoi les actions de cycle sont grisées au poste (info-bulle, toast, bandeau).
+  static const motifActionsCycleFermees =
+      'Palpation, mise bas et clôture se saisissent sur la surface web : le serveur '
+      "n'accepte de ce poste que la création d'une saillie. Une correction de cycle "
+      "envoyée d'ici serait acquittée sans être appliquée, puis effacée au tirage suivant.";
+
+  /// Messages des toasts de `SuiviReproduction.php`, mot pour mot.
+  static const messageSaillie = 'Saillie enregistrée avec succès.';
+  static const messagePalpation = 'Palpation enregistrée avec succès.';
+  static const messageMiseBas = 'Mise bas enregistrée avec succès.';
+  static const messageCloture = 'Cycle clôturé (sevrage effectué).';
+
   /// Les deux seules filières suivies par femelle nommée — même règle que le
   /// serveur, qui refuse les autres à l'envoi.
   static const especesSuivies = ['cuniculture', 'porciculture'];
 
-  /// Échéances du cycle, en jours depuis la saillie — Document 05, et
-  /// reprises telles quelles des bandeaux « Rappel du cycle » de la maquette.
+  /// Échéances du cycle, en jours depuis la saillie — Document 05, et `$offsets` du Blade.
   ///
   /// ⚠️ « Boîte à nid J+28 » (lapins) n'est PAS ici : c'est un jalon
   /// informatif, sans colonne dédiée ni action de suivi propre. Le composant
@@ -114,7 +226,7 @@ class SuiviReproductionRepository {
   static const cyclePorcs = (retourChaleur: 21, miseBas: 114, sevrage: 42);
 
   Future<DonneesSuiviReproduction> charger({DateTime? quand}) async {
-    final maintenant = quand ?? DateTime.now();
+    final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
 
     final bandes = await database.select(database.livestockLots).get();
@@ -165,7 +277,9 @@ class SuiviReproductionRepository {
         return d != null && d.year == jour.year && d.month == jour.month;
       }).length,
       echecs: evenements.where((e) {
-        final d = e.updatedAt;
+        // Ticket U12b (reste de S-T11) — `whereMonth('updated_at', now()->month)` du web : le mois d'un INSTANT, à
+        // l'heure du Bénin (serveur en `Africa/Porto-Novo`), jamais à celle de Windows.
+        final d = HeureBenin.depuisInstant(e.updatedAt);
         return e.status == 'echec' &&
             d.year == jour.year &&
             d.month == jour.month;
@@ -178,10 +292,15 @@ class SuiviReproductionRepository {
   }
 
   /// Bandes ouvertes à la déclaration d'une saillie.
+  ///
+  /// Ticket H7 : le Blade fait foi — `getLotsForTabProperty()` filtre `status = 'actif'` ET
+  /// `is_active`. Une bande vendue mais pas encore archivée n'est pas proposée.
   Future<List<LivestockLot>> bandesDeclarables(String codeEspece) async {
-    final bandes = await (database.select(
-      database.livestockLots,
-    )..where((t) => t.isActive.equals(true))).get();
+    final bandes =
+        await (database.select(database.livestockLots)..where(
+              (t) => t.isActive.equals(true) & t.status.equals('actif'),
+            ))
+            .get();
 
     return bandes.where((b) => b.speciesCode == codeEspece).toList();
   }
@@ -201,7 +320,7 @@ class SuiviReproductionRepository {
     required DateTime dateSaillie,
     DateTime? maintenant,
   }) async {
-    final jour = maintenant ?? DateTime.now();
+    final jour = maintenant ?? HeureBenin.maintenant();
 
     final bande = await (database.select(
       database.livestockLots,
@@ -258,7 +377,7 @@ class SuiviReproductionRepository {
             // ⚠️ `pending` : c'est ce statut qui met la saillie dans la file
             // d'envoi et la fait compter dans le badge « en attente ».
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: jour,
+            updatedAt: HeureBenin.versInstant(jour),
             lotId: lotId,
             motherRef: numeroFemelle,
             sireRef: Value(numeroMale),
@@ -269,6 +388,85 @@ class SuiviReproductionRepository {
 
     return id;
   }
+
+  /// `recordPalpation($id, $positive)` : palpation (ou retour chaleur) datée du jour, cycle
+  /// `en_cours` si positive, `echec` sinon.
+  Future<void> enregistrerPalpation(
+    String id, {
+    required bool positive,
+    DateTime? maintenant,
+  }) {
+    final quand = maintenant ?? HeureBenin.maintenant();
+    return _mettreAJourCycle(
+      id,
+      quand,
+      LivestockReproductionEventsCompanion(
+        palpationDate: Value(_jour(quand)),
+        status: Value(positive ? 'en_cours' : 'echec'),
+      ),
+    );
+  }
+
+  /// `saveMiseBas()` : mise bas datée du jour, nés vivants et nés morts (`integer|min:0`).
+  Future<void> enregistrerMiseBas(
+    String id, {
+    required int nesVivants,
+    required int nesMorts,
+    DateTime? maintenant,
+  }) {
+    if (nesVivants < 0 || nesMorts < 0) {
+      throw ArgumentError(
+        'Les nombres de nés vivants et de nés morts sont des entiers positifs ou nuls.',
+      );
+    }
+    final quand = maintenant ?? HeureBenin.maintenant();
+    return _mettreAJourCycle(
+      id,
+      quand,
+      LivestockReproductionEventsCompanion(
+        miseBasDateActual: Value(_jour(quand)),
+        nesVivants: Value(nesVivants),
+        nesMorts: Value(nesMorts),
+      ),
+    );
+  }
+
+  /// `closeCycle($id)` : le cycle passe à `termine` (sevrage effectué).
+  Future<void> cloturerCycle(String id, {DateTime? maintenant}) =>
+      _mettreAJourCycle(
+        id,
+        maintenant ?? HeureBenin.maintenant(),
+        const LivestockReproductionEventsCompanion(status: Value('termine')),
+      );
+
+  /// Écriture LOCALE d'une action de cycle : même UUID, `pending`, `updated_at` = instant de
+  /// SAISIE (jamais celui de l'envoi). Refusée tant que le serveur n'accepte pas la mise à jour.
+  Future<void> _mettreAJourCycle(
+    String id,
+    DateTime quand,
+    LivestockReproductionEventsCompanion champs,
+  ) async {
+    if (!miseAJourCycleAccepteeParServeur) {
+      throw const ActionCycleIndisponible(motifActionsCycleFermees);
+    }
+
+    final modifiees =
+        await (database.update(
+          database.livestockReproductionEvents,
+        )..where((t) => t.id.equals(id))).write(
+          champs.copyWith(
+            syncStatus: const Value(SyncStatus.pending),
+            updatedAt: Value(HeureBenin.versInstant(quand)),
+          ),
+        );
+
+    // `findOrFail` du composant : un cycle inconnu est une erreur, pas un succès silencieux.
+    if (modifiees == 0) {
+      throw ArgumentError('Cycle de reproduction introuvable.');
+    }
+  }
+
+  static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Résumé du couvoir du mois, reconstruit depuis les fiches journalières.
   ///

@@ -212,7 +212,8 @@ class JournalComptable extends Component
             $this->dispatch('close-modal', name: 'modal-create-journal-comptable');
             $this->dispatch('toast', message: $message, type: 'success');
         } catch (\Throwable $e) {
-            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+            // Ticket U5 : le motif d'une exception du framework (SQL…) n'est pas montré en anglais.
+            $this->dispatch('toast', message: \App\Support\MessagesErreurFr::pourUtilisateur($e), type: 'error');
         }
     }
 

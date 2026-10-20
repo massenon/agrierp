@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'attestations_repository.dart';
 import 'attestations_vue.dart';
 import 'personnel_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/personnel-stages.html` → Personnel & Stages.
 ///
@@ -48,11 +50,11 @@ class PersonnelStagesScreen extends StatefulWidget {
 class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
   /// Les cinq onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
-    ('Registre Employés', Icons.badge),
-    ('Registre Stagiaires', Icons.school),
-    ('Feuille de Pointage', Icons.fact_check),
-    ('Gestion de la Paie', Icons.payments),
-    ('Attestations', Icons.workspace_premium),
+    ('Registre Employés', SymbolesAgri.badge),
+    ('Registre Stagiaires', SymbolesAgri.school),
+    ('Feuille de Pointage', SymbolesAgri.fact_check),
+    ('Gestion de la Paie', SymbolesAgri.payments),
+    ('Attestations', SymbolesAgri.workspace_premium),
   ];
 
   String _onglet = onglets.first.$1;
@@ -181,7 +183,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           libelle: 'Employés actifs',
           valeur: '${d.employesActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.badge,
+          icone: SymbolesAgri.badge,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -189,7 +191,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           libelle: 'Nouveaux (année)',
           valeur: '${d.nouveauxEmployesDeLAnnee}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.person_add,
+          icone: SymbolesAgri.person_add,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -258,7 +260,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           libelle: 'Stagiaires Actifs',
           valeur: '${d.stagiairesActifs}',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.school,
+          icone: SymbolesAgri.school,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -266,7 +268,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           libelle: 'Frais Collectés',
           valeur: _montant(d.fraisCollectes),
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.payments,
+          icone: SymbolesAgri.payments,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -274,7 +276,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           libelle: 'Frais en Attente',
           valeur: _montant(d.fraisEnAttente),
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.pending,
+          icone: SymbolesAgri.pending,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -288,7 +290,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               : '${d.attestationsEmises}',
           legende: 'Décompte du serveur',
           couleurLisere: AgriColors.brandForest,
-          icone: Icons.workspace_premium,
+          icone: SymbolesAgri.workspace_premium,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -372,20 +374,20 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           valeur: '${d.presents}',
           legende: 'Retards inclus',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.how_to_reg,
+          icone: SymbolesAgri.how_to_reg,
         ),
         CarteKpi(
           libelle: 'Absents',
           valeur: '${d.absents}',
           couleurLisere: AgriColors.errorRed,
-          icone: Icons.person_off,
+          icone: SymbolesAgri.person_off,
           couleurIcone: AgriColors.errorRed,
         ),
         CarteKpi(
           libelle: 'Retards',
           valeur: '${d.retards}',
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.schedule,
+          icone: SymbolesAgri.schedule,
           couleurIcone: AgriColors.brandForest,
         ),
         CarteKpi(
@@ -395,7 +397,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               ? '${d.enAttenteDEnvoi} en attente d\'envoi'
               : 'Tout est parti',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.pending_actions,
+          icone: SymbolesAgri.pending_actions,
           couleurIcone: AgriColors.infoBlue,
         ),
       ]),
@@ -405,7 +407,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
         child: FilledButton.icon(
           key: const Key('ouvrir-pointage'),
           onPressed: d.employes.isEmpty ? null : () => _ouvrirPointage(d),
-          icon: const Icon(Icons.add, size: 18),
+          icon: const Icon(SymbolesAgri.add, size: 18),
           style: FilledButton.styleFrom(
             backgroundColor: AgriColors.brandEmerald,
           ),
@@ -611,7 +613,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               onPressed: () async {
                 await widget.depot.pointer(
                   employeId: employeId,
-                  jour: DateTime.now(),
+                  jour: HeureBenin.maintenant(),
                   statut: statut,
                   arrivee: arrivee.text.trim().isEmpty
                       ? null
@@ -659,7 +661,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           valeur: _montant(d.masseSalariale),
           legende: 'Calculée au serveur, charges comprises',
           couleurLisere: AgriColors.brandEmerald,
-          icone: Icons.account_balance_wallet,
+          icone: SymbolesAgri.account_balance_wallet,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -668,7 +670,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           valeur: d.bulletinsEmis == null ? '—' : '${d.bulletinsEmis}',
           legende: 'Bulletins non transmis au poste',
           couleurLisere: AgriColors.infoBlue,
-          icone: Icons.description,
+          icone: SymbolesAgri.description,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -678,7 +680,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
           // ⚠️ La part PATRONALE ne se déduit pas de la part salariale.
           legende: 'Taux et assiette côté serveur',
           couleurLisere: AgriColors.accentYellow,
-          icone: Icons.shield,
+          icone: SymbolesAgri.shield,
           couleurIcone: AgriColors.outline,
         ),
         CarteKpi(
@@ -689,7 +691,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               : '${d.bulletinsEnAttente}',
           legende: 'Statut porté par le bulletin',
           couleurLisere: AgriColors.errorRed,
-          icone: Icons.pending,
+          icone: SymbolesAgri.pending,
           couleurIcone: AgriColors.outline,
         ),
       ]),
@@ -912,7 +914,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
     opacity: 0.4,
     child: Align(
       alignment: Alignment.centerLeft,
-      child: Icon(Icons.visibility, size: 16, color: AgriColors.outline),
+      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -929,7 +931,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 18, color: AgriColors.brandForest),
+        const Icon(SymbolesAgri.info, size: 18, color: AgriColors.brandForest),
         const SizedBox(width: AgriSpacing.sm),
         Expanded(
           child: Text(

@@ -76,7 +76,7 @@ class ApiProduitsTest extends TestCase
     private function pousser(string $u, array ...$produits)
     {
         return $this->avec($u)->postJson('/api/sync/push', [
-            'device_id' => 'poste-test',
+            'device_id' => 'poste-'.$u, // S-T2 : le poste du jeton (voir `avec`)
             'products' => $produits,
         ])->assertOk();
     }
@@ -171,7 +171,7 @@ class ApiProduitsTest extends TestCase
         $p = $this->corps(['stock_qty' => 10]);
 
         $r = $this->avec('magasin')->postJson('/api/sync/push', [
-            'device_id' => 'poste-test',
+            'device_id' => 'poste-magasin', // S-T2 : le poste du jeton (voir `avec`)
             // ⚠️ L'ajustement est listé AVANT le produit : l'ordre du paquet ne compte
             // pas, le serveur traite les produits d'abord.
             'stock_adjustments' => [[
@@ -241,6 +241,37 @@ class ApiProduitsTest extends TestCase
         $p = Product::where('name', 'Œufs de table')->first();
         $this->assertSame('AVI-001', $p->sku);
         $this->assertEquals(30, $p->stock_qty);
+    }
+
+    /**
+     * 🔴→✅ Ticket S-T12 (trouvé par l'essai à plusieurs postes) — LE STOCK INITIAL ENTRE PAR LE GRAND LIVRE, au poste
+     * comme au web. Il était écrit dans `stock_qty` sans mouvement : 12 au stock, 0 au grand livre, et tout ce qui
+     * reconstruit le stock depuis `stock_movements` (rotation, Stock Final des fiches) se trompait de 12.
+     */
+    public function test_le_stock_initial_est_un_mouvement_du_grand_livre(): void
+    {
+        $p = $this->corps(['stock_qty' => 12]);
+        $this->pousser('magasin', $p);
+
+        $mouvement = \App\Models\StockMovement::where('product_id', $p['id'])->sole();
+        $this->assertSame(['entree', 12.0, 'manual_addition', 'Stock initial'],
+            [$mouvement->type, (float) $mouvement->quantity, $mouvement->reference_type, $mouvement->reason]);
+        $this->assertEquals(12, Product::find($p['id'])->stock_qty, 'le stock vaut le grand livre : 12, pas 24');
+
+        // Le renvoi (modification) n'ajoute rien ; un produit créé sans stock n'a aucun mouvement.
+        $this->pousser('magasin', $p);
+        $vide = $this->corps(['name' => 'Sans stock', 'stock_qty' => 0]);
+        $this->pousser('magasin', $vide);
+        $this->assertSame(1, \App\Models\StockMovement::count());
+
+        $this->actingAs(User::where('username', 'magasin')->first());
+        Livewire::test(AjouterProduit::class)
+            ->set('name', 'Œufs de table')->set('category_id', $this->categorie->id)->set('unit', 'plateau')
+            ->set('pricing_mode', 'fourchette')->set('price_min', 2000)->set('price_max', 2500)
+            ->set('stock_qty', 30)->call('save')->assertHasNoErrors();
+        $web = Product::where('name', 'Œufs de table')->sole();
+        $this->assertEquals(30, $web->stock_qty);
+        $this->assertSame(30.0, (float) \App\Models\StockMovement::where('product_id', $web->id)->sole()->quantity);
     }
 
     public function test_la_page_web_applique_la_meme_regle_de_fourchette(): void

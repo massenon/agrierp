@@ -65,11 +65,14 @@ class SyncValeursNullTest extends TestCase
             Permission::findOrCreate($nom, 'web');
         }
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes', 'manage-ventes']);
+        // Ticket S1 : ces tests envoient aussi des fiches complètes, qui exigent `manage-elevage`.
+        Permission::findOrCreate('manage-elevage', 'web');
+        Role::findOrCreate('animalier', 'web')->givePermissionTo('manage-elevage');
 
         User::create([
             'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
             'password' => bcrypt(self::MDP), 'is_active' => true,
-        ])->assignRole('caissier');
+        ])->assignRole('caissier', 'animalier');
 
         FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);
 
@@ -221,6 +224,9 @@ class SyncValeursNullTest extends TestCase
     /** Mesure exhaustive : AUCUNE colonne du modèle, mise à null, ne fait un 500 (future colonne NOT NULL = test rouge). */
     public function test_aucune_colonne_de_la_fiche_a_null_ne_provoque_un_500(): void
     {
+        // Ticket S1 : un envoi par colonne dépasse la limite de 30 appels par minute, sans rapport avec ce test.
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+
         $colonnes = array_diff((new LivestockDailyEntry)->getFillable(), ['lot_id', 'entry_date', 'effectif_final']);
         $this->assertNotEmpty($colonnes);
 

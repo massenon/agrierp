@@ -26,6 +26,28 @@
                     <x-kpi-card label="Coût sanitaire (mois)" icon="payments" color="red" :value="number_format($this->kpisRegistre['cout_sanitaire_mois'], 0, ',', ' ').' FCFA'" />
                 </x-kpi-accordion>
 
+                {{-- Ticket H11 — recherche et filtres du registre (ajouts du poste), filtrés par la requête. `x-datatable` ne
+                     convient pas ici : il ne porte que la recherche (pas de listes de filtre) et aligne toutes les colonnes à
+                     gauche, là où « Actions » est à droite. « Importer » / « Exporter PDF » sont inertes au poste : non construits. --}}
+                <div class="bg-white border border-outline-variant rounded-lg p-md flex flex-wrap items-center gap-sm">
+                    <div class="relative w-full sm:w-64">
+                        <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+                        <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher un diagnostic, un lot..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
+                    </div>
+                    <select wire:model.live="categorie" class="h-9 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                        <option value="">Toutes catégories</option>
+                        @foreach(\App\Livewire\Elevage\SoinsVaccinsHub::CATEGORIES_FILTRE as $categorie)
+                            <option value="{{ $categorie }}">{{ $categorie }}</option>
+                        @endforeach
+                    </select>
+                    <select wire:model.live="espece" class="h-9 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                        <option value="">Toutes espèces</option>
+                        @foreach(array_keys(\App\Livewire\Elevage\SoinsVaccinsHub::ESPECES_FILTRE) as $espece)
+                            <option value="{{ $espece }}">{{ $espece }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full rtable">
@@ -37,6 +59,8 @@
                                     <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Produit</th>
                                     <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Dose</th>
                                     <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                                    {{-- Ticket H11 — colonne « Statut » du poste, après les six du Blade. --}}
+                                    <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -50,10 +74,12 @@
                                         <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                             <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-soin-{{ $rec->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                         </td>
+                                        {{-- Un soin du registre est un soin ADMINISTRÉ (le planifié vit au calendrier) : « Effectué », comme au poste. --}}
+                                        <td data-label="Statut" class="px-md py-sm"><span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Effectué</span></td>
                                     </tr>
                                     <x-modal-confirm-delete :name="'archive-soin-'.$rec->id" :item-label="$rec->action_type.' — '.$rec->lot?->code" :action="'archiveSoin(\''.$rec->id.'\')'" />
                                 @empty
-                                    <tr><td colspan="6" class="px-md py-lg text-center text-outline">Aucun soin enregistré pour le moment.</td></tr>
+                                    <tr><td colspan="7" class="px-md py-lg text-center text-outline">{{ $this->registreFiltre ? '— Aucun soin au registre pour ces critères —' : 'Aucun soin enregistré pour le moment.' }}</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

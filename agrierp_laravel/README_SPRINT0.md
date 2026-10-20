@@ -21559,3 +21559,673 @@ Empreintes : `effectif_par_categorie.dart` `FBA5B1DF`, `sync_engine.dart` `15AE5
 **Ce qui n'a PAS été vérifié.** Vrai serveur de bout en bout (`sync_reel_test` non lancé, aucun `php artisan serve`) : le push 15.40 n'a été simulé que par un modèle écrit à la main (motifs, eux, vérifiés contre le PHP) ; la sérialisation réelle de `/sync/pull` des 18 clés (lue, et testée côté Laravel par 15.39) ; MySQL (chaînes numériques simulées) ; production et données réelles de la ferme (aucune bande n'a encore de départ : le rapport à blanc n'a pas été lancé) ; volume (cascade et resynchronisation complète sur une vraie ferme) ; fuseaux autres que celui du poste de développement ; rendu (aucun écran) ; `flutter build windows` ; Laravel Feature non relancé (non touché). Audit indépendant (`suivi-rigoureux`) : non lancé par moi, l'outil de lancement d'agent n'étant pas disponible dans cette session.
 
 **Décisions client ouvertes.** D5 (qui déverrouille un départ erroné), D6 (bandes déjà saisies sur le web), D15 (« Porc Marchand » / « Jeune porc »), confirmation de D2/D8/D9/D12 ; mise en service SIMULTANÉE poste/serveur et calendrier de F0.96/F0.97 vu le constat (1) ; validation de mes deux initiatives : resynchronisation f095 conditionnée au serveur à jour, et ventilation rendue inconnue quand le formulaire actuel change un total.
+
+---
+
+## Ticket 15.43 (Laravel) + F0.98 (Flutter) : « EFFECTIF TOTAL VIVANT » FAUX APRÈS SAISIE D'UNE FICHE JOURNALIÈRE — CASCADE UNIQUE PARTOUT (17/10/2026, monorepo `massenon/agrierp`)
+
+**Signalement de l'exploitant.** Après création d'une bande de reproduction puis saisie dans la fiche journalière, « Effectif Total Vivant » devient faux.
+
+### 1. Cause (reproduite par test, rouge avant correctif)
+- `FicheReproducteurs`, `FichePondeuses`, `FicheEscargots` (`saveDay`) : `current_quantity` = effectif final du jour ÉDITÉ. Une fiche antérieure à la dernière ramenait la bande à ce jour-là ; les fiches suivantes n'étaient jamais recalculées. Porcs et Lapins passaient déjà par la cascade (15.42).
+- `EnregistrerSujets::saveEntry` : une NOUVELLE fiche partait de `current_quantity` (l'effectif d'aujourd'hui) même pour une date passée, puis `increment()` sans cascade.
+- Poste : `FicheJournaliereRepository.enregistrer` écrivait aussi l'effectif du jour édité.
+
+### 2. Correctif
+Les quatre écrans web et le repository du poste appellent la cascade unique (`RecordSaleOnFicheElevageAction::recalculerEnCascade` / `FicheJournaliereRepository.recalculerEnCascade`) : jours suivants recalculés, bande = DERNIÈRE fiche. `EnregistrerSujets` part de `previousEffectif()` et écrit fiche + cascade dans une transaction.
+
+### 3. Tests (valeurs calculées à la main, épreuve de mutation faite)
+- `tests/Feature/EffectifTotalVivantCascadeTest.php` : 4 tests, **4 rouges sans le correctif** (KPI 255 au lieu de 265), 4 verts avec.
+- `test/fiche_journaliere_test.dart` : 1 test, rouge sans le correctif (46 au lieu de 39), vert avec.
+
+### 4. Corrections annexes
+- `sync_engine.dart` ne compilait pas avec Dart 3.13 (Flutter stable 3.47.7, autorisé par `pubspec.yaml`) : promotion de nullité d'une variable capturée par la transaction. Copie finale locale `annoncees`, aucune règle changée.
+- `database/data/plan-comptable-syscohada-revise.csv` : le premier commit du monorepo l'avait converti en LF ; rétabli en CRLF (empreinte du client `4103f4ef…`), protégé par `-text` dans `.gitattributes`.
+
+### Mesures
+- Laravel : suite Feature 1 574 tests ; 11 échecs constatés au premier passage, tous d'environnement (9 manifeste Vite absent, 1 lien `public/storage` absent, 1 CSV ci-dessus) ; les 11 repassés verts après `npm run build`, `storage:link` et la correction du CSV.
+- Flutter (SDK 3.47.7 / Dart 3.13.5) : `flutter analyze` sans problème ; `flutter test` 1 953 verts, 32 sautés, 3 échecs PRÉEXISTANTS dans `export_comptabilite_test.dart` (chemins absolus `C:/laragon/...` et `C:/Projects/.../prototype_html` introuvables hors du poste du développeur — A7 du plan).
+
+### Ce qui n'a PAS été vérifié
+- La fiche Escargots n'a pas de test dédié (même modification que Pondeuses/Reproducteurs).
+- La parité exécutée PHP ↔ Dart de la cascade a été sautée (test `cascade_categories_test.dart` : dépôt Laravel non trouvé par le chemin attendu).
+- Aucun test Dusk, aucun essai sur la base de production.
+- ⚠️ La seconde copie de ce journal (`C:\Projects\agrierp_laravel\README_SPRINT0.md`) n'est pas dans le monorepo : à resynchroniser à la main.
+
+### Décisions OUVERTES (voir `PLAN_FINALISATION.md`)
+A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucun transfert entre bandes n'existe), A3 (« Don » reçu soustrait par la formule), A4 (Transformation hors fiche, effacée par la cascade suivante), A5 (`saveDay()` sans `authorize()` sur les cinq fiches).
+
+---
+
+## Ticket 15.44 (Laravel) : CORRECTIONS CLIENT DU 17/10/2026 — GLOSSAIRE LAPINS, RATIONNEMENT AUTOMATIQUE, AUTONOMIE, POIDS ET TRAITEMENTS, TRANSFORMATION, ARCHIVAGE, TIROIR DES BANDES, PARAMÈTRES, SEEDERS
+
+### Décisions client du 17/10/2026
+- Lapins : trois catégories **Reproducteur / Jeune / Sous-mères**, partout (remplace D2 et la décision du 14/10/2026). L'ancien « Lapin de Chair » (60 g) = Jeune ; l'ancien « Jeune » / « Lapereau » (30 g) = Sous-mères. Emplacements de synchronisation inchangés (`*_sevre` = Sous-mères, `*_jeune` = Jeune).
+- « Don » = sortie, soustraite (A3 fermée). Transformation = vente (A4 fermée). Bandes déjà saisies : corrigées (D6 tranchée).
+- Administrateur : « M. Olouchègoun », `contact@fermeolouwachegoun.com` ; serveur `https://agrierp.fermeolouwachegoun.com`.
+
+### Défauts trouvés et corrigés
+1. **Rationnement jamais automatique** : sans départ par catégorie saisi à la main, la provende restait « — ». Départ désormais DÉDUIT du stade de la bande (`EffectifParCategorieService::departDepuisStade`, trait `AvecDepartAutomatique`), corrigeable avant le premier enregistrement (Lapins, Porcs).
+2. **« Poids Général (g) »** des tableaux mensuels Lapins / Escargots / Reproducteurs affichait la MOYENNE. Accesseur `poids_general_g`. « Poids Moyen Constaté » : troncature (Lapins) → arrondi ; ajouté à Escargots et Reproducteurs.
+3. **« Traitements & Prophylaxie »** des tableaux mensuels ne lisait jamais le registre vétérinaire (trait `AvecSoinsDuMois`). Prophylaxie du jour raccordée à Pondeuses et Reproducteurs (marqueurs « à planifier » retirés).
+4. **Autonomie alimentaire** : composant unique, rouge en rupture / sous 3 jours / sans produit de provende ; jamais bloquante. Calcul unique `AutonomieAlimentaireService`.
+5. **Transformation effacée** à la sauvegarde de fiche suivante : passe par `RecordSaleOnFicheElevageAction`.
+6. **Archivage** : `archiveLot()` posait `is_active = false` mais les KPI ne filtraient que `status = actif`. Scope `LivestockLot::vivantes()`. Aussi corrigés : absences archivées retenues sur la paie, utilisateurs archivés comptés par rôle, avances archivées dans les acomptes du mois, soins archivés dans le coût vétérinaire et le tableau de bord sanitaire, bandes archivées dans la mortalité et le taux de ponte du tableau de bord.
+7. **Tiroir de Gestion des Bandes** : Autonomie alimentaire et Suivi sanitaire réels (délai d'attente, infirmerie, mortalité 7 jours, derniers soins).
+8. **`DemoUsersSeeder`** retrouvait les comptes par e-mail : le changement d'e-mail de l'admin aurait créé un second « admin » (échec d'unicité). Retrouvés par identifiant.
+9. **Seeders** : les bandes lapins / porcs suivent la chaîne par catégorie (départ déduit, mouvements ventilés, sevrage avant vente). Recalcul indépendant (Python sur la base SQLite) : 8 bandes, 932 fiches, 0 anomalie ; « Effectif Total Vivant » 263 en base = 263 à l'écran (Gestion Élevage, Gestion des Bandes).
+
+### Mesures
+- Suite Feature : **1 588 verts** avant l'ajout du test « Don » ; `CorrectionsElevage17OctobreTest` (13) et glossaire (28) verts ensuite.
+- Tests réécrits parce qu'ils verrouillaient l'ancien comportement (départ manuel, provende « — » sans départ, glossaire du 14/10) : 14 Lapins, 10 Porcs, 11 glossaire, 2 rationnement, 1 prophylaxie — chaque réécriture documentée dans son test.
+
+### Ce qui n'a PAS été fait / vérifié
+- **Poste** : le glossaire du 17/10 n'est pas porté dans `categorie_ration_lapin.dart` (plus de 25 tests du poste à réécrire, périmètre de F0.96). À livrer AVANT de déployer la migration `2026_10_17_000001` (PLAN_FINALISATION A12). Sur le poste : nom de l'attestation et adresse du serveur par défaut alignés.
+- Fiches Pondeuses et Escargots à plusieurs bandes (A11) : non traitées.
+- Aucun test Dusk, aucun essai sur la base de production.
+
+## Ticket 15.45 (Laravel) + F0.99 (Flutter) : SÉCURITÉ DE L'API DE SYNCHRONISATION ET DES ÉCRITURES (S1 à S3 de l'audit du 17/10/2026)
+
+### Ce qui a été constaté (audit statique du 17/10/2026)
+- `POST /api/sync/push` acceptait fiches, reproduction, soins, dépenses, achats, pointages, ventes et ajustements de stock de **n'importe quel jeton**, sans contrôle de rôle.
+- Une vente envoyée était remplie avec **tous** ses champs (`mecef_status`, `mecef_qr_ref`, `accounting_entry_id`…) ; une ligne pouvait se rattacher à une autre vente (son `sale_id` passait après celui du serveur).
+- Fiches et soins : `fill()` recevait des colonnes jamais validées (effectifs négatifs, produit inexistant → 500 pour tout l'envoi, `is_active` d'un soin).
+- 27 méthodes Livewire écrivaient sans `authorize()`, dont les cinq `saveDay()`.
+- `GET /api/sync/pull` servait les salaires et le journal d'audit à tout compte ; un compte désactivé gardait l'accès de ses postes ; les jetons n'expiraient jamais ; tirage et envoi sans limite de débit.
+
+### Corrections
+- **S1** : permission par table à l'envoi (`PERMISSION_PAR_TABLE`, motif `MotifsRefusPush::roleInsuffisant`). Un compte de vente peut inscrire la **vente** dans une fiche (le poste la répercute sur la fiche du jour) mais rien d'autre : sinon refus `ficheEleveurRequise`, la fiche reste sur le poste sans perte. Ventes, lignes, fiches et soins ne reprennent que des champs validés (`payment_mode` borné à l'enum, `customer_id` existant, sexe et gravité bornés). `throttle:30,1` sur `/sync/pull` et `/sync/push`.
+- **S2** : `authorize()` en première ligne de 27 méthodes (fiches, soins, modes de paiement, pointage, employés, devis, annulation de vente, clients, règlement fournisseur, clôture, sauvegarde depuis Rôles & Permissions). Garde-fou `AutorisationsMethodesMutantesTest` qui lit le code source.
+- **S3** : middleware `CompteActif` (403 motivé, jeton révoqué) ; archiver un utilisateur révoque ses jetons ; salaire `null` sans `view-rh` ; journal d'audit vide sans `manage-users` ; `config/sanctum.php` : expiration 90 jours (`SANCTUM_EXPIRATION`). Poste : `EchecSynchronisation` nomme le 401, le 403 et le 429 au lieu d'afficher l'exception brute.
+
+### Mesures
+- Référence (copie propre de la branche, même environnement) : 1 579 verts, 10 échecs d'environnement (manifeste Vite absent).
+- Après : **1 601 verts**, les mêmes 10 échecs d'environnement. 22 tests nouveaux (`SyncPushDroitsEtChampsTest`, `SyncPullDroitsEtCompteActifTest`, `AutorisationsMethodesMutantesTest`) : 17 sur 20 de la première version échouaient sans les correctifs (épreuve de mutation), les autres sont des contrôles positifs.
+- 20 fichiers de tests existants mis à jour : leur utilisateur n'avait aucun rôle, ou un caissier envoyait des fiches complètes. Rôle ajouté, intention du test inchangée.
+- Poste : `flutter analyze` propre ; `flutter test` 1 958 verts, 32 sautés, 3 échecs déjà connus (`export_comptabilite_test`, chemins `C:/laragon`, A7).
+
+### Ce qui n'a PAS été fait / vérifié
+- Tirage : comptabilité, utilisateurs et autres modules restent servis à tout compte (filtrer le journal comptable touche la purge à deux tirages du poste : ticket à part).
+- Pas de limite de taille par envoi (un poste longtemps hors ligne envoie toute sa file en une fois).
+- **Au déploiement** : les jetons de plus de 90 jours deviennent invalides ; les postes concernés affichent « Session expirée : reconnectez-vous ».
+- Hors code (propriétaire du serveur) : changer `APP_KEY`, supprimer `agrierp.zip` du serveur, révoquer jetons et sessions, retirer `database/agrierp_db.sql` du dépôt et de l'historique.
+- Aucun test Dusk ; essai réel poste ↔ serveur non fait.
+
+## Ticket 15.46 (Laravel) + F0.100 (Flutter) : TRANSFERTS ENTRE BANDES ET CORRECTION DU DOUBLE COMPTAGE (A2, décision client du 17/10/2026 : écran dédié, bandes déjà saisies corrigées)
+
+### Constat
+- Aucun mouvement ne faisait passer des sujets d'une bande à une autre. Les nés d'une portée, saisis dans la fiche de la bande mère (`ne`), étaient recomptés dans la bande créée pour eux (`initial_quantity`) : « Effectif Total Vivant » comptait ces sujets DEUX fois (exemple vérifié en test : 18 animaux réels affichés 26).
+
+### Réalisé
+- **Source de vérité** : table `livestock_transfers` (UUID, archivage logique : un transfert s'annule, il ne se supprime jamais). Colonnes `transfert_entree` / `transfert_sortie` des fiches, et leur ventilation par catégorie, DÉRIVÉES de cette table comme `effectif_final` : jamais saisies, jamais reprises du poste. `livestock_lots.lot_source_id` = bande d'origine.
+- **Formule unique** : `computeEffectifFinal` et `calculerJour` comptent les entrées et sorties (veille + achats + nés + entrées − morts − ventes − dons − sorties). Tous les points de calcul passent par `effectifFinalDepuis()` / `mouvementsParCategorie()` : cascade, envoi du poste, Enregistrer Sujets, et l'aperçu des cinq fiches (trait `AvecTransfertsDuJour`). Ressaisir la fiche d'un jour de transfert ne l'efface plus.
+- **`TransferBetweenLotsAction`** : contrôles réels (même espèce, bandes non archivées, ni futur ni antérieur à la création, catégorie obligatoire pour lapins et porcs, effectif suffisant le jour même ET chaque jour suivant, total et catégorie). Report sur la fiche du jour, création de la fiche si besoin (départ déduit du stade pour une première fiche lapins/porcs), cascade.
+- **Correction des bandes existantes** : transfert « constitution » = sortie de la bande mère au jour de création de la bande cible, sans entrée dans la cible (son effectif initial les compte déjà). L'écran liste les « bandes à vérifier » (bande vivante sans origine, précédée d'une autre bande de la même espèce) avec un bouton « Rattacher à sa bande d'origine » : la filiation reste une décision de l'exploitant, rien n'est deviné. Gestion des Bandes : champ facultatif « Bande d'Origine » à la création, qui inscrit la constitution (refus = bande non créée).
+- **Écran web** `/transferts-bandes` (`elevage.transferts`, `can:view-elevage`, écritures `manage-elevage`), carte dans Gestion Élevage. Écran ABSENT du prototype : construit sur le web avec les composants partagés, puis porté.
+- **Synchronisation** : le tirage sert `livestock_transfers` ; l'envoi accepte `livestock_transfers` (`manage-elevage`), traité APRÈS les fiches, rejoué par l'Action (jamais fusionné), idempotent, annulation par `is_active: false`.
+- **Poste (Drift v39)** : table `LivestockTransfers`, colonnes dérivées, `lotSourceId`, palier de migration et entrée du test « toutes versions ». Formule et chaîne miroirs, cascade, caisse, cinq fiches. `TransfertsRepository` (mêmes contrôles, mêmes phrases, hors ligne), écran `TransfertsBandesScreen` (admin et animalier, ouvert depuis Gestion Élevage), absorbeur, envoi et acquittement.
+
+### Mesures
+- Laravel : `TransfertsEntreBandesTest` (12 tests). Mutations : retirer les transferts de l'aperçu Lapins fait échouer le test de ressaisie ; les retirer de `effectifFinalDepuis` fait échouer 6 tests sur 12.
+- Poste : `transferts_bandes_test.dart` (7), `transferts_sync_test.dart` (3), migration v39 couverte par `migration_toutes_versions_test.dart`. Un défaut réel trouvé en test : deux widgets de l'écran portaient la même clé.
+
+### Ce qui n'a PAS été fait / vérifié
+- La correction des données de PRODUCTION reste un geste de l'exploitant (écran « Bandes à vérifier ») : aucune filiation n'est déduite automatiquement.
+- Un transfert ne change pas le stade d'une bande ; le passage de stade reste celui de la fiche.
+- Aucun test Dusk.
+
+## Ticket 15.47 (Laravel) : FICHES PONDEUSES ET ESCARGOTS À PLUSIEURS BANDES (A11)
+
+### Constat
+- `saveDay()` écrivait toujours sur `lots->first()` (ordre des UUID, imprévisible) ; la veille était celle de TOUTES les bandes ; le tableau mensuel écrasait deux fiches du même jour ; et ré-enregistrer un jour remettait ses morts à zéro (leur répartition par catégorie n'est pas stockée, seul le total `mort` l'est).
+
+### Réalisé
+- Sélecteur de bande `bandeId` identique à Lapins et Porcs (15.41), bandes triées par code (comme le poste), veille par `previousEffectif()` de LA bande, tableau mensuel et vente du jour de LA bande, chargement du jour au montage et au changement de date ou de bande.
+- `mortEnregistre` : le total déjà enregistré est conservé tant qu'aucune répartition n'est ressaisie, avec un message à l'écran.
+- Poste : déjà conforme (sélecteur existant, tri par code).
+
+### Mesures
+- `FichesPondeusesEscargotsBandeTest` (4 tests), tous rouges sur l'ancien code.
+
+## Ticket 15.48 (Laravel) + F0.101 (Flutter) : « BILAN TECHNICO-ÉCONOMIQUE » DEVIENT « RENTABILITÉ »
+
+- Décision client du 17/10/2026 : onglet du Dashboard Élevage et titre de l'onglet (« Rentabilité de Lot »), fil d'Ariane et carte du hub, sur le web puis le poste à l'identique.
+- Écart ASSUMÉ au prototype, déclaré par page dans `fidelite_libelles_test.dart` (motif : décision client). Les clés internes (`bilan`, `dash-tab-bilan`) et les noms de fichiers ne changent pas.
+- Tests : `LibelleRentabiliteTest` (2, web) ; tests poste du dashboard, du bilan et des captures mis à jour.
+
+## Ticket 15.49 (Laravel) : ALERTES DE LA CLOCHE — VALEURS HORS COLONNE ET ALERTES JAMAIS ÉMISES
+
+### Constat
+- Trois écritures de notification utilisaient des valeurs ABSENTES des énumérations de la base : `severity = 'warning'` (rappel de prophylaxie), `severity = 'error'` (vente sous délai d'attente), `type = 'backup.reminder'` + `error`/`warning` (rappel de sauvegarde). MySQL strict les refuse ; SQLite (tests) les acceptait : un test verrouillait même `'error'`.
+- `sale_under_withdrawal` tombait dans la catégorie « Système ».
+- Jamais émises : stock sous seuil, mortalité anormale, soins planifiés à venir ou en retard (calendrier VMS), échecs de reproduction (indicateur « Alertes Réforme / Pertes »). Elles n'étaient qu'affichées sur leurs écrans.
+
+### Corrections
+- `Notification::TYPES` / `SEVERITES` : le modèle REFUSE toute valeur hors colonne (garde-fou visible en test). Écritures corrigées : `moyen`, `critique`, type `system`. Migration : type `reproduction_echec`.
+- `AlertesElevageService` + `DailyElevageAlertsJob` (06:05, Africa/Porto-Novo), une alerte par objet et par jour. Seuils EXISTANTS uniquement : `alert_threshold` ; pire jour ≥ 5 % sur 7 jours (règle du tableau de bord, désormais lue dans ce même service ; la divergence avec le cumul hebdomadaire « > 10 % » reste un ARBITRAGE CLIENT) ; cycle de reproduction en `echec`.
+- ⚠️ Fenêtre du rappel des soins planifiés : 3 jours, faute de toute durée dans la maquette ou la documentation (même valeur que le seuil d'autonomie) — **à confirmer par l'exploitant**.
+
+### Mesures
+- `AlertesClocheTest` (6) ; `VenteSousRemanenceRecueTest` corrigé (`critique`). Suite Feature : 1 635 verts (manifeste Vite construit, `storage:link` fait).
+
+### Non fait
+- Le poste n'émet aucune alerte hors ligne : elles descendent au tirage (règle serveur unique).
+- Aucune règle de réforme par âge n'existe nulle part : non inventée.
+
+---
+
+## Tickets F0.96 / F0.97 — Glossaire Lapins du 17/10/2026 au poste, saisie ventilée Lapins et Porcs (17/10/2026)
+
+### Constat
+- Le poste suivait encore le glossaire du 14/10 (Reproducteur / Jeune / Lapin de Chair) quand le serveur (15.44) sert Reproducteur (120 g) / Sous-mères (30 g) / Jeune (60 g) : ~25 tests du poste échouaient.
+- 🔴 La fiche Lapins enregistrait TOUS ses morts et dons sur « Reproducteur » : catégorie fabriquée, chaîne par catégorie faussée.
+- 🔴 La fiche Porcs rechargeait ses morts à 0 : ré-enregistrer le jour les effaçait.
+- Le rationnement du poste ne déduisait pas le départ du stade (`departDepuisStade`, 15.41) : « — » partout là où le web calcule.
+- Le bloc « Passage de stade » des porcs (ajouté en cours de ticket) affichait trois compteurs au lieu d'un — attrapé par `fiche_porcs_test`.
+
+### Corrections
+- `CategorieRationLapin` : clés `reproducteur` / `sous_meres` / `chair`, libellés, ordre et secours du serveur ; `cle()` transposée de `App\Support\CategorieRationLapin::cle` ; le stade se rattache par `STADE_VERS_CATEGORIE`.
+- `FicheJournaliereRepository.enregistrer(…, ventilation:)` : écrit `mort_*` / `don_*` / `passage_sevre_jeune`, totaux = somme ; départ déduit du stade écrit pour une bande sans chaîne ; D3 (passage > catégorie source) refusé AVANT écriture (`FicheRefusee`, motif du serveur).
+- Fiches Lapins et Porcs : chargement des colonnes ventilées ; une fiche ancienne non ventilée est SIGNALÉE et son enregistrement bloqué tant qu'elle n'est pas ventilée (aucune ventilation inventée) ; rationnement par `EffectifParCategorie.calculerJour`.
+- Fiche Sujet : motif du web (« Reproducteur / Jeune / Sous-mères »).
+
+### Mesures
+- Parité de `cle()` : 7 452 libellés (bords Unicode × libellés anciens et nouveaux) passés dans le Dart du poste ET dans la règle PHP du serveur (`php` + `vendor/autoload.php`) : 0 écart.
+- `ventilation_categories_test.dart` (6, dont une mutation vérifiée : retirer le blocage fait échouer le test), `categorie_ration_lapin_test.dart` et `fiche_lapins_glossaire_test.dart` réécrits au glossaire du 17/10.
+- Suite du poste : 1 976 verts, 32 ignorés, 3 rouges connus (`export_comptabilite_test`, chemins `C:/laragon`, A7). `flutter analyze` propre.
+
+### Non fait
+- Les fiches anciennes non ventilées ne sont PAS ventilées automatiquement : l'animalier les ventile à la ressaisie (aucune répartition ne peut être déduite sans fabriquer une donnée).
+
+---
+
+## Ticket 15.50 — Réinitialisation complète des données, propagée aux postes (17/10/2026)
+
+### Constat (mesuré en classant chaque table du schéma migré)
+- 🔴 La liste des tables vidées nommait `correspondences`, table inexistante : les courriers (`mails`) n'étaient JAMAIS vidés. La liste conservée nommait `module_configs` (la table est `modules_config`).
+- 🔴 Survivaient : `livestock_transfers` (15.46), `notifications` (alertes pointant vers des bandes, produits et soins effacés), et les immobilisations restaient « capitalisées » sans plus aucune écriture d'acquisition ni d'amortissement — achats de démonstration compris.
+- Quinze tables n'étaient classées nulle part (dont `growth_standards`, `attestation_templates`, `elevage_numbering_settings` et les tables techniques).
+- 🔴 Un poste hors ligne pendant la réinitialisation gardait toutes les données effacées et RENVOYAIT ses saisies en attente : la réinitialisation était défaite à la reconnexion suivante.
+
+### Corrections
+- `ReinitialisationDonneesService` : courriers, transferts et notifications vidés ; immobilisations ACHETÉES dans l'application (écriture `asset_acquisition`) supprimées, les autres (reprise d'antériorité de `FixedAssetsSeeder`, apport `asset_opening`) remises hors comptabilité et en service ; référentiels jamais classés ajoutés aux conservés ; nouvelle liste `tablesTechniques()` (jetons et sessions conservés : l'administrateur n'est pas déconnecté).
+- Migration `2026_10_18_000003` : `company_settings.data_reset_at`, posé par la réinitialisation, servi au tirage (`data_reset_at`).
+- Envoi : un poste qui ne renvoie pas la marque connue est refusé EN BLOC (409, `MotifsRefusPush::reinitialisationNonVue`). Sans réinitialisation, rien n'est exigé (anciens postes inchangés).
+- Poste : à la marque inconnue, AVANT toute absorption et tout envoi, `purgerDonneesDActivite()` (36 tables d'activité, stock et trésorerie à 0, curseur effacé), puis tirage complet ; la perte des saisies en attente est ANNONCÉE avec leur nombre. Écran web : listes Supprimé / Conservé mises à jour, perte côté poste annoncée.
+
+### Mesures
+- `ReinitialisationCompleteTest` (7) : immobilisations suivant leurs écritures, chaque table du schéma classée une seule fois, aucune table listée inexistante, vidage effectif, marque servie, 409 sans marque ou marque périmée, envoi accepté avec la marque, aucune exigence sans réinitialisation. Suite Feature : 1 642 verts.
+- Poste : `reinitialisation_poste_test.dart` (6), dont le classement de chaque table Drift. Suite : 1 982 verts, 32 ignorés, 3 rouges connus (A7).
+
+### Non fait — ARBITRAGE CLIENT
+- Un exercice CLÔTURÉ reste clôturé après réinitialisation (ses écritures, dont le report à nouveaux, sont effacées). La clôture est irréversible par conception : la rouvrir est une décision de l'exploitant, pas une conséquence automatique.
+
+---
+
+## Tickets 15.51 / F0.98 — Assistant de démarrage (web) et premier démarrage du poste (17/10/2026)
+
+### Constat
+- Sur une base vide, rien ne disait à l'administrateur ce qui manquait : la première vente échouait sur « aucun exercice ouvert », la première dépense sur l'absence de compte de trésorerie. Et AUCUN écran ne permettait d'ouvrir le premier exercice (seule la clôture crée le suivant — constat déjà fait au ticket 13.4, comblé alors par un seeder uniquement).
+- Poste neuf : rien n'indiquait qu'une synchronisation devait précéder toute saisie, et l'adresse du serveur ne se changeait que dans « Paramètres du poste », réservé à l'administrateur… donc inaccessible avant une connexion réussie.
+
+### Corrections
+- Web : `DemarrageService` CONSTATE six étapes dans la base (identité, plan comptable, exercice ouvert couvrant aujourd'hui — règle de `AccountingEntryService` —, trésorerie active, module d'élevage activé ; comptes de l'équipe en recommandé). `AssistantDemarrage` (modale du tableau de bord) : administrateur seulement, ouverte tant qu'une étape obligatoire manque, NON bloquante (« Plus tard » pour la session), chaque étape renvoie à son écran ; « Ouvrir l'exercice AAAA » (année civile, règle de `FiscalYearSeeder`, jamais sur un exercice clôturé) ; « Terminer » exige les étapes obligatoires et pose `company_settings.onboarding_completed_at` (migration `2026_10_18_000004`).
+- Poste : `PremierDemarrageScreen` après la connexion d'un poste NEUF (jamais tiré, rien en attente) : serveur et identifiant du poste, lancement et compte rendu de la première synchronisation, « Plus tard ». À la connexion, un poste neuf affiche son serveur et peut en changer (appliqué aussitôt au client partagé) ; un poste en service ne le peut pas (règle de « Paramètres du poste » inchangée).
+- Défaut attrapé au test : le contrôleur de saisie de l'adresse était libéré pendant l'animation de fermeture de la modale.
+
+### Mesures
+- `AssistantDemarrageTest` (9). Suite Feature : 1 651 verts.
+- `premier_demarrage_test.dart` (9). Suite du poste : 1 991 verts, 32 ignorés, 3 rouges connus (A7). `flutter analyze` propre.
+
+### Non fait
+- L'assistant ne crée ni compte de trésorerie, ni utilisateur, ni plan comptable : il renvoie aux écrans existants qui le font.
+
+---
+
+## Ticket A7 — Chemins des tests du poste, script de construction Windows (17/10/2026)
+
+### Constat
+- 12 fichiers de test et 7 outils lisaient `C:/laragon/www/agrierp` ou `C:/Projects/agrierp_laravel/prototype_html` en dur : dans le monorepo, `export_comptabilite_test` échouait (3) et 32 tests se sautaient, dont toutes les parités exécutées avec le serveur.
+- 🔴 Une fois les chemins résolus, `conformite_portage_test` a aussitôt attrapé une divergence réelle : la clé `data_reset_at` (15.50) servie au tirage n'était pas déclarée côté poste.
+- `build_windows.bat` sortait en SUCCÈS sans Inno Setup (aucun installateur produit), et ne faisait qu'avertir quand une DLL du runtime VC++ manquait — l'application livrée ne démarrait pas sur un poste neuf.
+
+### Corrections
+- `test/chemins_depot.dart` et `outils/chemins.py` : variable d'environnement (`AGRIERP_LARAVEL`, `AGRIERP_PROTOTYPE`), puis monorepo, puis ancien chemin Windows.
+- Le test qui lit la maquette se saute AVEC sa raison quand elle est absente (A8).
+- `build_windows.bat` : version `x.y.z` contrôlée, DLL VC++ manquante = échec, Inno Setup absent = échec sauf `--sans-installateur`, présence de `AgriERP-Setup-<version>.exe` vérifiée ; `agrierp.iss` estampille `VersionInfoVersion`.
+
+### Mesures
+- Suite du poste : 2 010 verts, 16 sautés (maquette absente), 0 rouge. `flutter analyze` propre.
+
+### Non fait
+- ⚠️ `build_windows.bat` n'a PAS été exécuté : il exige Windows, Visual Studio 2022 et Inno Setup. À valider sur le poste de compilation (plan, D2).
+
+---
+
+## Ticket 15.52 — Règle R-SOINS-01 : rappel des soins planifiés, rédigée et réglable (17/10/2026)
+
+### Décision client
+« Il faut rédiger la règle » (17/10/2026) : la fenêtre de 3 jours du ticket 15.49 était une valeur sans source.
+
+### Règle R-SOINS-01
+Tout soin du calendrier vétérinaire au statut « planifié », rattaché à une bande vivante, est signalé à l'animalier dans la cloche :
+1. « Soin à venir » (sévérité moyenne) dès qu'il reste N jours ou moins avant sa date planifiée ;
+2. « Soin en retard » (sévérité critique) dès que la date est dépassée sans réalisation ni replanification ;
+3. N = délai réglé par l'exploitant dans Paramètres Élevage > Prophylaxie (0 à 30 jours, 3 par défaut) ; N = 0 : le jour même seulement ;
+4. une alerte par soin et par jour ; plus aucune dès que le soin n'est plus « planifié » ou que sa bande n'est plus vivante.
+
+### Corrections
+- Migration `2026_10_18_000005` : `company_settings.rappel_soins_jours` (défaut 3). `AlertesElevageService::joursRappelSoins()` remplace la constante dans la requête ; la règle est écrite en tête du service.
+- Paramètres Élevage > Prophylaxie : champ « Rappel des soins planifiés (jours avant la date) », `manage-elevage`, validé 0–30, journalisé.
+
+### Mesures
+- `AlertesClocheTest` : +3 (délai 0 et 11 appliqués, défaut 3, réglage validé et refusé au caissier).
+
+---
+
+## Ticket 15.53 — Réouverture d'un exercice clôturé (17/10/2026)
+
+### Décision client
+« Si un exercice est clôturé, on peut le rouvrir » (17/10/2026). La clôture (10.6) était présentée comme irréversible.
+
+### Corrections
+- `ReopenFiscalYearAction` défait la clôture SANS RIEN EFFACER : le report à nouveau de N+1 est contre-passé (`ran_reversal`, même date, il reste au journal), les écritures de N sont déverrouillées (horodatées pour le tirage du poste), N repasse « ouvert ». Refus si N n'est pas clôturé ou si N+1 l'est (rouvrir N+1 d'abord).
+- Clôture d'Exercice : bouton « Rouvrir l'Exercice » sur un exercice clos, administrateur seulement (`manage-modules`, même droit que la déclôture d'un mois), modale de confirmation, journalisé `fiscal_year.reopened`. La modale de clôture ne dit plus « irréversible ».
+- Réinitialisation des données : les exercices clôturés sont rouverts (leurs écritures n'existent plus).
+- Dusk `FiscalYearClosureTest` : texte attendu de la modale mis à jour (non exécuté ici : Chrome et le serveur Dusk absents).
+
+### Mesures
+- `ReouvertureExerciceTest` (5), chiffres calculés à la main : report 1 000 000 → contre-passé → 0 ; correction de 250 000 puis nouvelle clôture → à-nouveau 1 250 000 ; refus si N+1 clos ; comptable refusé ; réinitialisation rouvre.
+
+---
+
+## Ticket 15.54 — Vider les sessions (17/10/2026)
+
+### Décision client
+« Vider les sessions » (17/10/2026), en réponse à l'expiration des jetons des postes à 90 jours (S1).
+
+### Corrections
+- `ViderSessionsService` : supprime les sessions web (pilote `database`) et révoque tous les jetons Sanctum des postes, en conservant la session de celui qui agit.
+- Gestion des Utilisateurs : bouton « Déconnecter Toutes les Sessions » (`manage-users`), modale de confirmation, nombre réel annoncé, journalisé `sessions.videes`.
+- Commande `php artisan agrierp:vider-sessions [--force]` (cPanel, maintenance).
+- Réinitialisation des données : vide aussi sessions et jetons ; chaque poste se reconnecte, et son premier tirage applique la réinitialisation (15.50).
+- Les saisies en attente d'un poste déconnecté restent sur la machine et partent après la reconnexion (aucune donnée du poste n'est touchée par ce geste).
+
+### Mesures
+- `ViderSessionsTest` (5) : session en cours conservée, comptable refusé, commande, jeton révoqué → 401 au tirage, réinitialisation.
+
+---
+
+## Tickets F0.99 / 15.55 — Glossaire des fiches hors lapins aligné sur le web ; morts conservés au rechargement (17/10/2026)
+
+### Constat (audit web ↔ poste des fiches Porcs, Pondeuses, Escargots, Reproducteurs)
+- 🔴 **Porcs (poste)** : aucune transposition de `CategorieRationPorc`. Le barème se rattachait au STADE par sous-chaîne et tout l'effectif final allait sur une seule ligne : une bande en `croissance` (Porcelet au serveur) nourrissait « Jeune porc », « Engraissement » n'était pas reconnu, aucune ration de secours, total toujours chiffré. Titre « PAR ESPÈCES », colonne « Espèce ».
+- 🔴 **Pondeuses, Escargots, Reproducteurs (poste)** : les morts repartaient à 0 au chargement ; ré-enregistrer le jour EFFAÇAIT ses morts (le défaut que le web a corrigé en 15.47). Catégories et ordre différents du web (Pondeuses : 4 stades au lieu de 3), bloc « Dons » alors que le web n'en a pas et enregistre `don = 0`.
+- 🔴 **Reproducteurs (web)** : `loadDay` ne rechargeait aucun mort (ceux d'un autre jour affiché restaient dans les compteurs) : ré-enregistrer le jour les perdait. Ticket 15.55.
+- **Lapins (poste, F0.96)** : l'aperçu par catégorie ignorait les transferts du jour, que le web compte.
+- Libellés de refus du serveur encore à l'ancien glossaire (« morts jeunes ou porcelets »).
+
+### Corrections
+- Poste : `categorie_ration_porc.dart` (clé, libellés, ordre, secours 2 000 / 300 / 600) ; normalisation PHP partagée avec les lapins (`CategorieRationLapin.normaliser`). Fiche Porcs : effectifs PAR CATÉGORIE (`calculerJour`, transferts compris), trois lignes fixes Porcelet / Porc Marchand / Reproducteur, « — » si inconnu, titre « PAR STADE PORCIN », colonne « Stade Physiologique », « 2 000 g/j (2.0 Kg) » sur la seule ligne Reproducteur, total en Kg à la manière de PHP ; morts « Reproducteur (Truie/Verrat) » / « Porc marchand / Engraiss. » ; colonne mensuelle « Traitements & Prophylaxie ».
+- Poste, Pondeuses / Escargots / Reproducteurs : catégories du web (« Pondeuse / Repro, Poulette, Poussin » ; « Reproducteur (Bordé), Engraissement, Naissain » ; « Repro, Poulet, Poussin »), total des morts conservé tant qu'aucune répartition n'est ressaisie (bandeau du web), plus de bloc Dons (`don = 0` comme le web), formules affichées du web, en-têtes mensuels du web (« Date / Jour », SRH / TS / OS ; « Traitements & Prophylaxie » ; Reproducteurs : « Morts (total) », sans « Lot / Souche » ni « Traitements »).
+- Web : `FicheReproducteurs` reçoit `mortEnregistre` (miroir de 15.47) et son bandeau ; libellés de refus et docblocks au glossaire du 17/10.
+
+### Mesures
+- Poste : `categorie_ration_porc_test.dart` (20, dont la parité EXÉCUTÉE sur la règle PHP du serveur), 7 tests de rationnement porcin (650 g du barème distingué du secours 600 g), `morts_enregistres_test.dart` (3, mutation vérifiée), tests des quatre fiches et tableaux mensuels réécrits sur les libellés du web. Suite : 2 039 verts, 16 sautés (maquette absente), 0 rouge.
+- Web : +2 tests `FicheReproducteursEclosionTest` (mutation vérifiée). Suite Feature : 1 666 verts.
+
+### Non fait
+- Écarts de STRUCTURE (sections présentes d'un seul côté) : consignés en A13 du plan, à trancher.
+
+---
+
+## Ticket 15.56 — Le don existe sur toutes les fiches, et il sort du stock (17/10/2026)
+
+### Décision client
+« Le bloc Don ne doit pas être retiré ; implémenter la logique sur toutes les fiches : un don est retiré du stock » (17/10/2026). Elle annule le retrait des Dons du poste fait en F0.99.
+
+### Constat
+- Web : Pondeuses, Escargots et Reproducteurs n'avaient AUCUN bloc Dons et enregistraient `don = 0` en dur — un don saisi au poste était même effacé au prochain enregistrement web du jour.
+- Web Pondeuses : `SyncLotProductionStockAction` (naissances − morts − dons au stock du produit de la bande, 14.37) n'était pas appelé.
+- 🔴 Serveur : une fiche reçue du poste ne passait PAS par `SyncLotProductionStockAction` : naissances, morts et dons saisis hors ligne ne touchaient jamais le stock.
+
+### Corrections
+- Web, trois fiches : « Dons par catégorie » (mêmes catégories que les morts), `donEnregistre` conservé au rechargement (même règle que `mortEnregistre`), don compté dans l'effectif final et enregistré ; formules affichées « − (Morts + Ventes + Dons) » / « − (Morts + Dons) ». Pondeuses : `SyncLotProductionStockAction` par écart, comme les quatre autres fiches.
+- Serveur, `pushDailyEntries` : `SyncLotProductionStockAction` avec l'état d'avant écriture ; un renvoi identique ne bouge rien, une correction ne sort que l'écart.
+- Poste, trois fiches : bloc Dons rétabli sur les catégories du web, dons déjà enregistrés conservés (bandeau), don compté dans l'effectif et envoyé. Le stock du produit de la bande est recalculé par le serveur à la réception (le poste ne le recalcule pas localement : point de passage unique, doctrine § 5.4).
+
+### Mesures
+- `DonsToutesFichesTest` (7) : trois fiches × (effectif 60 − 3 = 57, stock 10 − 3 = 7) ; rechargement sans double retrait ; push 10 − 1 − 2 = 7, renvoi identique 7, correction 4 dons → 5. Suite Feature : 1 673 verts.
+- Poste : dons rétablis dans les tests des trois fiches, « un don saisi réduit aussitôt l'effectif final » (3), `morts_enregistres_test` étendu aux dons. Suite : 2 042 verts, 16 sautés, 0 rouge.
+
+---
+
+## Ticket 15.57 — Les sections de chaque fiche existent des deux côtés (17/10/2026)
+
+### Décision client
+« Les sections doivent exister des deux côtés, et vice versa » (17/10/2026) — écarts listés en A13 du plan.
+
+### Corrections
+- Règle commune `RationVolaille` (web `App\Support`, poste `ration_volaille.dart`) : lignes du barème avicole triées par libellé, effectif final sur la PREMIÈRE ligne contenant « pondeuse » ou « reproducteur », 0 ailleurs ; aucune ligne → « — » et la raison (la fiche Reproducteurs du poste affichait 0 g : le barème du semis n'a pas de ligne « reproducteur »).
+- Web : composant `x-ration-volaille` sur Pondeuses et Reproducteurs ; Pesée Pondeuses (poids général, taille d'échantillon, poids moyen, `weight_sample_avg_g`).
+- Poste Porcs : « Effectif de départ par catégorie » (pré-rempli depuis le stade, corrigeable sans chaîne, contrôlé par `verifierDepart` avec le message du serveur, refusé avant écriture, verrouillé ensuite avec sa date, mention « avant départ ») et saisie Verrats / Truies Gestantes / Porcelets / Engraissement (`effectif_m/f/sevres/smeres`).
+- Poste Escargots : saisie Naissains / Engraissement / Bordés.
+- Poste, tableaux mensuels : colonnes par catégorie remplies depuis les colonnes synchronisées (elles l'étaient déjà dans les deux sens ; seul l'affichage manquait) ; sous-colonnes des groupes en casse mixte comme le web.
+- Dépôt du poste : `EffectifsSaisis`, `VentilationJour.departSaisi`, `etatCategories()`.
+
+### Mesures
+- Web : `RationVolailleTest` (4). Suite Feature : 1 677 verts.
+- Poste : `ration_volaille_test.dart` (5, dont la parité EXÉCUTÉE sur 60 barèmes au hasard), `sections_deux_cotes_test.dart` (5, mutation vérifiée sur le refus du départ), tests mensuels à la casse du web. Suite : 2 052 verts, 16 sautés, 0 rouge.
+
+---
+
+## Audit de fidélité des écrans clés et Sprint H (19/10/2026)
+
+Audit écran par écran, web (Blade, maître) contre poste : châssis, Tableau de bord, Gestion Élevage, Dashboard Élevage, Suivi Reproduction, Soins et vaccins, Paramètres Élevage, synchronisation. Les directives d'ergonomie du client servent de liste de contrôle ; toutes les valeurs viennent du Blade (plusieurs valeurs des directives — `#0E2A1D`, 260 px, en-têtes `#0F172A`, initiales « MO » — sont contredites par le Blade et ne sont pas appliquées). Résultat : `AUDIT_FIDELITE_ECRANS.md` ; PRD `docs/prd/synchronisation-barre-superieure.md` ; tickets H1 à H10 et décisions D-SYNC-1 à 6, D-H8, D-H9 dans `PLAN_FINALISATION.md`.
+
+Constat transversal : la plupart des écrans du poste ont été portés depuis la MAQUETTE, pas depuis le Blade ; leurs garde-fous comparent à la maquette. Là où le Blade a réécrit la maquette, le poste diverge du maître sans qu'aucun test ne le signale (H10).
+
+---
+
+## Ticket H3 — Bouton « Synchroniser » et état des postes au web (19/10/2026)
+
+### Décision client
+« Créer un bouton de synchronisation dans le haut, avec une modale, dans le poste et la vue Blade » (19/10/2026). Elle revient sur l'exclusion du Sprint 0 §0.2 (« un bouton Synchroniser serait un décor ») en donnant au web un objet RÉEL : le serveur ne synchronise rien, il montre l'état des postes.
+
+### Corrections
+- Table serveur `journal_synchronisation` (UUID, jamais tirée ni poussée) : une ligne par tirage et par envoi, poste = nom du jeton Sanctum, compteurs reçus / acceptés / refusés. Écrite après le calcul de la réponse ; un échec du journal ne fait jamais échouer la synchronisation. Vidée à la réinitialisation (15.50).
+- Barre supérieure web, administrateur (`manage-users`, comme « Vider les sessions ») : bouton `sync` → modale « Synchronisation / Postes de la ferme » : un poste par jeton non expiré, dernier contact, dernier envoi, acceptés / refusés, pastille « À jour » / « Inactif depuis N jours » (> 3 j, D-SYNC-6) / « Refus à corriger » (prioritaire).
+
+### Mesures
+- `EtatSynchronisationPostesTest` (4) : droits des 4 rôles ; jeu P1 / P2 / P3 du PRD ; journal d'un tirage et d'un envoi 1 accepté / 1 refusé ; journal en panne sans effet. Mutation : retirer la journalisation de l'envoi rougit le test. Suite Feature : 1 681 verts.
+- Non vérifié : rendu navigateur (Dusk non lancé ici), `php artisan migrate` sur MySQL (migration `2026_10_19_000001`).
+
+---
+
+## Ticket H2 (+ H1, première partie) — Synchronisation dans la barre supérieure du poste, Accès Rapide, barre latérale du web (19/10/2026)
+
+### Constat
+- 🔴 Le seul bouton « Synchroniser » était en pied de barre latérale, et la barre ne défilait pas : il devenait inatteignable sur un petit écran. La barre supérieure n'avait qu'une pastille non cliquable.
+- 🔴 `pendingCount()` oubliait 8 tables pourtant envoyées (produits, fournisseurs, clients, règlements, avances, imputations, retours, remboursements) : un client créé hors ligne affichait « 0 en attente » et la fermeture ne prévenait pas.
+- 🔴 Le panneau « Accès Rapide » du web (bouton flottant, 13 entrées) n'existait pas au poste.
+
+### Corrections (poste)
+- `AppDatabase.tablesEnvoyees` (20 tables) : `pendingCount()` et `compteursSynchronisation()` (à envoyer / refusés) en sont dérivés. Drift v40 : `sync_state.last_succeeded_at`, posé à l'heure du SERVEUR (tirage) à chaque synchronisation aboutie, refus compris.
+- Barre supérieure : bouton `sync` à la place de la pastille, badge sur le modèle de la cloche web (« 9+ », rouge s'il y a un refus, émeraude sinon). Modale « Synchronisation » : liaison, « En attente d'envoi », « Refusés par le serveur », « Dernière synchronisation réussie », dernières réception et envoi, résultat de la dernière tentative avec TOUS les motifs, « Synchroniser maintenant » / « Voir le détail » / « Fermer ». Le bouton du pied de barre (`sync_button.dart`) est retiré.
+- Composant unique `ToastAgri` (haut droite, 3,5 s, succès / erreur / avertissement, valeurs de `toast-container.blade.php`), employé par la modale ; les autres écrans gardent leurs SnackBar jusqu'à la suite de H1.
+- Barre latérale aux valeurs du web : 288 px, dégradé, « Agri » blanc + « ERP » jaune, sous-titre, séparateurs, navigation qui DÉFILE, lien icône 20 / libellé 13, entrée active jaune, rôle technique en capitales. Seules les entrées autorisées sont affichées et un groupe vide est masqué, comme les `@hasanyrole` du web (l'ancien message « vit sur l'application web » était faux pour un refus de droit).
+- Bouton flottant et tiroir « Accès Rapide » (13 entrées, 3 groupes, libellés et couleurs du Blade). Le bouton « Visite guidée » du web est inerte : non porté.
+- Cloche : plafond « 9+ » comme le web.
+- Tableau de bord : grilles de KPI à hauteur fixe (la barre à 288 px faisait déborder les cartes en 1280 px).
+
+### Mesures
+- `synchronisation_barre_test.dart` (4) : jeu du PRD (2 fiches, 1 client, 1 article en attente, 1 vente refusée) → 4 / 1, badge « 5 » rouge, modale « — » pour la dernière réussite, hors ligne en avertissement ; la barre latérale défile en 1280 × 600.
+- `compteur_attente_test.dart` : `tablesEnvoyees` == tables lues par `_pousser` (lecture du source). Mutation : retirer `customers` rougit 4 tests.
+- `acces_rapide_test.dart` (3) : entrées, icônes, groupes et couleurs LUS DANS LE BLADE ; navigation et fermeture. Mutation : « Rapports & Exports » rougit le test.
+- `test/coque_poste.dart` : coque complète partagée (tests du châssis, captures).
+- Suite : 2 062 verts, 16 sautés, 0 rouge ; `flutter analyze` propre.
+- Reste de H1 (non fait) : menu du compte (Paramètres, Déconnexion), titre de la barre supérieure, recherche globale, ruban replié, migration des SnackBar vers `ToastAgri`, icônes Material Symbols « Outlined ».
+
+---
+
+## Décisions du client du 19/10/2026 (Sprint H)
+
+- D-SYNC-1 non (pas de route unique ni d'outbox), D-SYNC-2 oui (lots de 50, après B2), D-SYNC-3 oui (synchronisation automatique, réessais réseau), D-SYNC-4 accepter et signaler, D-SYNC-5 non (pas d'appairage), D-SYNC-6 3 jours.
+- D-H8 oui : infirmerie et calendrier planifié saisis au poste.
+- D-H9 **oui, au poste et au web** : Paramètres Élevage modifiables (le client a écarté la recommandation « lecture seule »).
+- D-H-maquette : les ajouts du poste absents du Blade sont **gardés au poste** et **construits au web** (H11).
+
+---
+
+## Tickets H1 (fin), H1b, H4, H5, H6, H7, H14 et parties serveur de H7, H8b, H9b (19/10/2026)
+
+### Poste
+- **H1 (fin)** : menu du compte complet (Paramètres, séparateur, Déconnexion qui ferme la session sans toucher aux saisies en attente) ; titre de la barre supérieure repris du `$title` de chaque composant web ; barre de 64 px ; ruban de la barre repliée (six raccourcis et « Réafficher le menu »).
+- **H1b** : recherche globale du web transposée sur la base locale (5 domaines, droits filtrés en amont, comparaison sans accents ni ligatures, Ctrl+K, clavier).
+- **H4 Gestion Élevage** : dépôt et 4 KPI du web (`vivantes()`, mortalité du mois sur `previousEffectif()`), intertitres, cartes du Blade, 3 accès rapides manquants, Escargots grisé.
+- **H5 Tableau de bord** : Dettes, Dépenses sur les achats, Résultat Net, « Mois précédent », Gestantes, mortalité, alertes du web (dont « Créance en retard »), onglets Achat et Factures, activités du jour depuis `audit_logs`, mentions périmées retirées ; parité exécutée avec le PHP. L'en-tête lit l'exercice OUVERT (il affichait l'année du calendrier).
+- **H6 Dashboard Élevage** : GMQ cumulé et mortalité en parité exécutée avec le PHP, périmètre `status = 'actif'`, espèces activées, résumé GMQ par bande, rappels VMS du web, tableaux GMQ et Prévision du Blade ; ajouts du poste gardés.
+- **H7 Suivi Reproduction** : colonnes, cellules, statuts, rappel du cycle et KPI du Blade, modale de mise bas, lien « Saisir le Couvoir du Jour → », mâle facultatif. Les actions de cycle restent **grisées** au poste jusqu'à l'ouverture du moteur (ticket suivant).
+
+### Web et serveur
+- **H14 (D-SYNC-4)** : une vente reçue d'un poste qui rend un stock négatif est acceptée et signalée à l'administrateur.
+- **H7 serveur** : les étapes du cycle envoyées par le poste (palpation, mise bas, clôture) sont appliquées ; elles étaient acquittées sans effet.
+- **H8b serveur** : infirmerie et calendrier vétérinaire tirés et envoyés (`manage-elevage`).
+- **H9b serveur** : rations, prophylaxie, provendes, numérotation et délai de rappel envoyables par le poste (`manage-elevage`, validations et archivage du web).
+- **H11 (Tableau de bord)** : Caisse / Banque sous la Trésorerie, trois produits sous la carte Stock Critique, exercice ouvert dans l'en-tête.
+
+### Défauts du web trouvés en alignant le poste, corrigés au web PUIS au poste
+- 🔴 Le chiffre d'affaires comptait les ventes **annulées** (`Sale::nonAnnulees()`).
+- 🔴 Le retard d'une créance s'affichait **négatif** (« (-10 jours) » : écart signé de Carbon 3).
+- 🔴 « Mortalité Cumulée (7j) » ne couvrait que **6 jours** (borne `now()->subDays(6)` avec l'heure : la fiche de J-6 sortait).
+
+### Non fait / réserves
+- Marge du Top 5 « — » au poste et Top 5 / ventes porcines limités aux lignes saisies sur le poste : `sale_lines` et `purchase_lines` ne descendent pas.
+- Colonne « Morts S/Mère » (ajout du poste, Suivi Reproduction) : elle affiche `nes_morts` ; à confirmer avec le client.
+- Icônes : Material Icons pleines au poste, Material Symbols Outlined au web (reste de H1).
+
+## Tickets H7 (fin), H8 et H8b (poste), H11 (web) (19/10/2026)
+
+### Poste
+- **H7 (fin)** : le moteur envoie les étapes du cycle avec la saillie (`palpation_date`, `mise_bas_date_actual`, `nes_vivants`, `nes_morts`, `status`) ; les actions Palpation / Mise bas / Clôture sont ouvertes et le bandeau de restriction disparaît.
+- **H8 Soins et vaccins** : registre aux six colonnes du Blade (+ « Statut »), « CODE (Espèce) », montants « 12 500 FCFA », message vide exact, modale Nouveau Soin (largeur sm, exemples, aide de la rémanence), messages du composant en `ToastAgri`.
+- **H8b (D-H8)** : Drift v41, tables `infirmary_records` et `veterinary_calendar_events` (UUID, colonnes de synchronisation), absorbeurs stricts qui n'écrasent jamais une saisie en attente, envoi et relance ; onglet Suivi Sanitaire complet (4 KPI, Réintégrer / Décès), calendrier J → J+13 et « Planifier une Intervention ».
+
+### Web (H11, décision D-H-maquette)
+- Ajouts du poste construits au web, formules reprises des écrans Flutter : courbe « Croissance (GMQ) par Espèce », cartes de filière, rappels VMS calculés, filtre d'espèce et cartes GMQ, prévision à horizons (Dashboard Élevage) ; jalon « Boîte à nid J+28 », colonnes Sevrés / Morts S/Mère / Poids Moyen / Cages, « Bandes suivies », bandeaux de cycle Volailles / Escargots (Suivi Reproduction) ; recherche, filtres et colonne « Statut » du registre des soins.
+- Les ajouts vivent dans `livewire/elevage/ajouts-poste/` ; fonte d'icônes régénérée (`flag`, `show_chart`) ; `sw.js` en `agrierp-v3`.
+- Les garde-fous du poste qui lisent le Blade du registre suivent le Blade enrichi : 7 colonnes (dernière « Statut »), deux messages vides (avec ou sans critères), modale lue à partir de son `<x-modal>`.
+
+### Mesures
+- Laravel : suite Feature 1 711 verts.
+- Poste : `flutter analyze` propre ; `soins_infirmerie_calendrier_test.dart` 25 verts ; suite complète relancée après la fusion H11.
+
+### Non fait / réserves
+- « Importer » / « Exporter PDF » du registre des soins : non construits au web (inertes au poste).
+- Archiver un soin reste impossible au poste (`is_active` absent du poste et non accepté à l'envoi).
+- La modale Infirmerie du poste refuse les dates futures ; le web les accepte.
+- « En retard » du calendrier dès minuit, comme le web.
+- Les objectifs GMQ sont des constantes du poste, pas `growth_standards`.
+
+## Tickets H13 et H1 (icônes) — synchronisation automatique, icônes du web au poste (19/10/2026)
+
+### H13 (D-SYNC-3, B2)
+- `SynchronisationAutomatique` : retour du réseau, intervalle (15 min par défaut, réglable 5 / 15 / 30 / 60 dans Paramètres du poste), fermeture (bouton ✕ et demande de sortie du système, bornée à 15 s, modale « Synchronisation avant fermeture »).
+- Réessais après un échec RÉSEAU seulement : 30 s, 2 min, 5 min, 15 min, puis 1 h. Un refus du serveur n'est jamais réessayé ; hors ligne n'est pas un échec.
+- `SyncEngine.synchroniser` rend la tentative en cours à un second appelant : jamais deux synchronisations entremêlées.
+- **H13b (envoi par lots de 50) reporté à un ticket propre** : le serveur couple des tables dans un même envoi (vente ↔ fiche du jour, 15.30 ; transferts après fiches, 15.46). Un découpage aveugle compterait une vente deux fois.
+
+### H1 (fin) — icônes
+- Le poste affichait les Material Icons PLEINES de Flutter ; le web, Material Symbols OUTLINED. `outils/icones_poste.py` tire de la fonte complète du web un sous-ensemble TTF (173 icônes, 29 Ko, axes figés comme `app.css` : FILL 0, wght 400) et génère `SymbolesAgri` ; `--remplacer` convertit `Icons.x` dans `lib/` et `test/`.
+- Garde-fou `symboles_agri_test.dart` : aucune `Icons.` dans `lib/`, fonte déclarée, et chaque point de code de `SymbolesAgri` présent dans la `cmap` de la fonte embarquée (lue par le test) — un glyphe absent rend un carré vide sans erreur.
+- Piège : la source est un WOFF2 ; sans `flavor = None`, fontTools réécrit du WOFF2 sous l'extension `.ttf`.
+
+### Mesures
+- Poste : `flutter analyze` propre ; suite complète 2 201 verts, 16 sautés ; 3 échecs pendant la suite, dus à un second `flutter test` lancé en parallèle (« Asset 'shaders/ink_sparkle.frag' not found ») ou au remplacement encore partiel, relancés seuls : 45 verts.
+
+## Tickets H9 et H9b (poste), H10 (19/10/2026)
+
+### H9 / H9b — Paramètres Élevage modifiables au poste comme au web (décision D-H9)
+- Drift v42 : `is_active`, `sync_status`, `updated_at` sur rations, prophylaxie et provendes ; `sync_status` et `updated_at` sur la numérotation et l'entreprise (+ `rappel_soins_jours`) ; `created_at` sur la prophylaxie (tri du web).
+- Moteur : absorbeurs stricts qui n'écrasent jamais une ligne `pending` / `conflict` ; une ligne `synced` que le serveur ne sert plus est archivée au poste (une ration archivée au web restait active au poste) ; envoi au format exact de `RecordParametresElevageFromDeviceAction`, acquittement de la seule version partie, refus en `conflict` avec motif, relance.
+- Écran aligné sur le Blade (onglets, colonnes, formats, modales, suppression = archivage, « Rappel des soins planifiés », numérotation enregistrable, toasts). Droit `manage-elevage` via `PermissionsPoste.peut`, vérifié contre `RolesAndPermissionsSeeder`. Rations, protocole de soins et prix moyen de provende ne lisent plus que les lignes actives.
+- Garde-fou `parametres_elevage_blade_test.dart` ; la page `parametres-elevage.html` quitte les comparaisons à la maquette (le Blade fait foi).
+
+### Web
+- 🔴 `AuditLog` n'avait pas de libellé pour `feed_ration_standard.archived`, `feed_type.archived`, `prophylaxis_schedule.archived`, `rappel_soins.updated` (le web archive depuis 14.55) : le journal montrait la clé technique. Libellés ajoutés ; `libelles_audit.dart` régénéré, qui avait aussi six libellés de retard (avances clients, stock négatif reçu, cycle mis à jour depuis un poste).
+
+### H10
+- Un garde-fou lisant le Blade existe pour chaque écran H4 à H9 (voir le plan).
+
+### Mesures
+- Poste : `flutter analyze` propre ; suite complète 2 238 verts, 16 sautés. Laravel : 1 711 verts.
+
+### Non fait / réserves
+- Le bilan web calcule le prix moyen de provende sur TOUS les types, archivés compris ; le poste sur les actifs.
+- Tri de la prophylaxie : le web trie sur `created_at` seul (ordre non garanti à égalité) ; le poste départage par jour de cycle puis libellé.
+
+## Ticket H13b — envoi par lots de 50 (décision D-SYNC-2, 19/10/2026)
+
+- `SyncEngine.decouperEnLots` : au plus 50 lignes par requête, dans l'ordre de traitement de `SyncController::push` (`ordreDuServeur`) — ce qu'une table attend d'une autre est déjà écrit quand elle arrive. Un envoi de 50 lignes au plus part TEL QUEL (aucun changement pour le cas courant).
+- ⚠️⚠️ Fiches, transferts et ventes partent par **journées entières**, au rang des ventes : le serveur exempte une vente de son incrément seulement si la fiche (bande, jour) est acceptée dans la MÊME requête (15.30). Une fiche partie dans un lot antérieur à sa vente la ferait compter deux fois, sans erreur. Une journée de plus de 50 lignes part seule.
+- Réponses fusionnées table par table avant l'acquittement habituel. Un lot en échec après d'autres : les accusés reçus sont acquittés, puis l'échec remonte (réessai réseau de H13) ; ce que le serveur a déjà écrit ne repart pas.
+- Tests : `envoi_par_lots_test.dart` (9), dont un qui lit `_pousser` pour vérifier que chaque table envoyée a son rang dans `ordreDuServeur`. Mutation : sans le regroupement par journée, deux tests rougissent.
+
+## Décisions du client « uniformiser web et poste » (19/10/2026, soir) — tickets U2 à U7
+
+### U7 — prix moyen de la provende (D-U7)
+- Le Bilan du web moyennait TOUS les types de provende de l'espèce, archivés compris, et valorisait à 0 sans prix ; le poste prenait les seuls actifs et affichait « — ». Une règle : types actifs ; sans prix, « — » et le même motif. `BilanPrixProvendeTest`.
+
+### U5 — tous les messages d'erreur en français (D-U5)
+- Web : `lang/fr` (validation complète de Laravel 12, auth, passwords, pagination, `fr.json`), libellés français des 225 champs validés (un test casse si un champ validé n'en a pas), `:date` rendu « aujourd'hui » / jj/mm/aaaa (`DatesValidationFr`), pages d'erreur 401–503 en français et autonomes, messages JSON de l'API traduits (`MessagesErreurFr`), boîte « page expirée » de Livewire remplacée par une confirmation française (`resources/js/app.js` — `npm run build` au déploiement). Locale `fr` par défaut. `MessagesErreurFrancaisTest` (11).
+- Poste : `flutter_localizations` (SDK) et locale `fr` sur le `MaterialApp` ; intl passe à `^0.20.2` (imposé par flutter_localizations ; intl n'était importé nulle part). Les échecs techniques ne s'affichent plus bruts (« Synchronisation impossible — DioException… ») : `messageErreur()` ; les refus du serveur restent mot pour mot. `localisation_francaise_test.dart` (6), dont un garde-fou contre les mots d'erreur anglais dans les littéraux de `lib/`.
+- Non vérifié : la boîte 419 dans un navigateur, les pages d'erreur avec `APP_DEBUG=false` en production, le poste sous Windows. Le message du test SMTP garde le détail technique du serveur de courriel (écran de diagnostic administrateur).
+
+### U4 — lignes de vente et d'achat au poste (D-U4)
+- Serveur : `sale_lines` et `purchase_lines` servies au tirage pour chaque pièce servie (jamais une ligne d'une pièce non servie ; une ligne modifiée seule fait redescendre sa pièce et toutes ses lignes). `SyncLignesVentesAchatsTest` (5).
+- Poste : absorbeurs stricts (lignes d'une pièce `synced` remplacées entièrement ; pièce `pending`/`conflict` jamais touchée) ; resynchronisation unique `lignes_resync_u4` pour les postes déjà en service (même règle que F0.95). Top 5 (marge = PMP du web), ventes porcines : mêmes chiffres qu'au web, parité exécutée avec `Index.php` sur 24 ventes. Mentions « limité aux lignes saisies sur ce poste » retirées.
+- Écarts restants relevés, confiés au ticket U8 : valorisation des stocks au poste, colonne Catégorie des achats, carte « Écarts / Retours », filtre par jour du Tableau 3 de la ponte (défaut antérieur), ventes refusées comptées au Top 5 du poste.
+
+### U2, U3, U6 (D-U2, D-U3, D-U6)
+- **U2** : `growth_standards` servie au tirage (référentiel, ignorée à l'envoi), table Drift `GrowthStandards` et absorbeur strict. Une seule règle d'objectif, codée une fois de chaque côté (`GrowthAnalysisService::objectifPour`, `DashboardElevageRepository.objectifPour`) : barème du STADE de chaque bande moyennée (égalité stricte, comme Analyse des Croissances), enveloppe min des minima / max des maxima ; aucun barème → « Objectif : — ». Pas de repli sur toute l'espèce (il mêlerait truies 40–80 et engraissement 500–650). Constantes supprimées des deux côtés ; Analyse des Croissances suit la même règle (elle prenait l'objectif du dernier lot lu).
+- **U3** : archivage d'un soin envoyé (`{id, is_active:false}`), accepté (`manage-elevage`, audit `veterinary_record.archived`, jamais de restauration par envoi) ; Drift v43 `veterinary_records.is_active` ; bouton « Archiver » et modale « Confirmer l'archivage » au registre ; registre, KPI, Dashboard, Bilan, protocole du jour, fiche sujet, recherche limités aux soins actifs. 🔴 Au web, deux requêtes comptaient les archivés : KPI « Interventions / Coût sanitaire (mois) » du registre, et la recherche globale santé (précédence `OR`/`AND`).
+- **U6** : le web n'impose que `required|date` à la date d'entrée à l'infirmerie ; `pushInfirmerie` exigeait `before_or_equal:today` et le poste bornait à aujourd'hui. Mêmes règles partout ; même alignement pour la date du Nouveau Soin (`soinDate`, `record_date`). Tests qui lisent les règles du web et du serveur.
+- Mesures : Laravel 1 747 verts ; poste 2 287 verts, 16 sautés, `flutter analyze` propre ; 12 mutants tués (agent) + 1 (date du soin).
+- Reste : la modale d'archivage du poste empile ses boutons (gabarit `ModaleConfirmation` du poste) là où le Blade les aligne ; textes identiques.
+
+### U8 — écarts restants relevés par U4
+- **Gestion des stocks au poste** : PMP, valeur, valorisation totale, écarts en FCFA, journal = formules de `GestionStocks` (un seul `PmpService`, partagé avec le Tableau de bord) ; « — » pour un produit jamais acheté, « 0 FCFA » sans aucun achat comme le web ; parité exécutée. 🔴 Défaut du web : « Écarts d'Inventaire » ne lisait que le type `adjustment` ; les inventaires du poste (type `inventaire`) n'y figuraient jamais (`EcartsInventairePosteTest`).
+- **Achats** : colonne Catégorie = catégorie produit de la première ligne (liste et PDF) ; carte « Écarts / Retours » = nombre de LIGNES de retour ; `purchase_returns` servis au tirage avec leurs achats (`SyncRetoursAchatsTest`), absorbeur strict, resynchronisation unique `retours_resync_u8` ; parité exécutée sur le vrai tirage.
+- **Tableau 3 de la ponte** : la colonne OS ne compte que les ventes du jour de la fiche (défaut antérieur : toutes les ventes de la bande) ; une vente refusée ne sort rien.
+- **Tableau de bord** : règle écrite — compte ce que le web compte (`synced`) plus ce qui part (`pending`) ; une pièce refusée (`conflict`) ne compte nulle part (CA, Dépenses, Résultat, courbe, ventes porcines, Top 5, PMP).
+- Mesures (branche fusionnée) : Laravel 1 754 verts ; poste 2 308 verts, 16 sautés ; 17 mutants tués.
+- Reste : « Rotation du Stock » « — » et écarts d'inventaire saisis ailleurs absents du poste (`stock_movements` ne descend pas) ; Tableau 3 du web en plateaux à l'échelle de la ferme, celui du poste par bande en œufs ; tri et pastilles du tableau des stocks du poste.
+
+### D-U8 — Mobile Money dans la Trésorerie du Tableau de bord
+- Légende de la carte Trésorerie : « Caisse : X F · Banque : Y F · Mobile Money : Z F », au web et au poste (comptes actifs ; le poste ne reçoit que ceux-là). Le poste écrivait les montants sans « F » : aligné sur le web.
+
+### U9 — mouvements de stock au poste
+- Serveur : `stock_movements` servie au tirage (colonnes du calcul seulement, date en heure murale, recouvrement de 2 min en plus de celui du tirage : un journal immuable n'est jamais resservi), ignorée à l'envoi ; index sur `updated_at` (migration `2026_10_19_000002`). `SyncMouvementsStockTest` (5).
+- Poste : Drift v44 `StockMovements` (lecture seule, table d'activité vidée par la réinitialisation), absorbeur strict, resynchronisation unique `mouvements_resync_u9`. `JournalStocks` transpose une fois les formules du web : écarts d'inventaire (`adjustment` + `inventaire`), rotation (`StockRotationService`), journal des 100 derniers, grand livre des œufs (`EggStockLedgerService`).
+- Saisies `pending` PROJETÉES selon la règle du serveur qui les recevra (jamais écrites ; disparaissent dès qu'un mouvement descendu porte la même pièce) ; `conflict` ne compte nulle part.
+- Tableau des stocks aligné sur le Blade (tri par nom façon MySQL, pastilles « Critique » / « Normal », « Entrée non saisie »…) ; Tableau 3 = celui du web (11 colonnes dont « Lot », plateaux, ferme). Parités exécutées : Gestion des stocks entière, Tableau 3 rendu par le Blade, cellule par cellule. 24 mutants tués.
+- Mesures (branche) : Laravel 1 762 verts ; poste 2 334 verts, 16 sautés.
+- Délais connus : une vente, un achat ou une fiche acquittés manquent à la rotation et au Tableau 3 jusqu'au tirage suivant (jamais comptés deux fois). Écarts restants : ticket U10.
+
+### U10 — derniers écarts Stocks, Rapport élevage, Fiche Pondeuses
+- Gestion des stocks : export PDF du web, modale « Ajouter Stock » (`manage-stocks`) écrite en `stock_adjustments` pending `manual_addition` daté ; 🔴 au serveur, `pushStockAdjustments` traitait un ajout comme une perte et ignorait la date : il le rejoue désormais comme `submitAjouterStock` (entrée, date du mouvement, aucune écriture comptable, audit `stock.manual_addition` — `SyncAjoutStockPosteTest`). Lien « Configurer les Seuils d'Alerte », icône Modifier, écart « 0 », icônes des cartes (sablier).
+- Rapport élevage : filtre « Lot / Souche », libellés des onglets, Tableaux 1 et 2 et indicateurs du Blade (parité exécutée avec le rendu Livewire), PDF du web ; fiches refusées exclues. Drift v45 : vendeur de sexe, montant de vente, traitement, dose, symptômes des fiches tirés du serveur (jamais envoyés), resynchronisation unique `fiches_resync_u10`.
+- Fiche Pondeuses : SRH, TS, OS, Stock Final du jour sélectionné depuis le grand livre, comme le web.
+- Mesures : Laravel 1 766 verts ; poste 2 363 verts, 16 sautés ; 28 mutants tués sur 29 (le survivant est sans effet observable).
+- Restes mineurs : ticket U11.
+
+## Méthode TATACORA transposée (D-SYNC-1 confirmée) — S-T1, S-T2, S-T3 (19/10/2026)
+- **S-T1** (poste) : 5xx et 429 réessayées comme un échec réseau (`estReessayable`) ; 401 / 403 : la synchronisation automatique est suspendue jusqu'à la reconnexion (le bouton reste possible et dit pourquoi) ; 422 / 413 sur un lot : coupe en deux récursive par UNITÉS indivisibles (une ligne, ou une journée couplée fiches + transferts + ventes), l'unité fautive passe en `conflict` avec le motif « Refusée par le serveur : requête invalide (422) — … ».
+- **S-T2** (serveur) : `device_id` ≠ nom du jeton Sanctum → 403 « posteDifferentDuJeton », rien d'écrit ni de journalisé (jetons transitoires des tests exclus, documenté). `ApiProduitsTest` envoyait un autre poste que son jeton : aligné.
+- **S-T3** (poste) : synchronisation à l'ouverture de session (pas après le premier démarrage, qui synchronise déjà), après un geste important (`GestesImportants` injecté dans la caisse, la fiche journalière et les soins ; agrégation 5 s), intervalle par défaut 5 min.
+- Mesures : Laravel 1 771 verts ; poste 2 390 verts, 16 sautés ; 18 mutants tués.
+- Reste : une synchronisation manuelle réussie après un 403 ne relance pas l'automatique (il reprend à la reconnexion) ; le signal de `validerTraitementsDuJour` n'est pas couvert par un test.
+
+### S-T6, S-T7, S-T8
+- **S-T6** : bouton « Demander la synchronisation des postes » (tous ou un poste) dans la modale H3, tables `demandes_synchronisation` / `_servies` ; `GET /api/sync/demande` (poste identifié par son jeton, servie une fois, expire après 60 min) lu toutes les 30 s par la session ouverte (silencieux, arrêté si la session est refusée) ; `GET /api/sync/coherence` : nombre et total par table et par jour (`CoherenceSynchronisationService::AGREGATS`, copie Dart vérifiée contre le PHP), section « Contrôle de cohérence » de l'écran Synchronisation, date du dernier contrôle au web (`controles_coherence`). Les dépenses n'y sont pas : elles ne descendent pas au poste.
+- **S-T7** : garde-fou « un seul écrivain par table » (`ecrivain_unique_test`) ; trois écritures parasites déplacées vers leur dépôt (fiche du jour écrite par la caisse et par les transferts, soin archivé par le hub) ; exception documentée `products.stock_qty`. `Role` / `Permission` datent le rôle quand la matrice des droits change (sinon un tirage filtré ne le resservirait jamais). Reste : `model_has_roles` ne date pas `users`.
+- **S-T8** : `environnement.dart` (dev, recette, production par `--dart-define=AGRIERP_ENV`, production par défaut) ; `build_windows.bat --env …` refuse une version `-demo` en production avant toute compilation ; `agrierp.iss` aussi (`#error`). Non exécutés ici (ni Windows ni Inno Setup) : relus et vérifiés par `environnement_test`. Adresse de recette proposée, à confirmer.
+- Mesures (branche fusionnée avec S-T1 à S-T3) : Laravel 1 782 verts ; poste 2 425 verts, 16 sautés ; 20 mutants tués.
+
+### S-T5 — fusion par clé naturelle
+- Le web n'empêchait aucun doublon et le schéma n'a d'unicité que sur `products.sku` (que le serveur ENGENDRE : deux postes ont toujours deux SKU) ; le même client, fournisseur ou produit saisi sur deux postes existait deux fois. Règle prudente, une seule classe (`FusionReferentielsService`) : client = nom normalisé + téléphone normalisé (≥ 8 chiffres, sinon jamais de fusion) ; fournisseur = nom + téléphone ; produit = nom + catégorie + unité + filière. Seulement à la CRÉATION, fiche active contre fiche active ; la plus ancienne gagne ; la quantité initiale du second poste n'est pas ajoutée (même stock physique).
+- `correspondances_identifiants` (unique table + id du poste) ; réponse `accepted` + `merged: [{id, id_serveur, motif}]` ; toutes les références d'envoi (ventes et lignes, achats et lignes, règlements, remboursements, avances, ajustements, fiches) traduites en UN point (`REFERENCES`, garde-fou qui exige chaque `customer_id` / `supplier_id` / `…product_id` validé). Poste : remplacement transactionnel des 17 colonnes de référence (garde-fou lu dans le schéma Drift à l'exécution), saisies `pending` gardées.
+- Poste ancien : acquitté normalement, références traduites au serveur ; il garde sa copie locale (écart possible au contrôle de cohérence S-T6).
+- Mesures : Laravel 1 802 verts ; poste 2 440 verts, 16 sautés ; 32 mutants tués. Reste : deux envois simultanés du même nouveau client à la même fraction de seconde peuvent encore créer deux fiches (pas de verrou).
+
+### CFG-1 et CFG-2 — configurations dans Paramètres (D-CFG-1, D-CFG-2)
+- Web : 🔴 la saisie SMTP existait EN DOUBLE (`DonneesEntreprise` et `Integrations`, valeurs divergentes `TLS` / `tls`, deux e-mails de test) ; regroupée dans l'onglet « Email (SMTP) » (`EmailSmtp`, `manage-parametres`) : mot de passe chiffré, jamais réaffiché, champ vide = inchangé, effacement confirmé et audité, e-mail de test réel. Nouvelle colonne `smtp_from_address` (l'adresse d'expédition écrasait l'e-mail de CONTACT). Onglet « Postes & Appairage » (`manage-users`) : postes = jetons nommés, état H3, « Demander la synchronisation » (S-T6), « Révoquer l'appairage » (supprime les jetons du poste ; 401 ensuite). 🔴 Hors périmètre : un `<button type="submit">` non fermé dans `donnees-entreprise.blade.php` englobait les sections TVA et charges — retiré.
+- Poste : hub Paramètres à 8 onglets, « Email (SMTP) » (réglages dans `app_settings`, mot de passe au coffre `flutter_secure_storage`, jamais en base — vérifié cellule par cellule ; e-mail de test par `mailer` 7.2.0) et « Appairage » (remplace l'écran « Paramètres du poste » : identifiant, environnement, adresse, intervalle, compte, état du jeton, « Tester la connexion », « Réappairer »).
+- Mesures (branche, avec S-T5) : Laravel 1 818 verts ; poste 2 479 verts, 16 sautés.
+- Non vérifié : un envoi SMTP réel, le rendu navigateur (`npm run build` nécessaire pour deux classes Tailwind), le coffre réel de Windows.
+
+### S-T4 — tirage paginé et limité aux tables que le compte lit
+- `page=1` puis `curseur_page` (jeton chiffré, lié au compte) : tables entières à la page 1 (remplacement complet gardé), tables d'historique découpées PAR PIÈCE au curseur (`updated_at`, `id`) — jamais une ligne sans sa pièce ; `server_time` à la dernière page seulement ; débit propre au tirage (`throttle:120,1,sync-pull`, sinon un long tirage échouait en 429 et repartait de la page 1). Poste : une transaction par page, curseur avancé après la dernière, reprise sans perte ni doublon. Sans `page` : réponse complète d'avant, identique (comparée sur le jeu de démonstration).
+- `PERMISSIONS_DE_TIRAGE` : une table servie si le compte a une des permissions ; croisée par `perimetre_tirage_test` avec les tables lues par chaque écran que le rôle ouvre (imports suivis), la cloche et la recherche. Changement de rôle : une table AJOUTÉE au périmètre impose un tirage complet, une fois ; une table retirée n'est jamais vidée.
+- Limites : le filtrage ne vaut que pour le tirage paginé (un appel sans `page` reçoit tout : ce n'est pas une barrière de sécurité, S3 reste la protection) ; tri `COALESCE(updated_at, …)` non exécuté sur MySQL (S-T9).
+- Mesures (branche, avec S-T5 et CFG) : Laravel 1 834 verts ; poste 2 500 verts, 16 sautés ; 32 mutants tués. Fusion : `perimetre_tirage_test` pointait vers l'écran « Paramètres du poste », supprimé par CFG-2 — pointe vers le hub Paramètres.
+
+### S-T9 — essai à 5 postes contre le vrai serveur, sur MariaDB
+- `agrierp_flutter/outils/essai_multipostes.sh` : MariaDB privé (10.11, `utf8mb4_unicode_ci`, `migrate:fresh --seed` + démonstration), `php artisan serve`, 5 postes réels (admin, deux caisses, animalier, comptable ; vrais dépôts, vrais moteurs, connexion réelle), 4 journées de gestes, écritures au web par les vrais composants Livewire, coupures au hasard (requête perdue, réponse perdue APRÈS traitement, délai, 500, 413), rétablissement puis invariants. Graines 42, 7, 13, 5, 2026, 1, 99, 314 vertes après corrections.
+- **Défauts réels trouvés et corrigés** :
+  1. 🔴 deux caisses vendant dans la même bande le même jour : chaque fiche renvoyée portait SA vente, la dernière écrasait l'autre, et chaque vente était dispensée (15.30) — une vente comptée ZÉRO fois. Le serveur ne reprend plus la vente d'une fiche connue ; la dispense ne vaut que pour une fiche créée par le même envoi.
+  2. 🔴 toutes les fiches de l'animalier refusées dès qu'une caisse avait vendu dans la bande le même jour (fiche du jour créée par la vente) : fusion prudente par (bande, jour), réponse `merged`, le poste reprend l'identifiant du serveur.
+  3. 🔴 une correction faite PENDANT l'envoi de la fiche était acquittée avec l'ancienne version, donc perdue : seule la version partie est acquittée.
+  4. 🔴 une caisse renvoyait une fiche tirée avec des morts périmés (refus, ou écrasement silencieux des morts de l'animalier pour un compte admin).
+  5. 🔴 interblocages MariaDB (1213) invisibles sur SQLite : l'envoi partait en 500 à moitié écrit, et la vente était comptée deux fois au renvoi. Tout l'envoi passe dans UNE transaction, rejouée jusqu'à 3 fois.
+- Mesures : Laravel 1 844 verts ; poste 2 507 verts, 17 sautés (dont l'essai sans serveur) ; 9 corrections désactivées une à une : chaque fois un test rouge.
+- ⚠️ **Déploiement : le SERVEUR d'abord**, les postes ensuite (un poste S-T9 face à un ancien serveur laisserait non comptées les ventes faites sur une fiche déjà synchronisée).
+- Reste : S-T10 (inventaire calculé sur un stock local périmé), S-T11 (fuseau horaire du poste) ; non exercés par l'essai : retours et remboursements fournisseurs, imputations, produits créés au poste, dépenses, sessions refusées, demande du web, plusieurs jours hors ligne, vrai poste Windows.
+
+### Décisions du client (19/10/2026, nuit) — recette, réinitialisation, en-têtes
+- Recette = serveur de la ferme (`environnement.dart`) : les essais se font sur la production, puis « Réinitialisation des données » (Paramètres, 15.50) vide les données d'essai. **Vérifiée en réel** sur le jeu de démonstration : 7 390 lignes d'activité dans 35 tables → 0 ; 1 506 lignes de référentiels gardées dans 20 tables ; stocks et trésorerie à 0 ; bandes supprimées ; exercice ouvert et 4 utilisateurs gardés ; marque `data_reset_at` posée (les postes purgent au tirage suivant). Le test « chaque table du schéma est classée une seule fois » couvre les tables ajoutées aujourd'hui (demandes de synchronisation, contrôles de cohérence, correspondances, etc.).
+- En-têtes « DÉSIGNATION » / « CATÉGORIE » du tableau des stocks au poste accentués comme le Blade.
+
+### S-T10 et S-T11 — inventaire calculé par le serveur, dates à l'heure du Bénin
+- **S-T10** : le poste envoie `counted_quantity` et `counted_at` (Drift v46) ; le serveur (`InventaireAuComptageService`) calcule écart = compté − (stock courant − mouvements datés après le comptage), daté du comptage, rejoué par `AdjustStockAction` sous verrou ; un comptage reçu aussitôt = formule du web. Comptage dépassé ou sans écart : acquitté sans mouvement, audité. Poste ancien : l'écart envoyé, comme avant. 🔴 Défaut trouvé par l'essai : les refus d'ajustements ne renvoyaient que `client_ref`, le poste gardait la saisie en attente indéfiniment sans montrer le motif — le serveur renvoie aussi `id`.
+- **S-T11** : le jour métier est toujours celui du Bénin (`lib/core/temps/heure_benin.dart`, décalage fixe +1, pas d'heure d'été) ; ~85 `DateTime.now()` de jour métier remplacés ; toutes les dates métier lues par `HeureBenin.lire` (jamais `toLocal()`). Suite du poste verte sous `TZ=Asia/Tokyo` et `TZ=America/New_York` (2 tests échouaient avant sous New York) ; essai multipostes vert dans 4 fuseaux × 4 graines ; chaque correction désactivée fait échouer l'essai (stock 21 au lieu de 24 ; écarts de cohérence soins / avances).
+- Mesures (branche) : Laravel 1 856 verts ; poste 2 524 verts, 17 sautés ; 22 mutants tués.
+- Reste : une pièce antérieure au comptage mais arrivée APRÈS lui est encore comptée en plus ; dates du journal d'audit, des notifications et du profil affichées à l'heure de Windows.
+
+### R-1 — « Réinitialisation des données » au poste comme au web
+- Serveur : `ReinitialisationDonneesController` (API Sanctum) → même service, même droit (`manage-parametres`), mêmes verrous dans l'ordre du web (mode démonstration activé, sinon 409 ; mot `REINITIALISER`, sinon 422 ; autre rôle 403), même journal, même marque `data_reset_at`. Verrous et messages regroupés dans le service : le web et l'API ne peuvent plus diverger. Le jeton du poste qui lance l'opération est conservé (sinon son tirage complet immédiat échouerait en 401) ; ceux des autres postes sont révoqués (15.54).
+- Poste : 9e onglet du hub Paramètres (après « Audit Logs », comme au web), Blade repris bloc par bloc ; hors ligne : boutons inactifs ; saisies `pending`/`conflict` des tables effacées annoncées table par table, case à cocher obligatoire ; après succès, purge IMMÉDIATE (`SyncEngine.appliquerReinitialisation`, partagée avec la propagation 15.50) puis tirage complet ; aucune synchronisation ne s'intercale.
+- Mesures (branche, avec S-T10/S-T11) : Laravel 1 863 verts ; poste 2 548 verts, 17 sautés ; 25 mutants tués.
+- À trancher : réponse du serveur perdue alors que la réinitialisation a eu lieu → le poste purge au tirage suivant (règle 15.50), la perte des saisies est annoncée par l'avertissement de synchronisation, pas par l'onglet.
+
+### U11 — derniers petits écarts (Ajustement, PDF, Rapport élevage, Fiche Pondeuses)
+- Ajustement des stocks au poste : validations du web (motif FACULTATIF), écart nul refusé avec l'avertissement du web, toasts du web, « -- Sélectionner -- », aide du Blade.
+- Noms des PDF : ceux du web (`stocks-AAAA-MM-JJ.pdf`, rapports, plan comptable, journal, grand livre, balance, achats, avances, fiche) ; 🔴 le poste proposait jusqu'ici `….xlsx` pour TOUS ses PDF.
+- Rapport élevage : en-tête du Blade (plus de « Filtrer la Période »), ordre déterministe de deux fiches du même jour (identifiant croissant, web et poste).
+- Fiche Pondeuses : mise en page du Blade, tous les jours du mois, « Traitements & Rappels », taux divisés par l'effectif de la VEILLE (le poste divisait par l'effectif final) ; parité PHP sur deux bandes. 🔴 Web : `loadDay()` affichait à vide la fiche d'une date hors du mois courant et « Enregistrer ce Jour » l'écrasait avec des zéros — corrigé (`FichePondeusesJourHorsMoisTest`). Texte d'aide des stocks : l'écriture de perte est active depuis 14.41.
+- Mesures (branche, avec S-T10/S-T11 et R-1) : Laravel 1 865 verts ; poste 2 570 verts, 17 sautés.
+- Reste : ticket U12.
+
+### U12b — hub Rapports sur le Blade, dates affichées à l'heure du Bénin
+- Les cinq autres onglets du hub suivent leur Blade (parité exécutée avec le PHP) ; export réservé à `export-rapports` comme au web ; noms et contenus des PDF du web ; Excel `.xlsx` avec les lignes du CSV du web. 🔴 Poste : ventes à crédit comptées comme recettes, achats payés absents des dépenses, trésorerie réduite au dernier solde, créances et dettes hors période, stocks valorisés au prix de vente minimal au lieu du PMP — corrigés. 🔴 Web : dépense ARCHIVÉE encore dans Recettes et Dépenses ; ordre non déterministe de deux pièces du même jour ; zébrage décalé du Rapport de Stocks — corrigés (`RapportsHubPosteTest`).
+- Dates d'Audit Logs, de Mon Profil et des notifications à l'heure du Bénin (`HeureBenin.depuisInstant`) ; suite du poste verte sous `TZ=America/New_York` et `TZ=Asia/Tokyo`.
+- Mesures (branche) : Laravel 1 869 verts ; poste 2 589 verts, 17 sautés ; 35 mutants tués.
+- Reste (ticket U13) : `expenses` et `payslips` ne descendent pas au poste ; « Échecs (mois) » du web compte le même mois des années passées ; libellé « Paie — … » ; cloche relative (« il y a … ») au web, date au poste.
+
+### U12a — fiches Lapins, Porcs, Reproducteurs et Escargots sur le Blade
+- Poste : les quatre fiches suivent leur Blade (`mois_fiche.dart`, `jour_categories.dart`, `elements_fiche.dart`, vue partagée Lapins / Porcs) : tableau du mois sur tous les jours (taux sur `previousEffectif()`, poids reconstitué, Traitements & Prophylaxie), cartes `getKpisProperty()`, catégories du jour, provende et autonomie, PDF du web. Tests Blade + parité exécutée avec le vrai composant Livewire, formulaire du jour comparé au rendu web.
+- 🔴 Web corrigés (`FichesEspecesU12aTest`) : `loadDay()` hors du mois courant qui écrasait la fiche par des zéros (Escargots, Reproducteurs) ; Reproducteurs ne chargeait jamais le jour (ouverture ni changement de date) ; taux d'éclosion du mois sans œuf à 85,0 % (valeur de démonstration) ou 0,0 % → « — » ; « Poids Moyen Constaté » des porcs à « 0 Kg » sans pesée → « — » ; formule affichée qui oubliait les ventes.
+- Mesures (branche, avec U12b) : Laravel 1 876 verts ; poste 2 609 verts, 17 sautés ; 17 mutants tués au poste, 5 au web.
+- Reste : taux d'éclosion du JOUR sans œuf « 0,0 % » (règle du web 14.61, question posée au client) ; alerte d'autonomie de la cloche non levée pour une fiche reçue d'un poste (U13) ; choix du produit de provende sans ordre au web (approximé, documenté).
+
+### S-T12 — essai à cinq postes étendu à tout ce qui se synchronise
+- Couvert : achat à crédit, règlements, retour et remboursement fournisseurs, dépenses, imputations (créance descendue et vente à crédit du même envoi), produits créés au poste (fusion S-T5 avec le web), Paramètres Élevage, infirmerie, calendrier, archivage d'un soin, cycle de reproduction, appairage révoqué et compte désactivé (401 → suspension → reprise), 3 journées hors ligne (lots de 50, tirage paginé), demande du web (~30 s), réinitialisation au web (401, 409, purge, rien ne ressuscite). Invariants ajoutés : trésorerie par compte (deux livres), créances / dettes / avances / créances fournisseurs = grand livre, dépense comptée une fois, avances = somme des imputations, état d'élevage identique.
+- **Défauts réels corrigés** : 🔴 vente ou achat antérieur à un comptage mais arrivé après lui, compté en plus (régularisation datée du comptage suivant, perte 657 recalculée — `annulerPerte`) ; 🔴 achat du poste daté de sa réception (`purchased_at`) ; 🔴 saillie et palpation saisies hors ligne avant tout envoi : palpation perdue ; 🔴 stock initial d'un produit créé absent du grand livre ; 🔴 curseur `since` en UTC lu en heure locale : chaque tirage resservait l'heure écoulée (6 pages au lieu d'une) ; 🔴 deux envois simultanés sur la même fiche : une vente comptée zéro fois (MariaDB seulement — relecture sous verrou) ; 🔴 deux créations simultanées de la même fiche : erreur 1062 et vente perdue à la caisse web, refus « en double » d'une caisse.
+- Non corrigé (S-T13) : la caisse du web n'est pas rejouée sur un interblocage (MeCeF dans la transaction).
+- Mesures (branche entière) : Laravel 1 894 verts ; poste 2 610 verts, 17 sautés ; essai graine 42 vert sur la branche fusionnée ; série de l'agent : graines 42, 7, 314, 5, 13, 2026 × Porto-Novo / New York, 12/12.
+- À vérifier chez l'hébergeur : `post_max_size` et ModSecurity (une journée de ventes d'un poste est indivisible) ; connexion limitée à 5 par minute et par adresse (plus de 5 postes derrière une même adresse après une réinitialisation).
+
+### S-T13 — la caisse du web résiste aux interblocages ; MeCeF une seule fois
+- `TransactionRejouable` (point unique, caisse web ET envoi des postes) : rejoue jusqu'à 3 fois sur 1213 / 1205 (code reconnu même en français et enveloppé), jamais dans une transaction englobante ; au-delà, `TransactionInterbloqueeException` et message clair, rien d'écrit, panier conservé.
+- `FacturationMecefService` : MeCeF APRÈS la validation de la vente, une seule fois (vente relue sous verrou, jamais retransmise si `transmise`) — caisse, `Facturation::retryMecef`, envoi des postes. 🔴 Le bloc MeCeF était DANS la transaction de l'envoi rejouée depuis S-T9 : un envoi rejoué retransmettait les ventes de l'essai annulé (deux factures) — corrigé, test à l'appui.
+- Échec MeCeF : règle existante (7.1, 14.80) — la vente n'est jamais défaite, elle passe en `erreur` avec le bouton de retransmission ; avertissement à la caisse.
+- Mesures : Laravel 1 908 verts ; poste 2 610 verts, 17 sautés ; essai 314, 42, 7, 5 verts (graine 314 : un vrai interblocage sur la vente du web, rejoué) ; 17 mutants tués.
+- À trancher (D-MECEF-1) : double déclaration possible si le dispositif accepte et que la réponse se perd (passerelle réelle) ; bouton de retransmission pour une vente « En attente ».
+
+### U13 — dépenses et paie au poste, cloche, alerte d'autonomie, correctifs web
+- `expenses` (servie à tout compte, archivées comprises avec `is_active`, absorbeur strict qui n'écrase jamais une dépense `pending`/`conflict`) et `payslips` (servie à `view-rapports` seulement : `id`, nom de l'employé, `net_salary`, `created_at` — jamais le brut, les retenues ni les charges, test à l'appui) tirées au poste (Drift v47, resynchronisation unique `depenses_resync_u13`, purge 15.50). Recettes et Dépenses du poste = celui du web (parité exécutée, paie comprise ; vérifié aussi dans l'essai multipostes) ; contrôle de cohérence S-T6 étendu aux dépenses.
+- 🔴 Web : « Échecs (mois) » comptait le même mois des années passées (`whereYear`) ; libellé « Paie — Employé » jamais appliqué (priorité de `??`). Cloche du poste : « il y a … » comme `diffForHumans` en français (parité sur 492 écarts). Alerte d'autonomie alimentaire levée aussi pour une fiche reçue d'un poste (`AlerteAutonomieFicheService`, mêmes règles et dédoublonnage que `saveDay()`).
+- Mesures (branche entière, avec S-T13) : Laravel 1 926 verts ; poste 2 648 verts, 17 sautés ; essai graines 42 et 314 verts ; 33 mutants tués.
+- Reste : ticket U14.
+
+### U14 — derniers écarts : Saisie des Dépenses, cloche, ordre des verrous, provende, éclosion, revue U11–U13
+- **Saisie des Dépenses** — web d'abord : `SaisieDepenseAction`, point de passage unique (création, modification, archivage) du composant Livewire ET de `SyncController::pushExpenses` (mêmes règles, effets, messages ; droit `manage-achats`). 🔴 Web corrigés : compte de trésorerie d'une dépense comptabilisée modifiable (les deux livres divergeaient, pour l'ancien et le nouveau compte) ; dépense archivée modifiable (caisse débitée une seconde fois) ; second archivage (montant réintégré et charge contre-passée deux fois) ; deux dépenses du même jour sans ordre ; dépense reçue d'un poste sans `expense.created` au journal d'audit. 🔴 Envoi : une dépense connue était acquittée sans rien rejouer — une modification ou un archivage fait au poste se perdait en silence. Tirage : `status` et `accounting_entry_id` (Drift v48, absorbeur strict, resynchronisation unique `depenses_resync_u14`). Poste : l'écran suit le Blade (en-tête, cartes, formulaire « Nouvelle / Modifier la Dépense » sur deux colonnes, erreurs par champ avec les messages du web, « Rechercher... » à 300 ms, filtre de statut, tableau à six colonnes, « Modifier » / « Archiver » et leur modale, toasts du web) ; règles de `SaisieDepenseAction` appliquées avant d'écrire ; parité exécutée de la liste (`getExpensesProperty()`, 30 recherches × statuts). Essai multipostes étendu : une dépense modifiée et une archivée au bureau.
+- **Cloche** : le `title` (le poste montrait le message), rouge si non lue quelle que soit la gravité, bouton « Marquer comme lue », ligne sans lien ; relue toutes les 30 s (`RafraichissementPeriodique`, `wire:poll.30s`), panneau ouvert compris (`MenuAnchor`) ; minuterie arrêtée au `dispose` (test à horloge simulée, deux mutants tués).
+- **Ordre des verrous** : `OrdreDesVerrous::stock` — les produits que la transaction mouvemente, par identifiant croissant, AVANT toute fiche, dans l'envoi des postes (juste après les produits du même envoi), la caisse du web, les cinq fiches et la Transformation. L'envoi prenait la fiche puis le stock, la caisse l'inverse. Les fiches Escargots, Reproducteurs et Pondeuses écrivent désormais en une transaction. Preuve : journal des requêtes (`OrdreDesVerrousTest`), garde-fou lu dans le code, essai à cinq postes sous MariaDB.
+- **Audit** : `sale.mecef_failed_on_sync` a son libellé (copie poste régénérée) et l'envoi l'écrit de nouveau (perdu en S-T13).
+- **Provende (U12a)** : le web choisit le produit et le type de sac par identifiant (`orderBy('id')`, plus l'ordre du plan MySQL) ; le poste compare le nom sans casse ni accents ; parité exécutée avec le service PHP.
+- **Taux d'éclosion sans œuf** : « — » au web (fiches Reproducteurs et Escargots, Suivi Reproduction) puis au poste ; une couvée perdue reste « 0,0 % ».
+- **Revue U11–U13 (poste ↔ Blade)** : 🔴 rationnement Lapins / Porcs sans le champ grisé ni son info-bulle « Calculé automatiquement : … » ; Suivi Reproduction à quatre colonnes dès `md` (web : `xl` et `lg`) et cartes qui débordaient ; Audit Logs avec les clés techniques au lieu des libellés, sans recherche, connexions échouées comptées hors des 24 h, état vide et info-bulle absents (le tirage sert désormais les 200 lignes de la liste du web) ; Centre de notifications : recherche sur toute la ligne (web : message ou titre), bandeau au lieu des toasts, « Marquer comme lue » sur une notification lue, suppression sans confirmation, état vide — tous corrigés, avec tests.
+- Mesures : Laravel 1 951 verts (22 521 assertions) ; poste 2 677 verts, 17 sautés (sans la maquette), `flutter analyze` propre ; essai graines 42 et 314 verts (MariaDB) ; mutants tués à chaque règle nouvelle.
+- **À trancher par le client** : (D-U14-1) la DATE d'une dépense comptabilisée reste modifiable (web et poste) alors que l'écriture garde la date d'origine — registre et grand livre peuvent se décaler d'une période ; faut-il la verrouiller comme le montant ? (D-U14-2) export du journal d'audit au poste : non proposé (le poste ne détient que les 200 dernières lignes, et ne peut pas écrire `audit_logs.exported` au serveur) ; (D-U14-3) taux de mortalité sans effectif (fiches du jour, Dashboard Élevage, Tableau de bord) : « 0,0 % » des deux côtés — même règle « inconnu = — » ? (D-U14-4) une dépense saisie puis archivée avant tout envoi est créée puis archivée au serveur (deux écritures, deux lignes d'audit) — choix fait pour garder la trace, à confirmer.
+- Non corrigé, relevé : l'envoi prend encore le verrou de la séquence des pièces comptables (dépenses, achats) avant les fiches des ventes du même envoi, la caisse l'inverse — interblocage possible fiche / séquence, rejoué par `TransactionRejouable` (hors du périmètre stock / fiche du ticket).

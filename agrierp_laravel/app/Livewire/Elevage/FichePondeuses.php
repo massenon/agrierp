@@ -2,13 +2,22 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Livewire\Elevage\Concerns\AvecTransfertsDuJour;
 use App\Actions\RecordEggProductionStockAction;
+use App\Actions\SyncLotProductionStockAction;
+use App\Actions\RecordSaleOnFicheElevageAction;
+use App\Livewire\Elevage\Concerns\AvecProphylaxieDuJour;
+use App\Livewire\Elevage\Concerns\AvecSoinsDuMois;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
+use App\Models\FeedRationStandard;
+use App\Support\RationVolaille;
 use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\EggStockLedgerService;
+use App\Support\OrdreDesVerrous;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -42,6 +51,10 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class FichePondeuses extends Component
 {
+    use AvecTransfertsDuJour;
+    use AvecProphylaxieDuJour;
+    use AvecSoinsDuMois;
+
     public string $selectedDate;
 
     public int $achat = 0;
@@ -54,15 +67,87 @@ class FichePondeuses extends Component
 
     public int $mortPoussin = 0;
 
+    public int $donRepro = 0;
+
+    public int $donPoulette = 0;
+
+    public int $donPoussin = 0;
+
+    /**
+     * Ticket 15.56 — dons déjà enregistrés pour le jour rechargé (même règle que `mortEnregistre`) : la répartition
+     * n'est pas stockée, seul le total l'est ; il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $donEnregistre = null;
+
+    /** Ticket 15.57 — poids TOTAL pesé (g) ; la base stocke la moyenne par sujet, comme les autres fiches. */
+    public ?int $peseeTotal = null;
+
     public int $oeufsRecoltes = 0;
 
     public int $oeufsCasses = 0;
 
     public string $observations = '';
 
+    /**
+     * Ticket 15.47 (A11) — LA bande de la fiche, comme Lapins et Porcs (15.41). `null` = la première bande par
+     * code. Avant : `saveDay()` écrivait toujours sur la PREMIÈRE bande (ordre des UUID, imprévisible) et le
+     * tableau mensuel mêlait toutes les bandes, deux fiches du même jour s'y écrasant.
+     */
+    public ?string $bandeId = null;
+
+    /**
+     * Ticket 15.47 — morts déjà enregistrés pour le jour rechargé. La répartition Reproducteurs / Poulettes /
+     * Poussins n'est pas stockée (seul le total `mort` l'est) : sans ce total, ré-enregistrer le jour remettait
+     * ses morts à zéro. Il est gardé tant qu'aucune répartition n'est ressaisie.
+     */
+    public ?int $mortEnregistre = null;
+
     public function mount(): void
     {
         $this->selectedDate = now()->format('Y-m-d');
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedSelectedDate(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function updatedBandeId(): void
+    {
+        $this->loadDay($this->selectedDate);
+    }
+
+    public function getBandeProperty(): ?LivestockLot
+    {
+        $lots = $this->lots;
+
+        return ($this->bandeId !== null ? $lots->firstWhere('id', $this->bandeId) : null) ?? $lots->first();
+    }
+
+    protected function bandeDeLaFiche()
+    {
+        return $this->bande;
+    }
+
+    /** Morts du jour : la répartition saisie, sinon le total déjà enregistré. */
+    private function mortDuJour(): int
+    {
+        $saisis = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->mortEnregistre ?? 0);
+    }
+
+    /**
+     * Ticket 15.56 — dons du jour : la répartition saisie, sinon le total déjà enregistré. Un don fait QUITTER le
+     * sujet de l'exploitation : il réduit l'effectif et sort du stock du produit de la bande
+     * (`SyncLotProductionStockAction`, ticket 14.37).
+     */
+    private function donDuJour(): int
+    {
+        $saisis = $this->donRepro + $this->donPoulette + $this->donPoussin;
+
+        return $saisis > 0 ? $saisis : (int) ($this->donEnregistre ?? 0);
     }
 
     private function speciesCode(): string
@@ -76,6 +161,7 @@ class FichePondeuses extends Component
             ->where('stage', 'ponte')
             ->where('status', 'actif')
             ->where('is_active', true)
+            ->orderBy('code')
             ->get();
     }
 
@@ -108,14 +194,25 @@ class FichePondeuses extends Component
         ];
     }
 
+    /** Bandes du tableau mensuel (AvecSoinsDuMois). */
+    protected function lotsDuTableauMensuel(): array
+    {
+        return [$this->bande?->id];
+    }
+
+    /** Fiches du mois de LA bande de la fiche (ticket 15.47 : une bande par tableau, plus d'écrasement). */
     public function getMonthlyEntriesProperty()
     {
-        $lotIds = $this->lots->pluck('id');
+        $bande = $this->bande;
+
+        if (! $bande) {
+            return collect();
+        }
 
         // Ticket audit fidélité : eager-load treatmentProduct — colonne
         // "Traitements & Rappels" du prototype, trouvée manquante du
         // tableau mensuel (même écart que fiche-lapins.html).
-        return LivestockDailyEntry::whereIn('lot_id', $lotIds)
+        return LivestockDailyEntry::where('lot_id', $bande->id)
             ->whereBetween('entry_date', [now()->startOfMonth(), now()->endOfMonth()])
             ->with('treatmentProduct')
             ->orderBy('entry_date')
@@ -152,14 +249,19 @@ class FichePondeuses extends Component
         return range(1, now()->daysInMonth);
     }
 
+    /** Veille de LA bande : dernière fiche antérieure, sinon son effectif initial (point unique `previousEffectif`). */
     public function getPreviousEffectifProperty(): int
     {
-        $entry = LivestockDailyEntry::whereIn('lot_id', $this->lots->pluck('id'))
-            ->where('entry_date', '<', $this->selectedDate)
-            ->orderByDesc('entry_date')
-            ->first();
+        $bande = $this->bande;
 
-        return $entry?->effectif_final ?? (int) $this->lots->sum('initial_quantity');
+        if (! $bande) {
+            return 0;
+        }
+
+        $sonde = new LivestockDailyEntry(['lot_id' => $bande->id, 'entry_date' => $this->selectedDate]);
+        $sonde->setRelation('lot', $bande);
+
+        return $sonde->previousEffectif();
     }
 
     /**
@@ -178,7 +280,7 @@ class FichePondeuses extends Component
      */
     public function getVenteDuJourProperty(): int
     {
-        $lot = $this->lots->first();
+        $lot = $this->bande;
 
         if (! $lot) {
             return 0;
@@ -191,14 +293,14 @@ class FichePondeuses extends Component
 
     public function getEffectifFinalCalcProperty(): int
     {
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
-        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, 0);
+        return LivestockDailyEntry::computeEffectifFinal($this->previousEffectif, $this->achat, $this->ne, $mort, $this->venteDuJour, $this->donDuJour(), $this->transfertsDuJour['transfert_entree'], $this->transfertsDuJour['transfert_sortie']);
     }
 
     public function getMortalityRateCalcProperty(): float
     {
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
 
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
@@ -250,22 +352,39 @@ class FichePondeuses extends Component
 
     public function loadDay(string $date): void
     {
+        $this->traitementsCoches = [];   // une case cochée ne survit pas à un changement de jour
         $this->selectedDate = $date;
-        $entry = $this->monthlyEntries->get($date);
+        // 🔴→✅ Ticket U11 — la fiche du jour CHOISI, même hors du mois en cours. `monthlyEntries` ne porte que le
+        // mois courant : choisir le 28 du mois précédent vidait le formulaire alors que la fiche existait, et
+        // « Enregistrer ce Jour » l'écrasait avec des zéros (achats, nés, œufs). Le poste charge la fiche de
+        // n'importe quel jour (`FicheJournaliereRepository::chargerJour`) : même règle.
+        $entry = $this->monthlyEntries->get($date)
+            ?? ($this->bande
+                ? LivestockDailyEntry::where('lot_id', $this->bande->id)->whereDate('entry_date', $date)->first()
+                : null);
+
+        $this->reset(['mortRepro', 'mortPoulette', 'mortPoussin', 'mortEnregistre', 'donRepro', 'donPoulette', 'donPoussin', 'donEnregistre']);
 
         if ($entry) {
             $this->achat = $entry->achat;
             $this->ne = $entry->ne;
+            $this->mortEnregistre = (int) $entry->mort > 0 ? (int) $entry->mort : null;
+            $this->donEnregistre = (int) ($entry->don ?? 0) > 0 ? (int) $entry->don : null;
             $this->oeufsRecoltes = $entry->ponte_total ?? 0;
             $this->oeufsCasses = $entry->ponte_casses ?? 0;
+            $effectifFiche = (int) ($entry->effectif_final ?? 0);
+            $this->peseeTotal = $entry->weight_sample_avg_g && $effectifFiche > 0
+                ? (int) round($entry->weight_sample_avg_g * $effectifFiche)
+                : null;
         } else {
-            $this->reset(['achat', 'ne', 'mortRepro', 'mortPoulette', 'mortPoussin', 'oeufsRecoltes', 'oeufsCasses']);
+            $this->reset(['achat', 'ne', 'oeufsRecoltes', 'oeufsCasses', 'peseeTotal']);
         }
     }
 
     public function saveDay(): void
     {
-        $lot = $this->lots->first();
+        $this->authorize('manage-elevage');
+        $lot = $this->bande;
 
         if (! $lot) {
             $this->dispatch('toast', message: "Aucune bande active au stade Ponte. Créez d'abord une bande.", type: 'error');
@@ -273,42 +392,83 @@ class FichePondeuses extends Component
             return;
         }
 
-        $mort = $this->mortRepro + $this->mortPoulette + $this->mortPoussin;
+        $mort = $this->mortDuJour();
         $effectifFinal = $this->effectifFinalCalc;
 
-        $dailyEntry = LivestockDailyEntry::updateOrCreate(
-            ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
-            [
-                'achat' => $this->achat,
-                'ne' => $this->ne,
-                'mort' => $mort,
-                'vente' => $this->venteDuJour,
-                'don' => 0,
-                'effectif_final' => $effectifFinal,
-                'ponte_total' => $this->oeufsRecoltes,
-                'ponte_casses' => $this->oeufsCasses,
-            ]
-        );
+        // Ticket 15.56 — état AVANT enregistrement : naissances, morts et dons ne sortent du stock du produit de la
+        // bande que par ÉCART (`SyncLotProductionStockAction`), comme sur les quatre autres fiches.
+        $ficheAvant = LivestockDailyEntry::where('lot_id', $lot->id)->whereDate('entry_date', $this->selectedDate)->first();
+        $etatAvant = $ficheAvant
+            ? ['ne' => (int) $ficheAvant->ne, 'mort' => (int) $ficheAvant->mort, 'don' => (int) ($ficheAvant->don ?? 0)]
+            : [];
 
-        $lot->update(['current_quantity' => $effectifFinal]);
+        $dailyEntry = DB::transaction(function () use ($effectifFinal, $etatAvant, $lot, $mort) {
+            // 🔴→✅ Ticket U14 — UNE TRANSACTION, ET LE STOCK AVANT LA FICHE (`OrdreDesVerrous`), comme les fiches Porcs et
+            // Lapins, la caisse et l'envoi des postes. Ces écritures (fiche, production au stock, cascade) partaient une par
+            // une : une erreur au milieu laissait la fiche sans son mouvement de stock.
+            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$lot->id]));
 
-        // ⚠️ Ajustement de stock appliqué uniquement à la création de la fiche
-        // du jour, jamais à sa modification — bug préexistant découvert
-        // pendant le rétro-câblage (ticket 6.1) : incrémenter le stock à
-        // chaque sauvegarde, y compris une simple correction du même jour,
-        // aurait compté les œufs plusieurs fois. Modifier une fiche déjà
-        // enregistrée ne réajuste donc pas le stock — limitation connue,
-        // à traiter par un recalcul différentiel si un besoin réel émerge.
-        // ⚠️ TICKET 14.59 — RÈGLE EXTRAITE DANS
-        // `RecordEggProductionStockAction`. Elle vivait ici, donc la
-        // synchronisation ne pouvait pas l'atteindre : une ponte saisie hors
-        // ligne arrivait au serveur sans entrer un seul œuf au stock.
-        if ($dailyEntry->wasRecentlyCreated) {
-            app(RecordEggProductionStockAction::class)->execute($dailyEntry);
-        }
+            $dailyEntry = LivestockDailyEntry::updateOrCreate(
+                ['lot_id' => $lot->id, 'entry_date' => $this->selectedDate],
+                [
+                    'achat' => $this->achat,
+                    'ne' => $this->ne,
+                    'mort' => $mort,
+                    'vente' => $this->venteDuJour,
+                    'don' => $this->donDuJour(),
+                    'effectif_final' => $effectifFinal,
+                    'ponte_total' => $this->oeufsRecoltes,
+                    'ponte_casses' => $this->oeufsCasses,
+                    // Ticket 15.57 — moyenne par sujet (g), comme les fiches Reproducteurs et Escargots.
+                    'weight_sample_avg_g' => $this->peseeTotal && $effectifFinal > 0
+                        ? (int) round($this->peseeTotal / $effectifFinal)
+                        : null,
+                ]
+            );
+
+            // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — la bande prenait l'effectif du jour ÉDITÉ.
+            // Saisir ou corriger une fiche antérieure à la dernière remplaçait `current_quantity` par
+            // l'effectif de CE jour (KPI « Effectif Total Vivant » faux sur Gestion des Bandes, Gestion
+            // Élevage, Tableau de bord), sans recalculer les fiches suivantes. Même point d'entrée que
+            // les fiches Porcs/Lapins (ticket 15.42), la vente antidatée et le push : jours suivants
+            // recalculés, bande = DERNIÈRE fiche.
+            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot->id, $this->selectedDate);
+
+            // ⚠️ Ajustement de stock appliqué uniquement à la création de la fiche
+            // du jour, jamais à sa modification — bug préexistant découvert
+            // pendant le rétro-câblage (ticket 6.1) : incrémenter le stock à
+            // chaque sauvegarde, y compris une simple correction du même jour,
+            // aurait compté les œufs plusieurs fois. Modifier une fiche déjà
+            // enregistrée ne réajuste donc pas le stock — limitation connue,
+            // à traiter par un recalcul différentiel si un besoin réel émerge.
+            // ⚠️ TICKET 14.59 — RÈGLE EXTRAITE DANS
+            // `RecordEggProductionStockAction`. Elle vivait ici, donc la
+            // synchronisation ne pouvait pas l'atteindre : une ponte saisie hors
+            // ligne arrivait au serveur sans entrer un seul œuf au stock.
+            if ($dailyEntry->wasRecentlyCreated) {
+                app(RecordEggProductionStockAction::class)->execute($dailyEntry);
+            }
+
+            // Ticket 15.56 — la bande rattachée à un produit voit ses naissances, morts et DONS répercutés au stock.
+            app(SyncLotProductionStockAction::class)->execute($dailyEntry, $etatAvant);
+
+            return $dailyEntry;
+        });
 
         AuditLog::record('livestock_daily_entry.saved', 'elevage');
         $this->dispatch('toast', message: 'Jour enregistré avec succès.', type: 'success');
+    }
+
+    /**
+     * Ticket 15.57 — rationnement par stade, même règle que le poste (`RationVolaille`). Barème de l'aviculture.
+     */
+    public function getRationnementProperty(): array
+    {
+        return RationVolaille::tableau(
+            FeedRationStandard::where('species_code', 'aviculture')->get(),
+            RationVolaille::PONDEUSE,
+            $this->effectifFinalCalc,
+        );
     }
 
     public function render()

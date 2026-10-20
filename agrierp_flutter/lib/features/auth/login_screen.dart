@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../demarrage/premier_demarrage_repository.dart';
+import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
 ///
@@ -29,10 +31,19 @@ import '../../core/widgets/modale_agri.dart';
 /// 3. La maquette authentifie contre deux adresses codées en dur ; ici,
 ///    authentification RÉELLE contre `POST /api/auth/login`.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.auth, required this.onConnecte});
+  const LoginScreen({
+    super.key,
+    required this.auth,
+    required this.onConnecte,
+    this.demarrage,
+  });
 
   final AuthService auth;
   final VoidCallback onConnecte;
+
+  /// Ticket F0.98 — sur un poste NEUF, l'adresse du serveur s'affiche et se change avant la connexion
+  /// (« Paramètres du poste », réservé à l'administrateur, n'est pas encore accessible).
+  final PremierDemarrageRepository? demarrage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -46,6 +57,36 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _seSouvenir = false;
   bool _enCours = false;
   String? _erreur;
+
+  /// Ticket F0.98 — adresse affichée seulement sur un poste neuf (null sinon).
+  String? _adresseServeur;
+
+  @override
+  void initState() {
+    super.initState();
+    _lireServeur();
+  }
+
+  Future<void> _lireServeur() async {
+    final depot = widget.demarrage;
+    if (depot == null || !await depot.posteNeuf()) return;
+    final adresse = await depot.adresse();
+    if (mounted) setState(() => _adresseServeur = adresse);
+  }
+
+  Future<void> _changerServeur() async {
+    final nouvelle = await afficherModale<String>(
+      context: context,
+      constructeur: (_) => _DialogueServeur(adresse: _adresseServeur ?? ''),
+    );
+    if (nouvelle == null || nouvelle.trim().isEmpty) return;
+    try {
+      final enregistree = await widget.demarrage!.changerAdresse(nouvelle);
+      if (mounted) setState(() => _adresseServeur = enregistree);
+    } on StateError catch (e) {
+      if (mounted) setState(() => _erreur = e.message);
+    }
+  }
 
   @override
   void dispose() {
@@ -156,21 +197,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       _champ(
                         libelle: "NOM D'UTILISATEUR OU EMAIL",
                         controleur: _identifiant,
-                        icone: Icons.person_outline,
+                        icone: SymbolesAgri.person_outline,
                         indice: 'admin ou dg@olouwachegoun.bj',
                       ),
                       const SizedBox(height: AgriSpacing.md),
                       _champ(
                         libelle: 'MOT DE PASSE',
                         controleur: _motDePasse,
-                        icone: Icons.lock_outline,
+                        icone: SymbolesAgri.lock_outline,
                         indice: 'AgriERP@2026',
                         masque: !_motDePasseVisible,
                         suffixe: IconButton(
                           icon: Icon(
                             _motDePasseVisible
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+                                ? SymbolesAgri.visibility_off
+                                : SymbolesAgri.visibility,
                             size: 18,
                             color: AgriColors.outline,
                           ),
@@ -183,6 +224,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       _ligneOptions(),
                       const SizedBox(height: AgriSpacing.md),
                       _boutonConnexion(),
+                      if (_adresseServeur != null) ...[
+                        const SizedBox(height: AgriSpacing.md),
+                        Row(
+                          key: const Key('login-serveur'),
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Serveur : $_adresseServeur',
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                  color: AgriColors.outline,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              key: const Key('login-modifier-serveur'),
+                              onPressed: _changerServeur,
+                              child: const Text(
+                                'Modifier',
+                                style: TextStyle(fontSize: AgriTypography.xs),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -240,42 +306,49 @@ class _LoginScreenState extends State<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: Checkbox(
-                value: _seSouvenir,
-                onChanged: (v) => setState(() => _seSouvenir = v ?? false),
-                activeColor: AgriColors.brandEmerald,
+        // Flexible : à 440 px de colonne, une police plus large ne déborde pas (vu au test F0.98).
+        Flexible(
+          child: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: Checkbox(
+                  value: _seSouvenir,
+                  onChanged: (v) => setState(() => _seSouvenir = v ?? false),
+                  activeColor: AgriColors.brandEmerald,
+                ),
               ),
+              const SizedBox(width: AgriSpacing.sm),
+              const Flexible(
+                child: Text(
+                  'Se souvenir de moi',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.outline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: TextButton(
+            // ⚠️ La réinitialisation passe par un lien envoyé par E-MAIL : elle
+            // exige donc le réseau ET une adresse. Ouvrir une saisie hors ligne
+            // laisserait croire à un envoi qui n'aura pas lieu — l'écran renvoie
+            // vers la surface web, qui porte ce parcours en entier.
+            onPressed: () => afficherModale<void>(
+              context: context,
+              constructeur: (_) => const _DialogueMotDePasseOublie(),
             ),
-            const SizedBox(width: AgriSpacing.sm),
-            const Text(
-              'Se souvenir de moi',
+            child: const Text(
+              'Mot de passe oublié ?',
               style: TextStyle(
                 fontSize: AgriTypography.xs,
-                color: AgriColors.outline,
+                fontWeight: FontWeight.w600,
+                color: AgriColors.brandEmerald,
               ),
-            ),
-          ],
-        ),
-        TextButton(
-          // ⚠️ La réinitialisation passe par un lien envoyé par E-MAIL : elle
-          // exige donc le réseau ET une adresse. Ouvrir une saisie hors ligne
-          // laisserait croire à un envoi qui n'aura pas lieu — l'écran renvoie
-          // vers la surface web, qui porte ce parcours en entier.
-          onPressed: () => afficherModale<void>(
-            context: context,
-            constructeur: (_) => const _DialogueMotDePasseOublie(),
-          ),
-          child: const Text(
-            'Mot de passe oublié ?',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.w600,
-              color: AgriColors.brandEmerald,
             ),
           ),
         ),
@@ -312,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               )
             else
-              const Icon(Icons.lock_open, size: 16),
+              const Icon(SymbolesAgri.lock_open, size: 16),
             const SizedBox(width: AgriSpacing.sm),
             const Text(
               'SE CONNECTER',
@@ -350,7 +423,7 @@ class _PanneauFerme extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.agriculture,
+                SymbolesAgri.agriculture,
                 color: AgriColors.accentYellow,
                 size: 26,
               ),
@@ -417,13 +490,13 @@ class _BarreSuperieure extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: null,
-          icon: const Icon(Icons.dark_mode, size: 16),
+          icon: const Icon(SymbolesAgri.dark_mode, size: 16),
           label: const Text('Mode sombre', style: TextStyle(fontSize: 11)),
         ),
         const SizedBox(width: AgriSpacing.sm),
         OutlinedButton.icon(
           onPressed: null,
-          icon: const Icon(Icons.translate, size: 16),
+          icon: const Icon(SymbolesAgri.translate, size: 16),
           label: const Text('Français', style: TextStyle(fontSize: 11)),
         ),
         const SizedBox(width: AgriSpacing.sm),
@@ -452,7 +525,7 @@ class _EnTeteMarque extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.agriculture,
+              SymbolesAgri.agriculture,
               color: AgriColors.brandEmerald,
               size: 38,
             ),
@@ -513,13 +586,13 @@ class _BandeauModules extends StatelessWidget {
   const _BandeauModules();
 
   static const _icones = [
-    Icons.local_florist,
-    Icons.account_balance,
-    Icons.point_of_sale,
-    Icons.inventory_2,
-    Icons.pets,
-    Icons.analytics,
-    Icons.settings,
+    SymbolesAgri.local_florist,
+    SymbolesAgri.account_balance,
+    SymbolesAgri.point_of_sale,
+    SymbolesAgri.inventory_2,
+    SymbolesAgri.pets,
+    SymbolesAgri.analytics,
+    SymbolesAgri.settings,
   ];
 
   @override
@@ -561,7 +634,7 @@ class _BandeauErreur extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_clock, size: 18, color: AgriColors.errorDeep),
+          const Icon(SymbolesAgri.lock_clock, size: 18, color: AgriColors.errorDeep),
           const SizedBox(width: AgriSpacing.sm),
           Expanded(
             child: Text(
@@ -575,6 +648,50 @@ class _BandeauErreur extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Ticket F0.98 — saisie de l'adresse du serveur. ⚠️ StatefulWidget : le contrôleur vit avec la modale ;
+/// le libérer au retour de `afficherModale` le faisait servir pendant l'animation de fermeture.
+class _DialogueServeur extends StatefulWidget {
+  const _DialogueServeur({required this.adresse});
+
+  final String adresse;
+
+  @override
+  State<_DialogueServeur> createState() => _DialogueServeurState();
+}
+
+class _DialogueServeurState extends State<_DialogueServeur> {
+  late final _saisie = TextEditingController(text: widget.adresse);
+
+  @override
+  void dispose() {
+    _saisie.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ModaleAgri(
+      titre: 'Adresse du serveur',
+      largeur: LargeurModale.sm,
+      contenu: TextField(
+        key: const Key('login-adresse-serveur'),
+        controller: _saisie,
+        style: const TextStyle(fontSize: AgriTypography.xs),
+      ),
+      actions: [
+        BoutonModaleSecondaire(
+          libelle: 'Annuler',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        BoutonModalePrimaire(
+          libelle: 'Enregistrer',
+          onPressed: () => Navigator.of(context).pop(_saisie.text),
+        ),
+      ],
     );
   }
 }

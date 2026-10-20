@@ -11,6 +11,10 @@
                 <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
             </button>
             @can('manage-users')
+            {{-- Ticket 15.54 — vider les sessions (web et postes), session en cours conservée. --}}
+            <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-vider-sessions' })" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-error-deep font-bold text-xs px-md py-sm rounded-full transition-all">
+                <span class="material-symbols-outlined text-[18px]">logout</span>Déconnecter Toutes les Sessions
+            </button>
             <button type="button" wire:click="newUser" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvel Utilisateur
             </button>
@@ -85,6 +89,18 @@
             </table>
         </div>
     </div>
+
+    <x-modal name="modal-vider-sessions" max-width="sm">
+        <div class="text-center">
+            <span class="material-symbols-outlined text-error-deep" style="font-size:48px;">logout</span>
+            <h3 class="font-bold text-lg text-brand-forest mt-sm">Déconnecter toutes les sessions ?</h3>
+            <p class="text-xs text-outline mt-xs">Tous les utilisateurs du site sont déconnectés et chaque poste Windows devra se reconnecter. Les saisies en attente sur les postes sont conservées et partiront après la reconnexion. Votre propre session reste ouverte. L'action est journalisée.</p>
+            <div class="flex justify-center gap-sm mt-lg">
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-vider-sessions' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                <button type="button" wire:click="viderSessions" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold">Déconnecter</button>
+            </div>
+        </div>
+    </x-modal>
 
     <x-modal name="modal-create-gestion-utilisateurs" max-width="lg">
         <div class="flex items-center justify-between mb-md">

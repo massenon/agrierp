@@ -53,6 +53,13 @@ Schedule::job(new \App\Jobs\DailyProphylaxyReminderJob())
     ->timezone('Africa/Porto-Novo')
     ->onOneServer();
 
+// Ticket 15.49 — alertes de la cloche : stock sous seuil, mortalité anormale, soins planifiés à venir ou en
+// retard, échecs de reproduction (règles dans AlertesElevageService). Juste après le rappel de prophylaxie.
+Schedule::job(new \App\Jobs\DailyElevageAlertsJob())
+    ->dailyAt('06:05')
+    ->timezone('Africa/Porto-Novo')
+    ->onOneServer();
+
 // Nettoyage des sessions expirées — hebdomadaire.
 Schedule::command('session:gc')->weekly();
 
@@ -83,8 +90,10 @@ Schedule::call(function () {
 
     \App\Models\Notification::create([
         'target_role' => 'admin',
-        'type' => 'backup.reminder',
-        'severity' => $derniere === null ? 'error' : 'warning',
+        // Ticket 15.49 — `backup.reminder`, `error` et `warning` sont HORS des valeurs autorisées par la colonne
+        // (MySQL strict refusait l'écriture) : type `system`, gravités du référentiel.
+        'type' => 'system',
+        'severity' => $derniere === null ? 'critique' : 'moyen',
         'title' => 'Sauvegarde à télécharger',
         'message' => $derniere === null
             // Le cas « aucune sauvegarde » est le plus grave : il signale que la

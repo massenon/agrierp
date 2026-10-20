@@ -58,7 +58,9 @@ class SyncRetourFournisseurTest extends TestCase
         parent::setUp();
 
         Permission::findOrCreate('manage-achats', 'web');
-        Role::findOrCreate('acheteur', 'web')->givePermissionTo('manage-achats');
+        // Ticket S1 : l'acheteur de ces tests envoie aussi des sorties de stock, qui exigent `manage-stocks`.
+        Permission::findOrCreate('manage-stocks', 'web');
+        Role::findOrCreate('acheteur', 'web')->givePermissionTo(['manage-achats', 'manage-stocks']);
         Role::findOrCreate('caissier', 'web');
 
         $this->acheteur = $this->utilisateur('acheteur');

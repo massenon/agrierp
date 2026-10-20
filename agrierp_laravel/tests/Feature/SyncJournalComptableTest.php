@@ -140,7 +140,7 @@ class SyncJournalComptableTest extends TestCase
         $this->agirCommeComptable();
         Livewire::test(JournalComptable::class)->call('archiveEntry', $b->id);
 
-        $corps = $this->tirer('2026-10-10T10:01:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T10:01:00')->assertOk()->json();
 
         $this->assertSame([$a->id], $corps['accounting_entry_ids']);
         // L'archivée n'est plus servie dans le détail, mais les identifiants suffisent à la retirer.
@@ -153,7 +153,7 @@ class SyncJournalComptableTest extends TestCase
         $b = $this->ecrire(2_000, 'OD-0002 — B');
 
         // `since` dans le futur : plus aucune écriture n'est « modifiée »…
-        $corps = $this->tirer('2026-10-10T12:00:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T12:00:00')->assertOk()->json();
 
         $this->assertSame([], $corps['accounting_entries']);
         // … mais le poste doit toujours connaître l'ensemble des actives.
@@ -172,7 +172,7 @@ class SyncJournalComptableTest extends TestCase
             $e, $this->banque->id, $this->ventes->id, 4_000, '2026-10-05', 'OD-0001 — Vente',
         );
 
-        $corps = $this->tirer('2026-10-10T10:01:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T10:01:00')->assertOk()->json();
 
         $this->assertContains($e->id, array_column($corps['accounting_entries'], 'id'),
             "Une écriture dont les lignes ont été recréées DOIT être servie, même si sa date et sa référence n'ont pas changé.");
@@ -195,7 +195,7 @@ class SyncJournalComptableTest extends TestCase
             $e, $this->caisse->id, $this->ventes->id, 10_000, '2026-10-06', 'OD-0001 — Corrigée',
         );
 
-        $ids = array_column($this->tirer('2026-10-10T10:01:00+00:00')->json('accounting_entries'), 'id');
+        $ids = array_column($this->tirer('2026-10-10T10:01:00')->json('accounting_entries'), 'id');
 
         $this->assertSame([$e->id], $ids);
     }
@@ -211,7 +211,7 @@ class SyncJournalComptableTest extends TestCase
         Carbon::setTestNow('2026-10-10 10:05:00');
         AccountingEntry::findOrFail($e->id)->update(['is_active' => true]);
 
-        $corps = $this->tirer('2026-10-10T10:01:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-10T10:01:00')->assertOk()->json();
 
         $this->assertSame([$e->id], $corps['accounting_entry_ids']);
         $this->assertSame([$e->id], array_column($corps['accounting_entries'], 'id'));
@@ -227,7 +227,7 @@ class SyncJournalComptableTest extends TestCase
         DB::table('accounting_entry_lines')->where('entry_id', $b->id)->delete();
         DB::table('accounting_entries')->where('id', $b->id)->delete();
 
-        $this->assertSame([$a->id], $this->tirer('2026-10-10T12:00:00+00:00')->json('accounting_entry_ids'));
+        $this->assertSame([$a->id], $this->tirer('2026-10-10T12:00:00')->json('accounting_entry_ids'));
     }
 
     public function test_la_cloture_de_l_exercice_fait_redescendre_les_ecritures_verrouillees(): void
@@ -238,7 +238,7 @@ class SyncJournalComptableTest extends TestCase
         // Chemin de ClotureExercice (étape définitive) : mise à jour de masse via le modèle.
         AccountingEntry::where('fiscal_year_id', $e->fiscal_year_id)->update(['is_locked' => true]);
 
-        $lignes = $this->tirer('2026-10-10T10:01:00+00:00')->json('accounting_entries');
+        $lignes = $this->tirer('2026-10-10T10:01:00')->json('accounting_entries');
 
         $this->assertSame([$e->id], array_column($lignes, 'id'));
         $this->assertTrue($lignes[0]['is_locked']);
@@ -274,7 +274,7 @@ class SyncJournalComptableTest extends TestCase
         Product::where('id', $ancien->id)->update(['updated_at' => '2026-10-01 00:00:00']);
         ProductCategory::query()->update(['updated_at' => '2026-10-01 00:00:00']);
 
-        $corps = $this->tirer('2026-10-05T00:00:00+00:00')->assertOk()->json();
+        $corps = $this->tirer('2026-10-05T00:00:00')->assertOk()->json();
 
         $this->assertSame([], $corps['products']);
         $this->assertArrayHasKey('server_time', $corps);
@@ -290,7 +290,7 @@ class SyncJournalComptableTest extends TestCase
         Carbon::setTestNow('2026-10-10 10:05:00');
         $b = $this->ecrire(2_000, 'OD-0002 — B');
 
-        $corps = $this->tirer('2026-10-10T10:01:00+00:00')->json();
+        $corps = $this->tirer('2026-10-10T10:01:00')->json();
 
         $this->assertSame([$b->id], array_column($corps['accounting_entries'], 'id'));
         $this->assertEqualsCanonicalizing([$b->id], array_unique(array_column($corps['accounting_entry_lines'], 'entry_id')));

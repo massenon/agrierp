@@ -296,7 +296,8 @@ void main() {
         expect(f.map((x) => x.effectifFinal), [60, 52, 20]);
         expect(await bande(lapins), 20);
         expect(f.first.vente, 6);
-        expect(f.first.syncStatus, SyncStatus.pending);
+        // S-T9 : fiche déjà synchronisée — la vente s'y affiche, la fiche ne repart pas (la vente l'inscrit au serveur).
+        expect(f.first.syncStatus, SyncStatus.synced);
         expect(f[1].syncStatus, SyncStatus.synced);
         expect(f[2].syncStatus, SyncStatus.synced);
       },
@@ -423,8 +424,18 @@ void main() {
           'lib/features/ventes/caisse_repository.dart',
         ).readAsStringSync();
         expect(source.contains('_recalculerEnCascade'), isFalse);
-        expect(source.contains('recalculerEnCascade('), isTrue);
+        // Ticket S-T7 — la caisse n'écrit plus la fiche : elle la confie à son dépôt (un seul écrivain par
+        // table), dont `repercuterVente` passe par LA cascade unique.
+        expect(source.contains('.repercuterVente('), isTrue);
         expect(source.contains('calculerEffectifFinal('), isFalse);
+        final depot = File(
+          'lib/features/elevage/fiche_journaliere_repository.dart',
+        ).readAsStringSync();
+        final repercuter = depot.substring(
+          depot.indexOf('Future<void> repercuterVente('),
+          depot.indexOf('Future<void> reporterTransferts('),
+        );
+        expect(repercuter.contains('await recalculerEnCascade(lotId, jour);'), isTrue);
       },
     );
   });

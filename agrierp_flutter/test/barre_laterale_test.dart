@@ -137,6 +137,9 @@ void main() {
       EcranPoste.ficheReproducteurs,
       EcranPoste.fichePorcs,
       EcranPoste.ficheEscargots,
+      // Ticket 15.46 : comme les fiches, l'écran des transferts s'ouvre depuis « Gestion Élevage »
+      // (carte du hub). Accès vérifié par `transferts_bandes_test.dart`.
+      EcranPoste.transfertsBandes,
       // Premier onglet du hub de vente, comme dans la maquette.
       EcranPoste.caisse,
       // ⚠️ TROISIÈME FAMILLE (ticket F0.57) : les pages du MENU DU COMPTE de la

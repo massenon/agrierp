@@ -64,7 +64,7 @@
                     <label class="block text-[10px] text-brand-forest font-bold tracking-wider mb-1" for="identifiant">NOM D'UTILISATEUR OU EMAIL</label>
                     <div class="relative">
                         <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-[18px]">person</span>
-                        <input wire:model="identifiant" id="identifiant" name="identifiant" autocomplete="username" type="text" placeholder="admin ou dg@olouwachegoun.bj"
+                        <input wire:model="identifiant" id="identifiant" name="identifiant" autocomplete="username" type="text" placeholder="admin ou contact@fermeolouwachegoun.com"
                             class="w-full pl-11 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-brand-emerald outline-none text-xs h-11 {{ $errors->has('identifiant') ? 'is-invalid' : 'border-outline-variant' }}">
                     </div>
                     @error('identifiant') <p class="invalid-feedback">{{ $message }}</p> @enderror

@@ -89,13 +89,20 @@ class ElevageSynth extends Component
         return LivestockLot::where('is_active', true)->orderBy('code')->get();
     }
 
+    /**
+     * 🔴→✅ TICKET U11 — ORDRE DÉTERMINISTE. Deux fiches du même jour (deux bandes) sortaient dans l'ordre que le
+     * moteur de base voulait bien leur donner : MySQL, SQLite et le poste pouvaient les présenter autrement, et la
+     * fiche « la plus ancienne » de la mortalité hebdo (`sortBy('entry_date')->first()`) dépendait de ce hasard.
+     * Second critère : l'identifiant (UUID), croissant — le même au poste (`RapportsRepository.ordreDesFiches`).
+     */
     private function baseQuery()
     {
         return LivestockDailyEntry::with(['lot.species', 'treatmentProduct'])
             ->whereDate('entry_date', '>=', $this->startDate)
             ->whereDate('entry_date', '<=', $this->endDate)
             ->when($this->lotFilter, fn ($q) => $q->where('lot_id', $this->lotFilter))
-            ->orderByDesc('entry_date');
+            ->orderByDesc('entry_date')
+            ->orderBy('id');
     }
 
     public function getEntriesProperty()

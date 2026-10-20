@@ -1,6 +1,8 @@
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agrierp/core/theme/symboles_agri.dart';
 
 /// Ticket F0.25 — BARRE SUPÉRIEURE.
 ///
@@ -19,8 +21,10 @@ void main() {
     String groupe = 'PRODUCTION ÉLEVAGE & SOINS',
     String ecran = 'Fiches Lapins',
     int enAttente = 0,
+    int refuses = 0,
     bool menuOuvert = true,
     VoidCallback? onBascule,
+    VoidCallback? onSynchroniser,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -29,6 +33,8 @@ void main() {
             groupe: groupe,
             ecran: ecran,
             enAttente: enAttente,
+            refuses: refuses,
+            onSynchroniser: onSynchroniser,
             menuOuvert: menuOuvert,
             onBasculerMenu: onBascule ?? () {},
           ),
@@ -56,18 +62,19 @@ void main() {
     expect(find.byKey(const Key('bascule-menu')), findsOneWidget);
     expect(find.byKey(const Key('fil-ariane')), findsOneWidget);
     expect(find.byKey(const Key('recherche-globale')), findsOneWidget);
-    expect(find.byKey(const Key('pastille-sync')), findsOneWidget);
+    expect(find.byKey(const Key('bouton-synchroniser')), findsOneWidget);
+    // Ticket H2 : la pastille non cliquable a cédé la place au bouton.
+    expect(find.byKey(const Key('pastille-sync')), findsNothing);
     expect(find.byKey(const Key('cloche-notifications')), findsOneWidget);
   });
 
-  testWidgets('la bascule du menu change d icône selon son état', (
-    tester,
-  ) async {
+  // Ticket H1 — comme au web, la bascule garde TOUJOURS l'icône `menu_open`.
+  testWidgets('la bascule du menu garde l icône du web', (tester) async {
     await afficher(tester);
-    expect(find.byIcon(Icons.menu_open), findsOneWidget);
+    expect(find.byIcon(SymbolesAgri.menu_open), findsOneWidget);
 
     await afficher(tester, menuOuvert: false);
-    expect(find.byIcon(Icons.menu), findsOneWidget);
+    expect(find.byIcon(SymbolesAgri.menu_open), findsOneWidget);
   });
 
   testWidgets('la bascule prévient le socle', (tester) async {
@@ -80,22 +87,32 @@ void main() {
     expect(bascule, 1);
   });
 
-  /// ⚠️ LA PASTILLE COMPTE CE QUI ATTEND D'ÊTRE ENVOYÉ : c'est le seul chiffre
-  /// qui dise à l'animalier si sa journée est partie.
-  testWidgets('la pastille Sync annonce les enregistrements en attente', (
-    tester,
-  ) async {
+  /// Ticket H2 — LE BADGE DU BOUTON « SYNCHRONISER » COMPTE CE QUI N'EST PAS ENCORE AU SERVEUR : c'est le seul
+  /// chiffre qui dise à l'animalier si sa journée est partie. Gabarit du badge de la cloche web : « 9+ » au plus.
+  testWidgets('le badge du bouton Synchroniser compte la file, émeraude sans refus', (tester) async {
     await afficher(tester, enAttente: 4);
 
-    expect(find.text('Sync · 4 en attente'), findsOneWidget);
+    final badge = find.byKey(const Key('bouton-synchroniser-badge'));
+    expect(find.descendant(of: badge, matching: find.text('4')), findsOneWidget);
+    expect((tester.widget<Container>(badge).decoration! as BoxDecoration).color, AgriColors.brandEmerald);
   });
 
-  testWidgets('sans rien en attente, la pastille dit simplement « Sync »', (
-    tester,
-  ) async {
-    await afficher(tester);
+  testWidgets('un refus à corriger passe le badge au rouge ; plafond « 9+ »', (tester) async {
+    await afficher(tester, enAttente: 12, refuses: 1);
 
-    expect(find.text('Sync'), findsOneWidget);
+    final badge = find.byKey(const Key('bouton-synchroniser-badge'));
+    expect(find.descendant(of: badge, matching: find.text('9+')), findsOneWidget);
+    expect((tester.widget<Container>(badge).decoration! as BoxDecoration).color, AgriColors.errorRed);
+  });
+
+  testWidgets('sans rien en attente, aucun badge ; le bouton ouvre la synchronisation', (tester) async {
+    var ouvertures = 0;
+    await afficher(tester, onSynchroniser: () => ouvertures++);
+
+    expect(find.byKey(const Key('bouton-synchroniser-badge')), findsNothing);
+    await tester.tap(find.byKey(const Key('bouton-synchroniser')));
+    await tester.pumpAndSettle();
+    expect(ouvertures, 1);
   });
 
   /// ⚠️ LA RECHERCHE GLOBALE PARCOURT TOUS LES ÉCRANS DU WEB ; le poste n'en

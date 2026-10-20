@@ -41,6 +41,8 @@ class RecordPurchaseAction
         ?string $purchaseId = null,
         ?string $purchaseDate = null,
         ?string $purchaseOrderId = null,
+        // Ticket S-T12 — date de l'entrée en stock (achat du poste : l'instant de l'achat) ; `null` = maintenant.
+        ?\DateTimeInterface $instantDuMouvement = null,
     ): Purchase {
         $total = collect($lignes)->sum(
             fn (array $l) => (float) $l['qty'] * (float) $l['unit_price']
@@ -59,7 +61,7 @@ class RecordPurchaseAction
 
         return DB::transaction(function () use (
             $supplierId, $lignes, $paymentMode, $treasuryAccountId,
-            $total, $regle, $purchaseId, $purchaseDate, $purchaseOrderId
+            $total, $regle, $purchaseId, $purchaseDate, $purchaseOrderId, $instantDuMouvement
         ) {
             // ⚠️⚠️ L'IDENTIFIANT SE POSE HORS DE `create()`. `id` n'est pas
             // dans `$fillable` — et il ne doit pas y être : `create(['id' =>
@@ -96,7 +98,7 @@ class RecordPurchaseAction
                 $produit = Product::find($ligne['product_id']);
                 if ($produit) {
                     app(AdjustStockAction::class)
-                        ->execute($produit, (float) $ligne['qty'], 'purchase', $achat->id);
+                        ->execute($produit, (float) $ligne['qty'], 'purchase', $achat->id, $instantDuMouvement);
                 }
             }
 

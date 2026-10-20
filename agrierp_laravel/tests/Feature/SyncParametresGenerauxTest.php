@@ -47,6 +47,11 @@ class SyncParametresGenerauxTest extends TestCase
             'email' => 'dg@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+
+        // Ticket S3 : le journal d'audit ne descend qu'aux comptes qui gèrent les utilisateurs. Permission
+        // directe, sans rôle : ces tests créent eux-mêmes les rôles dont ils vérifient le transport.
+        Permission::findOrCreate('manage-users', 'web');
+        $this->administrateur->givePermissionTo('manage-users');
     }
 
     private function tirer(): \Illuminate\Testing\TestResponse
@@ -192,14 +197,16 @@ class SyncParametresGenerauxTest extends TestCase
     }
 
     /**
-     * ⚠️ CENT LIGNES, PAS TOUT L'HISTORIQUE : la table grossit d'une ligne par
-     * action, et un poste n'a pas à en porter des années.
+     * ⚠️ PAS TOUT L'HISTORIQUE : la table grossit d'une ligne par action, et un
+     * poste n'a pas à en porter des années. Ticket U14 : DEUX CENTS lignes, la
+     * liste de l'onglet du web (`AuditLogs::getLogsProperty()`, `limit(200)`),
+     * et non cent — l'onglet du poste montre la même liste.
      */
-    public function test_the_audit_trail_is_capped_at_a_hundred_lines(): void
+    public function test_le_journal_tire_est_plafonne_a_la_liste_du_web(): void
     {
         AuditLog::query()->delete();
 
-        for ($i = 0; $i < 120; $i++) {
+        for ($i = 0; $i < 220; $i++) {
             AuditLog::create([
                 'user_id' => $this->administrateur->id,
                 'action' => 'api.login',
@@ -210,7 +217,7 @@ class SyncParametresGenerauxTest extends TestCase
 
         $traces = $this->tirer()->assertOk()->json('audit_logs');
 
-        $this->assertCount(100, $traces);
+        $this->assertCount(200, $traces);
     }
 
     /**

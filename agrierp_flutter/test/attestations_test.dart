@@ -784,7 +784,7 @@ void main() {
 
       expect(find.text('FERME ÉCOLE OLOUWACHEGOUN'), findsOneWidget);
       expect(find.text('RCCM : RB/PNO/22 A 33870'), findsOneWidget);
-      expect(find.text('OLOUKOUNLE Olouchegoun Hassimiyou'), findsOneWidget);
+      expect(find.text('M. Olouchègoun'), findsOneWidget);
       expect(find.text('Fait à Ikpinlè, le 28/07/2026.'), findsOneWidget);
       // L'IFU de démonstration du prototype n'est PAS repris.
       expect(find.textContaining('3202601234567'), findsNothing);

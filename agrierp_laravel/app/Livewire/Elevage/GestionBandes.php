@@ -2,9 +2,14 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\TransferBetweenLotsAction;
 use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use App\Services\EffectifParCategorieService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -63,7 +68,8 @@ class GestionBandes extends Component
 
     public string $species_id = '';
 
-    public string $stage = 'Reproduction';
+    /** Valeur STOCKÉE du stade (`reproduction`, `croissance`, `ponte`, `engraissement`) ; libellé selon l'espèce. */
+    public string $stage = 'reproduction';
 
     public string $created_date = '';
 
@@ -81,6 +87,13 @@ class GestionBandes extends Component
     public string $product_id = '';
 
     public string $status = 'actif';
+
+    /**
+     * Ticket 15.46 — bande d'origine FACULTATIVE : la nouvelle bande est constituée de sujets déjà comptés dans
+     * une autre (portée, sevrés). Sa création inscrit leur sortie de la bande d'origine (constitution), sinon ils
+     * seraient comptés deux fois dans « Effectif Total Vivant ». Vide pour un achat ou des animaux extérieurs.
+     */
+    public string $lot_origine_id = '';
 
     /**
      * Produits candidats pour la bande sélectionnée.
@@ -105,7 +118,7 @@ class GestionBandes extends Component
 
     public function getKpisProperty(): array
     {
-        $actives = LivestockLot::where('status', 'actif');
+        $actives = LivestockLot::vivantes();   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
 
         return [
             'bandes_actives' => (clone $actives)->count(),
@@ -118,10 +131,18 @@ class GestionBandes extends Component
             // et le calendrier de soins existent réellement — compte les
             // bandes actives sous rémanence en cours aujourd'hui.
             'alertes_sanitaires' => \App\Models\VeterinaryWithdrawalPeriod::where('end_date', '>=', now()->toDateString())
-                ->whereHas('lot', fn ($q) => $q->where('status', 'actif'))
+                ->whereHas('lot', fn ($q) => $q->vivantes())
                 ->distinct('lot_id')
                 ->count('lot_id'),
         ];
+    }
+
+    /** Ticket 15.46 — bandes vivantes de l'espèce choisie, candidates comme bande d'origine. */
+    public function getBandesOriginePossiblesProperty()
+    {
+        return $this->species_id === ''
+            ? collect()
+            : LivestockLot::where('species_id', $this->species_id)->where('is_active', true)->orderBy('code')->get();
     }
 
     public function getSpeciesOptionsProperty()
@@ -165,6 +186,55 @@ class GestionBandes extends Component
         return $this->viewingLotId ? LivestockLot::with('species')->find($this->viewingLotId) : null;
     }
 
+    /**
+     * 🔴→✅ TIROIR « AUTONOMIE ALIMENTAIRE » — était un « sera alimenté… Sprint 6 » alors que le stock de provende
+     * et la provende servie existent. Autonomie de la FILIÈRE de la bande (le stock de provende est commun à la
+     * filière), même calcul que les fiches (AutonomieAlimentaireService), plus la provende servie à CETTE bande
+     * sur sa dernière fiche.
+     */
+    public function getAutonomieBandeProperty(): ?array
+    {
+        $lot = $this->viewingLot;
+        if (! $lot || ! $lot->species) {
+            return null;
+        }
+
+        $derniere = \App\Models\LivestockDailyEntry::where('lot_id', $lot->id)->orderByDesc('entry_date')->first();
+
+        return [
+            'filiere' => app(\App\Services\AutonomieAlimentaireService::class)->pourEspece($lot->species->code),
+            'provende_bande_kg' => $derniere?->feed_qty_kg === null ? null : round((float) $derniere->feed_qty_kg, 2),
+            'date_fiche' => $derniere?->entry_date,
+        ];
+    }
+
+    /**
+     * 🔴→✅ TIROIR « SUIVI SANITAIRE » — était un « sera alimenté… ticket 3.12 » alors que rémanences, infirmerie et
+     * registre vétérinaire existent. Données réelles de la bande : délai d'attente en cours (vente interdite),
+     * sujets en infirmerie, mortalité des 7 derniers jours, derniers soins ACTIFS du registre.
+     */
+    public function getSuiviSanitaireBandeProperty(): ?array
+    {
+        $lot = $this->viewingLot;
+        if (! $lot) {
+            return null;
+        }
+
+        $fiches7j = \App\Models\LivestockDailyEntry::where('lot_id', $lot->id)
+            ->whereDate('entry_date', '>=', now()->subDays(6)->toDateString())->get();
+        $depart7j = $fiches7j->sortBy('entry_date')->first()?->previousEffectif();
+
+        return [
+            'remanence' => \App\Models\VeterinaryWithdrawalPeriod::where('lot_id', $lot->id)
+                ->whereDate('end_date', '>=', now()->toDateString())->orderByDesc('end_date')->first(),
+            'infirmerie' => \App\Models\InfirmaryRecord::where('lot_id', $lot->id)->where('status', 'en_cours')->count(),
+            'morts_7j' => (int) $fiches7j->sum('mort'),
+            'mortalite_7j' => $depart7j ? round($fiches7j->sum('mort') / $depart7j * 100, 1) : null,
+            'derniers_soins' => \App\Models\VeterinaryRecord::where('lot_id', $lot->id)->where('is_active', true)
+                ->orderByDesc('record_date')->orderByDesc('created_at')->limit(3)->get(),
+        ];
+    }
+
     public function view(string $id): void
     {
         $this->viewingLotId = $id;
@@ -175,6 +245,17 @@ class GestionBandes extends Component
         $this->viewingLotId = null;
     }
 
+    /**
+     * Stades proposés pour l'espèce choisie : Reproducteur / Jeune / Sous-mères pour les lapins
+     * (décision client du 17/10/2026), les quatre stades génériques sinon.
+     *
+     * @return array<string, string>
+     */
+    public function getStadesProperty(): array
+    {
+        return LivestockLot::stadesPourEspece(LivestockSpecies::find($this->species_id)?->code);
+    }
+
     public function updatedSpeciesId(): void
     {
         $species = LivestockSpecies::find($this->species_id);
@@ -182,14 +263,19 @@ class GestionBandes extends Component
         if ($species) {
             $this->code = LivestockLot::suggestNextCode($species->code);
         }
+
+        // Un stade qui n'existe pas pour la nouvelle espèce (la ponte pour les lapins) n'est jamais gardé.
+        if (! array_key_exists($this->stage, $this->stades)) {
+            $this->stage = array_key_first($this->stades);
+        }
     }
 
     public function newLot(): void
     {
         $this->authorize('manage-elevage');
 
-        $this->reset(['editingLotId', 'code', 'species_id', 'acquisition_cost']);
-        $this->stage = 'Reproduction';
+        $this->reset(['editingLotId', 'code', 'species_id', 'acquisition_cost', 'lot_origine_id']);
+        $this->stage = 'reproduction';
         $this->created_date = now()->format('Y-m-d');
         $this->quantity = 0;
         $this->dispatch('open-modal', name: 'modal-create-bande');
@@ -202,20 +288,36 @@ class GestionBandes extends Component
         $this->validate([
             'code' => ['required', 'string', 'max:50', 'unique:livestock_lots,code'],
             'species_id' => ['required', 'exists:livestock_species,id'],
-            'stage' => ['required', 'in:Reproduction,Croissance,Ponte,Engraissement'],
+            'stage' => ['required', 'in:'.implode(',', array_keys($this->stades))],
             'created_date' => ['required', 'date'],
             'quantity' => ['required', 'integer', 'min:1'],
             'product_id' => ['nullable', 'exists:products,id'],
+            'lot_origine_id' => ['nullable', 'exists:livestock_lots,id'],
         ]);
 
-        $stageMap = ['Reproduction' => 'reproduction', 'Croissance' => 'croissance', 'Ponte' => 'ponte', 'Engraissement' => 'engraissement'];
+        try {
+            DB::transaction(fn () => $this->creerLaBande());
+        } catch (ValidationException $e) {
+            // La constitution est refusée (bande d'origine insuffisante…) : la bande n'est pas créée non plus.
+            $this->addError('lot_origine_id', collect($e->errors())->flatten()->first());
 
-        LivestockLot::create([
+            return;
+        }
+
+        AuditLog::record('livestock_lot.created', 'elevage');
+        $this->dispatch('close-modal', name: 'modal-create-bande');
+        $this->dispatch('toast', message: 'Bande créée avec succès.', type: 'success');
+        $this->reset(['code', 'species_id', 'quantity', 'acquisition_cost', 'product_id', 'lot_origine_id']);
+    }
+
+    private function creerLaBande(): void
+    {
+        $lot = LivestockLot::create([
             'code' => $this->code,
             'species_id' => $this->species_id,
             // Ticket 14.37 : ce que la bande produit, décidé par l'exploitant.
             'product_id' => $this->product_id ?: null,
-            'stage' => $stageMap[$this->stage],
+            'stage' => $this->stage,
             'initial_quantity' => $this->quantity,
             'current_quantity' => $this->quantity,
             'created_date' => $this->created_date,
@@ -224,10 +326,19 @@ class GestionBandes extends Component
             'is_active' => true,
         ]);
 
-        AuditLog::record('livestock_lot.created', 'elevage');
-        $this->dispatch('close-modal', name: 'modal-create-bande');
-        $this->dispatch('toast', message: 'Bande créée avec succès.', type: 'success');
-        $this->reset(['code', 'species_id', 'quantity', 'acquisition_cost', 'product_id']);
+        if ($this->lot_origine_id !== '') {
+            app(TransferBetweenLotsAction::class)->execute([
+                'source_lot_id' => $this->lot_origine_id,
+                'target_lot_id' => $lot->id,
+                'transfer_date' => $lot->created_date->format('Y-m-d'),
+                'quantity' => $lot->initial_quantity,
+                'categorie' => EffectifParCategorieService::especeDuLot($lot->load('species')) !== null
+                    ? EffectifParCategorieService::categorieDuStade($lot->stage)
+                    : null,
+                'constitution' => true,
+                'motif' => 'Constitution de la bande '.$lot->code,
+            ], Auth::user());
+        }
     }
 
     public function editLot(string $id): void
@@ -237,7 +348,8 @@ class GestionBandes extends Component
         $lot = LivestockLot::findOrFail($id);
         $this->editingLotId = $lot->id;
         $this->code = $lot->code;
-        $this->stage = ucfirst($lot->stage);
+        $this->species_id = $lot->species_id;
+        $this->stage = $lot->stage;
         $this->quantity = $lot->current_quantity;
         $this->status = $lot->status;
         $this->dispatch('open-modal', name: 'modal-edit-bande');
@@ -248,15 +360,13 @@ class GestionBandes extends Component
         $this->authorize('manage-elevage');
 
         $this->validate([
-            'stage' => ['required', 'in:Reproduction,Croissance,Ponte,Engraissement'],
+            'stage' => ['required', 'in:'.implode(',', array_keys($this->stades))],
             'quantity' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:actif,cloture'],
         ]);
 
-        $stageMap = ['Reproduction' => 'reproduction', 'Croissance' => 'croissance', 'Ponte' => 'ponte', 'Engraissement' => 'engraissement'];
-
         LivestockLot::findOrFail($this->editingLotId)->update([
-            'stage' => $stageMap[$this->stage],
+            'stage' => $this->stage,
             'current_quantity' => $this->quantity,
             'status' => $this->status,
         ]);

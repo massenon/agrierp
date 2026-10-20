@@ -160,6 +160,9 @@ class EggProductionStockTest extends TestCase
             'email' => 'elevage@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $utilisateur->assignRole('admin');
 
         $reponse = $this->actingAs($utilisateur, 'sanctum')->postJson('/api/sync/push', [
             'livestock_daily_entries' => [[
@@ -189,6 +192,9 @@ class EggProductionStockTest extends TestCase
             'email' => 'elevage@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $utilisateur->assignRole('admin');
 
         $charge = ['livestock_daily_entries' => [[
             'id' => '99999999-9999-4999-8999-999999999999',
@@ -218,6 +224,9 @@ class EggProductionStockTest extends TestCase
             'email' => 'elevage@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $utilisateur->assignRole('admin');
 
         \Livewire\Livewire::actingAs($utilisateur)
             ->test(\App\Livewire\Elevage\FichePondeuses::class)
@@ -242,6 +251,9 @@ class EggProductionStockTest extends TestCase
             'email' => 'elevage@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $utilisateur->assignRole('admin');
 
         $reponse = $this->actingAs($utilisateur, 'sanctum')->getJson('/api/sync/pull');
 

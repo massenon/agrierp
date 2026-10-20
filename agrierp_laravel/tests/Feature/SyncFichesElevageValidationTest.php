@@ -44,6 +44,12 @@ class SyncFichesElevageValidationTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 
+        // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->utilisateur->assignRole('admin');
+
         $espece = LivestockSpecies::firstOrCreate(
             ['code' => 'cuniculture'],
             ['label' => 'Cuniculture', 'is_active' => true],
@@ -134,10 +140,12 @@ class SyncFichesElevageValidationTest extends TestCase
      */
     public function test_a_duplicate_day_rejects_only_that_sheet(): void
     {
-        // Un premier poste a deja transmis la journee.
+        // Un premier poste a deja transmis la journee, AVEC une saisie d'elevage (ticket S-T9 : une fiche sans saisie,
+        // nee d'une vente, est desormais reunie a celle du second poste ; deux saisies differentes restent refusees).
         LivestockDailyEntry::create([
             'lot_id' => $this->bande->id,
             'entry_date' => now()->toDateString(),
+            'mort' => 1,
             'effectif_final' => 40,
         ]);
 

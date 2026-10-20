@@ -174,6 +174,8 @@ class DurcissementPushAdministrationTest extends TestCase
             'accounting_entries', 'accounting_entry_lines', 'company_settings', 'modules_config', 'roles',
             'users', 'audit_logs', 'notifications', 'lot_revenues', 'animals', 'livestock_species',
             'attestation_templates', 'attestation_counts',
+            // Ticket U2 — objectifs de GMQ.
+            'growth_standards',
         ];
 
         $jeux = [];

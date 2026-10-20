@@ -98,6 +98,8 @@ class AuditLog extends Model
         'company_settings.updated' => "Données de l'entreprise modifiées",
         'company_settings.smtp_updated' => 'Configuration SMTP modifiée',
         'company_settings.smtp_tested' => 'Test SMTP envoyé',
+        // Ticket CFG-1 — effacement explicite du mot de passe SMTP (onglet Email (SMTP)).
+        'company_settings.smtp_password_cleared' => 'Mot de passe SMTP effacé',
         'company_settings.sms_updated' => 'Configuration SMS modifiée',
         'database.backup_generated' => 'Sauvegarde générée',
         'database.backup_downloaded' => 'Sauvegarde téléchargée',
@@ -117,6 +119,8 @@ class AuditLog extends Model
         'customer.created' => 'Client créé',
         'customer.updated' => 'Client modifié',
         'customer.archived' => 'Client archivé',
+        // Ticket S-T5 — création d'un poste fusionnée avec une fiche existante (même clé naturelle).
+        'customer.merged' => 'Client du poste fusionné avec une fiche existante',
         'customer_reminder.sent_' => 'Relance client envoyée',
         'credit_note.created' => 'Avoir créé',
         'credit_note.treated' => 'Avoir traité',
@@ -128,6 +132,7 @@ class AuditLog extends Model
         'supplier.created' => 'Fournisseur créé',
         'supplier.updated' => 'Fournisseur modifié',
         'supplier.archived' => 'Fournisseur archivé',
+        'supplier.merged' => 'Fournisseur du poste fusionné avec une fiche existante',
         'supplier_refund.recorded' => 'Remboursement fournisseur enregistré',
         'payable.payment_recorded' => 'Règlement fournisseur enregistré',
         // Ticket 15.19 — avances clients (clés posées depuis le Sprint 4, jamais libellées).
@@ -141,9 +146,13 @@ class AuditLog extends Model
         'product.created' => 'Produit créé',
         'product.updated' => 'Produit modifié',
         'product.archived' => 'Produit archivé',
+        'product.merged' => 'Produit du poste fusionné avec une fiche existante',
         'product.threshold_updated' => "Seuil d'alerte modifié",
         'stock.adjusted' => 'Stock ajusté',
         'stock.manual_addition' => 'Ajout manuel de stock',
+        // Ticket S-T10 — inventaire du poste acquitté sans mouvement.
+        'stock.inventaire_sans_ecart' => "Inventaire du poste sans écart au serveur",
+        'stock.inventaire_depasse' => 'Inventaire du poste remplacé par un inventaire plus récent',
         'transformation.recorded' => 'Transformation enregistrée',
         'livestock_lot.created' => 'Lot créé',
         'livestock_lot.updated' => 'Lot modifié',
@@ -168,6 +177,11 @@ class AuditLog extends Model
         'prophylaxis_schedule.saved' => 'Calendrier de prophylaxie enregistré',
         'prophylaxis_schedule.deleted' => 'Calendrier de prophylaxie supprimé',
         'elevage_numbering.updated' => 'Numérotation élevage modifiée',
+        // Ticket H9b — l'écran web et le poste ARCHIVENT (14.55) : ces clés s'affichaient brutes au journal.
+        'feed_ration_standard.archived' => 'Barème de rationnement archivé',
+        'feed_type.archived' => "Type d'aliment archivé",
+        'prophylaxis_schedule.archived' => 'Calendrier de prophylaxie archivé',
+        'rappel_soins.updated' => 'Délai de rappel des soins modifié',
         'employee.created' => 'Employé créé',
         'employee.updated' => 'Employé modifié',
         'employee.archived' => 'Employé archivé',
@@ -181,6 +195,14 @@ class AuditLog extends Model
         'api.login' => 'Connexion API (appareil Flutter)',
         'api.logout' => 'Déconnexion API (appareil Flutter)',
         'api.sync_push' => 'Synchronisation — données envoyées par un appareil',
+        // Ticket CFG-1 — onglet Postes & Appairage : jetons d'un poste supprimés.
+        'sync.appairage_revoque' => "Appairage d'un poste révoqué",
+        'sale.negative_stock_received' => 'Vente reçue d\'un poste : stock passé sous zéro',
+        // Ticket U14 — écrit par l'envoi des postes quand la facture d'une vente reçue n'a pas pu être transmise au
+        // MeCeF (vente gardée, statut « erreur », retransmission depuis Facturation). Il était écrit avant S-T13 sans
+        // libellé : le journal d'audit montrait la clé technique.
+        'sale.mecef_failed_on_sync' => 'Vente reçue d\'un poste : échec de la transmission MeCeF',
+        'reproduction_event.updated_from_device' => 'Cycle de reproduction mis à jour depuis un poste',
         'attestation.generated.employe' => 'Attestation de travail générée',
         'attestation.generated.stagiaire' => 'Attestation de stage générée',
         'attestation_template.updated' => "Modèle d'attestation modifié",

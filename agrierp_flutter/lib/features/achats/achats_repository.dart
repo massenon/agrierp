@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
+import '../../core/temps/heure_benin.dart';
 
 /// Une ligne du panier d'achat, avant enregistrement.
 class LigneSaisieAchat {
@@ -28,9 +29,16 @@ class LigneAchat {
     this.retour,
     this.motifRefusRetour,
     this.motifRefusAchat,
+    this.categorie,
   });
 
   final Purchase achat;
+
+  /// Colonne « Catégorie » de la liste — ticket U8, comme `ListeAchats::getPurchasesProperty()` du web : la
+  /// catégorie de PRODUIT de la PREMIÈRE ligne de l'achat (`lines->first()?->product?->category?->label`), et non
+  /// la catégorie du fournisseur. `null` (« — ») pour un achat sans ligne ou dont le produit n'a pas de catégorie.
+  /// Voir [AchatsRepository.categoriesDesAchats].
+  final String? categorie;
 
   /// Motif de rejet de l'ACHAT lui-même au push, mot pour mot (ticket F0.77) : compte
   /// absent du plan comptable, total nul, exercice clos… Le serveur seul sait pourquoi.
@@ -48,7 +56,8 @@ class LigneAchat {
   /// comptabilité n'ont bougé.
   final bool envoye;
 
-  /// Le retour fournisseur demandé AU POSTE pour cet achat, s'il y en a un (ticket F0.74).
+  /// Le retour fournisseur de cet achat, s'il y en a un : la demande saisie AU POSTE (ticket F0.74), ou —
+  /// depuis U8 — une ligne de retour servie par le serveur (`synced`).
   final RetourFournisseur? retour;
 
   /// Motif de rejet du retour, mot pour mot tel que le serveur l'a donné.
@@ -126,6 +135,7 @@ class DocumentsAchats {
 
     return DocumentOfficiel(
       titre: 'Liste des Achats',
+      fichier: 'achats-{jour}.pdf',
       sousTitre: 'Historique des achats et bons de commande',
       entetes: const [
         'Référence Achat',
@@ -140,7 +150,7 @@ class DocumentsAchats {
             inconnu,
             AchatsRepository.jour(l.achat.purchaseDate),
             l.achat.supplierName ?? inconnu,
-            l.achat.supplierCategory ?? inconnu,
+            l.categorie ?? inconnu,
             '${AchatsRepository.montant(l.achat.total)} FCFA',
           ]),
       ],
@@ -159,9 +169,8 @@ class DocumentsAchats {
   ///
   /// ⚠️ **RÉFÉRENCE, OPÉRATEUR ET TVA RÉCUPÉRABLE SONT DES TIRETS.** Aucune
   /// référence ni opérateur n'est servi par le serveur ; la TVA se ventile là-bas
-  /// ligne à ligne, selon le taux de chaque produit — les lignes d'un achat
-  /// reçu ne descendent pas. Un « 0 » imprimé sur un document qui SORT de la
-  /// ferme affirmerait qu'il n'y a aucune TVA à récupérer.
+  /// ligne à ligne, selon le taux de chaque produit. Un « 0 » imprimé sur un
+  /// document qui SORT de la ferme affirmerait qu'il n'y a aucune TVA à récupérer.
   static DocumentOfficiel bonReception(LigneAchat ligne) {
     final a = ligne.achat;
 
@@ -203,7 +212,16 @@ class DonneesAchats {
     this.creances = const [],
     this.remboursements = const [],
     this.dettes = const [],
+    this.lignesRetourServies = const {},
+    this.lignesParAchat = const {},
   });
+
+  /// Ticket U8 — nombre de LIGNES DE RETOUR servies par le serveur (`purchase_returns`, une ligne par ligne d'achat
+  /// retournée), par achat.
+  final Map<String, int> lignesRetourServies;
+
+  /// Nombre de lignes d'achat (`purchase_lines`) de chaque achat — repli de [ecartsEtRetours].
+  final Map<String, int> lignesParAchat;
 
   /// Dettes fournisseurs servies par le serveur (`payables`) : seules à porter `amount_paid`.
   final List<Payable> dettes;
@@ -314,16 +332,25 @@ class DonneesAchats {
   double get depensesRetournees =>
       achatsRetournes.fold<double>(0, (t, l) => t + l.achat.total);
 
-  /// « Écarts / Retours » — le nombre d'ACHATS RETOURNÉS (ticket F0.74).
+  /// « Écarts / Retours » — 🔴→✅ TICKET U8 : les LIGNES DE RETOUR, comme le web
+  /// (`PurchaseReturn::count()`), et non plus les achats retournés.
   ///
-  /// Calculable depuis que `returned_at` descend et que le poste acquitte ses propres
-  /// retours : un tiret n'est plus honnête, et « 0 » l'est maintenant (le poste SAIT
-  /// qu'aucun achat n'est retourné). ⚠️ **L'UNITÉ DIFFÈRE DU SERVEUR** : la page web
-  /// compte les LIGNES de retour (`PurchaseReturn::count()`) ; les lignes d'un achat reçu ne
-  /// descendent pas, le poste compte donc des achats (un retour annule tout l'achat, D6).
-  /// Un retour en attente d'envoi n'est PAS compté : il n'est pas encore un fait pour la
-  /// ferme (la légende le dit).
-  int get ecartsEtRetours => achatsRetournes.length;
+  /// `purchase_returns` descend au tirage depuis U8 (lignes des retours des achats servis) :
+  ///  - les lignes de retour servies par le serveur sont comptées telles quelles ([lignesRetourServies]) ;
+  ///  - un achat RETOURNÉ dont le poste n'a encore reçu aucune ligne de retour (retour du poste acquitté, tirage
+  ///    de confirmation pas encore passé ; serveur antérieur à U8) compte ses lignes d'achat : le serveur crée
+  ///    exactement une ligne de retour par ligne d'achat (`PurchaseReturnService`, D6 — annulation complète).
+  /// Un retour en attente d'envoi n'est PAS compté : il n'est pas encore un fait pour la ferme (la légende le
+  /// dit) ; un retour refusé (`conflict`) non plus — le web ne le connaîtra pas.
+  int get ecartsEtRetours {
+    var total = lignesRetourServies.values.fold<int>(0, (t, n) => t + n);
+    for (final l in achatsRetournes) {
+      if (!lignesRetourServies.containsKey(l.achat.id)) {
+        total += lignesParAchat[l.achat.id] ?? 0;
+      }
+    }
+    return total;
+  }
 }
 
 /// Lectures et écritures de `prototype_html/achats-commandes.html`.
@@ -350,9 +377,45 @@ class AchatsRepository {
   /// Horloge injectée (tests) : « date future refusée » se juge sur le jour du poste.
   final DateTime Function()? horloge;
 
-  DateTime get _maintenant => (horloge ?? DateTime.now)();
+  DateTime get _maintenant => (horloge ?? HeureBenin.maintenant)();
 
   static DateTime _jourSeul(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// `device_id` des lignes de retour SERVIES par le serveur (`purchase_returns`, ticket U8) : l'absorbeur les
+  /// marque ainsi, comme les ventes et achats qu'il absorbe. Une demande saisie ICI porte l'identifiant du poste.
+  static const origineServeur = 'serveur';
+
+  /// Ticket U8 — catégorie de chaque achat, comme le web (`ListeAchats` et `ProfileFournisseur`) : la catégorie
+  /// de PRODUIT de la PREMIÈRE ligne de l'achat. Seuls les achats dont cette catégorie existe sont dans la table.
+  ///
+  /// ⚠️ « Première » = la première dans l'ordre d'insertion au poste (`rowid`) : celui de la saisie pour un achat du
+  /// poste, celui du serveur (`created_at`, puis `id`) pour un achat reçu — l'absorbeur insère les lignes servies
+  /// dans cet ordre.
+  static Future<Map<String, String>> categoriesDesAchats(
+    AppDatabase database,
+  ) async {
+    final lignes =
+        await (database.select(database.purchaseLines)..orderBy([
+              (_) => OrderingTerm.asc(const CustomExpression<int>('rowid')),
+            ]))
+            .get();
+    final produits = {
+      for (final p in await database.select(database.products).get()) p.id: p,
+    };
+    final libelles = {
+      for (final c in await database.select(database.productCategories).get())
+        c.id: c.label,
+    };
+
+    final premiere = <String, PurchaseLine>{};
+    for (final l in lignes) {
+      premiere.putIfAbsent(l.purchaseId, () => l);
+    }
+    return {
+      for (final MapEntry(key: achat, value: ligne) in premiere.entries)
+        achat: ?libelles[produits[ligne.productId]?.categoryId],
+    };
+  }
 
   static const _uuid = Uuid();
 
@@ -413,8 +476,25 @@ class AchatsRepository {
     }
 
     final dettes = await database.select(database.payables).get();
+    final categories = await categoriesDesAchats(database);
+
+    // Ticket U8 — lignes de retour SERVIES par le serveur (marquées `serveur` par l'absorbeur), par achat ; et
+    // nombre de lignes de chaque achat (repli de « Écarts / Retours »).
+    final lignesRetourServies = <String, int>{};
+    for (final r in retours) {
+      if (r.syncStatus == SyncStatus.synced && r.deviceId == origineServeur) {
+        lignesRetourServies[r.purchaseId] =
+            (lignesRetourServies[r.purchaseId] ?? 0) + 1;
+      }
+    }
+    final lignesParAchat = <String, int>{};
+    for (final l in await database.select(database.purchaseLines).get()) {
+      lignesParAchat[l.purchaseId] = (lignesParAchat[l.purchaseId] ?? 0) + 1;
+    }
 
     return DonneesAchats(
+      lignesRetourServies: lignesRetourServies,
+      lignesParAchat: lignesParAchat,
       dettes: dettes,
       creances: creances,
       remboursements: [
@@ -440,6 +520,7 @@ class AchatsRepository {
                 (a) => LigneAchat(
                   achat: a,
                   envoye: a.syncStatus == SyncStatus.synced,
+                  categorie: categories[a.id],
                   motifRefusAchat: a.syncStatus == SyncStatus.conflict
                       ? refus['purchases:${a.id}']
                       : null,
@@ -486,7 +567,7 @@ class AchatsRepository {
     )..where((t) => t.id.equals(fournisseurId))).getSingleOrNull();
 
     final total = lignes.fold<double>(0, (t, l) => t + l.total);
-    final jour = date ?? DateTime.now();
+    final jour = date ?? HeureBenin.maintenant();
     final id = _uuid.v4();
 
     await database.transaction(() async {
@@ -496,7 +577,7 @@ class AchatsRepository {
             PurchasesCompanion.insert(
               id: id,
               deviceId: identifiantPoste,
-              updatedAt: jour,
+              updatedAt: HeureBenin.versInstant(jour),
               supplierId: fournisseurId,
               supplierName: Value(fournisseur?.name),
               supplierCategory: Value(fournisseur?.category),
@@ -626,7 +707,7 @@ class AchatsRepository {
             id: id,
             deviceId: identifiantPoste,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: _maintenant,
+            updatedAt: HeureBenin.versInstant(_maintenant),
             purchaseId: achatId,
             reason: motifNet,
             returnDate: jour,
@@ -735,7 +816,7 @@ class AchatsRepository {
             id: id,
             deviceId: identifiantPoste,
             syncStatus: const Value(SyncStatus.pending),
-            updatedAt: _maintenant,
+            updatedAt: HeureBenin.versInstant(_maintenant),
             supplierId: fournisseurId,
             treasuryAccountId: compteId,
             amount: montant,

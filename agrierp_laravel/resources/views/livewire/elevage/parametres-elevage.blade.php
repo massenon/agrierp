@@ -93,6 +93,17 @@
                     </button>
                 </div>
 
+                {{-- Règle R-SOINS-01 : délai du rappel des soins planifiés, réglé par l'exploitant. --}}
+                <form wire:submit="saveRappelSoins" class="bg-white border border-outline-variant rounded-lg px-md py-sm flex flex-col sm:flex-row sm:items-end gap-sm">
+                    <div class="flex-1">
+                        <label for="rappel-soins" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Rappel des soins planifiés (jours avant la date)</label>
+                        <p class="text-xs text-outline">La cloche signale un soin « à venir » quand il reste ce nombre de jours ou moins, puis « en retard » une fois la date dépassée. 0 : le jour même.</p>
+                    </div>
+                    <input id="rappel-soins" wire:model="rappelSoinsJours" type="number" min="0" max="30" class="w-24 h-11 px-md border border-outline-variant rounded-lg text-sm font-bold text-brand-forest">
+                    <button type="submit" class="bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full">Enregistrer</button>
+                    @error('rappelSoinsJours') <p class="text-xs text-error-deep">{{ $message }}</p> @enderror
+                </form>
+
                 <div class="flex items-center gap-xs border-b border-outline-variant bg-white px-md py-2 rounded-lg">
                     <button type="button" wire:click="$set('prophySpecies', 'cuniculture')" @class(['px-sm py-1 text-xs font-bold rounded-full', 'bg-brand-emerald text-white' => $prophySpecies === 'cuniculture', 'border border-outline-variant text-outline' => $prophySpecies !== 'cuniculture'])>🐰 Cuniculture (Lapins)</button>
                     <button type="button" wire:click="$set('prophySpecies', 'aviculture')" @class(['px-sm py-1 text-xs font-bold rounded-full', 'bg-brand-emerald text-white' => $prophySpecies === 'aviculture', 'border border-outline-variant text-outline' => $prophySpecies !== 'aviculture'])>🐔 Aviculture (Volailles)</button>
