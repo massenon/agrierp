@@ -487,12 +487,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Depuis EX7 + EX8, un jour d'exercice clos est en LECTURE SEULE : bandeau, bouton sans effet. Le refus R4
+    // du serveur reste la garantie (testé côté Laravel et à l'envoi) ; ici, rien ne doit s'écrire.
+    expect(find.textContaining('lecture seule'), findsWidgets);
     final bouton = find.byKey(const Key('bouton-enregistrer'));
-    await tester.ensureVisible(bouton);
-    await tester.tap(bouton);
-    await tester.pumpAndSettle();
-
-    expect(find.text(_clos), findsOneWidget);
+    if (bouton.evaluate().isNotEmpty) {
+      await tester.ensureVisible(bouton);
+      await tester.tap(bouton, warnIfMissed: false);
+      await tester.pumpAndSettle();
+    }
     await laisserPartirLeToast(tester);
     expect(find.text('Jour enregistré avec succès.'), findsNothing);
     expect(await db.select(db.livestockDailyEntries).get(), isEmpty);
