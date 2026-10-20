@@ -199,6 +199,20 @@ void main() {
       expect(local['stock_movements'], {'2026-10-19': const TotauxJour(nombre: 2, total: 4.5)});
     });
 
+    test(
+      'EX1 — sans « anouveaux » servi (compte sans la comptabilité), le poste ne contrôle pas les à-nouveaux',
+      () async {
+        final sans = await depot(const {'tables': {}}).verifier();
+        expect(sans.anouveauxServeur, isNull);
+        expect(sans.anouveauxPoste, isNull, reason: 'le journal ne descend pas à ce compte : rien à relire');
+        expect(sans.nombreEcartsAnouveaux, 0);
+
+        final avec = await depot(const {'tables': {}, 'anouveaux': []}).verifier();
+        expect(avec.anouveauxServeur, isEmpty);
+        expect(avec.anouveauxPoste, isEmpty, reason: 'aucun exercice au poste : rien à comparer');
+      },
+    );
+
     test('lecture de la réponse du serveur : un tableau PHP vide (`[]`) est une table sans ligne', () {
       final lu = ControleCoherenceRepository.lireServeur({
         'tables': {
