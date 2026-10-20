@@ -228,9 +228,17 @@ Ce que déclenche le planificateur (`agrierp_laravel/routes/console.php`) :
 | Purge des notifications lues de plus de 90 jours | chaque semaine |
 | Purge des tâches échouées de plus de 30 jours | chaque semaine |
 | Rappel de télécharger la dernière sauvegarde | chaque lundi à 08h00 |
+| Ouverture de l'exercice de l'année `agrierp:ouvrir-exercice` (ticket EX3) | chaque 1er janvier à 00h00 |
 
 Vérifier après installation : `php artisan schedule:list` (liste et prochaines exécutions) et, le lendemain, la
 présence d'une sauvegarde et des notifications du matin.
+
+**Exercice comptable (EX3).** Aucune entrée cron de plus : l'ouverture de l'exercice passe par le même
+`schedule:run`. Elle se lance aussi à la main, sans risque de doublon (`php artisan agrierp:ouvrir-exercice`).
+Si le cron ne tourne pas le 1er janvier, la première saisie datée de la nouvelle année ouvre l'exercice d'elle-même ;
+l'exercice peut aussi être ouvert dès le 1er décembre par **Comptabilité › Clôture d'exercice › Ouvrir l'exercice**.
+Si l'ouverture est refusée (deux exercices déjà ouverts : l'avant-dernier n'est pas clôturé), l'administrateur reçoit
+une notification « Exercice AAAA non ouvert » : toute saisie de l'année est refusée tant qu'il ne l'est pas.
 
 ## 6. Essais en production, puis remise à zéro
 
