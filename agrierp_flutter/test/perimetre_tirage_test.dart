@@ -241,7 +241,8 @@ void main() {
       ).allMatches(source)) {
         final cible = m.group(1)!;
         if (cible.startsWith('package:') || cible.startsWith('dart:')) continue;
-        final resolu = File(f).parent.uri.resolve(cible).toFilePath();
+        // Sous Windows `toFilePath()` rend des `\\` : on normalise avant de chercher `lib/`.
+        final resolu = File(f).parent.uri.resolve(cible).toFilePath().replaceAll('\\', '/');
         final relatif = resolu.substring(resolu.indexOf('lib/'));
         if (relatif.startsWith('lib/core/database/') ||
             relatif == 'lib/core/sync/sync_engine.dart') {
