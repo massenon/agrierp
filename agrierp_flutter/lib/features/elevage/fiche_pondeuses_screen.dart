@@ -7,6 +7,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../../core/export/document_officiel.dart';
+import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleFiche, MoisDeFiche;
 import 'fiche_journaliere_repository.dart';
 import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'mois_pondeuses.dart';
@@ -120,6 +121,9 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// Ticket U11 — indicateurs, tableau et PDF du mois ([MoisPondeuses]).
   DonneesMoisPondeuses? _mois;
 
+  /// Ticket EX8 (EF12) — motif R4 de la lecture seule (exercice clos), `null` quand le jour se saisit.
+  String? _motifLectureSeule;
+
   ProtocoleDuJour? _protocole;
   final _traitementsCoches = <String>{};
   final _observations = TextEditingController();
@@ -174,16 +178,23 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     final produits = await widget.depot.database
         .select(widget.depot.database.products)
         .get();
+    // Ticket EX8 (EF12) : le mois AFFICHÉ est celui du jour choisi (`AvecMoisDeFiche` du web).
     final mois = await MoisPondeuses.charger(
       widget.depot.database,
       bandes: _bandes,
       bande: bande,
-      maintenant: _maintenant,
+      maintenant: _jour,
     );
+    // Ticket EX8 (EF12) : un jour d'un exercice CLOS se consulte en lecture seule (motif R4, règle de `saveDay`).
+    final lectureSeule = await ExerciceDeSaisie(
+      widget.depot.database,
+      maintenant: widget.maintenant,
+    ).refus(_jour, regle: RegleExercice.closSeulement);
     if (bande == null) {
       if (!mounted) return;
       setState(() {
         _mois = mois;
+        _motifLectureSeule = lectureSeule;
         _produitOeufs = JournalStocks.produitOeufs(produits);
         _chargement = false;
       });
@@ -205,6 +216,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     setState(() {
       _effectifPrecedent = precedent;
       _mois = mois;
+      _motifLectureSeule = lectureSeule;
       _journal = grandLivre.journal;
       _produitGrandLivre = grandLivre.produit;
       _produitOeufs = JournalStocks.produitOeufs(produits);
@@ -525,6 +537,16 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       children: [
         _enTeteSaisie(),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket EX8 (EF12) — `<x-fiche-lecture-seule>` puis `<fieldset disabled>` du Blade.
+        if (_motifLectureSeule != null) ...[
+          LectureSeuleFiche(motif: _motifLectureSeule!),
+          const SizedBox(height: AgriSpacing.md),
+        ],
+        FormulaireFiche(
+          lectureSeule: _motifLectureSeule != null,
+          enfant: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
         if (_transfertEntree > 0 || _transfertSortie > 0) ...[
           _transfertsDuJour(),
           const SizedBox(height: AgriSpacing.md),
@@ -572,6 +594,9 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         _traitementsEtRappels(),
         const SizedBox(height: AgriSpacing.md),
         _boutons(),
+            ],
+          ),
+        ),
       ],
     ),
   );
@@ -657,6 +682,16 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
                   ),
                 ),
               ),
+            ),
+            // Ticket EX8 (EF12) — `<x-mois-de-fiche>` : consulter un mois passé.
+            MoisDeFiche(
+              jour: _jour,
+              maintenant: _maintenant,
+              onPrecedent: () => _ouvrirJour(MoisDeFiche.precedent(_jour)),
+              onSuivant: () {
+                final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+                if (suivant != null) _ouvrirJour(suivant);
+              },
             ),
           ],
         ),

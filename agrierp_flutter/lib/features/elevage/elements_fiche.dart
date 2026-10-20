@@ -220,10 +220,15 @@ class AucuneBandeFiche extends StatelessWidget {
 
 /// La carte de saisie du Blade (`bg-white rounded-lg border shadow-sm p-md lg:p-lg`), ses blocs espacés de `space-y-md`.
 class CarteSaisieFiche extends StatelessWidget {
-  const CarteSaisieFiche({super.key, required this.enTete, required this.blocs});
+  const CarteSaisieFiche({super.key, required this.enTete, required this.blocs, this.motifLectureSeule});
 
   final Widget enTete;
   final List<Widget> blocs;
+
+  /// Ticket EX8 (EF12) — le jour choisi est dans un exercice CLOS (motif R4 du serveur) : bandeau « Lecture seule »
+  /// en tête du formulaire, formulaire grisé et inerte (`<fieldset disabled>` du Blade) ; l'en-tête (bande, date,
+  /// mois) reste utilisable pour consulter. `null` : le jour se saisit.
+  final String? motifLectureSeule;
 
   @override
   Widget build(BuildContext context) {
@@ -240,9 +245,194 @@ class CarteSaisieFiche extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           enTete,
-          for (final b in blocs) ...[const SizedBox(height: AgriSpacing.md), b],
+          if (motifLectureSeule != null) ...[
+            const SizedBox(height: AgriSpacing.md),
+            LectureSeuleFiche(motif: motifLectureSeule!),
+          ],
+          FormulaireFiche(
+            lectureSeule: motifLectureSeule != null,
+            enfant: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final b in blocs) ...[const SizedBox(height: AgriSpacing.md), b],
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Ticket EX8 (EF12) — `<fieldset @disabled(...)>` du Blade : en lecture seule, le formulaire est grisé et ne reçoit
+/// plus aucun geste (compteurs, champs, « Enregistrer ce Jour », validation des traitements).
+class FormulaireFiche extends StatelessWidget {
+  const FormulaireFiche({super.key, required this.lectureSeule, required this.enfant});
+
+  final bool lectureSeule;
+  final Widget enfant;
+
+  @override
+  Widget build(BuildContext context) => lectureSeule
+      ? AbsorbPointer(
+          key: const Key('formulaire-lecture-seule'),
+          child: Opacity(opacity: 0.6, child: enfant),
+        )
+      : enfant;
+}
+
+/// Ticket EX8 (EF12) — `components/fiche-lecture-seule.blade.php` : bandeau d'une fiche datée dans un exercice CLOS,
+/// cadenas, « Lecture seule » et le motif R4 du serveur (celui que `saveDay` renvoie, EX5 / EX6).
+class LectureSeuleFiche extends StatelessWidget {
+  const LectureSeuleFiche({super.key, required this.motif});
+
+  final String motif;
+
+  static const titre = 'Lecture seule';
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('lecture-seule'),
+    padding: const EdgeInsets.all(AgriSpacing.sm),
+    decoration: BoxDecoration(
+      color: AgriColors.surfaceZebra,
+      border: Border.all(color: AgriColors.outlineVariant),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(SymbolesAgri.lock, size: 20, color: AgriColors.outline),
+        const SizedBox(width: AgriSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                titre,
+                style: TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: AgriTypography.gras,
+                  color: AgriColors.brandForest,
+                ),
+              ),
+              const SizedBox(height: AgriSpacing.xs),
+              Text(motif, style: const TextStyle(fontSize: 11, color: AgriColors.onSurface)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Ticket EX8 (EF12) — `components/mois-de-fiche.blade.php` : « Mois : » puis « ‹ » (mois précédent), le mois
+/// affiché, « › » (mois suivant, grisé sur le mois en cours). Le mois affiché est celui du jour choisi (`selectedDate`
+/// au web) : tableau du mois, cartes du mois, soins du mois et PDF le suivent.
+class MoisDeFiche extends StatelessWidget {
+  const MoisDeFiche({
+    super.key,
+    required this.jour,
+    required this.maintenant,
+    required this.onPrecedent,
+    required this.onSuivant,
+  });
+
+  /// Le jour choisi (son mois est le mois affiché).
+  final DateTime jour;
+  final DateTime maintenant;
+  final VoidCallback onPrecedent;
+  final VoidCallback onSuivant;
+
+  static const etiquette = 'Mois :';
+  static const infoPrecedent = 'Mois précédent';
+  static const infoSuivant = 'Mois suivant';
+
+  static const _mois = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre',
+    'Décembre',
+  ];
+
+  /// `ucfirst(translatedFormat('F Y'))` du web : « Septembre 2026 ».
+  static String libelle(DateTime jour) => '${_mois[jour.month - 1]} ${jour.year}';
+
+  /// Le mois de [jour] est-il celui de [maintenant] (ou à venir) ? « › » est alors grisé (`estMoisCourant`).
+  static bool estMoisCourant(DateTime jour, DateTime maintenant) =>
+      jour.year * 12 + jour.month >= maintenant.year * 12 + maintenant.month;
+
+  /// `moisPrecedent()` : le premier jour du mois précédent.
+  static DateTime precedent(DateTime jour) => DateTime(jour.year, jour.month - 1, 1);
+
+  /// `moisSuivant()` : le premier jour du mois suivant — le jour même quand c'est le mois en cours ; `null` depuis le
+  /// mois en cours (jamais de mois à venir).
+  static DateTime? suivant(DateTime jour, DateTime maintenant) {
+    if (estMoisCourant(jour, maintenant)) return null;
+    final s = DateTime(jour.year, jour.month + 1, 1);
+    return s.year == maintenant.year && s.month == maintenant.month
+        ? DateTime(maintenant.year, maintenant.month, maintenant.day)
+        : s;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final courant = estMoisCourant(jour, maintenant);
+    Widget fleche(String cle, IconData icone, String info, VoidCallback? onTap) => Tooltip(
+      message: info,
+      child: InkWell(
+        key: Key(cle),
+        onTap: onTap,
+        child: SizedBox(
+          width: 32,
+          height: 36,
+          child: Icon(
+            icone,
+            size: 18,
+            color: onTap == null ? AgriColors.brandForest.withValues(alpha: 0.4) : AgriColors.brandForest,
+          ),
+        ),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          etiquette,
+          style: TextStyle(
+            fontSize: AgriTypography.xs,
+            fontWeight: AgriTypography.demiGras,
+            color: AgriColors.outline,
+          ),
+        ),
+        const SizedBox(width: AgriSpacing.xs),
+        Container(
+          key: const Key('mois-de-fiche'),
+          height: 36,
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceZebra,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              fleche('mois-precedent', SymbolesAgri.chevron_left, infoPrecedent, onPrecedent),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+                child: Text(
+                  libelle(jour),
+                  key: const Key('mois-affiche'),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: AgriTypography.gras,
+                    color: AgriColors.brandForest,
+                  ),
+                ),
+              ),
+              fleche('mois-suivant', SymbolesAgri.chevron_right, infoSuivant, courant ? null : onSuivant),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -258,11 +448,20 @@ class EnTeteSaisieFiche extends StatelessWidget {
     this.bandes = const [],
     this.bandeId,
     this.onBande,
+    this.maintenant,
+    this.onMoisPrecedent,
+    this.onMoisSuivant,
   });
 
   final String titre;
   final DateTime jour;
   final ValueChanged<DateTime> onJour;
+
+  /// Ticket EX8 (EF12) — la navigation de mois ([MoisDeFiche]) après « Date : », comme `<x-mois-de-fiche>` du Blade ;
+  /// absente sans [onMoisPrecedent].
+  final DateTime? maintenant;
+  final VoidCallback? onMoisPrecedent;
+  final VoidCallback? onMoisSuivant;
 
   /// `(identifiant, code)` des bandes ; le sélecteur n'apparaît qu'à partir de deux bandes, comme au web.
   final List<(String, String)> bandes;
@@ -366,6 +565,13 @@ class EnTeteSaisieFiche extends StatelessWidget {
                   child: Text(dateLongue(jour), key: const Key('date-choisie'), style: style),
                 ),
               ),
+              if (onMoisPrecedent != null && onMoisSuivant != null)
+                MoisDeFiche(
+                  jour: jour,
+                  maintenant: maintenant ?? jour,
+                  onPrecedent: onMoisPrecedent!,
+                  onSuivant: onMoisSuivant!,
+                ),
             ],
           ),
         ],

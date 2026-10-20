@@ -158,7 +158,7 @@ class DonneesMoisFiche {
   /// Les quatre `x-kpi-card` du Blade, valeurs mises en forme comme le web, dans l'ordre du Blade.
   final List<String> indicateurs;
 
-  /// TOUS les jours du mois en cours, du 1er au dernier (`range(1, now()->daysInMonth)`).
+  /// TOUS les jours du mois affiché, du 1er au dernier (`getDaysInMonthProperty()` d'`AvecMoisDeFiche`).
   final List<JourFiche> jours;
 
   /// « Exporter PDF » (`exportFichePdf()`).
@@ -199,6 +199,9 @@ abstract final class MoisFiche {
     ];
   }
 
+  /// 🔴→✅ Ticket EX8 (EF12) — [maintenant] est un jour du MOIS AFFICHÉ (le jour choisi, `AvecMoisDeFiche` du web) :
+  /// tableau, cartes du mois, soins du mois et PDF le suivent ; seul son mois compte. Avant EX8 : toujours le mois de
+  /// l'horloge.
   static Future<DonneesMoisFiche> charger(
     AppDatabase db, {
     required EspeceFiche espece,
@@ -339,7 +342,8 @@ abstract final class MoisFiche {
     return DocumentOfficiel(
       titre: espece.titrePdf,
       sousTitre: '${_mois[maintenant.month - 1]} ${maintenant.year}',
-      fichier: 'fiche-{mois}.pdf',
+      // Ticket EX8 (EF12) : le mois AFFICHÉ (`fichierDuPdf()` du web), jamais celui de l'horloge à l'édition.
+      fichier: 'fiche-${maintenant.year}-${deux(maintenant.month)}.pdf',
       entetes: const ['Date', 'Achat', 'Nés', 'Morts', 'Ventes', 'Dons', 'Effectif Final', 'Mortalité'],
       lignes: [
         if (saisis.isEmpty) const DonneesDocument(['Aucune saisie ce mois-ci.']),
