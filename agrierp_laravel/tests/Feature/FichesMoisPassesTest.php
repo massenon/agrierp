@@ -112,6 +112,9 @@ class FichesMoisPassesTest extends TestCase
 
         // « › » : retour au mois en cours, sur le jour même ; jamais au-delà.
         $fiche->call('moisSuivant')->assertSet('selectedDate', '2026-10-14')->assertSee('Octobre 2026');
+        // « › » grisé dès le rendu qui suit (une propriété calculée lue avant le changement de mois restait « faux »).
+        $this->assertTrue($fiche->instance()->estMoisCourant);
+        $this->assertMatchesRegularExpression('/wire:click="moisSuivant"[^>]*disabled/', $fiche->html());
         $fiche->call('moisSuivant')->assertSet('selectedDate', '2026-10-14');
 
         // Choisir une date d'un autre mois y amène le tableau.

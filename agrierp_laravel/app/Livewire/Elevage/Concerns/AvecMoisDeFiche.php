@@ -49,6 +49,16 @@ trait AvecMoisDeFiche
     /** Le mois affiché est-il le mois en cours ? (« › » grisé : pas de mois à venir.) */
     public function getEstMoisCourantProperty(): bool
     {
+        return $this->moisCourant();
+    }
+
+    /**
+     * ⚠️ Jamais la propriété calculée dans une action : Livewire MÉMORISE une propriété `getXProperty` pour toute la
+     * requête — lue dans `moisSuivant()` AVANT de changer de mois, elle restait « faux » au rendu qui suit, et « › »
+     * restait actif une fois revenu sur le mois en cours.
+     */
+    private function moisCourant(): bool
+    {
         return $this->debutMoisFiche()->format('Y-m') >= now()->format('Y-m');
     }
 
@@ -59,7 +69,7 @@ trait AvecMoisDeFiche
 
     public function moisSuivant(): void
     {
-        if ($this->estMoisCourant) {
+        if ($this->moisCourant()) {
             return;
         }
 
