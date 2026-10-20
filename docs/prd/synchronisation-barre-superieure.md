@@ -1,5 +1,5 @@
 # PRD — Bouton « Synchroniser » dans la barre supérieure et modale de synchronisation (poste et web)
-**Statut :** brouillon · **Date :** 2026-10-19 · **Ticket(s) :** H2 (absorbe B4), H3, décisions D-SYNC-1 à D-SYNC-5 (`PLAN_FINALISATION.md`)
+**Statut :** brouillon · **Date :** 2026-10-19 · **Ticket(s) :** H2 (absorbe B4), H3, décisions D-SYNC-1 à D-SYNC-5 (`docs/PLAN_FINALISATION.md`)
 
 > **Construit d'abord sur le web** (Doctrine, article 0). Ni le web ni le prototype n'ont cette modale. Côté web, **ce n'est pas un bouton qui synchronise** : le serveur EST la base. La décision du Sprint 0 (`README_SPRINT0.md:107`, `:9667`) a écarté du web un bouton « Synchroniser » « décor sans mécanisme ». Elle reste juste pour un bouton qui ferait semblant d'envoyer. La demande du client du 19/10/2026 lui donne un objet réel au web : **montrer l'état de synchronisation des postes de la ferme**. Les deux surfaces partagent le même bouton, la même modale et la même structure ; seul le contenu propre à chaque surface diffère, et il est dit à l'écran.
 

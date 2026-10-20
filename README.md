@@ -14,7 +14,7 @@ Chaque projet a son propre `CLAUDE.md` qui décrit son architecture, ses convent
 
 ## Démarrage rapide
 
-Guide complet pas à pas (Windows, clonage, tests, installateur) : [`INSTALLATION_LOCALE.md`](INSTALLATION_LOCALE.md).
+Guide complet pas à pas (Windows, clonage, tests, installateur) : [`docs/INSTALLATION_LOCALE.md`](docs/INSTALLATION_LOCALE.md).
 
 ### Application web — `agrierp_laravel/`
 
@@ -64,11 +64,11 @@ cd agrierp_laravel && php artisan migrate:fresh --seed
 
 ## Conventions
 
-- [`DOCTRINE_PORTAGE.md`](DOCTRINE_PORTAGE.md) : règles de fidélité Laravel → Flutter et d'architecture hors ligne.
-- [`PLAN_FINALISATION.md`](PLAN_FINALISATION.md) : tickets restants, par sprint, et décisions client en attente.
+- [`docs/DOCTRINE_PORTAGE.md`](docs/DOCTRINE_PORTAGE.md) : règles de fidélité Laravel → Flutter et d'architecture hors ligne.
+- [`docs/PLAN_FINALISATION.md`](docs/PLAN_FINALISATION.md) : tickets restants, par sprint, et décisions client en attente.
 
 - Toute la prose, les libellés d'interface, les commentaires et la documentation sont **en français**.
 - Le prototype HTML reste la source de vérité visuelle et comportementale des deux clients (voir les `CLAUDE.md` des projets).
 - Les fins de ligne sont normalisées en LF dans le dépôt (voir `.gitattributes`).
 
-**Cloner, tester, déployer sur cPanel, tâches planifiées :** [`GUIDE_DEPLOIEMENT.md`](GUIDE_DEPLOIEMENT.md).
+**Cloner, tester, déployer sur cPanel, tâches planifiées :** [`docs/GUIDE_DEPLOIEMENT.md`](docs/GUIDE_DEPLOIEMENT.md).

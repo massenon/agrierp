@@ -9,7 +9,7 @@ Produit un fichier `docs/prd/<slug>.md` à la racine du monorepo. Tout est en fr
 
 ## Avant d'écrire
 
-1. Lire `DOCTRINE_PORTAGE.md` et `PLAN_FINALISATION.md` (la fonctionnalité y a peut-être déjà un ticket).
+1. Lire `docs/DOCTRINE_PORTAGE.md` et `docs/PLAN_FINALISATION.md` (la fonctionnalité y a peut-être déjà un ticket).
 2. Chercher la fonctionnalité dans les trois sources, dans l'ordre :
    - la vue Blade et le composant Livewire (`agrierp_laravel/resources/views/livewire/`, `app/Livewire/`) ;
    - les Actions et Services (`app/Actions/`, `app/Services/`) ;

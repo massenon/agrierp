@@ -27,7 +27,7 @@ import '../temps/heure_benin.dart';
 /// 1er janvier ne connaît pas encore N+1 ; une saisie datée de N+1 alors que N est l'exercice ouvert le plus récent
 /// est ACCEPTÉE ici, parce que le serveur créera N+1 en la recevant.
 ///
-/// ⚠️ Le poste ne tranche jamais un exercice (clôture, ouverture : `DOCTRINE_PORTAGE.md`, § 1.6) : il ne fait que
+/// ⚠️ Le poste ne tranche jamais un exercice (clôture, ouverture : `docs/DOCTRINE_PORTAGE.md`, § 1.6) : il ne fait que
 /// refuser avant d'écrire ce que le serveur refuserait. Le serveur re-juge tout à l'envoi.
 enum RegleExercice {
   /// `AccountingEntryService::exerciceOuvertPour()` — exercice absent (sans filet) ou clos : refus.
