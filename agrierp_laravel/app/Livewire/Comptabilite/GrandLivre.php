@@ -4,6 +4,7 @@ namespace App\Livewire\Comptabilite;
 
 use App\Models\ChartOfAccount;
 use App\Services\FinancialReportService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -62,17 +63,25 @@ class GrandLivre extends Component
 
     public function mount(): void
     {
-        if ($this->startDate === '') {
-            $this->startDate = now()->startOfMonth()->format('Y-m-d');
-        }
-
-        if ($this->endDate === '') {
-            $this->endDate = now()->format('Y-m-d');
-        }
+        // Ticket EX7 (EF9) — période par défaut DANS l'exercice affiché : du 1er du mois à aujourd'hui quand il
+        // contient le jour, l'exercice entier sinon (2026 consulté en 2027) ; une date d'URL hors exercice est bornée.
+        [$debut, $fin] = ExerciceChoisi::periodeParDefaut(now()->startOfMonth()->format('Y-m-d'), now()->format('Y-m-d'));
+        [$this->startDate, $this->endDate] = ExerciceChoisi::bornerPeriode($this->startDate !== '' ? $this->startDate : $debut, $this->endDate !== '' ? $this->endDate : $fin);
 
         if ($this->accountId === '') {
             $this->accountId = (string) $this->defaultAccountId();
         }
+    }
+
+    /** Ticket EX7 (EF9) — une date saisie hors de l'exercice affiché est ramenée à sa borne. */
+    public function updatedStartDate(): void
+    {
+        [$this->startDate, $this->endDate] = ExerciceChoisi::bornerPeriode($this->startDate, $this->endDate);
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->updatedStartDate();
     }
 
     /**

@@ -293,7 +293,7 @@ class SelecteurExerciceTest extends TestCase
             Expense::create(['expense_date' => $jour, 'label' => "Dépense {$n}", 'category' => '605 - Énergie', 'amount' => 1000, 'treasury_account_id' => $caisse->id, 'status' => 'payee', 'is_active' => true]);
             StockMovement::create(['product_id' => $produit->id, 'type' => 'entree', 'quantity' => 1, 'reference_type' => 'manual_addition', 'movement_date' => $jour.' 08:00:00']);
             VeterinaryRecord::create(['lot_id' => $bande->id, 'action_type' => 'vaccination', 'record_date' => $jour, 'is_active' => true]);
-            InfirmaryRecord::create(['lot_id' => $bande->id, 'motif' => 'Boiterie', 'entry_date' => $jour, 'status' => 'en_cours']);
+            InfirmaryRecord::create(['lot_id' => $bande->id, 'motif' => 'Boiterie', 'entry_date' => $jour, 'status' => 'reintegre']);
             LivestockTransfer::create(['source_lot_id' => $bande->id, 'target_lot_id' => $cible->id, 'transfer_date' => $jour, 'quantity' => 1, 'is_active' => true]);
             // Hors des exercices enregistrés (2025) : écrit directement, `record()` le refuserait.
             if (substr($jour, 0, 4) !== '2025') {
@@ -332,10 +332,15 @@ class SelecteurExerciceTest extends TestCase
             $this->assertSame(1, Livewire::test($composant)->instance()->{$propriete}->total(), "{$composant}::{$propriete} : 2027 seulement");
         }
 
+        // ⚠️ Infirmerie : un cas ENCORE EN COURS entré en 2026 reste listé dans 2027 (il se réintègre depuis l'exercice
+        // du jour) ; il ne l'est pas dans 2025, qui ne contient pas le jour.
+        InfirmaryRecord::create(['lot_id' => $bande->id, 'motif' => 'Diarrhée', 'entry_date' => '2026-12-28', 'status' => 'en_cours']);
+        $this->assertSame(2, Livewire::test(SoinsVaccinsHub::class)->instance()->infirmaryRecords->total());
+
         // Le pied de pagination (composant partagé) : nombre de lignes dans l'exercice, Précédent / Suivant.
         ExerciceChoisi::choisir(2026);
         Livewire::test(JournalComptable::class)
-            ->assertSee("27 lignes dans l'exercice 2026 — page 1 sur 2")
+            ->assertSee("27 lignes dans l'exercice 2026 — page 1 sur 2", false)
             ->assertSee('Précédent')
             ->assertSee('Suivant');
     }
@@ -377,9 +382,11 @@ class SelecteurExerciceTest extends TestCase
 
         ExerciceChoisi::choisir(2026);
         $this->assertSame($motif, ExerciceChoisi::motifLectureSeule());
+        // Une requête HTTP de test repart d'une session neuve : le choix lui est passé explicitement.
+        $this->withSession([ExerciceChoisi::CLE_SESSION => 2026]);
 
         $html = $this->get('/journal-comptable')->assertOk()->getContent();
-        $this->assertStringContainsString("Exercice 2026 clôturé — lecture seule. Les saisies se font dans l'exercice 2027.", $html);
+        $this->assertStringContainsString(e("Exercice 2026 clôturé — lecture seule. Les saisies se font dans l'exercice 2027."), $html);
         $this->assertStringContainsString('Passer à 2027', $html);
         $this->assertMatchesRegularExpression('/<button[^>]*disabled[^>]*data-lecture-seule[^>]*title="'.preg_quote($motif, '/').'"[^>]*wire:click="newEntry"/u', $html, '« Nouvelle écriture » grisé, motif en info-bulle');
         // Consultation, export et impression restent ouverts.
@@ -392,7 +399,7 @@ class SelecteurExerciceTest extends TestCase
             '/transferts-bandes' => 'wire:click="nouveauTransfert"',
         ] as $url => $repere) {
             $page = $this->get($url)->assertOk()->getContent();
-            $this->assertStringContainsString("Exercice 2026 clôturé — lecture seule. Les saisies se font dans l'exercice 2027.", $page, $url);
+            $this->assertStringContainsString(e("Exercice 2026 clôturé — lecture seule. Les saisies se font dans l'exercice 2027."), $page, $url);
             $this->assertMatchesRegularExpression('/<button[^>]*disabled[^>]*data-lecture-seule[^>]*title="'.preg_quote($motif, '/').'"[^>]*'.preg_quote($repere, '/').'/u', $page, "{$url} : {$repere} grisé");
         }
 

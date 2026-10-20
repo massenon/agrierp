@@ -6,7 +6,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
             <div>
                 <h2 class="text-xl lg:text-2xl font-bold text-on-surface">Bienvenue, {{ auth()->user()->name }} 👋</h2>
-                <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }} · {{ $this->details['exercice'] ? 'Exercice '.$this->details['exercice'].' actif' : 'Aucun exercice ouvert' }}</p>
+                <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }} · {{ $this->details['exercice'] ? 'Exercice '.$this->details['exercice'].($this->details['exercice_clos'] ? ' clôturé' : ' actif') : 'Aucun exercice ouvert' }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-xs">
                 <a href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">

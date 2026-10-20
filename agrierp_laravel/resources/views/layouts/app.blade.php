@@ -171,6 +171,9 @@
             <div class="flex items-center gap-sm md:gap-md">
                 <livewire:shared.global-search />
 
+                {{-- Ticket EX7 (EF8) — sélecteur d'exercice global, à gauche du bouton « Synchroniser » (tous les rôles). --}}
+                <livewire:shared.selecteur-exercice />
+
                 {{-- Ticket H3 — état de synchronisation des postes (administrateur). --}}
                 @can('manage-users')
                     <livewire:shared.etat-synchronisation-postes />
@@ -198,6 +201,8 @@
         </header>
 
         <div class="flex-1 overflow-y-auto p-md lg:p-lg pb-56 lg:pb-lg bg-surface-bg">
+            {{-- Ticket EX7 (EF10) — bandeau de lecture seule d'un exercice clos, en haut du contenu. --}}
+            <livewire:shared.bandeau-exercice />
             {{ $slot }}
         </div>
     </div>

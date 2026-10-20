@@ -44,5 +44,11 @@ class AppServiceProvider extends ServiceProvider
         // Ticket U5 (D-U5) — « :date » des règles de date en français (« aujourd'hui », jj/mm/aaaa)
         // : les phrases viennent de `lang/fr/validation.php`, mais Laravel y collait « today ».
         DatesValidationFr::enregistrer();
+
+        // Ticket EX7 (EF10) — `@lectureSeule`, juste après `<button` d'un bouton de saisie (Nouveau, Modifier, Archiver,
+        // Enregistrer) : grisé, désactivé, motif « Exercice 2026 clôturé — lecture seule » en info-bulle quand
+        // l'exercice affiché est clos. Le motif est lu UNE fois par rendu de vue (`$__motifExercice`), pas à chaque
+        // ligne d'une liste. Confort seulement : la garantie reste le refus du serveur (EX5).
+        \Illuminate\Support\Facades\Blade::directive('lectureSeule', fn () => '<?php echo \App\Support\ExerciceChoisi::attributs(($__motifExercice ??= [\App\Support\ExerciceChoisi::motifLectureSeule()])[0]); ?>');
     }
 }

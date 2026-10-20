@@ -13,9 +13,9 @@
         </div>
         <div class="flex items-center gap-xs bg-white border border-outline-variant rounded-lg p-sm w-fit">
             <span class="material-symbols-outlined text-outline text-[18px]">calendar_month</span>
-            <input wire:model.live="dateFrom" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5">
+            <input wire:model.live="dateFrom" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5">
             <span class="text-outline text-xs">au</span>
-            <input wire:model.live="dateTo" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5">
+            <input wire:model.live="dateTo" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5">
         </div>
     </div>
 
@@ -113,7 +113,7 @@
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="view('{{ $sale->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Voir"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
                                 @if($sale->status !== 'annulee')
-                                    <button type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Annuler"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                    <button @lectureSeule type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Annuler"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                 @endif
                             </td>
                         </tr>
@@ -123,6 +123,7 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->sales" />
     </div>
 
     <x-modal name="modal-cancel-sale" max-width="sm">
@@ -134,7 +135,7 @@
             <p class="text-xs text-outline mb-lg">Le stock des produits vendus sera automatiquement réintégré. Cette action est réversible uniquement en recréant une nouvelle vente.</p>
             <div class="flex justify-center gap-sm">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-cancel-sale' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="button" wire:click="cancelSale" class="px-md py-sm rounded-lg bg-error-deep text-white text-sm font-bold hover:bg-red-800">Oui, Annuler la Vente</button>
+                <button @lectureSeule type="button" wire:click="cancelSale" class="px-md py-sm rounded-lg bg-error-deep text-white text-sm font-bold hover:bg-red-800">Oui, Annuler la Vente</button>
             </div>
         </div>
     </x-modal>

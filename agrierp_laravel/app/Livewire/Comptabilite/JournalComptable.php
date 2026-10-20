@@ -6,9 +6,11 @@ use App\Models\AccountingEntry;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use App\Services\AccountingEntryService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 10.4 (Sprint 10) — journal-comptable.html → Livewire\Comptabilite\JournalComptable
@@ -50,6 +52,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class JournalComptable extends Component
 {
+    use WithPagination;
+
     #[Url]
     public string $search = '';
 
@@ -77,9 +81,11 @@ class JournalComptable extends Component
 
     public function getKpisProperty(): array
     {
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $monthEntries = AccountingEntry::with('lines')
             ->where('is_active', true)
-            ->whereMonth('entry_date', now()->month)->whereYear('entry_date', now()->year)
+            ->whereMonth('entry_date', $mois->month)->whereYear('entry_date', $mois->year)
             ->get();
 
         return [
@@ -89,15 +95,38 @@ class JournalComptable extends Component
         ];
     }
 
-    public function getEntriesProperty()
+    /**
+     * Ticket EX7 (EF9) — les écritures de l'exercice AFFICHÉ, PAGINÉES (25 par page), au lieu des 100 dernières toutes
+     * années confondues : avec le volume, l'année N disparaissait de l'écran dès N+1.
+     */
+    private function requeteEcritures()
     {
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
         return AccountingEntry::with(['lines.account'])
             ->where('is_active', true)
+            ->whereDate('entry_date', '>=', $debut)
+            ->whereDate('entry_date', '<=', $fin)
             ->when($this->search, fn ($q) => $q->where('reference', 'like', '%'.$this->search.'%'))
             ->orderByDesc('entry_date')
             ->orderByDesc('created_at')
-            ->limit(100)
-            ->get();
+            ->orderByDesc('id');
+    }
+
+    public function getEntriesProperty()
+    {
+        return $this->requeteEcritures()->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageJournal');
+    }
+
+    /** Toutes les écritures de l'exercice affiché (recherche comprise) : l'export PDF, jamais la seule page affichée. */
+    public function ecrituresDeLExercice()
+    {
+        return $this->requeteEcritures()->get();
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage('pageJournal');
     }
 
     public function debitLine(AccountingEntry $entry)
@@ -120,13 +149,13 @@ class JournalComptable extends Component
     {
         $this->authorize('view-comptabilite');
 
-        $entries = $this->entries;
+        $entries = $this->ecrituresDeLExercice();
 
         $pdf = app(\App\Services\PdfExportService::class)->render(
             'exports.journal-comptable',
             ['entries' => $entries, 'component' => $this],
             'Journal Comptable',
-            'État au '.now()->format('d/m/Y')
+            'Exercice '.ExerciceChoisi::annee().' — état au '.now()->format('d/m/Y')
         );
 
         return response()->streamDownload(fn () => print($pdf->output()), 'journal-comptable-'.now()->format('Y-m-d').'.pdf');

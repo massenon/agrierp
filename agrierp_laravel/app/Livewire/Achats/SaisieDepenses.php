@@ -6,10 +6,12 @@ use App\Actions\SaisieDepenseAction;
 use App\Exceptions\DepenseNonModifiableException;
 use App\Models\Expense;
 use App\Models\TreasuryAccount;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 /**
  * Ticket 5.8 (Sprint 5) — saisie-depenses.html → Livewire\Achats\SaisieDepenses
@@ -43,6 +45,7 @@ use Livewire\WithFileUploads;
 class SaisieDepenses extends Component
 {
     use \App\Livewire\Concerns\BornesCalendrierExercice;
+    use WithPagination;
 
     use WithFileUploads;
 
@@ -78,18 +81,25 @@ class SaisieDepenses extends Component
 
     public function getKpisProperty(): array
     {
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $monthExpenses = Expense::where('is_active', true)
-            ->whereMonth('expense_date', now()->month)->whereYear('expense_date', now()->year);
+            ->whereMonth('expense_date', $mois->month)->whereYear('expense_date', $mois->year);
 
         return [
             'depenses_mois' => (float) (clone $monthExpenses)->sum('amount'),
         ];
     }
 
+    /** Ticket EX7 (EF9) — les dépenses de l'exercice AFFICHÉ, PAGINÉES (25 par page) ; avant : toutes, sans fin. */
     public function getExpensesProperty()
     {
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
         return Expense::with('treasuryAccount')
             ->where('is_active', true)
+            ->whereDate('expense_date', '>=', $debut)
+            ->whereDate('expense_date', '<=', $fin)
             ->when($this->search, fn ($q) => $q->where('label', 'like', '%'.$this->search.'%'))
             ->when($this->statusFilter === 'Payée', fn ($q) => $q->where('status', 'payee'))
             ->when($this->statusFilter === 'En attente', fn ($q) => $q->where('status', 'en_attente'))
@@ -97,7 +107,26 @@ class SaisieDepenses extends Component
             // 🔴→✅ Ticket U14 — deux dépenses du même jour n'avaient pas d'ordre défini (MySQL rend l'ordre qu'il
             // veut) : l'identifiant les départage, ici et au poste (`DepensesRepository::depenses`).
             ->orderBy('id')
-            ->get();
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageDepenses');
+    }
+
+    /** Un filtre change : retour à la première page. */
+    public function updating(string $propriete): void
+    {
+        if (in_array($propriete, ['search', 'statusFilter'], true)) {
+            $this->resetPage('pageDepenses');
+        }
+    }
+
+    /**
+     * Ticket EX7 (réponse à EX-Q5, décision D-U14-1) — la dépense en cours de modification est comptabilisée : son
+     * champ « Date » est GRISÉ, motif en info-bulle (`SaisieDepenseAction::MOTIF_DATE_VERROUILLEE`). Confort : le refus
+     * de `SaisieDepenseAction::modifier()` reste la garantie (sous « Montant »).
+     */
+    public function getDateVerrouilleeProperty(): bool
+    {
+        return $this->editingExpenseId !== null
+            && Expense::whereKey($this->editingExpenseId)->whereNotNull('accounting_entry_id')->exists();
     }
 
     public function submitExpense(): void

@@ -7,7 +7,7 @@
             <p class="text-xs text-outline mt-xs">Sujets passés d'une bande à une autre le même jour : sortie de la bande source, entrée dans la bande cible, effectifs recalculés.</p>
         </div>
         @can('manage-elevage')
-        <button type="button" wire:click="nouveauTransfert" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+        <button @lectureSeule type="button" wire:click="nouveauTransfert" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
             <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Transfert
         </button>
         @endcan
@@ -44,7 +44,7 @@
                                 <td data-label="Effectif Initial" class="px-md py-sm text-xs text-right">{{ number_format($lot->initial_quantity, 0, ',', ' ') }}</td>
                                 <td data-label="Actions" class="px-md py-sm text-right">
                                     @can('manage-elevage')
-                                    <button type="button" wire:click="rattacher('{{ $lot->id }}')" class="text-xs font-bold text-brand-emerald hover:text-brand-forest">Rattacher à sa bande d'origine</button>
+                                    <button @lectureSeule type="button" wire:click="rattacher('{{ $lot->id }}')" class="text-xs font-bold text-brand-emerald hover:text-brand-forest">Rattacher à sa bande d'origine</button>
                                     @endcan
                                 </td>
                             </tr>
@@ -94,7 +94,7 @@
                             <td data-label="Actions" class="px-md py-sm text-right">
                                 @can('manage-elevage')
                                     @if($transfert->is_active)
-                                        <button type="button" wire:click="annuler('{{ $transfert->id }}')" wire:confirm="Annuler ce transfert ? Les deux bandes seront recalculées." class="text-xs font-bold text-error-deep hover:underline">Annuler</button>
+                                        <button @lectureSeule type="button" wire:click="annuler('{{ $transfert->id }}')" wire:confirm="Annuler ce transfert ? Les deux bandes seront recalculées." class="text-xs font-bold text-error-deep hover:underline">Annuler</button>
                                     @endif
                                 @endcan
                             </td>
@@ -105,6 +105,7 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->transferts" />
     </div>
 
     <x-modal name="modal-transfert" max-width="md">
@@ -173,7 +174,7 @@
             </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-transfert' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ $constitution ? 'Rattacher' : 'Enregistrer le Transfert' }}</button>
+                <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ $constitution ? 'Rattacher' : 'Enregistrer le Transfert' }}</button>
             </div>
         </form>
     </x-modal>

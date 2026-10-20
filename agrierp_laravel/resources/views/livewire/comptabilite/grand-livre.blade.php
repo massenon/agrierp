@@ -25,9 +25,9 @@
             @endforelse
         </select>
         <div class="flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1">
-            <input wire:model.live="startDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="startDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
             <span class="text-outline text-xs">au</span>
-            <input wire:model.live="endDate" type="date" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
+            <input wire:model.live="endDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs font-bold text-brand-forest border-0 outline-none bg-transparent p-1">
         </div>
     </div>
 

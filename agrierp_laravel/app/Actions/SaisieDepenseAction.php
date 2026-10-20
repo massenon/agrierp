@@ -44,6 +44,13 @@ class SaisieDepenseAction
      * 🔴→✅ Ticket U14 — modifier une dépense ARCHIVÉE (page restée ouverte au web, ou poste qui ne l'a pas encore appris)
      * réajustait la trésorerie d'une dépense déjà réintégrée : la caisse perdait le montant une seconde fois.
      */
+    /**
+     * Ticket EX7 (réponse à EX-Q5) — info-bulle du champ « Date » GRISÉ d'une dépense comptabilisée, au web
+     * (`SaisieDepenses`) puis au poste (`SaisieDepensesScreen`), mot pour mot. Le refus à l'enregistrement
+     * ([MESSAGE_DEJA_COMPTABILISEE], sous « Montant ») reste la garantie (D-U14-1).
+     */
+    public const MOTIF_DATE_VERROUILLEE = 'Dépense déjà comptabilisée : sa date ne peut plus être modifiée.';
+
     public const MESSAGE_ARCHIVEE = 'Cette dépense est archivée : elle ne peut plus être modifiée.';
 
     public const ARCHIVEE = 'archivee';

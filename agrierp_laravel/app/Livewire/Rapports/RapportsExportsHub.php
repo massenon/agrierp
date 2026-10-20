@@ -57,12 +57,21 @@ class RapportsExportsHub extends Component
 
     public function mount(): void
     {
-        if (! $this->startDate) {
-            $this->startDate = now()->startOfMonth()->format('Y-m-d');
-        }
-        if (! $this->endDate) {
-            $this->endDate = now()->endOfMonth()->format('Y-m-d');
-        }
+        // Ticket EX7 (EF9) — période par défaut DANS l'exercice affiché : le mois du jour quand il le contient,
+        // l'exercice entier sinon (2026 consulté en 2027) ; une date d'URL hors exercice est bornée.
+        [$debut, $fin] = \App\Support\ExerciceChoisi::periodeParDefaut(now()->startOfMonth()->format('Y-m-d'), now()->endOfMonth()->format('Y-m-d'));
+        [$this->startDate, $this->endDate] = \App\Support\ExerciceChoisi::bornerPeriode($this->startDate ?: $debut, $this->endDate ?: $fin);
+    }
+
+    /** Ticket EX7 (EF9) — une date saisie hors de l'exercice affiché est ramenée à sa borne. */
+    public function updatedStartDate(): void
+    {
+        [$this->startDate, $this->endDate] = \App\Support\ExerciceChoisi::bornerPeriode($this->startDate, $this->endDate);
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->updatedStartDate();
     }
 
     /** Un seul point de correspondance onglet → classe du composant réellement affiché. */

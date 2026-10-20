@@ -10,9 +10,11 @@ use App\Models\ProductCategory;
 use App\Models\PurchaseLine;
 use App\Models\StockMovement;
 use App\Services\StockRotationService;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 6.2 (Sprint 6) — gestion-stocks.html → Livewire\Stocks\GestionStocks
@@ -111,6 +113,7 @@ use Livewire\Component;
 class GestionStocks extends Component
 {
     use \App\Livewire\Concerns\BornesCalendrierExercice;
+    use WithPagination;
 
     /** Ticket U8 — les mouvements qui sont des écarts d'inventaire : cet écran (`adjustment`) et le poste (`inventaire`). */
     public const TYPES_ECART_INVENTAIRE = ['adjustment', 'inventaire'];
@@ -218,8 +221,10 @@ class GestionStocks extends Component
         // perte comme ceux de cet écran (`RecordStockAdjustmentEntryAction`) — mais cette carte ne lisait que
         // `adjustment` : un manquant constaté hors ligne n'apparaissait jamais dans les « Écarts d'Inventaire » de
         // la ferme, alors que le poste, lui, le compte.
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $ecartsMois = StockMovement::whereIn('reference_type', self::TYPES_ECART_INVENTAIRE)
-            ->whereMonth('movement_date', now()->month)->whereYear('movement_date', now()->year)
+            ->whereMonth('movement_date', $mois->month)->whereYear('movement_date', $mois->year)
             ->get();
 
         $ecartsValeur = $ecartsMois->sum(function ($m) {
@@ -273,9 +278,20 @@ class GestionStocks extends Component
         $this->dispatch('toast', message: 'Stock ajouté avec succès.', type: 'success');
     }
 
+    /**
+     * Ticket EX7 (EF9) — le Journal des Mouvements de l'exercice AFFICHÉ, PAGINÉ (25 par page), au lieu des 100 derniers
+     * toutes années confondues.
+     */
     public function getMovementsProperty()
     {
-        return StockMovement::with('product')->orderByDesc('movement_date')->limit(100)->get();
+        [$debut, $fin] = ExerciceChoisi::bornes();
+
+        return StockMovement::with('product')
+            ->whereDate('movement_date', '>=', $debut)
+            ->whereDate('movement_date', '<=', $fin)
+            ->orderByDesc('movement_date')
+            ->orderByDesc('id')
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageMouvements');
     }
 
     public function referenceLabel(string $type): string

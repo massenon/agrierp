@@ -70,7 +70,14 @@ class Bilan extends Component
 
     public function mount(): void
     {
-        $this->asOfDate = now()->format('Y-m-d');
+        // Ticket EX7 (EF9) — arrêté à aujourd'hui, ramené dans l'exercice affiché (sa fin pour 2026 consulté en 2027).
+        $this->asOfDate = \App\Support\ExerciceChoisi::dateArrete();
+    }
+
+    /** Ticket EX7 (EF9) — une date d'arrêté hors de l'exercice affiché est ramenée à sa borne. */
+    public function updatedAsOfDate(): void
+    {
+        $this->asOfDate = \App\Support\ExerciceChoisi::borner($this->asOfDate !== '' ? $this->asOfDate : \App\Support\ExerciceChoisi::dateArrete());
     }
 
     /** Solde de chaque compte (débit-crédit) à la date choisie, un seul point de calcul. */

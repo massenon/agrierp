@@ -9,9 +9,11 @@ use App\Models\LivestockLot;
 use App\Models\VeterinaryCalendarEvent;
 use App\Models\VeterinaryRecord;
 use App\Models\VeterinaryWithdrawalPeriod;
+use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Ticket 3.11 (Sprint 3) — soins-vaccins-hub.html → Livewire\Elevage\SoinsVaccinsHub
@@ -49,6 +51,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class SoinsVaccinsHub extends Component
 {
+    use WithPagination;
+
     #[Url]
     public string $tab = 'registre';
 
@@ -123,8 +127,10 @@ class SoinsVaccinsHub extends Component
         // 🔴→✅ Ticket U3 — soins ACTIFS seulement : un soin archivé (`archiveSoin`) quittait le registre mais restait
         // compté dans « Interventions (mois) » et « Coût sanitaire (mois) », alors que le Dashboard Élevage, le Bilan
         // et le protocole du jour l'écartent (« soin archivé = supprimé »). Même règle au poste.
+        // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+        $mois = ExerciceChoisi::moisDeReference();
         $monthRecords = VeterinaryRecord::where('is_active', true)
-            ->whereMonth('record_date', now()->month)->whereYear('record_date', now()->year);
+            ->whereMonth('record_date', $mois->month)->whereYear('record_date', $mois->year);
 
         return [
             'interventions_mois' => (clone $monthRecords)->count(),
@@ -134,12 +140,19 @@ class SoinsVaccinsHub extends Component
         ];
     }
 
+    /**
+     * Ticket EX7 (EF9) — le registre de l'exercice AFFICHÉ, PAGINÉ (25 par page), filtres compris, au lieu des 50
+     * derniers soins toutes années confondues.
+     */
     public function getVeterinaryRecordsProperty()
     {
         $terme = trim($this->recherche);
         $codeEspece = self::ESPECES_FILTRE[$this->espece] ?? null;
+        [$debut, $fin] = ExerciceChoisi::bornes();
 
         return VeterinaryRecord::with('lot.species')->where('is_active', true)
+            ->whereDate('record_date', '>=', $debut)
+            ->whereDate('record_date', '<=', $fin)
             // Ticket H11 — recherche et filtres du poste (`_lignesFiltrees`), appliqués PAR LA REQUÊTE, avant la limite.
             ->when($this->categorie !== '', fn ($q) => $q->where('action_type', $this->categorie))
             ->when($codeEspece, fn ($q) => $q->whereHas('lot.species', fn ($s) => $s->where('code', $codeEspece)))
@@ -151,7 +164,16 @@ class SoinsVaccinsHub extends Component
                     ->orWhereRaw('LOWER(symptomes) LIKE ?', [$motif])
                     ->orWhereHas('lot', fn ($l) => $l->whereRaw('LOWER(code) LIKE ?', [$motif])));
             })
-            ->orderByDesc('record_date')->limit(50)->get();
+            ->orderByDesc('record_date')->orderByDesc('id')
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageRegistre');
+    }
+
+    /** Un filtre du registre change : retour à sa première page. */
+    public function updating(string $propriete): void
+    {
+        if (in_array($propriete, ['recherche', 'categorie', 'espece'], true)) {
+            $this->resetPage('pageRegistre');
+        }
     }
 
     /** Ticket H11 — le registre est-il filtré ? (message vide du poste : « … pour ces critères »). */
@@ -271,7 +293,8 @@ class SoinsVaccinsHub extends Component
     // ===================== SUIVI SANITAIRE (Infirmerie) =====================
     public function getKpisInfirmerieProperty(): array
     {
-        $monthRecords = InfirmaryRecord::whereMonth('entry_date', now()->month)->whereYear('entry_date', now()->year);
+        $mois = ExerciceChoisi::moisDeReference();
+        $monthRecords = InfirmaryRecord::whereMonth('entry_date', $mois->month)->whereYear('entry_date', $mois->year);
         $effectifTotal = LivestockLot::vivantes()->sum('current_quantity');   // Bandes VIVANTES : une bande archivée ne compte plus (LivestockLot::vivantes).
         $enCours = InfirmaryRecord::where('status', 'en_cours')->count();
 
@@ -284,9 +307,21 @@ class SoinsVaccinsHub extends Component
         ];
     }
 
+    /**
+     * Ticket EX7 (EF9) — les entrées d'infirmerie de l'exercice AFFICHÉ, PAGINÉES (25 par page), au lieu des 50
+     * dernières. ⚠️ Quand l'exercice affiché contient le jour, les cas ENCORE EN COURS d'un exercice antérieur restent
+     * listés : un sujet entré le 28/12/2026 et toujours isolé en février 2027 doit pouvoir être réintégré depuis 2027.
+     */
     public function getInfirmaryRecordsProperty()
     {
-        return InfirmaryRecord::with('lot')->orderByDesc('entry_date')->limit(50)->get();
+        [$debut, $fin] = ExerciceChoisi::bornes();
+        $enCoursAnterieurs = ExerciceChoisi::contientAujourdhui();
+
+        return InfirmaryRecord::with('lot')
+            ->where(fn ($q) => $q->where(fn ($p) => $p->whereDate('entry_date', '>=', $debut)->whereDate('entry_date', '<=', $fin))
+                ->when($enCoursAnterieurs, fn ($o) => $o->orWhere(fn ($c) => $c->where('status', 'en_cours')->whereDate('entry_date', '<', $debut))))
+            ->orderByDesc('entry_date')->orderByDesc('id')
+            ->paginate(ExerciceChoisi::PAR_PAGE, pageName: 'pageInfirmerie');
     }
 
     public function newInfirmaryEntry(): void

@@ -74,6 +74,7 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->sales" />
     </div>
 
     <x-modal name="modal-mecef" max-width="sm">

@@ -11,7 +11,7 @@
                 <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
             </button>
             @can('manage-comptabilite')
-            <button type="button" wire:click="newEntry" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+            <button @lectureSeule type="button" wire:click="newEntry" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Saisie d'Écriture
             </button>
             @endcan
@@ -64,8 +64,8 @@
                                 @if($entry->is_locked)
                                     <span class="material-symbols-outlined text-[16px] text-outline align-middle" title="Écriture verrouillée (exercice clôturé)">lock</span>
                                 @elseif(auth()->user()->can('manage-comptabilite'))
-                                    <button type="button" wire:click="editEntry('{{ $entry->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
-                                    <button type="button" wire:click="archiveEntry('{{ $entry->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
+                                    <button @lectureSeule type="button" wire:click="editEntry('{{ $entry->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+                                    <button @lectureSeule type="button" wire:click="archiveEntry('{{ $entry->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
                                 @else
                                     <span class="text-outline text-[10px] italic">Lecture seule</span>
                                 @endif
@@ -77,6 +77,7 @@
                 </tbody>
             </table>
         </div>
+        <x-pagination :paginator="$this->entries" />
     </div>
 
     <x-modal name="modal-create-journal-comptable" max-width="md">
@@ -121,7 +122,7 @@
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-journal-comptable' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
             </div>
         </form>
     </x-modal>

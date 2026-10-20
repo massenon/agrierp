@@ -242,8 +242,11 @@ class BasculeExerciceEtatsTest extends TestCase
             ->set('startDate', '2027-01-01')->set('endDate', '2027-01-31')->assertSee($mention);
         Livewire::test(EtatsFinanciers::class)->assertSee($mention);
 
-        // Un état de 2026 n'a rien de provisoire.
+        // Un état de 2026 n'a rien de provisoire. Ticket EX7 : la date d'arrêté est bornée à l'exercice affiché — 2026
+        // se consulte en le choisissant, puis on revient à l'exercice du jour.
+        \App\Support\ExerciceChoisi::choisir(2026);
         Livewire::test(Bilan::class)->set('asOfDate', '2026-12-31')->assertDontSee($mention);
+        \App\Support\ExerciceChoisi::choisir(2027);
 
         $this->cloturer2026();
 

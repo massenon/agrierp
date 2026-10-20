@@ -52,21 +52,16 @@ class EtatsFinanciers extends Component
     #[Url]
     public string $tab = 'bilan';
 
+    /** Ticket EX7 (EF9) — l'exercice AFFICHÉ (`ExerciceChoisi`), et non plus le plus récent ouvert. */
     public function getFiscalYearProperty(): ?FiscalYear
     {
-        return FiscalYear::current();
+        return \App\Support\ExerciceChoisi::exercice();
     }
 
     private function asOfDate(): string
     {
-        $year = $this->fiscalYear;
-
-        // Arrêté à aujourd'hui, jamais au-delà de la fin de l'exercice ouvert.
-        if ($year && now()->greaterThan($year->end_date)) {
-            return $year->end_date->format('Y-m-d');
-        }
-
-        return now()->format('Y-m-d');
+        // Arrêté à aujourd'hui, ramené dans l'exercice affiché (sa fin quand on consulte 2026 en 2027).
+        return \App\Support\ExerciceChoisi::dateArrete();
     }
 
     private function startDate(): string

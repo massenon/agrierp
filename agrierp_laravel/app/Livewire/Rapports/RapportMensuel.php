@@ -49,20 +49,19 @@ class RapportMensuel extends Component
 
     public function mount(): void
     {
-        if ($this->periode === '') {
-            $this->periode = now()->format('Y-m');
-        }
+        // Ticket EX7 (EF9) — le mois du jour s'il est dans l'exercice affiché, sinon son dernier mois.
+        $this->periode = \App\Support\ExerciceChoisi::bornerMois($this->periode !== '' ? $this->periode : now()->format('Y-m'));
     }
 
+    public function updatedPeriode(): void
+    {
+        $this->periode = \App\Support\ExerciceChoisi::bornerMois($this->periode);
+    }
+
+    /** Ticket EX7 (EF9) — les mois de l'exercice affiché (avant : les 12 derniers mois glissants). */
     public function getPeriodesProperty(): array
     {
-        return collect(range(0, 11))
-            ->mapWithKeys(function ($i) {
-                $date = now()->startOfMonth()->subMonths($i);
-
-                return [$date->format('Y-m') => ucfirst($date->translatedFormat('F Y'))];
-            })
-            ->all();
+        return \App\Support\ExerciceChoisi::moisDeLExercice();
     }
 
     private function mois(int $decalage = 0): Carbon
