@@ -7,6 +7,7 @@ import 'package:agrierp/features/comptabilite/comptabilite_screen.dart';
 import 'package:agrierp/features/comptabilite/mention_anouveaux.dart';
 import 'package:agrierp/features/comptabilite/soldes_exercice.dart';
 import 'package:agrierp/features/rapports/rapports_repository.dart';
+import 'package:agrierp/features/sync/coherence_repository.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -387,6 +388,56 @@ void main() {
       }
     },
     skip: sautSansPhp() != null,
+  );
+
+  test(
+    'EX1 — contrôle de cohérence S-T6 : « anouveaux » du serveur lu au poste, et le même calcul sur la base du poste',
+    () async {
+      expect(ControleCoherenceRepository.lireAnouveaux({'tables': const {}}), isNull, reason: 'non servi');
+      expect(ControleCoherenceRepository.lireAnouveaux({'anouveaux': null}), isNull);
+
+      final photo = serveur!['definitif'] as Map<String, dynamic>;
+      // Un à-nouveau altéré (caisse 180 000 au lieu de la clôture), comme dans `BasculeExerciceEtatsTest`.
+      final lu = ControleCoherenceRepository.lireAnouveaux({
+        'anouveaux': [
+          {
+            'exercice': 2027,
+            'precedent': 2026,
+            'statut_precedent': 'cloture',
+            'ecarts': [
+              {'code': '531', 'libelle': 'Caisse', 'cloture': 200000, 'ouverture': 180000.0},
+            ],
+          },
+        ],
+      })!;
+      expect(lu.single.ecarts.single.cloture, 200000.0);
+      expect(lu.single.ecarts.single.ouverture, 180000.0);
+
+      final db = await basePoste(photo);
+      addTearDown(db.close);
+      final local = await ControleCoherenceRepository(
+        database: db,
+        serveur: (_) async => {'tables': const {}, 'anouveaux': photo['controle']},
+      ).anouveauxLocaux();
+      expect(local.single.exercice, 2027);
+      expect(local.single.ecarts, isEmpty, reason: 'à-nouveau écrit = clôture calculée');
+
+      // L'à-nouveau de la caisse altéré au poste : l'écart se voit, au centime.
+      final ran = (photo['journal'] as List).firstWhere((e) => e['source_type'] == 'ran');
+      final caisse = (photo['plan'] as List).firstWhere((c) => c['code'] == '531')['id'];
+      final ligne = (ran['lines'] as List).firstWhere((l) => l['account_id'] == caisse);
+      await (db.update(db.accountingEntryLines)..where((l) => l.id.equals(ligne['id'] as String)))
+          .write(AccountingEntryLinesCompanion(debit: Value(n(ligne['debit']) - 20000)));
+      final altere = await ControleCoherenceRepository(
+        database: db,
+        serveur: (_) async => const {},
+      ).anouveauxLocaux();
+      expect(
+        [for (final e in altere.single.ecarts) [e.code, e.cloture - e.ouverture]],
+        [['531', 20000.0]],
+      );
+    },
+    skip: sautSansPhp(),
   );
 
   test('EX2 — la mention ne s affiche que pour une ouverture provisoire', () {
