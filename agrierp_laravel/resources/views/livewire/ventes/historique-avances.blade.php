@@ -116,7 +116,7 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date *</label>
-                <input wire:model="advanceDate" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('advanceDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                <input wire:model="advanceDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('advanceDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('advanceDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             @if(! $editingAdvanceId)

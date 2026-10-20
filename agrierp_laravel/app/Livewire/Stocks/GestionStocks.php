@@ -110,6 +110,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class GestionStocks extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     /** Ticket U8 — les mouvements qui sont des écarts d'inventaire : cet écran (`adjustment`) et le poste (`inventaire`). */
     public const TYPES_ECART_INVENTAIRE = ['adjustment', 'inventaire'];
 

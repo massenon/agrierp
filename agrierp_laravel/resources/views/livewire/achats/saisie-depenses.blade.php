@@ -20,7 +20,7 @@
         <form wire:submit="submitExpense" class="grid grid-cols-1 md:grid-cols-2 gap-md">
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la Transaction *</label>
-                <input wire:model="expenseDate" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                <input wire:model="expenseDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('expenseDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>

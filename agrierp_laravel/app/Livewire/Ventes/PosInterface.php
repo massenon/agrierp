@@ -173,11 +173,10 @@ class PosInterface extends Component
         return $finExercice ? min($today, substr((string) $finExercice, 0, 10)) : $today;
     }
 
+    /** Ticket EX6 — la même borne que toutes les saisies datées (`AccountingEntryService::premierJourSaisissable`). */
     public function getDateMinProperty(): ?string
     {
-        $debut = FiscalYear::where('status', 'ouvert')->min('start_date');
-
-        return $debut ? substr((string) $debut, 0, 10) : null;
+        return app(\App\Services\AccountingEntryService::class)->premierJourSaisissable();
     }
 
     /** Retour immédiat sous le champ, avant même « Valider la Vente » (aucun effet, aucun toast). */

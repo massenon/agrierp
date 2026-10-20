@@ -46,6 +46,8 @@ use Livewire\Component;
  */
 class DettesFournisseurs extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     #[Url]
     public string $search = '';
 
@@ -140,12 +142,20 @@ class DettesFournisseurs extends Component
 
         // ⚠️ TICKET 15.16 — L'IMPUTATION, LA TRÉSORERIE ET L'ÉCRITURE VIVENT DANS
         // `SupplierSettlementService`, partagé avec ProfileFournisseur et le poste.
-        app(SupplierSettlementService::class)->regler(
-            $this->paymentSupplierId,
-            (float) $this->paymentAmount,
-            $this->paymentTreasuryAccountId,
-            $this->paymentDate,
-        );
+        // 🔴→✅ Ticket EX6 (EF6, oubli d'EX5) — exercice clos ou absent : erreur 500. Le motif R4 va sous « Date », comme
+        // la dépense et l'ajout de stock ; la transaction du service annulée, rien n'a bougé.
+        try {
+            app(SupplierSettlementService::class)->regler(
+                $this->paymentSupplierId,
+                (float) $this->paymentAmount,
+                $this->paymentTreasuryAccountId,
+                $this->paymentDate,
+            );
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->addError('paymentDate', $e->getMessage());
+
+            return;
+        }
 
         $this->dispatch('close-modal', name: 'modal-create-dettes-fournisseurs');
         $this->dispatch('toast', message: 'Règlement enregistré avec succès.', type: 'success');

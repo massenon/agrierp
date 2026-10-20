@@ -116,7 +116,9 @@
             <form wire:submit="submitAjouterStock" class="space-y-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du Nouveau Stock *</label>
-                    <input wire:model="addDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="addDate" type="date" @if($this->dateMinHorsExerciceClos) min="{{ $this->dateMinHorsExerciceClos }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('addDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                    {{-- 🔴→✅ Ticket EX6 — le motif R4 posé sous « Date » par EX5 n'était affiché nulle part : refus muet. --}}
+                    @error('addDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Produit *</label>

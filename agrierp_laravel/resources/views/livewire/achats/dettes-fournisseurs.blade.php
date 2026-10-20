@@ -92,7 +92,9 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de règlement *</label>
-                <input wire:model="paymentDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="paymentDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('paymentDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                {{-- Ticket EX6 — exercice clos ou absent : le motif R4 sous « Date » (EF6), comme la dépense. --}}
+                @error('paymentDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte de Trésorerie *</label>

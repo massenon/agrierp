@@ -2,8 +2,6 @@
 
 namespace App\Livewire\Achats;
 
-use App\Models\AuditLog;
-use App\Actions\RecordSettlementAccountingEntryAction;
 use App\Models\Payable;
 use App\Models\Purchase;
 use App\Models\PurchaseOrder;
@@ -102,22 +100,22 @@ class ProfileFournisseur extends Component
         // ⚠️ TICKET 15.16 — MÊME SERVICE QUE `DettesFournisseurs`. Cette copie retirait
         // de la trésorerie, et écrivait au journal, le montant SAISI en entier même
         // s'il dépassait les dettes ; seule la part imputée sort désormais.
-        app(SupplierSettlementService::class)->regler(
-            $this->supplier->id,
-            (float) $this->regularisationMontant,
-            $this->regularisationTreasuryId,
-        );
+        //
+        // 🔴→✅ Ticket EX6 — le service passe DÉJÀ l'écriture 401 / 5xx et la ligne d'audit `payable.payment_recorded`
+        // (15.16). Le bloc qui les refaisait ici appelait une variable non définie (`$treasury`) : chaque règlement
+        // depuis le profil finissait en erreur 500 APRÈS avoir été enregistré (caisse débitée, page en erreur). Retiré.
+        // Exercice clos ou absent (le règlement est daté du jour) : motif R4 en toast, rien n'est écrit (EF6).
+        try {
+            app(SupplierSettlementService::class)->regler(
+                $this->supplier->id,
+                (float) $this->regularisationMontant,
+                $this->regularisationTreasuryId,
+            );
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
-        // 🔴→✅ TICKET 14.34 — écriture de règlement fournisseur.
-        $ecriture = app(RecordSettlementAccountingEntryAction::class)->payToSupplier(
-            $treasury, (float) $this->regularisationMontant, $this->supplier?->name
-        );
-
-        if ($ecriture === null) {
-            AuditLog::record('payable.accounting_entry_missing', 'comptabilite');
+            return;
         }
-
-        AuditLog::record('payable.payment_recorded', 'achats');
 
         // 🔴→✅ TICKET 14.3 — même défaut que `ProfileClient::confirmRegularisation`,
         // côté achats : `debts` ne retient que les dettes non soldées et a été

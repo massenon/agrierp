@@ -44,6 +44,8 @@ use Livewire\Component;
  */
 class ListeAchats extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     public string $search = '';
 
     public string $statusFilter = '';

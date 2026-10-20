@@ -42,6 +42,8 @@ use Livewire\WithFileUploads;
 #[Layout('layouts.app')]
 class SaisieDepenses extends Component
 {
+    use \App\Livewire\Concerns\BornesCalendrierExercice;
+
     use WithFileUploads;
 
     #[Url]

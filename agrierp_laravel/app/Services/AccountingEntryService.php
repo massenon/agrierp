@@ -111,6 +111,31 @@ class AccountingEntryService
         }
     }
 
+    /**
+     * Ticket EX6 (EF7) — BORNE BASSE du calendrier d'une saisie qui passe une écriture (dépense, règlement,
+     * remboursement, avance, vente datée) : le début du plus ancien exercice OUVERT, `null` s'il n'y en a aucun.
+     * Indicative : [exerciceOuvertPour] reste le juge. Le poste en garde la copie (`ExerciceDeSaisie::premierJour`,
+     * règle `ecriture`).
+     */
+    public function premierJourSaisissable(): ?string
+    {
+        $debut = FiscalYear::where('status', 'ouvert')->min('start_date');
+
+        return $debut ? substr((string) $debut, 0, 10) : null;
+    }
+
+    /**
+     * Ticket EX6 (EF7) — BORNE BASSE du calendrier d'une saisie jugée par [refusExerciceClos] seulement (ajout de
+     * stock) : le lendemain du plus récent exercice CLOS, `null` s'il n'y en a aucun — un jour qu'aucun exercice ne
+     * couvre reste admis. Copie au poste : `ExerciceDeSaisie::premierJour`, règle `closSeulement`.
+     */
+    public function premierJourHorsExerciceClos(): ?string
+    {
+        $fin = FiscalYear::where('status', '!=', 'ouvert')->max('end_date');
+
+        return $fin ? Carbon::parse(substr((string) $fin, 0, 10))->addDay()->format('Y-m-d') : null;
+    }
+
     private function exerciceQuiCouvre(string $date): ?FiscalYear
     {
         $jour = Carbon::parse($date)->format('Y-m-d');
