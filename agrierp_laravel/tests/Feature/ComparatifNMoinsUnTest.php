@@ -269,8 +269,12 @@ class ComparatifNMoinsUnTest extends TestCase
         };
         $this->app->instance(PdfExportService::class, $espion);
 
-        Livewire::test(EtatsFinanciers::class)->call('exportEtatActifPdf')
-            ->call('switchTab', 'resultat')->call('exportEtatActifPdf');
+        Livewire::test(EtatsFinanciers::class)->call('exportEtatActifPdf')->assertFileDownloaded()
+            ->call('switchTab', 'resultat')->call('exportEtatActifPdf')->assertFileDownloaded()
+            // 🔴→✅ La vue du PDF ne compilait pas (« achat@if » sans directive, « @endif » orphelin) : erreur 500 sur les
+            // quatre onglets, jamais vue faute de test.
+            ->call('switchTab', 'tafire')->call('exportEtatActifPdf')->assertFileDownloaded()
+            ->call('switchTab', 'notes')->call('exportEtatActifPdf')->assertFileDownloaded();
 
         [$bilan, $resultat] = $espion->html;
         foreach ([$bilan, $resultat] as $document) {

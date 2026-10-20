@@ -29,6 +29,15 @@ class FinancialReportService
      */
     public const SOURCES_A_NOUVEAU = ['ran', 'ran_reversal'];
 
+    /**
+     * Ticket EX8 — écriture de SOLDE DES COMPTES DE GESTION (étape 2 de la clôture, `ClotureExercice::soldeComptesGestion`,
+     * datée du 31/12 de l'exercice) : elle ramène les classes 6 et 7 à zéro et porte le résultat au 131 / 139. Le Bilan et
+     * le Compte de résultat l'ÉCARTENT, ses deux côtés ensemble (point relevé par EX1) : lue telle quelle, le Compte de
+     * résultat d'un exercice clos vaudrait 0 et le comparatif N-1 serait faux. La Balance et le Grand Livre, eux, la
+     * montrent : ce sont les livres, elle y est écrite.
+     */
+    public const SOURCES_SOLDE_GESTION = ['closing'];
+
     /** Libellé de la ligne de résultat d'un exercice encore ouvert, reporté dans l'ouverture du suivant (R3). */
     public static function libelleResultatProvisoire(int $annee): string
     {
@@ -230,11 +239,13 @@ class FinancialReportService
     /**
      * Ticket EX1 — SOLDES À UNE DATE selon R1 : classes 1 à 5 = ouverture de l'exercice + mouvements de l'exercice
      * jusqu'à la date ; classes 6 et au-delà = mouvements de l'exercice seulement. `$inclus` faux : à l'ouverture de
-     * la journée (« strictement avant » : l'ouverture d'une période).
+     * la journée (« strictement avant » : l'ouverture d'une période). `$horsSoldeGestion` vrai (ticket EX8 : Bilan et
+     * Compte de résultat) : l'écriture de solde des comptes de gestion de l'exercice est écartée
+     * (`SOURCES_SOLDE_GESTION`).
      *
      * @return array{ouverture: array, comptes: array<string, array{code: string, label: string, class: int, net: float}>, resultat_provisoire: ?array}
      */
-    public function soldes(string $date, bool $inclus = true): array
+    public function soldes(string $date, bool $inclus = true, bool $horsSoldeGestion = false): array
     {
         $date = substr($date, 0, 10);
         $exercice = $this->exerciceDe($date);
@@ -243,7 +254,7 @@ class FinancialReportService
 
         $comptes = $ouverture['comptes'];
         if ($fin >= $exercice['debut']) {
-            foreach ($this->cumuls($exercice['debut'], $fin, false) as $id => $m) {
+            foreach ($this->cumuls($exercice['debut'], $fin, false, $horsSoldeGestion) as $id => $m) {
                 $comptes[$id] ??= ['code' => $m['code'], 'label' => $m['label'], 'class' => $m['class'], 'net' => 0.0];
                 $comptes[$id]['net'] = round($comptes[$id]['net'] + (float) $m['debit'] - (float) $m['credit'], 2);
             }
@@ -337,10 +348,11 @@ class FinancialReportService
     /**
      * Cumuls débit / crédit par compte des écritures ACTIVES datées de `$du` (inclus ; `null` = depuis l'origine) à
      * `$au` (inclus). `$aNouveau` vrai : les seules écritures d'à-nouveau ; faux : toutes les AUTRES.
+     * `$horsSoldeGestion` vrai : sans l'écriture de solde des comptes de gestion (ticket EX8).
      *
      * @return array<string, array{code: string, label: string, class: int, debit: float, credit: float}>
      */
-    private function cumuls(?string $du, string $au, bool $aNouveau): array
+    private function cumuls(?string $du, string $au, bool $aNouveau, bool $horsSoldeGestion = false): array
     {
         $query = AccountingEntryLine::query()
             ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
@@ -350,6 +362,11 @@ class FinancialReportService
             ->when($du !== null, fn ($q) => $q->whereDate('accounting_entries.entry_date', '>=', $du));
 
         self::filtrerANouveau($query, $aNouveau);
+        if ($horsSoldeGestion) {
+            // ⚠️ Comme `filtrerANouveau` : une écriture SANS `source_type` est gardée (NULL n'est jamais « pas dans »).
+            $query->where(fn ($q) => $q->whereNull('accounting_entries.source_type')
+                ->orWhereNotIn('accounting_entries.source_type', self::SOURCES_SOLDE_GESTION));
+        }
 
         return $query
             ->groupBy('chart_of_accounts.id', 'chart_of_accounts.code', 'chart_of_accounts.label', 'chart_of_accounts.class')
@@ -397,10 +414,13 @@ class FinancialReportService
     /**
      * Ticket EX1 — le Bilan lit les soldes de R1 (`soldes()`) : classes 1 à 5 depuis l'ouverture de l'exercice,
      * résultat = classes 6 et 7 de l'exercice seulement.
+     *
+     * 🔴→✅ Ticket EX8 — sans l'écriture de solde des comptes de gestion (`SOURCES_SOLDE_GESTION`) : le résultat d'un
+     * exercice dont l'étape 2 est passée reste « Résultat de l'exercice », jamais déplacé au 131 / 139 (même total).
      */
     public function bilan(string $asOfDate): array
     {
-        return $this->bilanDepuis($this->soldes($asOfDate));
+        return $this->bilanDepuis($this->soldes($asOfDate, true, true));
     }
 
     private function bilanDepuis(array $soldes): array
@@ -619,7 +639,8 @@ class FinancialReportService
      */
     public function compteResultat(string $asOfDate): array
     {
-        return $this->compteResultatDepuis($this->soldes($asOfDate));
+        // Ticket EX8 — l'écriture de solde de l'étape 2 écartée : le Compte de résultat d'un exercice clos n'est plus 0.
+        return $this->compteResultatDepuis($this->soldes($asOfDate, true, true));
     }
 
     /** Ticket EX1 — classes 6 et 7 de l'EXERCICE seulement (R1), depuis son premier jour. */
@@ -676,6 +697,102 @@ class FinancialReportService
     }
 
     /**
+     * Ticket EX8 (EF11) — DATE D'ARRÊTÉ des états d'un exercice choisi : aujourd'hui s'il est en cours, sa clôture s'il
+     * est passé, son premier jour s'il est à venir. L'exercice enregistré de cette année, à défaut l'année civile.
+     * C'est la date que prennent le Bilan et les États financiers quand l'exercice affiché leur est donné (`exercice`,
+     * branché par le sélecteur d'exercice d'EX7).
+     */
+    public function arreteDeLExercice(int $annee): string
+    {
+        $exercice = FiscalYear::where('year', $annee)->first();
+        $debut = $exercice?->start_date->format('Y-m-d') ?? "{$annee}-01-01";
+        $fin = $exercice?->end_date->format('Y-m-d') ?? "{$annee}-12-31";
+        $aujourdhui = now()->format('Y-m-d');
+
+        return max($debut, min($aujourdhui, $fin));
+    }
+
+    /**
+     * Ticket EX8 (EF11) — l'exercice N-1 de l'exercice qui contient `$asOfDate` : l'exercice ENREGISTRÉ qui couvre la
+     * veille du premier jour de N, présenté à sa clôture (`arrete` = son dernier jour), ou `null` s'il n'existe pas —
+     * la colonne N-1 dit alors « — », jamais 0.
+     *
+     * @return array{exercice_n: array{annee: int, arrete: string}, exercice_n1: ?array{annee: int, arrete: string, statut: ?string}}
+     */
+    public function exercicesComparatif(string $asOfDate): array
+    {
+        $asOfDate = substr($asOfDate, 0, 10);
+        $n = $this->exerciceDe($asOfDate);
+        $precedent = $this->exerciceDe(Carbon::parse($n['debut'])->subDay()->format('Y-m-d'));
+
+        return [
+            'exercice_n' => ['annee' => $n['annee'], 'arrete' => $asOfDate],
+            'exercice_n1' => $precedent['reel']
+                ? ['annee' => $precedent['annee'], 'arrete' => $precedent['fin'], 'statut' => $precedent['statut']]
+                : null,
+        ];
+    }
+
+    /**
+     * Ticket EX8 (EF11) — BILAN N / N-1 : le Bilan de N à `$asOfDate` et celui de N-1 à sa clôture, juxtaposés.
+     *
+     * `n` / `n1` : `bilan()` de chaque exercice (totaux, résultat, équilibre) — `n1` vaut `null` sans exercice N-1.
+     * `lignes` : par rubrique (`immo`, `stocks`, `creances`, `tresorerie`, `capitaux`, `dettes`), l'union des comptes
+     * des deux colonnes, triée par code ; chaque ligne porte son solde (même signe que `bilan()`) en `n` et en `n1`. Un
+     * compte absent d'un exercice EXISTANT y vaut 0 (mesuré) ; sans exercice N-1, `n1` vaut `null` (inconnu : « — »).
+     *
+     * @return array{exercice_n: array, exercice_n1: ?array, n: array, n1: ?array, lignes: array<string, array<int, array{code: string, label: string, provisoire: bool, n: float, n1: ?float}>>}
+     */
+    public function bilanComparatif(string $asOfDate): array
+    {
+        $exercices = $this->exercicesComparatif($asOfDate);
+        $n = $this->bilan($exercices['exercice_n']['arrete']);
+        $n1 = $exercices['exercice_n1'] !== null ? $this->bilan($exercices['exercice_n1']['arrete']) : null;
+
+        $lignes = [];
+        foreach (['immo', 'stocks', 'creances', 'tresorerie', 'capitaux', 'dettes'] as $rubrique) {
+            $fusion = [];
+            $colonnes = ['n' => $n[$rubrique]];
+            if ($n1 !== null) {
+                $colonnes['n1'] = $n1[$rubrique];
+            }
+            foreach ($colonnes as $colonne => $source) {
+                foreach ($source as $l) {
+                    $provisoire = (bool) ($l['provisoire'] ?? false);
+                    $cle = $l['code'].'|'.$l['label'].'|'.($provisoire ? 'p' : '');
+                    $fusion[$cle] ??= [
+                        'code' => (string) $l['code'], 'label' => (string) $l['label'], 'provisoire' => $provisoire,
+                        'n' => 0.0, 'n1' => $n1 === null ? null : 0.0,
+                    ];
+                    $fusion[$cle][$colonne] = round($fusion[$cle][$colonne] + (float) $l['balance'], 2);
+                }
+            }
+            $fusion = array_values($fusion);
+            // Tri STABLE par code : à code égal, l'ordre d'arrivée (colonne N d'abord).
+            usort($fusion, fn ($a, $b) => strcmp($a['code'], $b['code']));
+            $lignes[$rubrique] = $fusion;
+        }
+
+        return $exercices + ['n' => $n, 'n1' => $n1, 'lignes' => $lignes];
+    }
+
+    /**
+     * Ticket EX8 (EF11) — COMPTE DE RÉSULTAT N / N-1 : la cascade de N à `$asOfDate` et celle de l'exercice N-1 entier
+     * (à sa clôture), écriture de solde des comptes de gestion écartée ; `n1` vaut `null` sans exercice N-1.
+     *
+     * @return array{exercice_n: array, exercice_n1: ?array, n: array<string, float>, n1: ?array<string, float>}
+     */
+    public function compteResultatComparatif(string $asOfDate): array
+    {
+        $exercices = $this->exercicesComparatif($asOfDate);
+
+        return $exercices + [
+            'n' => $this->compteResultat($exercices['exercice_n']['arrete']),
+            'n1' => $exercices['exercice_n1'] !== null ? $this->compteResultat($exercices['exercice_n1']['arrete']) : null,
+        ];
+    }
+
+    /**
      * Ticket 14.6 — TAFIRE simplifié (tableau des flux de trésorerie).
      *
      * ⚠️ LE CONTRÔLE DE COHÉRENCE EST RÉELLEMENT FALSIFIABLE — c'est tout son
@@ -705,7 +822,7 @@ class FinancialReportService
         // (R1), et non le Bilan de la veille : au 01/01, la veille appartient à l'exercice précédent, dont le résultat
         // est encore en classes 6-7 (ou provisoire), alors que l'ouverture du nouvel exercice le porte au 131/139.
         // Comparer les deux faisait passer le résultat reporté pour un flux de financement.
-        $soldesOuverture = $this->soldes($startDate, false);
+        $soldesOuverture = $this->soldes($startDate, false, true);   // EX8 : même lecture que `bilan()`
         $ouverture = $this->bilanDepuis($soldesOuverture);
         $cloture = $this->bilan($endDate);
 

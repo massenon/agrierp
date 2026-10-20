@@ -220,10 +220,13 @@ class BasculeExerciceEtatsTest extends TestCase
         $this->verifierTresorerieEtRapprochement();
 
         // 2026 clos, lu au 31/12/2026 : l'étape 2 a porté le résultat au 131, le total ne change pas.
+        // Ticket EX8 — le Bilan écarte l'écriture de solde des comptes de gestion (ses deux côtés) : le résultat de 2026
+        // reste « Résultat de l'exercice » (200 000) au lieu de passer au 131 (avant EX8 : 131 = 200 000, résultat 0).
+        // Même total ; c'est ce que la colonne N-1 du comparatif présente (`ComparatifNMoinsUnTest`).
         $bilan2026 = $this->service()->bilan('2026-12-31');
         $this->assertEquals(200_000.0, $this->ligne($bilan2026['tresorerie'], '531')['balance']);
-        $this->assertEquals(-200_000.0, $this->ligne($bilan2026['capitaux'], '131')['balance']);
-        $this->assertEquals(0.0, $bilan2026['resultat']);
+        $this->assertSame([], array_values(array_filter($bilan2026['capitaux'], fn ($l) => $l['code'] === '131')));
+        $this->assertEquals(200_000.0, $bilan2026['resultat']);
         $this->assertEquals(1_200_000.0, $bilan2026['total_actif']);
         $this->assertEquals(1_200_000.0, $bilan2026['total_passif']);
     }

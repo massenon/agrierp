@@ -68,15 +68,44 @@ class Bilan extends Component
 {
     public string $asOfDate = '';
 
-    public function mount(): void
+    /**
+     * Ticket EX8 (EF11) — L'EXERCICE AFFICHÉ, paramètre explicite : `null` = le comportement d'avant (arrêté au jour
+     * même, date libre) ; une année = l'état de cet exercice, arrêté à aujourd'hui s'il est en cours, à sa clôture s'il
+     * est passé (`FinancialReportService::arreteDeLExercice`). Le sélecteur d'exercice global (ticket EX7) s'y branche.
+     */
+    public ?int $exercice = null;
+
+    public function mount(?int $exercice = null): void
     {
-        $this->asOfDate = now()->format('Y-m-d');
+        $this->exercice = $exercice;
+        $this->asOfDate = $exercice !== null
+            ? app(FinancialReportService::class)->arreteDeLExercice($exercice)
+            : now()->format('Y-m-d');
     }
 
-    /** Solde de chaque compte (débit-crédit) à la date choisie, un seul point de calcul. */
+    public function updatedExercice(): void
+    {
+        if ($this->exercice !== null) {
+            $this->asOfDate = app(FinancialReportService::class)->arreteDeLExercice($this->exercice);
+        }
+    }
+
+    /**
+     * Ticket EX8 (EF11) — Bilan N / N-1 : l'exercice de la date choisie (colonne « Exercice N ») et l'exercice précédent
+     * à sa clôture (colonne « Exercice N-1 », « — » s'il n'existe pas). Un seul point de calcul.
+     */
+    public function getComparatifProperty(): array
+    {
+        return $this->calculs[$this->asOfDate] ??= app(FinancialReportService::class)->bilanComparatif($this->asOfDate);
+    }
+
+    /** @var array<string, array> calculs de la requête en cours, par date d'arrêté (jamais conservés d'une requête à l'autre) */
+    private array $calculs = [];
+
+    /** Solde de chaque compte (débit-crédit) à la date choisie — la colonne N du comparatif. */
     public function getBilanProperty(): array
     {
-        return app(FinancialReportService::class)->bilan($this->asOfDate);
+        return $this->comparatif['n'];
     }
 
     public function render()
