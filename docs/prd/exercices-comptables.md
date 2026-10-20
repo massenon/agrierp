@@ -1,5 +1,5 @@
 # PRD — Bascule et clôture d'exercice, navigation N / N-1 / N+1 (web et poste)
-**Statut :** brouillon · **Date :** 2026-10-20 · **Ticket(s) :** à créer (skill `plan`, préfixe EX) ; reprend la question client Q4 « historique des exercices antérieurs » (`agrierp_flutter/AUDIT_FIDELISATION.md:1020`) et D-U14-1 (`PLAN_FINALISATION.md`)
+**Statut :** validé par le client le 20/10/2026 · **Date :** 2026-10-20 · **Ticket(s) :** à créer (skill `plan`, préfixe EX) ; reprend la question client Q4 « historique des exercices antérieurs » (`agrierp_flutter/AUDIT_FIDELISATION.md:1020`) et D-U14-1 (`PLAN_FINALISATION.md`)
 
 > **Construit d'abord sur le web** (Doctrine, article 0 et article 5), puis porté au poste à l'identique. La clôture elle-même reste au web seulement (`DOCTRINE_PORTAGE.md:36` : « clôture d'exercice = jamais synchronisée ») ; le poste **affiche** l'état des exercices, **refuse** les saisies dans un exercice clos et **consulte** N-1.
 >
@@ -214,9 +214,11 @@ Les ventes gardent leur préfixe actuel « Vente refusée : » (`VerifySaleDateA
 - **Conservation hors du serveur** (cloud, disque externe automatique) : elle relève de l'hébergement cPanel. Le PRD fournit l'archive téléchargeable ; la copie externe reste une procédure, à documenter dans `GUIDE_DEPLOIEMENT.md`.
 - **Tables à fenêtre du poste** (pointages, journal d'audit, notifications) : elles ne servent pas aux états d'un exercice.
 
-## 9. Questions ouvertes pour le client
+## 9. Questions au client — tranchées le 20/10/2026
 
-| # | Question | Proposition recommandée | Bloquante pour |
+**Décision du client du 20/10/2026 : toutes les propositions recommandées ci-dessous sont retenues.** Q6 (10 ans) reste à faire confirmer par le cabinet FAGUEZ. Tickets EX1 à EX9 dans `PLAN_FINALISATION.md`.
+
+| # | Question | Proposition recommandée (retenue) | Bloquante pour |
 |---|---|---|---|
 | Q1 | N+1 doit-il s'ouvrir **tout seul** le 1er janvier, ou seulement par le bouton du comptable ? | **Tout seul** (tâche + filet de R2) **et** bouton dès le 1er décembre : la caisse ne peut pas dépendre d'un geste oublié | Lot 1 |
 | Q2 | Faut-il garder la clôture **possible avant** le 31/12 (cas d'erreur) ? | **Non** : l'étape 3 refusée avant l'échéance, car une clôture anticipée bloque la fin de l'année | Lot 1 |

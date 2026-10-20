@@ -318,7 +318,30 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 
 | Réf. | Question au client |
 |---|---|
-| D-U14-1 | ❓ La DATE d'une dépense comptabilisée reste modifiable (web et poste) ; l'écriture garde la date d'origine : registre des dépenses et grand livre peuvent se décaler d'une période. La verrouiller comme le montant, le compte de charge et le compte de trésorerie ? |
+| D-U14-1 | ✅ 20/10/2026 : **verrouillée** comme le montant (ticket EX5). La DATE d'une dépense comptabilisée reste modifiable (web et poste) ; l'écriture garde la date d'origine : registre des dépenses et grand livre peuvent se décaler d'une période. La verrouiller comme le montant, le compte de charge et le compte de trésorerie ? |
 | D-U14-2 | ❓ Export du journal d'audit au poste : non proposé (le poste ne détient que les 200 dernières lignes ; l'export ne pourrait pas être journalisé au serveur). Le garder au web seul, ou tirer la période entière ? |
 | D-U14-3 | ❓ Taux de mortalité sans effectif (fiches du jour, Dashboard Élevage, Tableau de bord) : « 0,0 % » des deux côtés ; appliquer « inconnu = — » comme pour l'éclosion ? |
 | D-U14-4 | ❓ Dépense saisie puis archivée au poste avant tout envoi : créée puis archivée au serveur (deux écritures, deux lignes d'audit), pour garder la trace — à confirmer (alternative : effacée du poste, rien n'est envoyé) |
+
+## Sprint EX — Bascule et clôture d'exercice (PRD `docs/prd/exercices-comptables.md`)
+
+### Décisions du client du 20/10/2026
+Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 (tâche planifiée + filet à la première saisie) et par un bouton dès le 1er décembre ; **Q2** clôture refusée avant l'échéance ; **Q3** fiche d'élevage datée dans un exercice clos refusée ; **Q4** paie de décembre N validée en N+1 : charge au 31/12/N si N est ouvert, refus si N est clos ; **Q5** Bilan et Compte de résultat N / N-1 aussi au poste ; **Q6** archives conservées 10 ans, **sous réserve de confirmation du cabinet FAGUEZ** ; **Q7** reprises d'avant le logiciel = à-nouveau initial au premier jour du premier exercice ; **Q8** Réinitialisation interdite dès qu'un exercice a été clos hors mode démonstration ; **D-U14-1** date d'une dépense comptabilisée verrouillée.
+
+### Lot 1 — en production avant le 15/12/2026 (bloquant au 01/01/2027)
+
+| # | Ticket | Statut |
+|---|---|---|
+| EX1 | États justes après clôture (R1, défaut C1) : jamais historique + à-nouveau ; Bilan, Compte de résultat, États financiers, Balance, Grand Livre, TAFIRE, Rapprochement au web ; Balance et Grand Livre au poste (parité exécutée) ; à-nouveau initial des reprises (Q7) ; contrôle « ouverture N+1 = clôture N » dans S-T6 | 🔧 |
+| EX2 | À-nouveaux provisoires (R3, EF3) : ouverture de N+1 calculée tant que N est ouvert, mention « À-nouveaux provisoires », mêmes chiffres après clôture | 🔧 |
+| EX3 | Ouverture de N+1 sans clôture de N (R2, EF2, défaut C2) : tâche du 01/01 heure du Bénin, filet à la première saisie, bouton dès le 1er décembre, deux exercices ouverts au plus | 🔧 |
+| EX4 | Clôture gardée (EF4) : échéance passée, étapes 1 et 2 faites, N-1 clos, à-nouveau équilibré ; à-nouveau verrouillé (ni modifiable ni archivable) | 🔧 |
+| EX5 | Exercice clos verrouillé au serveur (EF5, EF6, R4) : stock, fiches (Q3), paie (Q4), déplacement d'écriture, date de dépense comptabilisée (D-U14-1) ; plus aucune erreur 500 ; messages R4 en JJ/MM/AAAA | 🔧 |
+| EX6 | Refus local au poste sur tous les écrans de saisie (EF7), messages du serveur mot pour mot, calendriers bornés | 🔧 (après EX5) |
+
+### Lot 2 — avant la clôture de 2026 (mars 2027)
+| EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | 🔧 |
+| EX8 | Bilan et Compte de résultat N / N-1 au web puis au poste (EF11, Q5) ; fiches d'élevage des mois passés (EF12) | 🔧 |
+
+### Lot 3 — avec la clôture de 2026
+| EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
