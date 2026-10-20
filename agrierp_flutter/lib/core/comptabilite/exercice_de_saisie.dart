@@ -113,6 +113,24 @@ class ExerciceDeSaisie {
     return borne;
   }
 
+  /// Bornes d'un `showDatePicker` de saisie : la borne d'exercice [premier] (sinon [repli], celle de l'écran), jamais
+  /// après [dernier] ; et le jour [initial] ramené entre les deux (`showDatePicker` refuse un jour initial hors bornes).
+  static ({DateTime premier, DateTime initial}) calendrier({
+    required DateTime? premier,
+    required DateTime repli,
+    required DateTime dernier,
+    required DateTime initial,
+  }) {
+    final fin = _minuit(dernier);
+    var debut = _minuit(premier ?? repli);
+    if (debut.isAfter(fin)) debut = fin;
+    final jour = _minuit(initial);
+    return (
+      premier: debut,
+      initial: jour.isBefore(debut) ? debut : (jour.isAfter(fin) ? fin : jour),
+    );
+  }
+
   /// LA RÈGLE, sans base : les exercices connus au poste, le jour de la saisie, la règle, et aujourd'hui (filet R2).
   static String? juger(
     List<FiscalYear> exercices,

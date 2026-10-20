@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
@@ -325,6 +326,10 @@ class FournisseursRepository {
     return parFournisseur;
   }
 
+  /// Ticket EX6 — borne basse du calendrier « Date de règlement » : début du plus ancien exercice OUVERT connu.
+  Future<DateTime?> premierJourSaisissable() =>
+      ExerciceDeSaisie(database).premierJour();
+
   /// Enregistre un règlement fournisseur, EN ATTENTE d'envoi.
   ///
   /// ⚠️ **REFUSER AVANT D'ÉCRIRE.** Montant strictement positif, fournisseur et compte
@@ -366,6 +371,10 @@ class FournisseursRepository {
         '(${reste.toStringAsFixed(0)} F).',
       );
     }
+
+    // 🔴→✅ Ticket EX6 (EF7) — l'écriture 401 / 5xx est datée du règlement (`SupplierSettlementService::regler`) :
+    // exercice absent (sans filet R2) ou clos → refusé AVANT d'écrire, motif R4 du serveur ([RefusExercice]).
+    await ExerciceDeSaisie(database).refuser(date);
 
     final id = _uuid.v4();
     await database

@@ -12,6 +12,8 @@ import 'achats_repository.dart';
 import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/widgets/toast_agri.dart';
 
 /// `prototype_html/achats-commandes.html` → Achats & Commandes.
 ///
@@ -191,13 +193,26 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
     final paye = double.tryParse(_montantPaye.text.replaceAll(',', '.')) ?? 0;
 
-    await widget.depot.enregistrer(
-      fournisseurId: _fournisseurId!,
-      lignes: List.of(_panier),
-      modePaiement: _modePaiement,
-      compteId: _compteId!,
-      montantPaye: paye,
-    );
+    try {
+      await widget.depot.enregistrer(
+        fournisseurId: _fournisseurId!,
+        lignes: List.of(_panier),
+        modePaiement: _modePaiement,
+        compteId: _compteId!,
+        montantPaye: paye,
+      );
+    } on RefusExercice catch (e) {
+      // 🔴→✅ Ticket EX6 (EF7) — `EnregistrerAchat::save()` : « Achat refusé : » + le motif R4 en toast d'erreur, le
+      // panier conservé pour corriger et réessayer.
+      if (mounted) {
+        ToastAgri.afficher(
+          context,
+          'Achat refusé : ${e.motif}',
+          type: TypeToast.erreur,
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
 

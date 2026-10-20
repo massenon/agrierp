@@ -7,6 +7,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 import 'elements_fiche.dart';
@@ -496,19 +497,25 @@ class _FicheReproducteursScreenState extends State<FicheReproducteursScreen> {
       ToastAgri.afficher(context, "Sélectionnez d'abord une bande.", type: TypeToast.erreur);
       return;
     }
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _poussinsNes,
-      mort: _totalMorts,
-      don: _totalDons,
-      ponteTotal: _oeufsCouves,
-      poidsMoyen: FicheJournaliereRepository.poidsMoyen(
-        poidsTotalG: _pesee ?? 0,
-        tailleEchantillon: _effectifFinal,
-      ),
-    );
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _poussinsNes,
+        mort: _totalMorts,
+        don: _totalDons,
+        ponteTotal: _oeufsCouves,
+        poidsMoyen: FicheJournaliereRepository.poidsMoyen(
+          poidsTotalG: _pesee ?? 0,
+          tailleEchantillon: _effectifFinal,
+        ),
+      );
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur.
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
     if (!mounted) return;
     ToastAgri.afficher(context, 'Jour enregistré avec succès.');
     await _chargerJour();

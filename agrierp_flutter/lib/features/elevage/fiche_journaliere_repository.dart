@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
@@ -223,6 +224,15 @@ class FicheJournaliereRepository {
     EffectifsSaisis? effectifs,
   }) async {
     final date = _minuit(jour);
+
+    // 🔴→✅ Ticket EX6 (EF7, décision Q3 du 20/10/2026) — une fiche datée dans un exercice CLOS est refusée AVANT toute
+    // écriture, avec le motif R4 de `saveDay` (toast au web) et de l'envoi (`pushDailyEntries`) : le stock consommé de
+    // l'exercice est figé avec son inventaire. Règle `refusExerciceClos` : une fiche ne passe aucune écriture, un
+    // jour qu'aucun exercice ne couvre reste admis.
+    await ExerciceDeSaisie(
+      _db,
+    ).refuser(date, regle: RegleExercice.closSeulement);
+
     final existante = await chargerJour(lotId, date);
 
     // F0.96 / F0.97 — saisie VENTILÉE : les totaux sont la somme des catégories (règle du serveur).

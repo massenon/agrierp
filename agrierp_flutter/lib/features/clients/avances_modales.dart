@@ -5,6 +5,8 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'clients_creances_repository.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/widgets/toast_agri.dart';
 
 /// Ce que « Nouvel Acompte » rend à l'écran une fois l'avance ÉCRITE en local : de quoi
 /// émettre le reçu (jamais avant — un reçu pour une saisie perdue serait un faux).
@@ -192,6 +194,11 @@ class _ModaleAcompteState extends State<_ModaleAcompte> {
         _envoi = false;
         _refus = e.motif;
       });
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `HistoriqueAvances::save()` : motif R4 en toast d'erreur, modale ouverte.
+      if (!mounted) return;
+      setState(() => _envoi = false);
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
     }
   }
 
@@ -408,6 +415,11 @@ class _ModaleImputationState extends State<_ModaleImputation> {
         _envoi = false;
         _refus = e.motif;
       });
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `HistoriqueAvances::confirmImputation()` : motif R4 en toast d'erreur, modale ouverte.
+      if (!mounted) return;
+      setState(() => _envoi = false);
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
     }
   }
 

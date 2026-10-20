@@ -576,7 +576,7 @@ void main() {
       const aujourdhuis = ['2025-12-31', '2026-01-01', '2026-10-20', '2027-03-01'];
 
       final cas = <Map<String, Object>>[];
-      for (final (i, decor) in decors.indexed) {
+      for (var i = 0; i < decors.length; i++) {
         for (final jour in jours) {
           for (final auj in aujourdhuis) {
             cas.add({'decor': i, 'jour': jour, 'aujourdhui': auj});

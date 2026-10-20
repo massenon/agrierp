@@ -10,6 +10,7 @@ import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/pmp_service.dart';
 import 'depenses_repository.dart';
 
@@ -419,7 +420,8 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     borderRadius: BorderRadius.circular(AgriRadius.lg),
   );
 
-  /// « Date de la Transaction * » — `type="date"` du web : toute date (le web n'en borne aucune).
+  /// « Date de la Transaction * » — `type="date"` du web, borné (ticket EX6) au plus ancien exercice OUVERT connu
+  /// (`min` du web, `AccountingEntryService::premierJourSaisissable`).
   Widget _champDate() {
     String deux(int n) => n.toString().padLeft(2, '0');
     return Column(
@@ -429,10 +431,18 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
         InkWell(
           key: const Key('champ-date'),
           onTap: () async {
+            final premier = await widget.depot.premierJourSaisissable();
+            if (!mounted) return;
+            final bornes = ExerciceDeSaisie.calendrier(
+              premier: premier,
+              repli: DateTime(2000),
+              dernier: DateTime(2100),
+              initial: _date,
+            );
             final choisie = await showDatePicker(
               context: context,
-              initialDate: _date,
-              firstDate: DateTime(2000),
+              initialDate: bornes.initial,
+              firstDate: bornes.premier,
               lastDate: DateTime(2100),
             );
             if (choisie != null) setState(() => _date = choisie);
@@ -965,7 +975,14 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     );
     if (confirme != true) return;
 
-    await widget.depot.archiver(d.id);
+    try {
+      await widget.depot.archiver(d.id);
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `archiveExpense()` : dépense d'un exercice clos, motif R4 en toast d'erreur.
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
     await _charger();
     if (!mounted) return;
     ToastAgri.afficher(
@@ -996,6 +1013,14 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
       if (!mounted) return;
       setState(() {
         _erreurs = e.erreurs;
+        _enregistrement = false;
+      });
+      return;
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `submitExpense()` : exercice clos ou absent, le motif R4 sous « Date ».
+      if (!mounted) return;
+      setState(() {
+        _erreurs = {'date': e.motif};
         _enregistrement = false;
       });
       return;

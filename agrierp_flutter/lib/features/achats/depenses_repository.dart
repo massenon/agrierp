@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
@@ -71,6 +72,13 @@ class DepensesRepository {
   final AppDatabase _db;
   final String _deviceId;
   final Uuid _uuid;
+
+  /// Ticket EX6 — le point de passage commun de l'exercice d'une saisie (`lib/core/comptabilite/`).
+  ExerciceDeSaisie get _exercice => ExerciceDeSaisie(_db);
+
+  /// Borne basse du calendrier « Date de la Transaction » : début du plus ancien exercice OUVERT connu (une
+  /// dépense créée passe une écriture), `null` si aucun.
+  Future<DateTime?> premierJourSaisissable() => _exercice.premierJour();
 
   /// `SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE` du web, mot pour mot.
   static const messageDejaComptabilisee =
@@ -296,6 +304,15 @@ class DepensesRepository {
       if (!existante.isActive && !archivageRefuse) {
         throw DepenseRefusee({'montant': messageArchivee});
       }
+      // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::modifier` : une dépense d'un exercice CLOS ne se modifie plus
+      // (motif R4 de sa date d'origine), et ne passe pas non plus dans un exercice clos (motif R4 de la nouvelle date).
+      // Règle `refusExerciceClos` : une modification ne passe aucune écriture, un jour qu'aucun exercice ne couvre
+      // reste admis.
+      await _exercice.refuser(
+        existante.expenseDate,
+        regle: RegleExercice.closSeulement,
+      );
+      await _exercice.refuser(jour, regle: RegleExercice.closSeulement);
       final montantChange =
           PmpService.arrondi(valeur, 2) != PmpService.arrondi(existante.amount, 2);
       // 🔴→✅ Ticket EX5 (décision D-U14-1 du 20/10/2026) — la DATE d'une dépense comptabilisée
@@ -333,6 +350,10 @@ class DepensesRepository {
       return _lire(existante.id);
     }
 
+    // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::creer` : exercice clos refusé avant tout effet, puis l'écriture
+    // Débit 6 / Crédit 5 datée de la dépense (`record()`, filet R2 compris) refuse un jour qu'aucun exercice ne couvre.
+    await _exercice.refuser(jour);
+
     final id = _uuid.v4();
     await _db
         .into(_db.expenses)
@@ -363,6 +384,9 @@ class DepensesRepository {
       if (d == null || (!d.isActive && d.syncStatus != SyncStatus.conflict)) {
         return;
       }
+      // 🔴→✅ Ticket EX6 (EF7) — `SaisieDepenseAction::archiver` : une dépense d'un exercice CLOS ne s'archive plus
+      // (elle disparaîtrait des états de cet exercice) ; motif R4 de sa date, toast au web.
+      await _exercice.refuser(d.expenseDate, regle: RegleExercice.closSeulement);
       await (_db.update(_db.expenses)..where((t) => t.id.equals(id))).write(
         ExpensesCompanion(
           isActive: const Value(false),

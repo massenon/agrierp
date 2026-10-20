@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import 'achats_repository.dart';
 
 /// Motifs de retour proposés — **les trois de la maquette** (`liste-achats.html`,
@@ -102,6 +103,13 @@ class _ModaleRetourState extends State<_ModaleRetour> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on SaisieAchatRefusee catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _envoi = false;
+        _refus = e.motif;
+      });
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `confirmReturnPurchase()` : le motif R4 sous « Motif » (`returnReason`), comme au web.
       if (!mounted) return;
       setState(() {
         _envoi = false;
@@ -289,6 +297,13 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
         _envoi = false;
         _refus = e.motif;
       });
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `submitRefund()` : le motif R4 sous « Montant Remboursé » (`refundAmount`), comme au web.
+      if (!mounted) return;
+      setState(() {
+        _envoi = false;
+        _erreurs = {'montant': e.motif};
+      });
     }
   }
 
@@ -393,11 +408,21 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
             OutlinedButton(
               key: const Key('remb-date'),
               onPressed: () async {
+                // Ticket EX6 (EF7) — calendrier borné au plus ancien exercice OUVERT connu (`min` du web).
+                final premier = await widget.depot.premierJourSaisissable();
+                if (!context.mounted) return;
+                final dernier = HeureBenin.maintenant();
+                final bornes = ExerciceDeSaisie.calendrier(
+                  premier: premier,
+                  repli: DateTime(2020),
+                  dernier: dernier,
+                  initial: _date,
+                );
                 final choisie = await showDatePicker(
                   context: context,
-                  initialDate: _date,
-                  firstDate: DateTime(2020),
-                  lastDate: HeureBenin.maintenant(),
+                  initialDate: bornes.initial,
+                  firstDate: bornes.premier,
+                  lastDate: dernier,
                 );
                 if (choisie != null) setState(() => _date = choisie);
               },

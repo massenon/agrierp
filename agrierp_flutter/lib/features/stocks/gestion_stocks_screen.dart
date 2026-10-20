@@ -10,6 +10,7 @@ import 'journal_stocks.dart';
 import 'pmp_service.dart';
 import 'stocks_repository.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 
 /// `prototype_html/gestion-stocks.html` → Gestion Stocks.
 ///
@@ -1269,11 +1270,21 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
               InkWell(
                 key: const Key('ajout-date'),
                 onTap: () async {
+                  // Ticket EX6 (EF7) — borné au lendemain du dernier exercice CLOS connu (`min` du web).
+                  final premier = await widget.depot.premierJourAjout();
+                  if (!context.mounted) return;
+                  final dernier = DateTime(HeureBenin.maintenant().year + 5, 12, 31);
+                  final bornes = ExerciceDeSaisie.calendrier(
+                    premier: premier,
+                    repli: DateTime(2020),
+                    dernier: dernier,
+                    initial: date,
+                  );
                   final choisie = await showDatePicker(
                     context: context,
-                    initialDate: date,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(HeureBenin.maintenant().year + 5, 12, 31),
+                    initialDate: bornes.initial,
+                    firstDate: bornes.premier,
+                    lastDate: dernier,
                   );
                   if (choisie != null) rafraichir(() => date = choisie);
                 },
@@ -1286,6 +1297,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   ),
                 ),
               ),
+              // 🔴→✅ Ticket EX6 — `@error('addDate')` : exercice clos, le motif R4 sous « Date ».
+              if (erreurs['date'] != null)
+                _erreurChamp('ajout-erreur-date', erreurs['date']!),
               const SizedBox(height: AgriSpacing.md),
               _etiquette('Produit *'),
               DropdownButtonFormField<String>(
@@ -1351,6 +1365,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   );
                 } on ArgumentError catch (e) {
                   rafraichir(() => erreurs = {'produit': '${e.message}'});
+                  return;
+                } on RefusExercice catch (e) {
+                  rafraichir(() => erreurs = {'date': e.motif});
                   return;
                 }
                 if (context.mounted) Navigator.of(context).pop(true);
@@ -1427,6 +1444,10 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
       );
     } on ArgumentError catch (e) {
       setState(() => _erreursAjustement = {'produit': '${e.message}'});
+      return;
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7) — `validateAdjustment()` : exercice clos ou absent, motif R4 en toast d'erreur.
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
       return;
     }
     final comptes = await widget.depot.comptesDePerte();

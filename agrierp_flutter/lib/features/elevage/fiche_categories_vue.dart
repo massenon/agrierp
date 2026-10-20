@@ -7,6 +7,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 import 'effectif_par_categorie.dart';
@@ -1133,6 +1134,10 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
         effectifs: EffectifsSaisis(m: _effectifs[0], f: _effectifs[1], sevres: _effectifs[2], smeres: _effectifs[3]),
       );
     } on FicheRefusee catch (e) {
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur.
       if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
       return;
     }

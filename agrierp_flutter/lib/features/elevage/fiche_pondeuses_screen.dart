@@ -16,6 +16,7 @@ import 'soins_repository.dart';
 import '../stocks/journal_stocks.dart';
 import '../stocks/pmp_service.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 
 /// `fiche-pondeuses.blade.php` (web, `FichePondeuses`) → Fiches Pondeuses - Aviculture.
 ///
@@ -1936,20 +1937,27 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     // chaque correction du même jour.
     final creation = await widget.depot.chargerJour(bande.id, _jour) == null;
 
-    await widget.depot.enregistrer(
-      lotId: bande.id,
-      jour: _jour,
-      achat: _achat,
-      ne: _ne,
-      mort: _totalMorts,
-      don: _totalDons,
-      ponteTotal: _oeufsRecoltes,
-      ponteCasses: _oeufsCasses,
-      poidsMoyen: FicheJournaliereRepository.poidsMoyen(
-        poidsTotalG: _poidsTotalPese,
-        tailleEchantillon: _effectifFinal,
-      ),
-    );
+    try {
+      await widget.depot.enregistrer(
+        lotId: bande.id,
+        jour: _jour,
+        achat: _achat,
+        ne: _ne,
+        mort: _totalMorts,
+        don: _totalDons,
+        ponteTotal: _oeufsRecoltes,
+        ponteCasses: _oeufsCasses,
+        poidsMoyen: FicheJournaliereRepository.poidsMoyen(
+          poidsTotalG: _poidsTotalPese,
+          tailleEchantillon: _effectifFinal,
+        ),
+      );
+    } on RefusExercice catch (e) {
+      // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur ; les plateaux
+      // n'entrent pas au stock (rien n'a été écrit).
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
 
     await widget.production.entrerAuStock(
       bande: bande,
