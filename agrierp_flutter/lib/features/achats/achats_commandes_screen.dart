@@ -5,7 +5,10 @@ import '../../core/export/document_officiel.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
+import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'achats_modales.dart';
 import 'achats_repository.dart';
@@ -95,6 +98,9 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   ];
 
   String _onglet = onglets.first.$1;
+
+  /// Ticket EX7 (EF9) — page de la Liste d'Achats (25 achats), dans l'exercice affiché.
+  int _pageAchats = 1;
 
   String? _fournisseurId;
   String? _produitId;
@@ -236,11 +242,14 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// ressemble à un rapport « rien à signaler » alors que le poste n'a
   /// simplement aucun achat.
   Future<void> _exporterListe(DonneesAchats d) async {
-    if (d.achats.isEmpty) {
+    // Ticket EX7 (EF9) — tout l'exercice affiché (`achatsDeLExercice()` du web), jamais la seule page.
+    final etat = PorteeExerciceChoisi.lire(context);
+    final achats = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
+    if (achats.isEmpty) {
       _annoncer('Aucun achat à exporter.');
       return;
     }
-    await _editer(DocumentsAchats.liste(d.achats));
+    await _editer(DocumentsAchats.liste(achats));
   }
 
   Future<void> _editer(DocumentOfficiel document) async {
@@ -820,9 +829,10 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         _etiquette('Montant Paye (FCFA)'),
         _champ('montant-paye', _montantPaye),
         const SizedBox(height: AgriSpacing.md),
-        FilledButton.icon(
+        // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
+        LectureSeule.infobulle(LectureSeule.motif(context), FilledButton.icon(
           key: const Key('enregistrer-achat'),
-          onPressed: _enregistrer,
+          onPressed: LectureSeule.motif(context) == null ? _enregistrer : null,
           icon: const Icon(SymbolesAgri.save, size: 18),
           style: FilledButton.styleFrom(
             backgroundColor: AgriColors.brandEmerald,
@@ -835,7 +845,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               fontWeight: AgriTypography.gras,
             ),
           ),
-        ),
+        )),
         const SizedBox(height: AgriSpacing.sm),
         // ⚠️ « Piece Justificative » de la maquette (l.192) : le poste n'a ni
         // sélecteur de fichier ni canal d'envoi de pièce jointe. Promettre le
@@ -851,7 +861,14 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   // ── Onglet 2 : Liste d'Achats ─────────────────────────────────────────────
 
-  Widget _ongletListe(DonneesAchats d, bool large) => Column(
+  Widget _ongletListe(DonneesAchats d, bool large) {
+    // Ticket EX7 (EF9) — les achats de l'exercice AFFICHÉ, 25 par page (web : `achatsDeLExercice()` puis la page) ;
+    // l'export reprend tout l'exercice. Les indicateurs restent ceux du web (toute la ferme).
+    final etat = PorteeExerciceChoisi.lire(context);
+    final achats = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
+    final page = etat == null ? achats : PaginationAgri.tranche(achats, _pageAchats);
+    final verrou = LectureSeule.motif(context);
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Wrap(
@@ -881,9 +898,9 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
               ),
               // « Ajouter Remboursement » : bouton blanc à texte rouge (`text-error-deep`).
-              OutlinedButton.icon(
+              LectureSeule.infobulle(verrou, OutlinedButton.icon(
                 key: const Key('ajouter-remboursement'),
-                onPressed: () => _demanderRemboursement(d),
+                onPressed: verrou != null ? null : () => _demanderRemboursement(d),
                 icon: const Icon(SymbolesAgri.payments, size: 18),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AgriColors.errorDeep,
@@ -897,7 +914,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                     fontWeight: AgriTypography.gras,
                   ),
                 ),
-              ),
+              )),
             ],
           ),
         ],
@@ -976,13 +993,13 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         ],
         vide: '— Aucun achat pour ces critères —',
         lignes: [
-          for (var i = 0; i < d.achats.length; i++)
+          for (var i = 0; i < page.length; i++)
             _ligne(i, [
               (_reference(), 3),
-              (Text(_date(d.achats[i].achat.purchaseDate), style: _cellule), 3),
+              (Text(_date(page[i].achat.purchaseDate), style: _cellule), 3),
               (
                 Text(
-                  d.achats[i].achat.supplierName ?? '—',
+                  page[i].achat.supplierName ?? '—',
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -992,7 +1009,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               // web (`ListeAchats`), et non celle du fournisseur.
               (
                 Text(
-                  d.achats[i].categorie ?? '—',
+                  page[i].categorie ?? '—',
                   key: Key('categorie-achat-$i'),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
@@ -1001,7 +1018,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
               ),
               (
                 Text(
-                  _montant(d.achats[i].achat.total),
+                  _montant(page[i].achat.total),
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
                     fontWeight: AgriTypography.gras,
@@ -1009,11 +1026,19 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
                 3,
               ),
-              (_statut(d.achats[i], 'liste-$i'), 4),
-              (_actionsAchat(d.achats[i], i), 3),
+              (_statut(page[i], 'liste-$i'), 4),
+              (_actionsAchat(page[i], i), 3),
             ]),
         ],
       ),
+      if (etat != null)
+        PaginationAgri(
+          nom: 'achats',
+          total: achats.length,
+          page: _pageAchats,
+          annee: etat.annee,
+          onPage: (p) => setState(() => _pageAchats = p),
+        ),
       if (d.remboursements.any(
         (r) => r.remboursement.syncStatus != SyncStatus.synced,
       )) ...[
@@ -1033,6 +1058,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       ),
     ],
   );
+  }
 
   /// Remboursements saisis ici et PAS ENCORE acquittés par le serveur : en attente, ou
   /// refusés (avec le motif du serveur, mot pour mot). Un remboursement acquitté a rejoint la
@@ -1479,10 +1505,11 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           const SizedBox(width: AgriSpacing.sm),
           IconButton(
             key: Key('retour-achat-$index'),
-            onPressed: () => _demanderRetour(ligne),
+            // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle.
+            onPressed: LectureSeule.motif(context) != null ? null : () => _demanderRetour(ligne),
             icon: const Icon(SymbolesAgri.cancel, size: 18),
             color: AgriColors.errorDeep,
-            tooltip: 'Retour fournisseur',
+            tooltip: LectureSeule.motif(context) ?? 'Retour fournisseur',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),

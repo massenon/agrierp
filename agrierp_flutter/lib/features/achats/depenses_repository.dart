@@ -119,9 +119,12 @@ class DepensesRepository {
   /// Ticket U13 — les dépenses du serveur DESCENDENT au poste : la liste est celle de l'exploitation, plus les saisies
   /// de ce poste pas encore acquittées. ➕ Ajout du poste : une saisie REFUSÉE (`conflict`) reste listée avec son motif,
   /// même un ARCHIVAGE refusé (la dépense est encore active au serveur) — c'est ici que le refus se voit.
+  /// Ticket EX7 (EF9) — [bornes] (l'exercice affiché) : seules les dépenses datées dans l'exercice (le web les
+  /// pagine dans l'exercice) ; sans bornes, toutes, comme avant.
   Future<List<LigneDepense>> depenses({
     String recherche = '',
     String statut = '',
+    ({DateTime debut, DateTime fin})? bornes,
   }) async {
     final lignes =
         await (_db.select(_db.expenses)..where(
@@ -139,9 +142,14 @@ class DepensesRepository {
     final filtreTexte = recherche.isEmpty || recherche == '0'
         ? null
         : _motifLike(recherche);
+    bool dansLExercice(DateTime jour) =>
+        bornes == null ||
+        (!DateTime(jour.year, jour.month, jour.day).isBefore(bornes.debut) &&
+            !DateTime(jour.year, jour.month, jour.day).isAfter(bornes.fin));
     final retenues = [
       for (final d in lignes)
-        if ((filtreTexte == null ||
+        if (dansLExercice(d.expenseDate) &&
+            (filtreTexte == null ||
                 filtreTexte.hasMatch(cleCommeLeServeur(d.label))) &&
             (statut.isEmpty ||
                 (statut == 'Payée' && d.status == 'payee') ||

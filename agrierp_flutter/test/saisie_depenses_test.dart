@@ -427,7 +427,9 @@ void main() {
         for (final m in RegExp(r'<option[^>]*>([^<{]+)</option>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'<x-kpi-card label="([^"]+)"').allMatches(b)) html(m[1]!),
-        for (final m in RegExp(r'title="([^"]+)"').allMatches(b)) html(m[1]!),
+        // Ticket EX7 : une info-bulle CALCULÉE (`title="{{ … }}"`, motif de la date grisée) n'est pas un texte littéral ;
+        // `selecteur_exercice_test.dart` la compare à la constante du poste.
+        for (final m in RegExp(r'title="([^"{]+)"').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'border-brand-emerald/30">([^<]+)</span>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r'border-accent-yellow">([^<]+)</span>').allMatches(b)) html(m[1]!),
         for (final m in RegExp(r"editingExpenseId \? '([^']+)' : '([^']+)'").allMatches(b)) ...[

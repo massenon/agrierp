@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:agrierp/core/comptabilite/exercice_choisi.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
@@ -479,11 +480,7 @@ void main() {
     test(
       '⚠️⚠️ « mois » : du 1er au DERNIER jour du mois (pas à aujourd hui)',
       () {
-        final b = DonneesComptabilite.bornesBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 3, 15, 10),
-          null,
-        );
+        final b = DonneesComptabilite.bornesBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15, 10)));
 
         expect(b.debut, DateTime(2026, 3, 1));
         expect(b.fin, DateTime(2026, 3, 31));
@@ -491,11 +488,7 @@ void main() {
     );
 
     test('« mois » de février d une année bissextile', () {
-      final b = DonneesComptabilite.bornesBalance(
-        PeriodeBalance.mois,
-        DateTime(2028, 2, 3),
-        null,
-      );
+      final b = DonneesComptabilite.bornesBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2028, 2, 3)));
 
       expect(b.fin, DateTime(2028, 2, 29));
     });
@@ -513,61 +506,37 @@ void main() {
         fin: DateTime(2026, 6, 30),
       );
       final d = await depot.charger();
-      final b = DonneesComptabilite.bornesBalance(
-        PeriodeBalance.exercice,
-        DateTime(2026, 3, 15),
-        d.exerciceOuvert,
-      );
+      final b = DonneesComptabilite.bornesBalance(PeriodeBalance.exercice, EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: DateTime(2026, 3, 15)));
 
       expect(b.debut, DateTime(2025, 7, 1));
       expect(b.fin, DateTime(2026, 6, 30));
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.exercice,
-          DateTime(2026, 3, 15),
-          d.exerciceOuvert,
-        ),
-        'Exercice complet — 2026',
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.exercice, EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: DateTime(2026, 3, 15))),
+        'Exercice 2026',
       );
     });
 
     test(
       '« exercice » sans exercice ouvert : l année civile (comme le serveur)',
       () {
-        final b = DonneesComptabilite.bornesBalance(
-          PeriodeBalance.exercice,
-          DateTime(2026, 3, 15),
-          null,
-        );
+        final b = DonneesComptabilite.bornesBalance(PeriodeBalance.exercice, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15)));
 
         expect(b.debut, DateTime(2026, 1, 1));
         expect(b.fin, DateTime(2026, 12, 31));
         expect(
-          DonneesComptabilite.libellePeriodeBalance(
-            PeriodeBalance.exercice,
-            DateTime(2026, 3, 15),
-            null,
-          ),
-          'Exercice complet — 2026',
+          DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.exercice, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15))),
+          'Exercice 2026',
         );
       },
     );
 
     test('le libellé du mois : « Mars 2026 (période courante) »', () {
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 3, 15),
-          null,
-        ),
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 3, 15))),
         'Mars 2026 (période courante)',
       );
       expect(
-        DonneesComptabilite.libellePeriodeBalance(
-          PeriodeBalance.mois,
-          DateTime(2026, 8, 2),
-          null,
-        ),
+        DonneesComptabilite.libellePeriodeBalance(PeriodeBalance.mois, EtatExercice(exercices: const [], memorise: null, aujourdhui: DateTime(2026, 8, 2))),
         'Août 2026 (période courante)',
       );
     });
@@ -967,7 +936,7 @@ void main() {
         }
 
         verifier(debutMars, finMars);
-        await choisir(tester, 'Exercice complet — 2026');
+        await choisir(tester, 'Exercice 2026');
         verifier(DateTime(2026, 1, 1), DateTime(2026, 12, 31));
       },
     );
@@ -1228,7 +1197,7 @@ void main() {
         await afficher(tester);
         expect(texteDe('bal-total-2'), '40 501');
 
-        await choisir(tester, 'Exercice complet — 2026');
+        await choisir(tester, 'Exercice 2026');
         expect(texteDe('bal-total-2'), '207 101');
         expect(texteDe('bal-total-0'), '0');
 

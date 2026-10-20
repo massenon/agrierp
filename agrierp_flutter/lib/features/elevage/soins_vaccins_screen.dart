@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/lecture_seule.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'soins_repository.dart';
@@ -104,6 +107,10 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
   DonneesSoinsVaccins? _donnees;
   bool _chargement = true;
 
+  /// Ticket EX7 (EF9) — pages du registre et de l'infirmerie (25 lignes), dans l'exercice affiché.
+  int _pageRegistre = 1;
+  int _pageInfirmerie = 1;
+
   final _produit = TextEditingController();
   final _dose = TextEditingController();
   final _veterinaire = TextEditingController();
@@ -140,7 +147,9 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
 
   Future<void> _charger() async {
     setState(() => _chargement = true);
-    final donnees = await widget.depot.charger();
+    // Ticket EX7 (EF9) — registre et infirmerie de l'exercice AFFICHÉ (web : `paginate(25)` dans l'exercice).
+    final exercice = PorteeExerciceChoisi.lire(context);
+    final donnees = await widget.depot.charger(exercice: exercice);
     if (!mounted) return;
     setState(() {
       _donnees = donnees;
@@ -307,10 +316,11 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
     );
   }
 
+  /// Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
   Widget _boutonPrincipal(String cle, String libelle, VoidCallback action) =>
-      ElevatedButton.icon(
+      LectureSeule.infobulle(LectureSeule.motif(context), ElevatedButton.icon(
         key: Key(cle),
-        onPressed: action,
+        onPressed: LectureSeule.motif(context) == null ? action : null,
         icon: const Icon(SymbolesAgri.add_circle, size: 18),
         label: Text(
           libelle,
@@ -330,7 +340,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             vertical: AgriSpacing.sm,
           ),
         ),
-      );
+      ));
 
   // ── Onglet 1 : Registre Vétérinaire ───────────────────────────────────────
 
@@ -629,9 +639,12 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
 
   Widget _tableauRegistre() {
     final d = _donnees!;
-    final lignes = _lignesFiltrees;
+    final filtrees = _lignesFiltrees;
+    // Ticket EX7 (EF9) — 25 soins par page dans l'exercice affiché, filtres compris (web : filtres PUIS `paginate`).
+    final etat = PorteeExerciceChoisi.lire(context);
+    final lignes = etat == null ? filtrees : PaginationAgri.tranche(filtrees, _pageRegistre);
 
-    return _tableau(
+    final tableau = _tableau(
       colonnes: colonnesRegistre,
       prefixeCle: 'soin',
       // Registre vide : message exact du Blade. Registre non vide que les filtres (ajout du poste) vident : le
@@ -653,10 +666,11 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: Tooltip(
-                message: 'Archiver',
+                // Ticket EX7 (EF10) — exercice affiché clos : le motif remplace l'info-bulle, l'action est grisée.
+                message: LectureSeule.motif(context) ?? 'Archiver',
                 child: InkWell(
                   key: Key('archiver-soin-${l.soin.id}'),
-                  onTap: () => _archiverSoin(l),
+                  onTap: LectureSeule.motif(context) == null ? () => _archiverSoin(l) : null,
                   child: const Padding(
                     padding: EdgeInsets.all(AgriSpacing.xs),
                     child: Icon(
@@ -670,6 +684,20 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
             ),
             _pastilleEffectue(),
           ],
+      ],
+    );
+    if (etat == null) return tableau;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        tableau,
+        PaginationAgri(
+          nom: 'registre',
+          total: filtrees.length,
+          page: _pageRegistre,
+          annee: etat.annee,
+          onPage: (p) => setState(() => _pageRegistre = p),
+        ),
       ],
     );
   }
@@ -1100,7 +1128,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           prefixeCle: 'infirmerie',
           vide: "Aucune entrée d'infirmerie pour le moment.",
           lignes: [
-            for (final l in d.infirmerie)
+            for (final l in (PorteeExerciceChoisi.lire(context) == null ? d.infirmerie : PaginationAgri.tranche(d.infirmerie, _pageInfirmerie)))
               [
                 Text(_date(l.entree.entryDate), style: _cellule),
                 Text(l.lotSujet, style: _celluleBande),
@@ -1111,6 +1139,15 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
               ],
           ],
         ),
+        // Ticket EX7 (EF9) — `<x-pagination>` du web, sous le tableau.
+        if (PorteeExerciceChoisi.lire(context) case final etat?)
+          PaginationAgri(
+            nom: 'infirmerie',
+            total: d.infirmerie.length,
+            page: _pageInfirmerie,
+            annee: etat.annee,
+            onPage: (p) => setState(() => _pageInfirmerie = p),
+          ),
       ],
     );
   }
@@ -1152,14 +1189,14 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       children: [
         IconButton(
           key: Key('reintegrer-${l.entree.id}'),
-          tooltip: 'Valider la guérison et réintégrer',
+          tooltip: LectureSeule.motif(context) ?? 'Valider la guérison et réintégrer',
           visualDensity: VisualDensity.compact,
           icon: const Icon(
             SymbolesAgri.settings_backup_restore,
             size: 18,
             color: AgriColors.brandEmerald,
           ),
-          onPressed: () async {
+          onPressed: LectureSeule.motif(context) != null ? null : () async {
             await widget.depot.reintegrer(l.entree.id);
             await _charger();
             _toast(_sujetReintegre);
@@ -1167,14 +1204,14 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
         ),
         IconButton(
           key: Key('deces-${l.entree.id}'),
-          tooltip: 'Déclarer le décès',
+          tooltip: LectureSeule.motif(context) ?? 'Déclarer le décès',
           visualDensity: VisualDensity.compact,
           icon: const Icon(
             SymbolesAgri.heart_broken,
             size: 18,
             color: AgriColors.errorDeep,
           ),
-          onPressed: () async {
+          onPressed: LectureSeule.motif(context) != null ? null : () async {
             await widget.depot.declarerDeces(l.entree.id);
             await _charger();
             _toast(_decesDeclare, type: TypeToast.avertissement);

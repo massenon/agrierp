@@ -48,6 +48,7 @@ abstract final class SymbolesAgri {
   static const IconData category = IconData(0xe574, fontFamily: famille);
   static const IconData check_circle = IconData(0xe86c, fontFamily: famille);
   static const IconData checklist = IconData(0xe6b1, fontFamily: famille);
+  static const IconData chevron_left = IconData(0xe408, fontFamily: famille);
   static const IconData chevron_right = IconData(0xe409, fontFamily: famille);
   static const IconData child_care = IconData(0xeb41, fontFamily: famille);
   static const IconData close = IconData(0xe14c, fontFamily: famille);

@@ -487,7 +487,7 @@ void main() {
         d.rotation.stockMoyen,
         closeTo((sortie['stock_moyen'] as num).toDouble(), 1e-9),
       );
-      // Journal : les 100 derniers, dans l'ordre du web, cellule par cellule.
+      // Journal : les 100 derniers (toutes les pages du web, ticket EX7), dans l'ordre du web, cellule par cellule.
       expect(
         [
           for (final l in d.journal)
@@ -571,7 +571,21 @@ $rotationLegende = $rotation['rotation'] === null
         ? 'Couvre '.number_format($rotation['couverture'], 0, ',', ' ').' % des ventes du mois — '
         : '')."les marchandises produites à la ferme n'ont pas de coût d'achat";
 $journal = [];
-foreach ($composant->movements as $movement) {
+// Ticket EX7 : le Journal des Mouvements du web est PAGINÉ (25) dans l'exercice affiché (ici l'année civile 2026,
+// aucun exercice enregistré) ; la parité lit toutes ses pages, dans l'ordre.
+$mouvements = [];
+for ($page = 1; $page <= 100; $page++) {
+    $composant->setPage($page, 'pageMouvements');
+    Illuminate\Pagination\Paginator::currentPageResolver(fn () => $page);
+    $paginees = $composant->getMovementsProperty();
+    foreach ($paginees as $m) {
+        $mouvements[] = $m;
+    }
+    if (! $paginees->hasMorePages()) {
+        break;
+    }
+}
+foreach ($mouvements as $movement) {
     $movPmp = $movement->product?->computePmp();
     $journal[] = [
         $movement->movement_date->format('d/m/Y H:i'),

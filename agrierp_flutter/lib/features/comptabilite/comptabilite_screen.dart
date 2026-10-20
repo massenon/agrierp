@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
@@ -106,6 +108,26 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   DonneesComptabilite? _donnees;
 
+  /// Ticket EX7 (EF9) — page affichée du Journal (25 écritures par page), dans l'exercice affiché.
+  int _pageDuJournal = 1;
+
+  /// Ticket EX7 — l'exercice AFFICHÉ (`PorteeExerciceChoisi`, posé par le socle) ; hors du socle (tests d'écran), son
+  /// défaut : l'exercice qui contient le jour, comme au web sans choix en session.
+  EtatExercice _etat(DonneesComptabilite d) =>
+      PorteeExerciceChoisi.lire(context) ??
+      EtatExercice(exercices: d.exercices, memorise: null, aujourdhui: widget.maintenant());
+
+  /// Les écritures listées : celles de l'exercice affiché sous le socle (web : `requeteEcritures()`), tout le journal
+  /// reçu hors du socle (comportement d'avant EX7).
+  List<LigneJournal> _ecrituresAffichees(DonneesComptabilite d) {
+    final etat = PorteeExerciceChoisi.lire(context);
+    if (etat == null) return d.journal;
+    return [
+      for (final e in d.journal)
+        if (etat.contient(e.ecriture.entryDate)) e,
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -117,12 +139,18 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     if (!mounted) return;
 
     final aujourdhui = widget.maintenant();
+    // Ticket EX7 (EF9) — du 1er du mois à aujourd'hui quand l'exercice affiché contient le jour, l'exercice entier
+    // sinon (`ExerciceChoisi::periodeParDefaut`, comme `GrandLivre::mount` du web).
+    final defaut = _etat(donnees).periodeParDefaut(
+      DateTime(aujourdhui.year, aujourdhui.month, 1),
+      aujourdhui,
+    );
 
     setState(() {
       _donnees = donnees;
       _compteGrandLivre ??= donnees.compteGrandLivreParDefaut?.id;
-      _debut ??= DateTime(aujourdhui.year, aujourdhui.month, 1);
-      _fin ??= DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
+      _debut ??= defaut.debut;
+      _fin ??= defaut.fin;
     });
   }
 
@@ -199,9 +227,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           libelle: 'Écritures reçues',
           valeur: '${d.journal.length}',
-          legende: d.exerciceOuvert == null
+          legende: _etat(d).exercice == null
               ? 'Exercice non synchronisé'
-              : 'Exercice ${d.exerciceOuvert!.year}',
+              : 'Exercice ${_etat(d).annee}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.menu_book,
         ),
@@ -331,9 +359,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           key: const Key('kpi-plan-exercice'),
           libelle: 'Exercice',
-          // ⚠️ Un tiret si aucun exercice OUVERT n'est descendu : afficher
-          // l'année courante laisserait croire qu'un exercice l'est.
-          valeur: '${d.anneeExerciceOuvert ?? '—'}',
+          // ⚠️ Un tiret si aucun exercice n'est descendu : afficher l'année courante laisserait croire qu'un exercice
+          // existe. Ticket EX7 : l'exercice AFFICHÉ (`ExerciceChoisi::exercice()?->year ?? '—'` du web).
+          valeur: '${_etat(d).exercice?.year ?? '—'}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.event,
           couleurIcone: AgriColors.outline,
@@ -390,7 +418,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   // ── Journal Comptable ─────────────────────────────────────────────────────
 
-  Widget _pageJournal(DonneesComptabilite d, bool large) => Column(
+  Widget _pageJournal(DonneesComptabilite d, bool large) {
+    // Ticket EX7 (EF9) — les écritures de l'exercice affiché, 25 par page (web : `paginate(25)`) ; l'export reprend
+    // tout l'exercice, jamais la seule page.
+    final etat = PorteeExerciceChoisi.lire(context);
+    final ecritures = _ecrituresAffichees(d);
+    final page = etat == null ? ecritures : PaginationAgri.tranche(ecritures, _pageDuJournal);
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _enTete(
@@ -398,7 +432,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         _boutonExport(
           'exporter-pdf-journal',
           () => _exporter(
-            DocumentsComptabilite.journal(d, le: widget.maintenant()),
+            DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
             'Aucune écriture à exporter.',
           ),
         ),
@@ -415,7 +449,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         CarteKpi(
           key: const Key('kpi-journal-ecritures'),
           libelle: 'Écritures (mois)',
-          valeur: '${d.ecrituresDuMois(HeureBenin.maintenant())}',
+          // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
+          valeur: '${d.ecrituresDuMois(etat?.moisDeReference ?? HeureBenin.maintenant())}',
           couleurLisere: AgriColors.brandEmerald,
           icone: SymbolesAgri.receipt_long,
           couleurIcone: AgriColors.outline,
@@ -455,13 +490,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ],
         vide: '— Aucune écriture synchronisée —',
         lignes: [
-          for (var i = 0; i < d.journal.length; i++)
+          for (var i = 0; i < page.length; i++)
             _ligne(i, [
               (
                 // ⚠️ F0.87 : la PIÈCE (référence avant « — »), comme la page web — et non plus le
                 // type de source (« sale », « purchase »), qui n'est pas un numéro de pièce.
                 Text(
-                  d.journal[i].piece.isEmpty ? '—' : d.journal[i].piece,
+                  page[i].piece.isEmpty ? '—' : page[i].piece,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
@@ -471,12 +506,12 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 4,
               ),
               (
-                Text(_date(d.journal[i].ecriture.entryDate), style: _cellule),
+                Text(_date(page[i].ecriture.entryDate), style: _cellule),
                 2,
               ),
               (
                 Text(
-                  d.journal[i].libelle.isEmpty ? '—' : d.journal[i].libelle,
+                  page[i].libelle.isEmpty ? '—' : page[i].libelle,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -484,7 +519,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
               ),
               (
                 Text(
-                  d.journal[i].comptesDebites,
+                  page[i].comptesDebites,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -492,17 +527,25 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
               ),
               (
                 Text(
-                  d.journal[i].comptesCredites,
+                  page[i].comptesCredites,
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
                 2,
               ),
-              (_montantEcriture(d.journal[i]), 3),
+              (_montantEcriture(page[i]), 3),
               (_actionInerte(), 2),
             ]),
         ],
       ),
+      if (etat != null)
+        PaginationAgri(
+          nom: 'journal',
+          total: ecritures.length,
+          page: _pageDuJournal,
+          annee: etat.annee,
+          onPage: (p) => setState(() => _pageDuJournal = p),
+        ),
       const SizedBox(height: AgriSpacing.md),
       // ⚠️⚠️ AUCUNE ÉCRITURE NE SE SAISIT AU POSTE, et ce n'est pas un manque.
       // Une écriture naît d'une opération — vente, achat, dépense, ponte,
@@ -517,6 +560,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       ),
     ],
   );
+  }
 
   Widget _montantEcriture(LigneJournal e) {
     if (!e.equilibree) {
@@ -862,11 +906,13 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     return InkWell(
       key: cle,
       onTap: () async {
+        // Ticket EX7 (EF9) — calendrier borné à l'exercice affiché (`min` / `max` du web) sous le socle.
+        final etat = PorteeExerciceChoisi.lire(context);
         final choisie = await showDatePicker(
           context: context,
-          initialDate: valeur,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
+          initialDate: etat?.borner(valeur) ?? valeur,
+          firstDate: etat?.bornes.debut ?? DateTime(2000),
+          lastDate: etat?.bornes.fin ?? DateTime(2100),
         );
         if (choisie == null) return;
         setState(() => affecter(choisie));
@@ -888,13 +934,10 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   // ── Balance Générale ──────────────────────────────────────────────────────
 
   Widget _pageBalance(DonneesComptabilite d, bool large) {
-    final maintenant = widget.maintenant();
-    final exercice = d.exerciceOuvert;
-    final bornes = DonneesComptabilite.bornesBalance(
-      _periodeBalance,
-      maintenant,
-      exercice,
-    );
+    // Ticket EX7 (EF9) — les deux options DANS l'exercice affiché ; « Exercice 2026 » = cet exercice, et non plus le
+    // plus récent ouvert.
+    final etat = _etat(d);
+    final bornes = DonneesComptabilite.bornesBalance(_periodeBalance, etat);
     final b = d.balanceGenerale(debut: bornes.debut, fin: bornes.fin);
     final lignes = b.lignes;
 
@@ -921,11 +964,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
             () => _exporter(
               DocumentsComptabilite.balance(
                 b,
-                periode: DonneesComptabilite.libellePeriodeBalance(
-                  _periodeBalance,
-                  maintenant,
-                  exercice,
-                ),
+                periode: DonneesComptabilite.libellePeriodeBalance(_periodeBalance, etat),
               ),
               'Aucun compte mouvementé à exporter sur cette période.',
             ),
@@ -985,11 +1024,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                       DropdownMenuItem(
                         value: p,
                         child: Text(
-                          DonneesComptabilite.libellePeriodeBalance(
-                            p,
-                            maintenant,
-                            exercice,
-                          ),
+                          DonneesComptabilite.libellePeriodeBalance(p, etat),
                         ),
                       ),
                   ],

@@ -1,3 +1,4 @@
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import 'nature_compte.dart';
 import 'soldes_exercice.dart';
@@ -272,68 +273,38 @@ class DonneesComptabilite {
 
   /// Bornes de la période de la Balance — reproduction de `Livewire\Comptabilite\BalanceGenerale::periodBounds`.
   ///
-  ///  - `mois` : du 1er au DERNIER jour du mois courant (`startOfMonth` → `endOfMonth`) — et non « à
-  ///    aujourd'hui » comme le Grand Livre : les deux composants web diffèrent, le poste suit chacun ;
-  ///  - `exercice` : les dates de l'exercice OUVERT ([exercice], `FiscalYear::current()`), jamais l'année
-  ///    civile supposée ; à défaut d'exercice ouvert, l'année civile courante (repli du serveur).
+  /// Ticket EX7 (EF9) — toujours DANS l'exercice AFFICHÉ ([etat], `ExerciceChoisi`) :
+  ///  - `exercice` : ses dates réelles, jamais l'année civile supposée — l'année civile du jour si aucun exercice n'est
+  ///    connu (repli du serveur) ;
+  ///  - `mois` : du 1er au DERNIER jour (`startOfMonth` → `endOfMonth`, et non « à aujourd'hui » comme le Grand Livre)
+  ///    du mois du jour quand l'exercice le contient, sinon de son DERNIER mois (2026 lu en 2027 : décembre 2026).
   ///
-  /// ⚠️ Un exercice ouvert SANS dates (colonnes nullables au poste, `NOT NULL` au serveur : ne devrait
-  /// pas arriver) suit le repli « pas d'exercice » plutôt que d'inventer des bornes.
+  /// Avant EX7, « exercice » lisait l'exercice ouvert ([exerciceOuvert], `FiscalYear::current()`) : avec 2026 et 2027
+  /// ouverts, 2026 ne s'affichait plus.
   static ({DateTime debut, DateTime fin}) bornesBalance(
     PeriodeBalance periode,
-    DateTime maintenant,
-    FiscalYear? exercice,
+    EtatExercice etat,
   ) {
-    if (periode == PeriodeBalance.exercice) {
-      final debut = exercice?.startDate;
-      final fin = exercice?.endDate;
-      if (debut != null && fin != null) {
-        return (
-          debut: DateTime(debut.year, debut.month, debut.day),
-          fin: DateTime(fin.year, fin.month, fin.day),
-        );
-      }
-      return (
-        debut: DateTime(maintenant.year, 1, 1),
-        fin: DateTime(maintenant.year, 12, 31),
-      );
-    }
-
-    return (
-      debut: DateTime(maintenant.year, maintenant.month, 1),
-      // Jour 0 du mois suivant = dernier jour du mois courant (28, 29, 30 ou 31).
-      fin: DateTime(maintenant.year, maintenant.month + 1, 0),
-    );
+    if (periode == PeriodeBalance.exercice) return etat.bornes;
+    final mois = etat.moisDeReference;
+    // Jour 0 du mois suivant = dernier jour du mois (28, 29, 30 ou 31).
+    return (debut: mois, fin: DateTime(mois.year, mois.month + 1, 0));
   }
 
-  /// Libellé de l'option — `getPeriodLabelProperty` du composant web : « Mars 2026 (période
-  /// courante) » (`ucfirst(translatedFormat('F Y'))`, locale `fr`) ou « Exercice complet — 2026 »
-  /// (année de l'exercice ouvert, sinon année courante).
-  static String libellePeriodeBalance(
-    PeriodeBalance periode,
-    DateTime maintenant,
-    FiscalYear? exercice,
-  ) {
-    if (periode == PeriodeBalance.exercice) {
-      return 'Exercice complet — ${exercice?.year ?? maintenant.year}';
-    }
-    return '${_moisFr[maintenant.month - 1]} ${maintenant.year} (période courante)';
-  }
+  /// Libellés des deux options — `getLibellesPeriodeProperty` du composant web, mot pour mot : « Mars 2026 (période
+  /// courante) » (le mois du jour), « Décembre 2026 » (le dernier mois d'un exercice qui ne contient pas le jour), et
+  /// « Exercice 2026 » (PRD § 7 : l'option prend le libellé de l'exercice choisi ; « Exercice complet — 2026 » avant).
+  static ({String mois, String exercice}) libellesPeriodeBalance(EtatExercice etat) => (
+    mois:
+        '${EtatExercice.libelleMois(etat.moisDeReference)}${etat.contientAujourdhui ? ' (période courante)' : ''}',
+    exercice: 'Exercice ${etat.annee}',
+  );
 
-  static const _moisFr = [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre',
-  ];
+  /// Le libellé de l'option [periode] (sous-titre du document édité).
+  static String libellePeriodeBalance(PeriodeBalance periode, EtatExercice etat) {
+    final l = libellesPeriodeBalance(etat);
+    return periode == PeriodeBalance.exercice ? l.exercice : l.mois;
+  }
 
   FiscalYear? get exerciceOuvert =>
       exercices.where((e) => e.status == 'ouvert').firstOrNull;

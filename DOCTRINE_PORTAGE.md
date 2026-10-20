@@ -45,7 +45,7 @@ Contexte : la connexion Internet est instable en zone rurale (Adja-Ouèrè / Ikp
 
   ⚠️ **À ARBITRER.** La consigne initiale demandait des en-têtes « fond sombre `#0f172a`, texte blanc ». Ni l'application web ni le prototype n'utilisent cette couleur : les en-têtes web sont clairs (`text-outline`, bordure basse `border-outline-variant`). Appliquer `#0f172a` sur le poste violerait l'article 0. Si un en-tête sombre est voulu, il doit d'abord être décidé et appliqué **sur le web**, puis porté.
 
-  ⚠️ L'application web n'a **pas** de composant de pagination aujourd'hui (voir `agrierp_laravel/CLAUDE.md`). La pagination standard est donc une **CIBLE commune aux deux surfaces**.
+  ⚠️ Ticket EX7 (20/10/2026) : le composant partagé existe des deux côtés — `<x-pagination>` au web, `PaginationAgri` au poste (25 lignes, « 27 lignes dans l'exercice 2026 — page 1 sur 2 », Précédent / Suivant, libellés vérifiés par `selecteur_exercice_test.dart`). Il est appliqué aux listes de l'EF9 (Journal, ventes, factures, achats, dépenses, mouvements de stock, soins, infirmerie, transferts) ; les autres listes restent à paginer (**CIBLE**).
 - **Modales unifiées.** Même design, même voile (`bg-black/50`), même ✕ et même pied de modale partout. Jamais de dialogue natif du système (`alert()`, `confirm()`, `AlertDialog` brut, `showDialog` sans `afficherModale`). *État : appliqué et verrouillé par `conformite_portage_test.dart`.*
 - **Donnée inconnue = `'—'`, jamais `0`.** Un zéro se lit comme une mesure ; un tiret dit « ce poste ne sait pas ».
 
@@ -99,7 +99,7 @@ Objectif : **parité de 100 %** entre la vue Blade (maître) et l'écran Flutter
 | Champs et modales | Même placement des champs, listes, formulaires et modales | Appliqué : `ModaleAgri` / `afficherModale` |
 | Listes avec recherche | Liste déroulante avec barre de recherche intégrée pour les listes longues (articles, clients) | **CIBLE COMMUNE** : aucune des deux surfaces ne l'a (pas de composant web). À construire d'abord en composant Blade partagé, puis en un widget Flutter unique |
 | Recherche, filtres, tris | Au même endroit que dans la vue Blade | Appliqué écran par écran (`x-datatable` porte la recherche côté web) |
-| Tableaux | Mêmes colonnes, en-têtes, cellules d'actions (voir, modifier, archiver), pagination 10/25 | Colonnes et en-têtes : appliqué (`conformite_structure_test.dart`). Pagination : **CIBLE COMMUNE** (aucun composant web, voir § 2) |
+| Tableaux | Mêmes colonnes, en-têtes, cellules d'actions (voir, modifier, archiver), pagination 10/25 | Colonnes et en-têtes : appliqué (`conformite_structure_test.dart`). Pagination : composant commun depuis EX7 (`x-pagination` / `PaginationAgri`), appliqué aux listes de l'exercice ; **CIBLE** pour les autres (voir § 2) |
 
 ### 5.3 Interactivité et retours
 

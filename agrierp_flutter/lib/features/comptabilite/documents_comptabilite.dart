@@ -142,8 +142,12 @@ class DocumentsComptabilite {
   static DocumentOfficiel journal(
     DonneesComptabilite d, {
     required DateTime le,
+    List<LigneJournal>? ecritures,
   }) {
-    final incompletes = d.journal.where((e) => !e.equilibree).length;
+    // Ticket EX7 (EF9) — [ecritures] : celles de l'exercice affiché (`ecrituresDeLExercice` du web) ; tout le journal
+    // reçu sinon.
+    final journal = ecritures ?? d.journal;
+    final incompletes = journal.where((e) => !e.equilibree).length;
 
     return DocumentOfficiel(
       titre: 'Journal Comptable',
@@ -158,7 +162,7 @@ class DocumentsComptabilite {
         'Montant',
       ],
       lignes: [
-        for (final e in d.journal)
+        for (final e in journal)
           DonneesDocument([
             _ouTiret(e.piece),
             jour(e.ecriture.entryDate),

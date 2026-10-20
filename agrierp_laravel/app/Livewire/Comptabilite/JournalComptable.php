@@ -155,7 +155,7 @@ class JournalComptable extends Component
             'exports.journal-comptable',
             ['entries' => $entries, 'component' => $this],
             'Journal Comptable',
-            'Exercice '.ExerciceChoisi::annee().' — état au '.now()->format('d/m/Y')
+            'État au '.now()->format('d/m/Y')
         );
 
         return response()->streamDownload(fn () => print($pdf->output()), 'journal-comptable-'.now()->format('Y-m-d').'.pdf');

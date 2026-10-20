@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
@@ -226,9 +227,14 @@ class SoinsVaccinsRepository {
     return '${entier < 0 ? '-' : ''}${groupes.join(' ')} FCFA';
   }
 
-  Future<DonneesSoinsVaccins> charger({DateTime? quand}) async {
+  /// Ticket EX7 (EF9) — [exercice] (l'exercice affiché) : registre et infirmerie de l'exercice, SANS plafond (l'écran
+  /// pagine, comme le web), cas d'infirmerie ENCORE EN COURS d'un exercice antérieur gardés quand l'exercice contient
+  /// le jour (`SoinsVaccinsHub::getInfirmaryRecordsProperty`), indicateurs « du mois » sur son mois de référence. Sans
+  /// exercice : les 50 derniers et le mois du jour, comme avant.
+  Future<DonneesSoinsVaccins> charger({DateTime? quand, EtatExercice? exercice}) async {
     final maintenant = quand ?? HeureBenin.maintenant();
     final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
+    final moisKpi = exercice?.moisDeReference ?? jour;
 
     final toutesBandes = await database.select(database.livestockLots).get();
     final especes = {
@@ -252,7 +258,7 @@ class SoinsVaccinsRepository {
     // `getActiveLotsProperty` : `status = 'actif'` ET `is_active`.
     final actives = toutesBandes.where(_estActive).toList();
 
-    bool duMois(DateTime d) => d.year == jour.year && d.month == jour.month;
+    bool duMois(DateTime d) => d.year == moisKpi.year && d.month == moisKpi.month;
     final soinsDuMois = registre.where((s) => duMois(s.recordDate)).toList();
 
     final fenetre = [
@@ -305,9 +311,21 @@ class SoinsVaccinsRepository {
     }
 
     final enCours = entrees.where((e) => e.status == 'en_cours').length;
+    final enCoursAnterieurs = exercice?.contientAujourdhui ?? false;
     final infirmerie =
-        (entrees.toList()..sort((a, b) => b.entryDate.compareTo(a.entryDate)))
-            .take(limiteInfirmerie)
+        (entrees
+                .where(
+                  (e) =>
+                      exercice == null ||
+                      exercice.contient(e.entryDate) ||
+                      (enCoursAnterieurs && e.status == 'en_cours' && e.entryDate.isBefore(exercice.bornes.debut)),
+                )
+                .toList()
+              ..sort((a, b) {
+                final parDate = b.entryDate.compareTo(a.entryDate);
+                return parDate != 0 ? parDate : b.id.compareTo(a.id);
+              }))
+            .take(exercice == null ? limiteInfirmerie : entrees.length)
             .map(
               (e) => LigneInfirmerie(
                 entree: e,
@@ -324,9 +342,12 @@ class SoinsVaccinsRepository {
       enQuarantaine: enCours,
       coutDuMois: soinsDuMois.fold<double>(0, (t, s) => t + (s.cost ?? 0)),
       registre:
-          (registre.toList()
-                ..sort((a, b) => b.recordDate.compareTo(a.recordDate)))
-              .take(limiteRegistre)
+          (registre.where((s) => exercice == null || exercice.contient(s.recordDate)).toList()
+                ..sort((a, b) {
+                  final parDate = b.recordDate.compareTo(a.recordDate);
+                  return parDate != 0 ? parDate : b.id.compareTo(a.id);
+                }))
+              .take(exercice == null ? limiteRegistre : registre.length)
               .map((s) {
                 final bande = bandeDe[s.lotId];
                 return LigneRegistre(

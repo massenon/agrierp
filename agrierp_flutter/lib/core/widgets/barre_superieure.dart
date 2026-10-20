@@ -66,7 +66,12 @@ class BarreSuperieure extends StatelessWidget {
     this.onNotifications,
     this.onMarquerLue,
     this.avantFermeture,
+    this.selecteurExercice,
   });
+
+  /// Ticket EX7 (EF8) — sélecteur d'exercice global (`SelecteurExercice`, posé par le socle), à gauche du bouton
+  /// « Synchroniser » comme au web. `null` : aucun sélecteur (tests de la barre seule).
+  final Widget? selecteurExercice;
 
   /// `wire:poll.30s` de la cloche du web : la barre se relit toutes les 30 secondes (non lues, quatre dernières, et
   /// « il y a … » recalculé) — voir `RafraichissementPeriodique`, posé par le socle autour de la barre.
@@ -201,6 +206,12 @@ class BarreSuperieure extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AgriSpacing.md),
+
+          // 3 bis. Ticket EX7 (EF8) — « Exercice 2027 ▾ », à gauche du bouton « Synchroniser » (`app.blade.php`).
+          if (selecteurExercice != null) ...[
+            selecteurExercice!,
+            const SizedBox(width: AgriSpacing.sm),
+          ],
 
           // 4. Bouton « Synchroniser » (ticket H2, même place et même gabarit qu'au web, entre la recherche
           // et la cloche). Il remplace la pastille non cliquable et le bouton du pied de la barre latérale,

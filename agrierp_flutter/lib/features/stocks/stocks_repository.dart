@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
@@ -367,7 +368,9 @@ class StocksRepository {
     );
   }
 
-  Future<DonneesStocks> charger() async {
+  /// Ticket EX7 (EF9) — [exercice] (l'exercice affiché) : le Journal des Mouvements de l'exercice, sans plafond, et
+  /// les écarts d'inventaire de son mois de référence ; sans exercice, les 100 derniers et le mois du jour.
+  Future<DonneesStocks> charger({EtatExercice? exercice}) async {
     final maintenant = _horloge();
     final tousProduits = await database.select(database.products).get();
     final categories = await database.select(database.productCategories).get();
@@ -401,7 +404,9 @@ class StocksRepository {
           ),
       ],
       journal: [
-        for (final m in journal.derniers())
+        for (final m in exercice == null
+            ? journal.derniers()
+            : journal.dansLaPeriode(exercice.bornes.debut, exercice.bornes.fin))
           LigneJournal(
             mouvement: m,
             designation: nomDe[m.productId],
@@ -411,7 +416,7 @@ class StocksRepository {
       categories:
           categories.where((c) => c.isActive).toList()
             ..sort((a, b) => comparerCommeLeServeur(a.label, b.label)),
-      ecartsDuMois: journal.ecartsDuMois(pmpDe, maintenant),
+      ecartsDuMois: journal.ecartsDuMois(pmpDe, exercice?.moisDeReference ?? maintenant),
       rotation: journal.rotation(
         produits: tousProduits,
         pmp: pmpDe,
