@@ -130,19 +130,22 @@
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">TVA (%)</label>
-                    <select wire:model="tvaRate" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
+                    <select wire:model="tvaRate" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('tvaRate') ? 'is-invalid' : 'border-outline-variant' }}">
                         <option value="0">0 %</option>
                         <option value="18">18 %</option>
                     </select>
+                    @error('tvaRate') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Validité (jours)</label>
-                    <input wire:model="validityDays" type="number" min="1" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="validityDays" type="number" min="1" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('validityDays') ? 'is-invalid' : 'border-outline-variant' }}">
+                    @error('validityDays') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du Devis</label>
-                <input wire:model="quoteDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="quoteDate" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('quoteDate') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('quoteDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Note (optionnel)</label>
