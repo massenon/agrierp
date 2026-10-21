@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
@@ -140,12 +140,48 @@ class SyncEngine {
   /// ⚠️ NE LÈVE JAMAIS : hors ligne, serveur injoignable, session expirée ou réponse inattendue rendent `false`. Cette
   /// question est posée toutes les 30 s sans geste de l'utilisateur ; une erreur rouge à chaque fois apprendrait à
   /// ignorer les alertes (`SynchronisationAutomatique`).
+  ///
+  /// Ticket SW-1 — la même réponse porte le drapeau « resynchronisation demandée » (« Renvoyer vers ce poste » du web) :
+  /// le poste le note ([resynchronisationServeur]) et rend `true` pour que la synchronisation parte aussitôt, qui
+  /// repart d'un tirage complet puis acquitte (voir [_tirer]).
   Future<bool> demandeDuServeur() async {
     try {
       final reponse = await _client.get<Map<String, dynamic>>('/api/sync/demande');
-      return reponse.data?['demande'] == true;
+      final donnees = reponse.data;
+      if (donnees?['resynchronisation'] == true) {
+        resynchronisationServeur.value = true;
+        return true;
+      }
+      return donnees?['demande'] == true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Ticket SW-1 (correction du client du 21/10/2026) — « Resynchronisation demandée par le serveur » : vrai de la
+  /// lecture du drapeau (ping de 30 s ou tirage) jusqu'à son acquittement par le serveur. La modale
+  /// « Synchronisation » l'écoute. Mémoire seule : le drapeau vit au serveur, aucune colonne locale (pas de migration).
+  final ValueNotifier<bool> resynchronisationServeur = ValueNotifier<bool>(false);
+
+  /// Ticket SW-1 — instant (ISO 8601, tel que le serveur l'a rendu) de la demande de resynchronisation que le tirage en
+  /// cours doit honorer ; `null` : aucune. Renvoyé tel quel à l'acquittement.
+  String? _resyncAHonorer;
+
+  /// Ticket SW-1 — acquitte la resynchronisation honorée : le drapeau tombe au serveur. Ne lève JAMAIS : la
+  /// resynchronisation a eu lieu, un échec ici (réseau, drapeau plus récent) laisse le drapeau levé et le prochain
+  /// tirage la refera — au pire un tirage complet de trop, jamais une donnée manquante.
+  Future<void> _acquitterResynchronisation(String demandeeLe) async {
+    try {
+      final reponse = await _client.post<Map<String, dynamic>>(
+        '/api/sync/resynchronisation/acquittement',
+        data: {'demandee_le': demandeeLe},
+      );
+      if (reponse.data?['acquittee'] == true) {
+        if (_resyncAHonorer == demandeeLe) _resyncAHonorer = null;
+        resynchronisationServeur.value = false;
+      }
+    } catch (_) {
+      // Silencieux par construction : voir ci-dessus.
     }
   }
 
@@ -555,6 +591,16 @@ class SyncEngine {
       final servies = PerimetreTirage.depuisReponse(corps);
 
       if (page == 1) {
+        // 🔴→✅ Ticket SW-1 — LE SERVEUR DEMANDE UNE RESYNCHRONISATION (« Renvoyer vers ce poste » au web : le portable a
+        // servi de base pendant la panne de ce poste, qui doit récupérer ce qui y a été saisi). Rien n'est absorbé de
+        // cette page : le tirage repart, COMPLET (sans `since`), une fois ; l'acquittement suit son dernier curseur.
+        final demandee = corps['resynchronisation_demandee_le'];
+        if (demandee is String && demandee.isNotEmpty) {
+          _resyncAHonorer = demandee;
+          resynchronisationServeur.value = true;
+          if (!toutRedemander) return _tirer(complet: true);
+        }
+
         // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
         // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
         // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
@@ -704,6 +750,12 @@ class SyncEngine {
       await _db.noterEtatDeSynchronisation(
         tire: DateTime.parse(horlogeServeur),
       );
+    }
+
+    // Ticket SW-1 — le tirage COMPLET que le serveur avait demandé est fini et son curseur noté : acquittement.
+    final aAcquitter = _resyncAHonorer;
+    if (aAcquitter != null && since == null) {
+      await _acquitterResynchronisation(aAcquitter);
     }
 
     return recus;

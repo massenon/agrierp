@@ -53,6 +53,7 @@ abstract final class SymbolesAgri {
   static const IconData child_care = IconData(0xeb41, fontFamily: famille);
   static const IconData close = IconData(0xe14c, fontFamily: famille);
   static const IconData cloud_done = IconData(0xe2bf, fontFamily: famille);
+  static const IconData cloud_download = IconData(0xe2c0, fontFamily: famille);
   static const IconData cloud_upload = IconData(0xe2c3, fontFamily: famille);
   static const IconData contact_page = IconData(0xf22e, fontFamily: famille);
   static const IconData coronavirus = IconData(0xf221, fontFamily: famille);

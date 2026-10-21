@@ -14,7 +14,8 @@ import '../theme/symboles_agri.dart';
 /// (PRD `docs/prd/synchronisation-barre-superieure.md`, EF2, EF4-EF6, EF14).
 ///
 /// Même bouton, même modale, même titre qu'au web (ticket H3) ; le contenu est celui de CE poste : sa liaison,
-/// sa file, ses refus. Le web, lui, montre l'état de tous les postes (le serveur n'envoie rien).
+/// sa file, ses refus. Le web, lui, montre l'état de tous les postes et ce que chacun n'a pas encore reçu : il peut
+/// lui demander de tout récupérer (« Renvoyer vers ce poste », ticket SW-1).
 ///
 /// ⚠️ HORS LIGNE N'EST PAS UNE ERREUR (`agrierp_flutter/CLAUDE.md`) : la modale s'ouvre et lit la base locale ;
 /// « Synchroniser maintenant » sans réseau répond par un avertissement, jamais par du rouge.
@@ -142,6 +143,32 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _liaison(enLigne),
+          // Ticket SW-1 — le web a demandé à CE poste de tout récupérer (« Renvoyer vers ce poste »).
+          ValueListenableBuilder<bool>(
+            valueListenable: widget.engine.resynchronisationServeur,
+            builder: (context, demandee, _) => demandee
+                ? Padding(
+                    padding: const EdgeInsets.only(top: AgriSpacing.xs),
+                    child: Row(
+                      key: const Key('sync-resync-serveur'),
+                      children: [
+                        const Icon(SymbolesAgri.cloud_download, size: 18, color: AgriColors.brandForest),
+                        const SizedBox(width: AgriSpacing.xs),
+                        const Expanded(
+                          child: Text(
+                            'Resynchronisation demandée par le serveur',
+                            style: TextStyle(
+                              fontSize: AgriTypography.xs,
+                              fontWeight: FontWeight.bold,
+                              color: AgriColors.brandForest,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
           const SizedBox(height: AgriSpacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
