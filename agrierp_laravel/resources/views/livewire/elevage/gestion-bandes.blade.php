@@ -126,7 +126,8 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de Création</label>
-                <input wire:model="created_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="created_date" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('created_date') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('created_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Quantité Initiale (Effectif) *</label>
