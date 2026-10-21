@@ -439,6 +439,13 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?
 
+### BS3 ✅ (21/10/2026) Registre nominatif des reproducteurs au poste (BS-Q1 tranché)
+
+**Objectif :** « Sujets » inclut le registre nominatif (`Animal`, `RegistreReproducteurs`, `AnimalDetails`) : le poste l'ÉCRIT (enregistrer, modifier, sortir), à l'identique du web.
+**Vérifié d'abord au web :** Créer, Modifier et Sortir existent déjà (`manage-elevage`, audit, aucune cascade d'effectif : identifier n'est pas faire entrer) ; construit au web : point de passage `SaisieReproducteurAction`, bouton « Registre des Reproducteurs » dans « Bandes & Sujets » (l'écran n'était relié à rien), seconde sortie refusée.
+**Poste / serveur :** `animals` table mixte (`pushAnimals`), Drift v51, `ReproducteursRepository`, `RegistreReproducteursScreen`, absorbeur strict qui protège `pending` / `conflict`. Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 ».
+**Questions au client (non tranchées) :** **BS-Q11** « Reforme » sans accent au registre (`ucfirst`), à corriger ? · **BS-Q12** espèces du registre : `is_enabled` au web contre modules actifs au tirage · **BS-Q13** changer l'identifiant d'un sujet laisse orphelines les références de saillie : l'interdire après enregistrement ?
+
 ## Sprint MP — Mise en page du poste (demandes du client)
 
 | Ticket | Contenu | État |
