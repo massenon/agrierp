@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../config/domaine_email.dart';
+
 /// Utilisateur connecté, tel que le serveur le décrit.
 class SessionUtilisateur {
   const SessionUtilisateur({
@@ -19,7 +21,8 @@ class SessionUtilisateur {
         id: (j['id'] ?? '') as String,
         nom: (j['name'] ?? '') as String,
         identifiant: (j['username'] ?? '') as String,
-        email: (j['email'] ?? '') as String,
+        // MAIL1 : la session mise en cache au coffre peut porter l'ancien domaine de la ferme.
+        email: convertirDomaineEmail((j['email'] ?? '') as String),
         role: (j['role'] ?? '') as String,
         roleLibelle: (j['role_label'] ?? '') as String,
       );

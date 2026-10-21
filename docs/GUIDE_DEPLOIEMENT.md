@@ -195,6 +195,14 @@ php artisan queue:restart
 php artisan up
 ```
 
+- **Décision du client du 21/10/2026 (MAIL1) :** `php artisan migrate --force` convertit AUSSI les anciennes adresses déjà
+  enregistrées en base : tout `@olouwachegoun.bj` devient `@fermeolouwachegoun.com` (migration
+  `2026_10_21_000001_migrer_les_adresses_email_du_domaine`, idempotente, relançable sans risque). Elle touche les e-mails des
+  comptes, clients et fournisseurs, l'identité de la ferme, la configuration SMTP (jamais le mot de passe), les notifications ;
+  pas le journal d'audit. Un compte dont la nouvelle adresse existe déjà chez un autre compte n'est pas changé : la ligne est
+  écrite dans `storage/logs` (« Migration des adresses e-mail… »), à reprendre à la main. Le compte `admin` prend
+  `contact@fermeolouwachegoun.com`. Les postes se convertissent seuls à leur première ouverture après mise à jour (Drift v50).
+  Faire la sauvegarde (`agrierp:backup`) AVANT, comme pour toute migration.
 - Envoyer le nouveau `public/build/` si les styles ou scripts ont changé, et **incrémenter `VERSION` dans
   `public/sw.js`** si un fichier mis en cache par le navigateur a changé.
 - Puis seulement : distribuer le nouvel installateur des postes.

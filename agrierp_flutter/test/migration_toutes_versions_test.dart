@@ -220,6 +220,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.animals, d.animals.syncStatus),
     (d.animals, d.animals.updatedAt),
   ],
+  // Ticket MAIL1 — palier de DONNÉES (adresses e-mail du nouveau domaine) : aucune table ni colonne ajoutée.
+  52: [],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
