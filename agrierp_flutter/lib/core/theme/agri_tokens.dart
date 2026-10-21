@@ -262,6 +262,9 @@ class AgriChamps {
   /// `py-1` du conteneur gris du Grand Livre.
   static const double margeVerticaleConteneur = 4;
 
+  /// `sm:w-56` : liste « Choisir un état / rapport » du Tableau de bord, à côté de la période.
+  static const double largeurChoixEtat = 224;
+
   /// `border` : épaisseur d'un trait de champ.
   static const double bordure = 1;
 

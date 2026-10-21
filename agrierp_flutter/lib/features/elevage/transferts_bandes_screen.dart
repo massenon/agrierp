@@ -5,6 +5,7 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -545,23 +546,21 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
               onChanged: (v) => setState(() => _cible = v),
             ),
           const SizedBox(height: AgriSpacing.sm),
-          InkWell(
-            key: const Key('transfert-date'),
-            onTap: _constitution
-                ? null
-                : () async {
-                    final choisi = await showDatePicker(
-                      context: context,
-                      initialDate: _jour,
-                      firstDate: DateTime(2020),
-                      lastDate: HeureBenin.maintenant(),
-                    );
-                    if (choisi != null) setState(() => _jour = choisi);
-                  },
-            child: InputDecorator(
-              decoration: const InputDecoration(labelText: 'Date du Transfert *'),
-              child: Text(_TransfertsBandesScreenState._fr(_jour)),
-            ),
+          ChampDateFormulaire(
+            cle: const Key('transfert-date'),
+            etiquette: 'Date du Transfert *',
+            valeur: _jour,
+            // `@disabled($constitution)` : en constitution la date est celle du jour, grisée.
+            desactive: _constitution,
+            onTap: () async {
+              final choisi = await showDatePicker(
+                context: context,
+                initialDate: _jour,
+                firstDate: DateTime(2020),
+                lastDate: HeureBenin.maintenant(),
+              );
+              if (choisi != null) setState(() => _jour = choisi);
+            },
           ),
           const SizedBox(height: AgriSpacing.sm),
           TextField(

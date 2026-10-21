@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
@@ -909,17 +910,13 @@ class _ModaleReglementState extends State<_ModaleReglement> {
             ),
           ),
           const SizedBox(height: AgriSpacing.md),
-          const Text(
-            'Date de règlement *',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: AgriSpacing.xs),
-          OutlinedButton(
-            key: const Key('reglement-date'),
-            onPressed: () async {
+          ChampDateFormulaire(
+            cle: const Key('reglement-date'),
+            etiquette: 'Date de règlement *',
+            valeur: _date,
+            erreur: _erreurDate,
+            cleErreur: const Key('reglement-erreur-date'),
+            onTap: () async {
               // Ticket EX6 (EF7) — calendrier borné au plus ancien exercice OUVERT connu (`min` du web).
               final premier = await widget.depot.premierJourSaisissable();
               if (!context.mounted) return;
@@ -938,26 +935,7 @@ class _ModaleReglementState extends State<_ModaleReglement> {
               );
               if (choisie != null) setState(() => _date = choisie);
             },
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${_date.day.toString().padLeft(2, '0')}/'
-                '${_date.month.toString().padLeft(2, '0')}/${_date.year}',
-              ),
-            ),
           ),
-          if (_erreurDate != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AgriSpacing.xs),
-              child: Text(
-                _erreurDate!,
-                key: const Key('reglement-erreur-date'),
-                style: const TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.errorDeep,
-                ),
-              ),
-            ),
           const SizedBox(height: AgriSpacing.md),
           const Text(
             'Compte de Trésorerie *',

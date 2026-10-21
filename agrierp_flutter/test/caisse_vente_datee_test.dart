@@ -1254,13 +1254,8 @@ void main() {
         const motif =
             "Vente refusée : l'exercice 2026 est clôturé : "
             'aucune saisie ne peut être datée du 11/10/2026.';
-        expect(
-          find.descendant(
-            of: find.byKey(const Key('date-vente-erreur')),
-            matching: find.text(motif),
-          ),
-          findsOneWidget,
-        );
+        // Ticket MP1 : la clé `date-vente-erreur` est portée par le texte du champ partagé (`ChampDateFormulaire`).
+        expect(tester.widget<Text>(find.byKey(const Key('date-vente-erreur'))).data, motif);
         expect(find.textContaining('Vente antérieure'), findsNothing);
 
         await ajouterProvende(tester);

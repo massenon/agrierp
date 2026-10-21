@@ -7,7 +7,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../../core/export/document_officiel.dart';
-import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, MoisDeFiche;
+import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, EnTeteSaisieFiche, MoisDeFiche;
 import 'fiche_journaliere_repository.dart';
 import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'mois_pondeuses.dart';
@@ -600,127 +600,25 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   );
 
   /// « Saisie Journalière Ponte & Cheptel » (`edit_note`), puis à droite « Bande : » (s'il y a plusieurs bandes,
-  /// ticket 15.47) et « Date : ».
-  Widget _enTeteSaisie() => Container(
-    padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
-    ),
-    child: Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: AgriSpacing.xs,
-      runSpacing: AgriSpacing.xs,
-      children: [
-        const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(SymbolesAgri.edit_note, color: AgriColors.brandEmerald),
-            SizedBox(width: AgriSpacing.xs),
-            Text(
-              'Saisie Journalière Ponte & Cheptel',
-              style: TextStyle(
-                fontSize: AgriTypography.base,
-                fontWeight: AgriTypography.gras,
-                color: AgriColors.brandForest,
-              ),
-            ),
-          ],
-        ),
-        Wrap(
-          spacing: AgriSpacing.xs,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (_bandes.length > 1) ...[
-              _etiquetteEnLigne('Bande :'),
-              _cadreSelection(
-                cle: 'bande-fiche',
-                enfant: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _bande?.id,
-                    isDense: true,
-                    style: const TextStyle(
-                      fontSize: AgriTypography.xs,
-                      fontWeight: AgriTypography.gras,
-                      color: AgriColors.brandForest,
-                    ),
-                    items: [
-                      for (final b in _bandes)
-                        DropdownMenuItem(value: b.id, child: Text(b.code)),
-                    ],
-                    onChanged: (id) async {
-                      setState(() => _bande = _bandes.firstWhere((b) => b.id == id));
-                      await _chargerJour();
-                    },
-                  ),
-                ),
-              ),
-            ],
-            _etiquetteEnLigne('Date :'),
-            _cadreSelection(
-              cle: 'date-fiche',
-              enfant: InkWell(
-                onTap: () async {
-                  final choisie = await showDatePicker(
-                    context: context,
-                    initialDate: _jour,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    locale: const Locale('fr'),
-                  );
-                  if (choisie != null) await _ouvrirJour(choisie);
-                },
-                child: Text(
-                  _dateLongue(_jour),
-                  key: const Key('date-choisie'),
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                    color: AgriColors.brandForest,
-                  ),
-                ),
-              ),
-            ),
-            // Ticket EX8 (EF12) — `<x-mois-de-fiche>` : consulter un mois passé.
-            MoisDeFiche(
-              jour: _jour,
-              maintenant: _maintenant,
-              onPrecedent: () => _ouvrirJour(MoisDeFiche.precedent(_jour)),
-              onSuivant: () {
-                final suivant = MoisDeFiche.suivant(_jour, _maintenant);
-                if (suivant != null) _ouvrirJour(suivant);
-              },
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  static String _dateLongue(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  Widget _etiquetteEnLigne(String texte) => Text(
-    texte,
-    style: const TextStyle(
-      fontSize: AgriTypography.xs,
-      fontWeight: FontWeight.w600,
-      color: AgriColors.outline,
-    ),
-  );
-
-  /// `h-9 px-md border rounded-lg bg-surface-zebra` des deux sélecteurs.
-  Widget _cadreSelection({required String cle, required Widget enfant}) => Container(
-    key: Key(cle),
-    height: 36,
-    alignment: Alignment.center,
-    padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-    decoration: BoxDecoration(
-      color: AgriColors.surfaceZebra,
-      border: Border.all(color: AgriColors.outlineVariant),
-      borderRadius: BorderRadius.circular(AgriRadius.lg),
-    ),
-    child: enfant,
+  /// ticket 15.47), « Date : » et « Mois : » — la MÊME barre que les quatre autres fiches (ticket MP1 : elle en était
+  /// une copie aux valeurs en dur).
+  Widget _enTeteSaisie() => EnTeteSaisieFiche(
+    titre: 'Saisie Journalière Ponte & Cheptel',
+    jour: _jour,
+    onJour: (choisie) => _ouvrirJour(choisie),
+    bandes: [for (final b in _bandes) (b.id, b.code)],
+    bandeId: _bande?.id,
+    onBande: (id) async {
+      setState(() => _bande = _bandes.firstWhere((b) => b.id == id));
+      await _chargerJour();
+    },
+    // Ticket EX8 (EF12) — `<x-mois-de-fiche>` : consulter un mois passé.
+    maintenant: _maintenant,
+    onMoisPrecedent: () => _ouvrirJour(MoisDeFiche.precedent(_jour)),
+    onMoisSuivant: () {
+      final suivant = MoisDeFiche.suivant(_jour, _maintenant);
+      if (suivant != null) _ouvrirJour(suivant);
+    },
   );
 
   /// `components/transferts-du-jour.blade.php` (ticket 15.46) : rien les jours sans transfert.

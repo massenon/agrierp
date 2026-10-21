@@ -296,13 +296,20 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 | E14 | Achats : Remboursement ; Fournisseurs : Règlement | idem + libellé `text-[10px] font-bold uppercase text-brand-forest mb-xs` | `OutlinedButton` ; le libellé du Règlement est en `xs` gras SANS majuscules, ni vert forêt, ni `mb-xs` | `ChampDateFormulaire` (libellé et champ ensemble) |
 | E15 | Stocks (Date du Nouveau Stock) ; Soins (Date du Soin, Date Prévue) ; Suivi Reproduction (Date de Saillie) | `h-11` fixe | `InputDecorator` : `vertical: 12` en dur + interligne du moteur : hauteur ≈ 43,5 px qui varie avec le thème | `ChampDateFormulaire` : 44 px exactement |
 | E16 | Transferts entre bandes (Date du Transfert) | libellé au-dessus (`mb-xs`), champ `h-11`, grisé (`bg-surface-zebra text-outline`) en constitution | libellé flottant DANS le cadre (`labelText`), casse « normale » | `ChampDateFormulaire(desactive: constitution)` |
-| E17 | Saisie des Dépenses | `h-11`, erreur `.invalid-feedback` (11 px, 2 px) | `44` en dur, `_cadre` local, erreur 11 px mais `top: xs` (4 px au lieu de 2) | `ChampDateFormulaire` |
+| E17 | Saisie des Dépenses | `h-11`, erreur `.invalid-feedback` (11 px, `mt: 2px`) | déjà fidèle en valeurs, mais **dupliquée** : `44`, `11` et `2` en dur, `_cadre` local, pas d'indicateur de calendrier | `ChampDateFormulaire` (mêmes valeurs, source unique) |
 | E18 | Caisse (Date de la vente) | `h-10 px-md text-xs bg-white`, texte normal, erreur 11 px `mt: 2px` | hauteur 34 (`vertical: sm`), texte en gras vert forêt, erreur 10 px à `xs` | `ChampDateFormulaire(variante: caisse)` : 40 px, texte `xs` normal |
-| E19 | Attestations (Début / Fin) | `grid grid-cols-2 gap-sm`, `h-11`, libellé `text-[10px]` | libellé conforme ; champ `TextField` à `vertical: 14` en dur (hauteur ≈ 47) avec bouton calendrier | hauteur `h-11` exacte ; saisie au clavier conservée (concession du poste) |
+| E19 | Attestations (Début / Fin) | `grid grid-cols-2 gap-sm`, `h-11`, libellé `text-[10px]` | libellé conforme ; champ `TextField` à `vertical: 14` en dur et bouton calendrier à zone de toucher de 48 px : **48 px de haut au lieu de 44** (mesuré, rouge avant correction) | hauteur `h-11` exacte (marges calculées sur l'interligne de `text-sm`, zone de toucher réduite) ; saisie au clavier conservée (concession du poste) |
+| E20 | Archivage des documents (Date d'archivage / Date d'expiration) | `grid grid-cols-2 gap-sm` : les deux champs **côte à côte**, libellés « Date d'archivage * » et « Date d'expiration » | empilés l'un sous l'autre, libellé sans l'astérisque | `Row` de deux `Expanded` à `gap-sm` ; bouton « Effacer » (ajout du poste) rangé dans le champ |
 
 **Écrans avec un champ Date au Blade et sans champ au poste** (hors périmètre : le champ n'existe pas, il se construit par un ticket de fonctionnalité) : Historique des ventes, Liste d'Achats (filtre), Bilan, Comptabilité analytique, Rapprochement bancaire, Balance âgée, Immobilisations, Journal comptable (saisie), Devis, Avances, Bons de commande, Feuille de pointage, Registre des stagiaires et des employés, Enregistrer des sujets, Registre des reproducteurs, Transformation. Les champs « Jour / Âge » de Paramètres Élevage sont des nombres, pas des dates.
 
 **Concession du poste, assumée :** le calendrier s'ouvre dans le `showDatePicker` de Flutter, pas dans le sélecteur natif du navigateur ; l'indicateur dessiné à droite du texte (16 px) en tient lieu.
+
+**Écarts relevés et NON corrigés (décision documentée) :**
+
+- *Fiche Reproducteurs :* son Blade écrit la barre `flex items-center gap-xs` SANS `flex-wrap` (les quatre autres : `flex-wrap`). Le poste replie la barre dans les cinq cas : identique dès 640 px, plus sûr en dessous. Si le client préfère la fidélité stricte, c'est une retouche du Blade (ajouter `flex-wrap`), pas du poste.
+- *Rapports & Exports :* `ml-auto` aligne les boutons d'export à DROITE même quand ils passent seuls à la ligne ; le poste les laisse à gauche dans ce cas (`WrapAlignment.spaceBetween` ne sait pas aligner un enfant seul). Visible seulement sous ~ 700 px de largeur de contenu.
+- *Police :* le banc de test dessine en police Ahem (toutes les chaînes y sont deux fois plus larges qu'en Inter) ; les mesures de largeur d'un champ sont donc des mesures de STRUCTURE (marges, hauteurs, alignements), pas de largeur réelle.
 
 **Hors périmètre, relevé :** dans les modales de Transferts, de Suivi Reproduction et de Courriers, les champs VOISINS de la date (texte, listes) ont encore le gabarit Material (`labelText` flottant ou `xs`) ; leur reprise est un ticket à part (MP2).
 
@@ -310,4 +317,5 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 
 1. **mesures** à 640, 1024 et 1440 px (et 360 px pour l'en-tête des fiches) : libellé à `mb-xs` au-dessus du champ, champs de même hauteur et de même ordonnée sur une même ligne, libellés en ligne centrés sur leur champ à `gap-xs`, flèches du Mois de 32 × 36 px, aucun débordement ;
 2. **écrans** : Rapports, Tableau de bord (640 / 700 / 1024), Grand Livre, Saisie des Dépenses ;
-3. **lecture du Blade** : les classes de chaque `<input type="date">` sont lues et comparées à `AgriChamps` / `AgriSpacing` ; un gabarit nouveau au Blade rougit le test (« à auditer ») ; tout écran du poste qui appelle `showDatePicker` doit passer par un champ partagé (`lib/core/widgets/champs_date_agri.dart`).
+3. **épreuve de mutation** (faite, puis annulée) : marge libellé → champ `xs` → `sm` (4 rouges), `hauteurFormulaire` 44 → 40 (2 rouges), `runSpacing` de la barre des fiches retiré (2 rouges), `margeVerticaleCompacte` 6 → 5 (2 rouges) ;
+4. **lecture du Blade** : les classes de chaque `<input type="date">` sont lues et comparées à `AgriChamps` / `AgriSpacing` ; un gabarit nouveau au Blade rougit le test (« à auditer ») ; tout écran du poste qui appelle `showDatePicker` doit passer par un champ partagé (`lib/core/widgets/champs_date_agri.dart`).

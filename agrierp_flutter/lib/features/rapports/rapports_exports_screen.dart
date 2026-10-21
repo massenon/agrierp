@@ -7,6 +7,7 @@ import '../../core/export/export_tableur.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../stocks/pmp_service.dart';
 import 'rapports_repository.dart';
@@ -261,18 +262,14 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        // Le Blade : `flex flex-wrap items-center gap-sm`, trois enfants PLATS (champ, « au », champ).
         Wrap(
           spacing: AgriSpacing.sm,
+          runSpacing: AgriSpacing.sm,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _champDate('hub-filter-du', _du, (v) => _changerPeriode(du: v)),
-            const Text(
-              'au',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                color: AgriColors.outline,
-              ),
-            ),
+            const Text('au', style: StylesChampsAgri.motPeriode),
             _champDate('hub-filter-au', _au, (v) => _changerPeriode(au: v)),
           ],
         ),
@@ -330,13 +327,16 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
     ),
   );
 
+  /// `<input wire:model.live type="date" min max class="text-xs border border-outline-variant rounded-lg px-sm py-2
+  /// bg-white">` : 34 px, texte seul (ticket MP1 : c'était un `OutlinedButton.icon` de 40 px à icône ajoutée).
   Widget _champDate(
     String cle,
     DateTime valeur,
     ValueChanged<DateTime> quand,
-  ) => OutlinedButton.icon(
-    key: Key(cle),
-    onPressed: () async {
+  ) => ChampDateFiltre(
+    cle: Key(cle),
+    valeur: valeur,
+    onTap: () async {
       // Ticket EX7 (EF9) — calendrier borné à l'exercice affiché (`min` / `max` du web).
       final etat = PorteeExerciceChoisi.lire(context);
       final choix = await showDatePicker(
@@ -348,19 +348,6 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       );
       if (choix != null) quand(choix);
     },
-    icon: const Icon(SymbolesAgri.event, size: 16),
-    label: Text(
-      RapportsRepository.date(valeur),
-      style: const TextStyle(fontSize: AgriTypography.xs),
-    ),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: AgriColors.onSurface,
-      backgroundColor: AgriColors.surfaceCard,
-      side: const BorderSide(color: AgriColors.outlineVariant),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-    ),
   );
 
   /// Barre d'onglets du hub web : `px-md py-2.5 text-xs font-bold border-b-2`, icône 16 px ; actif émeraude.

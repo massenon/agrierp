@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/widgets/lecture_seule.dart';
@@ -1287,9 +1288,13 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _etiquette('Date du Nouveau Stock *'),
-              InkWell(
-                key: const Key('ajout-date'),
+              // 🔴→✅ Ticket EX6 — `@error('addDate')` : exercice clos, le motif R4 sous « Date ».
+              ChampDateFormulaire(
+                cle: const Key('ajout-date'),
+                etiquette: 'Date du Nouveau Stock *',
+                valeur: date,
+                erreur: erreurs['date'],
+                cleErreur: const Key('ajout-erreur-date'),
                 onTap: () async {
                   // Ticket EX6 (EF7) — borné au lendemain du dernier exercice CLOS connu (`min` du web).
                   final premier = await widget.depot.premierJourAjout();
@@ -1309,18 +1314,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                   );
                   if (choisie != null) rafraichir(() => date = choisie);
                 },
-                child: InputDecorator(
-                  decoration: _decoration(),
-                  child: Text(
-                    '${date.day.toString().padLeft(2, '0')}/'
-                    '${date.month.toString().padLeft(2, '0')}/${date.year}',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
               ),
-              // 🔴→✅ Ticket EX6 — `@error('addDate')` : exercice clos, le motif R4 sous « Date ».
-              if (erreurs['date'] != null)
-                _erreurChamp('ajout-erreur-date', erreurs['date']!),
               const SizedBox(height: AgriSpacing.md),
               _etiquette('Produit *'),
               DropdownButtonFormField<String>(
