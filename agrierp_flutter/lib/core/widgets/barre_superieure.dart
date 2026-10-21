@@ -60,6 +60,7 @@ class BarreSuperieure extends StatelessWidget {
     this.onAide,
     this.onContact,
     this.onParametres,
+    this.onVerrouiller,
     this.onDeconnexion,
     this.recherche,
     this.nonLues,
@@ -110,6 +111,10 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Ticket H1 — « Paramètres » du menu du compte (`/parametres-hub` au web). `null` : entrée non proposée.
   final VoidCallback? onParametres;
+
+  /// Ticket VL-1 — « Verrouiller » : fonction propre au poste (le web n'a pas de verrou), avant « Déconnexion ».
+  /// `null` : non proposée.
+  final VoidCallback? onVerrouiller;
 
   /// Ticket H1 — « Déconnexion », sous un séparateur, en `text-error-deep` comme au web. `null` : non proposée.
   final VoidCallback? onDeconnexion;
@@ -411,6 +416,8 @@ class BarreSuperieure extends StatelessWidget {
       ),
     if (onParametres != null)
       ('parametres', 'menu-compte-parametres', SymbolesAgri.settings, 'Paramètres', onParametres!),
+    if (onVerrouiller != null)
+      ('verrouiller', 'menu-compte-verrouiller', SymbolesAgri.lock, 'Verrouiller', onVerrouiller!),
     if (onDeconnexion != null)
       ('deconnexion', 'menu-compte-deconnexion', SymbolesAgri.logout, 'Déconnexion', onDeconnexion!),
   ];

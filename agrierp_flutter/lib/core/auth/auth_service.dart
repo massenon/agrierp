@@ -128,6 +128,8 @@ class AuthService {
   /// poste neuf n'a rien à quoi faire confiance. Un déverrouillage hors ligne
   /// supposerait de conserver de quoi vérifier le mot de passe localement —
   /// décision de sécurité qui appartient au client, pas au développeur.
+  /// (Ticket VL-1 : le verrou local par code PIN, `VerrouLocal`, ne conserve PAS
+  /// le mot de passe : il protège seulement la REPRISE d'une session déjà ouverte.)
   Future<SessionUtilisateur> connecter({
     required String identifiant,
     required String motDePasse,

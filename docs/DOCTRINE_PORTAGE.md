@@ -121,3 +121,14 @@ Objectif : **parité de 100 %** entre la vue Blade (maître) et l'écran Flutter
 - Un écart constaté devient un **ticket** (plan de finalisation), pas une retouche au passage.
 - L'ordre reste celui du § 4 : web d'abord si le critère manque sur le web, poste ensuite.
 - Chaque critère appliqué reçoit son **garde-fou** (test lu dans le code ou test croisé), sinon il n'est pas « appliqué ».
+
+### 5.6 Exceptions justifiées : les fonctions propres au poste hors ligne
+
+La fidélité à la vue Blade a une limite : une fonction qui n'a de sens que parce que le poste **travaille sans réseau** n'a pas d'équivalent web, et le web n'a pas à l'inventer (article 0 : on ne porte que ce qui existe). Chacune est une **exception nommée**, décidée par le client, signalée dans le code (« fonction propre au poste ») et couverte par un garde-fou. Elle n'ajoute rien aux écrans du Blade et ne déplace rien : elle s'insère dans le châssis du poste (menu du compte, une carte de plus de Mon Profil, un écran avant l'application).
+
+| Exception | Décision | Pourquoi elle n'existe pas au web | Garde-fou |
+| --- | --- | --- | --- |
+| **Verrou local (VL-1)** : code PIN de 4 à 6 chiffres, écran de verrouillage à chaque lancement, entrée « Verrouiller » du menu du compte, carte « Changer le code PIN » de Mon Profil | Client, 21/10/2026 : « verrou local, écran de verrouillage à chaque lancement, sans réseau requis » | Le web s'appuie sur la session du serveur (connexion en ligne, expiration). Le poste reprend sa session SANS réseau (`reprendreSession`) : sans verrou, quiconque ouvre la machine lit les données de la ferme | `test/verrou_local_test.dart`, `test/verrou_ecrans_test.dart` (dont l'épreuve : aucun texte de l'application tant que verrouillé) |
+
+Règle : toute future exception de ce tableau se justifie par le hors-ligne, jamais par une préférence d'interface.
+

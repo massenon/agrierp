@@ -40,6 +40,8 @@ dependencies:
   dio: ^5.7.0
   connectivity_plus: ^6.1.0
   flutter_secure_storage: ^9.2.2
+  # Verrou local (ticket VL-1) : HMAC-SHA256 de la dérivation PBKDF2 du code PIN (déjà tirée par les autres paquets).
+  crypto: ^3.0.3
 
   # ─── Présentation ────────────────────────────────────────────────────────
   # ⚠️ ^0.20.2 : `flutter_localizations` (ticket U5) épingle intl 0.20.x selon
