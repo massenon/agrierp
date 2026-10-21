@@ -173,6 +173,7 @@ class ReinitialisationPoste {
     'advance_imputations': 'Imputations d\'avances',
     'purchase_returns': 'Retours fournisseurs',
     'supplier_refunds': 'Remboursements fournisseurs',
+    'credit_notes': 'Retours et avoirs clients',
     'livestock_transfers': 'Transferts entre bandes',
     'livestock_lots': 'Bandes',
     'animals': 'Reproducteurs (registre nominatif)',

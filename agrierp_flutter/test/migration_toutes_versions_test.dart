@@ -67,6 +67,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   44: [d.stockMovements],
   // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
   47: [d.payslips],
+  // Tickets AV1 / AV2 — retours et avoirs clients (table mixte). ⚠️ Le palier 53 est celui de la branche « Devis Prestations ».
+  54: [d.creditNotes],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier

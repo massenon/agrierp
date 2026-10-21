@@ -131,6 +131,8 @@ void main() {
     'attestation_templates',
     'attestation_counts',
     'sales',
+    // Tickets AV1 / AV2 — avoirs clients (table mixte : demandes du poste et avoirs du serveur).
+    'credit_notes',
     // Ticket U4 (D-U4) — lignes des ventes et des achats servis, avec leur pièce.
     'sale_lines',
     'purchase_lines',
