@@ -62,15 +62,36 @@ void main() {
   });
 
   test("l'.ico est bien celui que le script produit depuis assets/images/logo.png (le logo, pas une autre image)", () {
-    ProcessResult r;
-    try {
-      r = Process.runSync('python3', ['-I', 'outils/generer_icone.py', '--verifier']);
-    } on ProcessException {
+    // Le script est du code du dépôt, pas une entrée non fiable : pas d'option `-I` (mode isolé), qui ignorerait les
+    // paquets installés « pour l'utilisateur » (`pip install` sans droits d'administrateur sous Windows : AppData\\Roaming).
+    // Candidats : `python3` (Linux, macOS), `python`, puis le lanceur `py -3` de Windows ; `python3` peut y être un simple
+    // raccourci du Microsoft Store qui ne lance rien.
+    const candidats = <(String, List<String>)>[
+      ('python3', <String>[]),
+      ('python', <String>[]),
+      ('py', <String>['-3']),
+    ];
+    ProcessResult? r;
+    for (final (exe, args) in candidats) {
+      try {
+        final essai = Process.runSync(exe, [...args, 'outils/generer_icone.py', '--verifier']);
+        if ('${essai.stderr}'.contains('No module named')) {
+          r = essai; // cet interpréteur n'a pas Pillow : on essaie le suivant
+          continue;
+        }
+        if (essai.exitCode != 0 && '${essai.stderr}${essai.stdout}'.contains('Python was not found')) continue;
+        r = essai;
+        break;
+      } on ProcessException {
+        continue;
+      }
+    }
+    if (r == null) {
       markTestSkipped('Python introuvable');
       return;
     }
     if ('${r.stderr}'.contains('No module named')) {
-      markTestSkipped('Pillow absent : ${r.stderr}');
+      markTestSkipped('Pillow absent de tous les interpréteurs essayés (pip install pillow) : ${r.stderr}');
       return;
     }
     expect(r.exitCode, 0, reason: '${r.stdout}${r.stderr}');
