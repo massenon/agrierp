@@ -68,15 +68,12 @@ class GestionStocksScreen extends StatefulWidget {
   /// `route('stocks.produits.modifier', $id)` : l'édition du produit.
   final ValueChanged<String>? onModifierProduit;
 
-  /// Légende de « Rotation du Stock », construite comme dans le Blade : le périmètre du ratio se lit en même temps
-  /// que le ratio. Sans rotation : la légende de `x-kpi-card :pending`.
-  static String legendeRotation(RotationStock r) {
-    if (r.rotation == null) {
-      return 'Disponible après un stock valorisable non nul sur le mois';
-    }
-    return '${r.couverture == null ? '' : 'Couvre ${PmpService.nombre(r.couverture!, 0)} % des ventes du mois — '}'
-        "les marchandises produites à la ferme n'ont pas de coût d'achat";
-  }
+  /// Légende de « Rotation du Stock » : aucune quand le ratio existe (le client a retiré le message de couverture,
+  /// web et poste) ; sans rotation, celle de `x-kpi-card :pending`.
+  static String legendeRotation(RotationStock r) =>
+      r.rotation == null
+      ? 'Disponible après un stock valorisable non nul sur le mois'
+      : '';
 
   @override
   State<GestionStocksScreen> createState() => _GestionStocksScreenState();
