@@ -157,7 +157,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     children: [
                       _entete(large),
                       const SizedBox(height: AgriSpacing.lg),
-                      _kpis(d, large),
+                      _kpis(d),
                       const SizedBox(height: AgriSpacing.lg),
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.md),
@@ -253,22 +253,40 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  Widget _kpis(DonneesStocks d, bool large) => GridView(
+  Widget _kpis(DonneesStocks d) {
     // Ticket U11 — `grid-cols-2 md:grid-cols-4` du Blade : quatre colonnes dès 768 px (le poste attendait 1 024 px).
-    //
-    // 🔴→✅ HAUTEUR FIXE, plus un rapport largeur/hauteur : le web laisse la carte prendre la hauteur de son contenu.
-    // Avec `childAspectRatio: 2.6`, la carte « Rotation du Stock » faisait 76,8 px et sa légende sur deux lignes
-    // (police réelle de Windows) débordait de 8 px — bandeau jaune et noir. 104 px loge libellé, valeur et deux lignes
-    // de légende ; au-delà, la légende se coupe plutôt que de déborder.
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: AgriBreakpoints.moyen(context) ? 4 : 2,
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      mainAxisExtent: large ? 104 : 120,
-    ),
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    children: [
+    final colonnes = AgriBreakpoints.moyen(context) ? 4 : 2;
+    final cartes = _cartesKpi(d);
+
+    // 🔴→✅ LA CARTE PREND LA HAUTEUR DE SON CONTENU, comme au web (grille CSS : la rangée suit sa plus haute carte).
+    // `GridView.count` (rapport 2,6) faisait 76,8 px et la légende sur deux lignes de « Rotation du Stock » débordait
+    // de 8 px (bandeau jaune et noir) ; une hauteur fixe (104 px) débordait encore avec la police agrandie ou aux
+    // largeurs étroites. Chaque rangée est donc une `IntrinsicHeight` : ses cartes s'alignent sur la plus haute.
+    return Column(
+      children: [
+        for (var debut = 0; debut < cartes.length; debut += colonnes) ...[
+          if (debut > 0) const SizedBox(height: AgriSpacing.md),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < colonnes; i++) ...[
+                  if (i > 0) const SizedBox(width: AgriSpacing.md),
+                  Expanded(
+                    child: debut + i < cartes.length
+                        ? cartes[debut + i]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _cartesKpi(DonneesStocks d) => [
       // Ticket U8 — `number_format($kpis['valorisation'], 0, ',', ' ').' FCFA'`
       // et la légende du Blade. Le bouton « Recalculer PMP » de la maquette
       // n'est pas repris : le web ne l'a pas (le PMP se lit à chaque affichage).
@@ -313,8 +331,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         couleurIcone: AgriColors.brandForest,
         legende: 'Ajustements du mois',
       ),
-    ],
-  );
+  ];
 
   /// `x-kpi-card` du web : libellé, icône de la variante (couleur de la variante, `text-brand-forest` pour
   /// `maize`), valeur, légende ; `:pending` → tiret estompé et sablier (ticket U10).
