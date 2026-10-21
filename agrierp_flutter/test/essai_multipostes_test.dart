@@ -1317,9 +1317,28 @@ class _Essai {
         });
       case 2:
         // Ticket BS1/BS2 — ESSAI-D archivée ; les achats d'ESSAI-C archivés (29 → 25 sur la fiche, 25 sur la bande).
-        await _geste(p, 'bande ESSAI-D archivée au poste', () async {
+        // Décisions du 21/10/2026 — BS-Q3 : une bande qui a des sujets vivants ne s'archive pas ; il faut la VIDER d'abord.
+        await _geste(p, 'bande ESSAI-D : archivage refusé tant qu\'elle a 8 sujets vivants (BS-Q3)', () async {
+          try {
+            await p.bandes.archiver(bandeD!);
+          } on BandeRefusee {
+            return;
+          }
+          throw StateError('ESSAI-D archivée à tort avec 8 sujets vivants');
+        });
+        // BS-Q4 : ESSAI-C a des fiches — sa correction d'effectif passe par la fiche, jamais par « Modifier la Bande ».
+        await _geste(p, 'bande ESSAI-C : correction d\'effectif refusée, elle a des fiches (BS-Q4)', () async {
+          try {
+            await p.bandes.modifier(bandeC!, stage: 'ponte', quantite: '3', status: 'actif');
+          } on BandeRefusee {
+            return;
+          }
+          throw StateError('effectif d\'ESSAI-C corrigé à tort alors qu\'elle a des fiches');
+        });
+        await _geste(p, 'bande ESSAI-D vidée (effectif 0, sans fiche) puis archivée au poste', () async {
+          await p.bandes.modifier(bandeD!, stage: 'croissance', quantite: '0', status: 'actif');
           await p.bandes.archiver(bandeD!);
-          _saisi('livestock_lots', bandeD!, {'is_active': false});
+          _saisi('livestock_lots', bandeD!, {'is_active': false, 'current_quantity': 0});
         });
         await _geste(p, 'sujets : achats d\'ESSAI-C archivés', () async {
           await p.sujetsEntrees.archiver(ficheAchat!, 'Achat');
@@ -1346,6 +1365,11 @@ class _Essai {
           p.noter('livestock_transfers', t.id);
         });
       case 3:
+        // BS-Q7 : la bande archivée la veille est RESTAURÉE au poste (geste explicite, absorbeur strict, droits).
+        await _geste(p, 'bande ESSAI-D restaurée au poste (BS-Q7)', () async {
+          await p.bandes.restaurer(bandeD!);
+          _saisi('livestock_lots', bandeD!, {'is_active': true, 'current_quantity': 0});
+        });
         await _geste(p, 'mise bas de L-ESSAI-1 : 7 vivants, 1 mort', () async {
           await p.reproduction.enregistrerMiseBas(cycle1!, nesVivants: 7, nesMorts: 1, maintenant: p.maintenant());
           _saisi('livestock_reproduction_events', cycle1!, {'mise_bas_date_actual': _jourIso(p.jour), 'nes_vivants': 7, 'nes_morts': 1});

@@ -4626,6 +4626,7 @@ class SyncEngine {
                   LivestockLotsCompanion(
                     syncStatus: Value(statut),
                     effectifCorrige: statut == SyncStatus.synced ? const Value(null) : const Value.absent(),
+                    restauree: statut == SyncStatus.synced ? const Value(false) : const Value.absent(),
                   ),
                 ),
       ),
@@ -6110,6 +6111,8 @@ class SyncEngine {
     'status': b.status,
     'is_active': b.isActive,
     if (b.effectifCorrige != null) 'effectif_corrige': b.effectifCorrige,
+    // BS-Q7 : le geste explicite de restauration (le serveur ne restaure JAMAIS sur le seul `is_active: true`).
+    if (b.restauree) 'restauree': true,
     'device_id': _deviceId,
   };
 

@@ -159,6 +159,24 @@ class BandesRepository {
   static const toastCreee = 'Bande créée avec succès.';
   static const toastModifiee = 'Bande modifiée avec succès.';
   static const toastArchivee = 'Bande archivée avec succès.';
+  static const toastRestauree = 'Bande restaurée avec succès.';
+
+  /// `SaisieBandeAction::MESSAGE_EFFECTIF_PAR_LES_FICHES` (BS-Q4), mot pour mot.
+  static const messageEffectifParLesFiches =
+      "L'effectif de cette bande est tenu par ses fiches journalières : corrigez-le depuis la fiche, la bande suit automatiquement.";
+
+  /// `SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES` (BS-Q4) : info-bulle et aide du champ « Effectif Actuel » grisé.
+  static const infobulleEffectifParLesFiches =
+      'Cette bande a des fiches journalières : son effectif se corrige depuis la fiche (la bande suit automatiquement).';
+
+  /// `SaisieBandeAction::messageEffectifVivant()` (BS-Q3) : « … compte encore 200 sujets vivants : … » (singulier à 1).
+  static String messageEffectifVivant(int effectif) =>
+      'Cette bande compte encore $effectif ${effectif == 1 ? 'sujet vivant' : 'sujets vivants'}'
+      ' : archivez-la après avoir sorti ou transféré les sujets restants.';
+
+  /// `SaisieBandeAction::messageCodePris()` (BS-Q7).
+  static String messageCodePris(String code) =>
+      'Le code « $code » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.';
 
   /// `LivestockLot::stadesPourEspece()` : Reproducteur / Jeune / Sous-mères pour les lapins (décision client du
   /// 17/10/2026), les quatre stades génériques sinon. Valeur STOCKÉE => libellé.
@@ -226,14 +244,15 @@ class BandesRepository {
     ]..sort((a, b) => cleCommeLeServeur(a.label).compareTo(cleCommeLeServeur(b.label)));
   }
 
-  /// `getLotsProperty()` : bandes non archivées, recherche sur le code, filtre d'espèce, les plus récentes d'abord.
-  Future<List<LigneBande>> bandes({String recherche = '', String filiere = ''}) async {
+  /// `getLotsProperty()` : bandes non archivées (ou, sous le filtre « Bandes archivées » de BS-Q7, les archivées),
+  /// recherche sur le code, filtre d'espèce, les plus récentes d'abord.
+  Future<List<LigneBande>> bandes({String recherche = '', String filiere = '', bool archivees = false}) async {
     final especes = {for (final e in await _db.select(_db.livestockSpecies).get()) e.id: e};
     final refus = await _motifsDeRefus();
     final filtre = cleCommeLeServeur(recherche);
 
     final lignes = [
-      for (final b in await (_db.select(_db.livestockLots)..where((t) => t.isActive.equals(true))).get())
+      for (final b in await (_db.select(_db.livestockLots)..where((t) => t.isActive.equals(!archivees))).get())
         if (recherche.isEmpty || cleCommeLeServeur(b.code).contains(filtre))
           if (filiere.isEmpty || (especes[b.speciesId]?.code ?? b.speciesCode) == filiere) b,
     ]..sort((a, b) {
@@ -392,6 +411,11 @@ class BandesRepository {
     }
     return veille?.effectifFinal ?? initial;
   }
+
+  /// `SaisieBandeAction::aDesFiches()` (BS-Q4) : la bande a-t-elle au moins une fiche journalière ? Alors son effectif
+  /// est tenu par les fiches (cascade unique) : « Modifier la Bande » ne le corrige plus.
+  Future<bool> aDesFiches(String lotId) async =>
+      (await (_db.select(_db.livestockDailyEntries)..where((t) => t.lotId.equals(lotId))..limit(1)).get()).isNotEmpty;
 
   // ── Écriture ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -554,6 +578,11 @@ class BandesRepository {
 
     if (!bande.isActive) throw const BandeRefusee({'bande': messageArchivee});
 
+    // BS-Q4 : une VRAIE correction d'effectif sur une bande qui a des fiches passe par la fiche (cascade unique).
+    if (bande.currentQuantity != n && await aDesFiches(id)) {
+      throw const BandeRefusee({'quantity': messageEffectifParLesFiches});
+    }
+
     final change = bande.stage != stage || bande.status != status || bande.currentQuantity != n;
     if (!change) return bande;
 
@@ -573,14 +602,48 @@ class BandesRepository {
   }
 
   /// `archiveLot()` : `is_active = false`, la ligne est gardée. `false` : la bande l'était déjà (rien n'est écrit).
+  ///
+  /// ⚠️ BS-Q3 (décision client du 21/10/2026) : une bande qui a un effectif VIVANT (> 0) ne s'archive pas — refus avec
+  /// le message du web, rien n'est écrit. Pour la vider : fiche (mort, vente, don), transfert, ou correction d'effectif
+  /// d'une bande sans fiche.
   Future<bool> archiver(String id) async {
     final bande = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
     if (bande == null) throw const BandeRefusee({'bande': 'Bande introuvable sur ce poste.'});
     if (!bande.isActive) return false;
+    if (bande.currentQuantity > 0) {
+      throw BandeRefusee({'bande': messageEffectifVivant(bande.currentQuantity)});
+    }
 
     await (_db.update(_db.livestockLots)..where((t) => t.id.equals(id))).write(
       LivestockLotsCompanion(
         isActive: const Value(false),
+        // Archivée : un geste de restauration encore en file n'a plus de sens.
+        restauree: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.versInstant(_horloge())),
+      ),
+    );
+    _gestes?.signaler();
+    return true;
+  }
+
+  /// BS-Q7 — `SaisieBandeAction::restaurer()` : `is_active = true`, le geste part (`restauree`) à l'envoi. `false` : la
+  /// bande était déjà en cours (rien n'est écrit). Refusée si une AUTRE bande en cours porte le même code (sans tenir
+  /// compte de la casse, comme la collation du serveur).
+  Future<bool> restaurer(String id) async {
+    final bande = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (bande == null) throw const BandeRefusee({'bande': 'Bande introuvable sur ce poste.'});
+    if (bande.isActive) return false;
+
+    final code = cleCommeLeServeur(bande.code);
+    final prise = (await (_db.select(_db.livestockLots)..where((t) => t.isActive.equals(true) & t.id.equals(id).not())).get())
+        .any((autre) => cleCommeLeServeur(autre.code) == code);
+    if (prise) throw BandeRefusee({'bande': messageCodePris(bande.code)});
+
+    await (_db.update(_db.livestockLots)..where((t) => t.id.equals(id))).write(
+      LivestockLotsCompanion(
+        isActive: const Value(true),
+        restauree: const Value(true),
         syncStatus: const Value(SyncStatus.pending),
         updatedAt: Value(HeureBenin.versInstant(_horloge())),
       ),

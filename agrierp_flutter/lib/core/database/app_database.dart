@@ -197,6 +197,10 @@ class LivestockLots extends Table {
   /// l'acquittement.
   IntColumn get effectifCorrige => integer().nullable()();
 
+  /// Ticket BS-Q7 (v50) — RESTAURATION d'une bande archivée, à envoyer : geste EXPLICITE (jamais déduit de
+  /// `is_active = true`, qui peut venir d'une copie périmée d'un autre poste). Vidé à l'acquittement.
+  BoolColumn get restauree => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1716,7 +1720,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 49;
+  int get schemaVersion => 50;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2217,6 +2221,11 @@ class AppDatabase extends _$AppDatabase {
       if (from < 49) {
         await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.syncStatus);
         await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.effectifCorrige);
+      }
+
+      // v50 — décision BS-Q7 : une bande archivée se restaure au poste (geste explicite à envoyer).
+      if (from < 50) {
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.restauree);
       }
     },
   );

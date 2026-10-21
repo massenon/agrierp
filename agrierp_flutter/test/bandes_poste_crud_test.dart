@@ -123,6 +123,18 @@ void main() {
     ),
   );
 
+  /// Une fiche journalière de la bande (BS-Q4 : dès qu'il y en a une, l'effectif est tenu par les fiches).
+  Future<void> fiche(String lot, String id, {int effectifFinal = 10, DateTime? jour}) => db.into(db.livestockDailyEntries).insert(
+    LivestockDailyEntriesCompanion.insert(
+      id: uuid(id),
+      deviceId: 'serveur',
+      updatedAt: DateTime(2026, 10, 20),
+      lotId: lot,
+      entryDate: jour ?? DateTime(2026, 10, 20),
+      effectifFinal: Value(effectifFinal),
+      syncStatus: const Value(SyncStatus.synced),
+    ),
+  );
 
   /// Laisse la base (isolat) répondre, puis le widget se reconstruire.
   Future<void> attendre(WidgetTester t) async {
@@ -344,14 +356,59 @@ void main() {
   });
 
   group('archiver', () {
-    test('⚠️ archiver est LOGIQUE : is_active = false, la ligne et son effectif sont gardés, EN FILE', () async {
-      await bande(mere, 'LOT-LAP-1', courant: 8);
+    test('⚠️ archiver est LOGIQUE : is_active = false, la ligne et son effectif initial sont gardés, EN FILE (bande vidée, BS-Q3)', () async {
+      await bande(mere, 'LOT-LAP-1', initial: 8, courant: 0);
 
       expect(await depot.archiver(mere), isTrue);
 
       final b = (await lue(mere))!;
-      expect([b.isActive, b.status, b.currentQuantity, b.syncStatus], [false, 'actif', 8, SyncStatus.pending]);
+      expect([b.isActive, b.status, b.initialQuantity, b.currentQuantity, b.syncStatus], [false, 'actif', 8, 0, SyncStatus.pending]);
       expect(signaux, 1);
+    });
+
+    test('⚠️⚠️ BS-Q3 — une bande qui a un effectif VIVANT ne s archive pas : le message du web, rien n est écrit, aucun signal', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 8);
+
+      await expectLater(
+        depot.archiver(mere),
+        throwsA(
+          isA<BandeRefusee>().having(
+            (e) => e.erreurs,
+            'erreurs',
+            {'bande': 'Cette bande compte encore 8 sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants.'},
+          ),
+        ),
+      );
+
+      final b = (await lue(mere))!;
+      expect([b.isActive, b.syncStatus, b.currentQuantity], [true, SyncStatus.synced, 8]);
+      expect(signaux, 0);
+    });
+
+    test('BS-Q3 — un seul sujet vivant : le singulier du web', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 1);
+
+      await expectLater(
+        depot.archiver(mere),
+        throwsA(isA<BandeRefusee>().having((e) => e.erreurs['bande'], 'message', 'Cette bande compte encore 1 sujet vivant : archivez-la après avoir sorti ou transféré les sujets restants.')),
+      );
+    });
+
+    test('⚠️ BS-Q3 — la bande se VIDE puis s archive : correction d effectif (sans fiche), la ligne part avec les deux gestes', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 8);
+
+      await depot.modifier(mere, stage: 'reproduction', quantite: '0', status: 'actif');
+      expect(await depot.archiver(mere), isTrue);
+
+      final b = (await lue(mere))!;
+      expect([b.isActive, b.currentQuantity, b.effectifCorrige, b.syncStatus], [false, 0, 0, SyncStatus.pending]);
+    });
+
+    test('⚠️ BS-Q3 — le tirage d une bande vidée par ses fiches (sorties) l autorise à s archiver : effectif 0 avec fiches', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0);
+      await fiche(mere, 'f1', effectifFinal: 0);
+
+      expect(await depot.archiver(mere), isTrue);
     });
 
     test('⚠️ un second archivage ne fait rien : ni mise en file, ni signal', () async {
@@ -364,12 +421,13 @@ void main() {
     });
 
     test('une bande archivée quitte la liste et les indicateurs', () async {
-      await bande(mere, 'LOT-LAP-1', courant: 8);
+      await bande(mere, 'LOT-LAP-1', courant: 0);
       await bande(uuid('b2'), 'LOT-LAP-2', courant: 5);
 
       await depot.archiver(mere);
 
       expect([for (final l in await depot.bandes()) l.bande.code], ['LOT-LAP-2']);
+      expect([for (final l in await depot.bandes(archivees: true)) l.bande.code], ['LOT-LAP-1'], reason: 'le filtre des archivées');
       final k = await depot.indicateurs();
       expect([k.bandesActives, k.effectifTotal], [1, 5]);
     });
@@ -477,14 +535,46 @@ void main() {
       expect(ligne['stage'], 'engraissement');
     });
 
-    test('un archivage part avec is_active = false', () async {
-      await bande(mere, 'LOT-LAP-1');
+    test('un archivage part avec is_active = false (bande vidée)', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0);
       await depot.archiver(mere);
 
       await moteur.synchroniser();
 
       expect((serveur.envois.single['livestock_lots'] as List).single['is_active'], false);
       expect((await lue(mere))!.syncStatus, SyncStatus.synced);
+    });
+
+    test('⚠️ BS-Q3 — une bande vidée au poste puis archivée part avec effectif_corrige 0 ET is_active false (le serveur vide, puis archive)', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 6);
+      await depot.modifier(mere, stage: 'reproduction', quantite: '0', status: 'actif');
+      await depot.archiver(mere);
+
+      await moteur.synchroniser();
+
+      final ligne = (serveur.envois.single['livestock_lots'] as List).single as Map;
+      expect([ligne['effectif_corrige'], ligne['is_active']], [0, false]);
+    });
+
+    test('⚠️ BS-Q7 — une restauration part avec is_active true ET le geste explicite restauree, vidé à l accusé', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+      await depot.restaurer(mere);
+
+      await moteur.synchroniser();
+
+      final ligne = (serveur.envois.single['livestock_lots'] as List).single as Map;
+      expect([ligne['is_active'], ligne['restauree']], [true, true]);
+      final b = (await lue(mere))!;
+      expect([b.syncStatus, b.restauree], [SyncStatus.synced, false]);
+    });
+
+    test('BS-Q7 — une bande jamais restaurée ne porte pas la clé restauree', () async {
+      await bande(mere, 'LOT-LAP-1');
+      await depot.modifier(mere, stage: 'engraissement', quantite: '10', status: 'actif');
+
+      await moteur.synchroniser();
+
+      expect((serveur.envois.single['livestock_lots'] as List).single.containsKey('restauree'), isFalse);
     });
 
     test('⚠️⚠️ un REFUS du serveur passe la bande en conflit, avec son motif mot pour mot (jamais retour silencieux en pending)', () async {
@@ -555,6 +645,129 @@ void main() {
       final c = await db.compteursSynchronisation();
 
       expect([c.aEnvoyer, c.refuses], [1, 1]);
+    });
+  });
+
+  group('BS-Q4 : l effectif d une bande qui a des fiches se corrige par la fiche', () {
+    test('⚠️⚠️ une correction d effectif est refusée (message du web, sous « quantity »), rien n est écrit ni mis en file', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 10);
+      await fiche(mere, 'f1');
+
+      await expectLater(
+        depot.modifier(mere, stage: 'reproduction', quantite: '7', status: 'actif'),
+        throwsA(
+          isA<BandeRefusee>().having(
+            (e) => e.erreurs,
+            'erreurs',
+            {'quantity': "L'effectif de cette bande est tenu par ses fiches journalières : corrigez-le depuis la fiche, la bande suit automatiquement."},
+          ),
+        ),
+      );
+
+      final b = (await lue(mere))!;
+      expect([b.currentQuantity, b.effectifCorrige, b.syncStatus], [10, null, SyncStatus.synced]);
+      expect(signaux, 0);
+    });
+
+    test('le stade et le statut restent modifiables, l effectif inchangé (champ grisé) n est pas une correction', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 10);
+      await fiche(mere, 'f1');
+
+      await depot.modifier(mere, stage: 'engraissement', quantite: '10', status: 'cloture');
+
+      final b = (await lue(mere))!;
+      expect([b.stage, b.status, b.currentQuantity, b.effectifCorrige, b.syncStatus], ['engraissement', 'cloture', 10, null, SyncStatus.pending]);
+    });
+
+    test('une bande SANS fiche garde l édition libre de l effectif', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 10);
+
+      await depot.modifier(mere, stage: 'reproduction', quantite: '7', status: 'actif');
+
+      expect((await lue(mere))!.currentQuantity, 7);
+      expect(await depot.aDesFiches(mere), isFalse);
+    });
+
+    test('aDesFiches : vrai dès qu une fiche existe pour CETTE bande seulement', () async {
+      await bande(mere, 'LOT-LAP-1');
+      await bande(uuid('b2'), 'LOT-LAP-2');
+      await fiche(uuid('b2'), 'f9');
+
+      expect([await depot.aDesFiches(mere), await depot.aDesFiches(uuid('b2'))], [false, true]);
+    });
+  });
+
+  group('BS-Q7 : restaurer une bande archivée', () {
+    test('⚠️ la bande archivée redevient en cours, EN FILE, avec le geste explicite et un signal', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+
+      expect(await depot.restaurer(mere), isTrue);
+
+      final b = (await lue(mere))!;
+      expect([b.isActive, b.restauree, b.syncStatus, b.currentQuantity], [true, true, SyncStatus.pending, 0]);
+      expect(signaux, 1);
+      expect([for (final l in await depot.bandes()) l.bande.code], ['LOT-LAP-1']);
+      expect(await depot.bandes(archivees: true), isEmpty);
+    });
+
+    test('une bande déjà en cours : rien n est écrit, aucun signal', () async {
+      await bande(mere, 'LOT-LAP-1');
+
+      expect(await depot.restaurer(mere), isFalse);
+
+      final b = (await lue(mere))!;
+      expect([b.restauree, b.syncStatus], [false, SyncStatus.synced]);
+      expect(signaux, 0);
+    });
+
+    test('⚠️ refusée si le code est déjà porté par une AUTRE bande en cours (sans tenir compte de la casse)', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+      await bande(uuid('b2'), 'lot-lap-1');
+
+      await expectLater(
+        depot.restaurer(mere),
+        throwsA(
+          isA<BandeRefusee>().having(
+            (e) => e.erreurs,
+            'erreurs',
+            {'bande': 'Le code « LOT-LAP-1 » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.'},
+          ),
+        ),
+      );
+      expect((await lue(mere))!.isActive, isFalse);
+      expect(signaux, 0);
+    });
+
+    test('un code porté par une autre bande ARCHIVÉE ne bloque pas', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+      await bande(uuid('b2'), 'lot-lap-1', active: false);
+
+      expect(await depot.restaurer(mere), isTrue);
+    });
+
+    test('bande introuvable : le message du poste', () async {
+      await expectLater(depot.restaurer(uuid('zz')), throwsA(isA<BandeRefusee>().having((e) => e.erreurs.keys, 'champs', ['bande'])));
+    });
+
+    test('le tirage n écrase pas une restauration non acquittée (bande pending)', () async {
+      await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+      await depot.restaurer(mere);
+      serveur.tirage = {
+        'server_time': '2026-10-21T12:00:00Z',
+        'livestock_lots': [
+          {
+            'id': mere, 'code': 'LOT-LAP-1', 'species_id': lapins, 'species_code': 'cuniculture', 'stage': 'reproduction',
+            'initial_quantity': 10, 'current_quantity': 0, 'created_date': '2026-09-01', 'status': 'actif', 'is_active': false,
+            'updated_at': '2026-10-21T10:00:00+01:00',
+          },
+        ],
+      };
+
+      // Le tirage précède l'envoi : la ligne locale pending reste celle du poste.
+      serveur.avantReponse = null;
+      await moteur.synchroniser();
+
+      expect((await lue(mere))!.isActive, isTrue);
     });
   });
 
@@ -655,6 +868,14 @@ void main() {
 
     Future<void> choisir(WidgetTester t, String cle, String libelle) async {
       await t.tap(find.descendant(of: find.byKey(Key(cle)), matching: find.byType(DropdownButton<String>)));
+      await t.pumpAndSettle();
+      await t.tap(find.text(libelle).last);
+      await attendre(t);
+    }
+
+    /// Un filtre de la barre : la clé est celle du `DropdownButton` lui-même.
+    Future<void> choisirFiltre(WidgetTester t, String cle, String libelle) async {
+      await t.tap(find.byKey(Key(cle)));
       await t.pumpAndSettle();
       await t.tap(find.text(libelle).last);
       await attendre(t);
@@ -784,7 +1005,7 @@ void main() {
     });
 
     testWidgets('⚠️⚠️ Archiver : confirmation « Confirmer l archivage », la bande quitte la liste, toast d avertissement, EN FILE', (t) async {
-      await t.runAsync(() => bande(mere, 'LOT-LAP-1'));
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 0));
       await monter(t);
 
       await t.tap(find.byKey(const Key('bande-archiver-$mere')));
@@ -805,6 +1026,123 @@ void main() {
       expect(find.text('LOT-LAP-1'), findsNothing);
       expect(find.text('Bande archivée avec succès.'), findsOneWidget);
       await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️⚠️ BS-Q3 — archiver une bande qui a des sujets vivants : toast d erreur avec le message du web, la bande reste', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 10));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-archiver-$mere')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('archivage-bande-confirmer')));
+      await attendre(t);
+
+      expect(find.text('Cette bande compte encore 10 sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants.'), findsOneWidget);
+      expect((await t.runAsync(() => lue(mere)))!.isActive, isTrue);
+      expect(find.text('LOT-LAP-1'), findsOneWidget);
+      expect(find.text('Bande archivée avec succès.'), findsNothing);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️⚠️ BS-Q4 — Modifier la Bande : l effectif est GRISÉ avec son info-bulle dès que la bande a des fiches', (t) async {
+      await t.runAsync(() async {
+        await bande(mere, 'LOT-LAP-1', courant: 10);
+        await fiche(mere, 'f1');
+      });
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-modifier-$mere')));
+      await t.pumpAndSettle();
+
+      expect(find.descendant(of: find.byKey(const Key('bande-edit-quantite')), matching: find.byType(TextField)), findsNothing, reason: 'plus de champ saisissable');
+      expect(find.descendant(of: find.byKey(const Key('bande-edit-quantite')), matching: find.text('10')), findsOneWidget, reason: 'la valeur reste lisible');
+      expect(
+        find.byTooltip('Cette bande a des fiches journalières : son effectif se corrige depuis la fiche (la bande suit automatiquement).'),
+        findsOneWidget,
+      );
+      expect(find.text('Cette bande a des fiches journalières : son effectif se corrige depuis la fiche (la bande suit automatiquement).'), findsOneWidget, reason: 'aide sous le champ, comme au web');
+
+      // Le stade et le statut restent modifiables, l'effectif part inchangé.
+      await choisir(t, 'bande-edit-statut', 'Clôturé');
+      await t.tap(find.byKey(const Key('bande-enregistrer')));
+      await attendre(t);
+      final b = (await t.runAsync(() => lue(mere)))!;
+      expect([b.status, b.currentQuantity, b.effectifCorrige, b.syncStatus], ['cloture', 10, null, SyncStatus.pending]);
+      expect(find.text('Bande modifiée avec succès.'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('BS-Q4 — une bande sans fiche garde le champ Effectif Actuel saisissable', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 10));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-modifier-$mere')));
+      await t.pumpAndSettle();
+
+      expect(find.descendant(of: find.byKey(const Key('bande-edit-quantite')), matching: find.byType(TextField)), findsOneWidget);
+      expect(find.byTooltip('Cette bande a des fiches journalières : son effectif se corrige depuis la fiche (la bande suit automatiquement).'), findsNothing);
+    });
+
+    testWidgets('⚠️⚠️ BS-Q7 — le filtre « Bandes archivées » liste les archivées avec « Restaurer » ; restaurer : toast, retour en cours, EN FILE', (t) async {
+      await t.runAsync(() async {
+        await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+        await bande(uuid('b2'), 'LOT-LAP-2');
+      });
+      await monter(t);
+      expect(find.text('LOT-LAP-1'), findsNothing);
+      expect(find.byKey(Key('bande-restaurer-$mere')), findsNothing);
+
+      await choisirFiltre(t, 'bandes-filtre-affichage', 'Bandes archivées');
+
+      expect(find.text('LOT-LAP-1'), findsOneWidget);
+      expect(find.text('LOT-LAP-2'), findsNothing);
+      expect(find.byKey(Key('bande-modifier-$mere')), findsNothing, reason: 'une bande archivée ne se modifie pas');
+      expect(find.byKey(Key('bande-archiver-$mere')), findsNothing);
+      expect(find.byTooltip('Restaurer'), findsOneWidget);
+
+      await t.tap(find.byKey(Key('bande-restaurer-$mere')));
+      await attendre(t);
+
+      final b = (await t.runAsync(() => lue(mere)))!;
+      expect([b.isActive, b.restauree, b.syncStatus], [true, true, SyncStatus.pending]);
+      expect(find.text('Bande restaurée avec succès.'), findsOneWidget);
+      expect(find.text('LOT-LAP-1'), findsNothing, reason: 'elle a quitté la liste des archivées');
+      expect(find.text('Aucune bande archivée.'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('BS-Q7 — restauration refusée (code déjà porté) : toast d erreur avec le message du web', (t) async {
+      await t.runAsync(() async {
+        await bande(mere, 'LOT-LAP-1', courant: 0, active: false);
+        await bande(uuid('b2'), 'lot-lap-1');
+      });
+      await monter(t);
+      await choisirFiltre(t, 'bandes-filtre-affichage', 'Bandes archivées');
+
+      await t.tap(find.byKey(Key('bande-restaurer-$mere')));
+      await attendre(t);
+
+      expect(find.text('Le code « LOT-LAP-1 » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.'), findsOneWidget);
+      expect((await t.runAsync(() => lue(mere)))!.isActive, isFalse);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('BS-Q7 — sans le droit manage-elevage : pas de « Restaurer », « Lecture seule »', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 0, active: false));
+      await monter(t, peutGerer: false);
+      await choisirFiltre(t, 'bandes-filtre-affichage', 'Bandes archivées');
+
+      expect(find.text('LOT-LAP-1'), findsOneWidget);
+      expect(find.byKey(Key('bande-restaurer-$mere')), findsNothing);
+      expect(find.text('Lecture seule'), findsOneWidget);
+    });
+
+    testWidgets('BS-Q7 — le KPI « Bandes Actives » ne compte jamais les archivées, même sous le filtre', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 0, active: false));
+      await monter(t);
+      await choisirFiltre(t, 'bandes-filtre-affichage', 'Bandes archivées');
+
+      expect(find.descendant(of: find.byKey(const Key('kpi-Bandes Actives')), matching: find.text('0')), findsOneWidget);
     });
 
     testWidgets('⚠️ une bande REFUSÉE par le serveur le dit avec son motif, mot pour mot', (t) async {

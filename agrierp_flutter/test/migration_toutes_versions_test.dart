@@ -212,6 +212,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.livestockLots, d.livestockLots.syncStatus),
     (d.livestockLots, d.livestockLots.effectifCorrige),
   ],
+  // Ticket BS-Q7 — restauration d'une bande archivée, à envoyer.
+  50: [(d.livestockLots, d.livestockLots.restauree)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
