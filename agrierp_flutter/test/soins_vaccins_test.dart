@@ -422,6 +422,30 @@ void main() {
     }
   });
 
+  /// Ticket UNI — deux bandes de même code (doublon déjà présent chez le client) : le Gantt les montre toutes deux, sans
+  /// « Duplicate keys found » (qui arrêtait le dessin de l'écran). La première garde la clé d'origine, la suivante un rang.
+  testWidgets('Ticket UNI : deux bandes de même code ont chacune leur ligne du Gantt', (tester) async {
+    await db.into(db.livestockLots).insert(
+      LivestockLotsCompanion.insert(
+        id: uuid('doublon'),
+        code: 'LOT-LAP-2026-06',
+        speciesId: 'esp-cuniculture',
+        speciesCode: const Value('cuniculture'),
+        stage: const Value('engraissement'),
+        status: const Value('actif'),
+        createdDate: Value(jourDe(-10)),
+        currentQuantity: const Value(50),
+      ),
+    );
+
+    await afficher(tester);
+    await ouvrir(tester, 'Calendrier Vétérinaire');
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('gantt-LOT-LAP-2026-06')), findsOneWidget);
+    expect(find.byKey(const Key('gantt-LOT-LAP-2026-06-2')), findsOneWidget);
+  });
+
   /// Ticket H8 : le Blade fait foi — la fenêtre commence AUJOURD'HUI (J → J+13) : un traitement du protocole
   /// passé n'y figure plus. L'ajout du poste (protocole calculé, gardé par décision client) s'affiche en
   /// ANNEAU jaune « calculé » sur son jour à venir. La bande est née il y a 10 jours (J11 aujourd'hui) : le

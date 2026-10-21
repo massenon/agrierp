@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import 'suffixe_doublon.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// Dashboard Élevage — le maître est `Livewire\Elevage\DashboardElevage` et sa vue
@@ -1557,13 +1558,4 @@ class _CourbesGmqPainter extends CustomPainter {
       ancien.series != series;
 }
 
-/// Suffixe d'une clé de ligne quand deux bandes portent le même code (`-2`, `-3`…) ; vide pour la première.
-///
-/// 🔴→✅ « Duplicate keys found » : deux bandes de même code (ex. `AVI-2026-01`) donnaient deux lignes de clé
-/// identique, ce qui arrête le dessin de l'écran entier sans aucune erreur de compilation. La première garde sa clé
-/// d'origine (les tests la retrouvent), les suivantes reçoivent un rang.
-String _suffixeDoublon(Iterable<String> codes, int index) {
-  final liste = codes.toList();
-  final rang = liste.sublist(0, index + 1).where((c) => c == liste[index]).length;
-  return rang <= 1 ? '' : '-$rang';
-}
+String _suffixeDoublon(Iterable<String> codes, int index) => suffixeDoublon(codes, index);

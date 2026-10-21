@@ -42,6 +42,8 @@ class FusionReferentiels {
       ('receivables', 'customer_id'),
       ('customer_advances', 'customer_id'),
       ('customer_reminders', 'customer_id'),
+      // Ticket DEV — le client d'un devis du poste.
+      ('quotes', 'customer_id'),
     ],
     'suppliers': [
       ('purchases', 'supplier_id'),
@@ -58,6 +60,8 @@ class FusionReferentiels {
       ('stock_movements', 'product_id'),
       ('livestock_lots', 'product_id'),
       ('lot_revenues', 'product_id'),
+      // Tickets AV1 / AV2 — un avoir en attente désigne son produit.
+      ('credit_notes', 'product_id'),
       ('livestock_daily_entries', 'treatment_product_id'),
     ],
   };

@@ -67,6 +67,7 @@ abstract final class SymbolesAgri {
   static const IconData description = IconData(0xe683, fontFamily: famille);
   static const IconData domain = IconData(0xe0af, fontFamily: famille);
   static const IconData done_all = IconData(0xe877, fontFamily: famille);
+  static const IconData download = IconData(0xe171, fontFamily: famille);
   static const IconData edit = IconData(0xe150, fontFamily: famille);
   static const IconData edit_note = IconData(0xe745, fontFamily: famille);
   static const IconData egg = IconData(0xeacc, fontFamily: famille);
@@ -126,6 +127,7 @@ abstract final class SymbolesAgri {
   static const IconData payments = IconData(0xef63, fontFamily: famille);
   static const IconData pending = IconData(0xef64, fontFamily: famille);
   static const IconData pending_actions = IconData(0xf1bb, fontFamily: famille);
+  static const IconData percent = IconData(0xeb58, fontFamily: famille);
   static const IconData person = IconData(0xe7fd, fontFamily: famille);
   static const IconData person_add = IconData(0xe7fe, fontFamily: famille);
   static const IconData person_off = IconData(0xe510, fontFamily: famille);

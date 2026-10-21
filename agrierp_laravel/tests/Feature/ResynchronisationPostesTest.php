@@ -285,4 +285,38 @@ class ResynchronisationPostesTest extends TestCase
         $this->assertSame(0, PosteSynchronisation::whereNotNull('resync_demandee_le')->count());
         $this->assertSame(0, AuditLog::where('action', 'like', 'sync.renvoi%')->count());
     }
+
+    /** Les devis et les avoirs descendent au poste : le compte du retard les parcourt aussi (jeu calculé à la main : 1 + 2). */
+    public function test_le_retard_couvre_les_devis_et_les_avoirs(): void
+    {
+        $vente = $this->vente('2026-10-01 09:00:00');
+        $now = '2026-10-15 08:00:00';
+        $devis = fn (string $n, string $maj) => DB::table('quotes')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'quote_number' => $n, 'articles_description' => 'Cage', 'amount' => 1000,
+            'quote_date' => '2026-10-01', 'created_at' => $maj, 'updated_at' => $maj,
+        ]);
+        $avoir = fn (string $n, string $maj) => DB::table('credit_notes')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'credit_note_number' => $n, 'sale_id' => $vente->id, 'amount' => 500,
+            'created_at' => $maj, 'updated_at' => $maj,
+        ]);
+        $devis('DV-1', '2026-10-05 08:00:00'); // avant le curseur : non compté
+        $devis('DV-2', $now);
+        $avoir('AV-1', '2026-10-05 08:00:00'); // avant : non compté
+        $avoir('AV-2', $now);
+        $avoir('AV-3', '2026-10-16 08:00:00');
+        PosteSynchronisation::create(['poste' => 'POSTE-A', 'curseur_tirage' => '2026-10-10 12:00:00', 'dernier_tirage_le' => '2026-10-10 12:00:00']);
+
+        $retard = app(ResynchronisationPostesService::class)->retard('POSTE-A', Carbon::parse('2026-10-18 12:00:00'));
+
+        $this->assertSame(['Devis' => 1, 'Avoirs' => 2], $retard['details']);
+        $this->assertSame('1 devis, 2 avoirs', $retard['resume']);
+    }
+
+    /** Toute table comptée porte `updated_at` : sinon le calcul planterait en production. */
+    public function test_chaque_type_compte_a_une_colonne_updated_at(): void
+    {
+        foreach (array_keys(ResynchronisationPostesService::TYPES) as $table) {
+            $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn($table, 'updated_at'), $table);
+        }
+    }
 }

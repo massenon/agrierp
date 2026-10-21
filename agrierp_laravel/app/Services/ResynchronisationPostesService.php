@@ -48,6 +48,8 @@ class ResynchronisationPostesService
         'customer_advances' => ['avances', 'avance'],
         'stock_movements' => ['mouvements de stock', 'mouvement de stock'],
         'accounting_entries' => ['écritures comptables', 'écriture comptable'],
+        'quotes' => ['devis', 'devis'],
+        'credit_notes' => ['avoirs', 'avoir'],
     ];
 
     /**

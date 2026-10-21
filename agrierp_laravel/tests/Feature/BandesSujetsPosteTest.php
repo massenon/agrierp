@@ -302,7 +302,12 @@ class BandesSujetsPosteTest extends TestCase
 
         $reponse->assertJsonPath('livestock_lots.accepted', []);
         $motifs = collect($reponse->json('livestock_lots.rejected'))->pluck('reason', 'id');
-        $this->assertSame('La valeur du champ code existe déjà.', $motifs[self::LOT_2]);
+        // Ticket UNI : le motif dit le code ET la marche à suivre (renommer), au lieu du générique « existe déjà ».
+        $this->assertSame(
+            'Le code « PON-2026-01 » est déjà utilisé par une autre bande (en cours ou archivée) : choisissez un autre code. '
+            .'Votre bande est conservée sur ce poste : renommez-la (Élevage > Bandes & Sujets, bouton « Modifier ») puis synchronisez de nouveau.',
+            $motifs[self::LOT_2]
+        );
         $this->assertSame("L'exercice 2025 est clôturé : aucune saisie ne peut être datée du 20/12/2025.", $motifs['bbbb1111-0000-4000-8000-000000000003']);
         $this->assertSame("Le champ effectif initial est inférieur au minimum autorisé (1).", $motifs['bbbb1111-0000-4000-8000-000000000004']);
         $this->assertSame("La valeur du champ stade n'est pas autorisée.", $motifs['bbbb1111-0000-4000-8000-000000000005']);

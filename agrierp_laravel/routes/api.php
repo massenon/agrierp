@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReinitialisationDonneesController;
 use App\Http\Controllers\Api\SupervisionSynchronisationController;
 use App\Http\Controllers\Api\SyncController;
+use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -43,6 +44,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         ->middleware('throttle:30,1');
 
     // Ticket 15.13 : attestations depuis le poste — génération (PDF) et modèles.
+    // Ticket AV2 — ticket PDF d'une vente (« Télécharger PDF » du détail, Historique des Ventes).
+    Route::get('/ventes/{id}/pdf', [VenteController::class, 'pdf'])
+        ->middleware('throttle:30,1');
+
     Route::post('/attestations', [AttestationController::class, 'generer'])
         ->middleware('throttle:30,1');
     Route::put('/attestation-templates/{type}', [AttestationController::class, 'enregistrerModele']);

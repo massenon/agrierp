@@ -94,6 +94,9 @@ class GestionBandesScreen extends StatefulWidget {
 class _GestionBandesScreenState extends State<GestionBandesScreen> {
   IndicateursBandes? _kpis;
   List<LigneBande> _lignes = const [];
+
+  /// Ticket UNI — codes de bande partagés par plusieurs bandes (bandeau non bloquant, comme le web).
+  int _doublons = 0;
   final _recherche = TextEditingController();
   String _rechercheAppliquee = '';
   String _filiere = '';
@@ -120,10 +123,12 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
   Future<void> _charger() async {
     final kpis = await widget.depot.indicateurs();
     final lignes = await widget.depot.bandes(recherche: _rechercheAppliquee, filiere: _filiere, archivees: _affichage == 'archivees');
+    final doublons = await widget.depot.nombreDeCodesEnDouble();
     if (!mounted) return;
     setState(() {
       _kpis = kpis;
       _lignes = lignes;
+      _doublons = doublons;
     });
   }
 
@@ -149,6 +154,7 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
                 children: [
                   _enTete(),
                   const SizedBox(height: AgriSpacing.lg),
+                  if (_doublons > 0) ...[_bandeauDoublons(), const SizedBox(height: AgriSpacing.md)],
                   _indicateurs(k),
                   const SizedBox(height: AgriSpacing.md),
                   _exporter(),
@@ -253,6 +259,43 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
             ),
     );
   }
+
+  /// Ticket UNI — `data-doublons-codes` du Blade : `bg-accent-yellow/20 border border-accent-yellow rounded-lg px-md py-sm`.
+  /// Alerte NON bloquante : des bandes portent le même code (déjà présentes avant la règle d'unicité).
+  Widget _bandeauDoublons() => Container(
+    key: const Key('bandes-doublons-codes'),
+    padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+    decoration: BoxDecoration(
+      color: AgriColors.accentYellow.withValues(alpha: 0.2),
+      border: Border.all(color: AgriColors.accentYellow),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(SymbolesAgri.warning, size: 18, color: AgriColors.brandForest),
+        const SizedBox(width: AgriSpacing.sm),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.brandForest),
+              children: [
+                TextSpan(
+                  text: BandesRepository.titreDoublons(_doublons),
+                  style: const TextStyle(fontWeight: AgriTypography.gras),
+                ),
+                const TextSpan(
+                  text:
+                      " Des bandes portent le même code : cliquez sur « Modifier » pour corriger le code de l'une d'elles. "
+                      'Rien n\'est supprimé ni modifié automatiquement.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   /// `x-kpi-accordion` : `grid grid-cols-2 xl:grid-cols-4 gap-md`.
   Widget _indicateurs(IndicateursBandes k) {
@@ -690,10 +733,12 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
   Future<void> _modifier(LivestockLot b) async {
     // BS-Q4 : `editLot` lit si la bande a des fiches (`effectifVerrouille`) AVANT d'ouvrir la modale.
     final verrouille = await widget.depot.aDesFiches(b.id);
+    // Ticket UNI : `codeEnDoublon` — le champ code n'est ouvert que pour corriger un doublon.
+    final renommable = await widget.depot.codeRenommable(b.id);
     if (!mounted) return;
     final resultat = await afficherModale<String>(
       context: context,
-      constructeur: (_) => _ModaleModifierBande(depot: widget.depot, bande: b, effectifVerrouille: verrouille),
+      constructeur: (_) => _ModaleModifierBande(depot: widget.depot, bande: b, effectifVerrouille: verrouille, codeRenommable: renommable),
     );
     if (resultat == null || !mounted) return;
     await _charger();
@@ -1013,13 +1058,16 @@ class _ModaleNouvelleBandeState extends State<_ModaleNouvelleBande> {
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 class _ModaleModifierBande extends StatefulWidget {
-  const _ModaleModifierBande({required this.depot, required this.bande, this.effectifVerrouille = false});
+  const _ModaleModifierBande({required this.depot, required this.bande, this.effectifVerrouille = false, this.codeRenommable = false});
 
   final BandesRepository depot;
   final LivestockLot bande;
 
   /// BS-Q4 : la bande a des fiches — « Effectif Actuel » grisé (`disabled`), info-bulle explicative.
   final bool effectifVerrouille;
+
+  /// Ticket UNI : le code est partagé avec une autre bande (ou refusé « déjà utilisé » par le serveur) — il se corrige.
+  final bool codeRenommable;
 
   @override
   State<_ModaleModifierBande> createState() => _ModaleModifierBandeState();
@@ -1029,10 +1077,12 @@ class _ModaleModifierBandeState extends State<_ModaleModifierBande> {
   late String _stade = widget.bande.stage ?? 'reproduction';
   late String _statut = widget.bande.status ?? 'actif';
   late final TextEditingController _quantite = TextEditingController(text: '${widget.bande.currentQuantity}');
+  late final TextEditingController _code = TextEditingController(text: widget.bande.code);
   Map<String, String> _erreurs = const {};
 
   @override
   void dispose() {
+    _code.dispose();
     _quantite.dispose();
     super.dispose();
   }
@@ -1040,7 +1090,13 @@ class _ModaleModifierBandeState extends State<_ModaleModifierBande> {
   Future<void> _enregistrer() async {
     setState(() => _erreurs = const {});
     try {
-      await widget.depot.modifier(widget.bande.id, stage: _stade, quantite: _quantite.text, status: _statut);
+      await widget.depot.modifier(
+        widget.bande.id,
+        stage: _stade,
+        quantite: _quantite.text,
+        status: _statut,
+        code: widget.codeRenommable ? _code.text : null,
+      );
     } on BandeRefusee catch (e) {
       if (e.erreurs.containsKey('bande')) {
         // Bande archivée depuis l'ouverture de la modale : fermée, le motif en toast d'erreur (comme le web).
@@ -1063,10 +1119,20 @@ class _ModaleModifierBandeState extends State<_ModaleModifierBande> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Ticket UNI — `@if($codeEnDoublon)` : le champ code s'ouvre pour corriger un doublon, sinon il reste grisé.
           BlocChampModale(
             libelle: 'Code Unique de la Bande',
-            aide: "L'identifiant technique unique n'est jamais modifiable après création.",
-            enfant: KeyedSubtree(key: const Key('bande-edit-code'), child: ChampLectureModale(valeur: widget.bande.code)),
+            erreur: widget.codeRenommable ? _erreurs['code'] : null,
+            cleErreur: const Key('bande-erreur-code'),
+            aide: widget.codeRenommable
+                ? 'Ce code est partagé avec une autre bande : corrigez-le (il redeviendra non modifiable ensuite).'
+                : "L'identifiant technique unique n'est jamais modifiable après création.",
+            enfant: KeyedSubtree(
+              key: const Key('bande-edit-code'),
+              child: widget.codeRenommable
+                  ? ChampTexteModale(controleur: _code, enErreur: _erreurs.containsKey('code'))
+                  : ChampLectureModale(valeur: widget.bande.code),
+            ),
           ),
           BlocChampModale(
             libelle: 'Stade *',

@@ -1387,6 +1387,47 @@ class SaleLines extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Retour d'une vente et son avoir (`credit_notes`) — écran « Retours et Avoirs » (tickets AV1 / AV2).
+///
+/// ⚠️⚠️ **LE POSTE ENREGISTRE LA DEMANDE, PAS SES EFFETS** (même motif que le retour fournisseur F0.74, [PurchaseReturns]) :
+/// « ce produit, de cette vente, cette quantité, ce motif, réintégré ou réformé, pour ce montant, ce jour ». Le serveur
+/// attribue le numéro `AV-AAAA-NNN`, réintègre le stock (décision « réintégré »), passe l'écriture inverse 701 / 443 / 411
+/// et la date de ce JOUR (`created_at` ci-dessous est le jour du FAIT). Il peut refuser : vente inconnue ou annulée,
+/// produit absent de la vente, quantité au-delà de « vendu − déjà retourné », montant au-delà de « ligne − déjà crédité »,
+/// exercice clos, plan comptable incomplet. Son motif est gardé tel quel (`sync_conflicts`).
+///
+/// ⚠️ **JAMAIS d'ajustement de stock ni d'écriture au poste pour un avoir** : le serveur le fait, en une transaction, par
+/// `AvoirClientService` (le point de passage de `RetoursAvoirs::saveReturn()` du web).
+///
+/// TABLE MIXTE : une ligne `pending` / `conflict` saisie ICI n'est jamais écrasée par le tirage ; les avoirs du web et des
+/// autres postes descendent (`device_id` = `serveur`, `synced`) et remplacent les lignes acquittées. « Marquer comme
+/// traité » est aussi une demande : le statut passe à `traite`, la ligne repart `pending`, le serveur la marque une fois.
+/// `credit_note_number` est NUL tant que le serveur ne l'a pas attribué (la demande n'a pas de numéro avant l'envoi).
+/// `accounting_entry_id` ne descend pas : le poste ne tient pas la comptabilité d'un avoir.
+@DataClassName('AvoirClient')
+class CreditNotes extends Table with SyncColumns {
+  TextColumn get saleId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+
+  /// `AV-AAAA-NNN`, attribué par le serveur seul. `null` : demande pas encore reçue.
+  TextColumn get creditNoteNumber => text().nullable()();
+
+  /// Quantité retournée (nulle en base web pour un avoir sans produit : jamais saisie ainsi).
+  RealColumn get qty => real().nullable()();
+  RealColumn get amount => real()();
+  TextColumn get reason => text().nullable()();
+
+  /// `reintegre` · `reforme`.
+  TextColumn get decision => text().nullable()();
+  TextColumn get inspectionNotes => text().nullable()();
+
+  /// `en_attente` · `traite`.
+  TextColumn get status => text().withDefault(const Constant('en_attente'))();
+
+  /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
+  DateTimeColumn get createdAt => dateTime()();
+}
+
 /// Soin vétérinaire administré, saisi au poste ou reçu du serveur.
 ///
 /// ⚠️ `withdrawalDays` N'EST PAS UNE COLONNE DU REGISTRE CÔTÉ SERVEUR : c'est
@@ -1610,6 +1651,36 @@ class Expenses extends Table with SyncColumns {
   TextColumn get accountingEntryId => text().nullable()();
 }
 
+/// Ticket DEV — DEVIS (« Devis & Proforma » : `quotes` du serveur), TABLE MIXTE comme les dépenses : saisis, avancés dans
+/// leur cycle et archivés au poste (`pending`, envoyés), ET tirés du serveur (web, autres postes) au curseur, archivés
+/// compris. Un devis y est, comme au web, une description libre des prestations + un montant HT global + une TVA + une
+/// validité en jours — jamais des lignes de produits.
+///
+/// ⚠️ **LE NUMÉRO `DEV-AAAA-NNN` N'EST JAMAIS INVENTÉ PAR LE POSTE** (même principe que la référence des courriers) : le
+/// serveur l'attribue à la réception, `NULL` tant que le devis n'est pas acquitté puis tiré (« — » à l'écran). Deux postes
+/// hors ligne auraient sinon deux devis au même numéro.
+///
+/// ⚠️ `status` : `brouillon` → `envoye` → `accepte` | `refuse` (le poste ne pose jamais `facture`, que le serveur seul
+/// pourrait poser). Une saisie locale `pending` ou `conflict` n'est jamais écrasée par le tirage
+/// (`SyncEngine._absorberDevis`).
+class Quotes extends Table with SyncColumns {
+  /// `DEV-AAAA-NNN`, attribué par le serveur (voir plus haut).
+  TextColumn get quoteNumber => text().nullable()();
+  TextColumn get customerId => text()();
+  TextColumn get articlesDescription => text()();
+
+  /// Montant HT global (FCFA).
+  RealColumn get amount => real()();
+  RealColumn get tvaRate => real().withDefault(const Constant(0))();
+  IntColumn get validityDays => integer().withDefault(const Constant(15))();
+  DateTimeColumn get quoteDate => dateTime()();
+  TextColumn get note => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('brouillon'))();
+
+  /// Archivage logique (`false` : archivé, rien n'est supprimé).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
 /// et Dépenses » du web lit (`RecettesDepenses::depensesRows()`) descendent — l'instant du règlement, le nom de
 /// l'employé et le net versé. ⚠️ RIEN D'AUTRE SUR LA PAIE (protections S3 sur les salaires) : ni brut, ni retenues,
@@ -1711,12 +1782,14 @@ class SyncState extends Table {
     VeterinaryCalendarEvents,
     Sales,
     SaleLines,
+    CreditNotes,
     StockAdjustments,
     StockMovements,
     SyncConflicts,
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    Quotes,
     Payslips,
     AppSettings,
     SyncState,
@@ -1734,7 +1807,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 52;
+  int get schemaVersion => 54;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2255,6 +2328,21 @@ class AppDatabase extends _$AppDatabase {
       if (from < 52) {
         await _convertirAdressesEmail();
       }
+
+      // v53 — ticket DEV : « Devis & Proforma » au poste (table `quotes`, saisie ET tirée).
+      if (from < 53) {
+        if (!await _tableExiste(m, quotes)) {
+          await m.createTable(quotes);
+        }
+      }
+
+      // v54 — tickets AV1 / AV2 : retours et avoirs clients saisis au poste (`credit_notes`, table mixte : demandes
+      // `pending` ET avoirs tirés du serveur). Une base en v52, v53 ou v54 passe ici sans trou (`from < 53`, `from < 54`).
+      if (from < 54) {
+        if (!await _tableExiste(m, creditNotes)) {
+          await m.createTable(creditNotes);
+        }
+      }
     },
   );
 
@@ -2383,6 +2471,8 @@ class AppDatabase extends _$AppDatabase {
     'stock_adjustments',
     'veterinary_records',
     'expenses',
+    // Ticket DEV — devis saisis au poste.
+    'quotes',
     'livestock_reproduction_events',
     'purchases',
     'attendance_records',
@@ -2398,6 +2488,8 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Tickets AV1 / AV2 — retours et avoirs clients (demandes de retour, « marquer comme traité »).
+    'credit_notes',
     // Ticket BS1 — bandes saisies au poste.
     'livestock_lots',
     // Ticket BS3 — reproducteurs nominatifs saisis au poste.
@@ -2455,10 +2547,11 @@ class AppDatabase extends _$AppDatabase {
     'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
-    'advance_imputations', 'sales', 'sale_lines',
+    'advance_imputations', 'sales', 'sale_lines', 'credit_notes', // AV1
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'quotes', // DEV
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',
