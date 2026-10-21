@@ -401,6 +401,34 @@ class FicheJournaliereRepository {
     return (await chargerJour(lotId, date))!;
   }
 
+  /// Ticket BS2 — écrit les trois colonnes d'ENTRÉE (`achat`, `ne`, `don`) de la fiche (bande, jour) pour le journal
+  /// « Enregistrer des Sujets » (`SaisieSujetAction` du web), TOUT LE RESTE de la fiche étant gardé tel quel (morts,
+  /// ventes, ponte, aliment, pesée, ventilation) : la fiche est créée si elle manque, sinon corrigée.
+  ///
+  /// ⚠️ UN SEUL ÉCRIVAIN DES FICHES (S-T7) : le journal des sujets passe par [enregistrer], donc par le refus d'exercice
+  /// clos (EX6), la remise en file, l'horodatage de la saisie et la cascade unique ([recalculerEnCascade]).
+  Future<LivestockDailyEntry> ecrireEntrees({
+    required String lotId,
+    required DateTime jour,
+    required int achat,
+    required int ne,
+    required int don,
+  }) async {
+    final existante = await chargerJour(lotId, jour);
+    return enregistrer(
+      lotId: lotId,
+      jour: jour,
+      achat: achat,
+      ne: ne,
+      mort: existante?.mort ?? 0,
+      don: don,
+      ponteTotal: existante?.ponteTotal,
+      ponteCasses: existante?.ponteCasses,
+      aliment: existante?.feedQtyKg,
+      poidsMoyen: existante?.weightSampleAvgG,
+    );
+  }
+
   /// F0.96 / F0.97 — départ DÉDUIT du stade à écrire sur cette fiche : seulement pour une bande d'espèce
   /// suivie qui n'a pas encore de chaîne (`AvecDepartAutomatique` du web). null sinon.
   Future<EffectifCategories?> _departAEcrire(String lotId, DateTime jour) async {

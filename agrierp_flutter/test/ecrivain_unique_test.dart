@@ -46,6 +46,8 @@ void main() {
     'purchase_returns': 'lib/features/achats/achats_repository.dart',
     'supplier_refunds': 'lib/features/achats/achats_repository.dart',
     'livestock_transfers': 'lib/features/elevage/transferts_repository.dart',
+    // Ticket BS1 — « Bandes & Sujets » : la bande se crée, se modifie et s'archive par ce dépôt.
+    'livestock_lots': 'lib/features/elevage/bandes_repository.dart',
     'infirmary_records': 'lib/features/elevage/soins_vaccins_repository.dart',
     'veterinary_calendar_events': 'lib/features/elevage/soins_vaccins_repository.dart',
     'feed_ration_standards': 'lib/features/elevage/parametres_elevage_repository.dart',
@@ -70,12 +72,21 @@ void main() {
         'écart d\'inventaire : stock_qty ramené au stock physique, l\'ajustement part dans stock_adjustments',
     'products <- lib/features/elevage/production_oeufs_service.dart':
         'ponte : entrée des plateaux nets au stock d\'œufs à la création de la fiche, comme au serveur',
+    'livestock_lots <- lib/features/elevage/fiche_journaliere_repository.dart':
+        'cascade unique : la bande suit la DERNIÈRE fiche (current_quantity DÉRIVÉ, jamais remis en file : le serveur le recalcule par la même cascade)',
+    'livestock_lots <- lib/features/elevage/transferts_repository.dart':
+        'constitution : lot_source_id DÉRIVÉ du transfert (le serveur le pose lui-même en rejouant le transfert), jamais remis en file',
     'products <- lib/core/database/app_database.dart':
         'purge après réinitialisation du serveur (15.50) : stock_qty remis à zéro, comme au serveur',
   };
 
-  /// Seule colonne qu'une exception sur `products` peut écrire.
-  const colonnesPermises = {'stockQty', 'stock_qty'};
+  /// Seules colonnes qu'une exception peut écrire, par table : `products.stock_qty` (miroir du grand livre) ; ticket BS1,
+  /// `livestock_lots.current_quantity` (la bande suit sa dernière fiche, cascade unique) et `lot_source_id` (dérivé du
+  /// transfert de constitution) — DÉRIVÉES, que le serveur recalcule : elles ne remettent JAMAIS la bande en file.
+  const colonnesPermises = <String, Set<String>>{
+    'products': {'stockQty', 'stock_qty'},
+    'livestock_lots': {'currentQuantity', 'current_quantity', 'lotSourceId', 'lot_source_id'},
+  };
 
   String sqlDe(String getter) =>
       getter.replaceAllMapped(RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}');
@@ -165,11 +176,11 @@ void main() {
         exceptionsVues.add(cle);
         // Une exception sur `products` n'écrit QUE le stock, et ne remet pas le produit en file.
         final hors = RegExp(r'(\w+):').allMatches(extrait.split('Companion').skip(1).join()).map((m) => m[1]!).toSet()
-          ..removeAll(colonnesPermises);
+          ..removeAll(colonnesPermises[table] ?? const <String>{});
         // SQL brut : `SET stock_qty = 0` et rien d'autre (aucune seconde colonne après une virgule).
         final sqlHors = extrait.contains('SET') && !RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait);
         if (hors.isNotEmpty || sqlHors || extrait.contains('syncStatus') || extrait.contains('sync_status')) {
-          parasites.add('$cle écrit au-delà de stock_qty : $extrait');
+          parasites.add('$cle écrit au-delà de ses colonnes dérivées : $extrait');
         }
         continue;
       }
