@@ -118,7 +118,7 @@ class _RetoursAvoirsOngletState extends State<RetoursAvoirsOnglet> {
 
   // ── 2. Cartes ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-  Widget _kpis(KpisAvoirs k) => GrilleKpi(
+  Widget _kpis(KpisAvoirs k) => GrilleKpiAdaptative(
     cartes: [
       CarteKpi(
         key: const Key('kpi-Retours du mois'),

@@ -293,7 +293,7 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
 
   Widget _kpis(InstantaneHistorique d) {
     final k = d.kpis(_du!, _au!);
-    return GrilleKpi(
+    return GrilleKpiAdaptative(
       cartes: [
         CarteKpi(
           key: const Key("kpi-Chiffre d'Affaires"),
