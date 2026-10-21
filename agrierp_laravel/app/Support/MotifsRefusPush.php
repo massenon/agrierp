@@ -90,6 +90,9 @@ class MotifsRefusPush
             'achat' => 'achats', 'ne' => 'naissances', 'mort' => 'mortalité', 'vente' => 'ventes', 'don' => 'dons',
             'ponte_total' => 'ponte totale', 'ponte_casses' => 'œufs cassés', 'feed_qty_kg' => 'aliment (kg)',
             'weight_sample_avg_g' => 'poids moyen (g)', 'motif' => 'motif',
+            // Ticket DEV — devis : les noms de champ du web (`lang/fr/validation.php`, `attributes`).
+            'articles_description' => 'description des articles', 'tva_rate' => 'taux de TVA',
+            'validity_days' => 'durée de validité (jours)', 'quote_date' => 'date du devis',
             // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12), glossaire du 17/10/2026
             // (F0.99) : la 2e catégorie est Sous-mères (lapins) ou Porcelet (porcs), la 3e Jeune ou Porc Marchand.
             'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts sous-mères ou porcelets',

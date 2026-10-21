@@ -85,6 +85,8 @@ class FusionReferentielsService
         'customer_advances' => ['customer_id' => 'customers'],
         'livestock_daily_entries' => ['feed_product_id' => 'products', 'treatment_product_id' => 'products'],
         'purchases' => ['supplier_id' => 'suppliers', 'lines.*.product_id' => 'products'],
+        // Ticket DEV — le client d'un devis du poste.
+        'quotes' => ['customer_id' => 'customers'],
         'supplier_payments' => ['supplier_id' => 'suppliers'],
         'supplier_refunds' => ['supplier_id' => 'suppliers'],
         'sales' => ['customer_id' => 'customers', 'lines.*.product_id' => 'products'],

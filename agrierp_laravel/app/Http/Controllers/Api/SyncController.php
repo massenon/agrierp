@@ -63,6 +63,7 @@ use App\Models\LivestockReproductionEvent;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Receivable;
+use App\Models\Quote;
 use App\Models\Sale;
 use App\Models\SaleLine;
 use App\Actions\RecordVeterinaryCareAction;
@@ -133,6 +134,8 @@ class SyncController extends Controller
         'growth_standards',
         // Ticket U9 — grand livre des stocks : lecture seule au poste.
         'stock_movements',
+        // Ticket DEV — devis (« Devis & Proforma ») saisis, avancés et archivés au poste.
+        'quotes',
         // Ticket U13 — paie réglée : lecture seule au poste (Recettes et Dépenses).
         'payslips',
     ];
@@ -234,6 +237,9 @@ class SyncController extends Controller
         'attestation_counts' => ['view-rh'],
         'sales' => null,
         'sale_lines' => null,
+        // Ticket DEV — DEVIS : aux comptes qui ouvrent « Ventes & Devis » (`view-ventes`, la permission de la route du
+        // hub), comme le web leur montre l'onglet « Devis Prestations ». Archivés compris (`is_active`).
+        'quotes' => ['view-ventes'],
         'stock_movements' => ['view-elevage', 'view-stocks', 'view-rapports'],
         'treasury_accounts' => null,
         'expense_categories' => ['view-achats'],
@@ -1002,6 +1008,31 @@ class SyncController extends Controller
                     'mail_date' => $c->mail_date?->format('Y-m-d'),
                     'is_active' => (bool) $c->is_active,
                     'updated_at' => $c->updated_at?->toIso8601String(),
+                ]),
+
+            // Ticket DEV — `quotes` S'ÉCRIT AU POSTE (`pushQuotes`) : table MIXTE, tirée ET saisie. Tous les devis, archivés
+            // compris (`is_active`), au tirage complet ; depuis `since`, ceux créés, modifiés, avancés ou archivés. Le
+            // numéro `DEV-AAAA-NNN` est celui du serveur (le poste ne l'invente jamais). Dates en 'Y-m-d' (une DATE, jamais
+            // un instant : piège de l'échéance 14.75), `updated_at` en ISO pour départager. Le poste ne remplace jamais un
+            // devis qu'il a en attente ou en conflit.
+            'quotes' => fn () => Quote::query()
+                ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                ->orderBy('quote_date')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (Quote $d) => [
+                    'id' => $d->id,
+                    'quote_number' => $d->quote_number,
+                    'customer_id' => $d->customer_id,
+                    'articles_description' => $d->articles_description,
+                    'amount' => (float) $d->amount,
+                    'tva_rate' => (float) $d->tva_rate,
+                    'validity_days' => (int) $d->validity_days,
+                    'quote_date' => $d->quote_date?->format('Y-m-d'),
+                    'note' => $d->note,
+                    'status' => $d->status,
+                    'is_active' => (bool) $d->is_active,
+                    'updated_at' => $d->updated_at?->toIso8601String(),
                 ]),
 
             // ⚠️ TICKET 15.25 — `administrative_documents` S'ECRIT AU POSTE
@@ -1874,6 +1905,7 @@ class SyncController extends Controller
             'products' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'suppliers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'customers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
+            'quotes' => ['accepted' => [], 'rejected' => []],
             'mails' => ['accepted' => [], 'rejected' => []],
             'archived_documents' => ['accepted' => [], 'rejected' => []],
             'administrative_documents' => ['accepted' => [], 'rejected' => []],
@@ -1959,6 +1991,12 @@ class SyncController extends Controller
         // peut viser un client créé au poste à l'instant.
         if ($request->has('customers')) {
             $result['customers'] = $this->pushCustomers($request->input('customers'), $request->user(), $this->nomDuPoste($request));
+        }
+
+        // Ticket DEV — LES DEVIS APRÈS LES CLIENTS : un devis du même envoi peut viser un client créé (ou fusionné) au
+        // poste à l'instant. Références traduites comme celles des ventes (`FusionReferentielsService::REFERENCES`).
+        if ($request->has('quotes')) {
+            $result['quotes'] = $this->pushQuotes($this->envoiTraduit($request, 'quotes'));
         }
 
         // ⚠️ COURRIERS (15.23) : aucune dépendance, aucun ordre à respecter. `mails` S'ÉCRIT AU
@@ -2205,6 +2243,8 @@ class SyncController extends Controller
         'purchases' => 'manage-achats',
         'attendance_records' => 'manage-rh',
         'sales' => 'manage-ventes',
+        // Ticket DEV — le droit du composant `Ventes\Devis` du web.
+        'quotes' => 'manage-ventes',
         'stock_adjustments' => 'manage-stocks',
     ];
 
@@ -4157,6 +4197,84 @@ class SyncController extends Controller
                 }
 
                 $accepted[] = $validated['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket DEV — devis créés, modifiés, avancés dans leur cycle ou archivés au poste (droit `manage-ventes`).
+     *
+     * Jouée par `SaisieDevisAction`, le point de passage de l'écran web « Devis & Proforma » : mêmes règles, mêmes
+     * messages, même audit. Le poste envoie le FAIT (le devis tel qu'il est) :
+     *  - le numéro `DEV-AAAA-NNN` n'est JAMAIS lu : le serveur l'attribue à la création et le rend au tirage ;
+     *  - le statut avance pas à pas (`brouillon → envoyé → accepté | refusé`) ; un retour en arrière, ou `facture`, est
+     *    refusé avec son motif (`facture` n'est jamais atteint par un geste du poste : il ne facture rien ; il ne revient que sur un devis déjà facturé que le poste archive) ;
+     *  - un exercice clos qui couvre la date du devis le refuse, à la création comme à la modification ou à l'archivage ;
+     *  - idempotent : un renvoi identique n'écrit rien ; `is_active: false` archive (un second archivage ne fait rien) ;
+     *    un devis archivé ou facturé ne se modifie plus.
+     * Chaque devis est jugé seul, dans sa transaction : un refus ne fait échouer ni l'envoi ni les autres devis.
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>}
+     */
+    private function pushQuotes(array $devis): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieDevisAction::class);
+
+        foreach ($devis as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'customer_id' => ['required', 'uuid', 'exists:customers,id'],
+                    'articles_description' => ['required', 'string', 'max:2000'],
+                    'amount' => ['required', 'numeric', 'min:0'],
+                    'tva_rate' => ['required', 'numeric', 'min:0', 'max:100'],
+                    'validity_days' => ['required', 'integer', 'min:1'],
+                    'quote_date' => ['required', 'date'],
+                    'note' => ['nullable', 'string'],
+                    'status' => ['sometimes', 'in:brouillon,envoye,accepte,refuse,facture'],
+                    'is_active' => ['sometimes', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $statut = $valides['status'] ?? 'brouillon';
+                $archive = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $existant = Quote::find($valides['id']);
+
+                // Une seule transaction par devis : une création suivie d'un refus (statut, exercice) n'écrit rien.
+                DB::transaction(function () use ($saisie, $valides, $statut, $archive, $existant) {
+                    if ($existant === null) {
+                        $saisie->creer($valides, $valides['id']);
+                        $saisie->aligner($valides['id'], $statut);
+                        if ($archive) {
+                            $saisie->archiver($valides['id']);
+                        }
+
+                        return;
+                    }
+
+                    if ($archive) {
+                        // Archivage : acquitté tel quel si le devis l'est déjà (renvoi), sinon archivé.
+                        $saisie->archiver($existant->id);
+
+                        return;
+                    }
+
+                    if ($saisie->identique($existant, $valides) && $existant->status === $statut && $existant->is_active) {
+                        return;
+                    }
+
+                    $saisie->modifier($existant->id, $valides);
+                    $saisie->aligner($existant->id, $statut);
+                });
+
+                $accepted[] = $valides['id'];
             } catch (ValidationException $e) {
                 $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
             }
