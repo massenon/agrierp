@@ -246,14 +246,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
     ),
   );
 
-  Widget _kpis(DonneesHistorique d, bool large) => GridView.count(
-    crossAxisCount: large ? 4 : 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.6 : 1.7,
-    children: [
+  Widget _kpis(DonneesHistorique d, bool large) => GrilleKpi(colonnes: large ? 4 : 2, children: [
       _carteKpi(
         "Chiffre d'Affaires",
         '${_montant(d.chiffreAffaires)} FCFA',

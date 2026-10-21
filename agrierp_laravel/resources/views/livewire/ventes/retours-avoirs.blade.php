@@ -12,19 +12,19 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Retours du mois</span><span class="material-symbols-outlined text-[18px] text-info-blue">assignment_return</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['retours_mois'] }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-accent-yellow shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Montant Avoirs</span><span class="material-symbols-outlined text-[18px] text-brand-forest">payments</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['montant_avoirs'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Produits Retournés</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">inventory_2</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['produits_retournes'] }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Taux de Retour</span><span class="material-symbols-outlined text-[18px] text-error-red">percent</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['taux_retour'], 1, ',', ' ') }}%</span>
         </div>

@@ -217,14 +217,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   // ── Résumé des alertes : trois cartes, dans l'ordre de la maquette ───────
 
-  Widget _cartes(DonneesNotifications d, bool large) => GridView.count(
-    crossAxisCount: large ? 3 : 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 3.6 : 1.8,
-    children: [
+  Widget _cartes(DonneesNotifications d, bool large) => GrilleKpi(colonnes: large ? 3 : 2, children: [
       CarteKpi(
         libelle: 'Non Lues',
         valeur: '${d.nonLues}',

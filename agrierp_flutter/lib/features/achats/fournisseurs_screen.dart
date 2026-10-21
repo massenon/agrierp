@@ -645,14 +645,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     ),
   );
 
-  Widget _grilleKpis(bool large, List<Widget> cartes) => GridView.count(
-    crossAxisCount: large ? cartes.length : 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.4 : 1.6,
-    children: cartes,
+  Widget _grilleKpis(bool large, List<Widget> cartes) => GrilleKpi(colonnes: large ? cartes.length : 2, children: cartes,
   );
 
   Widget _tableau({

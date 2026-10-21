@@ -257,14 +257,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
   /// « (Replier / Déplier) » et la grille est repliée par défaut (`kpi-mobile-collapsed`).
   Widget _accordeonKpi(String titre, List<Widget> cartes) {
     final quatre = AgriBreakpoints.tresLarge(context);
-    final grille = GridView.count(
-      crossAxisCount: quatre ? 4 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: AgriBreakpoints.large(context) ? 2.6 : 1.7,
-      children: cartes,
+    final grille = GrilleKpi(colonnes: quatre ? 4 : 2, children: cartes,
     );
     if (AgriBreakpoints.moyen(context)) return grille;
 

@@ -22,7 +22,7 @@
     ];
     $variant = $variants[$color] ?? $variants['emerald'];
 @endphp
-<div {{ $attributes->class(['bg-white p-sm lg:p-md rounded-lg border border-outline-variant shadow-sm', $variant['border']]) }}>
+<div {{ $attributes->class(['kpi-card bg-white rounded-lg border border-outline-variant shadow-sm', $variant['border']]) }}>
     <div class="flex justify-between items-start">
         <span class="text-[10px] text-outline font-bold uppercase">{{ $label }}</span>
         @if($icon)

@@ -248,14 +248,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteKpi(
               libelle: 'Effectif Total Vivant',
               valeur: DashboardElevageRepository.milliers(
@@ -696,14 +689,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         const SizedBox(height: AgriSpacing.md),
         // AJOUTS du poste conservés (décision client du 19/10/2026) : cartes par espèce et courbe
         // de la bande suivie, sur le MÊME GMQ cumulé que le tableau du Blade.
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteGmq(
               'GMQ Moyen Lapins',
               d.gmqParEspece['cuniculture'],
@@ -959,14 +945,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         ),
         const SizedBox(height: AgriSpacing.md),
         // Les trois cartes du Blade : soins du mois des bandes actives.
-        GridView.count(
-          crossAxisCount: large ? 3 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.6 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 3 : 2, children: [
             _carteKpi(
               libelle: 'Traitements Administrés (mois)',
               valeur: '${d.traitementsDuMois}',
@@ -1254,14 +1233,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   ///
   /// ⚠️ Sans bande projetable, la maquette les montre à « — » : une carte que le
   /// poste ne peut pas calculer est un tiret expliqué, jamais omise ni à zéro.
-  Widget _cartesPrevision(Prevision? p, bool large) => GridView.count(
-    crossAxisCount: large ? 3 : 1,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.4 : 3.2,
-    children: [
+  Widget _cartesPrevision(Prevision? p, bool large) => GrilleKpi(colonnes: large ? 3 : 1, children: [
       _carteKpi(
         libelle: 'Poids Projeté',
         valeur: p == null ? '—' : '${_milliers(p.projeter(_horizon))} g',

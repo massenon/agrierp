@@ -12,17 +12,17 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Créances Échues</span><span class="material-symbols-outlined text-[18px] text-error-red">event_busy</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['creances_echues'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
             <p class="text-[10px] text-outline mt-xs">Échéance dépassée</p>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Relances Effectuées</span><span class="material-symbols-outlined text-[18px] text-info-blue">campaign</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['relances_effectuees'] }} <small class="text-xs font-normal">env.</small></span>
             <p class="text-[10px] text-outline mt-xs">Ce mois-ci, par email</p>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Taux de Réponse</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">check_circle</span></div>
             @if($this->kpis['taux_reponse'] === null)
                 <span class="text-lg md:text-2xl font-extrabold text-outline block mt-xs">—</span>
@@ -32,7 +32,7 @@
                 <p class="text-[10px] text-outline mt-xs">Créances relancées ayant reçu un paiement</p>
             @endif
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-forest shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-forest shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Montant Recouvré</span><span class="material-symbols-outlined text-[18px] text-brand-forest">trending_up</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['montant_recouvre'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
             <p class="text-[10px] text-outline mt-xs">Sur créances relancées</p>
