@@ -479,3 +479,42 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **Non vérifié :** migration sur une base réelle peuplée (MySQL/MariaDB de production) ; poste Windows réel (mise à jour d'une base locale existante).
 **Laissé tel quel, à confirmer :** le nom de serveur SMTP `smtp.olouwachegoun.bj` éventuellement saisi (pas une adresse : à corriger à la main dans Paramètres → Email (SMTP) si le serveur a changé) ; `support@faguez-sarl.bj` (adresse de l'éditeur, autre organisation) ; les adresses fictives des tests (`@ferme.bj`, `@resto.bj`).
+
+## Sprint DEV — « Devis & Proforma » au poste (demande du client du 21/10/2026)
+
+> **Demande :** « la saisie Devis & Proforma avec son tab panel et son CRUD doit être faite dans le poste », identique au web. PRD : [`docs/prd/devis-poste.md`](prd/devis-poste.md). Périmètre : le seul onglet « Devis Prestations » (modèle `Quote`) du hub « Ventes & Devis ». « Retours et Avoirs » et « Historique des Ventes » : ticket à part.
+
+### DEV1 ✅ (21/10/2026) Devis — créer, modifier, avancer dans le cycle, archiver, exporter, au web puis au poste
+
+**Objectif :** l'onglet « Devis Prestations » du poste reprend `devis.blade.php` / `Devis.php` à 100 %, avec sa table synchronisable.
+**Décisions client requises :** aucune pour livrer (propositions recommandées retenues, voir ci-dessous) ; trois questions ouvertes pour la suite (DEV-Q1 à DEV-Q3).
+
+**Web (agrierp_laravel)** — ordre : modèle → Action → Livewire → Blade
+- `app/Actions/SaisieDevisAction.php` : point de passage unique (créer, modifier, `changerStatut`, `aligner`, archiver) ; exercice clos refusé (règle `refusExerciceClos`, motif R4), cycle `brouillon → envoyé → accepté | refusé`, devis archivé ou facturé non modifiable, idempotence, audit.
+- `Livewire\Ventes\Devis` appelle l'action ; `devis.blade.php` : erreur sous « Date du Devis », « TVA » et « Validité » ; `Quote::STATUTS`.
+- Table `quotes` inchangée (déjà UUID : `uuid('id')->primary()`).
+
+**Poste (agrierp_flutter)** — ordre : table Drift (+ build_runner, palier v53) → dépôt → écran
+- `Quotes` (SyncColumns : `id` UUID, `device_id`, `sync_status`, `updated_at` ; `quote_number` NULLABLE), `schemaVersion` 52 → **53** (palier `createTable` gardé par `_tableExiste`), `tablesEnvoyees`, `tablesDActivite` (purgée à la réinitialisation).
+- `lib/features/ventes/devis_repository.dart` (`DevisRepository`), `lib/features/ventes/devis_onglet.dart` (`DevisOnglet`, modale), `ventes_devis_screen.dart` (branchement), `main.dart` (câblage et droits `manage-ventes` / `export-ventes`).
+
+**Synchronisation :** `quotes` table MIXTE (tirée ET saisie). Tirage : `PERMISSIONS_DE_TIRAGE['quotes'] = ['view-ventes']`, archivés compris. Envoi : `pushQuotes` (`manage-ventes`), après les clients ; numéro `DEV-AAAA-NNN` jamais lu du poste ; `quotes` ajouté à `FusionReferentielsService::REFERENCES` (client fusionné). Poste : `_absorberDevis` STRICT, jamais d'écrasement d'un `pending` / `conflict`, acquittement de la version partie (`_marquerSiInchangee`), `relancer`.
+
+**Décisions tranchées sur les recommandations :**
+1. **Numéro attribué par le serveur** (précédent : courriers F0.78). Le poste affiche « — » jusqu'au tirage qui suit l'acquittement.
+2. **Exercice clos refusé** (demande explicite du client), construit AU WEB d'abord (le Blade ne le faisait pas) : règle `closSeulement`, un devis ne passe aucune écriture ; vaut pour création, modification (date d'origine et nouvelle), statut et archivage.
+3. **Cycle contrôlé** : `facture` n'est atteint par aucun geste d'écran ni de poste (la conversion n'existe pas au web). Un poste qui envoie puis accepte hors ligne envoie l'état final ; le serveur parcourt le cycle pas à pas (`aligner`).
+4. **« Convertir en Facture » identique au web** : son toast d'attente, sans effet (DEV-Q1).
+5. **Pas de sous-onglets** : le « tab panel » est le hub (4 onglets) ; l'onglet Devis n'en a pas au web.
+6. **Pas de pagination ni de filtre d'exercice** : le web liste tous les devis actifs (`->get()`), le poste aussi.
+
+**Tests (écrits d'abord, rouges) :** web `DevisSaisieWebTest` (15) ; serveur `DevisPosteTest` (22 : accepté, rejeté, idempotent, numérotation, cycle, exercice clos, rôles, fusion, tirage) ; poste `devis_poste_test.dart` (65) et garde-fou `devis_blade_test.dart` (14). Gardes existants mis à jour : `perimetre_tirage_test`, `ecrivain_unique_test`, `migration_toutes_versions_test` (v53), `conformite_portage_test`, `ventes_devis_test`, `SyncTiragePagineTest`. Épreuve de mutation : `agrierp_laravel/README_SPRINT0.md`, entrée DEV1.
+**Vérification :** `php artisan test --testsuite=Feature`, `flutter analyze`, `flutter test`. Compteurs exacts : `agrierp_laravel/README_SPRINT0.md`.
+**Non vérifié / risques :** navigateur (Dusk) et poste Windows réels ; la conversion devis → facture (absente du web) ; l'impression « document client » d'un devis (DEV-Q3).
+
+| Ticket | Contenu | État |
+|---|---|---|
+| DEV2 | Tableau de bord : l'onglet « Devis » des « Transactions récentes » est encore vide au poste (« Aucun devis récent. ») alors que `quotes` descend désormais ; le lire comme `Dashboard\Index` | 🔧 proposé |
+| DEV-Q1 | ❓ Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ❓ client |
+| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client |
+| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client |

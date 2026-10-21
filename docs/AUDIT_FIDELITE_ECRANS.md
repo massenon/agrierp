@@ -118,7 +118,7 @@ Le second bouton flottant, « Visite guidée » (`help`, bleu), est **inerte au 
   - libellés et formule de mortalité ⚠️.
 - **Transactions récentes :**
   - onglets Achat et Factures marqués « non embarqués » alors que `purchases` et `sales.mecef_status` sont au poste ;
-  - onglet Devis ❌ (pas de table `quotes`) ;
+  - onglet Devis ✅ (la table `quotes` existe au poste depuis le ticket DEV, 21/10/2026 : le Tableau de bord ne la lit pas encore, ticket DEV-2) ;
   - lignes Vente : « ID8 · client » et jaune si crédit, au web.
 - **Activités du jour :** le web lit `audit_logs` (auteur, module) ; le poste reconstitue ses propres libellés.
 - **Sélecteur d'état :** le web propose 8 options qui naviguent, et active le bouton PDF ; le poste est inerte.
@@ -319,3 +319,26 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 2. **écrans** : Rapports, Tableau de bord (640 / 700 / 1024), Grand Livre, Saisie des Dépenses ;
 3. **épreuve de mutation** (faite, puis annulée) : marge libellé → champ `xs` → `sm` (4 rouges), `hauteurFormulaire` 44 → 40 (2 rouges), `runSpacing` de la barre des fiches retiré (2 rouges), `margeVerticaleCompacte` 6 → 5 (2 rouges) ;
 4. **lecture du Blade** : les classes de chaque `<input type="date">` sont lues et comparées à `AgriChamps` / `AgriSpacing` ; un gabarit nouveau au Blade rougit le test (« à auditer ») ; tout écran du poste qui appelle `showDatePicker` doit passer par un champ partagé (`lib/core/widgets/champs_date_agri.dart`).
+
+---
+
+## 10. Ventes & Devis — onglet « Devis Prestations » (ticket DEV, 21/10/2026)
+
+**Écart « Devis » SOLDÉ.** Avant : carte « non embarqué » (`devis-non-embarque`), aucune table `quotes`, aucun dépôt, `SyncController` n'en parlait pas. Après : l'onglet reprend `devis.blade.php` / `Devis.php` à l'identique ; PRD `docs/prd/devis-poste.md`. Le garde-fou `test/devis_blade_test.dart` LIT le Blade, le composant, `SaisieDevisAction`, `Quote`, le hub, l'export PDF et `lang/fr/validation.php` : un libellé, une colonne, un statut, une icône, un message ou une règle changés au web fait rougir le poste.
+
+| Élément du Blade | Verdict | Détail |
+|---|---|---|
+| En-tête (icône `request_quote`, « Devis & Proforma », sous-titre) | ✅ | titre 24 px à partir de `lg`, 20 px en dessous |
+| Boutons « Exporter » (`export-ventes`) et « Nouveau Devis » (`manage-ventes`) | ✅ | « Exporter » édite les devis AFFICHÉS (`DevisRepository.documentPdf`, mêmes colonnes que `exports/devis.blade.php`, `devis-AAAA-MM-JJ.pdf`) ; le web montre « Nouveau Devis » à tous et refuse au serveur, le poste ne le montre pas à qui n'a pas `manage-ventes` |
+| Quatre cartes : Devis Actifs, Valeur Totale, Taux de Conversion, En Attente de Relance | ✅ | libellés, icônes et couleurs lus du Blade ; formules du composant (statuts actifs, mois du jour, arrondi PHP) |
+| Accordéon « Indicateurs de performance » | ⚠️ assumé | `md:hidden` au web : le poste est un écran de bureau, cartes toujours déployées |
+| Barre « N° devis, client... », « Statut : Tous », « Client : Tous » | ✅ | recherche 300 ms, sans casse ni accents (collation du serveur) |
+| Tableau : 7 colonnes, badges, « Aucun devis pour le moment. » | ✅ | « — » en N° Devis tant que le serveur n'a pas attribué le numéro (client inconnu : « — ») |
+| Icônes d'action selon le statut (`send`, `check_circle`, `cancel`, `receipt_long`, `edit`, `delete`) | ✅ | mêmes infobulles, mêmes conditions |
+| Modale `modal-create-devis` (`max-width="md"`) | ✅ | 7 champs, `ChampDateFormulaire` pour « Date du Devis », erreurs sous les champs avec les messages de `lang/fr/validation.php` |
+| `x-modal-confirm-delete` | ✅ | « Confirmer l'archivage », « Archiver » en `error-red` |
+| Toasts | ✅ | mot pour mot (lus du composant) |
+| « Convertir en Facture » | ✅ identique | le web n'implémente pas la conversion : son message d'attente est repris (question DEV-Q1) |
+| ➕ « À envoyer » / « Refusé » + motif du serveur sous le numéro | ➕ | file d'envoi du poste, le web n'en a pas |
+| ➕ Écarts corrigés AU WEB d'abord (article 5) | ➕ | exercice clos refusé ; cycle de statut contrôlé ; devis archivé ou facturé non modifiable ; erreur sous « Date du Devis », « TVA » et « Validité » (le Blade n'affichait aucune erreur de ces champs) |
+
