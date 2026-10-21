@@ -2,10 +2,8 @@
 
 namespace App\Livewire\Ventes;
 
-use App\Actions\AdjustStockAction;
-use App\Models\AuditLog;
+use App\Actions\AnnulerVenteAction;
 use App\Models\Customer;
-use App\Models\Product;
 use App\Models\Receivable;
 use App\Models\Sale;
 use App\Support\ExerciceChoisi;
@@ -176,20 +174,10 @@ class HistoriqueVentes extends Component
         $this->authorize('manage-ventes');
         $sale = Sale::with('lines')->findOrFail($this->cancellingSaleId);
 
-        if ($sale->status === 'annulee') {
+        if (! app(AnnulerVenteAction::class)->execute($sale)) {
             return;
         }
 
-        foreach ($sale->lines as $line) {
-            $product = Product::find($line->product_id);
-            if ($product) {
-                app(AdjustStockAction::class)->execute($product, (float) $line->qty, 'sale', $sale->id);
-            }
-        }
-
-        $sale->update(['status' => 'annulee']);
-
-        AuditLog::record('sale.cancelled', 'ventes');
         $this->dispatch('close-modal', name: 'modal-cancel-sale');
         $this->dispatch('toast', message: 'Vente annulée — stock réintégré.', type: 'warning');
     }
