@@ -10,6 +10,9 @@
             <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
                 <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
             </a>
+            <a href="{{ route('elevage.reproducteurs') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+                <span class="material-symbols-outlined text-[18px]">badge</span>Registre des Reproducteurs
+            </a>
             @can('manage-elevage')
             <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande

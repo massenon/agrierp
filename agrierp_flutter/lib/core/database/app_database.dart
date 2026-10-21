@@ -800,6 +800,19 @@ class Animals extends Table {
   TextColumn get exitReason => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
+  /// Ticket BS3 (v51) — l'identifiant de l'ESPÈCE du sujet (le serveur le sert depuis BS3) : le poste écrit désormais un
+  /// sujet nominatif et l'envoie avec `species_id`. `null` : sujet reçu d'un serveur antérieur.
+  TextColumn get speciesId => text().nullable()();
+
+  /// ⚠️ **UN SUJET ENREGISTRÉ, MODIFIÉ OU SORTI AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT** (ticket BS3, v51). Défaut
+  /// `synced` : tout ce qui descend du serveur l'est. Le tirage ne touche JAMAIS un sujet qui ne l'est pas
+  /// (`_absorberSujets`).
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket BS3 (v51) — instant de la dernière saisie au poste : l'accusé de réception n'acquitte que la VERSION partie.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1720,7 +1733,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 50;
+  int get schemaVersion => 51;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2227,6 +2240,13 @@ class AppDatabase extends _$AppDatabase {
       if (from < 50) {
         await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.restauree);
       }
+
+      // v51 — décision BS-Q1 (ticket BS3) : le registre nominatif des reproducteurs s'écrit au poste.
+      if (from < 51) {
+        await _ajouterColonneSiAbsente(m, animals, animals.speciesId);
+        await _ajouterColonneSiAbsente(m, animals, animals.syncStatus);
+        await _ajouterColonneSiAbsente(m, animals, animals.updatedAt);
+      }
     },
   );
 
@@ -2326,6 +2346,8 @@ class AppDatabase extends _$AppDatabase {
     'livestock_transfers',
     // Ticket BS1 — bandes saisies au poste.
     'livestock_lots',
+    // Ticket BS3 — reproducteurs nominatifs saisis au poste.
+    'animals',
     // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
     'infirmary_records',
     'veterinary_calendar_events',

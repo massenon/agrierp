@@ -46,6 +46,8 @@ import 'features/elevage/dashboard_elevage_repository.dart';
 import 'features/elevage/bandes_repository.dart';
 import 'features/elevage/enregistrer_sujets_screen.dart';
 import 'features/elevage/gestion_bandes_screen.dart';
+import 'features/elevage/registre_reproducteurs_screen.dart';
+import 'features/elevage/reproducteurs_repository.dart';
 import 'features/elevage/sujets_entrees_repository.dart';
 import 'features/elevage/transferts_bandes_screen.dart';
 import 'features/elevage/transferts_repository.dart';
@@ -300,6 +302,13 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   late final SujetsEntreesRepository _sujetsEntrees = SujetsEntreesRepository(database: _db, fiches: _fiches);
 
+  /// Ticket BS3 — « Registre des Reproducteurs » : le sujet nominatif s'enregistre, se modifie et se sort par ce dépôt.
+  late final ReproducteursRepository _reproducteurs = ReproducteursRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+    gestes: _gestes,
+  );
+
   late final TableauDeBordRepository _tableauDeBord = TableauDeBordRepository(
     database: _db,
   );
@@ -442,6 +451,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           transferts: _transferts,
           bandes: _bandes,
           sujetsEntrees: _sujetsEntrees,
+          reproducteurs: _reproducteurs,
           reproduction: _reproduction,
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
@@ -496,6 +506,7 @@ class SocleAccueil extends StatefulWidget {
     required this.transferts,
     required this.bandes,
     required this.sujetsEntrees,
+    required this.reproducteurs,
     required this.reproduction,
     required this.soinsVaccins,
     required this.parametresElevage,
@@ -555,6 +566,7 @@ class SocleAccueil extends StatefulWidget {
   final TransfertsRepository transferts;
   final BandesRepository bandes;
   final SujetsEntreesRepository sujetsEntrees;
+  final ReproducteursRepository reproducteurs;
   final SuiviReproductionRepository reproduction;
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
@@ -970,6 +982,21 @@ class _SocleAccueilState extends State<SocleAccueil> {
           imprimer: EditeursRapports.imprimer,
           onCommanderStock: () =>
               setState(() => _ecran = EcranPoste.achatsEtCommandes),
+          onOuvrirSujets: () =>
+              setState(() => _ecran = EcranPoste.enregistrerSujets),
+          // Ticket BS3 — « Registre des Reproducteurs » (bouton ajouté au web d'abord).
+          onOuvrirRegistre: () =>
+              setState(() => _ecran = EcranPoste.registreReproducteurs),
+        ),
+        // Ticket BS3 — « Registre des Reproducteurs » : `manage-elevage` pour enregistrer, modifier, sortir un sujet.
+        EcranPoste.registreReproducteurs => RegistreReproducteursScreen(
+          depot: widget.reproducteurs,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-elevage'),
+          onOuvrirFiche: (id) => setState(() {
+            _sujetId = id;
+            _avantSujet = EcranPoste.registreReproducteurs;
+            _ecran = EcranPoste.ficheSujet;
+          }),
           onOuvrirSujets: () =>
               setState(() => _ecran = EcranPoste.enregistrerSujets),
         ),
@@ -1612,6 +1639,7 @@ class SocleAccueilTitres {
     EcranPoste.transfertsBandes: 'Élevage > Transferts entre Bandes',
     EcranPoste.gestionBandes: 'Élevage > Bandes & Sujets',
     EcranPoste.enregistrerSujets: 'Élevage > Enregistrer des Sujets',
+    EcranPoste.registreReproducteurs: 'Élevage > Registre des Reproducteurs',
     EcranPoste.ventesEtDevis: 'Ventes & Devis',
     EcranPoste.clientsEtCreances: 'Créances Clients',
     EcranPoste.achatsEtCommandes: 'Achats & Commandes',

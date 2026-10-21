@@ -76,6 +76,11 @@ enum EcranPoste {
   /// Ouvert depuis « Bandes & Sujets » (bouton « Enregistrer des Sujets », ajouté au web d'abord). Liste de l'animalier.
   enregistrerSujets('enregistrer-sujets.html'),
 
+  /// Ticket BS3 (décision BS-Q1 du 21/10/2026) — « Registre des Reproducteurs » (`/registre-reproducteurs`) : enregistrer,
+  /// modifier, sortir un sujet nominatif. Ouvert depuis « Bandes & Sujets » (bouton ajouté au web d'abord). Le web exige
+  /// `view-elevage` : comme `gestion-bandes.html`, la page est dans la liste de l'animalier.
+  registreReproducteurs('registre-reproducteurs.html'),
+
   /// ⚠️ Le HUB de vente, dont la caisse est le premier onglet. La barre
   /// latérale de la maquette ouvre `ventes-devis.html`, jamais
   /// `pos-interface.html` directement.
@@ -290,6 +295,7 @@ class PermissionsPoste {
       'gestion-bandes.html',
       'transformation.html',
       'enregistrer-sujets.html',
+      'registre-reproducteurs.html',
       'fiche-lapins.html',
       'fiche-volailles.html',
       'fiche-volailles-pondeuses.html',

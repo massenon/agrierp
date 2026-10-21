@@ -78,6 +78,7 @@ abstract final class SymbolesAgri {
   static const IconData expand_more = IconData(0xe5cf, fontFamily: famille);
   static const IconData fact_check = IconData(0xf0c5, fontFamily: famille);
   static const IconData favorite = IconData(0xe87d, fontFamily: famille);
+  static const IconData female = IconData(0xe590, fontFamily: famille);
   static const IconData flag = IconData(0xe153, fontFamily: famille);
   static const IconData folder = IconData(0xe2c7, fontFamily: famille);
   static const IconData folder_shared = IconData(0xe2c9, fontFamily: famille);
@@ -106,6 +107,7 @@ abstract final class SymbolesAgri {
   static const IconData lock_outline = IconData(0xe88d, fontFamily: famille);
   static const IconData logout = IconData(0xe9ba, fontFamily: famille);
   static const IconData mail = IconData(0xe0be, fontFamily: famille);
+  static const IconData male = IconData(0xe58e, fontFamily: famille);
   static const IconData manage_accounts = IconData(0xf02e, fontFamily: famille);
   static const IconData mark_email_read = IconData(0xe9fd, fontFamily: famille);
   static const IconData mark_email_unread = IconData(0xf18a, fontFamily: famille);

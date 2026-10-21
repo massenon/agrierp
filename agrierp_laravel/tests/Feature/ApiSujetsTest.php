@@ -96,13 +96,20 @@ class ApiSujetsTest extends TestCase
         $this->assertSame('C5', $a['cage']);
     }
 
-    public function test_un_envoi_de_sujets_par_le_poste_est_ignore(): void
+    /**
+     * BS3 (BS-Q1, 21/10/2026) : `animals` n'est plus un référentiel en lecture seule — le poste écrit le registre des
+     * reproducteurs (`SaisieReproducteurAction`, voir `ReproducteursPosteTest`). Une ligne FORGÉE (sans id, sans espèce…) est
+     * REJETÉE avec ses motifs, jamais écrite ni comptée parmi les référentiels ignorés.
+     */
+    public function test_un_envoi_de_sujets_forge_par_le_poste_est_rejete_et_n_ecrit_rien(): void
     {
         $r = $this->avec('animal')->postJson('/api/sync/push', [
             'animals' => [['identifier' => 'FORGE']],
         ])->assertOk();
 
-        $this->assertGreaterThanOrEqual(1, $r->json('referentiels_ignored'));
+        $this->assertSame([], $r->json('animals.accepted'));
+        $this->assertCount(1, $r->json('animals.rejected'));
+        $this->assertSame(0, (int) $r->json('referentiels_ignored'));
         $this->assertDatabaseMissing('animals', ['identifier' => 'FORGE']);
     }
 

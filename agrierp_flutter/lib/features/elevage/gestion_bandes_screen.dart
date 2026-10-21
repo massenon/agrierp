@@ -46,6 +46,7 @@ class GestionBandesScreen extends StatefulWidget {
     this.imprimer,
     this.onCommanderStock,
     this.onOuvrirSujets,
+    this.onOuvrirRegistre,
     this.horloge,
   });
 
@@ -62,6 +63,9 @@ class GestionBandesScreen extends StatefulWidget {
 
   /// Bouton « Enregistrer des Sujets » de l'en-tête (`route('elevage.enregistrer-sujets')` au web).
   final VoidCallback? onOuvrirSujets;
+
+  /// BS3 — bouton « Registre des Reproducteurs » de l'en-tête (`route('elevage.reproducteurs')` au web).
+  final VoidCallback? onOuvrirRegistre;
 
   final DateTime Function()? horloge;
 
@@ -196,6 +200,19 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
           onPressed: widget.onOuvrirSujets,
           icon: const Icon(SymbolesAgri.pets, size: 18),
           label: const Text('Enregistrer des Sujets'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AgriColors.brandForest,
+            side: const BorderSide(color: AgriColors.outlineVariant),
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+            textStyle: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AgriRadius.full)),
+          ),
+        ),
+        OutlinedButton.icon(
+          key: const Key('bandes-registre-reproducteurs'),
+          onPressed: widget.onOuvrirRegistre,
+          icon: const Icon(SymbolesAgri.badge, size: 18),
+          label: const Text('Registre des Reproducteurs'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AgriColors.brandForest,
             side: const BorderSide(color: AgriColors.outlineVariant),

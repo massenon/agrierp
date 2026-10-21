@@ -487,6 +487,8 @@ switch ($commande) {
             'feed_ration_standards' => 'feed_ration_standards',
             // Tickets BS1 et BS2.
             'livestock_lots' => 'livestock_lots', 'livestock_daily_entries' => 'livestock_daily_entries',
+            // Ticket BS3 — le reproducteur nominatif enregistré, modifié puis sorti au poste.
+            'animals' => 'animals',
         ];
         $presence = [];
         foreach ($tables as $cle => $table) {
@@ -518,6 +520,8 @@ switch ($commande) {
             // Tickets BS1 et BS2 — bandes créées, modifiée et archivée au poste, entrées de sujets modifiée et archivée.
             'livestock_lots' => ['code', 'stage', 'is_active', 'initial_quantity', 'current_quantity'],
             'livestock_daily_entries' => ['ne', 'achat', 'don', 'effectif_final'],
+            // Ticket BS3 — registre nominatif des reproducteurs.
+            'animals' => ['identifier', 'breed', 'cage', 'status', 'exit_reason'],
         ];
         $lignes = [];
         foreach ($colonnes as $table => $cols) {

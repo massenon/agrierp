@@ -144,6 +144,8 @@ void main() {
       // Sujets » depuis « Bandes & Sujets » (comme au web : aucune des deux n'est dans la barre latérale).
       EcranPoste.gestionBandes,
       EcranPoste.enregistrerSujets,
+      // Ticket BS3 : « Registre des Reproducteurs » s'ouvre depuis « Bandes & Sujets » (bouton ajouté au web d'abord).
+      EcranPoste.registreReproducteurs,
       // Premier onglet du hub de vente, comme dans la maquette.
       EcranPoste.caisse,
       // ⚠️ TROISIÈME FAMILLE (ticket F0.57) : les pages du MENU DU COMPTE de la
