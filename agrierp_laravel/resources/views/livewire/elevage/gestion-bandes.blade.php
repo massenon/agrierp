@@ -43,6 +43,10 @@
             <option value="porciculture">Porciculture</option>
             <option value="helico">Héliciculture</option>
         </select>
+        <select wire:model.live="affichage" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+            <option value="">Bandes en cours</option>
+            <option value="archivees">Bandes archivées</option>
+        </select>
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -83,16 +87,22 @@
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap" wire:click.stop>
                                 @can('manage-elevage')
+                                @if($affichage === 'archivees')
+                                <button type="button" wire:click="restoreLot('{{ $lot->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Restaurer"><span class="material-symbols-outlined text-[16px]">restore_from_trash</span></button>
+                                @else
                                 <button type="button" wire:click="editLot('{{ $lot->id }}')" class="text-info-blue hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[16px]">edit</span></button>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-bande-{{ $lot->id }}' })" class="text-error-deep hover:text-error-deep/70 p-1" title="Archiver"><span class="material-symbols-outlined text-[16px]">delete</span></button>
+                                @endif
                                 @else
                                 <span class="text-outline text-[10px] italic">Lecture seule</span>
                                 @endcan
                             </td>
                         </tr>
+                        @if($affichage !== 'archivees')
                         <x-modal-confirm-delete :name="'archive-bande-'.$lot->id" :item-label="$lot->code" :action="'archiveLot(\''.$lot->id.'\')'" />
+                        @endif
                     @empty
-                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.</td></tr>
+                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">{{ $affichage === 'archivees' ? 'Aucune bande archivée.' : 'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -194,7 +204,12 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Effectif Actuel *</label>
+                @if($effectifVerrouille)
+                <input wire:model="quantity" type="number" min="0" disabled data-effectif-verrouille title="{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline cursor-not-allowed">
+                <p class="text-[10px] text-outline mt-xs">{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}</p>
+                @else
                 <input wire:model="quantity" type="number" min="0" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('quantity') ? 'is-invalid' : 'border-outline-variant' }}">
+                @endif
                 @error('quantity') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>

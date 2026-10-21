@@ -434,9 +434,10 @@ void main() {
         expect(px(c.firstWhere((x) => x.startsWith('px-'))), AgriSpacing.md, reason: 'fiche-$nom px-md');
         expect(c, containsAll(['text-xs', 'font-bold', 'text-brand-forest', 'bg-surface-zebra', 'rounded-lg', 'border-outline-variant']));
         expect(blade, contains('<span class="text-xs text-outline font-semibold">Date :</span>'));
-        // ⚠️ La fiche Reproducteurs écrit `flex items-center gap-xs` SANS `flex-wrap` : sa barre ne se replie pas au web.
-        // Le poste la replie dans tous les cas (écart assumé, identique dès 640 px) ; `gap-xs` est commun aux cinq.
-        expect(blade, contains(nom == 'reproducteurs' ? '<div class="flex items-center gap-xs">\n                <span class="text-xs text-outline font-semibold">Date :' : 'flex items-center gap-xs flex-wrap'), reason: 'fiche-$nom : barre gap-xs');
+        // MP1-Q1 (tranché le 21/10/2026) : la barre Bande / Date / Mois des CINQ fiches se replie (`flex-wrap`) —
+        // la fiche Reproducteurs avait un écart, retouché au web ; le poste la replie dans les cinq cas.
+        expect(blade, contains('flex items-center gap-xs flex-wrap'), reason: 'fiche-$nom : barre gap-xs flex-wrap');
+        expect(blade, isNot(contains('<div class="flex items-center gap-xs">\n                <span class="text-xs text-outline font-semibold">Date :')), reason: 'fiche-$nom : la barre de la date ne reste pas sans flex-wrap');
         expect(blade, contains('flex items-center justify-between border-b border-outline-variant pb-sm mb-md flex-wrap gap-xs'));
       }
       const etiquette = StylesChampsAgri.etiquetteEnLigne;

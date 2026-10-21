@@ -59,6 +59,13 @@ class GestionBandes extends Component
     #[Url]
     public string $filiere = '';
 
+    /** BS-Q7 : `''` = bandes en cours (par défaut), `archivees` = bandes archivées (restaurables). */
+    #[Url]
+    public string $affichage = '';
+
+    /** BS-Q4 : la bande éditée a des fiches journalières — son effectif se corrige depuis la fiche. */
+    public bool $effectifVerrouille = false;
+
     public ?string $editingLotId = null;
 
     public ?string $viewingLotId = null;
@@ -153,7 +160,7 @@ class GestionBandes extends Component
     public function getLotsProperty()
     {
         return LivestockLot::with('species')
-            ->where('is_active', true)
+            ->where('is_active', $this->affichage !== 'archivees')
             ->when($this->search, fn ($q) => $q->where('code', 'like', '%'.$this->search.'%'))
             ->when($this->filiere, fn ($q) => $q->whereHas('species', fn ($q2) => $q2->where('code', $this->filiere)))
             ->orderByDesc('created_date')
@@ -355,6 +362,7 @@ class GestionBandes extends Component
         $this->stage = $lot->stage;
         $this->quantity = $lot->current_quantity;
         $this->status = $lot->status;
+        $this->effectifVerrouille = SaisieBandeAction::aDesFiches($lot->id);
         $this->dispatch('open-modal', name: 'modal-edit-bande');
     }
 
@@ -390,8 +398,34 @@ class GestionBandes extends Component
     {
         $this->authorize('manage-elevage');
 
-        app(SaisieBandeAction::class)->archiver($id);
+        try {
+            app(SaisieBandeAction::class)->archiver($id);
+        } catch (ValidationException $e) {
+            // BS-Q3 : une bande qui a des sujets vivants ne s'archive pas.
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
+
+            return;
+        }
+
         $this->dispatch('toast', message: 'Bande archivée avec succès.', type: 'warning');
+    }
+
+    /** BS-Q7 — restaure une bande archivée (même droit que l'archivage). */
+    public function restoreLot(string $id): void
+    {
+        $this->authorize('manage-elevage');
+
+        try {
+            $resultat = app(SaisieBandeAction::class)->restaurer($id);
+        } catch (ValidationException $e) {
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
+
+            return;
+        }
+
+        if ($resultat === SaisieBandeAction::RESTAUREE_MAINTENANT) {
+            $this->dispatch('toast', message: 'Bande restaurée avec succès.', type: 'success');
+        }
     }
 
     public function render()

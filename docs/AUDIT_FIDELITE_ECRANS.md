@@ -307,7 +307,7 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 
 **Écarts relevés et NON corrigés (décision documentée) :**
 
-- *Fiche Reproducteurs :* son Blade écrit la barre `flex items-center gap-xs` SANS `flex-wrap` (les quatre autres : `flex-wrap`). Le poste replie la barre dans les cinq cas : identique dès 640 px, plus sûr en dessous. Si le client préfère la fidélité stricte, c'est une retouche du Blade (ajouter `flex-wrap`), pas du poste.
+- *Fiche Reproducteurs :* ✅ **écart disparu (MP1-Q1, tranché le 21/10/2026)** — le Blade écrivait la barre `flex items-center gap-xs` sans `flex-wrap` ; `flex-wrap` y est ajouté (retouche web), comme aux quatre autres fiches. Le poste replie la barre dans les cinq cas ; le garde-fou `champs_date_mise_en_page_test.dart` exige désormais `flex-wrap` sur les cinq Blades.
 - *Rapports & Exports :* `ml-auto` aligne les boutons d'export à DROITE même quand ils passent seuls à la ligne ; le poste les laisse à gauche dans ce cas (`WrapAlignment.spaceBetween` ne sait pas aligner un enfant seul). Visible seulement sous ~ 700 px de largeur de contenu.
 - *Police :* le banc de test dessine en police Ahem (toutes les chaînes y sont deux fois plus larges qu'en Inter) ; les mesures de largeur d'un champ sont donc des mesures de STRUCTURE (marges, hauteurs, alignements), pas de largeur réelle.
 

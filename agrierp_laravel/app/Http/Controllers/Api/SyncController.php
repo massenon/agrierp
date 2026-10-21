@@ -4288,9 +4288,12 @@ class SyncController extends Controller
                     'status' => ['sometimes', 'in:actif,cloture'],
                     'is_active' => ['sometimes', 'boolean'],
                     'effectif_corrige' => ['nullable', 'integer', 'min:0'],
+                    // BS-Q7 : geste EXPLICITE de restauration (jamais déduit de `is_active: true`, qui peut venir d'une copie périmée).
+                    'restauree' => ['sometimes', 'nullable', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 $archivee = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $restauree = ! $archivee && filter_var($valides['restauree'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
                 if ($existante !== null && $existante->code !== $valides['code']) {
                     $rejected[] = ['id' => $id, 'reason' => "Le code d'une bande ne se modifie jamais après sa création."];
@@ -4299,7 +4302,7 @@ class SyncController extends Controller
                 }
 
                 // Une seule transaction par ligne : une création suivie d'un refus n'écrit rien.
-                DB::transaction(function () use ($saisie, $valides, $existante, $archivee) {
+                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree) {
                     if ($existante === null) {
                         $saisie->creer([
                             'code' => $valides['code'], 'species_id' => $valides['species_id'], 'stage' => $valides['stage'],
@@ -4318,8 +4321,21 @@ class SyncController extends Controller
                             $saisie->archiver($valides['id']);
                         }
                     } elseif ($archivee) {
+                        // BS-Q3 : la bande doit être vidée AVANT d'être archivée. Une correction d'effectif envoyée avec
+                        // l'archivage (bande vidée au poste) se joue d'abord, comme au web (Modifier, puis Archiver).
+                        if (($valides['effectif_corrige'] ?? null) !== null && $existante->is_active) {
+                            $saisie->modifier($valides['id'], [
+                                'stage' => $valides['stage'],
+                                'status' => $valides['status'] ?? $existante->status,
+                                'current_quantity' => $valides['effectif_corrige'],
+                            ]);
+                        }
                         $saisie->archiver($valides['id']);
                     } else {
+                        // BS-Q7 : la restauration est un geste explicite du poste, jouée avant la modification éventuelle.
+                        if ($restauree) {
+                            $saisie->restaurer($valides['id']);
+                        }
                         $saisie->modifier($valides['id'], [
                             'stage' => $valides['stage'],
                             'status' => $valides['status'] ?? $existante->status,
