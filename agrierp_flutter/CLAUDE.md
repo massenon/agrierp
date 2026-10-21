@@ -142,6 +142,18 @@ Known weaknesses, deliberately deferred rather than patched in passing (they tou
 3. **The fixtures cannot be fully regenerated.** `outils/fixtures.py` appends new pages; a full regeneration of the 39 pages already present yields a *different* result (77 field labels in the file, 118 when regenerated). They were assembled ticket by ticket with unreproducible manual adjustments. Reconciling them means re-examining every exemption.
 4. **`comptabilite-hub.html` is in no role's `RBAC_PAGE_MAP` list** — including the accountant's, which names `journal-comptable.html` but never the hub. Applied as-is, the accountant cannot reach the screen holding their own journal. Client arbitration.
 
+## Sécurité et démarrage — verrou local (ticket VL-1, 21/10/2026)
+
+**Fonction propre au poste** (exception de la doctrine § 5.6 : le web n'a pas de verrou). Au lancement, `main.dart` ne décide plus lui-même de l'écran : `PorteSession` (`lib/features/verrou/porte_session.dart`) le fait. Chargement (rien n'est montré, pas de flash de l'application) → pas de session : `LoginScreen` ; session restaurée + PIN défini : `EcranVerrou` ; session restaurée sans PIN : `EcranDefinirPin` ; bon PIN : application. Après une connexion en ligne : définition du PIN s'il n'y en a pas, sinon directement l'application.
+
+- **Même présentation que `LoginScreen`** (demande du client : « un écran de connexion à chaque lancement, avec reprise de session sans se connecter au serveur ») : `CadreConnexion` / `ChampConnexion` / `BoutonConnexion` sont des composants publics de `login_screen.dart`, partagés avec le verrou ; identifiant en lecture seule, secret = PIN (points masqués + pavé à l'écran + clavier physique).
+- **Hors ligne, aucun appel réseau** pour verrouiller ou déverrouiller. Le seul geste en ligne est « PIN oublié ? Se reconnecter » (déconnexion de la session, PIN effacé, retour à la connexion qui le redéfinit).
+- `lib/core/auth/verrou_local.dart` : PIN de 4 à 6 chiffres, **jamais stocké** ; PBKDF2-HMAC-SHA256 (≥ 100 000 itérations, sel de 16 octets), sel et empreinte au coffre sous `agrierp.verrou.<id utilisateur>`, comparaison à temps constant. Échecs persistants : temporisation dès le 5e (30 s, 1 min, 5 min, 15 min, 30 min), **10 échecs cumulés = reconnexion en ligne exigée**. Limite : l'horloge de Windows est modifiable (voir la docstring) ; le plafond de 10 échecs n'en dépend pas.
+- L'écran de verrouillage REMPLACE l'application (`home`), il ne la recouvre pas : aucune donnée n'est construite tant que verrouillé. Verrouiller démonte donc l'application (saisie en cours perdue).
+- Entrées : « Verrouiller » dans le menu du compte (`BarreSuperieure.onVerrouiller`), carte « Changer le code PIN » dans Mon Profil (`MonProfilScreen.changerPin`, absente si `null` : tests du châssis). Pas de verrouillage automatique par inactivité (non fait, ❓ VL-Q1).
+- Les tests emploient `CoffreMemoire` (`test/coffre_memoire.dart`) et `VerrouLocal(iterations: …)` réduit pour la vitesse ; un test fixe le réglage de production.
+- ⚠️ Le mot de passe, lui, n'est toujours JAMAIS conservé (`AuthService`) : le PIN ne le remplace pas, il ne sert qu'à rouvrir une session déjà ouverte.
+
 ## Sync Engine — the server half already exists
 
 ```

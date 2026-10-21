@@ -479,3 +479,24 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **Non vérifié :** migration sur une base réelle peuplée (MySQL/MariaDB de production) ; poste Windows réel (mise à jour d'une base locale existante).
 **Laissé tel quel, à confirmer :** le nom de serveur SMTP `smtp.olouwachegoun.bj` éventuellement saisi (pas une adresse : à corriger à la main dans Paramètres → Email (SMTP) si le serveur a changé) ; `support@faguez-sarl.bj` (adresse de l'éditeur, autre organisation) ; les adresses fictives des tests (`@ferme.bj`, `@resto.bj`).
+
+## Sprint VL — Verrou local du poste (décision du client du 21/10/2026)
+
+### VL-1 ✅ (21/10/2026) Code PIN, écran de verrouillage à chaque lancement, sans réseau
+
+**Décision (impérative) :** « Verrou local (code PIN ou mot de passe mémorisé localement) : écran de verrouillage à chaque lancement, sans réseau requis. » Retenu : un **code PIN de 4 à 6 chiffres** (jamais le mot de passe, que le poste ne conserve toujours pas). La reprise de session hors ligne est GARDÉE ; le verrou s'ajoute par-dessus.
+
+**Exception de fidélité (doctrine § 5.6) :** fonction **propre au poste**. Le web n'a pas de verrou et n'en reçoit pas : aucun écran du Blade n'est modifié, le poste ajoute un écran avant l'application, l'entrée « Verrouiller » au menu du compte (avant « Déconnexion ») et la carte « Changer le code PIN » à Mon Profil.
+
+**Livré (poste uniquement, aucune migration, schéma Drift inchangé) :**
+- `lib/core/auth/verrou_local.dart` : PBKDF2-HMAC-SHA256, 100 000 itérations, sel aléatoire de 16 octets, comparaison à temps constant ; sel et empreinte au coffre, par utilisateur (`agrierp.verrou.<id>`) ; compteur d'échecs persistant ; dès le 5e échec temporisation 30 s, 1 min, 5 min, 15 min, 30 min ; **10 échecs cumulés : accès local refusé, reconnexion EN LIGNE exigée**. Dépendance directe ajoutée : `crypto` (déjà présente en transitive).
+- `lib/features/verrou/` : l'écran de verrouillage et celui de définition ont **la présentation de l'écran de connexion** (précision du client : « un écran de connexion à chaque lancement, avec reprise de session sans se connecter au serveur ») : `CadreConnexion`, `ChampConnexion` (identifiant en lecture seule), `BoutonConnexion` extraits de `LoginScreen` et partagés, le secret étant le PIN ; `PorteSession` (chargement, connexion, définition, verrou, application : rien n'est montré avant que l'état soit connu), `EcranVerrou`, `EcranDefinirPin` (saisie + confirmation, obligatoire, sans « Plus tard »), `PavePin` (clavier à l'écran ET clavier physique, Entrée valide, points masqués), `changerPinDepuisProfil`.
+- Parcours : connexion en ligne sans PIN → définition ; connexion avec PIN existant → pas de redemande dans cette exécution ; session restaurée + PIN → verrou ; session restaurée sans PIN (poste mis à jour) → définition obligatoire ; « PIN oublié ? Se reconnecter » → confirmation, déconnexion, PIN effacé, retour à la connexion (qui redéfinit le PIN).
+
+**Limites et décisions :**
+- **Horloge** : la temporisation se mesure à l'horloge de Windows. Reculer l'horloge ne la raccourcit pas (comptée depuis le dernier essai) ; l'avancer ne fait gagner que des minutes. Le plafond de 10 échecs, lui, ne dépend d'aucune horloge. Un PIN de 4 à 6 chiffres protège d'un passant, pas d'un attaquant maître de la session Windows.
+- Verrouiller **démonte** l'application (l'écran de verrouillage la remplace, il ne la recouvre pas) : une saisie en cours est perdue, la synchronisation automatique de l'accueil s'arrête pendant le verrou et repart au déverrouillage.
+- **Verrouillage automatique après inactivité : NON fait** (facultatif et non trivial : il faudrait écouter toute la saisie et arbitrer les saisies en cours) ; à décider par le client si besoin (❓ VL-Q1).
+- Une déconnexion normale (menu du compte) conserve le PIN de l'utilisateur ; « PIN oublié » et les dix échecs l'effacent.
+- Tests : `verrou_local_test.dart` (18) et `verrou_ecrans_test.dart` (21), écrits rouges d'abord, 7 mutations tuées. **Non vérifié :** coffre Windows réel (Credential Manager), durée de PBKDF2 sur le poste le plus lent de la ferme.
+
