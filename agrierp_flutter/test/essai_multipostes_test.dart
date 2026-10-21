@@ -18,7 +18,9 @@ import 'package:agrierp/features/achats/achats_repository.dart';
 import 'package:agrierp/features/achats/depenses_repository.dart';
 import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
+import 'package:agrierp/features/elevage/bandes_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
+import 'package:agrierp/features/elevage/sujets_entrees_repository.dart';
 import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
 import 'package:agrierp/features/elevage/soins_vaccins_repository.dart';
@@ -436,6 +438,8 @@ class _Poste {
   AchatsRepository get achats => AchatsRepository(database: db, identifiantPoste: nom, horloge: maintenant);
   StocksRepository get stocks => StocksRepository(database: db, deviceId: nom, horloge: maintenant);
   TransfertsRepository get transferts => TransfertsRepository(database: db, deviceId: nom);
+  BandesRepository get bandes => BandesRepository(database: db, deviceId: nom, gestes: gestes, horloge: maintenant);
+  SujetsEntreesRepository get sujetsEntrees => SujetsEntreesRepository(database: db, fiches: fiches, horloge: maintenant);
   DepensesRepository get depenses => DepensesRepository(database: db, deviceId: nom);
   ProduitsRepository get produits => ProduitsRepository(database: db);
   ParametresElevageRepository get parametresElevage => ParametresElevageRepository(database: db, maintenant: maintenant);
@@ -1237,7 +1241,55 @@ class _Essai {
           p.noter('livestock_reproduction_events', cycle1!);
           _saisi('livestock_reproduction_events', cycle1!, {'status': 'en_cours'});
         });
+        // Ticket BS1 — « Bandes & Sujets » : deux bandes CRÉÉES au poste (l'une sera archivée au jour 3).
+        for (final (code, effectif) in [('ESSAI-C', 20), ('ESSAI-D', 8)]) {
+          await _geste(p, 'bande $code créée au poste ($effectif sujets)', () async {
+            final modele = await p.bande('ESSAI-A');
+            final b = await p.bandes.creer(
+              FormulaireBande(speciesId: modele.speciesId, code: code, stage: 'croissance', createdDate: p.jour, quantite: '$effectif'),
+            );
+            p.noter('livestock_lots', b.id);
+            if (code == 'ESSAI-C') {
+              bandeC = b.id;
+              _saisi('livestock_lots', b.id, {'code': code, 'stage': 'croissance', 'is_active': true, 'initial_quantity': effectif});
+            } else {
+              bandeD = b.id;
+              _saisi('livestock_lots', b.id, {'code': code, 'is_active': true, 'initial_quantity': effectif});
+            }
+          });
+        }
+        // Ticket BS2 — « Enregistrer des Sujets » : 6 naissances dans ESSAI-C (20 + 6 = 26).
+        await _geste(p, 'sujets : 6 naissances dans ESSAI-C', () async {
+          final f = await p.sujetsEntrees.ajouter(FormulaireSujet(speciesId: (await p.bande('ESSAI-A')).speciesId, lotId: bandeC!, origine: 'Naissance', quantite: '6', date: p.jour));
+          ficheNaissance = f.id;
+          jourNaissance = p.jour;
+          p.noter('livestock_daily_entries', f.id);
+          _saisi('livestock_daily_entries', f.id, {'ne': 6, 'achat': 0, 'effectif_final': 26});
+        });
       case 1:
+        // Ticket BS1 — le stade d'ESSAI-C change (sans correction d'effectif : il reste celui des fiches).
+        await _geste(p, 'bande ESSAI-C : stade → ponte', () async {
+          final b = (await p.db.select(p.db.livestockLots).get()).firstWhere((x) => x.id == bandeC);
+          await p.bandes.modifier(bandeC!, stage: 'ponte', quantite: '${b.currentQuantity}', status: 'actif');
+          _saisi('livestock_lots', bandeC!, {'stage': 'ponte'});
+        });
+        // Ticket BS2 — 4 achats ; puis les naissances du jour 1 corrigées (6 → 5) : la cascade refait les deux fiches.
+        await _geste(p, 'sujets : 4 achats dans ESSAI-C', () async {
+          final f = await p.sujetsEntrees.ajouter(FormulaireSujet(speciesId: (await p.bande('ESSAI-A')).speciesId, lotId: bandeC!, origine: 'Achat', quantite: '4', date: p.jour));
+          ficheAchat = f.id;
+          p.noter('livestock_daily_entries', f.id);
+          _saisi('livestock_daily_entries', f.id, {'ne': 0, 'achat': 4, 'effectif_final': 30});
+        });
+        await _geste(p, 'sujets : naissances de la journée 1 corrigées (6 → 5)', () async {
+          await p.sujetsEntrees.modifier(
+            ficheNaissance!,
+            'Naissance',
+            FormulaireSujet(origine: 'Naissance', quantite: '5', date: jourNaissance),
+          );
+          // 20 + 5 = 25 ; 25 + 4 = 29 : la cascade a refait la fiche des achats.
+          _saisi('livestock_daily_entries', ficheNaissance!, {'ne': 5, 'effectif_final': 25});
+          _saisi('livestock_daily_entries', ficheAchat!, {'effectif_final': 29});
+        });
         await _geste(p, 'soin : vitamines sur ESSAI-B (sans délai d\'attente)', () async {
           final s = await p.soins.enregistrer(lotId: (await p.bande('ESSAI-B')).id, typeAction: 'Traitement', produit: 'Vitamines AD3E', dose: '1 g/L', cout: 2500, quand: p.maintenant());
           p.noter('veterinary_records', s.id);
@@ -1264,6 +1316,16 @@ class _Essai {
           _saisi('feed_types', provende!, {'name': 'ESSAI Provende lapin', 'price_per_kg': 310, 'is_active': true});
         });
       case 2:
+        // Ticket BS1/BS2 — ESSAI-D archivée ; les achats d'ESSAI-C archivés (29 → 25 sur la fiche, 25 sur la bande).
+        await _geste(p, 'bande ESSAI-D archivée au poste', () async {
+          await p.bandes.archiver(bandeD!);
+          _saisi('livestock_lots', bandeD!, {'is_active': false});
+        });
+        await _geste(p, 'sujets : achats d\'ESSAI-C archivés', () async {
+          await p.sujetsEntrees.archiver(ficheAchat!, 'Achat');
+          _saisi('livestock_daily_entries', ficheAchat!, {'achat': 0, 'effectif_final': 25});
+          _saisi('livestock_lots', bandeC!, {'current_quantity': 25});
+        });
         // Hors ligne toute la journée : la saillie et sa palpation (négative) partent dans le MÊME envoi.
         await _geste(p, 'saillie de L-ESSAI-2 puis palpation négative, hors ligne', () async {
           cycle2 = await p.reproduction.declarerSaillie(lotId: (await p.bande('CUN-2026-01')).id, numeroFemelle: 'L-ESSAI-2', dateSaillie: p.jour, maintenant: p.maintenant());
@@ -1318,6 +1380,11 @@ class _Essai {
 
   /// Ticket S-T12 — lignes saisies à l'élevage dont le serveur doit détenir l'état FINAL du poste.
   String? infirmerie, intervention, cycle1, cycle2, soinAArchiver, rationPoste, provende;
+
+  /// Tickets BS1 et BS2 — les bandes ESSAI-C (modifiée, effectif par les sujets) et ESSAI-D (archivée) créées au poste, les
+  /// fiches de leurs entrées de sujets.
+  String? bandeC, bandeD, ficheNaissance, ficheAchat;
+  DateTime? jourNaissance;
   int? rappelSoins;
 
   /// Ticket S-T12 — ce que l'animalier a SAISI (dernière valeur de chaque champ), par `table|id` : c'est l'attendu, au
@@ -1509,6 +1576,21 @@ class _Essai {
     if (provende != null) {
       final f = await (p.db.select(p.db.feedTypes)..where((t) => t.id.equals(provende!))).getSingleOrNull();
       lignesLocales['feed_types|$provende'] = {'name': f?.name, 'price_per_kg': f?.pricePerKg, 'is_active': f?.isActive};
+    }
+    // Tickets BS1 et BS2 — bandes et entrées de sujets de l'élevage, telles que le poste les détient en fin d'essai.
+    for (final id in [?bandeC, ?bandeD]) {
+      final b = await (p.db.select(p.db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['livestock_lots|$id'] = {
+        'code': b?.code,
+        'stage': b?.stage,
+        'is_active': b?.isActive,
+        'initial_quantity': b?.initialQuantity,
+        'current_quantity': b?.currentQuantity,
+      };
+    }
+    for (final id in [?ficheNaissance, ?ficheAchat]) {
+      final f = await (p.db.select(p.db.livestockDailyEntries)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['livestock_daily_entries|$id'] = {'ne': f?.ne, 'achat': f?.achat, 'don': f?.don, 'effectif_final': f?.effectifFinal};
     }
     // Ticket U14 — les dépenses modifiée et archivée au bureau.
     for (final id in [?depenseAModifier, ?depenseAArchiverPoste]) {
@@ -1754,6 +1836,8 @@ class _Essai {
       if (cycle1 == null || cycle2 == null) 'cycles de reproduction',
       if (infirmerie == null || intervention == null || soinAArchiver == null) 'infirmerie, calendrier, soin archivé',
       if (rationPoste == null || provende == null || rappelSoins == null) 'Paramètres Élevage au poste',
+      if (bandeC == null || bandeD == null || ficheNaissance == null || ficheAchat == null)
+        'bandes créées au poste (ESSAI-C, ESSAI-D) et entrées de sujets modifiée et archivée (BS1, BS2)',
       if (!saisiElevage.containsKey('expenses|$depenseAModifier') || !saisiElevage.containsKey('expenses|$depenseAArchiverPoste'))
         'dépense modifiée et dépense archivée au poste (U14)',
       if (!sessionsRefusees.containsKey(caisse1.nom) || !sessionsRefusees.containsKey(compta.nom)) 'sessions refusées',

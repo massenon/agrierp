@@ -531,6 +531,22 @@ void main() {
       expect((await lue(creee.id))!.syncStatus, SyncStatus.pending);
     });
 
+    test('⚠️ découpé en lots de 50, l envoi garde la bande AVANT les fiches (le serveur crée la bande d abord)', () {
+      final envoi = <String, dynamic>{
+        'device_id': 'poste-test',
+        'livestock_daily_entries': [for (var i = 0; i < 60; i++) {'id': uuid('f$i'), 'entry_date': '2026-10-${(i % 28 + 1).toString().padLeft(2, '0')}'}],
+        'livestock_lots': [{'id': uuid('b1'), 'code': 'LOT-1'}],
+      };
+
+      final lots = SyncEngine.decouperEnLots(envoi);
+
+      expect(lots.length, greaterThan(1));
+      final premiere = lots.indexWhere((l) => l.containsKey('livestock_lots'));
+      final premiereFiche = lots.indexWhere((l) => l.containsKey('livestock_daily_entries'));
+      expect(premiere, lessThanOrEqualTo(premiereFiche));
+      expect(lots.first.containsKey('livestock_lots'), isTrue, reason: 'la bande part dans le tout premier lot');
+    });
+
     test('la bande figure parmi les tables envoyées (compteur « à envoyer » de la barre) et les tables perdues à la réinitialisation', () async {
       expect(AppDatabase.tablesEnvoyees, contains('livestock_lots'));
       await bande(mere, 'LOT-LAP-1', sync: SyncStatus.pending);
