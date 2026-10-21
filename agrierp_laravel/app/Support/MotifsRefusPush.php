@@ -231,6 +231,7 @@ class MotifsRefusPush
             'attendance_records' => 'enregistrer un pointage',
             'sales' => 'enregistrer une vente',
             'quotes' => 'saisir un devis',
+            'quote_conversions' => 'convertir un devis en facture (droits « ventes » et « facturation » requis)',
             'credit_notes' => 'enregistrer un retour ou un avoir client',
             'stock_adjustments' => 'ajuster le stock',
         ][$table] ?? 'écrire ces données';

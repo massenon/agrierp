@@ -137,6 +137,8 @@ class SyncController extends Controller
         'stock_movements',
         // Ticket DEV — devis (« Devis & Proforma ») saisis, avancés et archivés au poste.
         'quotes',
+        // Ticket DEV3 — DEMANDES de conversion d'un devis accepté en facture (le serveur crée la facture).
+        'quote_conversions',
         // Ticket U13 — paie réglée : lecture seule au poste (Recettes et Dépenses).
         'payslips',
         // Ticket AV1 — retours et avoirs clients saisis au poste (demande ; le serveur fait les effets).
@@ -1050,6 +1052,7 @@ class SyncController extends Controller
             // un instant : piège de l'échéance 14.75), `updated_at` en ISO pour départager. Le poste ne remplace jamais un
             // devis qu'il a en attente ou en conflit.
             'quotes' => fn () => Quote::query()
+                ->with('sale')
                 ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                 ->orderBy('quote_date')
                 ->orderBy('id')
@@ -1066,6 +1069,9 @@ class SyncController extends Controller
                     'note' => $d->note,
                     'status' => $d->status,
                     'is_active' => (bool) $d->is_active,
+                    // Ticket DEV3 — le lien vers la facture d'un devis converti (`null` avant) et son numéro `FV-AAAA-XXXXXX`.
+                    'converted_sale_id' => $d->converted_sale_id,
+                    'invoice_number' => $d->numero_facture,
                     'updated_at' => $d->updated_at?->toIso8601String(),
                 ]),
 
@@ -2012,6 +2018,8 @@ class SyncController extends Controller
             'suppliers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'customers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'quotes' => ['accepted' => [], 'rejected' => []],
+            // Ticket DEV3 — `invoices` : par devis accepté, le lien vers la facture que le serveur vient de créer.
+            'quote_conversions' => ['accepted' => [], 'rejected' => [], 'invoices' => []],
             'mails' => ['accepted' => [], 'rejected' => []],
             'archived_documents' => ['accepted' => [], 'rejected' => []],
             'administrative_documents' => ['accepted' => [], 'rejected' => []],
@@ -2103,6 +2111,12 @@ class SyncController extends Controller
         // poste à l'instant. Références traduites comme celles des ventes (`FusionReferentielsService::REFERENCES`).
         if ($request->has('quotes')) {
             $result['quotes'] = $this->pushQuotes($this->envoiTraduit($request, 'quotes'));
+        }
+
+        // Ticket DEV3 — LES DEMANDES DE CONVERSION APRÈS LES DEVIS : un poste hors ligne qui crée, envoie, fait accepter
+        // puis convertit un devis envoie tout d'un coup ; le devis du même envoi existe donc déjà, au statut `accepte`.
+        if ($request->has('quote_conversions')) {
+            $result['quote_conversions'] = $this->pushQuoteConversions($request->input('quote_conversions'), $request->user());
         }
 
         // ⚠️ COURRIERS (15.23) : aucune dépendance, aucun ordre à respecter. `mails` S'ÉCRIT AU
@@ -4450,7 +4464,11 @@ class SyncController extends Controller
                         return;
                     }
 
-                    if ($saisie->identique($existant, $valides) && $existant->status === $statut && $existant->is_active) {
+                    // Ticket DEV3 — un devis CONVERTI (`facture`) renvoyé tel que le poste l'a vu avant la conversion (`accepte`,
+                    // mêmes champs : la réponse d'un envoi précédent s'est perdue) est acquitté, jamais refusé comme modification
+                    // d'un devis facturé.
+                    $memeStatut = $existant->status === $statut || ($existant->status === 'facture' && $statut === 'accepte');
+                    if ($saisie->identique($existant, $valides) && $memeStatut && $existant->is_active) {
                         return;
                     }
 
@@ -4465,6 +4483,70 @@ class SyncController extends Controller
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket DEV3 — DEMANDES DE CONVERSION « devis accepté → facture » du poste (`quote_conversions`).
+     *
+     * ⚠️ LE POSTE N'ENVOIE QUE LA DEMANDE : `{ id: <uuid du devis>, requested_at?: <instant du clic, ISO 8601> }`. Le
+     * serveur crée la facture (vente à crédit sans ligne), la créance et l'écriture, la numérote (`FV-AAAA-XXXXXX`) et
+     * rend le lien dans `invoices[<uuid du devis>] = { sale_id, invoice_number }` : tout passe par
+     * `ConvertirDevisEnFactureAction`, le point de passage de l'écran web « Convertir en Facture ».
+     *
+     * ⚠️ IDEMPOTENCE PAR L'UUID DU DEVIS : un devis déjà converti est acquitté avec SA facture, sans seconde pièce (la
+     * réponse d'un envoi précédent s'est perdue). Refus, un par un, avec leur motif lisible (statut non convertible,
+     * devis archivé ou inconnu, client absent ou archivé, exercice clos, date de facture future ou clôturée, plan
+     * comptable incomplet, droits `manage-ventes` ET `manage-facturation`) : seule cette demande échoue.
+     *
+     * La facture normalisée MeCeF suit le circuit des ventes reçues (`ventesAFacturer`, après la transaction de
+     * l'envoi) : aucune transmission nouvelle, rien d'ajouté côté DGI (D-MECEF-1 laissé de côté).
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>, invoices: array<string, array{sale_id: string, invoice_number: string}>}
+     */
+    private function pushQuoteConversions(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $invoices = [];
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes') || ! $utilisateur->can('manage-facturation')) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::roleInsuffisant('quote_conversions')];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'requested_at' => ['nullable', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $resultat = app(\App\Actions\ConvertirDevisEnFactureAction::class)->execute(
+                    $valides['id'],
+                    ! empty($valides['requested_at']) ? Carbon::parse($valides['requested_at']) : null,
+                );
+
+                if (! $resultat['deja']) {
+                    $this->ventesAFacturer[] = $resultat['vente']->id;
+                }
+
+                $accepted[] = $valides['id'];
+                $invoices[$valides['id']] = [
+                    'sale_id' => $resultat['vente']->id,
+                    'invoice_number' => $resultat['vente']->numero_facture,
+                ];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\ConversionDevisRefuseeException $e) {
+                $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected, 'invoices' => $invoices];
     }
 
     /**

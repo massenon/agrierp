@@ -46,7 +46,7 @@
                 <tbody>
                     @forelse($this->sales as $i => $sale)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
-                            <td data-label="N° Facture" class="px-md py-sm text-xs font-mono font-bold text-brand-emerald">FV-{{ $sale->date_effective->format('Y') }}-{{ strtoupper(substr($sale->id, 0, 6)) }}</td>
+                            <td data-label="N° Facture" class="px-md py-sm text-xs font-mono font-bold text-brand-emerald">{{ $sale->numero_facture }}</td>
                             <td data-label="Client" class="px-md py-sm text-xs font-bold text-brand-forest">{{ $sale->customer?->name ?? 'Client Anonyme' }}</td>
                             <td data-label="Date" class="px-md py-sm text-xs">{{ $sale->date_effective->format('d/m/Y') }}</td>
                             <td data-label="Montant TTC" class="px-md py-sm text-xs">{{ number_format($sale->total, 0, ',', ' ') }}</td>

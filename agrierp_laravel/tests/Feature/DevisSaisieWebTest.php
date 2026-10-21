@@ -241,16 +241,6 @@ class DevisSaisieWebTest extends TestCase
         $this->assertSame([150000.0, 150000.0], [(float) $archive->fresh()->amount, (float) $facture->fresh()->amount]);
     }
 
-    public function test_convertir_en_facture_garde_le_message_d_attente_du_web(): void
-    {
-        $devis = $this->devis(['status' => 'accepte']);
-
-        Livewire::test(Devis::class)->call('convertToInvoice', $devis->id)
-            ->assertDispatched('toast', message: 'La conversion en facture réelle arrive avec le module Facturation (Sprint 7).', type: 'warning');
-
-        $this->assertSame('accepte', $devis->fresh()->status);
-    }
-
     public function test_les_quatre_kpi_sont_calcules_comme_le_web(): void
     {
         $this->devis(['status' => 'brouillon', 'amount' => 1000]);
