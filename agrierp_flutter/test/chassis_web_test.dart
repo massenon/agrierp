@@ -88,6 +88,8 @@ void main() {
       EcranPoste.fichePorcs: '/fiche-porcs',
       EcranPoste.ficheEscargots: '/fiche-escargots',
       EcranPoste.transfertsBandes: '/transferts-bandes',
+      EcranPoste.gestionBandes: '/gestion-bandes',
+      EcranPoste.enregistrerSujets: '/enregistrer-sujets',
       EcranPoste.ventesEtDevis: '/ventes-devis',
       EcranPoste.clientsEtCreances: '/creances-clients',
       EcranPoste.achatsEtCommandes: '/achats-commandes',

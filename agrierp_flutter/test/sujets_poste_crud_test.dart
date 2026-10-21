@@ -1,8 +1,11 @@
 import 'package:agrierp/core/comptabilite/exercice_de_saisie.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
+import 'package:agrierp/features/elevage/enregistrer_sujets_screen.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
+import 'package:flutter/material.dart';
 import 'package:agrierp/features/elevage/sujets_entrees_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -90,7 +93,10 @@ void main() {
     );
   });
 
-  tearDown(() async => db.close());
+  tearDown(() async {
+    ToastAgri.toutRetirer();
+    await db.close();
+  });
 
   FormulaireSujet saisie(String origine, int quantite, DateTime jour) =>
       FormulaireSujet(speciesId: lapins, lotId: bande, origine: origine, quantite: '$quantite', date: jour);
@@ -330,6 +336,217 @@ void main() {
       await moteur.synchroniser();
       expect([derniere()['ne'], derniere()['achat'], derniere()['don']], [0, 0, 0]);
       expect((await fiche(dix))!.syncStatus, SyncStatus.synced);
+    });
+  });
+
+  group('écran « Enregistrer des Sujets »', () {
+    Future<void> attendre(WidgetTester t) async {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 120)));
+      await t.pumpAndSettle();
+    }
+
+    Future<void> monter(WidgetTester t, {bool peutGerer = true, bool peutArchiver = true}) async {
+      t.view.physicalSize = const Size(1400, 2400);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        MaterialApp(
+          home: EnregistrerSujetsScreen(depot: depot, peutGerer: peutGerer, peutArchiver: peutArchiver, horloge: () => maintenant),
+        ),
+      );
+      await attendre(t);
+    }
+
+    Future<void> choisir(WidgetTester t, String cle, String libelle) async {
+      await t.tap(find.descendant(of: find.byKey(Key(cle)), matching: find.byType(DropdownButton<String>)));
+      await t.pumpAndSettle();
+      await t.tap(find.text(libelle).last);
+      await attendre(t);
+    }
+
+    Future<void> saisir(WidgetTester t, String cle, String texte) async {
+      await t.enterText(find.descendant(of: find.byKey(Key(cle)), matching: find.byType(TextField)), texte);
+      await t.pump();
+    }
+
+    String texteDe(WidgetTester t, String cle) => (t.widget(find.byKey(Key(cle))) as Text).data!;
+
+    Future<void> journalDuDecor(WidgetTester t) => t.runAsync(() async {
+      await depot.ajouter(saisie('Naissance', 10, dix));
+      await depot.ajouter(saisie('Achat', 5, quinze));
+    });
+
+    testWidgets('⚠️ l écran rend les KPI, le journal (une ligne par origine) et « Lecture seule » sans le droit', (t) async {
+      await journalDuDecor(t);
+      await monter(t, peutGerer: false);
+
+      expect(find.text('Enregistrer des Sujets'), findsOneWidget);
+      expect(find.textContaining('Journal des ENTRÉES (Phase 1 du cycle)'), findsOneWidget);
+      for (final (libelle, valeur) in [('Naissances (mois)', '10'), ('Acquisitions (mois)', '5'), ('Effectif Total', '215')]) {
+        expect(find.descendant(of: find.byKey(Key('kpi-$libelle')), matching: find.text(valeur)), findsOneWidget, reason: libelle);
+      }
+      expect(find.text('PON-2026-01'), findsNWidgets(2));
+      expect(find.text('15/10/2026'), findsOneWidget);
+      expect(find.text('Lecture seule'), findsNWidgets(2));
+      expect(find.byKey(const Key('sujet-nouveau')), findsNothing);
+    });
+
+    testWidgets('journal vide : « Aucun résultat trouvé » et « + Nouveau Sujet »', (t) async {
+      await monter(t);
+
+      expect(find.text('Aucun résultat trouvé'), findsOneWidget);
+      expect(find.text('+ Nouveau Sujet'), findsOneWidget);
+    });
+
+    testWidgets('⚠️⚠️ Nouveau Sujet : espèce puis bande, EN FILE, toast du web, effectif de la bande à jour', (t) async {
+      await monter(t);
+      await t.tap(find.byKey(const Key('sujet-nouveau')));
+      await t.pumpAndSettle();
+      expect(find.text('Nouveau Sujet'), findsWidgets);
+      expect(find.text("Choisir d'abord une espèce"), findsOneWidget);
+
+      await choisir(t, 'sujet-espece', 'Aviculture');
+      await choisir(t, 'sujet-bande', 'PON-2026-01 (200 têtes)');
+      await choisir(t, 'sujet-origine', 'Naissance');
+      await saisir(t, 'sujet-quantite', '10');
+      await t.tap(find.byKey(const Key('sujet-enregistrer')));
+      await attendre(t);
+
+      final f = (await t.runAsync(() => fiche(DateTime(2026, 10, 21))))!;
+      expect([f.ne, f.effectifFinal, f.syncStatus], [10, 210, SyncStatus.pending]);
+      expect(find.text('Enregistrement effectué avec succès.'), findsOneWidget);
+      expect(find.text('À envoyer'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️ formulaire vide : les messages du web sous leur champ ; un exercice clos : le motif R4 sous « Date »', (t) async {
+      await t.runAsync(
+        () => db.into(db.fiscalYears).insert(
+          FiscalYearsCompanion.insert(id: uuid('ex26'), year: 2026, startDate: Value(DateTime(2026)), endDate: Value(DateTime(2026, 12, 31)), status: const Value('cloture')),
+        ),
+      );
+      await monter(t);
+      await t.tap(find.byKey(const Key('sujet-nouveau')));
+      await t.pumpAndSettle();
+
+      await t.tap(find.byKey(const Key('sujet-enregistrer')));
+      await t.pumpAndSettle();
+      expect(texteDe(t, 'sujet-erreur-species_id'), 'Le champ espèce est obligatoire.');
+      expect(texteDe(t, 'sujet-erreur-lot_id'), 'Le champ bande est obligatoire.');
+      expect(texteDe(t, 'sujet-erreur-origine'), 'Le champ origine est obligatoire.');
+
+      await choisir(t, 'sujet-espece', 'Aviculture');
+      await choisir(t, 'sujet-bande', 'PON-2026-01 (200 têtes)');
+      await choisir(t, 'sujet-origine', 'Achat');
+      await t.tap(find.byKey(const Key('sujet-enregistrer')));
+      await attendre(t);
+      expect(texteDe(t, 'sujet-erreur-entry_date'), "L'exercice 2026 est clôturé : aucune saisie ne peut être datée du 21/10/2026.");
+      expect(await t.runAsync(() => db.select(db.livestockDailyEntries).get()), isEmpty);
+    });
+
+    testWidgets('⚠️⚠️ Modifier le Sujet : la quantité REMPLACE, la cascade suit ; toast du web ; la fiche repart EN FILE', (t) async {
+      await journalDuDecor(t);
+      await t.runAsync(() => db.update(db.livestockDailyEntries).write(const LivestockDailyEntriesCompanion(syncStatus: Value(SyncStatus.synced))));
+      final f = (await t.runAsync(() => fiche(dix)))!;
+      await monter(t);
+
+      await t.tap(find.byKey(Key('sujet-modifier-${f.id}-Naissance')));
+      await t.pumpAndSettle();
+      expect(find.text('Modifier le Sujet'), findsOneWidget);
+      expect(find.text('PON-2026-01'), findsWidgets);
+      await saisir(t, 'sujet-quantite', '4');
+      await t.tap(find.byKey(const Key('sujet-enregistrer')));
+      await attendre(t);
+
+      final apres = (await t.runAsync(() => fiche(dix)))!;
+      expect([apres.ne, apres.effectifFinal, apres.syncStatus], [4, 204, SyncStatus.pending]);
+      expect((await t.runAsync(bandeActuelle)), 209);
+      expect(find.text('Modification enregistrée avec succès.'), findsOneWidget);
+      expect(texteDe(t, 'sujet-quantite-${f.id}-Naissance'), '4');
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️⚠️ Archiver : confirmation, l entrée quitte le journal, la fiche est gardée, toast d avertissement', (t) async {
+      await journalDuDecor(t);
+      final f = (await t.runAsync(() => fiche(quinze)))!;
+      await monter(t);
+
+      await t.tap(find.byKey(Key('sujet-archiver-${f.id}-Achat')));
+      await t.pumpAndSettle();
+      expect(find.text("Confirmer l'archivage"), findsOneWidget);
+      expect(
+        find.text("PON-2026-01 — Achat (5) du 15/10/2026 sera marqué(e) comme archivé(e) (statut inactif). Aucune suppression définitive n'est effectuée."),
+        findsOneWidget,
+      );
+      await t.tap(find.byKey(const Key('archivage-sujet-confirmer')));
+      await attendre(t);
+
+      expect((await t.runAsync(() => fiche(quinze)))!.achat, 0);
+      expect(find.byKey(Key('sujet-ligne-${f.id}-Achat')), findsNothing);
+      expect(find.text('Entrée archivée avec succès.'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️ archiver une entrée qui rendrait un effectif négatif : toast d erreur avec le motif, rien n est écrit', (t) async {
+      await t.runAsync(() async {
+        await depot.ajouter(saisie('Naissance', 10, dix));
+        await db.into(db.livestockDailyEntries).insert(
+          LivestockDailyEntriesCompanion.insert(id: uuid('vente'), deviceId: 'poste-test', updatedAt: DateTime(2026, 10, 12), lotId: bande, entryDate: douze, vente: const Value(205), effectifFinal: const Value(5)),
+        );
+        await fiches.recalculerEnCascade(bande, dix);
+      });
+      final f = (await t.runAsync(() => fiche(dix)))!;
+      await monter(t);
+
+      await t.tap(find.byKey(Key('sujet-archiver-${f.id}-Naissance')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('archivage-sujet-confirmer')));
+      await attendre(t);
+
+      expect(find.text("Saisie refusée : l'effectif de la bande PON-2026-01 deviendrait négatif le 12/10/2026 (-5)."), findsOneWidget);
+      expect((await t.runAsync(() => fiche(dix)))!.ne, 10);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('sans archive-elevage : Modifier reste, Archiver disparaît', (t) async {
+      await journalDuDecor(t);
+      final f = (await t.runAsync(() => fiche(dix)))!;
+      await monter(t, peutArchiver: false);
+
+      expect(find.byKey(Key('sujet-modifier-${f.id}-Naissance')), findsOneWidget);
+      expect(find.byKey(Key('sujet-archiver-${f.id}-Naissance')), findsNothing);
+    });
+
+    testWidgets('filtre « Naissance » / « Achat » et recherche d un code de bande', (t) async {
+      await journalDuDecor(t);
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('sujets-filtre-statut')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Achat').last);
+      await attendre(t);
+      expect(find.text('15/10/2026'), findsOneWidget);
+      expect(find.text('10/10/2026'), findsNothing);
+
+      await t.enterText(find.byKey(const Key('sujets-recherche')), 'zzz');
+      await t.pump(EnregistrerSujetsScreen.delaiRecherche);
+      await attendre(t);
+      expect(find.text('Aucun résultat trouvé'), findsOneWidget);
+    });
+
+    testWidgets('⚠️ une fiche REFUSÉE par le serveur le dit avec son motif, mot pour mot', (t) async {
+      await journalDuDecor(t);
+      final f = (await t.runAsync(() => fiche(dix)))!;
+      await t.runAsync(() async {
+        await (db.update(db.livestockDailyEntries)..where((x) => x.id.equals(f.id))).write(const LivestockDailyEntriesCompanion(syncStatus: Value(SyncStatus.conflict)));
+        await db.into(db.syncConflicts).insert(
+          SyncConflictsCompanion.insert(id: 'livestock_daily_entries:${f.id}', sourceTable: 'livestock_daily_entries', recordId: f.id, reason: "L'exercice 2025 est clôturé.", detectedAt: DateTime(2026, 10, 21)),
+        );
+      });
+      await monter(t);
+
+      expect(find.text('Refusée'), findsOneWidget);
+      expect(texteDe(t, 'sujet-motif-${f.id}-Naissance'), "L'exercice 2025 est clôturé.");
     });
   });
 }

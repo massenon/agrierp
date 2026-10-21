@@ -141,6 +141,8 @@ void main() {
     // CFG-2 : « Paramètres du poste » ouvre le hub Paramètres sur l'onglet Appairage.
     EcranPoste.parametres: 'parametres/parametres_generaux_screen.dart',
     EcranPoste.transfertsBandes: 'elevage/transferts_bandes_screen.dart',
+    EcranPoste.gestionBandes: 'elevage/gestion_bandes_screen.dart',
+    EcranPoste.enregistrerSujets: 'elevage/enregistrer_sujets_screen.dart',
   };
 
   /// Recherche globale de la barre supérieure (tous rôles) : tables lues PAR DOMAINE, sous la permission du web

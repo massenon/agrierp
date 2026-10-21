@@ -68,6 +68,14 @@ enum EcranPoste {
   ficheReproducteurs('fiche-volailles-reproducteurs.html'),
   ficheEscargots('fiche-escargots.html'),
 
+  /// Ticket BS1 — « Bandes & Sujets » (`/gestion-bandes`) : créer, modifier, archiver une bande. Ouvert depuis la carte de
+  /// « Gestion Élevage », comme au web (aucune entrée de barre latérale). Dans la liste de l'animalier de `RBAC_PAGE_MAP`.
+  gestionBandes('gestion-bandes.html'),
+
+  /// Ticket BS2 — « Enregistrer des Sujets » (`/enregistrer-sujets`) : le journal des entrées (naissance, achat, don).
+  /// Ouvert depuis « Bandes & Sujets » (bouton « Enregistrer des Sujets », ajouté au web d'abord). Liste de l'animalier.
+  enregistrerSujets('enregistrer-sujets.html'),
+
   /// ⚠️ Le HUB de vente, dont la caisse est le premier onglet. La barre
   /// latérale de la maquette ouvre `ventes-devis.html`, jamais
   /// `pos-interface.html` directement.

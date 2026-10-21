@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/permissions_poste.dart' show EcranPoste;
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart' show AppDatabase, FiscalYear;
 import '../../core/widgets/bandeau_exercice.dart';
@@ -7,8 +8,8 @@ import '../../core/widgets/bandeau_exercice.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/navigation_poste.dart';
 import '../../core/widgets/toast_agri.dart';
-import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'ration_volaille.dart';
 import 'soins_repository.dart';
 
@@ -169,7 +170,22 @@ class CartesFiche extends StatelessWidget {
   }
 }
 
-/// Sans bande : la carte du Blade (`inbox`, message, lien vers « Bandes & Sujets », qui n'existe qu'au web).
+/// `route('elevage.bandes')` : ouvre « Bandes & Sujets » dans le socle (ticket BS1). Hors du socle (écran testé seul),
+/// le repli dit où la trouver, jamais un lien mort.
+void ouvrirBandes(BuildContext context) {
+  final navigation = NavigationPoste.maybeOf(context);
+  if (navigation != null) {
+    navigation.ouvrir(EcranPoste.gestionBandes);
+    return;
+  }
+  ToastAgri.afficher(
+    context,
+    'Ouvrez « Bandes & Sujets » depuis Gestion Élevage pour créer une bande.',
+    type: TypeToast.avertissement,
+  );
+}
+
+/// Sans bande : la carte du Blade (`inbox`, message, lien vers « Bandes & Sujets »).
 class AucuneBandeFiche extends StatelessWidget {
   const AucuneBandeFiche({super.key, required this.message});
 
@@ -201,12 +217,8 @@ class AucuneBandeFiche extends StatelessWidget {
           const SizedBox(height: AgriSpacing.sm),
           InkWell(
             key: const Key('lien-bandes'),
-            // `route('elevage.bandes')` : l'écran n'existe qu'au web — le poste le dit, comme Gestion Élevage.
-            onTap: () => ToastAgri.afficher(
-              context,
-              GestionElevageScreen.messageBandesWeb,
-              type: TypeToast.avertissement,
-            ),
+            // `route('elevage.bandes')` : « Bandes & Sujets » s'ouvre (ticket BS1) ; hors du socle, le repli le dit.
+            onTap: () => ouvrirBandes(context),
             child: const Text(
               'Créer une bande depuis Bandes & Sujets →',
               style: TextStyle(

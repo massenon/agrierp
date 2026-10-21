@@ -140,6 +140,10 @@ void main() {
       // Ticket 15.46 : comme les fiches, l'écran des transferts s'ouvre depuis « Gestion Élevage »
       // (carte du hub). Accès vérifié par `transferts_bandes_test.dart`.
       EcranPoste.transfertsBandes,
+      // Tickets BS1 et BS2 : « Bandes & Sujets » s'ouvre depuis la carte de « Gestion Élevage », « Enregistrer des
+      // Sujets » depuis « Bandes & Sujets » (comme au web : aucune des deux n'est dans la barre latérale).
+      EcranPoste.gestionBandes,
+      EcranPoste.enregistrerSujets,
       // Premier onglet du hub de vente, comme dans la maquette.
       EcranPoste.caisse,
       // ⚠️ TROISIÈME FAMILLE (ticket F0.57) : les pages du MENU DU COMPTE de la

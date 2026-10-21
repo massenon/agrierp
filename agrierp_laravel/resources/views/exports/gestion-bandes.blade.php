@@ -14,7 +14,7 @@
     <tbody>
         @forelse($lots as $lot)
             @php
-                $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : 0;
+                $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : null;
             @endphp
             <tr>
                 <td>{{ $lot->code }}</td>
@@ -23,7 +23,7 @@
                 <td>{{ $lot->created_date->format('d/m/Y') }}</td>
                 <td style="text-align:right;">{{ $lot->initial_quantity }}</td>
                 <td style="text-align:right;">{{ $lot->current_quantity }}</td>
-                <td style="text-align:right;">{{ $mortaliteRate }}%</td>
+                <td style="text-align:right;">{{ $mortaliteRate === null ? '—' : $mortaliteRate.'%' }}</td>
                 <td>{{ $lot->status === 'actif' ? 'Actif' : ucfirst($lot->status) }}</td>
             </tr>
         @empty

@@ -1,9 +1,13 @@
 import 'package:agrierp/core/comptabilite/exercice_de_saisie.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/export/document_officiel.dart';
+import 'package:agrierp/core/widgets/toast_agri.dart';
 import 'package:agrierp/core/sync/gestes_importants.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/elevage/bandes_repository.dart';
+import 'package:agrierp/features/elevage/gestion_bandes_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -119,6 +123,13 @@ void main() {
     ),
   );
 
+
+  /// Laisse la base (isolat) répondre, puis le widget se reconstruire.
+  Future<void> attendre(WidgetTester t) async {
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 120)));
+    await t.pumpAndSettle();
+  }
+
   FormulaireBande formulaire({
     String espece = lapins,
     String code = 'LOT-LAP-9',
@@ -155,7 +166,10 @@ void main() {
     await especes();
   });
 
-  tearDown(() async => db.close());
+  tearDown(() async {
+    ToastAgri.toutRetirer();
+    await db.close();
+  });
 
   group('créer', () {
     test('⚠️ la bande naît au poste : UUID, effectif initial = courant, actif, EN FILE (pending), signal de synchronisation', () async {
@@ -595,5 +609,300 @@ void main() {
         expect((await db.etatDeSynchronisation())?.lastPulledAt, curseur);
       });
     }
+  });
+
+  group('écran « Bandes & Sujets »', () {
+    final jeudi = maintenant;
+
+    Future<void> monter(
+      WidgetTester t, {
+      bool peutGerer = true,
+      Future<String?> Function(DocumentOfficiel, DateTime)? imprimer,
+      VoidCallback? onOuvrirSujets,
+    }) async {
+      t.view.physicalSize = const Size(1400, 2400);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        MaterialApp(
+          home: GestionBandesScreen(
+            depot: depot,
+            peutGerer: peutGerer,
+            imprimer: imprimer,
+            onOuvrirSujets: onOuvrirSujets,
+            horloge: () => jeudi,
+          ),
+        ),
+      );
+      await attendre(t);
+    }
+
+    Future<void> choisir(WidgetTester t, String cle, String libelle) async {
+      await t.tap(find.descendant(of: find.byKey(Key(cle)), matching: find.byType(DropdownButton<String>)));
+      await t.pumpAndSettle();
+      await t.tap(find.text(libelle).last);
+      await attendre(t);
+    }
+
+    Future<void> saisir(WidgetTester t, String cle, String texte) async {
+      await t.enterText(find.descendant(of: find.byKey(Key(cle)), matching: find.byType(TextField)), texte);
+      await t.pump();
+    }
+
+    String texteDe(WidgetTester t, String cle) => (t.widget(find.byKey(Key(cle))) as Text).data!;
+
+    testWidgets('⚠️ l écran rend les KPI, le tableau et l état vide du Blade ; « Lecture seule » sans le droit', (t) async {
+      await t.runAsync(() async {
+        await bande(uuid('b1'), 'LOT-LAP-1', initial: 8, courant: 7, creee: DateTime(2026, 9, 1));
+        await bande(uuid('b2'), 'LOT-VOL-1', espece: volailles, stade: 'ponte', initial: 3, courant: 3, creee: DateTime(2026, 10, 1));
+      });
+      await monter(t, peutGerer: false);
+
+      expect(find.text('Bandes & Sujets'), findsOneWidget);
+      expect(find.text('Effectif vivant en temps réel, stade physiologique et statut, par bande.'), findsOneWidget);
+      for (final (libelle, valeur) in [('Bandes Actives', '2'), ('En Reproduction', '1'), ('Effectif Total Vivant', '10'), ('Alertes Sanitaires', '0')]) {
+        expect(find.descendant(of: find.byKey(Key('kpi-$libelle')), matching: find.text(valeur)), findsOneWidget, reason: libelle);
+      }
+      expect(find.text('LOT-VOL-1'), findsOneWidget);
+      expect(find.text('Ponte'), findsOneWidget);
+      expect(find.text('12.5%'), findsOneWidget);
+      expect(find.text('Lecture seule'), findsNWidgets(2));
+      expect(find.byKey(const Key('bande-nouvelle')), findsNothing);
+      expect(find.byKey(Key('bande-modifier-${uuid('b1')}')), findsNothing);
+    });
+
+    testWidgets('aucune bande : le message du Blade', (t) async {
+      await monter(t);
+
+      expect(find.text('Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.'), findsOneWidget);
+    });
+
+    testWidgets('⚠️⚠️ Nouvelle Bande : code suggéré, création EN FILE, toast du web, ligne « À envoyer »', (t) async {
+      await t.runAsync(() => bande(uuid('b1'), 'LOT-LAP-3'));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-nouvelle')));
+      await t.pumpAndSettle();
+      expect(find.text('Nouvelle Bande'), findsWidgets);
+      await choisir(t, 'bande-espece', 'Cuniculture');
+      expect(t.widget<TextField>(find.descendant(of: find.byKey(const Key('bande-code')), matching: find.byType(TextField))).controller!.text, 'LOT-LAP-4');
+      await saisir(t, 'bande-quantite', '12');
+      await t.tap(find.byKey(const Key('bande-creer')));
+      await attendre(t);
+
+      final lot = await t.runAsync(() => (db.select(db.livestockLots)..where((x) => x.code.equals('LOT-LAP-4'))).getSingleOrNull());
+      expect([lot!.initialQuantity, lot.syncStatus, lot.stage], [12, SyncStatus.pending, 'reproduction']);
+      expect(find.text('Bande créée avec succès.'), findsOneWidget);
+      expect(find.byKey(Key('bande-etat-${lot.id}')), findsOneWidget);
+      expect(find.text('À envoyer'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️ formulaire vide : les messages du web sous leur champ, rien n est écrit ; « Annuler » ferme', (t) async {
+      await monter(t);
+      await t.tap(find.byKey(const Key('bande-nouvelle')));
+      await t.pumpAndSettle();
+
+      await t.tap(find.byKey(const Key('bande-creer')));
+      await t.pumpAndSettle();
+
+      expect(texteDe(t, 'bande-erreur-species_id'), 'Le champ espèce est obligatoire.');
+      expect(texteDe(t, 'bande-erreur-code'), 'Le champ code est obligatoire.');
+      expect(texteDe(t, 'bande-erreur-quantity'), 'Le champ quantité doit être au moins égal à 1.');
+      expect(await t.runAsync(() => db.select(db.livestockLots).get()), isEmpty);
+
+      await t.tap(find.text('Annuler'));
+      await t.pumpAndSettle();
+      expect(find.text('Créer la Bande'), findsNothing);
+    });
+
+    testWidgets('⚠️ une date dans un exercice clos : le motif R4 sous « Date de Création », rien n est écrit', (t) async {
+      await t.runAsync(() async {
+        await exercice(2026, 'cloture');
+      });
+      await monter(t);
+      await t.tap(find.byKey(const Key('bande-nouvelle')));
+      await t.pumpAndSettle();
+      await choisir(t, 'bande-espece', 'Cuniculture');
+      await saisir(t, 'bande-quantite', '12');
+
+      await t.tap(find.byKey(const Key('bande-creer')));
+      await attendre(t);
+
+      expect(texteDe(t, 'bande-erreur-created_date'), startsWith("L'exercice 2026 est clôturé"));
+      expect(await t.runAsync(() => db.select(db.livestockLots).get()), isEmpty);
+    });
+
+    testWidgets('⚠️ Modifier la Bande : code non modifiable, stade, effectif, statut ; toast du web ; la ligne repart EN FILE', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 10));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-modifier-$mere')));
+      await t.pumpAndSettle();
+      expect(find.text('Modifier la Bande'), findsOneWidget);
+      expect(find.text("L'identifiant technique unique n'est jamais modifiable après création."), findsOneWidget);
+      await choisir(t, 'bande-edit-statut', 'Clôturé');
+      await saisir(t, 'bande-edit-quantite', '7');
+      await t.tap(find.byKey(const Key('bande-enregistrer')));
+      await attendre(t);
+
+      final b = (await t.runAsync(() => lue(mere)))!;
+      expect([b.status, b.currentQuantity, b.effectifCorrige, b.syncStatus], ['cloture', 7, 7, SyncStatus.pending]);
+      expect(find.text('Bande modifiée avec succès.'), findsOneWidget);
+      expect(find.text('Clôturé'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('Modifier : un effectif négatif est refusé avec le message du web', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', courant: 10));
+      await monter(t);
+      await t.tap(find.byKey(const Key('bande-modifier-$mere')));
+      await t.pumpAndSettle();
+
+      await saisir(t, 'bande-edit-quantite', '-2');
+      await t.tap(find.byKey(const Key('bande-enregistrer')));
+      await t.pumpAndSettle();
+
+      expect(texteDe(t, 'bande-erreur-quantity'), 'Le champ quantité doit être au moins égal à 0.');
+      expect((await t.runAsync(() => lue(mere)))!.syncStatus, SyncStatus.synced);
+    });
+
+    testWidgets('⚠️⚠️ Archiver : confirmation « Confirmer l archivage », la bande quitte la liste, toast d avertissement, EN FILE', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1'));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('bande-archiver-$mere')));
+      await t.pumpAndSettle();
+      expect(find.text("Confirmer l'archivage"), findsOneWidget);
+      expect(find.text("LOT-LAP-1 sera marqué(e) comme archivé(e) (statut inactif). Aucune suppression définitive n'est effectuée."), findsOneWidget);
+      await t.tap(find.text('Annuler'));
+      await t.pumpAndSettle();
+      expect((await t.runAsync(() => lue(mere)))!.isActive, isTrue, reason: 'annuler n archive rien');
+
+      await t.tap(find.byKey(const Key('bande-archiver-$mere')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('archivage-bande-confirmer')));
+      await attendre(t);
+
+      final b = (await t.runAsync(() => lue(mere)))!;
+      expect([b.isActive, b.syncStatus], [false, SyncStatus.pending]);
+      expect(find.text('LOT-LAP-1'), findsNothing);
+      expect(find.text('Bande archivée avec succès.'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️ une bande REFUSÉE par le serveur le dit avec son motif, mot pour mot', (t) async {
+      await t.runAsync(() async {
+        await bande(mere, 'LOT-LAP-1', sync: SyncStatus.conflict);
+        await db.into(db.syncConflicts).insert(
+          SyncConflictsCompanion.insert(
+            id: 'livestock_lots:$mere',
+            sourceTable: 'livestock_lots',
+            recordId: mere,
+            reason: 'La valeur du champ code existe déjà.',
+            detectedAt: DateTime(2026, 10, 21),
+          ),
+        );
+      });
+      await monter(t);
+
+      expect(find.text('Refusée'), findsOneWidget);
+      expect(texteDe(t, 'bande-motif-$mere'), 'La valeur du champ code existe déjà.');
+    });
+
+    testWidgets('recherche (300 ms) et filtre d espèce', (t) async {
+      await t.runAsync(() async {
+        await bande(uuid('b1'), 'LOT-LAP-1');
+        await bande(uuid('b2'), 'LOT-VOL-1', espece: volailles, stade: 'ponte');
+      });
+      await monter(t);
+
+      await t.enterText(find.byKey(const Key('bandes-recherche')), 'vol');
+      await t.pump(const Duration(milliseconds: 299));
+      expect(find.text('LOT-LAP-1'), findsOneWidget, reason: 'pas encore appliquée');
+      await t.pump(const Duration(milliseconds: 2));
+      await attendre(t);
+      expect(find.text('LOT-LAP-1'), findsNothing);
+      expect(find.text('LOT-VOL-1'), findsOneWidget);
+
+      await t.enterText(find.byKey(const Key('bandes-recherche')), '');
+      await t.pump(GestionBandesScreen.delaiRecherche);
+      await attendre(t);
+      await t.tap(find.byKey(const Key('bandes-filtre-filiere')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cuniculture').last);
+      await attendre(t);
+      expect(find.text('LOT-VOL-1'), findsNothing);
+      expect(find.text('LOT-LAP-1'), findsOneWidget);
+    });
+
+    testWidgets('⚠️ le tiroir de détail : identité, autonomie, suivi sanitaire (rémanence, infirmerie, mortalité 7 jours)', (t) async {
+      await t.runAsync(() async {
+        await bande(mere, 'LOT-LAP-1', initial: 10, courant: 9);
+        await db.into(db.veterinaryWithdrawalPeriods).insert(
+          VeterinaryWithdrawalPeriodsCompanion.insert(id: uuid('p1'), lotId: mere, endDate: DateTime(2026, 10, 25), productUsed: const Value('Oxytétracycline')),
+        );
+        await db.into(db.livestockDailyEntries).insert(
+          LivestockDailyEntriesCompanion.insert(
+            id: uuid('f1'),
+            deviceId: 'serveur',
+            updatedAt: DateTime(2026, 10, 20),
+            lotId: mere,
+            entryDate: DateTime(2026, 10, 20),
+            mort: const Value(1),
+            effectifFinal: const Value(9),
+            feedQtyKg: const Value(2.5),
+            syncStatus: const Value(SyncStatus.synced),
+          ),
+        );
+      });
+      await monter(t);
+
+      await t.tap(find.byKey(Key('bande-ligne-$mere')));
+      await t.pumpAndSettle();
+
+      expect(find.byKey(const Key('bande-tiroir')), findsOneWidget);
+      expect(find.text("Délai d'attente en cours"), findsOneWidget);
+      expect(find.text("Oxytétracycline — vente interdite jusqu'au 25/10/2026."), findsOneWidget);
+      expect(find.text('0 sujet(s)'), findsOneWidget);
+      // 1 mort sur 10 au départ (effectif initial, aucune fiche avant) = 10,0 %.
+      expect(find.text('1 mort(s) — 10,0 %'), findsOneWidget);
+      expect(find.textContaining('2,50 Kg/j'), findsOneWidget);
+      expect(find.textContaining('fiche du 20/10/2026'), findsOneWidget);
+      expect(find.textContaining('Autonomie alimentaire : aucun stock de provende suivi'), findsOneWidget);
+
+      await t.tap(find.byKey(const Key('bande-tiroir-fermer')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('bande-tiroir')), findsNothing);
+    });
+
+    testWidgets('⚠️ Exporter PDF : « Gestion des Bandes », huit colonnes, une ligne par bande, nom du web', (t) async {
+      await t.runAsync(() => bande(mere, 'LOT-LAP-1', initial: 8, courant: 7, statut: 'cloture'));
+      DocumentOfficiel? recu;
+      await monter(t, imprimer: (d, m) async {
+        recu = d;
+        return null;
+      });
+
+      await t.tap(find.byKey(const Key('bandes-exporter-pdf')));
+      await attendre(t);
+
+      expect(recu!.titre, 'Gestion des Bandes');
+      expect(recu!.sousTitre, 'État au 21/10/2026');
+      expect(recu!.entetes, ['Code Bande', 'Espèce', 'Stade', 'Date Création', 'Effectif Initial', 'Effectif Actuel', 'Mortalité', 'Statut']);
+      expect((recu!.lignes.single as DonneesDocument).cellules, ['LOT-LAP-1', 'Cuniculture', 'Reproducteur', '01/09/2026', '8', '7', '12.5%', 'Cloture']);
+      expect(DocumentOfficiel.nomPdf(recu!, maintenant), 'bandes-2026-10-21.pdf');
+    });
+
+    testWidgets('le bouton « Enregistrer des Sujets » ouvre le journal des entrées', (t) async {
+      var ouvert = 0;
+      await monter(t, onOuvrirSujets: () => ouvert++);
+
+      await t.tap(find.byKey(const Key('bandes-enregistrer-sujets')));
+      await t.pump();
+
+      expect(ouvert, 1);
+      expect(find.text('Enregistrer des Sujets'), findsOneWidget);
+    });
   });
 }

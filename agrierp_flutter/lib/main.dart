@@ -17,6 +17,7 @@ import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
 import 'core/sync/gestes_importants.dart';
+import 'core/widgets/navigation_poste.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
 import 'core/widgets/acces_rapide.dart';
@@ -42,6 +43,10 @@ import 'features/achats/fournisseurs_screen.dart';
 import 'features/achats/depenses_repository.dart';
 import 'features/achats/saisie_depenses_screen.dart';
 import 'features/elevage/dashboard_elevage_repository.dart';
+import 'features/elevage/bandes_repository.dart';
+import 'features/elevage/enregistrer_sujets_screen.dart';
+import 'features/elevage/gestion_bandes_screen.dart';
+import 'features/elevage/sujets_entrees_repository.dart';
 import 'features/elevage/transferts_bandes_screen.dart';
 import 'features/elevage/transferts_repository.dart';
 import 'features/elevage/dashboard_elevage_screen.dart';
@@ -284,6 +289,17 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
   );
 
+  /// Tickets BS1 et BS2 — « Bandes & Sujets » et « Enregistrer des Sujets » : la bande se crée, se modifie et s'archive
+  /// par ce dépôt (constitution par les transferts) ; les entrées de sujets passent par l'unique écrivain des fiches.
+  late final BandesRepository _bandes = BandesRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+    transferts: _transferts,
+    gestes: _gestes,
+  );
+
+  late final SujetsEntreesRepository _sujetsEntrees = SujetsEntreesRepository(database: _db, fiches: _fiches);
+
   late final TableauDeBordRepository _tableauDeBord = TableauDeBordRepository(
     database: _db,
   );
@@ -424,6 +440,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           tableauDeBord: _tableauDeBord,
           dashboardElevage: _dashboardElevage,
           transferts: _transferts,
+          bandes: _bandes,
+          sujetsEntrees: _sujetsEntrees,
           reproduction: _reproduction,
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
@@ -476,6 +494,8 @@ class SocleAccueil extends StatefulWidget {
     required this.tableauDeBord,
     required this.dashboardElevage,
     required this.transferts,
+    required this.bandes,
+    required this.sujetsEntrees,
     required this.reproduction,
     required this.soinsVaccins,
     required this.parametresElevage,
@@ -533,6 +553,8 @@ class SocleAccueil extends StatefulWidget {
   final TableauDeBordRepository tableauDeBord;
   final DashboardElevageRepository dashboardElevage;
   final TransfertsRepository transferts;
+  final BandesRepository bandes;
+  final SujetsEntreesRepository sujetsEntrees;
   final SuiviReproductionRepository reproduction;
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
@@ -727,7 +749,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
     return PorteeExerciceChoisi(
       notifier: _exercice,
-      child: Scaffold(
+      // Ticket BS1 — les liens des composants partagés (« Créer une bande depuis Bandes & Sujets → ») ouvrent l'écran.
+      child: NavigationPoste(
+        ouvrir: (e) => setState(() => _ecran = e),
+        child: Scaffold(
       body: Row(
         children: [
           // ⚠️ La bascule de la barre supérieure replie la barre latérale,
@@ -850,6 +875,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ],
       ),
       ),
+      ),
     );
   }
 
@@ -936,6 +962,22 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.transfertsBandes => TransfertsBandesScreen(
           depot: widget.transferts,
+        ),
+        // Ticket BS1 — « Bandes & Sujets » : droit `manage-elevage` pour créer, modifier, archiver.
+        EcranPoste.gestionBandes => GestionBandesScreen(
+          depot: widget.bandes,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-elevage'),
+          imprimer: EditeursRapports.imprimer,
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
+          onOuvrirSujets: () =>
+              setState(() => _ecran = EcranPoste.enregistrerSujets),
+        ),
+        // Ticket BS2 — « Enregistrer des Sujets » : `manage-elevage` (nouveau, modifier), `archive-elevage` (archiver).
+        EcranPoste.enregistrerSujets => EnregistrerSujetsScreen(
+          depot: widget.sujetsEntrees,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-elevage'),
+          peutArchiver: PermissionsPoste.peut(_role, 'archive-elevage'),
         ),
         EcranPoste.dashboardElevage => DashboardElevageScreen(
           depot: widget.dashboardElevage,
@@ -1568,6 +1610,8 @@ class SocleAccueilTitres {
     EcranPoste.ficheEscargots: 'Élevage > Fiches Escargots',
     EcranPoste.ficheSujet: 'Élevage > Fiche Sujet',
     EcranPoste.transfertsBandes: 'Élevage > Transferts entre Bandes',
+    EcranPoste.gestionBandes: 'Élevage > Bandes & Sujets',
+    EcranPoste.enregistrerSujets: 'Élevage > Enregistrer des Sujets',
     EcranPoste.ventesEtDevis: 'Ventes & Devis',
     EcranPoste.clientsEtCreances: 'Créances Clients',
     EcranPoste.achatsEtCommandes: 'Achats & Commandes',

@@ -7,9 +7,8 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../../core/export/document_officiel.dart';
-import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, MoisDeFiche;
+import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, MoisDeFiche, ouvrirBandes;
 import 'fiche_journaliere_repository.dart';
-import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'mois_pondeuses.dart';
 import 'ration_volaille.dart';
 import 'production_oeufs_service.dart';
@@ -501,12 +500,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         const SizedBox(height: AgriSpacing.sm),
         InkWell(
           key: const Key('lien-bandes'),
-          // `route('elevage.bandes')` : l'écran n'existe qu'au web — le poste le dit, comme Gestion Élevage.
-          onTap: () => ToastAgri.afficher(
-            context,
-            GestionElevageScreen.messageBandesWeb,
-            type: TypeToast.avertissement,
-          ),
+          // `route('elevage.bandes')` : « Bandes & Sujets » s'ouvre (ticket BS1) ; hors du socle, le repli le dit.
+          onTap: () => ouvrirBandes(context),
           child: const Text(
             'Créer une bande depuis Bandes & Sujets →',
             style: TextStyle(

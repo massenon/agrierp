@@ -6,11 +6,16 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Effectif vivant en temps réel, stade physiologique et statut, par bande.</p>
         </div>
-        @can('manage-elevage')
-        <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-            <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
-        </button>
-        @endcan
+        <div class="flex flex-wrap items-center gap-sm">
+            <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+                <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
+            </a>
+            @can('manage-elevage')
+            <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
+            </button>
+            @endcan
+        </div>
     </div>
 
     <x-kpi-accordion title="Indicateurs de performance">
@@ -59,7 +64,7 @@
                 <tbody>
                     @forelse($this->lots as $i => $lot)
                         @php
-                            $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : 0;
+                            $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : null;   // effectif initial 0 : mortalité INCONNUE (« — »), jamais 0 %
                         @endphp
                         <tr wire:click="view('{{ $lot->id }}')" class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 cursor-pointer {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                             <td data-label="Code Bande" class="px-md py-sm text-xs font-bold text-brand-emerald">{{ $lot->code }}</td>
@@ -68,7 +73,7 @@
                             <td data-label="Date Création" class="px-md py-sm text-xs">{{ $lot->created_date->format('d/m/Y') }}</td>
                             <td data-label="Effectif Initial" class="px-md py-sm text-xs text-right">{{ $lot->initial_quantity }}</td>
                             <td data-label="Effectif Actuel" class="px-md py-sm text-xs text-right font-bold">{{ $lot->current_quantity }}</td>
-                            <td data-label="Mortalité" class="px-md py-sm text-xs text-right {{ $mortaliteRate > 0 ? 'text-error-deep font-bold' : 'text-outline' }}">{{ $mortaliteRate }}%</td>
+                            <td data-label="Mortalité" class="px-md py-sm text-xs text-right {{ ($mortaliteRate ?? 0) > 0 ? 'text-error-deep font-bold' : 'text-outline' }}">{{ $mortaliteRate === null ? '—' : $mortaliteRate.'%' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($lot->status === 'actif')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>

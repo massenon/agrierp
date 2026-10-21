@@ -155,6 +155,28 @@ class BandesSaisieWebTest extends TestCase
         $this->assertTrue((bool) $this->pondeuses->fresh()->is_active);
     }
 
+    public function test_la_mortalite_d_une_bande_sans_effectif_initial_est_inconnue_jamais_zero(): void
+    {
+        LivestockLot::create([
+            'code' => 'LOT-ZERO', 'species_id' => $this->especeId(), 'stage' => 'ponte', 'initial_quantity' => 0, 'current_quantity' => 0,
+            'created_date' => '2026-10-01', 'status' => 'actif', 'is_active' => true,
+        ]);
+        $this->pondeuses->update(['initial_quantity' => 8, 'current_quantity' => 7]);
+
+        $html = Livewire::test(GestionBandes::class)->html();
+
+        $this->assertStringContainsString('12.5%', $html, '(8 − 7) / 8 = 12,5 %');
+        $this->assertSame(1, preg_match('/LOT-ZERO.*?data-label="Mortalité"[^>]*>\s*—\s*</s', $html), 'effectif initial 0 : « — »');
+    }
+
+    public function test_enregistrer_des_sujets_est_atteignable_depuis_bandes_et_sujets(): void
+    {
+        $html = Livewire::test(GestionBandes::class)->html();
+
+        $this->assertStringContainsString(route('elevage.enregistrer-sujets'), $html);
+        $this->assertStringContainsString('Enregistrer des Sujets', $html);
+    }
+
     public function test_le_point_de_passage_unique_existe_et_porte_les_trois_gestes(): void
     {
         $action = app(SaisieBandeAction::class);

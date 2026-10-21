@@ -137,6 +137,9 @@ void main() {
         EcranPoste.fichePorcs,
         EcranPoste.ficheReproducteurs,
         EcranPoste.ficheEscargots,
+        // Tickets BS1 et BS2 — `gestion-bandes.html` et `enregistrer-sujets.html` figurent dans la liste de l'animalier.
+        EcranPoste.gestionBandes,
+        EcranPoste.enregistrerSujets,
         EcranPoste.monProfil,
         EcranPoste.notifications,
         EcranPoste.aideEtAPropos,
