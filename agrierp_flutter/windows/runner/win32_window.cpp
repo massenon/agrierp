@@ -3,6 +3,8 @@
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
+#include <algorithm>
+
 #include "resource.h"
 
 namespace {
@@ -35,6 +37,37 @@ using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+// AgriERP : taille minimale de la fenetre, en pixels LOGIQUES (a 96 ppp). Elle
+// reste sous le plus petit ecran courant meme a 150 % de mise a l'echelle ; elle
+// est de toute facon plafonnee a la zone de travail (voir FillMinMaxInfo).
+constexpr int kMinLogicalWidth = 640;
+constexpr int kMinLogicalHeight = 480;
+
+// AgriERP : l'icone de l'application (le logo de la ferme, ressource
+// IDI_APP_ICON de Runner.rc) est donnee a la fenetre en GRANDE taille (Alt+Tab,
+// barre des taches) et en PETITE taille (coin de la fenetre, barre des taches
+// en mode compact). Sans cela, Windows redimensionne l'unique icone de la classe
+// et la barre des taches la montre floue. LR_SHARED : le systeme gere la duree
+// de vie, rien a detruire.
+void ApplyWindowIcons(HWND hwnd) {
+  HINSTANCE instance = GetModuleHandle(nullptr);
+  HANDLE big = LoadImage(instance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON,
+                         GetSystemMetrics(SM_CXICON),
+                         GetSystemMetrics(SM_CYICON),
+                         LR_DEFAULTCOLOR | LR_SHARED);
+  HANDLE small_icon = LoadImage(instance, MAKEINTRESOURCE(IDI_APP_ICON),
+                                IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
+                                GetSystemMetrics(SM_CYSMICON),
+                                LR_DEFAULTCOLOR | LR_SHARED);
+  if (big) {
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(big));
+  }
+  if (small_icon) {
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL,
+                reinterpret_cast<LPARAM>(small_icon));
+  }
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -88,7 +121,8 @@ WindowClassRegistrar* WindowClassRegistrar::instance_ = nullptr;
 
 const wchar_t* WindowClassRegistrar::GetWindowClass() {
   if (!class_registered_) {
-    WNDCLASS window_class{};
+    WNDCLASSEX window_class{};
+    window_class.cbSize = sizeof(WNDCLASSEX);
     window_class.hCursor = LoadCursor(nullptr, IDC_ARROW);
     window_class.lpszClassName = kWindowClassName;
     window_class.style = CS_HREDRAW | CS_VREDRAW;
@@ -97,10 +131,15 @@ const wchar_t* WindowClassRegistrar::GetWindowClass() {
     window_class.hInstance = GetModuleHandle(nullptr);
     window_class.hIcon =
         LoadIcon(window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    // Petite icone de la classe : meme ressource, a la taille « petite » du systeme.
+    window_class.hIconSm = static_cast<HICON>(LoadImage(
+        window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON),
+        LR_DEFAULTCOLOR | LR_SHARED));
     window_class.hbrBackground = 0;
     window_class.lpszMenuName = nullptr;
     window_class.lpfnWndProc = Win32Window::WndProc;
-    RegisterClass(&window_class);
+    RegisterClassEx(&window_class);
     class_registered_ = true;
   }
   return kWindowClassName;
@@ -155,6 +194,7 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  ApplyWindowIcons(window);
 
   return OnCreate();
 }
@@ -205,9 +245,22 @@ Win32Window::MessageHandler(HWND hwnd,
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
+      // AgriERP : une fenetre agrandie reste sur la zone de travail du
+      // moniteur qui la porte desormais (autre resolution, autre echelle, autre
+      // barre des taches). Le rectangle suggere ci-dessus l'a d'abord amenee
+      // sur ce moniteur ; on la cale ensuite sur SA zone de travail.
+      if (maximized_) {
+        FitToWorkArea();
+      }
+
       return 0;
     }
     case WM_SIZE: {
+      // AgriERP : sortie de reduction dans la barre des taches. Si la zone de
+      // travail a change pendant que la fenetre etait reduite, elle se recale.
+      if (maximized_ && wparam == SIZE_RESTORED) {
+        FitToWorkArea();
+      }
       RECT rect = GetClientArea();
       if (child_content_ != nullptr) {
         // Size and position the child window.
@@ -271,6 +324,139 @@ HWND Win32Window::GetHandle() {
 
 void Win32Window::SetQuitOnClose(bool quit_on_close) {
   quit_on_close_ = quit_on_close;
+}
+
+RECT Win32Window::GetWorkArea() const {
+  // Repli si le systeme ne repond pas : un ecran de bureau courant.
+  RECT work = {0, 0, 1280, 720};
+
+  // `rcWork` = le moniteur MOINS la barre des taches (et les barres d'outils
+  // ancrees), quel que soit leur cote ou leur taille. Le moniteur est celui qui
+  // porte la fenetre ; MONITOR_DEFAULTTONEAREST garantit une reponse meme si la
+  // fenetre est hors de tout moniteur (debranchement a chaud).
+  HMONITOR monitor = nullptr;
+  if (window_handle_) {
+    monitor = MonitorFromWindow(window_handle_, MONITOR_DEFAULTTONEAREST);
+  }
+  MONITORINFO info{};
+  info.cbSize = sizeof(MONITORINFO);
+  if (monitor && GetMonitorInfo(monitor, &info)) {
+    work = info.rcWork;
+  } else {
+    RECT spi{};
+    if (SystemParametersInfo(SPI_GETWORKAREA, 0, &spi, 0)) {
+      work = spi;
+    }
+  }
+  return work;
+}
+
+bool Win32Window::IsMaximizedToWorkArea() const {
+  return maximized_;
+}
+
+void Win32Window::FitToWorkArea() {
+  if (!window_handle_ || IsIconic(window_handle_)) {
+    return;
+  }
+  RECT work = GetWorkArea();
+  RECT actuel{};
+  GetWindowRect(window_handle_, &actuel);
+  if (actuel.left == work.left && actuel.top == work.top &&
+      actuel.right == work.right && actuel.bottom == work.bottom) {
+    return;
+  }
+  SetWindowPos(window_handle_, nullptr, work.left, work.top,
+               work.right - work.left, work.bottom - work.top,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Win32Window::MaximizeToWorkArea() {
+  if (!window_handle_) {
+    return;
+  }
+  if (!maximized_) {
+    // Position de restauration : celle de la fenetre AVANT l'agrandissement.
+    GetWindowRect(window_handle_, &restore_rect_);
+  }
+  maximized_ = true;
+  FitToWorkArea();
+}
+
+void Win32Window::RestoreFromMaximized() {
+  if (!window_handle_ || !maximized_) {
+    return;
+  }
+  maximized_ = false;
+
+  // La position memorisee peut ne plus tenir : autre moniteur, resolution
+  // reduite, barre des taches agrandie. Elle est ramenee DANS la zone de travail.
+  RECT work = GetWorkArea();
+  const LONG work_width = work.right - work.left;
+  const LONG work_height = work.bottom - work.top;
+  LONG width = restore_rect_.right - restore_rect_.left;
+  LONG height = restore_rect_.bottom - restore_rect_.top;
+  if (width <= 0 || height <= 0) {
+    // Jamais memorisee (agrandie des l'ouverture) : 80 % de la zone de travail.
+    width = work_width * 8 / 10;
+    height = work_height * 8 / 10;
+  }
+  width = std::min(width, work_width);
+  height = std::min(height, work_height);
+  LONG left = std::max(work.left, std::min(restore_rect_.left, work.right - width));
+  LONG top = std::max(work.top, std::min(restore_rect_.top, work.bottom - height));
+  SetWindowPos(window_handle_, nullptr, left, top, width, height,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+bool Win32Window::ToggleMaximize() {
+  if (maximized_) {
+    RestoreFromMaximized();
+  } else {
+    MaximizeToWorkArea();
+  }
+  return maximized_;
+}
+
+void Win32Window::OnWorkAreaMessage(UINT const message, WPARAM const wparam) {
+  const bool zone_changee =
+      message == WM_DISPLAYCHANGE ||
+      (message == WM_SETTINGCHANGE && wparam == SPI_SETWORKAREA);
+  if (zone_changee && maximized_) {
+    FitToWorkArea();
+  }
+}
+
+void Win32Window::FillMinMaxInfo(LPARAM const lparam) const {
+  auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+  if (!info || !window_handle_) {
+    return;
+  }
+  HMONITOR monitor =
+      MonitorFromWindow(window_handle_, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO moniteur{};
+  moniteur.cbSize = sizeof(MONITORINFO);
+  if (!monitor || !GetMonitorInfo(monitor, &moniteur)) {
+    return;
+  }
+  const RECT& work = moniteur.rcWork;
+  const RECT& full = moniteur.rcMonitor;
+
+  // Un agrandissement fait par le systeme (touche Windows, menu de la barre
+  // des taches) reste lui aussi dans la zone de travail. ptMaxPosition est
+  // relatif au coin du moniteur.
+  info->ptMaxPosition.x = work.left - full.left;
+  info->ptMaxPosition.y = work.top - full.top;
+  info->ptMaxSize.x = work.right - work.left;
+  info->ptMaxSize.y = work.bottom - work.top;
+
+  // Taille minimale a l'echelle du moniteur, jamais plus grande que la zone de
+  // travail (sinon la fenetre deborderait d'un petit ecran).
+  const double scale = FlutterDesktopGetDpiForHWND(window_handle_) / 96.0;
+  info->ptMinTrackSize.x = std::min(Scale(kMinLogicalWidth, scale),
+                                    static_cast<int>(info->ptMaxSize.x));
+  info->ptMinTrackSize.y = std::min(Scale(kMinLogicalHeight, scale),
+                                    static_cast<int>(info->ptMaxSize.y));
 }
 
 bool Win32Window::OnCreate() {

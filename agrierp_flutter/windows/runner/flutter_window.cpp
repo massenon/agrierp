@@ -32,22 +32,52 @@ bool FlutterWindow::OnCreate() {
 
   // Canal minimal de commande de la fenetre.
   //
-  // ⚠️ SANS CADRE SYSTEME, REDUIRE ET FERMER DOIVENT VENIR DE L'APPLICATION.
-  // Une dependance externe (`window_manager`) aurait exige une recuperation de
-  // paquet ; ce canal de deux methodes se suffit et n'ajoute rien a installer
-  // sur un poste hors ligne.
+  // ⚠️ SANS CADRE SYSTEME, REDUIRE, AGRANDIR, DEPLACER ET FERMER DOIVENT VENIR
+  // DE L'APPLICATION. Une dependance externe (`window_manager`) aurait exige
+  // une recuperation de paquet ; ce canal de cinq methodes se suffit et
+  // n'ajoute rien a installer sur un poste hors ligne.
+  //
+  //   reduire                  -> reduit dans la barre des taches.
+  //   fermer                   -> WM_CLOSE (la confirmation est cote Dart).
+  //   etat                     -> {agrandie, x, y, largeur, hauteur} : l'etat et
+  //                               la ZONE DE TRAVAIL courante du moniteur.
+  //   basculerAgrandissement   -> agrandit (zone de travail) ou restaure ;
+  //                               rend le meme dictionnaire.
+  //   deplacer                 -> demarre le deplacement a la souris (barre).
+  //
+  // ⚠️ « Agrandir » = occuper la ZONE DE TRAVAIL, jamais le moniteur entier :
+  // la barre des taches de Windows reste visible (voir Win32Window).
   auto canal = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "agrierp/fenetre",
       &flutter::StandardMethodCodec::GetInstance());
 
   HWND fenetre = GetHandle();
   canal->SetMethodCallHandler(
-      [fenetre](const auto& appel, auto resultat) {
+      [this, fenetre](const auto& appel, auto resultat) {
         if (appel.method_name() == "reduire") {
           ::ShowWindow(fenetre, SW_MINIMIZE);
           resultat->Success();
         } else if (appel.method_name() == "fermer") {
           ::PostMessage(fenetre, WM_CLOSE, 0, 0);
+          resultat->Success();
+        } else if (appel.method_name() == "etat") {
+          resultat->Success(EtatFenetre());
+        } else if (appel.method_name() == "basculerAgrandissement") {
+          ToggleMaximize();
+          resultat->Success(EtatFenetre());
+        } else if (appel.method_name() == "deplacer") {
+          // Deplacement par la barre superieure. Une fenetre agrandie ne se
+          // deplace pas (elle occupe la zone de travail) : le geste est sans
+          // effet, comme la barre de titre d'une fenetre agrandie sans
+          // restauration. Le message est POSTE (et non envoye) pour ne pas
+          // bloquer ce rappel dans la boucle de deplacement du systeme.
+          if (!IsMaximizedToWorkArea()) {
+            POINT curseur{};
+            ::GetCursorPos(&curseur);
+            ::ReleaseCapture();
+            ::PostMessage(fenetre, WM_NCLBUTTONDOWN, HTCAPTION,
+                          MAKELPARAM(curseur.x, curseur.y));
+          }
           resultat->Success();
         } else {
           resultat->NotImplemented();
@@ -55,19 +85,21 @@ bool FlutterWindow::OnCreate() {
       });
   canal_fenetre_ = std::move(canal);
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    // AgriERP S'OUVRE MAXIMISE.
+  flutter_controller_->engine()->SetNextFrameCallback([this]() {
+    // AgriERP S'OUVRE AGRANDI, SUR LA ZONE DE TRAVAIL.
     //
-    // La fenetre est creee CACHEE (`WS_OVERLAPPEDWINDOW` sans `WS_VISIBLE`) et
-    // n'est montree qu'ici, a la premiere image. Maximiser depuis `main()`
-    // apres `Create()` ne servait donc a rien : ce `Show()` (SW_SHOWNORMAL)
-    // s'executait APRES et ramenait la fenetre a 1280x720. La maximisation
-    // doit se faire au meme endroit que l'affichage, pas avant.
+    // La fenetre est creee CACHEE (sans `WS_VISIBLE`) et n'est montree qu'ici, a
+    // la premiere image. L'agrandissement doit se faire au meme endroit que
+    // l'affichage, pas avant : un `ShowWindow` place dans `main()` etait
+    // ecrase par le `Show()` (SW_SHOWNORMAL) qui suivait.
     //
-    // Maximise, PAS plein ecran sans bordure : le poste est un ordinateur
-    // partage, ou l'on bascule vers un navigateur ou l'explorateur. Supprimer
-    // la barre de titre priverait l'utilisateur du bouton de reduction.
-    ::ShowWindow(GetHandle(), SW_SHOWMAXIMIZED);
+    // ⚠️ PAS `SW_SHOWMAXIMIZED` : sur une fenetre `WS_POPUP` (sans cadre), il
+    // la fait couvrir TOUT le moniteur et MASQUE LA BARRE DES TACHES de Windows
+    // (defaut constate chez le client). La fenetre est calee a la main sur la
+    // zone de travail (`MaximizeToWorkArea`, `rcWork` du moniteur) ; la barre
+    // des taches reste visible, quel que soit son cote ou sa taille.
+    MaximizeToWorkArea();
+    Show();
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -86,10 +118,34 @@ void FlutterWindow::OnDestroy() {
   Win32Window::OnDestroy();
 }
 
+flutter::EncodableValue FlutterWindow::EtatFenetre() {
+  const RECT zone = GetWorkArea();
+  flutter::EncodableMap etat;
+  etat[flutter::EncodableValue("agrandie")] =
+      flutter::EncodableValue(IsMaximizedToWorkArea());
+  etat[flutter::EncodableValue("x")] =
+      flutter::EncodableValue(static_cast<int>(zone.left));
+  etat[flutter::EncodableValue("y")] =
+      flutter::EncodableValue(static_cast<int>(zone.top));
+  etat[flutter::EncodableValue("largeur")] =
+      flutter::EncodableValue(static_cast<int>(zone.right - zone.left));
+  etat[flutter::EncodableValue("hauteur")] =
+      flutter::EncodableValue(static_cast<int>(zone.bottom - zone.top));
+  return flutter::EncodableValue(etat);
+}
+
 LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // AgriERP : la zone de travail change (resolution, barre des taches). Le
+  // message est observe, jamais consomme : Flutter le recoit ensuite.
+  OnWorkAreaMessage(message, wparam);
+  if (message == WM_GETMINMAXINFO) {
+    FillMinMaxInfo(lparam);
+    return 0;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

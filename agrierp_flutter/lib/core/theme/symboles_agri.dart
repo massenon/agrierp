@@ -56,6 +56,7 @@ abstract final class SymbolesAgri {
   static const IconData cloud_upload = IconData(0xe2c3, fontFamily: famille);
   static const IconData contact_page = IconData(0xf22e, fontFamily: famille);
   static const IconData coronavirus = IconData(0xf221, fontFamily: famille);
+  static const IconData crop_square = IconData(0xe3c1, fontFamily: famille);
   static const IconData cruelty_free = IconData(0xe799, fontFamily: famille);
   static const IconData dark_mode = IconData(0xe51c, fontFamily: famille);
   static const IconData dashboard = IconData(0xe871, fontFamily: famille);
@@ -78,6 +79,7 @@ abstract final class SymbolesAgri {
   static const IconData expand_more = IconData(0xe5cf, fontFamily: famille);
   static const IconData fact_check = IconData(0xf0c5, fontFamily: famille);
   static const IconData favorite = IconData(0xe87d, fontFamily: famille);
+  static const IconData filter_none = IconData(0xe3e0, fontFamily: famille);
   static const IconData flag = IconData(0xe153, fontFamily: famille);
   static const IconData folder = IconData(0xe2c7, fontFamily: famille);
   static const IconData folder_shared = IconData(0xe2c9, fontFamily: famille);
