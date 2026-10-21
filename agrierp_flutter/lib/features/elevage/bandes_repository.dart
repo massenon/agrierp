@@ -58,6 +58,7 @@ class LigneBande {
     required this.libelleStade,
     required this.mortalite,
     this.motifRefus,
+    this.codeRenommable = false,
   });
 
   final LivestockLot bande;
@@ -71,6 +72,10 @@ class LigneBande {
 
   /// Motif du serveur, mot pour mot, quand la dernière saisie de cette bande a été refusée (`conflict`).
   final String? motifRefus;
+
+  /// Ticket UNI — le code de cette bande se corrige : il est partagé avec une autre bande, ou le serveur l'a refusé
+  /// parce qu'il était déjà pris. Seul cas où « Modifier » ouvre le champ code (sinon il reste immuable).
+  final bool codeRenommable;
 }
 
 /// Les quatre cartes de `GestionBandes::getKpisProperty()`.
@@ -178,6 +183,22 @@ class BandesRepository {
   static String messageCodePris(String code) =>
       'Le code « $code » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.';
 
+  /// Ticket UNI — `LivestockLot::messageCodePris()` : le code est déjà porté par une AUTRE bande (en cours OU archivée,
+  /// casse et espaces ignorés). Le même texte que le web, sous le champ « Code Unique de la Bande ».
+  static String messageCodeDejaUtilise(String code) =>
+      'Le code « $code » est déjà utilisé par une autre bande (en cours ou archivée) : choisissez un autre code.';
+
+  /// Ticket UNI — `LivestockLot::MESSAGE_CODE_IMMUABLE` : seul un code partagé avec une autre bande se corrige.
+  static const messageCodeImmuable =
+      "Le code d'une bande ne se modifie jamais après sa création : seul un code partagé avec une autre bande peut être corrigé.";
+
+  /// Ticket UNI — le refus du serveur « code déjà utilisé » (`LivestockLot::messageCodePris(…, depuisPoste: true)`) :
+  /// la bande reste sur le poste, en conflit, et se renomme (« Modifier »). Reconnu à sa tournure, jamais à une copie.
+  static bool estRefusDeCode(String? motif) => motif != null && motif.contains('est déjà utilisé par une autre bande');
+
+  /// Ticket UNI — titre du bandeau : « 1 doublon de code détecté — à renommer. » (`gestion-bandes.blade.php`).
+  static String titreDoublons(int n) => '$n ${n == 1 ? 'doublon de code détecté' : 'doublons de code détectés'} — à renommer.';
+
   /// `LivestockLot::stadesPourEspece()` : Reproducteur / Jeune / Sous-mères pour les lapins (décision client du
   /// 17/10/2026), les quatre stades génériques sinon. Valeur STOCKÉE => libellé.
   static Map<String, String> stadesPourEspece(String? codeEspece) => codeEspece == 'cuniculture'
@@ -260,6 +281,7 @@ class BandesRepository {
         return c != 0 ? c : a.code.compareTo(b.code);
       });
 
+    final partages = await _clesPartagees();
     return [
       for (final b in lignes)
         LigneBande(
@@ -270,8 +292,35 @@ class BandesRepository {
               ? ((b.initialQuantity - b.currentQuantity) / b.initialQuantity * 1000).round() / 10
               : null,
           motifRefus: b.syncStatus == SyncStatus.conflict ? refus[b.id] : null,
+          codeRenommable:
+              partages.contains(cleUnicite(b.code)) ||
+              (b.syncStatus == SyncStatus.conflict && estRefusDeCode(refus[b.id])),
         ),
     ];
+  }
+
+  /// Ticket UNI — les clés de code portées par PLUSIEURS bandes (en cours ou archivées, tirées du serveur comprises).
+  Future<Set<String>> _clesPartagees() async {
+    final vues = <String>{};
+    final partagees = <String>{};
+    for (final b in await _db.select(_db.livestockLots).get()) {
+      final cle = cleUnicite(b.code);
+      if (cle.isEmpty) continue;
+      if (!vues.add(cle)) partagees.add(cle);
+    }
+    return partagees;
+  }
+
+  /// Ticket UNI — nombre de codes de bande partagés par plusieurs bandes : « N doublons de code détectés — à renommer »
+  /// (bandeau non bloquant de l'écran, `GestionBandes::getDoublonsDeCodesProperty()` du web).
+  Future<int> nombreDeCodesEnDouble() async => (await _clesPartagees()).length;
+
+  /// Ticket UNI — le code de la bande se corrige-t-il (partagé, ou refusé « déjà utilisé » par le serveur) ?
+  Future<bool> codeRenommable(String id) async {
+    final bande = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (bande == null) return false;
+    if ((await _clesPartagees()).contains(cleUnicite(bande.code))) return true;
+    return bande.syncStatus == SyncStatus.conflict && estRefusDeCode((await _motifsDeRefus())[id]);
   }
 
   Future<Map<String, String>> _motifsDeRefus() async => {
@@ -292,15 +341,17 @@ class BandesRepository {
       'helico' => reglage?.escargotPrefix ?? 'FOSSE',
       _ => 'LOT',
     };
-    final debut = cleCommeLeServeur('$prefixe-');
+    final debut = cleUnicite('$prefixe-');
     var dernier = 0;
     for (final b in await _db.select(_db.livestockLots).get()) {
-      if (!cleCommeLeServeur(b.code).startsWith(debut)) continue;
+      if (!cleUnicite(b.code).startsWith(debut)) continue;
       // `(int) preg_replace('/\D/', '', substr(strrchr($code, '-'), 1))`.
       final suffixe = b.code.substring(b.code.lastIndexOf('-') + 1);
       final n = int.tryParse(suffixe.replaceAll(RegExp(r'\D'), '')) ?? 0;
       if (n > dernier) dernier = n;
     }
+    // Ticket UNI : le code proposé est toujours LIBRE — plus grand que tout numéro déjà porté sous ce préfixe, bandes
+    // archivées et tirées du serveur comprises (`toutes` les lit sans filtre).
     return '$prefixe-${dernier + 1}';
   }
 
@@ -436,13 +487,14 @@ class BandesRepository {
     } else if (!especeConnue) {
       e['species_id'] = "La valeur sélectionnée pour le champ espèce n'existe pas.";
     }
-    final code = f.code;
+    // Ticket UNI : comme le web (`$this->code = trim(...)`), le code se lit sans espaces autour.
+    final code = f.code.trim();
     if (code.isEmpty) {
       e['code'] = 'Le champ code est obligatoire.';
     } else if (code.runes.length > 50) {
       e['code'] = 'Le champ code ne doit pas dépasser 50 caractères.';
     } else if (codeDejaPris) {
-      e['code'] = 'La valeur du champ code est déjà utilisée.';
+      e['code'] = messageCodeDejaUtilise(code);
     }
     if (f.stage.isEmpty) {
       e['stage'] = 'Le champ stade est obligatoire.';
@@ -489,8 +541,9 @@ class BandesRepository {
       f,
       codeEspece: espece?.code,
       especeConnue: espece != null,
-      // `unique:livestock_lots,code` : comparaison sous la collation du serveur, archivées comprises.
-      codeDejaPris: tousLesCodes.any((b) => cleCommeLeServeur(b.code) == cleCommeLeServeur(f.code)),
+      // `UniqueNormalise::bande()` : TOUTES les bandes (archivées et tirées du serveur comprises), casse, accents et
+      // espaces ignorés.
+      codeDejaPris: tousLesCodes.any((b) => cleUnicite(b.code) == cleUnicite(f.code)),
       produitConnu: f.productId.isEmpty || await (_db.select(_db.products)..where((t) => t.id.equals(f.productId))).getSingleOrNull() != null,
       origineConnue: f.lotOrigineId.isEmpty || tousLesCodes.any((b) => b.id == f.lotOrigineId),
     );
@@ -508,7 +561,7 @@ class BandesRepository {
       await _db.into(_db.livestockLots).insert(
         LivestockLotsCompanion.insert(
           id: id,
-          code: f.code,
+          code: f.code.trim(),
           speciesId: f.speciesId,
           speciesCode: Value(espece!.code),
           stage: Value(f.stage),
@@ -536,7 +589,7 @@ class BandesRepository {
                 ? EffectifParCategorie.categorieDuStade(f.stage)
                 : null,
             constitution: true,
-            motif: 'Constitution de la bande ${f.code}',
+            motif: 'Constitution de la bande ${f.code.trim()}',
           );
         } on TransfertRefuse catch (e) {
           // La constitution est refusée : la bande n'est pas créée non plus (la transaction est annulée).
@@ -549,10 +602,14 @@ class BandesRepository {
     return (await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingle());
   }
 
-  /// `updateLot()` : stade, effectif actuel (correction explicite), statut — rien d'autre. Le code, l'espèce, l'effectif
-  /// initial et la date ne changent jamais. Une bande archivée n'est plus modifiable ; une modification qui ne change
-  /// rien n'écrit rien (aucune mise en file).
-  Future<LivestockLot> modifier(String id, {required String stage, required String quantite, required String status}) async {
+  /// `updateLot()` : stade, effectif actuel (correction explicite), statut — rien d'autre. L'espèce, l'effectif initial
+  /// et la date ne changent jamais, le code non plus (sauf ci-dessous). Une bande archivée n'est plus modifiable ; une
+  /// modification qui ne change rien n'écrit rien (aucune mise en file).
+  ///
+  /// Ticket UNI : [code] n'est lu que pour CORRIGER un doublon (`SaisieBandeAction::modifier`, clé `code`) — le code
+  /// d'une bande dont le code est partagé avec une autre, ou que le serveur a refusé « déjà utilisé », peut être changé
+  /// vers un code libre ; sinon il reste immuable. La bande repart à l'envoi (`pending`), son refus périmé est levé.
+  Future<LivestockLot> modifier(String id, {required String stage, required String quantite, required String status, String? code}) async {
     final bande = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
     if (bande == null) throw const BandeRefusee({'bande': 'Bande introuvable sur ce poste.'});
 
@@ -578,16 +635,31 @@ class BandesRepository {
 
     if (!bande.isActive) throw const BandeRefusee({'bande': messageArchivee});
 
+    // Ticket UNI : correction d'un doublon de code — vers un code LIBRE, et seulement si le code est bien partagé.
+    final nouveauCode = code?.trim() ?? '';
+    final renomme = nouveauCode.isNotEmpty && nouveauCode != bande.code;
+    if (renomme) {
+      if (!await codeRenommable(id)) throw const BandeRefusee({'code': messageCodeImmuable});
+      if (nouveauCode.runes.length > 50) {
+        throw const BandeRefusee({'code': 'Le champ code ne doit pas dépasser 50 caractères.'});
+      }
+      final prises = await _db.select(_db.livestockLots).get();
+      if (prises.any((b) => b.id != id && cleUnicite(b.code) == cleUnicite(nouveauCode))) {
+        throw BandeRefusee({'code': messageCodeDejaUtilise(nouveauCode)});
+      }
+    }
+
     // BS-Q4 : une VRAIE correction d'effectif sur une bande qui a des fiches passe par la fiche (cascade unique).
     if (bande.currentQuantity != n && await aDesFiches(id)) {
       throw const BandeRefusee({'quantity': messageEffectifParLesFiches});
     }
 
-    final change = bande.stage != stage || bande.status != status || bande.currentQuantity != n;
+    final change = renomme || bande.stage != stage || bande.status != status || bande.currentQuantity != n;
     if (!change) return bande;
 
     await (_db.update(_db.livestockLots)..where((t) => t.id.equals(id))).write(
       LivestockLotsCompanion(
+        code: renomme ? Value(nouveauCode) : const Value.absent(),
         stage: Value(stage),
         status: Value(status),
         currentQuantity: Value(n!),
@@ -597,6 +669,8 @@ class BandesRepository {
         updatedAt: Value(HeureBenin.versInstant(_horloge())),
       ),
     );
+    // Un refus « code déjà utilisé » est périmé dès que la bande porte un autre code : le conflit est levé.
+    if (renomme) await (_db.delete(_db.syncConflicts)..where((c) => c.id.equals('livestock_lots:$id'))).go();
     _gestes?.signaler();
     return (await (_db.select(_db.livestockLots)..where((t) => t.id.equals(id))).getSingle());
   }

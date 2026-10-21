@@ -6,6 +6,7 @@ use App\Actions\SaisieBandeAction;
 use App\Actions\TransferBetweenLotsAction;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use App\Rules\UniqueNormalise;
 use App\Services\EffectifParCategorieService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,9 @@ class GestionBandes extends Component
     /** BS-Q4 : la bande éditée a des fiches journalières — son effectif se corrige depuis la fiche. */
     public bool $effectifVerrouille = false;
 
+    /** Ticket UNI : le code de la bande éditée est partagé avec une autre bande — seul cas où il se corrige. */
+    public bool $codeEnDoublon = false;
+
     public ?string $editingLotId = null;
 
     public ?string $viewingLotId = null;
@@ -121,6 +125,15 @@ class GestionBandes extends Component
             ->where('sku', 'not like', 'MED-%')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Ticket UNI — nombre de codes de bande partagés par plusieurs bandes (déjà présents avant la règle d'unicité).
+     * Alerte NON bloquante : le bandeau invite à les renommer (« Modifier » ouvre le champ code de ces bandes).
+     */
+    public function getDoublonsDeCodesProperty(): int
+    {
+        return app(\App\Services\DetectionDoublons::class)->nombreDeCodesDeBandeEnDouble();
     }
 
     public function getKpisProperty(): array
@@ -293,8 +306,12 @@ class GestionBandes extends Component
     {
         $this->authorize('manage-elevage');
 
+        // Ticket UNI : le code est rangé sans espaces autour, et unique parmi TOUTES les bandes (en cours ou
+        // archivées), casse et espaces ignorés — le message dit quel code est déjà pris.
+        $this->code = trim($this->code);
+
         $this->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:livestock_lots,code'],
+            'code' => ['required', 'string', 'max:50', UniqueNormalise::bande()],
             'species_id' => ['required', 'exists:livestock_species,id'],
             'stage' => ['required', 'in:'.implode(',', array_keys($this->stades))],
             'created_date' => ['required', 'date'],
@@ -363,6 +380,7 @@ class GestionBandes extends Component
         $this->quantity = $lot->current_quantity;
         $this->status = $lot->status;
         $this->effectifVerrouille = SaisieBandeAction::aDesFiches($lot->id);
+        $this->codeEnDoublon = $lot->codeEstEnDoublon();
         $this->dispatch('open-modal', name: 'modal-edit-bande');
     }
 
@@ -370,18 +388,20 @@ class GestionBandes extends Component
     {
         $this->authorize('manage-elevage');
 
+        $this->code = trim($this->code);
+
         $this->validate([
             'stage' => ['required', 'in:'.implode(',', array_keys($this->stades))],
             'quantity' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:actif,cloture'],
-        ]);
+        ] + ($this->codeEnDoublon ? ['code' => ['required', 'string', 'max:50', UniqueNormalise::bande($this->editingLotId)]] : []));
 
         try {
             app(SaisieBandeAction::class)->modifier($this->editingLotId, [
                 'stage' => $this->stage,
                 'current_quantity' => $this->quantity,
                 'status' => $this->status,
-            ]);
+            ] + ($this->codeEnDoublon ? ['code' => $this->code] : []));
         } catch (ValidationException $e) {
             // Bande archivée depuis l'ouverture de la modale (autre onglet, autre poste).
             $this->dispatch('close-modal', name: 'modal-edit-bande');

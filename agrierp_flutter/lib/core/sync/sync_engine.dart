@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
@@ -140,12 +140,48 @@ class SyncEngine {
   /// ⚠️ NE LÈVE JAMAIS : hors ligne, serveur injoignable, session expirée ou réponse inattendue rendent `false`. Cette
   /// question est posée toutes les 30 s sans geste de l'utilisateur ; une erreur rouge à chaque fois apprendrait à
   /// ignorer les alertes (`SynchronisationAutomatique`).
+  ///
+  /// Ticket SW-1 — la même réponse porte le drapeau « resynchronisation demandée » (« Renvoyer vers ce poste » du web) :
+  /// le poste le note ([resynchronisationServeur]) et rend `true` pour que la synchronisation parte aussitôt, qui
+  /// repart d'un tirage complet puis acquitte (voir [_tirer]).
   Future<bool> demandeDuServeur() async {
     try {
       final reponse = await _client.get<Map<String, dynamic>>('/api/sync/demande');
-      return reponse.data?['demande'] == true;
+      final donnees = reponse.data;
+      if (donnees?['resynchronisation'] == true) {
+        resynchronisationServeur.value = true;
+        return true;
+      }
+      return donnees?['demande'] == true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Ticket SW-1 (correction du client du 21/10/2026) — « Resynchronisation demandée par le serveur » : vrai de la
+  /// lecture du drapeau (ping de 30 s ou tirage) jusqu'à son acquittement par le serveur. La modale
+  /// « Synchronisation » l'écoute. Mémoire seule : le drapeau vit au serveur, aucune colonne locale (pas de migration).
+  final ValueNotifier<bool> resynchronisationServeur = ValueNotifier<bool>(false);
+
+  /// Ticket SW-1 — instant (ISO 8601, tel que le serveur l'a rendu) de la demande de resynchronisation que le tirage en
+  /// cours doit honorer ; `null` : aucune. Renvoyé tel quel à l'acquittement.
+  String? _resyncAHonorer;
+
+  /// Ticket SW-1 — acquitte la resynchronisation honorée : le drapeau tombe au serveur. Ne lève JAMAIS : la
+  /// resynchronisation a eu lieu, un échec ici (réseau, drapeau plus récent) laisse le drapeau levé et le prochain
+  /// tirage la refera — au pire un tirage complet de trop, jamais une donnée manquante.
+  Future<void> _acquitterResynchronisation(String demandeeLe) async {
+    try {
+      final reponse = await _client.post<Map<String, dynamic>>(
+        '/api/sync/resynchronisation/acquittement',
+        data: {'demandee_le': demandeeLe},
+      );
+      if (reponse.data?['acquittee'] == true) {
+        if (_resyncAHonorer == demandeeLe) _resyncAHonorer = null;
+        resynchronisationServeur.value = false;
+      }
+    } catch (_) {
+      // Silencieux par construction : voir ci-dessus.
     }
   }
 
@@ -565,6 +601,16 @@ class SyncEngine {
       final servies = PerimetreTirage.depuisReponse(corps);
 
       if (page == 1) {
+        // 🔴→✅ Ticket SW-1 — LE SERVEUR DEMANDE UNE RESYNCHRONISATION (« Renvoyer vers ce poste » au web : le portable a
+        // servi de base pendant la panne de ce poste, qui doit récupérer ce qui y a été saisi). Rien n'est absorbé de
+        // cette page : le tirage repart, COMPLET (sans `since`), une fois ; l'acquittement suit son dernier curseur.
+        final demandee = corps['resynchronisation_demandee_le'];
+        if (demandee is String && demandee.isNotEmpty) {
+          _resyncAHonorer = demandee;
+          resynchronisationServeur.value = true;
+          if (!toutRedemander) return _tirer(complet: true);
+        }
+
         // 🔴→✅ Ticket 15.50 — LE SERVEUR A ÉTÉ RÉINITIALISÉ depuis la dernière purge de ce poste : ses
         // données d'activité sont effacées AVANT toute absorption et AVANT tout envoi (le tirage précède
         // toujours l'envoi). Sinon le poste garderait des bandes et des ventes disparues du serveur, et les
@@ -721,6 +767,12 @@ class SyncEngine {
       );
     }
 
+    // Ticket SW-1 — le tirage COMPLET que le serveur avait demandé est fini et son curseur noté : acquittement.
+    final aAcquitter = _resyncAHonorer;
+    if (aAcquitter != null && since == null) {
+      await _acquitterResynchronisation(aAcquitter);
+    }
+
     return recus;
   }
 
@@ -783,12 +835,16 @@ class SyncEngine {
       corps['sales'],
       corps['sale_lines'],
     );
+    // Tickets AV1 / AV2 — APRÈS les ventes et les produits : l'avoir d'une vente ou d'un produit inconnu du poste est refusé.
+    recus += await _absorberAvoirs(corps['credit_notes']);
     // Ticket U9 — APRÈS les produits : un mouvement d'un produit inconnu du poste est refusé.
     recus += await _absorberMouvementsStock(corps['stock_movements']);
     recus += await _absorberEmployes(corps['employees']);
     recus += await _absorberStagiaires(corps['internships']);
     recus += await _absorberPointages(corps['attendance_records']);
     recus += await _absorberCourriers(corps['mails']);
+    // Ticket DEV — devis du serveur (table mixte : les saisies du poste en attente ne sont jamais écrasées).
+    recus += await _absorberDevis(corps['quotes']);
     recus += await _absorberDocuments(corps['administrative_documents']);
     recus += await _absorberArchives(corps['archived_documents']);
     recus += await _absorberPlanComptable(corps['chart_of_accounts']);
@@ -3463,6 +3519,10 @@ class SyncEngine {
         customerId: Value(l['customer_id'] as String?),
         customerName: Value(l['customer_name'] as String?),
         paymentMode: (l['payment_mode'] ?? 'especes') as String,
+        // Ticket AV2 — sous-total et remise servis (colonne « Remise » et détail d'une vente de l'historique). Absents
+        // (serveur antérieur) : la remise reste 0 et le sous-total le total, comme avant.
+        subtotal: Value(_reel(l['subtotal']) ?? _reel(l['total']) ?? 0),
+        discount: Value(_reel(l['discount']) ?? 0),
         total: _reel(l['total']) ?? 0,
         status: Value((l['status'] ?? 'validee') as String),
         mecefStatus: Value(l['mecef_status'] as String?),
@@ -4310,6 +4370,207 @@ class SyncEngine {
     return recus.length;
   }
 
+  /// 🔴→✅ Tickets AV1 / AV2 — LES AVOIRS CLIENTS DESCENDENT AU POSTE (écran « Retours et Avoirs »).
+  ///
+  /// Table MIXTE (comme les dépenses) : le poste y saisit des demandes de retour (`pending`) et y lit les avoirs du web et
+  /// des autres postes. Le serveur attribue le numéro `AV-AAAA-NNN` : une demande acquittée le reçoit ici, au tirage qui
+  /// suit.
+  ///
+  /// ⚠️⚠️ **UNE DEMANDE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (saisie ici, pas encore acquittée, ou refusée
+  /// et en attente de correction) : le tirage précède toujours l'envoi. Un avoir acquitté (`synced`) prend la dernière
+  /// version du serveur (numéro, statut « traité » posé au web) et garde son `device_id` d'origine.
+  ///
+  /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, vente ou produit inconnu du poste, montant absent ou
+  /// négatif, quantité négative, décision ou statut illisible, date illisible → [FormatException], rien n'est écrit, le
+  /// curseur n'avance pas. Clé absente (serveur antérieur, ou table non servie à ce compte) : rien n'est touché.
+  Future<int> _absorberAvoirs(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Avoir client';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final ventes = {for (final v in await _db.select(_db.sales).get()) v.id};
+    final produits = {for (final p in await _db.select(_db.products).get()) p.id};
+    final vus = <String>{};
+    final recus = <CreditNotesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final vente = l['sale_id'];
+      final produit = l['product_id'];
+      final numero = _texteStrict(l['credit_note_number'], '$quoi $id : numéro');
+      final quantite = _nombreStrict(l['qty'], '$quoi $id : quantité');
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final motif = _texteStrict(l['reason'], '$quoi $id : motif');
+      final decision = l['decision'];
+      final notes = _texteStrict(l['inspection_notes'], '$quoi $id : notes d\'inspection');
+      final statut = l['status'];
+      final date = l['created_at'] is String ? HeureBenin.lire(l['created_at']) : null;
+      if (vente is! String || !ventes.contains(vente)) {
+        throw FormatException('$quoi $id refusé : vente inconnue du poste ($vente).');
+      }
+      if (produit is! String || !produits.contains(produit)) {
+        throw FormatException('$quoi $id refusé : produit inconnu du poste ($produit).');
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException('$quoi $id refusé : montant absent ou négatif ($montant).');
+      }
+      if (quantite != null && quantite < 0) {
+        throw FormatException('$quoi $id refusé : quantité négative ($quantite).');
+      }
+      if (decision != null && decision != 'reintegre' && decision != 'reforme') {
+        throw FormatException('$quoi $id refusé : décision illisible ($decision).');
+      }
+      if (statut != 'en_attente' && statut != 'traite') {
+        throw FormatException('$quoi $id refusé : statut illisible ($statut).');
+      }
+      if (date == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['created_at']}).');
+      }
+      recus.add(
+        CreditNotesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          saleId: vente,
+          productId: produit,
+          creditNoteNumber: Value(numero),
+          qty: Value(quantite),
+          amount: montant,
+          reason: Value(motif),
+          decision: Value(decision as String?),
+          inspectionNotes: Value(notes),
+          status: Value(statut as String),
+          // Heure MURALE du serveur, lue telle quelle : le jour du web doit rester le jour.
+          createdAt: date,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final a in await (_db.select(
+          _db.creditNotes,
+        )..where((t) => t.id.isIn(vus))).get())
+          a.id: a.syncStatus,
+      };
+      for (final a in recus) {
+        final statut = locales[a.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Un avoir acquitté de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.creditNotes)
+            .insert(a, onConflict: DoUpdate((_) => a.copyWith(deviceId: const Value.absent())));
+      }
+    });
+
+    return recus.length;
+  }
+
+  /// 🔴→✅ Ticket DEV — LES DEVIS DU SERVEUR DESCENDENT AU POSTE (table mixte : saisis ici ET tirés).
+  ///
+  /// Le serveur sert tout devis créé, modifié, avancé dans son cycle ou archivé au web ou sur un autre poste, au curseur
+  /// (`updated_at`), archivés compris (`is_active`) : le numéro `DEV-AAAA-NNN` (que le poste n'invente jamais), le client,
+  /// la description, le montant HT, la TVA, la validité, la date, la note et le statut.
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberDepenses] : élément illisible, identifiant invalide ou servi deux fois, numéro,
+  /// client, description, montant (absent, illisible ou négatif), TVA, validité, date, statut ou `is_active` illisibles →
+  /// [FormatException] : rien n'est écrit, la page est annulée, le curseur n'avance pas. Lisser — un montant illisible
+  /// devenu 0 — fausserait « Valeur Totale » sans que rien ne le dise.
+  ///
+  /// ⚠️⚠️ **UN DEVIS LOCAL `pending` OU `conflict` N'EST JAMAIS ÉCRASÉ** (saisi ou avancé ici, pas encore acquitté, ou refusé
+  /// et en attente de correction) : le tirage précède toujours l'envoi. Un devis acquitté (`synced`) prend la dernière
+  /// version du serveur et garde son `device_id` d'origine. Clé absente (table non servie à ce compte, serveur antérieur à
+  /// DEV) : rien n'est touché.
+  Future<int> _absorberDevis(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Devis';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <QuotesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final numero = _texteStrict(l['quote_number'], '$quoi $id : numéro');
+      final client = _texteStrict(l['customer_id'], '$quoi $id : client');
+      final description = _texteStrict(
+        l['articles_description'],
+        '$quoi $id : description',
+      );
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final tva = _nombreStrict(l['tva_rate'], '$quoi $id : TVA');
+      final validite = _nombreStrict(l['validity_days'], '$quoi $id : validité');
+      final date = l['quote_date'] is String ? HeureBenin.lire(l['quote_date']) : null;
+      final remarque = _texteStrict(l['note'], '$quoi $id : note');
+      final statut = l['status'];
+      final actif = _actifStrict(l, '$quoi $id');
+      if (date == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['quote_date']}).');
+      }
+      if (client == null || client.isEmpty || description == null) {
+        throw FormatException('$quoi $id refusé : client ou description absent.');
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException('$quoi $id refusé : montant absent ou négatif ($montant).');
+      }
+      if (tva == null || tva < 0 || tva > 100) {
+        throw FormatException('$quoi $id refusé : TVA absente ou hors de 0 à 100 ($tva).');
+      }
+      if (validite == null || validite < 1 || validite != validite.roundToDouble()) {
+        throw FormatException('$quoi $id refusé : validité absente ou illisible ($validite).');
+      }
+      if (statut is! String || !const ['brouillon', 'envoye', 'accepte', 'refuse', 'facture'].contains(statut)) {
+        throw FormatException('$quoi $id refusé : statut illisible ($statut).');
+      }
+      recus.add(
+        QuotesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          quoteNumber: Value(numero),
+          customerId: client,
+          articlesDescription: description,
+          amount: montant,
+          tvaRate: Value(tva),
+          validityDays: Value(validite.round()),
+          // Une DATE pure, au jour du Bénin (minuit, heure murale) : celle que le web compare (`whereMonth`).
+          quoteDate: DateTime(date.year, date.month, date.day),
+          note: Value(remarque),
+          status: Value(statut),
+          isActive: Value(actif),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final d in await (_db.select(
+          _db.quotes,
+        )..where((t) => t.id.isIn(vus))).get())
+          d.id: d.syncStatus,
+      };
+      for (final d in recus) {
+        final statut = locales[d.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Un devis acquitté de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.quotes)
+            .insert(
+              d,
+              onConflict: DoUpdate(
+                (_) => d.copyWith(deviceId: const Value.absent()),
+              ),
+            );
+      }
+    });
+
+    return recus.length;
+  }
+
   /// 🔴→✅ Ticket U13 — LA PAIE RÉGLÉE DESCEND AU POSTE (lecture seule), pour le rapport « Recettes et Dépenses ».
   ///
   /// Le serveur ne sert que ce que `RecettesDepenses::depensesRows()` lit : l'instant du règlement (`created_at`, heure
@@ -4464,6 +4725,11 @@ class SyncEngine {
       _db.expenses,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket DEV — devis saisis, avancés ou archivés au poste.
+    final devis = await (_db.select(
+      _db.quotes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final saillies = await (_db.select(
       _db.livestockReproductionEvents,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4518,6 +4784,11 @@ class SyncEngine {
 
     final remboursements = await (_db.select(
       _db.supplierRefunds,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Tickets AV1 / AV2 — demandes de retour client et « marquer comme traité » : le serveur fait les effets.
+    final avoirs = await (_db.select(
+      _db.creditNotes,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
     // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
@@ -4577,6 +4848,7 @@ class SyncEngine {
         documents.isEmpty &&
         retours.isEmpty &&
         remboursements.isEmpty &&
+        avoirs.isEmpty &&
         avances.isEmpty &&
         imputations.isEmpty &&
         produits.isEmpty &&
@@ -4587,6 +4859,7 @@ class SyncEngine {
         ajustements.isEmpty &&
         soins.isEmpty &&
         depenses.isEmpty &&
+        devis.isEmpty &&
         saillies.isEmpty &&
         achats.isEmpty &&
         pointages.isEmpty) {
@@ -4690,9 +4963,14 @@ class SyncEngine {
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
+        // Ticket AV1 — le serveur traite les retours APRÈS les ventes du même envoi. ⚠️ JAMAIS de `stock_adjustments` ni
+        // d'écriture pour un avoir : le serveur réintègre le stock et passe l'écriture inverse (`AvoirClientService`).
+        'credit_notes': avoirs.map(_avoirEnJson).toList(),
         'stock_adjustments': ajustements.map(_ajustementEnJson).toList(),
         'veterinary_records': soins.map(_soinEnJson).toList(),
         'expenses': depenses.map((d) => _depenseEnJson(d, lignesDeDepense[d.id] ?? const [])).toList(),
+        // Ticket DEV — `pushQuotes` (manage-ventes) : le numéro `DEV-AAAA-NNN` ne part JAMAIS, le serveur l'attribue.
+        'quotes': devis.map(_devisEnJson).toList(),
         'livestock_reproduction_events': saillies.map(_saillieEnJson).toList(),
         'purchases': achats
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
@@ -5046,6 +5324,15 @@ class SyncEngine {
     );
 
     accepte += await _acquitter(
+      'credit_notes',
+      corps['credit_notes'],
+      (ids, statut) => (_db.update(_db.creditNotes)..where((t) => t.id.isIn(ids)))
+          .write(CreditNotesCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
       'expenses',
       corps['expenses'],
       (ids, statut) async {
@@ -5069,6 +5356,28 @@ class SyncEngine {
           }
         }
       },
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket DEV — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un devis
+    // avancé dans son cycle ou archivé PENDANT l'envoi de sa version précédente reste `pending` et repart.
+    accepte += await _acquitter(
+      'quotes',
+      corps['quotes'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final d in devis) (d.id, d.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.quotes)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.updatedAt.equals(saisie!),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(QuotesCompanion(syncStatus: Value(statut))),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -5249,6 +5558,8 @@ class SyncEngine {
     'company_settings',
     'suppliers',
     'customers',
+    // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
+    'quotes',
     'mails',
     'archived_documents',
     'administrative_documents',
@@ -5267,6 +5578,8 @@ class SyncEngine {
     'supplier_refunds',
     'attendance_records',
     'sales',
+    // Ticket AV1 — après les ventes (un retour peut viser la vente du même envoi), avant les imputations.
+    'credit_notes',
     'advance_imputations',
     'livestock_reproduction_events',
     'infirmary_records',
@@ -5783,6 +6096,12 @@ class SyncEngine {
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const CustomersCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
+      // Ticket DEV — un devis refusé (exercice clos, statut interdit, client inconnu…) se corrige puis se relance.
+      'quotes' =>
+        () =>
+            (_db.update(_db.quotes)..where((t) => t.id.equals(conflit.recordId))).write(
+              const QuotesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       'mails' =>
         () =>
             (_db.update(
@@ -5844,6 +6163,14 @@ class SyncEngine {
               _db.purchases,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const PurchasesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Tickets AV1 / AV2 — sans cette entrée, « Relancer » un retour client refusé ne ferait rien (défaut F0.77).
+      'credit_notes' =>
+        () =>
+            (_db.update(
+              _db.creditNotes,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const CreditNotesCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       'purchase_returns' =>
         () =>
@@ -6534,6 +6861,41 @@ class SyncEngine {
     },
     // Ticket U14 — archivage fait au poste (`DepensesRepository.archiver`), rejoué par le serveur comme
     // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
+    'is_active': d.isActive,
+    'device_id': d.deviceId,
+  };
+
+  /// Tickets AV1 / AV2 — la DEMANDE de retour : ce que le serveur lit dans `pushCreditNotes`. ⚠️ Ni numéro (`AV-AAAA-NNN`,
+  /// attribué par le serveur) ni écriture ni stock. `credit_date` = le jour du FAIT, en heure murale du Bénin sans
+  /// conversion UTC (même règle que `sold_at`) ; `status` = `traite` pour « Marquer comme traité » (une seule fois côté
+  /// serveur).
+  Map<String, dynamic> _avoirEnJson(AvoirClient a) => {
+    'id': a.id,
+    'sale_id': a.saleId,
+    'product_id': a.productId,
+    'qty': a.qty,
+    'amount': a.amount,
+    'reason': a.reason,
+    'decision': a.decision,
+    'inspection_notes': a.inspectionNotes,
+    'status': a.status,
+    'credit_date': _instant(a.createdAt),
+    'device_id': a.deviceId,
+  };
+
+  /// Ticket DEV — un devis tel qu'il est (le FAIT) : `pushQuotes` le rejoue par `SaisieDevisAction`. ⚠️ Le numéro
+  /// `DEV-AAAA-NNN` ne part JAMAIS (le serveur l'attribue, le poste le reçoit au tirage) ; un devis archivé repart entier
+  /// (`is_active: false`) ; `status` avance d'un cycle que le serveur parcourt pas à pas.
+  Map<String, dynamic> _devisEnJson(Quote d) => {
+    'id': d.id,
+    'customer_id': d.customerId,
+    'articles_description': d.articlesDescription,
+    'amount': d.amount,
+    'tva_rate': d.tvaRate,
+    'validity_days': d.validityDays,
+    'quote_date': _jour(d.quoteDate),
+    'note': d.note,
+    'status': d.status,
     'is_active': d.isActive,
     'device_id': d.deviceId,
   };

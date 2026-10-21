@@ -31,6 +31,27 @@ class JournalSynchronisationService
     public function tirage(Request $request, array $reponse, int $pagesPrecedentes = 0): void
     {
         $this->ecrire($request, 'tirage', $pagesPrecedentes + $this->compter($reponse), 0, 0);
+        $this->memoriserLeCurseur($request, $reponse);
+    }
+
+    /**
+     * Ticket SW-1 — le curseur rendu au poste (`server_time`, dernière page) est mémorisé par poste : c'est lui qui dit
+     * au web ce que ce poste n'a pas encore reçu. Jamais une raison de faire échouer le tirage.
+     *
+     * @param  array<string, mixed>  $reponse
+     */
+    private function memoriserLeCurseur(Request $request, array $reponse): void
+    {
+        $poste = ResynchronisationPostesService::nomDuPoste($request);
+        if ($poste === null || ! is_string($reponse['server_time'] ?? null)) {
+            return;
+        }
+
+        try {
+            app(ResynchronisationPostesService::class)->noterTirage($poste, Carbon::parse($reponse['server_time']));
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

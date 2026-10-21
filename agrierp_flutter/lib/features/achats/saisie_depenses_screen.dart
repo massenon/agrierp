@@ -173,73 +173,58 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   /// `grid grid-cols-1 sm:grid-cols-3 gap-md` — les trois `x-kpi-card` du Blade, dans son ordre et ses couleurs.
   Widget _indicateurs() {
-    return LayoutBuilder(
-      builder: (context, contraintes) {
-        final colonnes = AgriBreakpoints.petit(context) ? 3 : 1;
-        final largeur =
-            (contraintes.maxWidth - (colonnes - 1) * AgriSpacing.md) / colonnes;
-        final total = _totalDuMois;
-
-        return Wrap(
-          spacing: AgriSpacing.md,
-          runSpacing: AgriSpacing.md,
-          children: [
-            _carteKpi(
-              largeur,
-              'Dépenses du mois',
-              // `number_format($kpis['depenses_mois'], 0, ',', ' ').' FCFA'` ; « — » tant que rien n'est lu.
-              total == null ? '—' : '${PmpService.francs(total)} FCFA',
-              AgriColors.brandEmerald,
-              SymbolesAgri.payments,
-            ),
-            _carteKpi(
-              largeur,
-              'Charges Fixes',
-              '—',
-              AgriColors.accentYellow,
-              SymbolesAgri.event_repeat,
-              couleurIcone: AgriColors.brandForest,
-              enAttente: true,
-            ),
-            _carteKpi(
-              largeur,
-              'Charges Variables',
-              '—',
-              AgriColors.infoBlue,
-              SymbolesAgri.trending_down,
-              enAttente: true,
-            ),
-          ],
-        );
-      },
+    final total = _totalDuMois;
+    // `grid-cols-1 sm:grid-cols-3` : trois cartes dès `sm`, une colonne en dessous ; `GrilleKpi` : même hauteur par rangée.
+    return GrilleKpi(
+      colonnes: AgriBreakpoints.petit(context) ? 3 : 1,
+      children: [
+        _carteKpi(
+          'Dépenses du mois',
+          // `number_format($kpis['depenses_mois'], 0, ',', ' ').' FCFA'` ; « — » tant que rien n'est lu.
+          total == null ? '—' : '${PmpService.francs(total)} FCFA',
+          AgriColors.brandEmerald,
+          SymbolesAgri.payments,
+        ),
+        _carteKpi(
+          'Charges Fixes',
+          '—',
+          AgriColors.accentYellow,
+          SymbolesAgri.event_repeat,
+          couleurIcone: AgriColors.brandForest,
+          enAttente: true,
+        ),
+        _carteKpi(
+          'Charges Variables',
+          '—',
+          AgriColors.infoBlue,
+          SymbolesAgri.trending_down,
+          enAttente: true,
+        ),
+      ],
     );
   }
 
   /// `x-kpi-card` : liseré et icône de la variante (`text-brand-forest` pour `maize`) ; `:pending` → tiret estompé
   /// (`text-outline/50`) et sablier `hourglass_empty` devant « Disponible après … ».
   Widget _carteKpi(
-    double largeur,
     String libelle,
     String valeur,
     Color couleur,
     IconData icone, {
     Color? couleurIcone,
     bool enAttente = false,
-  }) => SizedBox(
-    width: largeur,
-    child: CarteKpi(
-      key: Key('kpi-$libelle'),
-      libelle: libelle,
-      valeur: valeur,
-      icone: icone,
-      couleurLisere: couleur,
-      couleurIcone: couleurIcone ?? couleur,
-      couleurValeur: enAttente
-          ? AgriColors.outline.withValues(alpha: 0.5)
-          : AgriColors.onSurface,
-      legende: enAttente ? SaisieDepensesScreen.legendeEnAttente : null,
-      iconeLegende: enAttente ? SymbolesAgri.hourglass_empty : null,
-    ),
+  }) => CarteKpi(
+    key: Key('kpi-$libelle'),
+    libelle: libelle,
+    valeur: valeur,
+    icone: icone,
+    couleurLisere: couleur,
+    couleurIcone: couleurIcone ?? couleur,
+    couleurValeur: enAttente
+        ? AgriColors.outline.withValues(alpha: 0.5)
+        : AgriColors.onSurface,
+    legende: enAttente ? SaisieDepensesScreen.legendeEnAttente : null,
+    iconeLegende: enAttente ? SymbolesAgri.hourglass_empty : null,
   );
 
   /// `bg-white border rounded-lg p-md flex flex-wrap items-center gap-sm` : « Rechercher... » (icône `search`,

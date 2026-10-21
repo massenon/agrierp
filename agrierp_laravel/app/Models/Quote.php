@@ -9,6 +9,15 @@ class Quote extends Model
 {
     use HasUuids;
 
+    /** Statuts du cycle de vie (colonne `status`), avec leur libellé du Blade et de l'export PDF. */
+    public const STATUTS = [
+        'brouillon' => 'Brouillon',
+        'envoye' => 'Envoyé',
+        'accepte' => 'Accepté',
+        'refuse' => 'Refusé',
+        'facture' => 'Facturé',
+    ];
+
     protected $fillable = [
         'quote_number', 'customer_id', 'articles_description', 'amount',
         'tva_rate', 'validity_days', 'quote_date', 'note', 'status',

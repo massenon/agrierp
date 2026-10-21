@@ -246,6 +246,7 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | H13 | **D-SYNC-2/3** (B2) : synchronisation automatique du poste (retour du réseau, toutes les 15 min, fermeture), réessais 30 s / 2 min / 5 min / 15 min / 1 h pour les échecs réseau | ✅ 19/10/2026 (intervalle réglable dans Paramètres du poste : 5, 15, 30 ou 60 min ; fermeture bornée à 15 s ; une seule tentative à la fois) |
 | H13b | **D-SYNC-2** : envoi par lots de 50. ⚠️ Le serveur COUPLE des tables dans un même envoi : une vente et la fiche (bande, jour) qu'elle touche (15.30 : sinon la vente est comptée deux fois), les transferts après leurs fiches (15.46), avances et imputations (15.19). Les lots suivent l'ordre de traitement du serveur et ne séparent jamais un groupe couplé | ✅ 19/10/2026 (fiches, transferts et ventes par journées entières au rang des ventes ; un envoi de 50 lignes au plus part tel quel) |
 | H14 | **D-SYNC-4** : vente reçue du poste qui rend un stock négatif → acceptée et signalée (notification à l'administrateur, compteur dans le journal) | ✅ 19/10/2026 |
+| SW-1 | **Correction du client du 21/10/2026 — le web fait AUSSI revenir les données vers les postes** (PRD [`synchronisation-barre-superieure`](prd/synchronisation-barre-superieure.md) §11) : audit du tirage (aucun trou de requête ; trous de conception : curseur ignoré du serveur, pas de tirage forcé, demande S-T6 expirant en 1 h) ; table serveur `poste_synchronisations` (curseur et drapeau par poste) ; modale web « Modifications du site depuis son dernier tirage : N » + « Renvoyer vers ce poste / tous les postes » ; le poste honore le drapeau (tirage complet puis acquittement, sans migration Drift) | ✅ 21/10/2026 |
 
 ### Décisions du client du 19/10/2026 (soir) — « uniformiser web et poste, pas de divergence »
 
@@ -435,7 +436,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **BS-Q5** : l'archivage d'une bande utilise `manage-elevage` au web (le droit `archive-elevage` existe mais n'est lu nulle part). Passer à `archive-elevage` ?
 - **BS-Q6** ✅ *tranché 21/10/2026* : une bande datée dans un exercice clos est refusée (déjà livré en BS1) ; tests de non-régression au web, à l'envoi et au poste.
 - **BS-Q7** ✅ *tranché 21/10/2026* : restauration d'une bande archivée au poste. Web d'abord : filtre « Bandes archivées » et bouton « Restaurer » (`manage-elevage`, audit `livestock_lot.restored`, refusée si une autre bande en cours porte le même code) dans « Bandes & Sujets » ; puis poste (Drift v50) et envoi (`restauree`, geste explicite).
-- **BS-Q8** : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé « La valeur du champ code est déjà utilisée » et reste en conflit à corriger. Suffisant ?
+- **BS-Q8** ✅ *traité par UNI (21/10/2026)* : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé avec le code et la marche à suivre (« renommez-la… »), la bande saisie est gardée sur le poste, se renomme et repart. Voir UNI ci-dessous.
 
 **Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?
 
@@ -457,6 +458,36 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 **Vérifié d'abord au web :** Créer, Modifier et Sortir existent déjà (`manage-elevage`, audit, aucune cascade d'effectif : identifier n'est pas faire entrer) ; construit au web : point de passage `SaisieReproducteurAction`, bouton « Registre des Reproducteurs » dans « Bandes & Sujets » (l'écran n'était relié à rien), seconde sortie refusée.
 **Poste / serveur :** `animals` table mixte (`pushAnimals`), Drift v51, `ReproducteursRepository`, `RegistreReproducteursScreen`, absorbeur strict qui protège `pending` / `conflict`. Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 ».
 **Questions au client — ✅ tranché 21/10/2026 (OUI aux trois), livré web puis poste (voir `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 sur le registre des reproducteurs ») :** **BS-Q11** ✅ tranché 21/10/2026 — « Reforme » sans accent au registre : désormais « Réformé », « Vendu », « Mort » (correspondance unique `Animal::LIBELLES_STATUT`, valeur technique inchangée) · **BS-Q12** ✅ tranché 21/10/2026 — espèces du registre : un seul critère, les modules actifs (`LivestockSpecies::enabled()`, celui du tirage), web et poste · **BS-Q13** ✅ tranché 21/10/2026 — l'identifiant d'un sujet enregistré ne change plus (champ grisé, refus serveur y compris à l'envoi du poste).
+
+## Sprint AV — « Retours et Avoirs » et « Historique des Ventes » au poste (demande du client du 21/10/2026)
+
+> Demande : « screen Retours et Avoirs doit être la même chose que celle de la version web » ; « même chose pour le screen Historique des Ventes ». PRD : `docs/prd/avoirs-historique-poste.md` ; audit ligne à ligne : `docs/AUDIT_FIDELITE_ECRANS.md` § 11.
+
+### AV1 ✅ (21/10/2026) Retours et Avoirs au poste (web d'abord)
+
+**Objectif :** l'onglet « Retours et Avoirs » du hub Ventes & Devis, à l'identique du Blade ; le poste enregistre la DEMANDE, le serveur fait les effets (motif F0.74).
+**Web :** `AvoirClientService` (point de passage UNIQUE de `RetoursAvoirs::saveReturn()` et de l'envoi du poste) ; refus nouveaux, construits d'abord ici : quantité > « vendu − déjà retourné », montant > « ligne − déjà crédité », vente annulée / inconnue, produit hors vente, date future ou antérieure à la vente, exercice absent ou clos, plan comptable incomplet — rien n'est écrit (une transaction ; fini « retour enregistré SANS écriture »). `CreditNote::generateCreditNoteNumber()` prend l'année du jour du retour.
+**Serveur :** famille de tirage paginée `credit_notes` (`view-ventes`) ; `pushCreditNotes` (`manage-ventes`, après les ventes, idempotent par UUID, `traite` une seule fois, date du fait `credit_date`) ; `MotifsRefusPush`.
+**Poste :** Drift **v54** (`credit_notes`, table mixte ; palier `from < 54`, le 53 est réservé à la branche « Devis Prestations »), absorbeur STRICT, `_avoirEnJson`, acquittement, relance d'un refus, libellés, purge à la réinitialisation ; `AvoirsRepository` + `RetoursAvoirsOnglet`.
+
+### AV2 ✅ (21/10/2026) Historique des Ventes au poste, identique au Blade
+
+**Objectif :** audit ligne à ligne Blade ↔ Dart (25 écarts, tous corrigés : § 11.1 de l'audit) ; toutes les actions du Blade.
+**Web / serveur :** `AnnulerVenteAction` (extraite de `cancelSale()`, partagée avec l'envoi) ; `pushSales` : une vente connue renvoyée `annulee` est annulée une fois (stock réintégré, audit), une vente inconnue annulée avant son premier envoi est reçue puis annulée ; `sales` servi avec `subtotal` et `discount` ; `GET /api/ventes/{id}/pdf` (`export-ventes`, ticket du web).
+**Poste :** `HistoriqueVentesOnglet` (extrait du hub) + `HistoriqueVentesRepository` (cartes sur la période, filtres, détail, annulation en demande, `ClientVentes` pour le PDF) ; `ChampDateFiltre` compact pour la période ; pièces communes `elements_ventes.dart`, `GrilleKpi`.
+
+**Tests (écrits d'abord, mutation faite) :** Laravel `AvoirsClientsSyncTest` (30) ; poste `avoirs_poste_test` (35), `avoirs_sync_poste_test`, `avoirs_blade_test`, `avoirs_schema_test`, `avoirs_parite_php_test` (le VRAI `SyncController` reçoit l'envoi du poste), `historique_ventes_poste_test`, `historique_ventes_blade_test`, `migration_toutes_versions_test` (v54). Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « AV1 + AV2 ».
+
+**Questions au client (non tranchées) :**
+- **AV-Q1** L'avoir ne diminue pas la créance d'une vente à crédit (web inchangé). Imputer l'avoir sur la créance ? (recommandé : OUI)
+- **AV-Q2** Annuler une vente ne contre-passe ni l'écriture, ni la créance, ni l'encaissement : seul le stock revient (web inchangé depuis 4.4). Contre-passer ? (recommandé : OUI, écriture inverse datée du jour)
+- **AV-Q3** Remboursement d'un avoir (D 411 / C trésorerie) : à construire au web d'abord, avec le choix du compte. (recommandé : OUI)
+- **AV-Q4** Un retour en exercice clos ou sur plan comptable incomplet est désormais REFUSÉ au web et à l'envoi (avant : enregistré sans écriture). À faire confirmer par le cabinet FAGUEZ.
+- **AV-Q5** Export Excel / PDF en masse de l'historique : le web ne l'a pas (le poste retire ses deux boutons inertes). En vouloir un ? (web d'abord)
+
+**NON vérifié :** poste Windows réel (rendu du tiroir, du calendrier, de l'enregistrement du PDF dans Documents\AgriERP) ; navigateur (Dusk) pour les modifications du Blade (aucune : seul le composant a changé) ; une base MySQL / MariaDB peuplée (numérotation `AV-AAAA-NNN` par `MAX(CAST(...))` sous envois simultanés de deux postes : sérialisée par la transaction d'envoi, non éprouvée sur MariaDB) ; l'essai à cinq postes n'a pas été étendu aux retours.
+
+**Reste :** `VentesDevisRepository.charger()` et ses classes `DonneesHistorique` / `LigneHistorique` ne servent plus à rien (laissés pour ne pas heurter la branche `t-devis` ; à supprimer après la fusion).
 
 ## Sprint MP — Mise en page du poste (demandes du client)
 
@@ -480,6 +511,44 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 **Non vérifié :** migration sur une base réelle peuplée (MySQL/MariaDB de production) ; poste Windows réel (mise à jour d'une base locale existante).
 **Laissé tel quel, à confirmer :** le nom de serveur SMTP `smtp.olouwachegoun.bj` éventuellement saisi (pas une adresse : à corriger à la main dans Paramètres → Email (SMTP) si le serveur a changé) ; `support@faguez-sarl.bj` (adresse de l'éditeur, autre organisation) ; les adresses fictives des tests (`@ferme.bj`, `@resto.bj`).
 
+## Sprint DEV — « Devis & Proforma » au poste (demande du client du 21/10/2026)
+
+> **Demande :** « la saisie Devis & Proforma avec son tab panel et son CRUD doit être faite dans le poste », identique au web. PRD : [`docs/prd/devis-poste.md`](prd/devis-poste.md). Périmètre : le seul onglet « Devis Prestations » (modèle `Quote`) du hub « Ventes & Devis ». « Retours et Avoirs » et « Historique des Ventes » : ticket à part.
+
+### DEV1 ✅ (21/10/2026) Devis — créer, modifier, avancer dans le cycle, archiver, exporter, au web puis au poste
+
+**Objectif :** l'onglet « Devis Prestations » du poste reprend `devis.blade.php` / `Devis.php` à 100 %, avec sa table synchronisable.
+**Décisions client requises :** aucune pour livrer (propositions recommandées retenues, voir ci-dessous) ; trois questions ouvertes pour la suite (DEV-Q1 à DEV-Q3).
+
+**Web (agrierp_laravel)** — ordre : modèle → Action → Livewire → Blade
+- `app/Actions/SaisieDevisAction.php` : point de passage unique (créer, modifier, `changerStatut`, `aligner`, archiver) ; exercice clos refusé (règle `refusExerciceClos`, motif R4), cycle `brouillon → envoyé → accepté | refusé`, devis archivé ou facturé non modifiable, idempotence, audit.
+- `Livewire\Ventes\Devis` appelle l'action ; `devis.blade.php` : erreur sous « Date du Devis », « TVA » et « Validité » ; `Quote::STATUTS`.
+- Table `quotes` inchangée (déjà UUID : `uuid('id')->primary()`).
+
+**Poste (agrierp_flutter)** — ordre : table Drift (+ build_runner, palier v53) → dépôt → écran
+- `Quotes` (SyncColumns : `id` UUID, `device_id`, `sync_status`, `updated_at` ; `quote_number` NULLABLE), `schemaVersion` 52 → **53** (palier `createTable` gardé par `_tableExiste`), `tablesEnvoyees`, `tablesDActivite` (purgée à la réinitialisation).
+- `lib/features/ventes/devis_repository.dart` (`DevisRepository`), `lib/features/ventes/devis_onglet.dart` (`DevisOnglet`, modale), `ventes_devis_screen.dart` (branchement), `main.dart` (câblage et droits `manage-ventes` / `export-ventes`).
+
+**Synchronisation :** `quotes` table MIXTE (tirée ET saisie). Tirage : `PERMISSIONS_DE_TIRAGE['quotes'] = ['view-ventes']`, archivés compris. Envoi : `pushQuotes` (`manage-ventes`), après les clients ; numéro `DEV-AAAA-NNN` jamais lu du poste ; `quotes` ajouté à `FusionReferentielsService::REFERENCES` (client fusionné). Poste : `_absorberDevis` STRICT, jamais d'écrasement d'un `pending` / `conflict`, acquittement de la version partie (`_marquerSiInchangee`), `relancer`.
+
+**Décisions tranchées sur les recommandations :**
+1. **Numéro attribué par le serveur** (précédent : courriers F0.78). Le poste affiche « — » jusqu'au tirage qui suit l'acquittement.
+2. **Exercice clos refusé** (demande explicite du client), construit AU WEB d'abord (le Blade ne le faisait pas) : règle `closSeulement`, un devis ne passe aucune écriture ; vaut pour création, modification (date d'origine et nouvelle), statut et archivage.
+3. **Cycle contrôlé** : `facture` n'est atteint par aucun geste d'écran ni de poste (la conversion n'existe pas au web). Un poste qui envoie puis accepte hors ligne envoie l'état final ; le serveur parcourt le cycle pas à pas (`aligner`).
+4. **« Convertir en Facture » identique au web** : son toast d'attente, sans effet (DEV-Q1).
+5. **Pas de sous-onglets** : le « tab panel » est le hub (4 onglets) ; l'onglet Devis n'en a pas au web.
+6. **Pas de pagination ni de filtre d'exercice** : le web liste tous les devis actifs (`->get()`), le poste aussi.
+
+**Tests (écrits d'abord, rouges) :** web `DevisSaisieWebTest` (15) ; serveur `DevisPosteTest` (22 : accepté, rejeté, idempotent, numérotation, cycle, exercice clos, rôles, fusion, tirage) ; poste `devis_poste_test.dart` (65) et garde-fou `devis_blade_test.dart` (14). Gardes existants mis à jour : `perimetre_tirage_test`, `ecrivain_unique_test`, `migration_toutes_versions_test` (v53), `conformite_portage_test`, `ventes_devis_test`, `SyncTiragePagineTest`. Épreuve de mutation : `agrierp_laravel/README_SPRINT0.md`, entrée DEV1.
+**Vérification :** `php artisan test --testsuite=Feature`, `flutter analyze`, `flutter test`. Compteurs exacts : `agrierp_laravel/README_SPRINT0.md`.
+**Non vérifié / risques :** navigateur (Dusk) et poste Windows réels ; la conversion devis → facture (absente du web) ; l'impression « document client » d'un devis (DEV-Q3).
+
+| Ticket | Contenu | État |
+|---|---|---|
+| DEV2 | Tableau de bord : l'onglet « Devis » des « Transactions récentes » est encore vide au poste (« Aucun devis récent. ») alors que `quotes` descend désormais ; le lire comme `Dashboard\Index` | 🔧 proposé |
+| DEV-Q1 | ❓ Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ❓ client |
+| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client |
+| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client |
 ## Sprint VL — Verrou local du poste (décision du client du 21/10/2026)
 
 ### VL-1 ✅ (21/10/2026) Code PIN, écran de verrouillage à chaque lancement, sans réseau
@@ -523,3 +592,27 @@ Tables `ExpenseLines` et `CostCenters`, colonnes de `Expenses` (dont `ecriture_r
 `saisie_depenses_screen.dart` : modale à lignes dynamiques, tableau à détail, mêmes libellés ; garde-fou de parité Blade ↔ Dart. Tests `depenses_multilignes_ecran_test`, `depenses_multilignes_parite_test`.
 
 **Livré le 21/10/2026** (détail, mutations et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Ticket DEP1 à DEP5 ») : suite Laravel 2 250 verts, poste 3 191 verts / 17 sautés, `flutter analyze` propre. **Questions client DEP-Q1 à DEP-Q8 : à confirmer** (PRD § 9). **Numéro de schéma Drift 56 propre à la branche `t-depenses`** : la fusion renumérotera si l'un des paliers 53 (devis), 54 (avoirs) ou 55 (unicité) manque. Non vérifié : base MySQL peuplée, poste Windows réel, Dusk, essai à cinq postes contre le serveur réel.
+## Sprint UNI — Unicité des codes et libellés (demande du client du 21/10/2026 : « que faire pour éviter cela à la longue ? »)
+
+### UNI ✅ (21/10/2026) Codes de bande et libellés de catégorie uniques à la source, sans toucher à l'existant
+
+**Constat.** Le code d'une bande avait un index `unique` exact en base et la validation `unique:` du web, mais : (1) comparaison sensible aux espaces (`AVI-2026-01 ` passait), (2) refus sans le code ni la marche à suivre (« La valeur du champ code existe déjà »), (3) les catégories de produits n'avaient aucune contrainte (libellé libre), (4) aucune détection des doublons déjà présents, (5) la bande refusée à l'envoi ne pouvait pas être renommée (le code était immuable). **Rien n'est supprimé ni renommé automatiquement.**
+
+**Décisions.**
+- **Clé de comparaison** `CleUnicite::cle()` (web) / `cleUnicite()` (poste) : casse, accents, espaces autour et doublés ignorés. Comparée en PHP / Dart (volume d'une ferme), pas en SQL (SQLite et MySQL ne s'accordent ni sur les accents ni sur les espaces).
+- **Portée : TOUTES les bandes, archivées comprises.** Une bande archivée garde son code, ses fiches et ses ventes ; redonner son code à une nouvelle bande referait deux lignes de même clé dans les rapports. (La restauration BS-Q7 garde son propre refus.)
+- **Message** (web, poste, serveur) : « Le code « X » est déjà utilisé par une autre bande (en cours ou archivée) : choisissez un autre code. » ; à l'envoi, le serveur ajoute : « Votre bande est conservée sur ce poste : renommez-la (Élevage > Bandes & Sujets, bouton « Modifier ») puis synchronisez de nouveau. »
+- **Renommer = seul assouplissement du code immuable.** Sans lui, « le client renommera lui-même » était impossible. Le code d'une bande se corrige UNIQUEMENT quand il est partagé avec une autre bande (ou, au poste, quand le serveur l'a refusé « déjà utilisé »), vers un code libre ; audit `livestock_lot.renamed`. Un code unique reste immuable (message dédié). Un doublon antérieur ne bloque ni l'archivage, ni la restauration, ni le changement de stade de la bande qui garde son code.
+- **Index unique** (migration `2026_10_21_000002_garantir_l_unicite_des_codes_et_libelles`) : `livestock_lots.code` l'avait déjà (exact) ; la migration le rétablit s'il manque et ajoute `product_categories.label`, **seulement si aucun doublon** (même clé que la règle). S'il y en a : `Log::warning` (table, valeurs) et pas d'index ; relancer `php artisan migrate` après correction. Aucune donnée touchée.
+- **Catégories de produits** : `ProductCategory` refuse un libellé déjà porté (actives ou non). Aucun écran ne crée de catégorie (créées par le seeder, référentiel tiré par le poste) : le garde-fou protège toute voie future ; les catégories en double déjà présentes ne sont que **détectées** (commande), le poste ne peut pas les renommer (référentiel en lecture seule).
+- **Détection** : `php artisan agrierp:doublons` (lecture seule, code de sortie 0) liste bandes et catégories en double, identifiants, lignes liées (fiches, ventes, transferts, sujets ; produits). Alerte **non bloquante** : bandeau « N doublon(s) de code détecté(s) — à renommer » en tête de « Bandes & Sujets », **web ET poste** (article 5 : web d'abord), que le poste voit y compris sur les bandes tirées du serveur. Choisi plutôt qu'une notification : la cloche est alimentée par le serveur, qui ne voit pas les bandes encore hors ligne d'un poste.
+- **Poste** : refus AVANT l'écriture, sous le champ « Code Unique de la Bande » (bandes archivées et tirées du serveur comprises) ; code rangé sans espaces ; proposition du prochain code libre (inchangée, désormais sur la même clé) ; refus du serveur affiché mot pour mot sous le code (« Refusée »), la bande saisie est GARDÉE ; « Modifier » ouvre le champ code des bandes à renommer ; la bande repart en file sous le même UUID, le refus périmé est levé.
+- **Audit des autres entités** (code / libellé servant de clé) : `livestock_species.code`, `products.sku` (généré), `chart_of_accounts.code`, `fixed_assets.code`, `animals.identifier` : déjà `unique` en base, exacts (insensibles à la casse sous MySQL ; non revérifiés ici). **Corrigé** : clé de ligne `gantt-<code bande>` de Soins & Vaccins (même « Duplicate keys found » que le tableau de bord d'élevage) via l'aide commune `suffixe_doublon.dart`. **Laissé** : noms de clients, fournisseurs, produits (homonymes légitimes, aucune clé de widget dessus) ; unicité de l'identifiant d'un sujet à rendre insensible aux espaces (`Rule::unique` exact) ; catégories de dépenses et autres listes libres non auditées une à une.
+
+**Contrat modifié** (`agrierp_laravel/README_SPRINT0.md`) : `POST /api/sync/push` `livestock_lots` — motif de rejet « code déjà utilisé » avec marche à suivre ; code partagé renommable (même `id`, nouveau `code`).
+
+**Tests (rouges d'abord, mutations tuées).** Web `UniciteCodesTest` (clé, création : pris / casse / espaces / archivée / libre, règle gardant son propre code, point de passage, absorbeur : rejet, casse et espaces, deux postes, rejeu du même UUID, doublon antérieur, renommage ; catégories ; migration avec et sans doublons ; commande ; bandeau) ; poste `unicite_codes_poste_test` (formulaire, proposition, bandes tirées du serveur comptées, renommage, refus du serveur de bout en bout, bandeau, champ code) + `soins_vaccins_test` (Gantt). Mutations tuées : clé exacte (5 rouges), migration sans contrôle de doublons, message d'envoi, garde du point de passage, immuabilité du code non partagé, clé poste sans espaces (8 rouges), reconnaissance du refus, levée du conflit, suffixe du Gantt.
+**Mesures (compteurs exacts).** Laravel `--testsuite=Feature` : **2 203 verts** (24 237 assertions ; avec `.env`, `npm run build` et `storage:link`, comme l'exige `CLAUDE.md`) ; poste `flutter analyze` propre, **3 120 verts, 17 sautés** (`flutter test --concurrency=3`).
+**Schéma Drift : inchangé** (v52 ; ni 53 ni 54 ni 55 pris).
+**Non vérifié :** migration sur une base MySQL réelle peuplée (collation, doublons réels) ; poste Windows réel ; rendu navigateur (Dusk) du bandeau et du champ code.
+

@@ -67,8 +67,12 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   44: [d.stockMovements],
   // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
   47: [d.payslips],
-  // Ticket DEP4 — lignes de dépense et centres de coût. ⚠️ Numéro 56 : 53 (devis), 54 (avoirs) et 55 (unicité) sont
-  // réservés à d'autres branches ; la fusion renumérotera si un palier manque.
+  // Ticket DEV — « Devis & Proforma » au poste.
+  53: [d.quotes],
+  // Tickets AV1 / AV2 — retours et avoirs clients (table mixte). ⚠️ Le palier 53 est celui de la branche « Devis Prestations ».
+  54: [d.creditNotes],
+  // Ticket DEP4 — lignes de dépense et centres de coût. ⚠️ Chaîne 52 → 53 (devis) → 54 (avoirs) → 56 (dépenses) : le palier
+  // 55 est inutilisé (aucune table ni colonne), la migration passe de 54 à 56 sans trou.
   56: [d.expenseLines, d.costCenters],
 };
 
@@ -225,6 +229,10 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket MAIL1 — palier de DONNÉES (adresses e-mail du nouveau domaine) : aucune table ni colonne ajoutée.
   52: [],
+  // Ticket DEV — table `quotes` créée (aucune colonne ajoutée à une table existante).
+  53: [],
+  // Tickets AV1 / AV2 — table `credit_notes` créée (aucune colonne ajoutée à une table existante).
+  54: [],
   // Ticket DEP4 — l'en-tête d'une dépense à plusieurs lignes (mode, centre de coût, fournisseur, bénéficiaire, auteur,
   // refus de la pièce) ; la transformation 1 en-tête = 1 ligne est vérifiée par `depenses_multilignes_test.dart`.
   56: [
@@ -329,6 +337,21 @@ void main() {
     } catch (_) {}
   });
 
+  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) est complète ; le 55 est inutilisé', () {
+    final d = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(d.close);
+    expect(d.schemaVersion, 56, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou');
+    expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
+    expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);
+    expect(_tablesCreees(d)[53], [d.quotes]);
+    expect(_tablesCreees(d)[54], [d.creditNotes]);
+    final source = File('lib/core/database/app_database.dart').readAsStringSync();
+    expect(source, contains('if (from < 53) {'));
+    expect(source, contains('if (from < 54) {'));
+    expect(source, contains('if (from < 56) {'));
+    expect(source, isNot(contains('if (from < 55) {')));
+  });
+
   test('l’historique du test couvre le palier le plus récent du schéma', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
@@ -339,6 +362,7 @@ void main() {
     // Un nouveau palier non reporté ici rendrait les bases « vN » fausses.
     expect(derniere, d.schemaVersion);
   });
+
 
   group('migration vers la version courante depuis chaque version', () {
     late Map<String, Object> reference;

@@ -98,6 +98,8 @@ void main() {
     'veterinary_calendar_events',
     'livestock_reproduction_events',
     'customers',
+    // Ticket DEV — devis (table mixte : saisie ET tirée).
+    'quotes',
     'receivables',
     'customer_advances',
     'customer_reminders',
@@ -131,6 +133,8 @@ void main() {
     'attestation_templates',
     'attestation_counts',
     'sales',
+    // Tickets AV1 / AV2 — avoirs clients (table mixte : demandes du poste et avoirs du serveur).
+    'credit_notes',
     // Ticket U4 (D-U4) — lignes des ventes et des achats servis, avec leur pièce.
     'sale_lines',
     'purchase_lines',

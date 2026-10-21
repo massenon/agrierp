@@ -557,7 +557,7 @@ echo json_encode($sortie);
       'lib/features/achats/saisie_depenses_screen.dart',
       'lib/features/achats/achats_commandes_screen.dart',
       'lib/features/stocks/gestion_stocks_screen.dart',
-      'lib/features/ventes/ventes_devis_screen.dart',
+      'lib/features/ventes/historique_ventes_onglet.dart',
       'lib/features/ventes/facturation_screen.dart',
       'lib/features/rapports/rapports_exports_screen.dart',
       'lib/features/pilotage/tableau_de_bord_screen.dart',

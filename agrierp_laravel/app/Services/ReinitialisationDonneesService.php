@@ -161,6 +161,9 @@ class ReinitialisationDonneesService
             // Ticket S-T5 — correspondances d'identifiants des postes : après une réinitialisation, les postes purgent
             // leurs données ; les identifiants qu'elles traduisaient ne seront plus jamais envoyés.
             'correspondances_identifiants',
+            // Ticket SW-1 — curseurs et drapeaux de resynchronisation des postes : après une réinitialisation, chaque
+            // poste purge ses données et repart de zéro ; son curseur d'avant ne décrit plus rien.
+            'poste_synchronisations',
         ];
     }
 
