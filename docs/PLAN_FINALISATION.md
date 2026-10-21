@@ -369,3 +369,70 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 ### Lot 3 — avec la clôture de 2026
 | EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
+
+---
+
+## Sprint BS — Bandes & Sujets au poste, avec toutes les actions (demande du client du 21/10/2026)
+
+> Demande : « dans le poste on doit avoir la possibilité de créer Bandes & Sujets avec CRUD, toutes les actions ».
+
+**Constat (lu dans le code, pas supposé).**
+- **Le poste n'a AUCUN écran « Bandes & Sujets » ni « Enregistrer des Sujets »** : la carte « Bandes & Sujets » de Gestion Élevage renvoie vers le web (`GestionElevageScreen.messageBandesWeb`), et `gestion-bandes.html` / `enregistrer-sujets.html` sont dans la liste de l'animalier mais sans `EcranPoste`. Ce n'est donc pas « une lecture seule » : les deux écrans sont à porter en entier, lecture comprise, avec leurs actions.
+- **Web, bandes** (`GestionBandes`) : Créer (`saveLot`), Lire (liste, tiroir), Modifier (`updateLot` : stade, effectif actuel, statut), Archiver (`archiveLot`, `is_active = false`, confirmation `x-modal-confirm-delete`), droit `manage-elevage` partout, audit `livestock_lot.*`. Pas d'exercice jugé, pas de règle sur l'effectif à l'archivage (le web archive toute bande), restauration seulement par la Corbeille (Administration), absente du poste.
+- **Web, sujets** (`EnregistrerSujets`) : seul « Nouveau Sujet » existe. Le docblock retire volontairement Modifier / Archiver (« romprait la cascade ») : c'était avant A1 ; la cascade unique `recalculerEnCascade()` rend maintenant la correction sûre. `newEntry` n'appelle pas `authorize`, l'exercice clos n'est pas jugé (la fiche écrite l'est pourtant à la saisie des fiches, Q3).
+- **Serveur** : `livestock_lots` est un référentiel en tirage seul (aucun envoi accepté, aucune table de droit) ; les entrées de sujets sont des colonnes `achat` / `ne` / `don` de `livestock_daily_entries`, déjà acceptées à l'envoi (dernier écrivain gagne, cascade).
+- **Poste** : `livestock_lots` n'a ni `sync_status` ni `device_id` ; son absorbeur écrase tout. Les entrées de sujets passent par `FicheJournaliereRepository`.
+
+### BS1 🔧 Bandes — créer, modifier, archiver au poste (web d'abord)
+
+**Objectif :** « Bandes & Sujets » au poste, à l'identique du Blade (KPI, filtres, tableau, tiroir, modales Nouvelle Bande / Modifier la Bande, confirmation d'archivage, toasts), saisies hors ligne en file, rejouées au serveur par le même point de passage que le web.
+**Décisions client requises :** aucune pour coder (les huit questions BS-Q1 à BS-Q8 ci-dessous se tranchent après). Le poste reprend le web tel qu'il est, défauts compris.
+
+**Web (agrierp_laravel)**
+- `app/Actions/SaisieBandeAction.php` (nouveau) : point de passage UNIQUE de création, modification et archivage d'une bande — pour `GestionBandes` et `SyncController::pushLots`. Mêmes règles, mêmes messages.
+- Règle nouvelle, web d'abord : une bande dont la date de création tombe dans un exercice CLOS est refusée (`AccountingEntryService::refusExerciceClos`, motif R4, sous « Date de Création » — l'erreur est ajoutée au Blade).
+- `GestionBandes` : appelle l'Action ; `newLot` / `saveLot` / `editLot` / `updateLot` / `archiveLot` inchangés pour l'utilisateur. Archiver une bande déjà archivée n'a aucun effet.
+
+**Poste (agrierp_flutter)**
+- Drift v49 : `livestock_lots.sync_status` (défaut `synced`), `device_id` (nul), `effectif_corrige` (nul : correction manuelle d'effectif à envoyer) ; palier de migration + `migration_toutes_versions_test`.
+- `BandesRepository` (nouveau) : liste, KPI, tiroir, `creer` / `modifier` / `archiver`, refus avant écriture avec les motifs du web, UUID au poste, `pending`, constitution par `TransfertsRepository.creer` (bande d'origine).
+- `GestionBandesScreen` (nouveau) ; `EcranPoste.gestionBandes`, carte du hub rendue active, titre, droits (`manage-elevage`), `@lectureSeule`.
+- Absorbeur `_absorberBandes` STRICT : une bande `pending` / `conflict` n'est jamais écrasée.
+
+**Synchronisation :** `livestock_lots` devient une table MIXTE (tirée ET saisie). Envoi : `pushLots` (droit `manage-elevage`, refus motivés, idempotent, une bande archivée n'est plus modifiable, l'effectif n'est écrit que sur correction explicite `effectif_corrige`). Avant les fiches et les transferts du même envoi.
+
+**Tests (écrits AVANT, rouges d'abord) :**
+- Laravel : `BandesSujetsPosteTest` (création, modification, archivage, droits, rejets motivés, idempotence, exercice clos, bande archivée) ; `BandesSaisieActionTest` (le web passe par la même Action).
+- Flutter : `bandes_poste_crud_test.dart` (repository, écran, file de sync, absorbeur), `bandes_blade_test.dart` (libellés lus dans le Blade).
+- Épreuve de mutation : retirer le refus d'exercice, l'archivage logique, la protection `pending` de l'absorbeur, le droit.
+
+### BS2 🔧 Sujets — nouveau, modifier, archiver (web d'abord, puis poste)
+
+**Objectif :** « Enregistrer des Sujets » au poste avec toutes ses actions ; le web gagne d'abord Modifier et Archiver.
+**Décision de modélisation (à confirmer, BS-Q2) :** une ligne du journal = une origine d'une fiche du jour (Naissance → `ne`, Achat → `achat`, Don → `don`). Modifier = changer la quantité (et/ou l'origine, la date) ; Archiver = retirer l'entrée (colonne remise à 0, la ligne quitte le journal, trace à l'audit). Dans les deux cas : cascade unique, et refus si un effectif deviendrait négatif un jour suivant.
+
+**Web**
+- `app/Actions/SaisieSujetAction.php` (nouveau) : `ajouter` (le code de `saveEntry`, déplacé), `modifier`, `archiver` ; exercice clos refusé (Q3) ; effectif négatif refusé.
+- `EnregistrerSujets` : modale « Modifier le Sujet », confirmation d'archivage, colonne Actions (`manage-elevage` / `archive-elevage`), `authorize` aussi sur `newEntry`, une ligne par origine, audit `livestock_entry.updated` / `.archived`.
+
+**Poste**
+- `SujetsEntreesRepository` (nouveau, sur `FicheJournaliereRepository` : une seule écriture de fiche) ; `EnregistrerSujetsScreen` (nouveau) ; `EcranPoste.enregistrerSujets`.
+
+**Synchronisation :** aucune table nouvelle : les fiches partent par `livestock_daily_entries` (déjà accepté, cascade du serveur). Tests de bout en bout : création, modification et archivage d'une entrée envoyés par le poste.
+
+**Tests :** `BandesSujetsPosteTest` (volet sujets), `EnregistrerSujetsActionsTest` (web), `sujets_poste_crud_test.dart`, `sujets_blade_test.dart`, essai multipostes étendu.
+
+**Hors périmètre / risques (BS1 + BS2) :**
+- Registre des Reproducteurs (`Animal`, fiche sujet nominative) : le web le crée / modifie / sort, le poste le lit seulement ; non traité ici (BS-Q1).
+- Restauration d'une bande : web = Corbeille uniquement ; non portée.
+- Le prototype HTML est absent (A8) : les garde-fous lisent le Blade.
+
+**Questions au client (non tranchées) :**
+- **BS-Q1** : « Sujets » = le journal des entrées (Enregistrer des Sujets, fait ici) ou aussi le registre nominatif des reproducteurs (`Animal`, à porter en écriture) ?
+- **BS-Q2** : « Archiver un sujet » = retirer l'entrée du journal (quantité remise à 0, tracé à l'audit) : confirmé ? Sinon, quelle trace garder ?
+- **BS-Q3** : le web archive une bande quel que soit son effectif ou ses fiches. Faut-il refuser l'archivage d'une bande qui a un effectif vivant ou des fiches ? (Le poste reprend le web.)
+- **BS-Q4** : « Modifier la Bande » écrit l'effectif actuel directement, sans passer par une fiche ; la prochaine fiche le réécrit (cascade). Interdire cette saisie dès qu'une bande a des fiches ?
+- **BS-Q5** : l'archivage d'une bande utilise `manage-elevage` au web (le droit `archive-elevage` existe mais n'est lu nulle part). Passer à `archive-elevage` ?
+- **BS-Q6** : une bande datée dans un exercice clos est maintenant refusée (règle nouvelle, web puis poste). Confirmé ?
+- **BS-Q7** : restaurer une bande au poste (Corbeille absente du poste) ?
+- **BS-Q8** : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé « La valeur du champ code est déjà utilisée » et reste en conflit à corriger. Suffisant ?
