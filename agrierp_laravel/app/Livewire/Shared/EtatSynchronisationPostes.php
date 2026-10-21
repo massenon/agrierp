@@ -4,6 +4,7 @@ namespace App\Livewire\Shared;
 
 use App\Services\DemandeSynchronisationService;
 use App\Services\JournalSynchronisationService;
+use App\Services\ResynchronisationPostesService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
@@ -11,9 +12,10 @@ use Livewire\Component;
  * Ticket H3 — bouton « Synchroniser » de la barre supérieure et modale « Synchronisation » du WEB
  * (PRD `docs/prd/synchronisation-barre-superieure.md`, EF1, EF2, EF11).
  *
- * ⚠️ Ce bouton n'envoie rien : le serveur EST la base (décision du Sprint 0, README_SPRINT0 §0.2 — un bouton qui
- * ferait semblant serait un décor). Il ouvre l'ÉTAT DES POSTES : dernier contact, dernier envoi, refus. Réservé
- * à l'administrateur (`manage-users`, comme « Vider les sessions », ticket 15.54) : la liste nomme les comptes.
+ * ⚠️ Ce bouton ne fait pas semblant (décision du Sprint 0, README_SPRINT0 §0.2 — un bouton décor). Il ouvre l'ÉTAT DES
+ * POSTES : dernier contact, dernier envoi, refus, et — correction du client du 21/10/2026 (ticket SW-1) — ce que
+ * chaque poste n'a pas encore REÇU du site, avec « Renvoyer vers ce poste » : le web fait aussi revenir les données
+ * vers les postes. Réservé à l'administrateur (`manage-users`, comme « Vider les sessions », ticket 15.54) : la liste nomme les comptes.
  */
 class EtatSynchronisationPostes extends Component
 {
@@ -24,7 +26,11 @@ class EtatSynchronisationPostes extends Component
 
     public function getPostesProperty()
     {
-        return app(JournalSynchronisationService::class)->etatDesPostes();
+        $retards = app(ResynchronisationPostesService::class);
+
+        // Ticket SW-1 — chaque poste porte aussi ce qu'il n'a pas encore reçu du site (`retard`).
+        return app(JournalSynchronisationService::class)->etatDesPostes()
+            ->map(fn (array $ligne) => $ligne + ['retard' => $retards->retard($ligne['poste'])]);
     }
 
     public function actualiser(): void
@@ -57,6 +63,41 @@ class EtatSynchronisationPostes extends Component
             ? 'Demande envoyée : les postes connectés synchroniseront dans les 30 secondes.'
             : "Demande envoyée au poste {$poste} : il synchronisera dans les 30 secondes s'il est connecté.",
             type: 'success');
+    }
+
+    /**
+     * Ticket SW-1 (correction du client du 21/10/2026) — « Renvoyer vers ce poste » : le web fait AUSSI revenir les
+     * données vers les postes. Lève le drapeau « resynchronisation demandée » du poste : à son prochain contact (ping de
+     * 30 s ou tirage), il repart d'un tirage COMPLET puis acquitte. Audité (qui, quand, quel poste).
+     */
+    public function renvoyer(string $poste): void
+    {
+        $this->authorize('manage-users');
+
+        if (! $this->postes->contains(fn ($ligne) => $ligne['poste'] === $poste)) {
+            $this->dispatch('toast', message: 'Poste inconnu du serveur : renvoi non demandé.', type: 'error');
+
+            return;
+        }
+
+        app(ResynchronisationPostesService::class)->demanderPoste($poste, auth()->user());
+        unset($this->postes);
+
+        $this->dispatch('toast', message: "Renvoi demandé au poste {$poste} : il recevra tout à son prochain contact avec le serveur.", type: 'success');
+    }
+
+    /** « Renvoyer vers tous les postes » : même geste, pour chaque poste appairé. */
+    public function renvoyerATous(): void
+    {
+        $this->authorize('manage-users');
+
+        $n = app(ResynchronisationPostesService::class)->demanderTous(auth()->user());
+        unset($this->postes);
+
+        $this->dispatch('toast', message: $n === 0
+            ? 'Aucun poste appairé : rien à renvoyer.'
+            : "Renvoi demandé à {$n} poste(s) : chacun recevra tout à son prochain contact avec le serveur.",
+            type: $n === 0 ? 'warning' : 'success');
     }
 
     public function render()

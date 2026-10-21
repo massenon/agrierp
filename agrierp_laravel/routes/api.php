@@ -69,6 +69,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     // `throttle:N,1` d'un compte partagent la même clé, et l'interrogation régulière mangerait le crédit du tirage.
     Route::get('/sync/demande', [SupervisionSynchronisationController::class, 'demande'])
         ->middleware('throttle:6,1,sync-demande');
+    // Ticket SW-1 — le poste acquitte une resynchronisation demandée par le web (drapeau « Renvoyer vers ce poste »).
+    Route::post('/sync/resynchronisation/acquittement', [SupervisionSynchronisationController::class, 'acquitterResynchronisation'])
+        ->middleware('throttle:6,1,sync-resync-acquittement');
     Route::get('/sync/coherence', [SupervisionSynchronisationController::class, 'coherence'])
         ->middleware('throttle:10,1,sync-coherence');
 

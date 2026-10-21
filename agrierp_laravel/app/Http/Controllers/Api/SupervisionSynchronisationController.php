@@ -7,6 +7,7 @@ use App\Models\ControleCoherence;
 use App\Services\CoherenceSynchronisationService;
 use App\Services\FinancialReportService;
 use App\Services\DemandeSynchronisationService;
+use App\Services\ResynchronisationPostesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -27,7 +28,7 @@ class SupervisionSynchronisationController extends Controller
      * GET /api/sync/demande — `{"demande": true, "demandee_le": …, "demandee_par": …}` si une demande valide n'a pas
      * encore été servie à ce poste (elle l'est alors), `{"demande": false}` sinon.
      */
-    public function demande(Request $request, DemandeSynchronisationService $demandes): JsonResponse
+    public function demande(Request $request, DemandeSynchronisationService $demandes, ResynchronisationPostesService $resynchronisations): JsonResponse
     {
         $poste = $request->user()?->currentAccessToken()?->name;
         if (! is_string($poste) || $poste === '') {
@@ -35,14 +36,34 @@ class SupervisionSynchronisationController extends Controller
         }
 
         $demande = $demandes->servir($poste);
+        // Ticket SW-1 — drapeau « resynchronisation demandée » (« Renvoyer vers ce poste » du web) : relu à chaque
+        // interrogation jusqu'à l'acquittement du poste, car il ne s'éteint pas au bout d'une heure. Clés ABSENTES sans
+        // drapeau : la réponse d'avant SW-1 reste celle d'un poste sans demande.
+        $drapeau = $resynchronisations->drapeau($poste);
+        $resync = $drapeau === null ? [] : ['resynchronisation' => true, 'resynchronisation_demandee_le' => $drapeau->toIso8601String()];
 
         return response()->json($demande === null
-            ? ['demande' => false]
+            ? ['demande' => false] + $resync
             : [
                 'demande' => true,
                 'demandee_le' => $demande->demandee_le?->toIso8601String(),
                 'demandee_par' => $demande->auteur?->name,
-            ]);
+            ] + $resync);
+    }
+
+    /**
+     * POST /api/sync/resynchronisation/acquittement `{demandee_le}` — le poste a refait un tirage complet sur la
+     * demande lue à `demandee_le` : le drapeau tombe, sauf si l'administrateur en a levé un plus récent entre-temps.
+     */
+    public function acquitterResynchronisation(Request $request, ResynchronisationPostesService $resynchronisations): JsonResponse
+    {
+        $donnees = $request->validate(['demandee_le' => ['required', 'date']]);
+
+        $poste = ResynchronisationPostesService::nomDuPoste($request);
+        $acquittee = $poste !== null
+            && $resynchronisations->acquitter($poste, Carbon::parse($donnees['demandee_le']));
+
+        return response()->json(['acquittee' => $acquittee]);
     }
 
     /**

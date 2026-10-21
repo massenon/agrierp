@@ -334,6 +334,8 @@ class SyncController extends Controller
             // connaît pas purge ses données d'activité avant tout envoi.
             'data_reset_at' => $this->instantDeReinitialisation(),
         ];
+        // Ticket SW-1 — « resynchronisation demandée » (clé absente sans drapeau).
+        $reponse += $this->drapeauDeResynchronisation($request);
         foreach ($this->tablesNonPaginees($request, $since) as $cle => $calcul) {
             $reponse[$cle] = $calcul();
         }
@@ -403,6 +405,7 @@ class SyncController extends Controller
 
         if ($premiere) {
             $reponse['data_reset_at'] = $this->instantDeReinitialisation();
+            $reponse += $this->drapeauDeResynchronisation($request);
             foreach ($this->tablesNonPaginees($request, $since) as $cle => $calcul) {
                 if (in_array($cle, $servies, true)) {
                     $reponse[$cle] = $calcul();
@@ -615,7 +618,7 @@ class SyncController extends Controller
      */
     private function dansLOrdreDuTirage(array $reponse): array
     {
-        $ordre = ['page', 'server_time', 'data_reset_at', 'tables_servies', ...array_keys(self::PERMISSIONS_DE_TIRAGE)];
+        $ordre = ['page', 'server_time', 'data_reset_at', 'resynchronisation_demandee_le', 'tables_servies', ...array_keys(self::PERMISSIONS_DE_TIRAGE)];
         $ordonnee = [];
         foreach ($ordre as $cle) {
             if (array_key_exists($cle, $reponse)) {
@@ -624,6 +627,25 @@ class SyncController extends Controller
         }
 
         return $ordonnee + $reponse;
+    }
+
+    /**
+     * Ticket SW-1 — « RESYNCHRONISATION DEMANDÉE » : si l'administrateur a cliqué « Renvoyer vers ce poste », le tirage
+     * porte l'instant de la demande (`resynchronisation_demandee_le`, ISO 8601). Clé ABSENTE sinon : un poste antérieur
+     * l'ignore, un poste à jour repart d'un tirage complet puis acquitte (`POST /api/sync/resynchronisation/acquittement`).
+     *
+     * @return array<string, string>
+     */
+    private function drapeauDeResynchronisation(Request $request): array
+    {
+        $poste = \App\Services\ResynchronisationPostesService::nomDuPoste($request);
+        if ($poste === null) {
+            return [];
+        }
+
+        $le = app(\App\Services\ResynchronisationPostesService::class)->drapeau($poste);
+
+        return $le === null ? [] : ['resynchronisation_demandee_le' => $le->toIso8601String()];
     }
 
     /** Ticket 15.50 — instant de la dernière réinitialisation des données (null : jamais). */
