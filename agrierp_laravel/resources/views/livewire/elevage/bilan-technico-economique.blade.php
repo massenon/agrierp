@@ -21,22 +21,22 @@
         </div>
     @else
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase">Coût Total Connu du Lot</span>
                 <span class="text-xl font-extrabold block mt-xs">{{ number_format($this->coutTotalConnu, 0, ',', ' ') }} FCFA</span>
                 <p class="text-[9px] text-outline mt-xs">Hors main d'œuvre (clé d'imputation à arbitrer)</p>
             </div>
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase">Revenu Total du Lot</span>
                 <span class="text-xl font-extrabold block mt-xs">{{ number_format($this->revenuTotalConnu, 0, ',', ' ') }} FCFA</span>
                 <p class="text-[9px] text-outline mt-xs">Ventes validées, nettes des avoirs traités</p>
             </div>
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-accent-yellow shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase">Marge Nette</span>
                 <span class="text-xl font-extrabold block mt-xs {{ $this->margeNette >= 0 ? 'text-brand-emerald' : 'text-error-deep' }}">{{ number_format($this->margeNette, 0, ',', ' ') }} FCFA</span>
                 <p class="text-[9px] text-outline mt-xs">Sur revenus et coûts connus</p>
             </div>
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase">Coût de Revient / Sujet</span>
                 <span class="text-xl font-extrabold block mt-xs">{{ $this->coutParSujet !== null ? number_format($this->coutParSujet, 0, ',', ' ').' FCFA' : '—' }}</span>
                 <p class="text-[9px] text-outline mt-xs">Sur coûts connus ÷ effectif initial</p>

@@ -8,6 +8,14 @@ fait foi** : il tient compte des tickets du 19/10/2026 (synchronisation S-T1 à 
 
 > ⚠️ **Ordre de mise en production : le SERVEUR d'abord, les postes ensuite.** Un poste à jour face à un ancien
 > serveur laisserait non comptées certaines ventes de bétail (ticket S-T9).
+>
+> ⚠️ **Idem pour SW-1 (21/10/2026, « Renvoyer vers ce poste »).** Le serveur doit porter la migration
+> `2026_10_21_000002_create_poste_synchronisations_table` (`php artisan migrate --force`) AVANT les postes : sans elle, la
+> modale web ne sait pas ce que chaque poste a reçu. Un poste à jour face à un ancien serveur ne reçoit jamais le drapeau
+> (il n'y a rien à honorer, rien ne casse) ; un ancien poste face au nouveau serveur ignore les clés ajoutées et ne sait
+> pas l'honorer : le drapeau reste levé et visible au web (« Resynchronisation demandée le … ») jusqu'à sa mise à jour.
+> Les curseurs ne se remplissent qu'au premier tirage de chaque poste après la mise à jour du serveur : d'ici là, la modale
+> écrit « Jamais synchronisé » (et « — », jamais 0).
 
 ---
 
@@ -265,5 +273,8 @@ Décision du 19/10/2026 : la recette se fait **sur le serveur de la ferme**.
 - [ ] Un poste se connecte, « Synchroniser maintenant » réussit, le contrôle de cohérence (écran Synchronisation)
       ne montre aucun écart.
 - [ ] Paramètres → Postes & Appairage liste le poste.
+- [ ] Modale « Synchronisation » du web : le poste synchronisé affiche « À jour » et « Modifications du site depuis son
+      dernier tirage : 0 » ; « Renvoyer vers ce poste » lève « Resynchronisation demandée », qui tombe après le tirage
+      complet du poste (30 s au plus).
 - [ ] Paramètres → Email (SMTP) → « Envoyer un e-mail de test » arrive.
 - [ ] `php artisan schedule:list` et la table `jobs` vide le lendemain matin.

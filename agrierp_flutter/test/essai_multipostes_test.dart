@@ -40,6 +40,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
 import 'coffre_memoire.dart';
+import 'depenses_aide.dart';
 
 /// Ticket S-T9 — ESSAI À PLUSIEURS POSTES CONTRE LE VRAI SERVEUR, AVEC COUPURES AU HASARD (méthode TATACORA).
 ///
@@ -769,11 +770,12 @@ class _Essai {
       (await p.db.select(p.db.suppliers).get()).firstWhere((s) => s.name == 'Provenderie ESSAI').id;
 
   Future<String> _depense(_Poste p, String libelle, double montant) async {
-    final categorie = (await p.depenses.categories()).first.label;
-    final e = await p.depenses.enregistrer(
+    // Ticket DEP4 — le compte de charge se choisit dans le plan comptable (classe 6) reçu du serveur, plus dans une liste de catégories.
+    final compteDeCharge = (await p.depenses.comptesDeCharge()).first.id;
+    final e = await p.depenses.enregistrerUneLigne(
       date: p.jour,
       libelle: libelle,
-      categorie: categorie,
+      compteChargeId: compteDeCharge,
       montant: montant,
       compteTresorerieId: await _compteCaisse(p),
     );
@@ -919,8 +921,19 @@ class _Essai {
           final pr = await p.produits.creer(FormulaireProduit(nom: 'ESSAI Miel de la ferme (pot)', categorieId: categorie, unite: 'pot', mode: 'fourchette', prixMin: 2500, prixMax: 3000, stock: 20));
           p.noter('products', pr.id);
         });
-        await _geste(p, 'dépense : carburant du groupe (15 000 F)', () async {
+        await _geste(p, 'dépense : carburant du groupe (15 000 F), libellé corrigé avant envoi (DEP1)', () async {
           depenseAModifier = await _depense(p, 'Carburant du groupe (essai)', 15000);
+          // Ticket DEP1 — une dépense SANS pièce (pas encore envoyée) se modifie ; une fois comptabilisée elle est immuable.
+          final d = await (p.db.select(p.db.expenses)..where((t) => t.id.equals(depenseAModifier!))).getSingle();
+          final ligne = await (p.db.select(p.db.expenseLines)..where((l) => l.expenseId.equals(d.id))).getSingle();
+          await p.depenses.enregistrerUneLigne(
+            date: d.expenseDate,
+            libelle: libelleDepenseModifiee,
+            compteChargeId: ligne.chargeAccountId,
+            montant: d.amount,
+            compteTresorerieId: d.treasuryAccountId,
+            idEnModification: d.id,
+          );
         });
       case 1:
         await _geste(p, 'inventaire : fumier composté, 2 sacs manquants', () async {
@@ -973,16 +986,26 @@ class _Essai {
         await _achatAvantInventaireWeb();
         // Ticket U14 — « Saisie des Dépenses » du poste modifie et archive comme le web : le serveur rejoue les deux
         // gestes par `SaisieDepenseAction` (libellé corrigé ; contre-passation et trésorerie réintégrée).
-        await _geste(p, 'dépense : libellé du carburant corrigé au poste (U14)', () async {
+        await _geste(p, 'dépense comptabilisée : sa modification est refusée au poste, son libellé reste (DEP1)', () async {
+          // Le poste connaît la pièce de sa dépense dès que le tirage la lui a rapportée.
+          await _jusqua(p, 'pièce de la dépense du carburant', () async =>
+              (await (p.db.select(p.db.expenses)..where((t) => t.id.equals(depenseAModifier!))).getSingle()).accountingEntryId != null);
           final d = await (p.db.select(p.db.expenses)..where((t) => t.id.equals(depenseAModifier!))).getSingle();
-          await p.depenses.enregistrer(
-            date: d.expenseDate,
-            libelle: libelleDepenseModifiee,
-            categorie: d.category,
-            montant: d.amount,
-            compteTresorerieId: d.treasuryAccountId,
-            idEnModification: d.id,
-          );
+          final ligne = await (p.db.select(p.db.expenseLines)..where((l) => l.expenseId.equals(d.id))).getSingle();
+          Map<String, String>? refus;
+          try {
+            await p.depenses.enregistrerUneLigne(
+              date: d.expenseDate,
+              libelle: 'Libellé que le poste n\'a pas le droit de changer',
+              compteChargeId: ligne.chargeAccountId,
+              montant: d.amount,
+              compteTresorerieId: d.treasuryAccountId,
+              idEnModification: d.id,
+            );
+          } on DepenseRefusee catch (e) {
+            refus = e.erreurs;
+          }
+          expect(refus, {'formulaire': DepensesRepository.messageDejaComptabilisee});
           _saisi('expenses', d.id, {'label': libelleDepenseModifiee, 'is_active': true});
         });
         await _geste(p, 'dépense : réparation des abreuvoirs archivée au poste (U14)', () async {

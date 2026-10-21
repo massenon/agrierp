@@ -7,7 +7,6 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
-import '../../core/widgets/champs_date_agri.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
@@ -17,31 +16,30 @@ import '../../core/widgets/toast_agri.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../stocks/pmp_service.dart';
 import 'depenses_repository.dart';
+import 'modale_depense.dart';
 
 /// « Saisie des Dépenses » — `resources/views/livewire/achats/saisie-depenses.blade.php` (maître, article 5).
 ///
-/// 🔴→✅ Ticket U14 — l'écran suit son Blade, section par section :
-///   1. en-tête : icône `request_page`, « Saisie des Dépenses », sous-titre du Blade (plus de « Indicateurs de
-///      performance », que le Blade n'a pas) ;
+/// 🔴→✅ Ticket DEP5 (PRD `docs/prd/depenses-multilignes.md`) — UNE DÉPENSE, PLUSIEURS LIGNES. L'écran suit son Blade,
+/// section par section :
+///   1. en-tête : icône `request_page`, « Saisie des Dépenses », sous-titre du Blade ;
 ///   2. trois `x-kpi-card` : « Dépenses du mois » (`… FCFA`, émeraude), « Charges Fixes » (maïs) et « Charges
-///      Variables » (bleu), ces deux-là « en attente » comme au web (tiret estompé, sablier, « Disponible après Aucun
-///      champ Fixe/Variable dans le formulaire source ») — le poste avait inversé leurs couleurs ;
-///   3. le formulaire « Nouvelle Dépense » / « Modifier la Dépense » sur deux colonnes (`md:grid-cols-2`), les
-///      erreurs sous leur champ avec les messages du web, le bouton « Enregistrer la Dépense » à droite ;
-///   4. la barre « Rechercher... » (300 ms, comme `wire:model.live.debounce.300ms`) et « Tous les statuts » /
-///      « Payée » / « En attente » ;
-///   5. le tableau Date · Libellé · Catégorie · Montant · Statut · Actions, badge du Blade (« Payée » / « En
-///      attente »), « Modifier » et « Archiver » (modale `x-modal-confirm-delete`), « Aucune dépense pour le moment. ».
+///      Variables » (bleu), ces deux-là « en attente » comme au web ;
+///   3. la barre « Rechercher... » (300 ms, sur le résumé ET les libellés des lignes), « Toutes les pièces » /
+///      « Comptabilisée » / « Sans pièce », puis le bouton « Nouvelle Dépense » qui ouvre la MODALE à lignes dynamiques
+///      ([ModaleDepense]) — la saisie n'est plus un formulaire en page ;
+///   4. le tableau Date · Libellé · Total · Mode · Pièce · Actions : le libellé est le RÉSUMÉ (« Provende ponte (+2
+///      autres) »), se déplie sur les lignes (Libellé · Compte de Charge · Montant) puis la trésorerie, le centre de coût,
+///      le fournisseur, le bénéficiaire et l'auteur ; « Pièce » = le numéro RELU de l'écriture liée, « Comptabilisée »
+///      si ce poste n'a pas le journal, « Sans pièce » ; « Modifier » seulement sans pièce (une dépense comptabilisée est
+///      immuable), « Archiver » (modale `x-modal-confirm-delete`), « Aucune dépense pour le moment. ».
 ///
 /// Toasts du web : « Dépense enregistrée avec succès. » (succès), « Dépense archivée — trésorerie réintégrée et
-/// charge annulée. » (avertissement). Comme au web, après un enregistrement le compte de trésorerie choisi reste
-/// sélectionné (`reset()` ne le vide pas) et la date revient à aujourd'hui.
+/// charge annulée. » (avertissement).
 ///
 /// ➕ Ajout du poste, gardé : sous la date, l'état d'envoi d'une saisie de ce poste (« À envoyer » ; « Refusée » ou
-/// « Archivage refusé » suivi du motif du serveur mot pour mot) — le web n'a pas de file d'envoi.
-///
-/// ⚠️ ÉCART (plateforme) : « Reçu / Facture (Photo) ». La synchronisation ne transporte aucun fichier : le champ est
-/// à sa place et dit sa limite, au lieu d'accepter une photo qui ne partirait jamais.
+/// « Archivage refusé » suivi du REFUS DE LA PIÈCE du serveur mot pour mot, `ecriture_refus`) — le web n'a pas de file
+/// d'envoi et dit le refus tout de suite.
 ///
 /// ⚠️ « Charges Fixes / Variables » : arbitrage client en attente (aucun champ Fixe/Variable, ni au web ni ici).
 class SaisieDepensesScreen extends StatefulWidget {
@@ -56,42 +54,24 @@ class SaisieDepensesScreen extends StatefulWidget {
   static const legendeEnAttente =
       'Disponible après Aucun champ Fixe/Variable dans le formulaire source';
 
-  /// Ticket EX7 (réponse à EX-Q5, décision D-U14-1) — info-bulle du champ « Date » GRISÉ d'une dépense comptabilisée :
-  /// `SaisieDepenseAction::MOTIF_DATE_VERROUILLEE` du web, mot pour mot. Le refus à l'enregistrement reste la garantie.
-  static const motifDateVerrouillee = 'Dépense déjà comptabilisée : sa date ne peut plus être modifiée.';
-
   @override
   State<SaisieDepensesScreen> createState() => _SaisieDepensesScreenState();
 }
 
 class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
-  List<ExpenseCategory> _categories = const [];
-  List<TreasuryAccount> _comptes = const [];
   List<LigneDepense> _depenses = const [];
   double? _totalDuMois;
 
-  /// `editingExpenseId` du composant : `null` = « Nouvelle Dépense ».
-  String? _enModification;
-
-  /// Ticket EX7 (EX-Q5) — la dépense en modification est comptabilisée (`accounting_entry_id`) : sa date est grisée.
-  bool _dateVerrouillee = false;
+  /// Dépenses dépliées sur leurs lignes (`x-data="{ ouvert: false }"` par dépense du Blade).
+  final Set<String> _ouvertes = {};
 
   /// Ticket EX7 (EF9) — page affichée (25 dépenses), dans l'exercice affiché.
   int _page = 1;
 
-  DateTime _date = HeureBenin.aujourdhui();
-  final _libelle = TextEditingController();
-  String? _categorie;
-  final _montant = TextEditingController();
-  String? _compteId;
-
   final _recherche = TextEditingController();
   String _rechercheAppliquee = '';
-  String _statut = '';
+  String _piece = '';
   Timer? _attenteRecherche;
-
-  bool _enregistrement = false;
-  Map<String, String> _erreurs = const {};
 
   @override
   void initState() {
@@ -102,8 +82,6 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   @override
   void dispose() {
     _attenteRecherche?.cancel();
-    _libelle.dispose();
-    _montant.dispose();
     _recherche.dispose();
     super.dispose();
   }
@@ -111,11 +89,9 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   Future<void> _charger() async {
     // Ticket EX7 (EF9) — les dépenses de l'exercice AFFICHÉ ; « Dépenses du mois » sur son mois de référence.
     final etat = PorteeExerciceChoisi.lire(context);
-    final categories = await widget.depot.categories();
-    final comptes = await widget.depot.comptesTresorerie();
     final depenses = await widget.depot.depenses(
       recherche: _rechercheAppliquee,
-      statut: _statut,
+      piece: _piece,
       bornes: etat?.bornes,
     );
     final total = await widget.depot.totalDuMois(etat?.moisDeReference ?? HeureBenin.maintenant());
@@ -123,8 +99,6 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     if (!mounted) return;
 
     setState(() {
-      _categories = categories;
-      _comptes = comptes;
       _depenses = depenses;
       _totalDuMois = total;
     });
@@ -142,8 +116,6 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
             _enTete(),
             const SizedBox(height: AgriSpacing.lg),
             _indicateurs(),
-            const SizedBox(height: AgriSpacing.lg),
-            _formulaire(),
             const SizedBox(height: AgriSpacing.lg),
             _barreFiltres(),
             const SizedBox(height: AgriSpacing.md),
@@ -201,413 +173,64 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   /// `grid grid-cols-1 sm:grid-cols-3 gap-md` — les trois `x-kpi-card` du Blade, dans son ordre et ses couleurs.
   Widget _indicateurs() {
-    return LayoutBuilder(
-      builder: (context, contraintes) {
-        final colonnes = AgriBreakpoints.petit(context) ? 3 : 1;
-        final largeur =
-            (contraintes.maxWidth - (colonnes - 1) * AgriSpacing.md) / colonnes;
-        final total = _totalDuMois;
-
-        return Wrap(
-          spacing: AgriSpacing.md,
-          runSpacing: AgriSpacing.md,
-          children: [
-            _carteKpi(
-              largeur,
-              'Dépenses du mois',
-              // `number_format($kpis['depenses_mois'], 0, ',', ' ').' FCFA'` ; « — » tant que rien n'est lu.
-              total == null ? '—' : '${PmpService.francs(total)} FCFA',
-              AgriColors.brandEmerald,
-              SymbolesAgri.payments,
-            ),
-            _carteKpi(
-              largeur,
-              'Charges Fixes',
-              '—',
-              AgriColors.accentYellow,
-              SymbolesAgri.event_repeat,
-              couleurIcone: AgriColors.brandForest,
-              enAttente: true,
-            ),
-            _carteKpi(
-              largeur,
-              'Charges Variables',
-              '—',
-              AgriColors.infoBlue,
-              SymbolesAgri.trending_down,
-              enAttente: true,
-            ),
-          ],
-        );
-      },
+    final total = _totalDuMois;
+    // `grid-cols-1 sm:grid-cols-3` : trois cartes dès `sm`, une colonne en dessous ; `GrilleKpi` : même hauteur par rangée.
+    return GrilleKpi(
+      colonnes: AgriBreakpoints.petit(context) ? 3 : 1,
+      children: [
+        _carteKpi(
+          'Dépenses du mois',
+          // `number_format($kpis['depenses_mois'], 0, ',', ' ').' FCFA'` ; « — » tant que rien n'est lu.
+          total == null ? '—' : '${PmpService.francs(total)} FCFA',
+          AgriColors.brandEmerald,
+          SymbolesAgri.payments,
+        ),
+        _carteKpi(
+          'Charges Fixes',
+          '—',
+          AgriColors.accentYellow,
+          SymbolesAgri.event_repeat,
+          couleurIcone: AgriColors.brandForest,
+          enAttente: true,
+        ),
+        _carteKpi(
+          'Charges Variables',
+          '—',
+          AgriColors.infoBlue,
+          SymbolesAgri.trending_down,
+          enAttente: true,
+        ),
+      ],
     );
   }
 
   /// `x-kpi-card` : liseré et icône de la variante (`text-brand-forest` pour `maize`) ; `:pending` → tiret estompé
   /// (`text-outline/50`) et sablier `hourglass_empty` devant « Disponible après … ».
   Widget _carteKpi(
-    double largeur,
     String libelle,
     String valeur,
     Color couleur,
     IconData icone, {
     Color? couleurIcone,
     bool enAttente = false,
-  }) => SizedBox(
-    width: largeur,
-    child: CarteKpi(
-      key: Key('kpi-$libelle'),
-      libelle: libelle,
-      valeur: valeur,
-      icone: icone,
-      couleurLisere: couleur,
-      couleurIcone: couleurIcone ?? couleur,
-      couleurValeur: enAttente
-          ? AgriColors.outline.withValues(alpha: 0.5)
-          : AgriColors.onSurface,
-      legende: enAttente ? SaisieDepensesScreen.legendeEnAttente : null,
-      iconeLegende: enAttente ? SymbolesAgri.hourglass_empty : null,
-    ),
+  }) => CarteKpi(
+    key: Key('kpi-$libelle'),
+    libelle: libelle,
+    valeur: valeur,
+    icone: icone,
+    couleurLisere: couleur,
+    couleurIcone: couleurIcone ?? couleur,
+    couleurValeur: enAttente
+        ? AgriColors.outline.withValues(alpha: 0.5)
+        : AgriColors.onSurface,
+    legende: enAttente ? SaisieDepensesScreen.legendeEnAttente : null,
+    iconeLegende: enAttente ? SymbolesAgri.hourglass_empty : null,
   );
-
-  /// Le formulaire du Blade : `bg-white rounded-lg border shadow-sm p-lg`, titre `font-bold text-lg
-  /// text-brand-forest` (« Nouvelle Dépense » ou « Modifier la Dépense »), aide, puis la grille `md:grid-cols-2`.
-  Widget _formulaire() {
-    final deuxColonnes = AgriBreakpoints.moyen(context);
-    final champs = <Widget>[
-      _champDate(),
-      _champTexte(
-        libelle: 'Libellé de la Dépense *',
-        cle: 'libelle',
-        controleur: _libelle,
-        exemple: 'ex : Carburant livraison ou Achat provende Lot 3',
-      ),
-      _champListe(
-        libelle: 'Catégorie de Charges (SYSCOHADA) *',
-        cle: 'categorie',
-        valeur: _categorie,
-        options: [for (final c in _categories) (c.label, c.label)],
-        surChangement: (v) => setState(() => _categorie = v),
-      ),
-      _champTexte(
-        libelle: 'Montant Décaissé (FCFA) *',
-        cle: 'montant',
-        controleur: _montant,
-        exemple: 'ex : 25000',
-        nombre: true,
-      ),
-      _champListe(
-        libelle: 'Compte de Trésorerie Débité *',
-        cle: 'compte',
-        valeur: _compteId,
-        // `{{ $account->label }} ({{ number_format($account->balance, 0, ',', ' ') }} FCFA)`.
-        options: [
-          for (final c in _comptes)
-            (c.id, '${c.label} (${PmpService.francs(c.balance)} FCFA)'),
-        ],
-        surChangement: (v) => setState(() => _compteId = v),
-      ),
-      _recu(),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(AgriSpacing.lg),
-      decoration: BoxDecoration(
-        color: AgriColors.surfaceCard,
-        border: Border.all(color: AgriColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-        boxShadow: AgriShadows.sm,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                SymbolesAgri.add_circle,
-                size: 20,
-                color: AgriColors.brandForest,
-              ),
-              const SizedBox(width: AgriSpacing.xs),
-              Expanded(
-                child: Text(
-                  _enModification == null
-                      ? 'Nouvelle Dépense'
-                      : 'Modifier la Dépense',
-                  key: const Key('depense-titre-formulaire'),
-                  style: const TextStyle(
-                    fontSize: AgriTypography.lg,
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AgriSpacing.md),
-          const Text(
-            "Enregistrez une charge d'exploitation de trésorerie directe.",
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
-            ),
-          ),
-          const SizedBox(height: AgriSpacing.md),
-          for (var i = 0; i < champs.length; i += deuxColonnes ? 2 : 1) ...[
-            if (i > 0) const SizedBox(height: AgriSpacing.md),
-            if (deuxColonnes)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: champs[i]),
-                  const SizedBox(width: AgriSpacing.md),
-                  Expanded(child: champs[i + 1]),
-                ],
-              )
-            else
-              champs[i],
-          ],
-          const SizedBox(height: AgriSpacing.md),
-          Align(
-            alignment: Alignment.centerRight,
-            // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
-            child: LectureSeule.infobulle(
-              LectureSeule.motif(context),
-              FilledButton.icon(
-              key: const Key('bouton-enregistrer-depense'),
-              onPressed: _enregistrement || LectureSeule.motif(context) != null ? null : _enregistrer,
-              icon: const Icon(SymbolesAgri.save, size: 18),
-              label: const Text('Enregistrer la Dépense'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AgriColors.brandEmerald,
-                foregroundColor: Colors.white,
-                textStyle: const TextStyle(
-                  fontSize: AgriTypography.sm,
-                  fontWeight: FontWeight.bold,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AgriSpacing.lg,
-                  vertical: AgriSpacing.sm,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AgriRadius.lg),
-                ),
-              ),
-            ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// `block text-[10px] text-brand-forest font-bold uppercase mb-xs`.
-  Widget _etiquette(String texte) => Padding(
-    padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
-    child: Text(
-      texte.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-        color: AgriColors.brandForest,
-      ),
-    ),
-  );
-
-  /// `<p class="invalid-feedback">` du Blade (11 px, `#BA1A1A`).
-  Widget _erreur(String cle) {
-    final texte = _erreurs[cle];
-    if (texte == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Text(
-        texte,
-        key: Key('erreur-$cle'),
-        style: const TextStyle(fontSize: 11, color: AgriColors.errorDeep),
-      ),
-    );
-  }
-
-  /// Cadre `h-11 px-md border rounded-lg text-sm`, rouge et teinté si le champ est en erreur (`is-invalid`).
-  BoxDecoration _cadre(String cle) => BoxDecoration(
-    color: _erreurs.containsKey(cle)
-        ? const Color(0xFFFFF5F5)
-        : AgriColors.surfaceCard,
-    border: Border.all(
-      color: _erreurs.containsKey(cle)
-          ? AgriColors.errorDeep
-          : AgriColors.outlineVariant,
-    ),
-    borderRadius: BorderRadius.circular(AgriRadius.lg),
-  );
-
-  /// « Date de la Transaction * » — `type="date"` du web, borné (ticket EX6) au plus ancien exercice OUVERT connu
-  /// (`min` du web, `AccountingEntryService::premierJourSaisissable`).
-  Widget _champDate() => ChampDateFormulaire(
-    cle: const Key('champ-date'),
-    etiquette: 'Date de la Transaction *',
-    valeur: _date,
-    erreur: _erreurs['date'],
-    cleErreur: const Key('erreur-date'),
-    // Ticket EX7 (EX-Q5) — dépense comptabilisée en modification : date grisée, motif du web en info-bulle.
-    desactive: _dateVerrouillee,
-    infobulle: _dateVerrouillee ? SaisieDepensesScreen.motifDateVerrouillee : null,
-    onTap: () async {
-      final premier = await widget.depot.premierJourSaisissable();
-      if (!mounted) return;
-      final bornes = ExerciceDeSaisie.calendrier(
-        premier: premier,
-        repli: DateTime(2000),
-        dernier: DateTime(2100),
-        initial: _date,
-      );
-      final choisie = await showDatePicker(
-        context: context,
-        initialDate: bornes.initial,
-        firstDate: bornes.premier,
-        lastDate: DateTime(2100),
-      );
-      if (choisie != null) setState(() => _date = choisie);
-    },
-  );
-
-  Widget _champTexte({
-    required String libelle,
-    required String cle,
-    required TextEditingController controleur,
-    required String exemple,
-    bool nombre = false,
-  }) {
-    final enErreur = _erreurs.containsKey(cle);
-    final bord = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AgriRadius.lg),
-      borderSide: BorderSide(
-        color: enErreur ? AgriColors.errorDeep : AgriColors.outlineVariant,
-      ),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _etiquette(libelle),
-        SizedBox(
-          height: 44,
-          child: TextField(
-            key: Key('champ-$cle'),
-            controller: controleur,
-            keyboardType: nombre ? TextInputType.number : TextInputType.text,
-            style: const TextStyle(fontSize: AgriTypography.sm),
-            decoration: InputDecoration(
-              hintText: exemple,
-              isDense: true,
-              filled: enErreur,
-              fillColor: const Color(0xFFFFF5F5),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: 12,
-              ),
-              border: bord,
-              enabledBorder: bord,
-            ),
-          ),
-        ),
-        _erreur(cle),
-      ],
-    );
-  }
-
-  Widget _champListe({
-    required String libelle,
-    required String cle,
-    required String? valeur,
-    required List<(String, String)> options,
-    required ValueChanged<String?> surChangement,
-  }) {
-    // Une valeur hors de la liste (compte désactivé depuis la saisie) : le web garde la valeur et montre
-    // « -- Sélectionner -- » ; une liste Flutter refuse une valeur absente de ses entrées.
-    final presente = options.any((o) => o.$1 == valeur);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _etiquette(libelle),
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-          decoration: _cadre(cle),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              key: Key('liste-$cle'),
-              isExpanded: true,
-              value: presente ? valeur : null,
-              hint: const Text(
-                '-- Sélectionner --',
-                style: TextStyle(
-                  fontSize: AgriTypography.sm,
-                  color: AgriColors.onSurface,
-                ),
-              ),
-              style: const TextStyle(
-                fontSize: AgriTypography.sm,
-                color: AgriColors.onSurface,
-              ),
-              items: [
-                for (final o in options)
-                  DropdownMenuItem(value: o.$1, child: Text(o.$2)),
-              ],
-              onChanged: surChangement,
-            ),
-          ),
-        ),
-        _erreur(cle),
-      ],
-    );
-  }
-
-  /// « Reçu / Facture (Photo) » — cadre pointillé du Blade (`border-2 border-dashed … h-11`).
-  ///
-  /// ⚠️ ÉCART (plateforme) : la synchronisation ne transporte aucun fichier. Le champ est à sa place et dit sa limite,
-  /// au lieu d'accepter une photo qui ne partirait jamais (l'utilisateur croirait le justificatif transmis).
-  Widget _recu() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _etiquette('Reçu / Facture (Photo)'),
-        Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AgriSpacing.md,
-            vertical: AgriSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            border: Border.all(color: AgriColors.outlineVariant, width: 2),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                SymbolesAgri.add_a_photo,
-                size: 18,
-                color: AgriColors.outlineVariant,
-              ),
-              SizedBox(width: AgriSpacing.xs),
-              Flexible(
-                child: Text(
-                  'Le justificatif ne peut pas encore être transmis depuis le poste : la synchronisation ne '
-                  "transporte aucun fichier. Joignez-le depuis l'application web.",
-                  key: Key('depense-recu-limite'),
-                  style: TextStyle(fontSize: 10, color: AgriColors.outline),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   /// `bg-white border rounded-lg p-md flex flex-wrap items-center gap-sm` : « Rechercher... » (icône `search`,
-  /// `flex-1 min-w-[180px]`) puis la liste des statuts.
+  /// `flex-1 min-w-[180px]`), la liste des pièces, puis le bouton « Nouvelle Dépense ».
   Widget _barreFiltres() {
+    final verrou = LectureSeule.motif(context);
     return Container(
       padding: const EdgeInsets.all(AgriSpacing.md),
       decoration: BoxDecoration(
@@ -615,10 +238,11 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
         border: Border.all(color: AgriColors.outlineVariant),
         borderRadius: BorderRadius.circular(AgriRadius.lg),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SizedBox(
+      // `flex flex-wrap items-center gap-sm` : sous le point de rupture `md` (768 px) la recherche prend toute la ligne, la liste
+      // des pièces et le bouton passent dessous.
+      child: LayoutBuilder(
+        builder: (context, contraintes) {
+          final recherche = SizedBox(
               height: 36,
               child: TextField(
                 key: const Key('depenses-recherche'),
@@ -642,10 +266,8 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: AgriSpacing.sm),
-          Container(
+            );
+          final filtre = Container(
             height: 36,
             padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
             decoration: BoxDecoration(
@@ -655,8 +277,8 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                key: const Key('depenses-filtre-statut'),
-                value: _statut,
+                key: const Key('depenses-filtre-piece'),
+                value: _piece,
                 style: const TextStyle(
                   fontSize: AgriTypography.xs,
                   color: AgriColors.onSurface,
@@ -664,19 +286,61 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                 items: [
                   const DropdownMenuItem(
                     value: '',
-                    child: Text('Tous les statuts'),
+                    child: Text('Toutes les pièces'),
                   ),
-                  for (final s in DepensesRepository.statuts)
-                    DropdownMenuItem(value: s, child: Text(s)),
+                  for (final f in DepensesRepository.filtresPiece)
+                    DropdownMenuItem(value: f, child: Text(f)),
                 ],
                 onChanged: (v) {
-                  _statut = v ?? '';
+                  _piece = v ?? '';
+                  _page = 1;
                   _charger();
                 },
               ),
             ),
-          ),
-        ],
+          );
+          final bouton = LectureSeule.infobulle(
+            verrou,
+            FilledButton.icon(
+              key: const Key('bouton-nouvelle-depense'),
+              onPressed: verrou != null ? null : _nouvelle,
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
+              label: const Text('Nouvelle Dépense'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AgriColors.brandEmerald,
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(
+                  fontSize: AgriTypography.sm,
+                  fontWeight: FontWeight.bold,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.lg,
+                  vertical: AgriSpacing.sm,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                ),
+              ),
+            ),
+          );
+          if (!AgriBreakpoints.moyen(context)) {
+            return Wrap(
+              spacing: AgriSpacing.sm,
+              runSpacing: AgriSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [SizedBox(width: contraintes.maxWidth, child: recherche), filtre, bouton],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: recherche),
+              const SizedBox(width: AgriSpacing.sm),
+              filtre,
+              const SizedBox(width: AgriSpacing.sm),
+              bouton,
+            ],
+          );
+        },
       ),
     );
   }
@@ -685,6 +349,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     _attenteRecherche?.cancel();
     _attenteRecherche = Timer(SaisieDepensesScreen.delaiRecherche, () {
       _rechercheAppliquee = texte;
+      _page = 1;
       _charger();
     });
   }
@@ -695,7 +360,8 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     color: AgriColors.outline,
   );
 
-  /// Le tableau du Blade (`table.rtable`) : en-tête `bg-surface-zebra`, six colonnes, zébrage une ligne sur deux.
+  /// Le tableau du Blade (`table.rtable`) : en-tête `bg-surface-zebra`, six colonnes (Date · Libellé · Total · Mode ·
+  /// Pièce · Actions), zébrage une ligne sur deux.
   Widget _tableau() {
     return Container(
       decoration: BoxDecoration(
@@ -722,13 +388,9 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   child: Text('LIBELLÉ', style: _enteteColonne),
                 ),
                 Expanded(
-                  flex: 3,
-                  child: Text('CATÉGORIE', style: _enteteColonne),
-                ),
-                Expanded(
                   flex: 2,
                   child: Text(
-                    'MONTANT',
+                    'TOTAL',
                     textAlign: TextAlign.right,
                     style: _enteteColonne,
                   ),
@@ -737,8 +399,12 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                   flex: 2,
                   child: Padding(
                     padding: EdgeInsets.only(left: AgriSpacing.md),
-                    child: Text('STATUT', style: _enteteColonne),
+                    child: Text('MODE', style: _enteteColonne),
                   ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('PIÈCE', style: _enteteColonne),
                 ),
                 Expanded(
                   flex: 2,
@@ -782,6 +448,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   Widget _ligne(LigneDepense l, int index) {
     final d = l.depense;
+    final ouverte = _ouvertes.contains(d.id);
     String deux(int n) => n.toString().padLeft(2, '0');
     const corps = TextStyle(fontSize: AgriTypography.xs);
     return Container(
@@ -796,108 +463,206 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
         horizontal: AgriSpacing.md,
         vertical: AgriSpacing.sm,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${deux(d.expenseDate.day)}/${deux(d.expenseDate.month)}/${d.expenseDate.year}',
-                  style: corps,
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${deux(d.expenseDate.day)}/${deux(d.expenseDate.month)}/${d.expenseDate.year}',
+                      style: corps,
+                    ),
+                    ..._etatEnvoi(l),
+                  ],
                 ),
-                ..._etatEnvoi(l),
-              ],
-            ),
+              ),
+              Expanded(
+                flex: 4,
+                // `<button x-on:click="ouvert = !ouvert">` : le libellé-résumé déplie les lignes.
+                child: Tooltip(
+                  message: 'Voir les lignes',
+                  child: InkWell(
+                  key: Key('depense-deplier-$index'),
+                  onTap: () => setState(() {
+                    if (!_ouvertes.remove(d.id)) _ouvertes.add(d.id);
+                  }),
+                  child: Row(
+                    children: [
+                      Icon(
+                        ouverte ? SymbolesAgri.expand_less : SymbolesAgri.expand_more,
+                        size: 18,
+                        color: AgriColors.onSurface,
+                      ),
+                      const SizedBox(width: AgriSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          d.label,
+                          key: Key('depense-libelle-$index'),
+                          style: corps.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  '${PmpService.francs(d.amount)} FCFA',
+                  key: Key('depense-montant-$index'),
+                  textAlign: TextAlign.right,
+                  style: corps.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: AgriSpacing.md),
+                  child: Text(
+                    DepensesRepository.modesDePaiement[d.paymentMode] ?? '—',
+                    key: Key('depense-mode-$index'),
+                    style: corps,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _badgePiece(l),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // Une dépense comptabilisée est IMMUABLE : pas de crayon (le web ne l'affiche pas non plus).
+                    if (!l.comptabilisee)
+                      _action(
+                        cle: 'depense-modifier-${d.id}',
+                        infobulle: 'Modifier',
+                        icone: SymbolesAgri.edit,
+                        couleur: AgriColors.brandEmerald,
+                        surAppui: () => _modifier(l),
+                        verrou: LectureSeule.motif(context),
+                      ),
+                    _action(
+                      cle: 'depense-archiver-${d.id}',
+                      infobulle: 'Archiver',
+                      icone: SymbolesAgri.delete,
+                      couleur: AgriColors.outline,
+                      surAppui: () => _archiver(d),
+                      verrou: LectureSeule.motif(context),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            flex: 4,
-            child: Text(
-              d.label,
-              key: Key('depense-libelle-$index'),
-              style: corps.copyWith(fontWeight: FontWeight.w600),
-            ),
+          if (ouverte) _detail(l, index),
+        ],
+      ),
+    );
+  }
+
+  /// Le détail déplié (`<tr x-show="ouvert">` du Blade) : un sous-tableau Libellé · Compte de Charge · Montant, puis
+  /// « Trésorerie : … · Centre de coût : … · Fournisseur : … · Bénéficiaire : … · Saisie par : … ».
+  Widget _detail(LigneDepense l, int index) {
+    const corps = TextStyle(fontSize: AgriTypography.xs);
+    String ou(String? v) => v == null || v.isEmpty ? '—' : v;
+    return Container(
+      key: Key('depense-detail-$index'),
+      margin: const EdgeInsets.only(top: AgriSpacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+      color: AgriColors.surfaceZebra,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              Expanded(flex: 4, child: Text('LIBELLÉ', style: _enteteColonne)),
+              Expanded(flex: 4, child: Text('COMPTE DE CHARGE', style: _enteteColonne)),
+              Expanded(
+                flex: 2,
+                child: Text('MONTANT', textAlign: TextAlign.right, style: _enteteColonne),
+              ),
+            ],
           ),
-          Expanded(flex: 3, child: Text(d.category, style: corps)),
-          Expanded(
-            flex: 2,
-            child: Text(
-              '${PmpService.francs(d.amount)} FCFA',
-              key: Key('depense-montant-$index'),
-              textAlign: TextAlign.right,
-              style: corps.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.only(left: AgriSpacing.md),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: _badgeStatut(d),
+          for (final (i, ligne) in l.lignes.indexed)
+            Container(
+              key: Key('depense-$index-ligne-$i'),
+              padding: const EdgeInsets.symmetric(vertical: AgriSpacing.xs),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AgriColors.outlineVariant)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(flex: 4, child: Text(ligne.libelle, style: corps)),
+                  Expanded(flex: 4, child: Text(ligne.compte, style: corps)),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${PmpService.francs(ligne.montant)} FCFA',
+                      textAlign: TextAlign.right,
+                      style: corps.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _action(
-                  cle: 'depense-modifier-${d.id}',
-                  infobulle: 'Modifier',
-                  icone: SymbolesAgri.edit,
-                  couleur: AgriColors.brandEmerald,
-                  surAppui: () => _modifier(d),
-                  verrou: LectureSeule.motif(context),
-                ),
-                _action(
-                  cle: 'depense-archiver-${d.id}',
-                  infobulle: 'Archiver',
-                  icone: SymbolesAgri.delete,
-                  couleur: AgriColors.outline,
-                  surAppui: () => _archiver(d),
-                  verrou: LectureSeule.motif(context),
-                ),
-              ],
-            ),
+          const SizedBox(height: AgriSpacing.xs),
+          Text(
+            'Trésorerie : ${ou(l.tresorerie)}'
+            ' · Centre de coût : ${ou(l.centreCout)}'
+            ' · Fournisseur : ${ou(l.fournisseur)}'
+            ' · Bénéficiaire : ${ou(l.depense.beneficiary)}'
+            ' · Saisie par : ${ou(l.auteur)}',
+            key: Key('depense-detail-resume-$index'),
+            style: const TextStyle(fontSize: 11, color: AgriColors.outline),
           ),
         ],
       ),
     );
   }
 
-  /// `inline-flex px-sm py-[2px] rounded-full text-[11px] font-bold border` : « Payée » émeraude (`payee`), sinon
-  /// « En attente » maïs.
-  Widget _badgeStatut(Expense d) {
-    final payee = d.status == 'payee';
+  /// `inline-flex px-sm py-[2px] rounded-full text-[11px] font-bold border` : le numéro de la pièce (émeraude) — ou
+  /// « Comptabilisée » quand ce poste n'a pas le journal pour le relire —, sinon « Sans pièce » (maïs).
+  Widget _badgePiece(LigneDepense l) {
+    final comptabilisee = l.comptabilisee;
     return Container(
-      key: Key('depense-statut-${d.id}'),
+      key: Key('depense-piece-${l.depense.id}'),
       padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 2),
       decoration: BoxDecoration(
-        color: payee
+        color: comptabilisee
             ? AgriColors.brandEmerald.withValues(alpha: 0.10)
             : AgriColors.accentYellow.withValues(alpha: 0.20),
         border: Border.all(
-          color: payee
+          color: comptabilisee
               ? AgriColors.brandEmerald.withValues(alpha: 0.30)
               : AgriColors.accentYellow,
         ),
         borderRadius: BorderRadius.circular(AgriRadius.full),
       ),
       child: Text(
-        payee ? 'Payée' : 'En attente',
+        comptabilisee ? (l.numeroPiece ?? 'Comptabilisée') : 'Sans pièce',
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: payee ? AgriColors.brandEmerald : AgriColors.brandForest,
+          color: comptabilisee ? AgriColors.brandEmerald : AgriColors.brandForest,
         ),
       ),
     );
   }
 
-  /// ➕ Ajout du poste : l'état d'envoi d'une saisie de ce poste, sous sa date.
+  /// ➕ Ajout du poste : l'état d'envoi d'une saisie de ce poste, sous sa date ; une saisie refusée porte le REFUS DE LA
+  /// PIÈCE du serveur, mot pour mot.
   List<Widget> _etatEnvoi(LigneDepense l) {
     final d = l.depense;
     if (d.syncStatus == SyncStatus.synced) return const [];
@@ -956,17 +721,31 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     ),
   );
 
-  /// `editExpense($id)` : le formulaire passe en « Modifier la Dépense », rempli avec la dépense (`(float) amount`).
-  void _modifier(Expense d) {
-    setState(() {
-      _enModification = d.id;
-      _dateVerrouillee = d.accountingEntryId != null;
-      _date = d.expenseDate;
-      _libelle.text = d.label;
-      _categorie = d.category;
-      _montant.text = PmpService.flottant(d.amount);
-      _compteId = d.treasuryAccountId;
-    });
+  /// `nouvelleDepense()` du web : la modale « Nouvelle Dépense » s'ouvre sur une ligne vide.
+  Future<void> _nouvelle() async {
+    final enregistree = await ModaleDepense.ouvrir(context, depot: widget.depot);
+    await _apresModale(enregistree);
+  }
+
+  /// `editExpense($id)` : la modale « Modifier la Dépense », remplie avec la dépense et ses lignes. Refus avant
+  /// d'ouvrir, comme le web : exercice clos (motif R4 de sa date), dépense comptabilisée (immuable : on l'archive puis on
+  /// la saisit à nouveau), dépense archivée.
+  Future<void> _modifier(LigneDepense l) async {
+    final refus = await widget.depot.refusAvantModification(l.depense);
+    if (!mounted) return;
+    if (refus != null) {
+      ToastAgri.afficher(context, refus, type: TypeToast.erreur);
+      return;
+    }
+    final enregistree = await ModaleDepense.ouvrir(context, depot: widget.depot, enModification: l);
+    await _apresModale(enregistree);
+  }
+
+  Future<void> _apresModale(bool? enregistree) async {
+    if (enregistree != true) return;
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, DepensesRepository.toastEnregistree);
   }
 
   /// `archiveExpense($id)` derrière `x-modal-confirm-delete` : icône `archive` `text-error-deep`, « Confirmer
@@ -1013,54 +792,5 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
       DepensesRepository.toastArchivee,
       type: TypeToast.avertissement,
     );
-  }
-
-  /// `submitExpense()` : erreurs sous leur champ ; sinon toast du web, formulaire remis à « Nouvelle Dépense »
-  /// (libellé, catégorie, montant vidés, date du jour ; le compte de trésorerie reste choisi, comme au web).
-  Future<void> _enregistrer() async {
-    setState(() {
-      _enregistrement = true;
-      _erreurs = const {};
-    });
-
-    try {
-      await widget.depot.enregistrerSaisie(
-        date: _date,
-        libelle: _libelle.text,
-        categorie: _categorie,
-        montant: _montant.text,
-        compteTresorerieId: _compteId,
-        idEnModification: _enModification,
-      );
-    } on DepenseRefusee catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _erreurs = e.erreurs;
-        _enregistrement = false;
-      });
-      return;
-    } on RefusExercice catch (e) {
-      // Ticket EX6 (EF7) — `submitExpense()` : exercice clos ou absent, le motif R4 sous « Date ».
-      if (!mounted) return;
-      setState(() {
-        _erreurs = {'date': e.motif};
-        _enregistrement = false;
-      });
-      return;
-    }
-
-    if (!mounted) return;
-    _libelle.clear();
-    _montant.clear();
-    setState(() {
-      _enModification = null;
-      _dateVerrouillee = false;
-      _categorie = null;
-      _date = HeureBenin.aujourdhui();
-      _enregistrement = false;
-    });
-    await _charger();
-    if (!mounted) return;
-    ToastAgri.afficher(context, DepensesRepository.toastEnregistree);
   }
 }

@@ -11,7 +11,10 @@ import '../theme/symboles_agri.dart';
 enum LargeurModale {
   sm(384),
   md(448),
-  lg(512);
+  lg(512),
+
+  /// `max-w-3xl` — la modale à lignes dynamiques « Nouvelle Dépense » (ticket DEP2, `x-modal max-width="xl"`).
+  xl(768);
 
   const LargeurModale(this.pixels);
 

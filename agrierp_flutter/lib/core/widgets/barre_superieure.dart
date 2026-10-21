@@ -60,6 +60,7 @@ class BarreSuperieure extends StatelessWidget {
     this.onAide,
     this.onContact,
     this.onParametres,
+    this.onVerrouiller,
     this.onDeconnexion,
     this.recherche,
     this.nonLues,
@@ -69,6 +70,9 @@ class BarreSuperieure extends StatelessWidget {
     this.avantFermeture,
     this.selecteurExercice,
   });
+
+  /// Hauteur de la barre (`h-16` du web) : aussi celle des commandes de fenêtre.
+  static const double hauteurBarre = 64;
 
   /// Ticket EX7 (EF8) — sélecteur d'exercice global (`SelecteurExercice`, posé par le socle), à gauche du bouton
   /// « Synchroniser » comme au web. `null` : aucun sélecteur (tests de la barre seule).
@@ -108,6 +112,10 @@ class BarreSuperieure extends StatelessWidget {
   /// Ticket H1 — « Paramètres » du menu du compte (`/parametres-hub` au web). `null` : entrée non proposée.
   final VoidCallback? onParametres;
 
+  /// Ticket VL-1 — « Verrouiller » : fonction propre au poste (le web n'a pas de verrou), avant « Déconnexion ».
+  /// `null` : non proposée.
+  final VoidCallback? onVerrouiller;
+
   /// Ticket H1 — « Déconnexion », sous un séparateur, en `text-error-deep` comme au web. `null` : non proposée.
   final VoidCallback? onDeconnexion;
 
@@ -141,8 +149,10 @@ class BarreSuperieure extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       // Ticket H1 — `h-16 … px-md lg:px-lg` du web : 64 px de haut, 24 px de marge sur un poste de bureau.
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.lg),
+      height: hauteurBarre,
+      // ⚠️ Pas de marge à DROITE : les commandes de fenêtre vont jusqu'au bord, comme celles de Windows (le
+      // « px-lg » du web s'applique au contenu, pas à des boutons de barre de titre).
+      padding: const EdgeInsets.only(left: AgriSpacing.lg),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
@@ -241,31 +251,29 @@ class BarreSuperieure extends StatelessWidget {
           // Propos, Contactez l'Éditeur, Paramètres, séparateur, Déconnexion.
           _compte(),
           const SizedBox(width: AgriSpacing.sm),
-          const VerticalDivider(indent: 14, endIndent: 14, width: 1),
+          // Séparateur centré sur l'axe de la barre (même axe que la recherche, la cloche et le compte) : une
+          // hauteur propre de 28 px, jamais un `indent` qui décale le trait dès que la barre change de hauteur.
+          const SizedBox(
+            key: Key('fenetre-separateur'),
+            height: 28,
+            child: VerticalDivider(width: 1, thickness: 1),
+          ),
           const SizedBox(width: AgriSpacing.xs),
 
-          // 6. Commandes de fenêtre — ajout assumé, voir le docblock.
-          IconButton(
-            key: const Key('fenetre-reduire'),
-            iconSize: 18,
-            color: AgriColors.outline,
-            icon: const Icon(SymbolesAgri.remove),
-            padding: EdgeInsets.zero,
-            constraints: _gabaritCommandeFenetre,
-            style: _styleCommandeFenetre,
-            tooltip: 'Réduire',
+          // 6. Commandes de fenêtre — ajout assumé, voir le docblock. Même gabarit (46 × hauteur de la barre),
+          // centrées sur l'axe de la barre, collées au bord droit.
+          const _CommandeFenetre(
+            cle: Key('fenetre-reduire'),
+            icone: SymbolesAgri.remove,
+            info: 'Réduire',
             onPressed: FenetrePoste.reduire,
           ),
           const _BoutonAgrandir(),
-          IconButton(
-            key: const Key('fenetre-fermer'),
-            iconSize: 18,
-            color: AgriColors.errorDeep,
-            icon: const Icon(SymbolesAgri.close),
-            padding: EdgeInsets.zero,
-            constraints: _gabaritCommandeFenetre,
-            style: _styleCommandeFenetre,
-            tooltip: 'Fermer AgriERP',
+          _CommandeFenetre(
+            cle: const Key('fenetre-fermer'),
+            icone: SymbolesAgri.close,
+            info: 'Fermer',
+            fermeture: true,
             onPressed: () => _confirmerFermeture(context),
           ),
         ],
@@ -408,6 +416,8 @@ class BarreSuperieure extends StatelessWidget {
       ),
     if (onParametres != null)
       ('parametres', 'menu-compte-parametres', SymbolesAgri.settings, 'Paramètres', onParametres!),
+    if (onVerrouiller != null)
+      ('verrouiller', 'menu-compte-verrouiller', SymbolesAgri.lock, 'Verrouiller', onVerrouiller!),
     if (onDeconnexion != null)
       ('deconnexion', 'menu-compte-deconnexion', SymbolesAgri.logout, 'Déconnexion', onDeconnexion!),
   ];
@@ -545,13 +555,94 @@ class BarreSuperieure extends StatelessWidget {
 final _rechercheInerte = TextEditingController();
 final _focusRechercheInerte = FocusNode(canRequestFocus: false);
 
-/// Gabarit des trois commandes de fenêtre : 36 px, comme les boutons de légende de Windows (le gabarit par défaut
-/// d'un `IconButton`, 48 px, faisait déborder la barre d'un poste étroit une fois le bouton « Agrandir » ajouté).
-const _gabaritCommandeFenetre = BoxConstraints.tightFor(width: 36, height: 36);
+/// Largeur des trois commandes de fenêtre (la hauteur est celle de la barre : [hauteurBarre]). 46 px, comme les
+/// boutons de légende de Windows ; la cible couvre toute la hauteur de la barre.
+const _largeurCommandeFenetre = 46.0;
 
-/// ⚠️ `shrinkWrap` : par défaut Material GONFLE la zone d'appui à 48 px et le bouton reprend alors cette taille dans
-/// la `Row`, quoi que dise `constraints`.
-final _styleCommandeFenetre = IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap);
+/// 🔴→✅ Une commande de fenêtre (réduire, agrandir / restaurer, fermer).
+///
+/// Ancienne version : trois `IconButton` de 36 px dans la `Row` — le survol (un rond de 36 px) flottait au milieu de
+/// rien, la zone d'appui ne couvrait pas la barre et le dernier bouton laissait 24 px de marge au bord droit. Ici
+/// chaque commande est un rectangle de [_largeurCommandeFenetre] × la zone utile de la barre ([BarreSuperieure.hauteurBarre] moins son filet de 1 px) dont l'icône est
+/// `Center`ée : le centre vertical de l'icône est, PAR CONSTRUCTION, celui de la barre.
+///
+/// États : repos gris (`outline`) ; survol — fond gris clair, ou fond rouge et icône blanche pour « Fermer » ;
+/// appui — fond plus soutenu.
+class _CommandeFenetre extends StatefulWidget {
+  const _CommandeFenetre({
+    required this.cle,
+    required this.icone,
+    required this.info,
+    required this.onPressed,
+    this.fermeture = false,
+  }) : super(key: cle);
+
+  final Key cle;
+  final IconData icone;
+  final String info;
+  final VoidCallback onPressed;
+  final bool fermeture;
+
+  @override
+  State<_CommandeFenetre> createState() => _CommandeFenetreEtat();
+}
+
+class _CommandeFenetreEtat extends State<_CommandeFenetre> {
+  bool _survol = false;
+  bool _appui = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fond;
+    final Color icone;
+    if (widget.fermeture) {
+      fond = _appui
+          ? AgriColors.errorDeep
+          : _survol
+              ? AgriColors.errorRed
+              : Colors.transparent;
+      icone = _survol || _appui ? Colors.white : AgriColors.outline;
+    } else {
+      fond = _appui
+          ? AgriColors.outlineVariant
+          : _survol
+              ? AgriColors.surfaceZebra
+              : Colors.transparent;
+      icone = AgriColors.outline;
+    }
+
+    return Tooltip(
+      message: widget.info,
+      child: Semantics(
+        button: true,
+        label: widget.info,
+        excludeSemantics: true,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _survol = true),
+          onExit: (_) => setState(() {
+            _survol = false;
+            _appui = false;
+          }),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => setState(() => _appui = true),
+            onTapUp: (_) => setState(() => _appui = false),
+            onTapCancel: () => setState(() => _appui = false),
+            onTap: widget.onPressed,
+            child: Container(
+              width: _largeurCommandeFenetre,
+              height: BarreSuperieure.hauteurBarre - 1, // moins le filet du bas (1 px, dans les 64)
+              color: fond,
+              alignment: Alignment.center,
+              child: Icon(widget.icone, size: 18, color: icone),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Ticket ENV1 — prise de la fenêtre sans cadre : glisser déplace la fenêtre, un double-clic l'agrandit sur la
 /// zone de travail ou la restaure (comme la barre de titre d'une fenêtre Windows). Un simple clic ne fait rien.
@@ -597,16 +688,11 @@ class _BoutonAgrandirEtat extends State<_BoutonAgrandir> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: FenetrePoste.agrandie,
-      builder: (context, agrandie, _) => IconButton(
-        key: const Key('fenetre-agrandir'),
-        iconSize: 18,
-        color: AgriColors.outline,
+      builder: (context, agrandie, _) => _CommandeFenetre(
+        cle: const Key('fenetre-agrandir'),
         // Windows : un carré pour « Agrandir », deux carrés superposés pour « Restaurer ».
-        icon: Icon(agrandie ? SymbolesAgri.filter_none : SymbolesAgri.crop_square),
-        padding: EdgeInsets.zero,
-        constraints: _gabaritCommandeFenetre,
-            style: _styleCommandeFenetre,
-        tooltip: agrandie ? 'Restaurer' : 'Agrandir',
+        icone: agrandie ? SymbolesAgri.filter_none : SymbolesAgri.crop_square,
+        info: agrandie ? 'Restaurer' : 'Agrandir',
         onPressed: FenetrePoste.basculerAgrandissement,
       ),
     );

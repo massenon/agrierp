@@ -306,7 +306,8 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
           spacing: AgriSpacing.xs,
           runSpacing: AgriSpacing.xs,
           children: [
-            for (final c in ['Tous', ...d.categories.map((c) => c.label)])
+            // Un libellé n'a qu'une pastille : deux catégories « Aliments » donnaient deux clés identiques.
+            for (final c in <String>{'Tous', ...d.categories.map((c) => c.label)})
               InkWell(
                 key: Key('pastille-$c'),
                 onTap: () => setState(() => _categorie = c),

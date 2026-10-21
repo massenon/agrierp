@@ -132,132 +132,70 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AgriColors.surfaceCard,
-      body: Builder(
-        // ⚠️ `Builder` ET NON `LayoutBuilder` : la mise en page se
-        // décide sur la largeur de l'ÉCRAN (MediaQuery), jamais sur
-        // celle du contenu. Retirer les contraintes de la portée
-        // interdit la rechute.
-        builder: (context) {
-          // La maquette masque le panneau gauche sous le point de rupture
-          // `lg` de Tailwind (1024 px) : `hidden lg:flex lg:w-[50%]`.
-          final panneauVisible = AgriBreakpoints.large(context);
-
-          return Row(
-            children: [
-              if (panneauVisible) const Expanded(child: _PanneauFerme()),
-              Expanded(child: _colonneFormulaire()),
-            ],
-          );
-        },
+    return CadreConnexion(
+      titre: 'Bienvenue !',
+      sousTitre: "Connectez-vous à votre espace d'administration AgriERP.",
+      enfants: [
+      if (_erreur != null) ...[
+        _BandeauErreur(message: _erreur!),
+        const SizedBox(height: AgriSpacing.md),
+      ],
+      _champ(
+        libelle: "NOM D'UTILISATEUR OU EMAIL",
+        controleur: _identifiant,
+        icone: SymbolesAgri.person_outline,
+        indice: 'admin ou contact@fermeolouwachegoun.com',
       ),
-    );
-  }
-
-  Widget _colonneFormulaire() {
-    return Padding(
-      padding: const EdgeInsets.all(AgriSpacing.xl),
-      child: Column(
-        children: [
-          const _BarreSuperieure(),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 440),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _EnTeteMarque(),
-                      const SizedBox(height: AgriSpacing.lg),
-                      const _BandeauModules(),
-                      const SizedBox(height: AgriSpacing.lg),
-                      const Text(
-                        'Bienvenue !',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AgriColors.brandForest,
-                        ),
-                      ),
-                      const SizedBox(height: AgriSpacing.xs),
-                      const Text(
-                        "Connectez-vous à votre espace d'administration AgriERP.",
-                        style: TextStyle(
-                          fontSize: AgriTypography.xs,
-                          color: AgriColors.outline,
-                        ),
-                      ),
-                      const SizedBox(height: AgriSpacing.lg),
-                      if (_erreur != null) ...[
-                        _BandeauErreur(message: _erreur!),
-                        const SizedBox(height: AgriSpacing.md),
-                      ],
-                      _champ(
-                        libelle: "NOM D'UTILISATEUR OU EMAIL",
-                        controleur: _identifiant,
-                        icone: SymbolesAgri.person_outline,
-                        indice: 'admin ou contact@fermeolouwachegoun.com',
-                      ),
-                      const SizedBox(height: AgriSpacing.md),
-                      _champ(
-                        libelle: 'MOT DE PASSE',
-                        controleur: _motDePasse,
-                        icone: SymbolesAgri.lock_outline,
-                        indice: 'AgriERP@2026',
-                        masque: !_motDePasseVisible,
-                        suffixe: IconButton(
-                          icon: Icon(
-                            _motDePasseVisible
-                                ? SymbolesAgri.visibility_off
-                                : SymbolesAgri.visibility,
-                            size: 18,
-                            color: AgriColors.outline,
-                          ),
-                          onPressed: () => setState(
-                            () => _motDePasseVisible = !_motDePasseVisible,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AgriSpacing.md),
-                      _ligneOptions(),
-                      const SizedBox(height: AgriSpacing.md),
-                      _boutonConnexion(),
-                      if (_adresseServeur != null) ...[
-                        const SizedBox(height: AgriSpacing.md),
-                        Row(
-                          key: const Key('login-serveur'),
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Serveur : $_adresseServeur',
-                                style: const TextStyle(
-                                  fontSize: AgriTypography.xs,
-                                  color: AgriColors.outline,
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              key: const Key('login-modifier-serveur'),
-                              onPressed: _changerServeur,
-                              child: const Text(
-                                'Modifier',
-                                style: TextStyle(fontSize: AgriTypography.xs),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
+      const SizedBox(height: AgriSpacing.md),
+      _champ(
+        libelle: 'MOT DE PASSE',
+        controleur: _motDePasse,
+        icone: SymbolesAgri.lock_outline,
+        indice: 'AgriERP@2026',
+        masque: !_motDePasseVisible,
+        suffixe: IconButton(
+          icon: Icon(
+            _motDePasseVisible
+                ? SymbolesAgri.visibility_off
+                : SymbolesAgri.visibility,
+            size: 18,
+            color: AgriColors.outline,
+          ),
+          onPressed: () => setState(
+            () => _motDePasseVisible = !_motDePasseVisible,
+          ),
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.md),
+      _ligneOptions(),
+      const SizedBox(height: AgriSpacing.md),
+      _boutonConnexion(),
+      if (_adresseServeur != null) ...[
+        const SizedBox(height: AgriSpacing.md),
+        Row(
+          key: const Key('login-serveur'),
+          children: [
+            Expanded(
+              child: Text(
+                'Serveur : $_adresseServeur',
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.outline,
                 ),
               ),
             ),
-          ),
-          const _PiedDePage(),
-        ],
-      ),
+            TextButton(
+              key: const Key('login-modifier-serveur'),
+              onPressed: _changerServeur,
+              child: const Text(
+                'Modifier',
+                style: TextStyle(fontSize: AgriTypography.xs),
+              ),
+            ),
+          ],
+        ),
+      ],
+      ],
     );
   }
 
@@ -268,39 +206,15 @@ class _LoginScreenState extends State<LoginScreen> {
     required String indice,
     bool masque = false,
     Widget? suffixe,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          libelle,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-            color: AgriColors.brandForest,
-          ),
-        ),
-        const SizedBox(height: AgriSpacing.xs),
-        TextField(
-          key: Key('champ-${libelle.hashCode}'),
-          controller: controleur,
-          obscureText: masque,
-          onSubmitted: (_) => _soumettre(),
-          style: const TextStyle(fontSize: AgriTypography.xs),
-          decoration: InputDecoration(
-            hintText: indice,
-            hintStyle: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
-            ),
-            prefixIcon: Icon(icone, size: 18, color: AgriColors.outline),
-            suffixIcon: suffixe,
-          ),
-        ),
-      ],
-    );
-  }
+  }) => ChampConnexion(
+    libelle: libelle,
+    controleur: controleur,
+    icone: icone,
+    indice: indice,
+    masque: masque,
+    suffixe: suffixe,
+    onSubmitted: _soumettre,
+  );
 
   Widget _ligneOptions() {
     return Row(
@@ -356,12 +270,192 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _boutonConnexion() {
+  Widget _boutonConnexion() => BoutonConnexion(
+    cle: const Key('bouton-connexion'),
+    libelle: 'SE CONNECTER',
+    enCours: _enCours,
+    onPressed: _soumettre,
+  );
+}
+
+/// Ticket VL-1 — le cadre de l'écran de connexion (panneau de la ferme à gauche, colonne de 440 px à droite : marque,
+/// bandeau des modules, titre, sous-titre, [enfants], pied de page), partagé avec l'écran de verrouillage : même
+/// mise en page, mêmes composants, rien de réinventé.
+class CadreConnexion extends StatelessWidget {
+  const CadreConnexion({
+    super.key,
+    required this.titre,
+    required this.sousTitre,
+    required this.enfants,
+  });
+
+  final String titre;
+  final String sousTitre;
+  final List<Widget> enfants;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AgriColors.surfaceCard,
+      body: Builder(
+        // ⚠️ `Builder` ET NON `LayoutBuilder` : la mise en page se
+        // décide sur la largeur de l'ÉCRAN (MediaQuery), jamais sur
+        // celle du contenu. Retirer les contraintes de la portée
+        // interdit la rechute.
+        builder: (context) {
+          // La maquette masque le panneau gauche sous le point de rupture
+          // `lg` de Tailwind (1024 px) : `hidden lg:flex lg:w-[50%]`.
+          final panneauVisible = AgriBreakpoints.large(context);
+
+          return Row(
+            children: [
+              if (panneauVisible) const Expanded(child: _PanneauFerme()),
+              Expanded(child: _colonne()),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _colonne() {
+    return Padding(
+      padding: const EdgeInsets.all(AgriSpacing.xl),
+      child: Column(
+        children: [
+          const _BarreSuperieure(),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const _EnTeteMarque(),
+                      const SizedBox(height: AgriSpacing.lg),
+                      const _BandeauModules(),
+                      const SizedBox(height: AgriSpacing.lg),
+                      Text(
+                        titre,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AgriColors.brandForest,
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                      Text(
+                        sousTitre,
+                        style: const TextStyle(
+                          fontSize: AgriTypography.xs,
+                          color: AgriColors.outline,
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.lg),
+                      ...enfants,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const _PiedDePage(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Champ de l'écran de connexion (libellé de 10 px en capitales, icône à gauche) ; [lectureSeule] : l'identifiant
+/// affiché par l'écran de verrouillage.
+class ChampConnexion extends StatelessWidget {
+  const ChampConnexion({
+    super.key,
+    required this.libelle,
+    required this.controleur,
+    required this.icone,
+    required this.indice,
+    this.masque = false,
+    this.suffixe,
+    this.onSubmitted,
+    this.lectureSeule = false,
+    this.cleChamp,
+  });
+
+  final String libelle;
+  final TextEditingController controleur;
+  final IconData icone;
+  final String indice;
+  final bool masque;
+  final Widget? suffixe;
+  final VoidCallback? onSubmitted;
+  final bool lectureSeule;
+  final Key? cleChamp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          libelle,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+            color: AgriColors.brandForest,
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        TextField(
+          key: cleChamp ?? Key('champ-${libelle.hashCode}'),
+          controller: controleur,
+          obscureText: masque,
+          readOnly: lectureSeule,
+          onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+          style: const TextStyle(fontSize: AgriTypography.xs),
+          decoration: InputDecoration(
+            hintText: indice,
+            hintStyle: const TextStyle(
+              fontSize: AgriTypography.xs,
+              color: AgriColors.outline,
+            ),
+            prefixIcon: Icon(icone, size: 18, color: AgriColors.outline),
+            suffixIcon: suffixe,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bouton plein de l'écran de connexion (44 px, émeraude, libellé en capitales espacées).
+class BoutonConnexion extends StatelessWidget {
+  const BoutonConnexion({
+    super.key,
+    required this.cle,
+    required this.libelle,
+    required this.enCours,
+    required this.onPressed,
+    this.desactive = false,
+  });
+
+  final Key cle;
+  final String libelle;
+  final bool enCours;
+
+  /// Grisé sans rouage (temporisation du verrou).
+  final bool desactive;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       height: 44,
       child: FilledButton(
-        key: const Key('bouton-connexion'),
-        onPressed: _enCours ? null : _soumettre,
+        key: cle,
+        onPressed: enCours || desactive ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: AgriColors.brandEmerald,
           disabledBackgroundColor: AgriColors.brandEmerald.withValues(
@@ -375,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_enCours)
+            if (enCours)
               const SizedBox(
                 width: 16,
                 height: 16,
@@ -387,9 +481,9 @@ class _LoginScreenState extends State<LoginScreen> {
             else
               const Icon(SymbolesAgri.lock_open, size: 16),
             const SizedBox(width: AgriSpacing.sm),
-            const Text(
-              'SE CONNECTER',
-              style: TextStyle(
+            Text(
+              libelle,
+              style: const TextStyle(
                 fontSize: AgriTypography.xs,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
@@ -400,6 +494,16 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// Bandeau d'erreur de l'écran de connexion (message rouge sous le sous-titre).
+class BandeauErreurConnexion extends StatelessWidget {
+  const BandeauErreurConnexion({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => _BandeauErreur(message: message);
 }
 
 /// Image de fond du panneau gauche : le même fichier que le web (`public/assets/images/image_login.png`).

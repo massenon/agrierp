@@ -154,6 +154,10 @@ class SyncFichesElevageValidationTest extends TestCase
             'type' => 'caisse', 'balance' => 500000, 'is_active' => true,
         ]);
 
+        // Ticket DEP1 — une dépense sans pièce possible est REFUSÉE : le décor porte le plan et l'exercice.
+        \App\Models\ChartOfAccount::create(['code' => '531', 'label' => 'Caisse', 'class' => 5, 'is_active' => true]);
+        \App\Models\ChartOfAccount::create(['code' => '605', 'label' => 'Énergie', 'class' => 6, 'is_active' => true]);
+        \App\Models\FiscalYear::firstOrCreate(['year' => now()->year], ['start_date' => now()->startOfYear()->format('Y-m-d'), 'end_date' => now()->endOfYear()->format('Y-m-d'), 'status' => 'ouvert']);
         // Second poste : sa fiche entre en conflit, mais son envoi porte AUSSI
         // une depense qui, elle, n'a rien a se reprocher.
         $reponse = $this->actingAs($this->utilisateur, 'sanctum')->postJson('/api/sync/push', [

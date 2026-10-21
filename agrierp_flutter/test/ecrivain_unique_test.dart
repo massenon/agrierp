@@ -31,6 +31,8 @@ void main() {
     'stock_adjustments': 'lib/features/stocks/stocks_repository.dart',
     'veterinary_records': 'lib/features/elevage/soins_repository.dart',
     'expenses': 'lib/features/achats/depenses_repository.dart',
+    // Ticket DEV — « Devis & Proforma » : le devis se crée, avance et s'archive par ce dépôt.
+    'quotes': 'lib/features/ventes/devis_repository.dart',
     'livestock_reproduction_events': 'lib/features/elevage/suivi_reproduction_repository.dart',
     'purchases': 'lib/features/achats/achats_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
@@ -46,6 +48,8 @@ void main() {
     'purchase_returns': 'lib/features/achats/achats_repository.dart',
     'supplier_refunds': 'lib/features/achats/achats_repository.dart',
     'livestock_transfers': 'lib/features/elevage/transferts_repository.dart',
+    // Tickets AV1 / AV2 — « Retours et Avoirs » : la demande de retour et « marquer comme traité » passent par ce dépôt.
+    'credit_notes': 'lib/features/ventes/avoirs_repository.dart',
     // Ticket BS1 — « Bandes & Sujets » : la bande se crée, se modifie et s'archive par ce dépôt.
     'livestock_lots': 'lib/features/elevage/bandes_repository.dart',
     // Ticket BS3 — « Registre des Reproducteurs » : le sujet nominatif s'enregistre, se modifie et se sort par ce dépôt.
@@ -80,6 +84,9 @@ void main() {
         'constitution : lot_source_id DÉRIVÉ du transfert (le serveur le pose lui-même en rejouant le transfert), jamais remis en file',
     'products <- lib/core/database/app_database.dart':
         'purge après réinitialisation du serveur (15.50) : stock_qty remis à zéro, comme au serveur',
+    'expenses <- lib/core/database/app_database.dart':
+        'palier v56 (DEP4) : mode de paiement DÉDUIT du type du compte payeur lors de la transformation 1 en-tête = 1 ligne ; '
+        'sync_status et updated_at ne bougent pas (la saisie en attente le reste, la pièce n\'est jamais touchée)',
   };
 
   /// Seules colonnes qu'une exception peut écrire, par table : `products.stock_qty` (miroir du grand livre) ; ticket BS1,
@@ -88,6 +95,8 @@ void main() {
   const colonnesPermises = <String, Set<String>>{
     'products': {'stockQty', 'stock_qty'},
     'livestock_lots': {'currentQuantity', 'current_quantity', 'lotSourceId', 'lot_source_id'},
+    // Ticket DEP4 — le mode de paiement déduit par le palier v56 (jamais remis en file).
+    'expenses': {'paymentMode', 'payment_mode'},
   };
 
   String sqlDe(String getter) =>
@@ -180,7 +189,9 @@ void main() {
         final hors = RegExp(r'(\w+):').allMatches(extrait.split('Companion').skip(1).join()).map((m) => m[1]!).toSet()
           ..removeAll(colonnesPermises[table] ?? const <String>{});
         // SQL brut : `SET stock_qty = 0` et rien d'autre (aucune seconde colonne après une virgule).
-        final sqlHors = extrait.contains('SET') && !RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait);
+        final sqlPermis = RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait) ||
+            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait));
+        final sqlHors = extrait.contains('SET') && !sqlPermis;
         if (hors.isNotEmpty || sqlHors || extrait.contains('syncStatus') || extrait.contains('sync_status')) {
           parasites.add('$cle écrit au-delà de ses colonnes dérivées : $extrait');
         }

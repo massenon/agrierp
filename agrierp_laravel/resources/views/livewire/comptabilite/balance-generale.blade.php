@@ -22,11 +22,11 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-md mb-lg">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Total Débits (Soldes Finaux)</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->balance['total_final_debit'], 0, ',', ' ') }} F</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Total Crédits (Soldes Finaux)</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->balance['total_final_credit'], 0, ',', ' ') }} F</span>
         </div>

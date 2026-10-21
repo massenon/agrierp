@@ -8,6 +8,7 @@ use App\Models\AccountingEntry;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use App\Models\Expense;
+use App\Models\ExpenseLine;
 use App\Models\FiscalYear;
 use App\Models\TreasuryAccount;
 use App\Models\User;
@@ -28,6 +29,9 @@ use Tests\TestCase;
  *  - au web, un second archivage (double clic) réintégrait le montant et contre-passait la charge deux fois ;
  *  - deux dépenses du même jour sans ordre défini dans la liste ;
  *  - une dépense créée par un poste n'écrivait pas `expense.created` au journal d'audit.
+ *
+ * Ticket DEP1 à DEP3 — une dépense a des LIGNES et une dépense COMPTABILISÉE est IMMUABLE (même son libellé) : on la
+ * corrige par archivage (contre-passation). Seule une dépense SANS pièce (reprise de l'ancien) se modifie.
  */
 class DepensesModificationArchivageTest extends TestCase
 {
@@ -65,22 +69,48 @@ class DepensesModificationArchivageTest extends TestCase
     private function depenseDuWeb(string $libelle = 'Sac de provende', string $date = null): Expense
     {
         $this->actingAs($this->admin);
-        [$depense] = app(SaisieDepenseAction::class)->creer([
-            'expense_date' => $date ?? now()->format('Y-m-d'), 'label' => $libelle, 'category' => '601 - Aliments',
-            'amount' => 25_000, 'treasury_account_id' => $this->caisse->id,
+        $depense = app(SaisieDepenseAction::class)->creer([
+            'expense_date' => $date ?? now()->format('Y-m-d'), 'treasury_account_id' => $this->caisse->id,
+            'lines' => [['label' => $libelle, 'charge_account_id' => ChartOfAccount::where('code', '601')->value('id'), 'amount' => 25_000]],
         ]);
         $this->assertNotNull($depense->accounting_entry_id);
 
         return $depense;
     }
 
-    /** @return array<string, mixed> */
+    /** Une dépense de l'ancien régime (reprise) : une ligne, AUCUNE pièce, 25 000 F décaissés de la caisse. */
+    private function depenseSansPiece(string $libelle = 'Reprise'): Expense
+    {
+        $this->actingAs($this->admin);
+        $d = new Expense();
+        $d->fill(['expense_date' => now()->format('Y-m-d'), 'label' => $libelle, 'category' => '601 - Aliments', 'amount' => 25_000,
+            'treasury_account_id' => $this->caisse->id, 'payment_mode' => 'caisse', 'status' => 'payee', 'is_active' => true]);
+        $d->save();
+        $l = new ExpenseLine();
+        $l->id = ExpenseLine::idDeConversion($d->id);
+        $l->fill(['expense_id' => $d->id, 'position' => 0, 'label' => $libelle, 'charge_account_id' => ChartOfAccount::where('code', '601')->value('id'), 'amount' => 25_000])->save();
+        $this->caisse->decrement('balance', 25_000);
+
+        return $d;
+    }
+
+    /**
+     * Le document d'envoi d'un poste migré pour [$d] ; [$remplacements] remplace des champs de l'en-tête, `libelle`
+     * celui de la première ligne, `montant` son montant, `compte` son compte de charge.
+     *
+     * @return array<string, mixed>
+     */
     private function ligne(Expense $d, array $remplacements = []): array
     {
+        $d->load('lines');
+        $l = $d->lines->first();
+        $ligne = ['id' => $l->id, 'label' => $remplacements['libelle'] ?? $l->label,
+            'charge_account_id' => $remplacements['compte'] ?? $l->charge_account_id, 'amount' => $remplacements['montant'] ?? (int) $l->amount];
+        unset($remplacements['libelle'], $remplacements['compte'], $remplacements['montant']);
+
         return array_merge([
-            'id' => $d->id, 'expense_date' => $d->expense_date->format('Y-m-d'), 'label' => $d->label,
-            'category' => $d->category, 'amount' => (float) $d->amount, 'treasury_account_id' => $d->treasury_account_id,
-            'is_active' => true,
+            'id' => $d->id, 'expense_date' => $d->expense_date->format('Y-m-d'), 'treasury_account_id' => $d->treasury_account_id,
+            'payment_mode' => $d->payment_mode, 'lines' => [$ligne], 'is_active' => true,
         ], $remplacements);
     }
 
@@ -99,32 +129,36 @@ class DepensesModificationArchivageTest extends TestCase
 
     // ── Web ────────────────────────────────────────────────────────────────
 
-    public function test_web_le_compte_de_tresorerie_d_une_depense_comptabilisee_ne_change_plus(): void
+    public function test_web_une_depense_comptabilisee_ne_se_modifie_plus_ni_compte_ni_libelle(): void
     {
         $d = $this->depenseDuWeb();
 
         Livewire::test(SaisieDepenses::class)
             ->call('editExpense', $d->id)
-            ->set('treasuryAccountId', $this->banque->id)
-            ->call('submitExpense')
-            ->assertHasErrors(['amount'])
-            ->tap(fn ($c) => $this->assertSame(SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE, $c->errors()->first('amount')));
+            ->assertNotDispatched('open-modal')
+            ->assertDispatched('toast', message: SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE, type: 'error');
 
-        $this->assertSame($this->caisse->id, $d->fresh()->treasury_account_id);
-        // Les deux livres restent d'accord, pour les deux comptes.
-        $this->assertEquals(475_000, (float) $this->caisse->fresh()->balance);
-        $this->assertEquals(800_000, (float) $this->banque->fresh()->balance);
-        $this->assertEquals(-25_000, $this->grandLivre('531'));
-        $this->assertEquals(0, $this->grandLivre('521'));
+        // Même en forçant l'état (page forgée) : le point de passage refuse.
+        $this->expectException(\App\Exceptions\DepenseNonModifiableException::class);
+        try {
+            app(SaisieDepenseAction::class)->modifier($d->id, $this->ligne($d, ['treasury_account_id' => $this->banque->id, 'payment_mode' => 'banque']));
+        } finally {
+            $this->assertSame($this->caisse->id, $d->fresh()->treasury_account_id);
+            // Les deux livres restent d'accord, pour les deux comptes.
+            $this->assertEquals(475_000, (float) $this->caisse->fresh()->balance);
+            $this->assertEquals(800_000, (float) $this->banque->fresh()->balance);
+            $this->assertEquals(-25_000, $this->grandLivre('531'));
+            $this->assertEquals(0, $this->grandLivre('521'));
+        }
     }
 
-    public function test_web_le_libelle_et_la_date_d_une_depense_comptabilisee_se_modifient(): void
+    public function test_web_le_libelle_d_une_depense_sans_piece_se_modifie(): void
     {
-        $d = $this->depenseDuWeb();
+        $d = $this->depenseSansPiece();
 
         Livewire::test(SaisieDepenses::class)
             ->call('editExpense', $d->id)
-            ->set('label', 'Sac de provende ponte')
+            ->set('lines.0.label', 'Sac de provende ponte')
             ->call('submitExpense')
             ->assertHasNoErrors()
             ->assertDispatched('toast', message: 'Dépense enregistrée avec succès.', type: 'success');
@@ -136,12 +170,12 @@ class DepensesModificationArchivageTest extends TestCase
 
     public function test_web_une_depense_archivee_ne_se_modifie_plus(): void
     {
-        $d = $this->depenseDuWeb();
+        $d = $this->depenseSansPiece();
         $page = Livewire::test(SaisieDepenses::class)->call('editExpense', $d->id);
         app(SaisieDepenseAction::class)->archiver($d->id);   // archivée ailleurs, la page reste ouverte
 
-        $page->set('label', 'Autre')->call('submitExpense')->assertHasErrors(['amount']);
-        $this->assertSame(SaisieDepenseAction::MESSAGE_ARCHIVEE, $page->errors()->first('amount'));
+        $page->set('lines.0.label', 'Autre')->call('submitExpense')->assertHasErrors(['formulaire']);
+        $this->assertSame(SaisieDepenseAction::MESSAGE_ARCHIVEE, $page->errors()->first('formulaire'));
 
         $this->assertEquals(500_000, (float) $this->caisse->fresh()->balance, 'la caisse ne perd pas le montant une seconde fois');
     }
@@ -160,12 +194,12 @@ class DepensesModificationArchivageTest extends TestCase
         $this->assertSame(1, AuditLog::where('action', 'expense.archived')->count());
     }
 
-    public function test_web_recherche_filtre_de_statut_et_ordre_de_deux_depenses_du_meme_jour(): void
+    public function test_web_recherche_filtre_de_piece_et_ordre_de_deux_depenses_du_meme_jour(): void
     {
         $b = $this->depenseDuWeb('Carburant B');
         $a = $this->depenseDuWeb('Carburant A');
         $this->depenseDuWeb('Électricité', now()->subDay()->format('Y-m-d'));
-        Expense::whereKey($a->id)->update(['status' => 'en_attente']);
+        Expense::whereKey($a->id)->update(['accounting_entry_id' => null]);
 
         $liste = fn ($c) => $c->instance()->expenses->pluck('label')->all();
 
@@ -173,11 +207,11 @@ class DepensesModificationArchivageTest extends TestCase
         $memeJour = collect([$a, $b])->sortBy('id')->pluck('label')->all();
         $this->assertSame([...$memeJour, 'Électricité'], $liste($c));
 
-        $this->assertSame(['Carburant A'], $liste($c->set('search', 'carburant')->set('statusFilter', 'En attente')));
-        $this->assertSame(['Carburant B'], $liste($c->set('statusFilter', 'Payée')));
+        $this->assertSame(['Carburant A'], $liste($c->set('search', 'carburant')->set('pieceFilter', 'Sans pièce')));
+        $this->assertSame(['Carburant B'], $liste($c->set('pieceFilter', 'Comptabilisée')));
         // (SQLite des tests : `LIKE` insensible à la casse pour l'ASCII seulement ; MySQL, `utf8mb4_unicode_ci`, l'est
         // aussi aux accents — le poste suit MySQL, `cleCommeLeServeur`.)
-        $this->assertSame(['Électricité'], $liste($c->set('search', 'ECTRI')->set('statusFilter', '')));
+        $this->assertSame(['Électricité'], $liste($c->set('search', 'ECTRI')->set('pieceFilter', '')));
     }
 
     // ── Envoi d'un poste ───────────────────────────────────────────────────
@@ -201,43 +235,41 @@ class DepensesModificationArchivageTest extends TestCase
     }
 
     /**
-     * 🔁 Ticket EX5 (décision D-U14-1 du 20/10/2026) — la DATE d'une dépense comptabilisée est verrouillée comme son
-     * montant : changée seule, la dépense passait à un autre jour (ou un autre exercice) pendant que son écriture restait
-     * à l'ancienne date. Le libellé, lui, se modifie toujours.
+     * 🔁 Ticket DEP1 — une dépense COMPTABILISÉE est immuable : le libellé comme la date, le montant, le compte de
+     * charge ou le compte de trésorerie. Le renvoi INCHANGÉ de la saisie d'origine reste acquitté (idempotence).
      */
-    public function test_poste_modifie_le_libelle_mais_pas_la_date_d_une_depense_comptabilisee(): void
+    public function test_poste_toute_modification_d_une_depense_comptabilisee_est_refusee_avec_le_message_du_web(): void
     {
         $d = $this->depenseDuWeb();
-        $aujourdhui = $d->expense_date->format('Y-m-d');
         $hier = now()->subDay()->format('Y-m-d');
+        $autreCompte = ChartOfAccount::where('code', '605')->value('id');
 
-        $this->pousser([$this->ligne($d, ['label' => 'Provende ponte', 'expense_date' => $hier])])
-            ->assertJsonPath('expenses.accepted', [])
-            ->assertJsonPath('expenses.rejected.0.reason', SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE);
-        $this->assertSame($aujourdhui, $d->fresh()->expense_date->format('Y-m-d'));
-        $this->assertSame('Sac de provende', $d->fresh()->label);
-
-        $this->pousser([$this->ligne($d, ['label' => 'Provende ponte'])])
-            ->assertJsonPath('expenses.accepted', [$d->id]);
-
-        $this->assertSame('Provende ponte', $d->fresh()->label);
-        $this->assertSame($aujourdhui, $d->fresh()->expense_date->format('Y-m-d'));
-        $this->assertEquals(475_000, (float) $this->caisse->fresh()->balance);
-        $this->assertSame(1, AuditLog::where('action', 'expense.updated')->count());
-    }
-
-    public function test_poste_le_montant_d_une_depense_comptabilisee_est_refuse_avec_le_message_du_web(): void
-    {
-        $d = $this->depenseDuWeb();
-
-        foreach ([['amount' => 30_000], ['category' => '605 - Énergie'], ['treasury_account_id' => $this->banque->id]] as $changement) {
+        foreach ([['libelle' => 'Provende ponte'], ['expense_date' => $hier], ['montant' => 30_000], ['compte' => $autreCompte],
+            ['treasury_account_id' => $this->banque->id, 'payment_mode' => 'banque']] as $changement) {
             $this->pousser([$this->ligne($d, $changement)])
                 ->assertJsonPath('expenses.accepted', [])
                 ->assertJsonPath('expenses.rejected.0.reason', SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE);
         }
 
+        $this->assertSame('Sac de provende', $d->fresh()->label);
         $this->assertEquals(25_000, (float) $d->fresh()->amount);
         $this->assertEquals(475_000, (float) $this->caisse->fresh()->balance);
+
+        $this->pousser([$this->ligne($d)])->assertJsonPath('expenses.accepted', [$d->id]);
+        $this->assertSame(0, AuditLog::where('action', 'expense.updated')->count());
+    }
+
+    public function test_poste_modifie_une_depense_sans_piece(): void
+    {
+        $d = $this->depenseSansPiece();
+
+        $this->pousser([$this->ligne($d, ['libelle' => 'Provende ponte', 'montant' => 30_000])])
+            ->assertJsonPath('expenses.accepted', [$d->id]);
+
+        $this->assertSame('Provende ponte', $d->fresh()->label);
+        $this->assertEquals(30_000, (float) $d->fresh()->amount);
+        $this->assertEquals(470_000, (float) $this->caisse->fresh()->balance);
+        $this->assertSame(1, AuditLog::where('action', 'expense.updated')->count());
     }
 
     public function test_poste_une_depense_archivee_au_web_ne_se_modifie_plus(): void
@@ -245,7 +277,7 @@ class DepensesModificationArchivageTest extends TestCase
         $d = $this->depenseDuWeb();
         app(SaisieDepenseAction::class)->archiver($d->id);
 
-        $this->pousser([$this->ligne($d, ['label' => 'Autre'])])
+        $this->pousser([$this->ligne($d, ['libelle' => 'Autre'])])
             ->assertJsonPath('expenses.rejected.0.reason', SaisieDepenseAction::MESSAGE_ARCHIVEE);
         // Le renvoi de la saisie d'origine (inchangée) reste acquitté.
         $this->pousser([$this->ligne($d)])->assertJsonPath('expenses.accepted', [$d->id]);
@@ -257,8 +289,8 @@ class DepensesModificationArchivageTest extends TestCase
         $id = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 
         $this->pousser([[
-            'id' => $id, 'expense_date' => now()->format('Y-m-d'), 'label' => 'Doublon', 'category' => '601 - Aliments',
-            'amount' => 9_000, 'treasury_account_id' => $this->caisse->id, 'is_active' => false,
+            'id' => $id, 'expense_date' => now()->format('Y-m-d'), 'treasury_account_id' => $this->caisse->id, 'is_active' => false,
+            'lines' => [['id' => 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb', 'label' => 'Doublon', 'charge_account_id' => ChartOfAccount::where('code', '601')->value('id'), 'amount' => 9_000]],
         ]])->assertJsonPath('expenses.accepted', [$id]);
 
         $this->assertFalse(Expense::findOrFail($id)->is_active);
@@ -271,27 +303,34 @@ class DepensesModificationArchivageTest extends TestCase
 
     public function test_poste_sans_le_droit_du_web_ni_modification_ni_archivage(): void
     {
-        $d = $this->depenseDuWeb();
+        $d = $this->depenseSansPiece();
         $comptable = User::create([
             'name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');   // pas `manage-achats`
 
-        $this->pousser([$this->ligne($d, ['is_active' => false]), $this->ligne($d, ['label' => 'X'])], $comptable)
+        $this->pousser([$this->ligne($d, ['is_active' => false]), $this->ligne($d, ['libelle' => 'X'])], $comptable)
             ->assertJsonPath('expenses.accepted', []);
 
         $this->assertTrue($d->fresh()->is_active);
-        $this->assertSame('Sac de provende', $d->fresh()->label);
+        $this->assertSame('Reprise', $d->fresh()->label);
     }
 
-    public function test_le_tirage_sert_le_statut_et_l_ecriture(): void
+    public function test_le_tirage_sert_le_statut_l_ecriture_et_les_lignes(): void
     {
         $d = $this->depenseDuWeb();
 
-        $servie = collect($this->actingAs($this->admin, 'sanctum')->getJson('/api/sync/pull')->json('expenses'))->firstWhere('id', $d->id);
+        $reponse = $this->actingAs($this->admin, 'sanctum')->getJson('/api/sync/pull');
+        $servie = collect($reponse->json('expenses'))->firstWhere('id', $d->id);
 
         $this->assertSame('payee', $servie['status']);
         $this->assertSame($d->accounting_entry_id, $servie['accounting_entry_id']);
+        $this->assertSame('caisse', $servie['payment_mode']);
+        $this->assertSame($this->admin->id, $servie['created_by']);
+        $this->assertEquals([[
+            'id' => $d->lines->first()->id, 'expense_id' => $d->id, 'position' => 0, 'label' => 'Sac de provende',
+            'charge_account_id' => ChartOfAccount::where('code', '601')->value('id'), 'amount' => 25000.0,
+        ]], $reponse->json('expense_lines'));
     }
 }

@@ -14,22 +14,22 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Encours Global</span><span class="material-symbols-outlined text-[18px] text-error-red">payments</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['encours_global'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
             <p class="text-[10px] text-outline mt-xs">Total dû par les clients</p>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-accent-yellow shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Échus &gt; 30 jours</span><span class="material-symbols-outlined text-[18px] text-brand-forest">event_busy</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['echus_30j'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
             <p class="text-[10px] text-outline mt-xs">À recouvrer d'urgence</p>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Taux de Recouvrement</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">trending_up</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['taux_recouvrement'] }}%</span>
             <p class="text-[10px] text-outline mt-xs">Factures créées ce mois-ci</p>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-forest shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-forest shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Acomptes Reçus</span><span class="material-symbols-outlined text-[18px] text-brand-forest">savings</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['acomptes_recus'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
             <p class="text-[10px] text-outline mt-xs">Avances sur commandes (mois)</p>

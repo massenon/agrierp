@@ -12,6 +12,7 @@
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="text-outline hover:text-on-surface"><span class="material-symbols-outlined">close</span></button>
         </div>
         <p class="text-xs text-outline mb-md">Le site est la base de référence : il ne synchronise rien lui-même. Chaque poste Windows envoie ses saisies et reçoit les données du site quand il synchronise ; voici ce que le serveur en sait. « Demander la synchronisation » dépose une demande que chaque poste connecté lit dans les 30 secondes ; c'est lui qui envoie et reçoit.</p>
+        <p class="text-xs text-outline mb-md">Quand le site a servi de base (poste en panne), les postes doivent récupérer ce qui y a été saisi : chaque ligne dit ce que le poste n'a pas encore reçu. « Renvoyer vers ce poste » lui fait refaire un tirage complet à son prochain contact, même s'il est resté hors ligne des semaines.</p>
 
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
@@ -27,16 +28,23 @@
                         <th class="py-xs font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @forelse($this->postes as $poste)
-                        @php
-                            $pastilles = [
-                                'a_jour' => 'bg-brand-emerald/10 text-brand-emerald',
-                                'inactif' => 'bg-accent-yellow/30 text-brand-forest',
-                                'refus' => 'bg-error-bg text-error-deep',
-                            ];
-                        @endphp
-                        <tr wire:key="poste-{{ $poste['poste'] }}" class="border-b border-outline-variant">
+                @forelse($this->postes as $poste)
+                    @php
+                        $pastilles = [
+                            'a_jour' => 'bg-brand-emerald/10 text-brand-emerald',
+                            'inactif' => 'bg-accent-yellow/30 text-brand-forest',
+                            'refus' => 'bg-error-bg text-error-deep',
+                        ];
+                        $retard = $poste['retard'];
+                        $pastillesRetard = [
+                            'a_jour' => 'bg-brand-emerald/10 text-brand-emerald',
+                            'a_recevoir' => 'bg-accent-yellow/30 text-brand-forest',
+                            'retard' => 'bg-error-bg text-error-deep',
+                            'jamais' => 'bg-surface-zebra text-outline',
+                        ];
+                    @endphp
+                    <tbody wire:key="poste-{{ $poste['poste'] }}" class="border-b border-outline-variant">
+                        <tr>
                             <td data-label="Poste" class="py-xs pr-sm font-semibold break-all">{{ $poste['poste'] }}</td>
                             <td data-label="Utilisateur" class="py-xs pr-sm">{{ $poste['utilisateur'] }}</td>
                             <td data-label="Dernier contact" class="py-xs pr-sm">{{ $poste['dernier_contact']?->format('d/m/Y H:i') ?? '—' }}</td>
@@ -48,16 +56,34 @@
                                 <button type="button" wire:click="demander(@js($poste['poste']))" title="Demander la synchronisation de ce poste" class="text-outline hover:text-brand-emerald"><span class="material-symbols-outlined text-[18px]">sync</span></button>
                             </td>
                         </tr>
-                    @empty
-                        <tr><td colspan="8" class="py-md text-center text-outline">Aucun poste n'est connecté au serveur pour le moment.</td></tr>
-                    @endforelse
-                </tbody>
+                        <tr class="bg-surface-zebra">
+                            <td colspan="8" class="py-xs px-xs">
+                                <div class="flex flex-wrap items-center justify-between gap-sm">
+                                    <div class="space-y-0.5">
+                                        <p><span class="text-outline">Modifications du site depuis son dernier tirage :</span> <span class="font-bold">{{ $retard['nombre'] ?? '—' }}</span>@if($retard['nombre'] !== null && $retard['nombre'] > 0) <span class="text-outline">({{ $retard['resume'] }})</span>@endif</p>
+                                        <p class="text-outline">Dernier tirage : {{ $retard['dernier_tirage']?->format('d/m/Y H:i') ?? '—' }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-xs">
+                                        <span class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] {{ $pastillesRetard[$retard['etat']] }}">{{ $retard['libelle'] }}</span>
+                                        @if($retard['resync_demandee_le'])
+                                            <span class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] bg-accent-yellow/30 text-brand-forest">Resynchronisation demandée le {{ $retard['resync_demandee_le']->format('d/m/Y H:i') }}</span>
+                                        @endif
+                                        <button type="button" wire:click="renvoyer(@js($poste['poste']))" title="Renvoyer vers ce poste" class="px-sm py-xs rounded-lg border border-brand-emerald text-brand-emerald font-semibold flex items-center gap-xs hover:bg-white"><span class="material-symbols-outlined text-[16px]">cloud_download</span>Renvoyer vers ce poste</button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                @empty
+                    <tbody><tr><td colspan="8" class="py-md text-center text-outline">Aucun poste n'est connecté au serveur pour le moment.</td></tr></tbody>
+                @endforelse
             </table>
         </div>
 
         <div class="flex justify-end gap-sm mt-lg">
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Fermer</button>
             <button type="button" wire:click="demander" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">sync</span>Demander la synchronisation des postes</button>
+            <button type="button" wire:click="renvoyerATous" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">cloud_download</span>Renvoyer vers tous les postes</button>
             <button type="button" wire:click="actualiser" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">refresh</span>Actualiser</button>
         </div>
     </x-modal>

@@ -189,6 +189,7 @@ return [
         'acquisitionDate' => 'date d\'acquisition',
         'acquisitionValue' => 'valeur d\'acquisition',
         'addDate' => 'date',
+        'demandee_le' => 'date de la demande',
         'addProductId' => 'produit',
         'addQty' => 'quantité',
         'address' => 'adresse',

@@ -261,28 +261,24 @@ class ExerciceClosLectureSeuleTest extends TestCase
 
     // ═══════════════════ Dépenses (D-U14-1) ═══════════════════
 
-    private const COMPTABILISEE = 'Cette dépense est déjà comptabilisée : sa date, son montant, son compte de charge et son compte de trésorerie ne peuvent plus être modifiés ici. Passez une écriture de correction au Journal Comptable.';
+    private const COMPTABILISEE = SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE;
 
     private function depenseComptabilisee(): Expense
     {
-        [$depense] = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_B, '2027-02-10'), self::UUID_B);
+        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_B, '2027-02-10'), self::UUID_B);
         $this->assertNotNull($depense->accounting_entry_id, 'décor : la dépense doit être comptabilisée');
 
         return $depense;
     }
 
-    public function test_la_date_d_une_depense_comptabilisee_est_verrouillee_au_web(): void
+    public function test_une_depense_comptabilisee_ne_s_ouvre_plus_en_modification_au_web(): void
     {
         $depense = $this->depenseComptabilisee();
 
-        $this->assertErreurSousLeChamp(
-            Livewire::test(SaisieDepenses::class)
-                ->call('editExpense', $depense->id)
-                ->set('expenseDate', '2027-02-01')
-                ->call('submitExpense'),
-            'amount',
-            self::COMPTABILISEE,
-        );
+        Livewire::test(SaisieDepenses::class)
+            ->call('editExpense', $depense->id)
+            ->assertNotDispatched('open-modal')
+            ->assertDispatched('toast', message: self::COMPTABILISEE, type: 'error');
 
         $this->assertSame('2027-02-10', $depense->fresh()->expense_date->format('Y-m-d'));
     }
@@ -301,11 +297,12 @@ class ExerciceClosLectureSeuleTest extends TestCase
     {
         $this->assertErreurSousLeChamp(
             Livewire::test(SaisieDepenses::class)
+                ->call('nouvelleDepense')
                 ->set('expenseDate', '2026-12-20')
-                ->set('label', 'Facture SBEE')
-                ->set('category', '605 - Énergie')
-                ->set('amount', 25_000)
                 ->set('treasuryAccountId', $this->caisse->id)
+                ->set('lines.0.label', 'Facture SBEE')
+                ->set('lines.0.chargeAccountId', $this->comptes['605']->id)
+                ->set('lines.0.amount', '25000')
                 ->call('submitExpense'),
             'expenseDate',
             self::CLOS_20_12,
@@ -322,17 +319,13 @@ class ExerciceClosLectureSeuleTest extends TestCase
     public function test_une_depense_d_un_exercice_clos_ne_se_modifie_ni_ne_s_archive(): void
     {
         FiscalYear::where('year', 2026)->update(['status' => 'ouvert']);
-        [$depense] = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_A, '2026-12-20'), self::UUID_A);
+        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_A, '2026-12-20'), self::UUID_A);
         FiscalYear::where('year', 2026)->update(['status' => 'cloture']);
 
-        $this->assertErreurSousLeChamp(
-            Livewire::test(SaisieDepenses::class)
-                ->call('editExpense', $depense->id)
-                ->set('label', 'Facture SBEE décembre')
-                ->call('submitExpense'),
-            'expenseDate',
-            self::CLOS_20_12,
-        );
+        Livewire::test(SaisieDepenses::class)
+            ->call('editExpense', $depense->id)
+            ->assertNotDispatched('open-modal')
+            ->assertDispatched('toast', message: self::CLOS_20_12, type: 'error');
 
         Livewire::test(SaisieDepenses::class)
             ->call('archiveExpense', $depense->id)

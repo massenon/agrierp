@@ -130,7 +130,8 @@ class ReinitialisationDonneesService
             'purchase_orders', 'purchase_returns', 'payables',
             // Ticket 15.20 : règlements (15.16) et remboursements fournisseurs - `supplier_payments` avait été oublié.
             'supplier_payments', 'supplier_refunds', 'suppliers',
-            'expenses',
+            // Ticket DEP1 — les lignes d'abord (enfants de `expenses`).
+            'expense_lines', 'expenses',
             // Stock
             'stock_movements',
             // Élevage
@@ -160,6 +161,9 @@ class ReinitialisationDonneesService
             // Ticket S-T5 — correspondances d'identifiants des postes : après une réinitialisation, les postes purgent
             // leurs données ; les identifiants qu'elles traduisaient ne seront plus jamais envoyés.
             'correspondances_identifiants',
+            // Ticket SW-1 — curseurs et drapeaux de resynchronisation des postes : après une réinitialisation, chaque
+            // poste purge ses données et repart de zéro ; son curseur d'avant ne décrit plus rien.
+            'poste_synchronisations',
         ];
     }
 

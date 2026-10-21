@@ -2,13 +2,20 @@
 
 namespace App\Livewire\Ventes;
 
-use App\Models\AuditLog;
+use App\Actions\SaisieDevisAction;
 use App\Models\Customer;
 use App\Models\Quote;
 use Livewire\Attributes\Url;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 /**
+ * Ticket DEV — les gestes d'écriture (créer, modifier, avancer dans le cycle, archiver) passent par UN point de
+ * passage, `SaisieDevisAction`, que le poste rejoue à l'envoi (`SyncController::pushQuotes`) : mêmes règles, mêmes
+ * messages, même audit. Nouveautés du ticket, côté web d'abord : un devis daté d'un exercice CLOS est refusé (motif R4,
+ * sous « Date du Devis », ou en toast pour un changement de statut ou un archivage) ; un changement de statut hors du
+ * cycle `brouillon → envoyé → accepté | refusé` est refusé avec son motif ; un devis archivé ou facturé ne se modifie plus.
+ *
  * Ticket 4.3 (Sprint 4) — devis.html → Livewire\Ventes\Devis
  * "Cycle de vie complet des devis : brouillon, envoi, acceptation et
  * conversion en facture."
@@ -174,17 +181,25 @@ class Devis extends Component
             'note' => $this->note ?: null,
         ];
 
-        if ($this->editingQuoteId) {
-            Quote::findOrFail($this->editingQuoteId)->update($payload);
-            AuditLog::record('quote.updated', 'ventes');
-            $message = 'Devis modifié avec succès.';
-        } else {
-            $payload['quote_number'] = Quote::generateQuoteNumber();
-            $payload['status'] = 'brouillon';
-            $payload['is_active'] = true;
-            Quote::create($payload);
-            AuditLog::record('quote.created', 'ventes');
-            $message = 'Devis créé avec succès.';
+        $saisie = app(SaisieDevisAction::class);
+
+        try {
+            if ($this->editingQuoteId) {
+                $saisie->modifier($this->editingQuoteId, $payload);
+                $message = 'Devis modifié avec succès.';
+            } else {
+                $saisie->creer($payload);
+                $message = 'Devis créé avec succès.';
+            }
+        } catch (ValidationException $e) {
+            // Exercice clos : sous « Date du Devis » (motif R4). Devis archivé ou facturé : toast d'erreur.
+            if (isset($e->errors()['quoteDate'])) {
+                $this->addError('quoteDate', $e->errors()['quoteDate'][0]);
+            } else {
+                $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+            }
+
+            return;
         }
 
         $this->dispatch('close-modal', name: 'modal-create-devis');
@@ -194,25 +209,19 @@ class Devis extends Component
     public function markAsSent(string $id): void
     {
         $this->authorize('manage-ventes');
-        Quote::findOrFail($id)->update(['status' => 'envoye']);
-        AuditLog::record('quote.sent', 'ventes');
-        $this->dispatch('toast', message: 'Devis marqué comme envoyé.', type: 'success');
+        $this->changerStatut($id, 'envoye', 'Devis marqué comme envoyé.', 'success');
     }
 
     public function markAsAccepted(string $id): void
     {
         $this->authorize('manage-ventes');
-        Quote::findOrFail($id)->update(['status' => 'accepte']);
-        AuditLog::record('quote.accepted', 'ventes');
-        $this->dispatch('toast', message: 'Devis marqué comme accepté.', type: 'success');
+        $this->changerStatut($id, 'accepte', 'Devis marqué comme accepté.', 'success');
     }
 
     public function markAsRefused(string $id): void
     {
         $this->authorize('manage-ventes');
-        Quote::findOrFail($id)->update(['status' => 'refuse']);
-        AuditLog::record('quote.refused', 'ventes');
-        $this->dispatch('toast', message: 'Devis marqué comme refusé.', type: 'warning');
+        $this->changerStatut($id, 'refuse', 'Devis marqué comme refusé.', 'warning');
     }
 
     public function convertToInvoice(string $id): void
@@ -223,9 +232,31 @@ class Devis extends Component
     public function archiveQuote(string $id): void
     {
         $this->authorize('manage-ventes');
-        Quote::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('quote.archived', 'ventes');
-        $this->dispatch('toast', message: 'Devis archivé avec succès.', type: 'warning');
+
+        try {
+            $resultat = app(SaisieDevisAction::class)->archiver($id);
+        } catch (ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+
+            return;
+        }
+
+        if ($resultat === SaisieDevisAction::ARCHIVE_MAINTENANT) {
+            $this->dispatch('toast', message: 'Devis archivé avec succès.', type: 'warning');
+        }
+    }
+
+    private function changerStatut(string $id, string $statut, string $message, string $type): void
+    {
+        try {
+            app(SaisieDevisAction::class)->changerStatut($id, $statut);
+        } catch (ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+
+            return;
+        }
+
+        $this->dispatch('toast', message: $message, type: $type);
     }
 
     public function render()

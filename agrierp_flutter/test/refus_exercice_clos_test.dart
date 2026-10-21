@@ -15,6 +15,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
+import 'depenses_aide.dart';
 import 'php_laravel.dart';
 
 /// Ticket EX6 (EF7 du PRD `docs/prd/exercices-comptables.md`) — REFUS LOCAL AU POSTE, SUR TOUS LES ÉCRANS DE SAISIE,
@@ -140,7 +141,6 @@ Future<void> _referentiels(AppDatabase db) async {
           syncStatus: const Value(SyncStatus.synced),
         ),
       );
-  await db.into(db.expenseCategories).insert(ExpenseCategoriesCompanion.insert(label: 'Énergie'));
   await db
       .into(db.livestockLots)
       .insert(LivestockLotsCompanion.insert(id: _uuid('b1'), code: 'PON-01', speciesId: _uuid('esp')));
@@ -258,27 +258,33 @@ final _ecrans = <_Ecran>[
     'Saisie des Dépenses — nouvelle dépense',
     RegleExercice.ecriture,
     (db) => _lignes(db, db.expenses),
-    (db, jour) => DepensesRepository(database: db, deviceId: 'poste-test').enregistrer(
+    (db, jour) => DepensesRepository(database: db, deviceId: 'poste-test').enregistrerUneLigne(
       date: jour,
       libelle: 'Carburant groupe',
-      categorie: 'Énergie',
+      compteChargeId: compte605,
       montant: 12000,
       compteTresorerieId: _uuid('t1'),
     ),
+    // Ticket DEP4 — les comptes de charge sont ceux du plan comptable reçu (classe 6) ; le plan n'est semé que pour les
+    // saisies de dépenses (les inventaires jugent « perte comptabilisée » sur sa présence).
+    preparer: (db, _) => semerPlanDeCharge(db),
   ),
   _Ecran(
     'Saisie des Dépenses — modification (nouvelle date)',
     RegleExercice.closSeulement,
     _enAttente,
-    (db, jour) => DepensesRepository(database: db, deviceId: 'poste-test').enregistrer(
+    (db, jour) => DepensesRepository(database: db, deviceId: 'poste-test').enregistrerUneLigne(
       date: jour,
       libelle: 'Facture SBEE',
-      categorie: 'Énergie',
+      compteChargeId: compte605,
       montant: 25000,
       compteTresorerieId: _uuid('t1'),
       idEnModification: _uuid('e1'),
     ),
-    preparer: (db, _) => _depenseExistante(db, DateTime(2025, 2, 10)),
+    preparer: (db, _) async {
+      await semerPlanDeCharge(db);
+      await _depenseExistante(db, DateTime(2025, 2, 10));
+    },
   ),
   _Ecran(
     'Saisie des Dépenses — archivage',
@@ -390,12 +396,13 @@ void main() {
   group('Saisie des Dépenses — l’exercice de la date D’ORIGINE compte aussi (`SaisieDepenseAction::modifier`)', () {
     test('une dépense d’un exercice clos ne se modifie pas, même vers un exercice ouvert', () async {
       await _exercicesDuDecor(db);
+      await semerPlanDeCharge(db);
       await _depenseExistante(db, _jourClos);
       await expectLater(
-        DepensesRepository(database: db, deviceId: 'poste-test').enregistrer(
+        DepensesRepository(database: db, deviceId: 'poste-test').enregistrerUneLigne(
           date: _jourOuvert,
           libelle: 'Facture SBEE corrigée',
-          categorie: 'Énergie',
+          compteChargeId: compte605,
           montant: 25000,
           compteTresorerieId: _uuid('t1'),
           idEnModification: _uuid('e1'),

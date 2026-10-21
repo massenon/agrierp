@@ -49,6 +49,8 @@ void main() {
     'veterinary_calendar_events': 'veterinary_calendar_events',
     'livestock_reproduction_events': 'livestock_reproduction_events',
     'customers': 'customers',
+    // Ticket DEV — devis (table mixte : saisie ET tirée), lus par l'onglet « Devis Prestations » de Ventes & Devis.
+    'quotes': 'quotes',
     'receivables': 'receivables',
     'customer_advances': 'customer_advances',
     'customer_reminders': 'customer_reminders',
@@ -85,11 +87,16 @@ void main() {
     'attestation_counts': null,
     'sales': 'sales',
     'sale_lines': 'sale_lines',
+    // Tickets AV1 / AV2 — retours et avoirs clients (table mixte : demandes saisies au poste ET avoirs tirés du serveur).
+    'credit_notes': 'credit_notes',
     'stock_movements': 'stock_movements',
     'treasury_accounts': 'treasury_accounts',
     'expense_categories': 'expense_categories',
     // Ticket U13 — dépenses (table mixte : saisies au poste ET tirées) et paie réglée (lecture seule).
     'expenses': 'expenses',
+    // Ticket DEP4 — lignes de dépense (avec leur dépense) et centres de coût (référentiel).
+    'expense_lines': 'expense_lines',
+    'cost_centers': 'cost_centers',
     'payslips': 'payslips',
   };
 

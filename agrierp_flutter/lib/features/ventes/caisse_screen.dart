@@ -895,9 +895,10 @@ class _DialogueBande extends StatelessWidget {
               style: TextStyle(fontSize: 11, color: AgriColors.outline),
             ),
             const SizedBox(height: AgriSpacing.sm),
-            for (final b in bandes)
+            for (final (i, b) in bandes.indexed)
               ListTile(
-                key: Key('bande-${b.code}'),
+                // Deux bandes de même code : la seconde reçoit un rang (« Duplicate keys found »).
+                key: Key('bande-${b.code}${i > 0 && bandes.take(i).any((x) => x.code == b.code) ? '-${bandes.take(i + 1).where((x) => x.code == b.code).length}' : ''}'),
                 dense: true,
                 title: Text(
                   b.code,

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../config/domaine_email.dart';
+import 'identifiant_ligne_depense.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -1387,6 +1388,47 @@ class SaleLines extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Retour d'une vente et son avoir (`credit_notes`) — écran « Retours et Avoirs » (tickets AV1 / AV2).
+///
+/// ⚠️⚠️ **LE POSTE ENREGISTRE LA DEMANDE, PAS SES EFFETS** (même motif que le retour fournisseur F0.74, [PurchaseReturns]) :
+/// « ce produit, de cette vente, cette quantité, ce motif, réintégré ou réformé, pour ce montant, ce jour ». Le serveur
+/// attribue le numéro `AV-AAAA-NNN`, réintègre le stock (décision « réintégré »), passe l'écriture inverse 701 / 443 / 411
+/// et la date de ce JOUR (`created_at` ci-dessous est le jour du FAIT). Il peut refuser : vente inconnue ou annulée,
+/// produit absent de la vente, quantité au-delà de « vendu − déjà retourné », montant au-delà de « ligne − déjà crédité »,
+/// exercice clos, plan comptable incomplet. Son motif est gardé tel quel (`sync_conflicts`).
+///
+/// ⚠️ **JAMAIS d'ajustement de stock ni d'écriture au poste pour un avoir** : le serveur le fait, en une transaction, par
+/// `AvoirClientService` (le point de passage de `RetoursAvoirs::saveReturn()` du web).
+///
+/// TABLE MIXTE : une ligne `pending` / `conflict` saisie ICI n'est jamais écrasée par le tirage ; les avoirs du web et des
+/// autres postes descendent (`device_id` = `serveur`, `synced`) et remplacent les lignes acquittées. « Marquer comme
+/// traité » est aussi une demande : le statut passe à `traite`, la ligne repart `pending`, le serveur la marque une fois.
+/// `credit_note_number` est NUL tant que le serveur ne l'a pas attribué (la demande n'a pas de numéro avant l'envoi).
+/// `accounting_entry_id` ne descend pas : le poste ne tient pas la comptabilité d'un avoir.
+@DataClassName('AvoirClient')
+class CreditNotes extends Table with SyncColumns {
+  TextColumn get saleId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+
+  /// `AV-AAAA-NNN`, attribué par le serveur seul. `null` : demande pas encore reçue.
+  TextColumn get creditNoteNumber => text().nullable()();
+
+  /// Quantité retournée (nulle en base web pour un avoir sans produit : jamais saisie ainsi).
+  RealColumn get qty => real().nullable()();
+  RealColumn get amount => real()();
+  TextColumn get reason => text().nullable()();
+
+  /// `reintegre` · `reforme`.
+  TextColumn get decision => text().nullable()();
+  TextColumn get inspectionNotes => text().nullable()();
+
+  /// `en_attente` · `traite`.
+  TextColumn get status => text().withDefault(const Constant('en_attente'))();
+
+  /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
+  DateTimeColumn get createdAt => dateTime()();
+}
+
 /// Soin vétérinaire administré, saisi au poste ou reçu du serveur.
 ///
 /// ⚠️ `withdrawalDays` N'EST PAS UNE COLONNE DU REGISTRE CÔTÉ SERVEUR : c'est
@@ -1608,6 +1650,85 @@ class Expenses extends Table with SyncColumns {
   /// compte de charge ni de compte de trésorerie (`SaisieDepenseAction`). Le poste refuse avant d'écrire, comme le web.
   /// `null` : pas d'écriture connue (saisie de ce poste pas encore reçue, ou plan comptable incomplet au serveur).
   TextColumn get accountingEntryId => text().nullable()();
+
+  /// Ticket DEP4 (PRD `docs/prd/depenses-multilignes.md`) — UNE DÉPENSE, PLUSIEURS LIGNES : `expenses` est l'EN-TÊTE.
+  /// `amount` est le TOTAL (somme des lignes, jamais saisi), `label` le résumé (« premier libellé (+N autres) »), `category`
+  /// n'est conservée que pour les serveurs non migrés (compte de la première ligne).
+  ///
+  /// Mode de paiement = type du compte de trésorerie (`caisse`, `banque`, `mobile_money`, `Expense::MODES_DE_PAIEMENT`).
+  TextColumn get paymentMode => text().nullable()();
+
+  /// Centre de coût facultatif (`cost_centers`, filières) ; fournisseur (`suppliers`) ou bénéficiaire (texte), facultatifs.
+  TextColumn get costCenterId => text().nullable()();
+  TextColumn get supplierId => text().nullable()();
+  TextColumn get beneficiary => text().nullable()();
+
+  /// Auteur de la saisie (`users.id`) : celui du compte connecté au poste, ou celui que le serveur a servi.
+  TextColumn get createdBy => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE (absent du schéma Laravel, déclaré dans `SchemaDepensesPosteTest`) — le REFUS de la pièce par le
+  /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
+  /// Effacé quand la saisie est acquittée ou corrigée. Le web n'a pas de file d'envoi : il dit le refus tout de suite.
+  TextColumn get ecritureRefus => text().nullable()();
+}
+
+/// Ticket DEP4 — une LIGNE de dépense : libellé, COMPTE DE CHARGE du plan (classe 6) et montant. Elle suit son en-tête :
+/// jamais envoyée ni tirée seule (clé `lines` du document de la dépense, `expense_lines` du tirage, au curseur de sa
+/// dépense), donc sans colonnes de synchronisation. Identifiant UUID créé sur le poste ; celui d'une dépense CONVERTIE
+/// est l'UUID v5 de la dépense (`ExpenseLine::idDeConversion` au serveur) : la même ligne des deux côtés.
+class ExpenseLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get expenseId => text().withLength(min: 36, max: 36)();
+  IntColumn get position => integer().withDefault(const Constant(0))();
+  TextColumn get label => text()();
+  TextColumn get chargeAccountId => text()();
+  RealColumn get amount => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket DEP4 — centres de coût (filières) servis par le serveur, en lecture seule : le « Centre de Coût » facultatif de
+/// l'en-tête d'une dépense. Référentiel : le serveur gagne.
+class CostCenters extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get label => text()();
+  TextColumn get type => text()();
+  TextColumn get parentSpeciesId => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket DEV — DEVIS (« Devis & Proforma » : `quotes` du serveur), TABLE MIXTE comme les dépenses : saisis, avancés dans
+/// leur cycle et archivés au poste (`pending`, envoyés), ET tirés du serveur (web, autres postes) au curseur, archivés
+/// compris. Un devis y est, comme au web, une description libre des prestations + un montant HT global + une TVA + une
+/// validité en jours — jamais des lignes de produits.
+///
+/// ⚠️ **LE NUMÉRO `DEV-AAAA-NNN` N'EST JAMAIS INVENTÉ PAR LE POSTE** (même principe que la référence des courriers) : le
+/// serveur l'attribue à la réception, `NULL` tant que le devis n'est pas acquitté puis tiré (« — » à l'écran). Deux postes
+/// hors ligne auraient sinon deux devis au même numéro.
+///
+/// ⚠️ `status` : `brouillon` → `envoye` → `accepte` | `refuse` (le poste ne pose jamais `facture`, que le serveur seul
+/// pourrait poser). Une saisie locale `pending` ou `conflict` n'est jamais écrasée par le tirage
+/// (`SyncEngine._absorberDevis`).
+class Quotes extends Table with SyncColumns {
+  /// `DEV-AAAA-NNN`, attribué par le serveur (voir plus haut).
+  TextColumn get quoteNumber => text().nullable()();
+  TextColumn get customerId => text()();
+  TextColumn get articlesDescription => text()();
+
+  /// Montant HT global (FCFA).
+  RealColumn get amount => real()();
+  RealColumn get tvaRate => real().withDefault(const Constant(0))();
+  IntColumn get validityDays => integer().withDefault(const Constant(15))();
+  DateTimeColumn get quoteDate => dateTime()();
+  TextColumn get note => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('brouillon'))();
+
+  /// Archivage logique (`false` : archivé, rien n'est supprimé).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
@@ -1711,12 +1832,16 @@ class SyncState extends Table {
     VeterinaryCalendarEvents,
     Sales,
     SaleLines,
+    CreditNotes,
     StockAdjustments,
     StockMovements,
     SyncConflicts,
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    ExpenseLines,
+    CostCenters,
+    Quotes,
     Payslips,
     AppSettings,
     SyncState,
@@ -1727,6 +1852,10 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
+  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4).** Le numéro
+  /// 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide, `from < 56` et
+  /// `schemaVersion = 56` l'enjambent sans trou.
+  ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
   /// présente sur un poste garde l'ancien schéma : la première requête sur la
@@ -1734,7 +1863,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 52;
+  int get schemaVersion => 56;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2255,8 +2384,97 @@ class AppDatabase extends _$AppDatabase {
       if (from < 52) {
         await _convertirAdressesEmail();
       }
+
+      // v53 — ticket DEV : « Devis & Proforma » au poste (table `quotes`, saisie ET tirée).
+      if (from < 53) {
+        if (!await _tableExiste(m, quotes)) {
+          await m.createTable(quotes);
+        }
+      }
+
+      // v54 — tickets AV1 / AV2 : retours et avoirs clients saisis au poste (`credit_notes`, table mixte : demandes
+      // `pending` ET avoirs tirés du serveur). Une base en v52, v53 ou v54 passe ici sans trou (`from < 53`, `from < 54`).
+      if (from < 54) {
+        if (!await _tableExiste(m, creditNotes)) {
+          await m.createTable(creditNotes);
+        }
+      }
+
+      // v56 — ticket DEP4 (une dépense, plusieurs lignes) : lignes, centres de coût, en-tête enrichi, et la
+      // transformation locale de chaque ancienne dépense en 1 en-tête + 1 ligne. Voir [_convertirDepensesEnLignes].
+      // ⚠️ Le numéro 55 est inutilisé (l'unicité des codes n'a pas pris de palier Drift) : 54 → 56.
+      if (from < 56) {
+        if (!await _tableExiste(m, expenseLines)) await m.createTable(expenseLines);
+        if (!await _tableExiste(m, costCenters)) await m.createTable(costCenters);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.paymentMode);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.costCenterId);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.supplierId);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.beneficiary);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.createdBy);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.ecritureRefus);
+        await _convertirDepensesEnLignes();
+      }
     },
   );
+
+  /// Compte « charges diverses » du plan (`ConversionDepensesEnLignes::COMPTE_DIVERS` au serveur).
+  static const compteChargesDiverses = '628';
+
+  /// Palier v56 (ticket DEP4) — CHAQUE ANCIENNE DÉPENSE DEVIENT 1 EN-TÊTE + 1 LIGNE, aucune n'est perdue : libellé de la
+  /// ligne = ancien libellé, montant = ancien montant (le total de l'en-tête reste cohérent), compte de charge déduit de
+  /// l'ancienne catégorie (« 605 - Énergie » → le compte de classe 6 de code 605 du plan LOCAL — la règle de la
+  /// comptabilisation d'origine), sinon 628 « Autres charges ». Identifiant de la ligne = UUID v5 de la dépense (le même
+  /// qu'au serveur). Le mode de paiement se déduit du type du compte de trésorerie.
+  ///
+  /// ⚠️ NE TOUCHE NI `sync_status` NI `updated_at` NI `accounting_entry_id` : une saisie `pending` le reste (elle partira
+  /// avec sa ligne), une `synced` le reste, une pièce déjà passée n'est jamais régénérée.
+  /// ⚠️ Un compte introuvable au plan local (poste sans plan : jamais tiré) ne crée AUCUNE ligne : la dépense reste
+  /// lisible (l'écran en fabrique une à l'affichage), part à plat si elle est en attente (le serveur la convertit), et
+  /// redescend avec ses vraies lignes à la resynchronisation unique (`depenses_resync_dep1`).
+  Future<void> _convertirDepensesEnLignes() async {
+    final depenses = await customSelect(
+      'SELECT id, label, category, amount, treasury_account_id, payment_mode FROM expenses '
+      'WHERE id NOT IN (SELECT expense_id FROM expense_lines)',
+    ).get();
+    if (depenses.isEmpty) return;
+
+    final comptes = {
+      for (final c in await customSelect(
+        'SELECT id, code FROM chart_of_accounts WHERE account_class = 6',
+      ).get())
+        c.read<String>('code'): c.read<String>('id'),
+    };
+    final types = {
+      for (final t in await customSelect('SELECT id, type FROM treasury_accounts').get())
+        t.read<String>('id'): t.read<String?>('type'),
+    };
+
+    for (final d in depenses) {
+      final id = d.read<String>('id');
+      final code = RegExp(r'^\s*(\d{2,4})').firstMatch(d.read<String>('category'))?.group(1);
+      final compte = (code == null ? null : comptes[code]) ?? comptes[compteChargesDiverses];
+      if (compte != null) {
+        await customInsert(
+          'INSERT INTO expense_lines (id, expense_id, position, label, charge_account_id, amount) '
+          'VALUES (?, ?, 0, ?, ?, ?)',
+          variables: [
+            Variable.withString(idLigneConvertie(id)),
+            Variable.withString(id),
+            Variable.withString(d.read<String>('label')),
+            Variable.withString(compte),
+            Variable.withReal(d.read<double>('amount')),
+          ],
+        );
+      }
+      final type = types[d.read<String>('treasury_account_id')];
+      if (type != null && d.read<String?>('payment_mode') == null) {
+        await customUpdate(
+          'UPDATE expenses SET payment_mode = ? WHERE id = ?',
+          variables: [Variable.withString(type), Variable.withString(id)],
+        );
+      }
+    }
+  }
 
   /// Palier v52 (ticket MAIL1) — remplace `@olouwachegoun.bj` par `@fermeolouwachegoun.com` (insensible à la casse, en
   /// SQL) dans TOUTES les colonnes locales susceptibles de porter une adresse : l'e-mail des clients, des fournisseurs,
@@ -2383,6 +2601,8 @@ class AppDatabase extends _$AppDatabase {
     'stock_adjustments',
     'veterinary_records',
     'expenses',
+    // Ticket DEV — devis saisis au poste.
+    'quotes',
     'livestock_reproduction_events',
     'purchases',
     'attendance_records',
@@ -2398,6 +2618,8 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Tickets AV1 / AV2 — retours et avoirs clients (demandes de retour, « marquer comme traité »).
+    'credit_notes',
     // Ticket BS1 — bandes saisies au poste.
     'livestock_lots',
     // Ticket BS3 — reproducteurs nominatifs saisis au poste.
@@ -2455,10 +2677,11 @@ class AppDatabase extends _$AppDatabase {
     'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
-    'advance_imputations', 'sales', 'sale_lines',
+    'advance_imputations', 'sales', 'sale_lines', 'credit_notes', // AV1
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
-    'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'expense_lines', 'expenses', 'stock_adjustments', 'stock_movements', // U9, DEP4
+    'quotes', // DEV
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',
@@ -2471,7 +2694,7 @@ class AppDatabase extends _$AppDatabase {
   static const tablesConservees = [
     'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
     'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
-    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories',
+    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers',
     'company_settings', 'modules_config', 'attestation_templates',
     'roles_applicatifs', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',

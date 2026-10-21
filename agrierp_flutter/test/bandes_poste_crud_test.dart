@@ -226,7 +226,9 @@ void main() {
         return {};
       }
 
-      expect(await erreurs(formulaire(code: 'lot-lap-1')), {'code': 'La valeur du champ code est déjà utilisée.'});
+      expect(await erreurs(formulaire(code: 'lot-lap-1')), {
+        'code': 'Le code « lot-lap-1 » est déjà utilisé par une autre bande (en cours ou archivée) : choisissez un autre code.',
+      });
       expect(await erreurs(formulaire(code: 'x' * 51)), {'code': 'Le champ code ne doit pas dépasser 50 caractères.'});
       expect(await erreurs(formulaire(quantite: '0')), {'quantity': 'Le champ quantité doit être au moins égal à 1.'});
       expect(await erreurs(formulaire(quantite: '-4')), {'quantity': 'Le champ quantité doit être au moins égal à 1.'});

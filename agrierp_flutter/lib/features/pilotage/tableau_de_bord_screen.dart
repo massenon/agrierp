@@ -423,20 +423,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       ),
     ];
 
-    // ⚠️ HAUTEUR FIXE, PAS UN RAPPORT LARGEUR / HAUTEUR. Une carte KPI garde la hauteur de son contenu quelle que
-    // soit sa largeur (la grille web n'impose aucun rapport) : avec `childAspectRatio`, la barre latérale passée à
-    // 288 px comme au web (ticket H1) rétrécissait les cartes en 1280 px et leur contenu débordait.
-    return GridView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: moyen ? 4 : 2,
-        mainAxisSpacing: AgriSpacing.md,
-        crossAxisSpacing: AgriSpacing.md,
-        mainAxisExtent: 160,
-      ),
-      children: cartes,
-    );
+    // Hauteur du contenu (min. `CarteKpi.hauteurMin`), jamais un rapport ni une hauteur fixe : la barre latérale
+    // passée à 288 px comme au web (ticket H1) rétrécissait les cartes en 1280 px et leur contenu débordait.
+    return GrilleKpi(colonnes: moyen ? 4 : 2, children: cartes);
   }
 
   Widget _carteKpi({

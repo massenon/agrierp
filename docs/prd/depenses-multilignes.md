@@ -1,0 +1,77 @@
+# PRD — Saisie des Dépenses : une dépense, plusieurs lignes
+**Statut :** livré le 21/10/2026 (décisions tranchées sur recommandation, questions client en § 9 à confirmer) · **Date :** 2026-10-21 · **Ticket(s) :** DEP1 à DEP5 (`docs/PLAN_FINALISATION.md`, sprint DEP)
+
+> Demande du client : « faut revoir le mode de fonctionnement actuel de la Saisie des Dépenses ». La fonctionnalité « plusieurs lignes par dépense » n'existe NI sur le web NI au poste NI dans le prototype : elle se construit **d'abord sur le web**, puis se porte au poste (Doctrine, article 0 et § 5). Le web reste le maître.
+
+## 1. Problème
+Une dépense est aujourd'hui plate : un libellé, une catégorie texte, un montant. Un passage au marché qui couvre de la provende (601), un produit vétérinaire (602) et le transport (614) se saisit en TROIS dépenses séparées, trois pièces comptables, sans lien entre elles. Exemple : ticket de 60 000 F = provende 45 000 + vermifuge 10 000 + transport 5 000, payé en espèces à la Caisse Principale.
+
+## 2. Existant
+- Web : `app/Livewire/Achats/SaisieDepenses.php` et `resources/views/livewire/achats/saisie-depenses.blade.php` (formulaire en page, pas de modale ; tableau Date / Libellé / Catégorie / Montant / Statut / Actions). Création, modification, archivage par `app/Actions/SaisieDepenseAction.php` (point de passage unique, partagé avec `SyncController::pushExpenses`). Écriture Débit 6 / Crédit 5 par `RecordExpenseAccountingEntryAction` ; le compte de charge est EXTRAIT du texte de la catégorie (« 605 - Énergie » → 605) ; liste fermée `Expense::CATEGORIES` (9 comptes).
+- Aujourd'hui l'écriture est tentée APRÈS l'insertion et son échec n'annule rien (toast « écriture non générée ») : la dépense reste sans pièce.
+- Une dépense comptabilisée refuse date, montant, compte de charge et compte de trésorerie (`MESSAGE_DEJA_COMPTABILISEE`, 14.33 / U14 / EX5) ; l'archivage contre-passe (écriture inverse du jour) et réintègre la trésorerie. **« RG-11 » n'est écrit nulle part dans le dépôt** (recherche exhaustive) : la règle d'immuabilité qui existe est celle-ci, plus `AccountingEntryService::verifierModifiable`.
+- Poste : `lib/features/achats/saisie_depenses_screen.dart`, `depenses_repository.dart`, tables Drift `Expenses` (schéma v52) et `ExpenseCategories` (liste reçue du serveur, lue par le seul écran de saisie). Le poste ne passe AUCUNE écriture : il enregistre le fait `pending`, le serveur rejoue (U14).
+- Lecteurs de `expenses` ailleurs : « Recettes et Dépenses » (web + poste), Tableau de bord (« Dépenses récentes »), KPI « Dépenses du mois », Corbeille, cohérence de synchronisation. **Aucun ne lit la catégorie** : tous lisent date / libellé / montant / `is_active` de l'en-tête. Les états financiers lisent le grand livre.
+- Centres de coût : `cost_centers` EXISTE (filières Cuniculture, Aviculture…, type `filiere`/`lot`), porté par `accounting_entry_lines.cost_center_id`, lu par la Comptabilité analytique. Il n'est obligatoire nulle part. Il n'est pas synchronisé au poste.
+- Mode de paiement : le projet n'a pas de colonne « mode » sur les dépenses ; la notion est le TYPE du compte de trésorerie (`caisse`, `banque`, `mobile_money`, écran Paramètres › Modes de Paiement).
+
+## 3. Utilisateurs et rôles
+Inchangés : `view-achats` pour voir, `manage-achats` pour créer / modifier / archiver (`authorize('manage-achats')` première ligne de chaque méthode ; `PERMISSION_PAR_TABLE['expenses']` à l'envoi). Écran aujourd'hui atteint par l'`admin` seul (cf. `agrierp_flutter/CLAUDE.md`, écrans hors des listes de rôles).
+
+## 4. Exigences fonctionnelles
+- **EF1** Une dépense a un en-tête (date, mode de paiement, compte de trésorerie, centre de coût facultatif, fournisseur facultatif, bénéficiaire facultatif, auteur, justificatif facultatif, pièce comptable liée) et 1 à N lignes (libellé, compte de charge, montant).
+- **EF2** Le total est la SOMME des lignes ; il n'est jamais saisi. Montants en francs entiers.
+- **EF3** La saisie se fait dans une modale « Nouvelle Dépense » / « Modifier la Dépense » à lignes dynamiques (ajout, retrait, total en direct) — identique web et poste.
+- **EF4** Validation avant d'écrire : au moins une ligne ; chaque ligne a un libellé (≤ 255), un compte de charge EXISTANT de classe 6 et un montant entier ≥ 1 ; date valide ; compte de trésorerie existant ; mode cohérent avec le type du compte de trésorerie.
+- **EF5** Création atomique : en-tête + lignes + écriture comptable + décaissement de trésorerie dans UNE transaction. Écriture refusée (exercice clos ou absent, déséquilibre, plan incomplet) ⇒ ni dépense, ni lignes, ni écriture, ni trésorerie touchée.
+- **EF6** Écriture : un débit par COMPTE de charge distinct (montants des lignes de ce compte additionnés), un crédit de trésorerie du total, datée de la dépense, centre de coût porté par chaque ligne d'écriture.
+- **EF7** Une dépense comptabilisée est IMMUABLE (rien ne se modifie) ; on la corrige par archivage = contre-passation (écriture inverse du jour de l'écriture d'origine, trésorerie réintégrée) puis nouvelle saisie. Une dépense SANS pièce (reprise de l'ancien) reste modifiable. Exercice clos : refus comme aujourd'hui (modification et archivage, motif R4).
+- **EF8** Lecture : tableau Date / Libellé (résumé) / Total / Mode / Pièce / Actions ; la ligne se déplie sur ses lignes ; le numéro de pièce est RELU de l'écriture liée (`accounting_entries.reference`), jamais recopié dans la dépense.
+- **EF9** Synchronisation : la dépense part avec ses lignes dans le même document ; le serveur la rejoue par `SaisieDepenseAction` (sa propre pièce) ; celles des autres postes descendent avec leurs lignes, sans pièce locale. Au poste, le refus du serveur s'affiche (`ecriture_refus`).
+- **EF10** Compatibilité : un poste non migré qui envoie une dépense plate est accepté et converti en 1 ligne ; le serveur est déployé AVANT les postes.
+- **EF11** Aucune dépense existante n'est perdue : chacune devient 1 en-tête + 1 ligne ; les pièces déjà passées ne sont jamais régénérées.
+
+## 5. Règles métier et calculs
+Jeu d'exemple (à la main, devient le test) : Date 15/06/2026, Caisse Principale (531), lignes : « Provende ponte » 601 45 000 ; « Vermifuge » 602 10 000 ; « Sac d'aliment bis » 601 5 000.
+- Total = 60 000. Écriture : D 601 = 50 000 ; D 602 = 10 000 ; C 531 = 60 000 (3 lignes). Trésorerie : 420 000 → 360 000.
+- Contre-passation (archivage, 20/06/2026) : D 531 = 60 000 ; C 601 = 50 000 ; C 602 = 10 000. Trésorerie revient à 420 000.
+- En-tête historique : `expenses.amount` reste la colonne du total (maintenue = somme des lignes par l'Action, jamais saisie) et `expenses.label` le résumé : le libellé de la ligne seule, sinon « premier libellé (+N autres) » (ex. « Provende ponte (+2 autres) »). C'est ce qui garde justes les rapports, le Tableau de bord et les KPI (ils lisent l'en-tête) sans les réécrire.
+- Migration d'une ancienne dépense : « Carburant » 25 000, catégorie « 614 - Transports » → ligne « Carburant » 25 000, compte 614. Catégorie sans compte de classe 6 correspondant (ou illisible) → compte 628 « Autres charges » (« charges diverses » du plan) et ligne de journal `Log::warning`. Identifiant de la ligne = UUID v5 de l'identifiant de la dépense (même valeur calculée au serveur et au poste : aucun doublon au tirage).
+- Effets stock et effectifs : aucun.
+- Montants entiers : imposés à la saisie et à l'envoi ; les anciens montants décimaux éventuels sont conservés tels quels par la migration (cohérence du total).
+
+## 6. Hors ligne et synchronisation
+- Tables : `expenses` (en-tête, mixte) et `expense_lines` (UUID, créées sur le poste ; jamais tirées/envoyées seules : elles voyagent DANS le document de l'en-tête, clé `lines`, donc jamais une ligne sans son en-tête, y compris dans le tirage paginé).
+- Règle de conflit inchangée (U14) : une dépense inconnue est créée, une connue identique est acquittée sans rien rejouer (idempotence UUID), une connue différente est modifiée si SANS pièce, refusée si comptabilisée, `is_active:false` archive (contre-passation).
+- Absorbeur STRICT du serveur : compte de charge existant de classe 6, montants entiers > 0, total envoyé = somme des lignes, identifiants de ligne uniques, exercice clos refusé, motifs en français.
+- Absorbeur strict du poste : une page dont une ligne est illisible est refusée entière (comme `_absorberDepenses`).
+- Référentiels descendants : `chart_of_accounts` aussi pour `view-achats` (comptes de charge de la modale), `cost_centers` (nouveau, base), `suppliers` (déjà), `treasury_accounts` (déjà). `expense_categories` est conservé tel quel POUR LES POSTES ANCIENS (ils le lisent) ; le poste migré ne l'affiche plus.
+- Poste : transaction Drift unique (en-tête + lignes) ; la pièce est passée par le serveur au rejeu ; refus ⇒ `conflict` + `ecriture_refus` affiché, la dépense reste modifiable (sans pièce) ou archivable.
+- Drift **schemaVersion 56** : palier `from < 56` (colonnes de l'en-tête, tables `expense_lines` et `cost_centers`, transformation locale 1 en-tête = 1 ligne). Les paliers 53 (devis), 54 (avoirs) et 55 (unicité) sont réservés ailleurs : **la fusion renumérotera si un palier manque** (le palier ne dépend d'aucun des trois).
+
+## 7. Interface
+Web d'abord (`x-modal name="modal-depense"`, `x-kpi-card`, `x-datatable`/`x-pagination` comme aujourd'hui), poste ensuite (`afficherModale`/`ModaleAgri`, `CarteKpi`/`GrilleKpi`, `ChampDateFormulaire`, `PaginationAgri`).
+- Page : titre et sous-titre inchangés ; 3 KPI inchangés (Dépenses du mois, Charges Fixes et Variables « en attente ») ; bouton « Nouvelle Dépense » ; recherche (sur le libellé résumé ET les libellés des lignes) ; filtre « Pièce » (Toutes les pièces / Comptabilisée / Sans pièce).
+- Modale : « Nouvelle Dépense » / « Modifier la Dépense ». En-tête : « Date de la Transaction * », « Mode de Paiement * » (Espèces / Banque / Mobile Money), « Compte de Trésorerie Débité * » (filtré par le mode), « Centre de Coût », « Fournisseur », « Bénéficiaire », « Reçu / Facture (Photo) ». Lignes : colonnes « Libellé * », « Compte de Charge * » (« 601 - Achats de marchandises »), « Montant (FCFA) * », bouton retirer ; « + Ajouter une ligne » ; « Total : N FCFA » en direct ; « Enregistrer la Dépense ».
+- Tableau : Date · Libellé · Total · Mode · Pièce (« N° … » / « Comptabilisée » / « Sans pièce » ; au poste aussi « En attente d'envoi » et le refus) · Actions (déplier, modifier si sans pièce, archiver). Le détail déplié liste libellé · compte · montant de chaque ligne, centre de coût, fournisseur / bénéficiaire, auteur.
+- Messages : ceux d'aujourd'hui (« Dépense enregistrée avec succès. », « Dépense archivée — trésorerie réintégrée et charge annulée. », `MESSAGE_DEJA_COMPTABILISEE` mis à jour) ; erreurs de ligne sous la ligne.
+- Garde-fou de parité Blade ↔ Dart : libellés, colonnes, ordre des champs.
+
+## 8. Hors périmètre
+Charges Fixes / Variables (inchangées : en attente), pièces jointes par ligne, import de relevés, génération rétroactive de pièces pour les dépenses sans pièce, TVA déductible, répartition d'une ligne sur plusieurs centres de coût.
+
+## 9. Questions ouvertes pour le client
+Décisions déjà prises sur recommandation ; à confirmer.
+1. **DEP-Q1 Centre de coût** : le projet en a (filières) mais ne le rend obligatoire nulle part. Retenu : FACULTATIF, un seul par dépense, reporté sur chaque ligne d'écriture (Comptabilité analytique). Obligatoire ?
+2. **DEP-Q2 Mode de paiement** : retenu : le mode est le TYPE du compte de trésorerie (Espèces/Banque/Mobile Money) ; choisir le mode filtre les comptes. Ajouter d'autres modes (chèque, virement) ?
+3. **DEP-Q3 Fournisseur / bénéficiaire** : retenu : deux champs facultatifs (fournisseur du référentiel, ou bénéficiaire en texte libre pour un tiers non fournisseur). Un seul champ suffit-il ? Une dépense à un fournisseur doit-elle créer une dette fournisseur (aujourd'hui non : payée sur le champ) ?
+4. **DEP-Q4 Dépense comptabilisée** : retenu : STRICTEMENT immuable (le libellé seul n'est plus modifiable, contrairement à aujourd'hui). Autoriser la correction d'un libellé sans effet comptable ?
+5. **DEP-Q5 Dépense sans pièce reprise de l'ancien** : reste modifiable et ne reçoit JAMAIS de pièce automatique (on ne génère jamais rétroactivement). Le comptable les régularise-t-il au Journal ?
+6. **DEP-Q6 Comptes de charge proposés** : retenu : tous les comptes de classe 6 actifs du plan (au lieu des 9 de l'ancienne liste). Restreindre ? Les doublons connus (614/624 « Transports », 621 « Salaires » vs 661) restent non tranchés (voir 14.33).
+7. **DEP-Q7 Pièce au poste** : le numéro n'est relu que si le poste a le journal (comptable, admin) ; sinon « Comptabilisée » sans numéro. Faire descendre le numéro à tous ?
+8. **DEP-Q8 Catégorie texte** : disparaît de la saisie ; la colonne `expenses.category` est conservée (compte de la première ligne) seulement pour les postes non migrés. À supprimer quand tous les postes le sont.
+
+## 10. Critères d'acceptation
+Laravel (`tests/Feature/DepensesMultilignesTest.php`, `DepensesMultilignesLivewireTest.php`, `SyncDepensesMultilignesTest.php`, `MigrationDepensesEnLignesTest.php`, `SchemaDepensesPosteTest.php`) : création multi-lignes équilibrée (60 000 = 50 000 + 10 000 / 60 000) ; pièce refusée ⇒ rien d'écrit ; exercice clos ; chaque règle de validation ; total = somme ; contre-passation ; ancien payload plat → 1 ligne ; idempotence ; migration d'anciennes dépenses → 1 ligne, pièce intacte ; schéma Laravel ↔ Drift.
+Flutter (`test/depenses_multilignes_test.dart`, `depenses_multilignes_ecran_test.dart`, `depenses_multilignes_parite_test.dart`, migration v56 dans `migration_toutes_versions_test.dart`) : transaction unique, validations, file d'envoi, refus de pièce affiché, modale à lignes dynamiques, parité Blade ↔ Dart.
+Épreuves de mutation : retirer l'écriture dans la transaction ; retirer le regroupement par compte ; retirer le contrôle total = somme ; retirer l'immuabilité ; retirer la conversion de l'ancien payload.

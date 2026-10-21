@@ -11,6 +11,7 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'soins_repository.dart';
 import 'soins_vaccins_repository.dart';
+import 'suffixe_doublon.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// Soins et vaccins — maître : `resources/views/livewire/elevage/soins-vaccins-hub.blade.php` et
@@ -257,14 +258,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
   /// « (Replier / Déplier) » et la grille est repliée par défaut (`kpi-mobile-collapsed`).
   Widget _accordeonKpi(String titre, List<Widget> cartes) {
     final quatre = AgriBreakpoints.tresLarge(context);
-    final grille = GridView.count(
-      crossAxisCount: quatre ? 4 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: AgriBreakpoints.large(context) ? 2.6 : 1.7,
-      children: cartes,
+    final grille = GrilleKpi(colonnes: quatre ? 4 : 2, children: cartes,
     );
     if (AgriBreakpoints.moyen(context)) return grille;
 
@@ -940,7 +934,13 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                       ),
                     ),
                     for (var i = 0; i < d.calendrier.length; i++)
-                      _ligneGantt(d.calendrier[i], d.fenetre, i.isOdd),
+                      _ligneGantt(
+                        d.calendrier[i],
+                        d.fenetre,
+                        i.isOdd,
+                        // Ticket UNI : deux bandes de même code (doublon déjà présent) ne partagent pas la même clé.
+                        suffixeDoublon(d.calendrier.map((l) => l.codeBande), i),
+                      ),
                   ],
                 ),
               ),
@@ -957,9 +957,10 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
     LigneCalendrier ligne,
     List<DateTime> fenetre,
     bool zebre,
+    String suffixeCle,
   ) {
     return Container(
-      key: Key('gantt-${ligne.codeBande}'),
+      key: Key('gantt-${ligne.codeBande}$suffixeCle'),
       color: zebre ? AgriColors.surfaceZebra : AgriColors.surfaceCard,
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(

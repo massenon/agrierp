@@ -58,11 +58,12 @@ class ErreursExerciceSans500Test extends TestCase
     {
         $this->assertErreurSousLeChamp(
             Livewire::test(SaisieDepenses::class)
+                ->call('nouvelleDepense')
                 ->set('expenseDate', '2027-01-05')
-                ->set('label', 'Facture SBEE')
-                ->set('category', '605 - Énergie')
-                ->set('amount', 25_000)
                 ->set('treasuryAccountId', $this->caisse->id)
+                ->set('lines.0.label', 'Facture SBEE')
+                ->set('lines.0.chargeAccountId', \App\Models\ChartOfAccount::where('code', '605')->value('id') ?? \App\Models\ChartOfAccount::create(['code' => '605', 'label' => 'Énergie', 'class' => 6, 'is_active' => true])->id)
+                ->set('lines.0.amount', '25000')
                 ->call('submitExpense'),
             'expenseDate',
             self::AUCUN_05_01,

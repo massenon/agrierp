@@ -202,7 +202,7 @@ void main() {
     testWidgets("le bouton agrandir appelle le natif et change d'icône : « Agrandir » puis « Restaurer »", (tester) async {
       await afficher(tester);
       IconData icone() => tester.widget<Icon>(find.descendant(of: find.byKey(const Key('fenetre-agrandir')), matching: find.byType(Icon))).icon!;
-      String info() => tester.widget<IconButton>(find.byKey(const Key('fenetre-agrandir'))).tooltip!;
+      String info() => tester.widget<Tooltip>(find.descendant(of: find.byKey(const Key('fenetre-agrandir')), matching: find.byType(Tooltip))).message!;
 
       expect(info(), 'Agrandir');
       expect(icone(), SymbolesAgri.crop_square);
@@ -225,7 +225,7 @@ void main() {
       await afficher(tester);
 
       expect(natif.appels, contains('etat'));
-      expect(tester.widget<IconButton>(find.byKey(const Key('fenetre-agrandir'))).tooltip, 'Restaurer');
+      expect(tester.widget<Tooltip>(find.descendant(of: find.byKey(const Key('fenetre-agrandir')), matching: find.byType(Tooltip))).message, 'Restaurer');
     });
 
     testWidgets("glisser la barre sur sa zone libre démarre le déplacement natif", (tester) async {

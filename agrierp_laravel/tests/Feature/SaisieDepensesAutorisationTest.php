@@ -70,13 +70,20 @@ class SaisieDepensesAutorisationTest extends TestCase
      */
     public function test_a_read_only_user_cannot_spend(): void
     {
-        Livewire::actingAs($this->utilisateur('lecteur'))
+        $lecteur = $this->utilisateur('lecteur');
+
+        Livewire::actingAs($lecteur)
+            ->test(\App\Livewire\Achats\SaisieDepenses::class)
+            ->call('nouvelleDepense')
+            ->assertForbidden();
+
+        // Et même en forçant l'état de la modale : la soumission est refusée.
+        Livewire::actingAs($lecteur)
             ->test(\App\Livewire\Achats\SaisieDepenses::class)
             ->set('expenseDate', now()->toDateString())
-            ->set('label', 'Sac de provende')
-            ->set('category', '601 - Aliments')
-            ->set('amount', 25000)
             ->set('treasuryAccountId', $this->caisse->id)
+            ->set('lines.0.label', 'Sac de provende')
+            ->set('lines.0.amount', '25000')
             ->call('submitExpense')
             ->assertForbidden();
 

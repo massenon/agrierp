@@ -22,6 +22,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'depenses_aide.dart';
+
 /// Ticket EX6 (EF7) — LE REFUS D'EXERCICE À L'ÉCRAN, À LA PLACE QUE LUI DONNE LA VUE BLADE, et les calendriers bornés.
 ///
 /// Les dépôts refusent (voir `refus_exercice_clos_test.dart`) ; ici, chaque écran montre le motif R4 là où le web le
@@ -78,7 +80,7 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     await db
         .into(db.treasuryAccounts)
-        .insert(TreasuryAccountsCompanion.insert(id: _uuid('t1'), label: 'Caisse Physique', balance: const Value(500000)));
+        .insert(TreasuryAccountsCompanion.insert(id: _uuid('t1'), label: 'Caisse Physique', type: const Value('caisse'), balance: const Value(500000)));
     await db.into(db.suppliers).insert(SuppliersCompanion.insert(id: _uuid('f1'), name: 'Provenderie du Plateau'));
     await db
         .into(db.products)
@@ -134,7 +136,7 @@ void main() {
 
   group('Saisie des Dépenses', () {
     setUp(() async {
-      await db.into(db.expenseCategories).insert(ExpenseCategoriesCompanion.insert(label: '601 - Aliments'));
+      await semerPlanDeCharge(db);
     });
 
     Future<void> afficher(WidgetTester tester) async {
@@ -149,9 +151,12 @@ void main() {
       await decorClos();
       await afficher(tester);
 
-      await tester.enterText(find.byKey(const Key('champ-libelle')), 'Sac de provende ponte');
-      await tester.enterText(find.byKey(const Key('champ-montant')), '25000');
-      await choisir(tester, 'liste-categorie', '601 - Aliments');
+      await tester.tap(find.byKey(const Key('bouton-nouvelle-depense')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('champ-ligne.0.libelle')), 'Sac de provende ponte');
+      await tester.enterText(find.byKey(const Key('champ-ligne.0.montant')), '25000');
+      await choisir(tester, 'liste-ligne-0-compte', '601 - Achats de marchandises');
+      await choisir(tester, 'liste-mode', 'Espèces');
       await choisir(tester, 'liste-compte', 'Caisse Physique (500 000 FCFA)');
       await tester.tap(find.byKey(const Key('bouton-enregistrer-depense')));
       await tester.pumpAndSettle();
@@ -195,6 +200,8 @@ void main() {
     testWidgets('calendrier « Date de la Transaction » borné au plus ancien exercice ouvert', (tester) async {
       await decorOuvert();
       await afficher(tester);
+      await tester.tap(find.byKey(const Key('bouton-nouvelle-depense')));
+      await tester.pumpAndSettle();
       expect(await premierJourDuCalendrier(tester, 'champ-date'), DateTime(2025));
     });
   });

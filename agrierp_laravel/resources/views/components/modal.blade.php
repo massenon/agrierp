@@ -1,10 +1,10 @@
 @props([
     'name',
-    'maxWidth' => 'sm', // sm | md | lg
+    'maxWidth' => 'sm', // sm | md | lg | xl
 ])
 @php
     // Classes statiques (jamais de construction dynamique — voir kpi-card.blade.php)
-    $widths = ['sm' => 'max-w-sm', 'md' => 'max-w-md', 'lg' => 'max-w-lg'];
+    $widths = ['sm' => 'max-w-sm', 'md' => 'max-w-md', 'lg' => 'max-w-lg', 'xl' => 'max-w-3xl'];
     $widthClass = $widths[$maxWidth] ?? $widths['sm'];
 @endphp
 <div

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReinitialisationDonneesController;
 use App\Http\Controllers\Api\SupervisionSynchronisationController;
 use App\Http\Controllers\Api\SyncController;
+use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -43,6 +44,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         ->middleware('throttle:30,1');
 
     // Ticket 15.13 : attestations depuis le poste — génération (PDF) et modèles.
+    // Ticket AV2 — ticket PDF d'une vente (« Télécharger PDF » du détail, Historique des Ventes).
+    Route::get('/ventes/{id}/pdf', [VenteController::class, 'pdf'])
+        ->middleware('throttle:30,1');
+
     Route::post('/attestations', [AttestationController::class, 'generer'])
         ->middleware('throttle:30,1');
     Route::put('/attestation-templates/{type}', [AttestationController::class, 'enregistrerModele']);
@@ -69,6 +74,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     // `throttle:N,1` d'un compte partagent la même clé, et l'interrogation régulière mangerait le crédit du tirage.
     Route::get('/sync/demande', [SupervisionSynchronisationController::class, 'demande'])
         ->middleware('throttle:6,1,sync-demande');
+    // Ticket SW-1 — le poste acquitte une resynchronisation demandée par le web (drapeau « Renvoyer vers ce poste »).
+    Route::post('/sync/resynchronisation/acquittement', [SupervisionSynchronisationController::class, 'acquitterResynchronisation'])
+        ->middleware('throttle:6,1,sync-resync-acquittement');
     Route::get('/sync/coherence', [SupervisionSynchronisationController::class, 'coherence'])
         ->middleware('throttle:10,1,sync-coherence');
 

@@ -82,8 +82,23 @@ class DemoAdministrationSeeder extends Seeder
         $compte = 0;
 
         for ($jour = $this->ctx->debut; $jour->lte($this->ctx->fin); $jour = $jour->addDays($this->ctx->entre(3, 7))) {
-            [$libelle, $categorie, $min, $max] = $this->ctx->parmi($modeles);
-            $montant = $this->ctx->entre($min, $max);
+            // Ticket DEP1 — UNE DÉPENSE, PLUSIEURS LIGNES : une dépense sur trois porte un second achat (autre compte de
+            // charge). Le total est la somme des lignes ; le libellé de l'en-tête leur résumé.
+            $achats = [$this->ctx->parmi($modeles)];
+            if ($this->ctx->entre(0, 2) === 0) {
+                $achats[] = $this->ctx->parmi($modeles);
+            }
+            $lignes = [];
+            foreach ($achats as [$libelle, $categorie, $min, $max]) {
+                $compteDeCharge = \App\Services\ConversionDepensesEnLignes::compteDeLaCategorie($categorie);
+                if ($compteDeCharge !== null) {
+                    $lignes[] = ['label' => $libelle, 'account' => $compteDeCharge, 'category' => $categorie, 'amount' => $this->ctx->entre($min, $max)];
+                }
+            }
+            if ($lignes === []) {
+                continue;
+            }
+            $montant = array_sum(array_column($lignes, 'amount'));
 
             // Compte payeur choisi selon le solde disponible : l'écran laisse ce
             // choix à l'opérateur, et une caisse systématiquement ponctionnée
@@ -92,14 +107,21 @@ class DemoAdministrationSeeder extends Seeder
 
             $depense = Expense::create([
                 'expense_date' => $jour->format('Y-m-d'),
-                'label' => $libelle,
-                'category' => $categorie,
+                'label' => Expense::resume(array_column($lignes, 'label')),
+                'category' => $lignes[0]['category'],
                 'amount' => $montant,
                 'treasury_account_id' => $payeur->id,
+                'payment_mode' => $payeur->type,
                 'status' => 'payee',
                 'is_active' => true,
                 'created_at' => $jour, 'updated_at' => $jour,
             ]);
+            foreach ($lignes as $rang => $ligne) {
+                \App\Models\ExpenseLine::create([
+                    'expense_id' => $depense->id, 'position' => $rang, 'label' => $ligne['label'],
+                    'charge_account_id' => $ligne['account']->id, 'amount' => $ligne['amount'],
+                ]);
+            }
 
             // Même séquence que `SaisieDepenses` : écriture comptable PUIS
             // décrément de trésorerie. Ticket 14.33 — avant lui, les dépenses

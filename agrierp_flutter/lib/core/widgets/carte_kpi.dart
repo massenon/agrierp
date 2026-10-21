@@ -74,9 +74,16 @@ class CarteKpi extends StatelessWidget {
   /// Épaisseur de `border-l-4`.
   static const double lisere = 4;
 
+  /// ⚠️ **LA TAILLE UNIQUE DES CARTES KPI** (demande client : « les tailles des cartes KPI doivent être uniformes
+  /// partout »). Hauteur minimale commune à TOUTES les cartes, avec ou sans légende, d'une ligne ou de deux : le
+  /// contenu s'aligne en haut, la carte ne rétrécit jamais en dessous, et ne grandit que si le texte l'exige.
+  /// Le web porte la même valeur dans la classe `kpi-card` (`min-height: 7rem`, soit 112 px).
+  static const double hauteurMin = 112;
+
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(minHeight: hauteurMin),
       decoration: BoxDecoration(
         color: AgriColors.surfaceCard,
         border: Border.all(color: AgriColors.outlineVariant),
@@ -197,6 +204,49 @@ class CarteKpi extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Grille de cartes KPI — l'équivalent de `grid grid-cols-N gap-md` du web : chaque rangée prend la hauteur de sa
+/// plus haute carte (`IntrinsicHeight`), jamais un rapport largeur / hauteur fixe.
+///
+/// ⚠️ **PAS DE `GridView` À `childAspectRatio` NI À `mainAxisExtent` POUR DES CARTES KPI.** Le rapport fixe donnait
+/// des cartes minuscules (contenu coupé) sur un écran étroit et démesurées (~300 px, presque vides) sur un large ;
+/// une hauteur fixe débordait avec la police agrandie. Un garde-fou (`test/cartes_kpi_uniformes_test.dart`) interdit
+/// leur retour.
+class GrilleKpi extends StatelessWidget {
+  const GrilleKpi({super.key, required this.colonnes, required this.children});
+
+  /// Nombre de cartes par rangée (au moins 1).
+  final int colonnes;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = colonnes < 1 ? 1 : colonnes;
+
+    return Column(
+      children: [
+        for (var debut = 0; debut < children.length; debut += n) ...[
+          if (debut > 0) const SizedBox(height: AgriSpacing.md),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < n; i++) ...[
+                  if (i > 0) const SizedBox(width: AgriSpacing.md),
+                  Expanded(
+                    child: debut + i < children.length
+                        ? children[debut + i]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -21,6 +21,13 @@
         </div>
     </div>
 
+    @if($this->doublonsDeCodes > 0)
+    <div data-doublons-codes class="flex items-start gap-sm bg-accent-yellow/20 border border-accent-yellow text-brand-forest rounded-lg px-md py-sm mb-md text-xs">
+        <span class="material-symbols-outlined text-[18px]">warning</span>
+        <p><span class="font-bold">{{ $this->doublonsDeCodes }} {{ $this->doublonsDeCodes === 1 ? 'doublon de code détecté' : 'doublons de code détectés' }} — à renommer.</span> Des bandes portent le même code : cliquez sur « Modifier » pour corriger le code de l'une d'elles. Rien n'est supprimé ni modifié automatiquement.</p>
+    </div>
+    @endif
+
     <x-kpi-accordion title="Indicateurs de performance">
         <x-kpi-card label="Bandes Actives" icon="layers" color="emerald" :value="$this->kpis['bandes_actives']" caption="Lots au statut « Actif », toutes espèces" />
         <x-kpi-card label="En Reproduction" icon="favorite" color="blue" :value="$this->kpis['en_reproduction']" caption="Bandes au stade Reproduction" />
@@ -194,8 +201,14 @@
         <form wire:submit="updateLot" class="space-y-md">
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Code Unique de la Bande</label>
+                @if($codeEnDoublon)
+                <input wire:model="code" type="text" maxlength="50" data-code-en-doublon class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('code') ? 'is-invalid' : 'border-outline-variant' }}">
+                <p class="text-[10px] text-outline mt-xs">Ce code est partagé avec une autre bande : corrigez-le (il redeviendra non modifiable ensuite).</p>
+                @error('code') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                @else
                 <input value="{{ $code }}" type="text" disabled class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline">
                 <p class="text-[10px] text-outline mt-xs">L'identifiant technique unique n'est jamais modifiable après création.</p>
+                @endif
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Stade *</label>

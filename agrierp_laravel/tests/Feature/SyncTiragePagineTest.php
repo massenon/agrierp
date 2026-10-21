@@ -53,7 +53,7 @@ class SyncTiragePagineTest extends TestCase
         'company_settings', 'modules_config', 'roles', 'users', 'audit_logs', 'notifications', 'sales', 'sale_lines',
         'treasury_accounts',
         // Ticket U13 — les dépenses : le Tableau de bord (quatre rôles) les liste au web.
-        'expenses',
+        'expenses', 'expense_lines',
     ];
 
     protected function setUp(): void
@@ -208,14 +208,15 @@ class SyncTiragePagineTest extends TestCase
     public function test_tables_servies_a_chacun_des_quatre_roles(): void
     {
         $attendu = [
+            // Tickets DEV et AV1 — `quotes` (Devis Prestations) et `credit_notes` (Retours et Avoirs) : `view-ventes`.
             'caissier' => [...self::BASE, 'feed_ration_standards', 'veterinary_withdrawal_periods', 'customer_advances',
-                'customer_reminders'],
+                'customer_reminders', 'quotes', 'credit_notes'],
             'animalier' => [...self::BASE, 'livestock_transfers', 'feed_ration_standards', 'growth_standards',
                 'veterinary_withdrawal_periods', 'prophylaxis_schedule_standards', 'veterinary_records', 'infirmary_records',
                 'veterinary_calendar_events', 'feed_types', 'elevage_numbering', 'lot_revenues', 'animals',
                 'livestock_species', 'stock_movements'],
             'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'accounting_entries', 'accounting_entry_lines',
-                'accounting_entry_ids', 'stock_movements', 'payslips'],
+                'accounting_entry_ids', 'stock_movements', 'payslips', 'cost_centers'],
             'admin' => array_keys(SyncController::PERMISSIONS_DE_TIRAGE),
         ];
 

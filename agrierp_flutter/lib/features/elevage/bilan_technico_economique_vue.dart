@@ -249,14 +249,7 @@ class _BilanTechnicoEconomiqueVueState
     final marge = b.margeNette;
     final parSujet = b.coutParSujet;
 
-    return GridView.count(
-      crossAxisCount: large ? 4 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AgriSpacing.md,
-      crossAxisSpacing: AgriSpacing.md,
-      childAspectRatio: large ? 1.7 : 1.4,
-      children: [
+    return GrilleKpi(colonnes: large ? 4 : 2, children: [
         CarteKpi(
           libelle: 'Coût Total Connu du Lot',
           valeur: _montant(b.coutTotalConnu),

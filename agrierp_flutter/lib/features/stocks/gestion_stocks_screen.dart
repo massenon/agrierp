@@ -157,7 +157,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                     children: [
                       _entete(large),
                       const SizedBox(height: AgriSpacing.lg),
-                      _kpis(d, large),
+                      _kpis(d),
                       const SizedBox(height: AgriSpacing.lg),
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.md),
@@ -253,15 +253,17 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  Widget _kpis(DonneesStocks d, bool large) => GridView.count(
+  Widget _kpis(DonneesStocks d) {
     // Ticket U11 — `grid-cols-2 md:grid-cols-4` du Blade : quatre colonnes dès 768 px (le poste attendait 1 024 px).
-    crossAxisCount: AgriBreakpoints.moyen(context) ? 4 : 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.6 : 1.6,
-    children: [
+    final colonnes = AgriBreakpoints.moyen(context) ? 4 : 2;
+    final cartes = _cartesKpi(d);
+
+    // La carte prend la hauteur de son contenu (min. `CarteKpi.hauteurMin`), comme au web (grille CSS : la rangée suit
+    // sa plus haute carte) : `GrilleKpi`, jamais un rapport fixe (débordement de « Rotation du Stock », 8 px).
+    return GrilleKpi(colonnes: colonnes, children: cartes);
+  }
+
+  List<Widget> _cartesKpi(DonneesStocks d) => [
       // Ticket U8 — `number_format($kpis['valorisation'], 0, ',', ' ').' FCFA'`
       // et la légende du Blade. Le bouton « Recalculer PMP » de la maquette
       // n'est pas repris : le web ne l'a pas (le PMP se lit à chaque affichage).
@@ -306,8 +308,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
         couleurIcone: AgriColors.brandForest,
         legende: 'Ajustements du mois',
       ),
-    ],
-  );
+  ];
 
   /// `x-kpi-card` du web : libellé, icône de la variante (couleur de la variante, `text-brand-forest` pour
   /// `maize`), valeur, légende ; `:pending` → tiret estompé et sablier (ticket U10).

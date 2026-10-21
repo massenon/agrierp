@@ -9,19 +9,19 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-md">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Production Totale (Œufs)</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->kpis['production_totale'], 0, ',', ' ') }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Taux de Ponte Moyen</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ $this->kpis['taux_ponte_moyen'] !== null ? $this->kpis['taux_ponte_moyen'].' %' : '—' }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Taux de Mortalité Hebdo</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ $this->kpis['taux_mortalite_hebdo'] !== null ? $this->kpis['taux_mortalite_hebdo'].' %' : '—' }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-accent-yellow shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">CA Ventes du Lot</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->kpis['ca_ventes'], 0, ',', ' ') }} <span class="text-xs font-normal text-outline">FCFA</span></span>
         </div>

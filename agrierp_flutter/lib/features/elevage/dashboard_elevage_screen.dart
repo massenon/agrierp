@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import 'suffixe_doublon.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// Dashboard Élevage — le maître est `Livewire\Elevage\DashboardElevage` et sa vue
@@ -248,14 +249,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteKpi(
               libelle: 'Effectif Total Vivant',
               valeur: DashboardElevageRepository.milliers(
@@ -448,9 +442,9 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               ),
             )
           else
-            for (final l in avecGmq)
+            for (final (i, l) in avecGmq.indexed)
               Container(
-                key: Key('resume-gmq-${l.code}'),
+                key: Key('resume-gmq-${l.code}${_suffixeDoublon(avecGmq.map((b) => b.code), i)}'),
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
                   border: Border(
@@ -696,14 +690,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         const SizedBox(height: AgriSpacing.md),
         // AJOUTS du poste conservés (décision client du 19/10/2026) : cartes par espèce et courbe
         // de la bande suivie, sur le MÊME GMQ cumulé que le tableau du Blade.
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteGmq(
               'GMQ Moyen Lapins',
               d.gmqParEspece['cuniculture'],
@@ -906,7 +893,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               _enteteTableau(c, aGauche: 2),
               if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
               for (final (i, l) in lignes.indexed)
-                _ligneTableau(Key('ligne-gmq-${l.code}'), i, [
+                _ligneTableau(Key('ligne-gmq-${l.code}${_suffixeDoublon(lignes.map((b) => b.code), i)}'), i, [
                   _cellule(
                     l.code,
                     c[0].$2,
@@ -959,14 +946,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         ),
         const SizedBox(height: AgriSpacing.md),
         // Les trois cartes du Blade : soins du mois des bandes actives.
-        GridView.count(
-          crossAxisCount: large ? 3 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.6 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 3 : 2, children: [
             _carteKpi(
               libelle: 'Traitements Administrés (mois)',
               valeur: '${d.traitementsDuMois}',
@@ -1002,7 +982,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
             children: [
               _enteteTableau(c),
               for (final (i, l) in d.sanitaire.indexed)
-                _ligneTableau(Key('ligne-sanitaire-${l.code}'), i, [
+                _ligneTableau(Key('ligne-sanitaire-${l.code}${_suffixeDoublon(d.sanitaire.map((b) => b.code), i)}'), i, [
                   _cellule(
                     l.libelleEspece,
                     c[0].$2,
@@ -1207,7 +1187,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           _enteteTableau(c),
           if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
           for (final (i, l) in lignes.indexed)
-            _ligneTableau(Key('ligne-prevision-${l.code}'), i, [
+            _ligneTableau(Key('ligne-prevision-${l.code}${_suffixeDoublon(lignes.map((b) => b.code), i)}'), i, [
               _cellule(
                 l.code,
                 c[0].$2,
@@ -1254,14 +1234,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   ///
   /// ⚠️ Sans bande projetable, la maquette les montre à « — » : une carte que le
   /// poste ne peut pas calculer est un tiret expliqué, jamais omise ni à zéro.
-  Widget _cartesPrevision(Prevision? p, bool large) => GridView.count(
-    crossAxisCount: large ? 3 : 1,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.4 : 3.2,
-    children: [
+  Widget _cartesPrevision(Prevision? p, bool large) => GrilleKpi(colonnes: large ? 3 : 1, children: [
       _carteKpi(
         libelle: 'Poids Projeté',
         valeur: p == null ? '—' : '${_milliers(p.projeter(_horizon))} g',
@@ -1584,3 +1557,5 @@ class _CourbesGmqPainter extends CustomPainter {
   bool shouldRepaint(covariant _CourbesGmqPainter ancien) =>
       ancien.series != series;
 }
+
+String _suffixeDoublon(Iterable<String> codes, int index) => suffixeDoublon(codes, index);
