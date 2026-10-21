@@ -931,7 +931,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.tableauDeBord => TableauDeBordScreen(
           depot: widget.tableauDeBord,
           nomUtilisateur:
-              widget.auth.utilisateur?.nom ?? 'Manager Olouwachegoun',
+              widget.auth.utilisateur?.nom ?? 'M. Olouchègoun',
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),
           onElevage: () => setState(() => _ecran = EcranPoste.gestionElevage),
           onOuvrir: (e) => setState(() => _ecran = e),

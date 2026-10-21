@@ -43,7 +43,7 @@ class SyncParametresGenerauxTest extends TestCase
         parent::setUp();
 
         $this->administrateur = User::create([
-            'name' => 'Manager Olouwachegoun', 'username' => 'admin',
+            'name' => 'M. Olouchègoun', 'username' => 'admin',
             'email' => 'dg@olouwachegoun.bj',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);

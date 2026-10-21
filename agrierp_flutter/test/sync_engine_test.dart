@@ -368,7 +368,7 @@ void main() {
         'audit_logs': [
           {
             'id': '22222222-2222-4222-8222-222222222222',
-            'user_name': 'Manager Olouwachegoun',
+            'user_name': 'M. Olouchègoun',
             'action': 'login',
             'module': 'auth',
             'ip_address': '192.168.1.42',
