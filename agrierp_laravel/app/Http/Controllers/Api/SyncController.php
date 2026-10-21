@@ -141,6 +141,8 @@ class SyncController extends Controller
         'payslips',
         // Ticket AV1 — retours et avoirs clients saisis au poste (demande ; le serveur fait les effets).
         'credit_notes',
+        // Ticket ARC2 — Corbeille : demandes de restauration / de suppression définitive (le serveur fait les effets).
+        'corbeille_demandes',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -266,6 +268,9 @@ class SyncController extends Controller
         // affiche au web à ces mêmes comptes (instant du règlement, nom de l'employé, NET versé) — jamais le brut, les
         // retenues, les charges patronales ni la période (voir [famillesPaginees]).
         'payslips' => ['view-rapports'],
+        // Ticket ARC2 — CORBEILLE : l'instantané des éléments archivés, avec ce que le serveur permet d'en faire. Aux
+        // seuls comptes qui gèrent les Paramètres (l'administrateur) : la liste agrège les archives de TOUS les modules.
+        'corbeille' => ['manage-parametres'],
     ];
 
     /**
@@ -1375,6 +1380,31 @@ class SyncController extends Controller
             // Ticket DEP3 — N'EST PLUS LU PAR LE POSTE MIGRÉ (le compte de charge d'une ligne se choisit dans le plan
             // comptable, classe 6) ; CONSERVÉ pour les postes non migrés, qui l'attendent (le serveur est déployé avant eux).
             'expense_categories' => fn () => \App\Models\Expense::CATEGORIES,
+            // 🔴→✅ TICKET ARC2 — LA CORBEILLE DESCEND AU POSTE, EN INSTANTANÉ (page 1, remplacé en entier à chaque tirage).
+            //
+            // Une ligne par élément archivé de `CorbeilleService::registre()`, AVEC ce que le serveur en permet
+            // (`restaurable` / `supprimable` et le motif du refus) : le poste n'a pas à recalculer les règles (dépenses
+            // contre-passées, exercice clos, code pris, références dans une vingtaine de tables) — deux implémentations
+            // finiraient par diverger. `id` = UUID v5 de (type, id de l'élément) : stable d'un tirage à l'autre, jamais
+            // celui de la ligne métier (une ligne supprimée n'a plus d'identité). ⚠️ AGRÈGE LES ARCHIVES DE TOUS LES
+            // MODULES : vide pour un compte sans `manage-parametres` — y compris sur la réponse complète des postes
+            // anciens, qui ne filtre pas les tables par permission.
+            'corbeille' => fn () => $request->user()?->can('manage-parametres')
+                ? collect(app(\App\Services\CorbeilleService::class)->elements())->map(fn (array $e) => [
+                    'id' => \Ramsey\Uuid\Uuid::uuid5(\App\Services\CorbeilleService::ESPACE_CORBEILLE, $e['type'].':'.$e['id'])->toString(),
+                    'type' => $e['type'],
+                    'element_id' => $e['id'],
+                    'titre' => $e['titre'],
+                    'detail' => $e['detail'],
+                    'module' => $e['module'],
+                    // Heure murale du serveur (le jour d'archivage du web), jamais convertie.
+                    'archive_le' => $e['archive_le']?->format('Y-m-d H:i:s'),
+                    'restaurable' => $e['restaurable'],
+                    'motif_restauration' => $e['motif_restauration'],
+                    'supprimable' => $e['supprimable'],
+                    'motif_suppression' => $e['motif_suppression'],
+                ])->values()
+                : collect(),
             // Ticket DEP3 — centres de coût (filières) : le Centre de Coût facultatif de l'en-tête d'une dépense.
             'cost_centers' => fn () => \App\Models\CostCenter::query()
                 ->orderBy('label')
@@ -1999,6 +2029,8 @@ class SyncController extends Controller
             'sales' => ['accepted' => [], 'rejected' => []],
             // Ticket AV1 — retours et avoirs clients, rejoués par `AvoirClientService` (le point de passage du web).
             'credit_notes' => ['accepted' => [], 'rejected' => []],
+            // Ticket ARC2 — demandes de la Corbeille, rejouées par `CorbeilleService` (le point de passage de l'écran web).
+            'corbeille_demandes' => ['accepted' => [], 'rejected' => []],
             'stock_adjustments' => ['accepted' => [], 'rejected' => []],
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
             'expenses' => ['accepted' => [], 'rejected' => []],
@@ -2273,6 +2305,17 @@ class SyncController extends Controller
             $result['veterinary_records'] = $this->pushVeterinaryRecords($request->input('veterinary_records'));
         }
 
+        // 🔴→✅ TICKET ARC2 — EN DERNIER : une demande de restauration ou de suppression porte sur ce que le même envoi
+        // vient d'archiver (le client archivé au poste puis supprimé dans le même paquet). Le POSTE N'ENVOIE QUE LA
+        // DEMANDE ; les effets (et leurs refus) sont ceux de `CorbeilleService`, comme la page web.
+        if ($request->has('corbeille_demandes')) {
+            $result['corbeille_demandes'] = $this->pushCorbeilleDemandes(
+                $request->input('corbeille_demandes'),
+                $request->user(),
+                $this->nomDuPoste($request),
+            );
+        }
+
         return $result;
     }
 
@@ -2363,6 +2406,8 @@ class SyncController extends Controller
         'quotes' => 'manage-ventes',
         // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
         'credit_notes' => 'manage-ventes',
+        // Ticket ARC2 — le droit de l'écran Corbeille du web (administrateur).
+        'corbeille_demandes' => 'manage-parametres',
         'stock_adjustments' => 'manage-stocks',
     ];
 
@@ -4279,6 +4324,72 @@ class SyncController extends Controller
             } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\AvoirClientRefuseException $e) {
                 $rejected[] = ['id' => $id, 'reason' => 'Retour refusé : '.$e->getMessage()];
             }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * 🔴→✅ TICKET ARC2 — DEMANDES DE LA CORBEILLE SAISIES AU POSTE (« Restaurer », « Supprimer définitivement »).
+     *
+     * ⚠️⚠️ LE POSTE N'ENVOIE QUE LA DEMANDE : « restaurer / supprimer cet élément de ce type » (et, pour une suppression,
+     * le mot saisi). Les effets — `is_active`, la règle de la dépense contre-passée, l'exercice clos, le code déjà pris, la
+     * vérification des références, l'effacement, l'audit — sont faits ICI par `CorbeilleService`, le point de passage de
+     * la page web : jamais une seconde implémentation, jamais un `is_active` ou un DELETE venu du poste.
+     *
+     * ⚠️ IDEMPOTENCE : `id` = UUID de la demande née sur le poste. Une demande DÉJÀ ACCEPTÉE (acquittement perdu,
+     * renvoi) est acquittée sans rien rejouer — sans cela, une restauration renvoyée serait refusée « déjà restauré » et
+     * le poste croirait avoir échoué. Une demande REFUSÉE est rejugée à chaque envoi (la cause a pu disparaître : « Relancer »).
+     */
+    private function pushCorbeilleDemandes(array $demandes, $utilisateur, ?string $poste): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\CorbeilleService::class);
+
+        foreach ($demandes as $data) {
+            $id = is_array($data) ? ($data['id'] ?? null) : null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-parametres')) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::roleInsuffisant('corbeille_demandes')];
+
+                continue;
+            }
+
+            try {
+                $valides = validator(is_array($data) ? $data : [], [
+                    'id' => ['required', 'uuid'],
+                    'type' => ['required', 'string', 'max:40'],
+                    'element_id' => ['required', 'uuid'],
+                    'action' => ['required', 'in:restaurer,supprimer'],
+                    'confirmation' => ['nullable', 'string', 'max:50'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+
+                continue;
+            }
+
+            if (\App\Models\CorbeilleOperation::query()->whereKey($valides['id'])->where('issue', 'accepte')->exists()) {
+                $accepted[] = $valides['id'];
+
+                continue;
+            }
+
+            $resultat = $valides['action'] === 'restaurer'
+                ? $service->tenterRestauration($valides['type'], $valides['element_id'], $poste, $utilisateur, $valides['id'])
+                : $service->supprimerDefinitivement($valides['type'], $valides['element_id'], (string) ($valides['confirmation'] ?? ''), $poste, $utilisateur, $valides['id']);
+
+            if ($resultat['ok']) {
+                $accepted[] = $valides['id'];
+
+                continue;
+            }
+
+            // Un refus laisse sa trace (qui, quoi, depuis quel poste, pourquoi) sous un identifiant PROPRE : l'identifiant de
+            // la demande reste libre pour la relance.
+            $service->journaliser($valides['action'], $valides['type'], $valides['element_id'], null, 'refuse', $resultat['message'], $utilisateur, $poste);
+            $rejected[] = ['id' => $valides['id'], 'reason' => $resultat['message']];
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
