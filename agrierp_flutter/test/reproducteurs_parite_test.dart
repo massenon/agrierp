@@ -28,11 +28,14 @@ void main() {
     ].join('-');
     String jour(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+    // Les trois premières : modules ACTIFS (servies au poste). La quatrième : module ÉTEINT (BS-Q12) — ni le web ni le
+    // tirage ne la proposent ; un sujet qui la porte garde pourtant son espèce.
     final especes = [
       {'id': uuid(), 'code': 'cuniculture', 'label': 'Lapins'},
       {'id': uuid(), 'code': 'aviculture', 'label': 'Volailles'},
       {'id': uuid(), 'code': 'porciculture', 'label': 'Porcs'},
     ];
+    final eteinte = {'id': uuid(), 'code': 'helico', 'label': 'Escargots'};
     final lots = <Map<String, dynamic>>[];
     for (var i = 0; i < 9; i++) {
       final e = especes[hasard.nextInt(3)];
@@ -69,7 +72,28 @@ void main() {
       });
     }
 
-    final entree = {'maintenant': '2026-10-21 10:30:00', 'especes': especes, 'lots': lots, 'sujets': sujets};
+    // Un sujet de l'espèce au module éteint : il figure au tableau (son espèce se lit), pas dans les filtres.
+    final sujetEteint = {
+      'id': uuid(),
+      'identifiant': 'ESC-2026-0001',
+      'espece': eteinte['id'],
+      'lot': null,
+      'categorie': 'reproducteur',
+      'sexe': 'F',
+      'race': null,
+      'cage': null,
+      'statut': 'actif',
+      'actif': true,
+      'entree': '2026-03-01',
+    };
+
+    final entree = {
+      'maintenant': '2026-10-21 10:30:00',
+      'especes': [...especes, eteinte],
+      'modules_actifs': [for (final e in especes) e['code']],
+      'lots': lots,
+      'sujets': [...sujets, sujetEteint],
+    };
     final web = executerPhp('<?php\n$amorceApplication\n$_script', entree, application: true) as Map<String, dynamic>;
 
     // ── Le même jeu dans la base du poste ────────────────────────────────────────────────────────────────────────
@@ -95,8 +119,8 @@ void main() {
         ),
       );
     }
-    for (final s in sujets) {
-      final e = especes.firstWhere((x) => x['id'] == s['espece']);
+    for (final s in [...sujets, sujetEteint]) {
+      final e = [...especes, eteinte].firstWhere((x) => x['id'] == s['espece']);
       final lot = lots.where((l) => l['id'] == s['lot']).firstOrNull;
       final d = (s['entree'] as String).split('-').map(int.parse).toList();
       await db.into(db.animals).insert(
@@ -151,7 +175,22 @@ void main() {
     for (final e in especes) {
       expect([for (final b in await depot.bandes(speciesId: e['id']!)) b.code], web['bandes'][e['id']], reason: 'bandes de ${e['label']}');
     }
-    expect([for (final e in await depot.especes()) e.label], web['especes_libelles']);
+    expect([for (final e in await depot.especes()) e.label], web['especes_libelles'], reason: 'BS-Q12 : mêmes espèces proposées, même ordre');
+    expect(web['especes_libelles'], web['especes_servies'], reason: 'BS-Q12 : le registre web propose ce que le tirage sert au poste');
+    expect(web['especes_libelles'], isNot(contains('Escargots')));
+    // Modale en modification d'un sujet dont le module est éteint : son espèce s'ajoute, comme au web.
+    final propre = (await depot.reproducteurs()).firstWhere((l) => l.animal.identifier == 'ESC-2026-0001').animal;
+    expect([for (final e in await depot.especesDuFormulaire(sujet: propre)) e.label], web['especes_modale_eteinte']);
+    expect([for (final e in await depot.especesDuFormulaire()) e.label], web['especes_modale_creation']);
+
+    // BS-Q11 : libellé de statut — la correspondance du web (modèle `Animal`), puis ce que le registre rend par ligne.
+    for (final st in ['actif', 'reforme', 'vendu', 'mort', 'disparu']) {
+      expect(ReproducteursRepository.libelleStatut(st), web['libelles_statut'][st], reason: 'libellé du statut « $st »');
+    }
+    for (final MapEntry(:key, :value) in (web['statuts_affiches'] as Map<String, dynamic>).entries) {
+      final l = lignes[key]!;
+      expect(ReproducteursRepository.libelleStatut(l.animal.status), value, reason: 'statut affiché de $key');
+    }
 
     // Messages de validation : chaque saisie invalide, mot pour mot.
     final existant = sujets.firstWhere((s) => s['categorie'] == 'reproducteur' && s['actif'] == true);
@@ -202,6 +241,18 @@ void main() {
       }
       expect(erreurs, attendu(web['validation'][key]), reason: 'saisie « $key »');
     }
+    // BS-Q13 : le message exact du refus d'un identifiant modifié, exécuté au web (formulaire forgé) puis au poste.
+    final depuis = (await depot.reproducteurs()).firstWhere((l) => l.animal.identifier == existant['identifiant']).animal;
+    String? refusPoste;
+    try {
+      await depot.modifier(depuis.id, FormulaireReproducteur.depuis(depuis).copieAvec(identifier: 'ZZ-NOUVEAU'));
+    } on ReproducteurRefuse catch (e) {
+      refusPoste = e.erreurs['identifier'];
+    }
+    expect(refusPoste, web['identifiant_fige'], reason: 'BS-Q13 : message du refus');
+    expect(ReproducteursRepository.messageIdentifiantFige, web['identifiant_fige_constante']);
+    expect(web['identifiant_fige'], web['identifiant_fige_constante'], reason: 'le web refuse bien sous « identifier » avec ce message');
+    expect(web['identifiant_inchange'], isTrue);
     expect(ReproducteursRepository.messageDejaSorti('vendu'), web['deja_sorti_vendu']);
     expect(ReproducteursRepository.toastEnregistre, web['toast_enregistre']);
     expect(ReproducteursRepository.toastMisAJour, web['toast_maj']);
@@ -215,6 +266,7 @@ use App\Livewire\Elevage\RegistreReproducteurs;
 use App\Models\Animal;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use App\Models\ModuleConfig;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -229,8 +281,11 @@ $u = User::create(['name' => 'a', 'username' => 'a', 'email' => 'a@a.bj', 'passw
 $u->assignRole('admin');
 auth()->login($u);
 
+// Décision BS-Q12 : l'indicateur `is_enabled` est volontairement VRAI partout ; seuls `modules_config` (« Modules actifs »)
+// décident, comme au tirage du poste — l'espèce `helico` a son module ÉTEINT.
 foreach ($e['especes'] as $x) {
     (new LivestockSpecies())->forceFill(['id' => $x['id'], 'code' => $x['code'], 'label' => $x['label'], 'is_enabled' => true])->save();
+    ModuleConfig::create(['species_code' => $x['code'], 'is_enabled' => in_array($x['code'], $e['modules_actifs'], true)]);
 }
 foreach ($e['lots'] as $l) {
     (new LivestockLot())->forceFill([
@@ -280,6 +335,20 @@ foreach ($e['especes'] as $x) {
     $sortie['bandes'][$x['id']] = Livewire::test(RegistreReproducteurs::class)->set('species_id', $x['id'])->instance()->lotOptions->pluck('code')->all();
 }
 $sortie['especes_libelles'] = $c->instance()->speciesOptions->pluck('label')->all();
+// Ce que le tirage sert au poste (`SyncController` : `LivestockSpecies::enabled()->orderBy('label')`).
+$sortie['especes_servies'] = LivestockSpecies::query()->enabled()->orderBy('label')->pluck('label')->all();
+$eteint = collect($e['sujets'])->firstWhere('identifiant', 'ESC-2026-0001');
+$sortie['especes_modale_eteinte'] = Livewire::test(RegistreReproducteurs::class)->call('editAnimal', $eteint['id'])->instance()->speciesFormOptions->pluck('label')->all();
+$sortie['especes_modale_creation'] = Livewire::test(RegistreReproducteurs::class)->call('newAnimal')->instance()->speciesFormOptions->pluck('label')->all();
+$sortie['libelles_statut'] = [];
+foreach (['actif', 'reforme', 'vendu', 'mort', 'disparu'] as $st) {
+    $sortie['libelles_statut'][$st] = Animal::libelleStatut($st);
+}
+$sortie['statuts_affiches'] = [];
+foreach ($xp->query("//tr[contains(@class, 'rrow')]") as $tr) {
+    $txt = fn ($label) => trim(preg_replace('/\s+/u', ' ', $xp->query(".//td[@data-label='$label']", $tr)->item(0)->textContent));
+    $sortie['statuts_affiches'][$txt('Identifiant')] = $txt('Statut');
+}
 
 $lap = $e['especes'][0]['id'];
 $existant = collect($e['sujets'])->first(fn ($s) => $s['categorie'] === 'reproducteur' && $s['actif'] === true);
@@ -314,6 +383,10 @@ foreach ($sorties as $nom => $champs) {
     $t->call('confirmExit');
     $sortie['validation'][$nom] = array_map(fn ($m) => $m[0], $t->errors()->toArray());
 }
+$forge = Livewire::test(RegistreReproducteurs::class)->call('editAnimal', $existant['id'])->set('identifier', 'ZZ-NOUVEAU')->call('saveAnimal');
+$sortie['identifiant_fige'] = $forge->errors()->first('identifier');
+$sortie['identifiant_fige_constante'] = SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE;
+$sortie['identifiant_inchange'] = Animal::find($existant['id'])->identifier === $existant['identifiant'];
 $sortie['deja_sorti_vendu'] = SaisieReproducteurAction::messageDejaSorti('vendu');
 $toast = function ($t) {
     foreach (array_reverse($t->effects['dispatches'] ?? []) as $d) {

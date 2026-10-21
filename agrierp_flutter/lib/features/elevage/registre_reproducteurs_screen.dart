@@ -35,8 +35,12 @@ import 'reproducteurs_repository.dart';
 /// ➕ Ajout du poste, gardé : sous l'identifiant d'un sujet de CE poste pas encore reçu par le serveur, « À envoyer » ;
 /// « Refusé » suivi du motif du serveur mot pour mot quand l'envoi a été refusé — le web n'a pas de file d'envoi.
 ///
-/// ⚠️ ÉCART DU WEB, REPRIS À L'IDENTIQUE : le statut d'un sujet sorti s'écrit `ucfirst($animal->status)` — « Reforme »,
-/// sans accent, alors que le filtre dit « Réformé » (question BS-Q11 au client, comme BS-Q10).
+/// Décisions du client du 21/10/2026 (web d'abord, puis ce poste à l'identique) :
+///  - BS-Q11 : le statut d'un sujet sorti s'écrit « Réformé », « Vendu », « Mort » (`Animal::libelleStatut()` du web,
+///    [ReproducteursRepository.libelleStatut]) ; la valeur technique reste `reforme` / `vendu` / `mort` ;
+///  - BS-Q12 : les espèces proposées sont celles des modules actifs, comme au web et au tirage ;
+///  - BS-Q13 : en modification, le champ Identifiant est GRISÉ avec son info-bulle (les saillies s'y rattachent par ce
+///    nom) ; à la création il reste libre.
 class RegistreReproducteursScreen extends StatefulWidget {
   const RegistreReproducteursScreen({
     super.key,
@@ -481,8 +485,8 @@ class _RegistreReproducteursScreenState extends State<RegistreReproducteursScree
     );
   }
 
-  /// `text-[11px] font-bold px-sm py-0.5 rounded-full` : « Actif » émeraude, sinon `ucfirst($status)` en gris, le motif de
-  /// sortie en info-bulle.
+  /// `text-[11px] font-bold px-sm py-0.5 rounded-full` : « Actif » émeraude, sinon le libellé du statut
+  /// (`$animal->status_label` : « Réformé », « Vendu », « Mort ») en gris, le motif de sortie en info-bulle.
   Widget _statutBadge(Sujet a, bool present) {
     final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 2),
@@ -491,14 +495,13 @@ class _RegistreReproducteursScreenState extends State<RegistreReproducteursScree
         borderRadius: BorderRadius.circular(AgriRadius.full),
       ),
       child: Text(
-        present ? 'Actif' : _ucfirst(a.status),
+        key: Key('reproducteur-statut-${a.id}'),
+        ReproducteursRepository.libelleStatut(a.status),
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: present ? AgriColors.brandEmerald : AgriColors.outline),
       ),
     );
     return present || (a.exitReason ?? '').isEmpty ? badge : Tooltip(message: a.exitReason!, child: badge);
   }
-
-  static String _ucfirst(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   Widget _action(String cle, String infobulle, IconData icone, Color couleur, VoidCallback surAppui) => Tooltip(
     message: infobulle,
@@ -638,7 +641,7 @@ class _ModaleReproducteurState extends State<_ModaleReproducteur> {
   }
 
   Future<void> _chargerOptions() async {
-    final especes = await widget.depot.especes();
+    final especes = await widget.depot.especesDuFormulaire(sujet: widget.sujet);
     final bandes = await widget.depot.bandes(speciesId: _espece);
     if (!mounted) return;
     setState(() {
@@ -721,9 +724,16 @@ class _ModaleReproducteurState extends State<_ModaleReproducteur> {
               libelle: 'Identifiant (boucle) *',
               erreur: _erreurs['identifier'],
               cleErreur: const Key('repro-erreur-identifier'),
+              // BS-Q13 : `@if($editingId)` du Blade — `<input disabled title="…">` et son aide.
+              aide: edition ? ReproducteursRepository.messageIdentifiantFige : null,
               enfant: KeyedSubtree(
                 key: const Key('repro-identifiant'),
-                child: ChampTexteModale(controleur: _identifiant, indice: 'ex : LAP-2026-0143', enErreur: _erreurs.containsKey('identifier')),
+                child: edition
+                    ? Tooltip(
+                        message: ReproducteursRepository.messageIdentifiantFige,
+                        child: ChampLectureModale(valeur: _identifiant.text),
+                      )
+                    : ChampTexteModale(controleur: _identifiant, indice: 'ex : LAP-2026-0143', enErreur: _erreurs.containsKey('identifier')),
               ),
             ),
             BlocChampModale(

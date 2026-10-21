@@ -152,7 +152,15 @@ class ReproducteursRepository {
   static String messageDejaSorti(String statut) =>
       'Ce reproducteur est déjà sorti (${libelleStatut(statut)}) : sa sortie ne peut pas être modifiée.';
 
-  /// `SaisieReproducteurAction::libelleStatut()`.
+  /// Décision BS-Q13 (21/10/2026) — `SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE` : l'identifiant d'un sujet
+  /// enregistré ne change plus (les saillies et l'historique du sujet s'y rattachent par ce nom). Même texte en
+  /// info-bulle du champ grisé et en refus (au poste, au web, et à l'envoi : rejet motivé, `conflict`).
+  static const messageIdentifiantFige =
+      "L'identifiant d'un sujet enregistré ne peut pas être modifié : les saillies et l'historique du sujet s'y rattachent par ce nom.";
+
+  /// Décision BS-Q11 (21/10/2026) — `Animal::libelleStatut()` du web, LA correspondance unique : « Réformé », « Vendu »,
+  /// « Mort » (la valeur technique, `reforme` / `vendu` / `mort`, reste celle de la base et de l'envoi). Registre,
+  /// filtres, fiche du sujet et historique passent par ici ; une valeur inconnue garde sa majuscule (`ucfirst`).
   static String libelleStatut(String statut) => switch (statut) {
     'actif' => 'Actif',
     'reforme' => 'Réformé',
@@ -188,10 +196,26 @@ class ReproducteursRepository {
     );
   }
 
-  /// `getSpeciesOptionsProperty()` : les espèces servies par le serveur, par libellé.
+  /// `getSpeciesOptionsProperty()` : les espèces des MODULES ACTIFS, par libellé. Décision BS-Q12 (21/10/2026) : le web
+  /// les lit par `LivestockSpecies::enabled()` — la règle même du tirage, qui ne sert au poste que celles-là. La table
+  /// locale EST donc cette liste ; aucun filtre de plus à faire ici.
   Future<List<EspeceElevage>> especes() async => [
     ...await _db.select(_db.livestockSpecies).get(),
   ]..sort((a, b) => cleCommeLeServeur(a.label).compareTo(cleCommeLeServeur(b.label)));
+
+  /// `getSpeciesFormOptionsProperty()` : les espèces de la MODALE — les modules actifs ; en modification, l'espèce
+  /// PROPRE du sujet s'y ajoute même si son module vient d'être éteint (le tirage ne la sert plus, le sujet la porte
+  /// encore : sans cela le champ s'afficherait vide). Les filtres du tableau ([especes]) gardent les modules actifs seuls.
+  Future<List<EspeceElevage>> especesDuFormulaire({Sujet? sujet}) async {
+    final liste = await especes();
+    final propre = sujet?.speciesId;
+    if (propre != null && !liste.any((e) => e.id == propre)) {
+      liste
+        ..add(EspeceElevage(id: propre, code: '', label: sujet!.speciesLabel ?? ''))
+        ..sort((a, b) => cleCommeLeServeur(a.label).compareTo(cleCommeLeServeur(b.label)));
+    }
+    return liste;
+  }
 
   /// `getLotOptionsProperty()` : bandes EN COURS et non archivées (de l'espèce choisie), par code.
   Future<List<LivestockLot>> bandes({String speciesId = ''}) =>
@@ -242,7 +266,7 @@ class ReproducteursRepository {
 
   // ── Validation (les règles de `saveAnimal()`, messages de `lang/fr/validation.php`) ───────────────────────────────
 
-  Future<Map<String, String>> _valider(FormulaireReproducteur f, {String? sauf}) async {
+  Future<Map<String, String>> _valider(FormulaireReproducteur f, {String? sauf, Sujet? sujet}) async {
     final e = <String, String>{};
     final identifiant = f.identifier;
     if (identifiant.isEmpty) {
@@ -257,7 +281,9 @@ class ReproducteursRepository {
 
     if (f.speciesId.isEmpty) {
       e['species_id'] = 'Le champ espèce est obligatoire.';
-    } else if (await (_db.select(_db.livestockSpecies)..where((t) => t.id.equals(f.speciesId))).getSingleOrNull() == null) {
+    } else if (f.speciesId != sujet?.speciesId &&
+        await (_db.select(_db.livestockSpecies)..where((t) => t.id.equals(f.speciesId))).getSingleOrNull() == null) {
+      // L'espèce PROPRE d'un sujet modifié reste valable même si son module vient d'être éteint (BS-Q12).
       e['species_id'] = "La valeur sélectionnée pour le champ espèce n'existe pas.";
     }
 
@@ -331,16 +357,20 @@ class ReproducteursRepository {
     final a = await sujet(id);
     if (a == null) throw const ReproducteurRefuse({'sujet': 'Reproducteur introuvable sur ce poste.'});
 
-    final erreurs = await _valider(f, sauf: id);
+    final erreurs = await _valider(f, sauf: id, sujet: a);
     if (erreurs.isNotEmpty) throw ReproducteurRefuse(erreurs);
 
-    final espece = await (_db.select(_db.livestockSpecies)..where((t) => t.id.equals(f.speciesId))).getSingle();
+    // Décision BS-Q13 : après la validation des champs (même ordre que le web : `validate()` puis le point de passage).
+    // Comparaison exacte, comme `SaisieReproducteurAction::modifier`.
+    if (f.identifier != a.identifier) throw const ReproducteurRefuse({'identifier': messageIdentifiantFige});
+
+    final espece = await (_db.select(_db.livestockSpecies)..where((t) => t.id.equals(f.speciesId))).getSingleOrNull();
+    final libelleEspece = espece?.label ?? a.speciesLabel;
     final lot = f.lotId.isEmpty ? null : await (_db.select(_db.livestockLots)..where((t) => t.id.equals(f.lotId))).getSingle();
     final naissance = f.birthDate == null ? null : _jour(f.birthDate!);
     final entree = _jour(f.entryDate!);
 
-    final change = a.identifier != f.identifier ||
-        a.speciesId != f.speciesId ||
+    final change = a.speciesId != f.speciesId ||
         a.lotId != lot?.id ||
         a.sex != f.sex ||
         a.breed != _vide(f.breed) ||
@@ -352,9 +382,8 @@ class ReproducteursRepository {
 
     await (_db.update(_db.animals)..where((t) => t.id.equals(id))).write(
       AnimalsCompanion(
-        identifier: Value(f.identifier),
         speciesId: Value(f.speciesId),
-        speciesLabel: Value(espece.label),
+        speciesLabel: Value(libelleEspece),
         lotId: Value(lot?.id),
         lotCode: Value(lot?.code),
         sex: Value(f.sex),

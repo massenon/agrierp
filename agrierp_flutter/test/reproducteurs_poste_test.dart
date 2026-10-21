@@ -262,15 +262,51 @@ void main() {
   });
 
   group('modifier', () {
-    test('⚠️ race, cage, bande et identifiant changent, la ligne repart EN FILE ; statut et sortie ne bougent jamais', () async {
+    test('⚠️ race, cage et bande changent, la ligne repart EN FILE ; identifiant, statut et sortie ne bougent jamais', () async {
       await uneBande(bande, 'LOT-CUNI-1');
       await unSujet(sujet1, 'LAP-2026-0143', statut: 'reforme');
 
-      await depot.modifier(sujet1, formulaire(identifiant: 'LAP-2026-0144', race: 'Californien', cage: 'C9', lot: bande));
+      await depot.modifier(sujet1, formulaire(identifiant: 'LAP-2026-0143', race: 'Californien', cage: 'C9', lot: bande));
 
       final a = (await lu(sujet1))!;
-      expect([a.identifier, a.breed, a.cage, a.lotId, a.lotCode, a.status, a.syncStatus], ['LAP-2026-0144', 'Californien', 'C9', bande, 'LOT-CUNI-1', 'reforme', SyncStatus.pending]);
+      expect([a.identifier, a.breed, a.cage, a.lotId, a.lotCode, a.status, a.syncStatus], ['LAP-2026-0143', 'Californien', 'C9', bande, 'LOT-CUNI-1', 'reforme', SyncStatus.pending]);
       expect(signaux, 1);
+    });
+
+    test('⚠️⚠️ BS-Q13 — l identifiant d un sujet enregistré ne change plus : le message du web, sous « identifier », rien n est écrit ni mis en file', () async {
+      await unSujet(sujet1, 'LAP-2026-0143');
+
+      final erreurs = await erreursDe(() => depot.modifier(sujet1, formulaire(identifiant: 'LAP-2026-0144', cage: 'C9')));
+
+      expect(erreurs, {
+        'identifier': "L'identifiant d'un sujet enregistré ne peut pas être modifié : les saillies et l'historique du sujet s'y rattachent par ce nom.",
+      });
+      expect(ReproducteursRepository.messageIdentifiantFige, erreurs['identifier']);
+      final a = (await lu(sujet1))!;
+      expect([a.identifier, a.cage, a.syncStatus], ['LAP-2026-0143', null, SyncStatus.synced]);
+      expect(signaux, 0);
+    });
+
+    test('BS-Q13 — un sujet sorti garde lui aussi son identifiant ; une casse différente est un autre identifiant (comparaison exacte, comme le web)', () async {
+      await unSujet(sujet1, 'LAP-2026-0143', statut: 'vendu');
+
+      expect((await erreursDe(() => depot.modifier(sujet1, formulaire(identifiant: 'LAP-2026-0099')))).keys, ['identifier']);
+      expect((await erreursDe(() => depot.modifier(sujet1, formulaire(identifiant: 'lap-2026-0143')))).keys, ['identifier']);
+    });
+
+    test('BS-Q13 — les autres refus passent AVANT celui de l identifiant (même ordre que le web : validation puis point de passage)', () async {
+      await unSujet(sujet1, 'LAP-2026-0143');
+
+      expect(
+        await erreursDe(() => depot.modifier(sujet1, formulaire(identifiant: 'LAP-2026-0144', naissance: DateTime(2026, 3, 1), entree: DateTime(2026, 2, 1)))),
+        {'birth_date': "La date de naissance ne peut pas être postérieure à la date d'entrée."},
+      );
+    });
+
+    test('BS-Q13 — un sujet pas encore enregistré (création) garde la saisie libre de son identifiant', () async {
+      final a = await depot.enregistrer(formulaire(identifiant: 'NOUVEAU-1'));
+
+      expect(a.identifier, 'NOUVEAU-1');
     });
 
     test('⚠️ une modification qui ne change rien n écrit rien : le sujet reste synchronisé, aucun signal', () async {
@@ -384,6 +420,32 @@ void main() {
       expect([for (final b in await depot.bandes(speciesId: lapins)) b.code], ['LOT-CUNI-1', 'LOT-CUNI-2']);
       expect([for (final b in await depot.bandes()) b.code], ['LOT-CUNI-1', 'LOT-CUNI-2', 'LOT-VOL-1']);
       expect([for (final e in await depot.especes()) e.label], ['Lapins', 'Volailles']);
+    });
+
+    test('⚠️ BS-Q12 — espèces de la modale : celles du tirage (modules actifs) ; en modification, l espèce PROPRE du sujet s y ajoute, même si son module est éteint', () async {
+      const escargots = 'aaaaaaaa-0000-4000-8000-0000000000a3';
+      await unSujet(sujet1, 'ESC-1', espece: escargots);
+      await db.update(db.animals).write(const AnimalsCompanion(speciesLabel: Value('Escargots')));
+
+      expect([for (final e in await depot.especesDuFormulaire()) e.label], ['Lapins', 'Volailles'], reason: 'création : les modules actifs seuls');
+      expect([for (final e in await depot.especesDuFormulaire(sujet: (await lu(sujet1))!)) (e.id, e.label)], [(escargots, 'Escargots'), (lapins, 'Lapins'), (volailles, 'Volailles')]);
+      expect([for (final e in await depot.especes()) e.label], ['Lapins', 'Volailles'], reason: 'les filtres du tableau gardent les modules actifs');
+    });
+
+    test('BS-Q12 — modifier la cage d un sujet dont l espèce n est plus servie reste possible (la fonctionnalité ne se réduit pas)', () async {
+      const escargots = 'aaaaaaaa-0000-4000-8000-0000000000a3';
+      await unSujet(sujet1, 'ESC-1', espece: escargots);
+      await db.update(db.animals).write(const AnimalsCompanion(speciesLabel: Value('Escargots')));
+
+      await depot.modifier(sujet1, formulaire(espece: escargots, identifiant: 'ESC-1', cage: 'C9'));
+
+      final a = (await lu(sujet1))!;
+      expect([a.speciesId, a.speciesLabel, a.cage, a.syncStatus], [escargots, 'Escargots', 'C9', SyncStatus.pending]);
+      // …mais proposer une espèce non servie à un AUTRE sujet reste refusé (comme `exists:livestock_species,id`… côté tirage).
+      expect(
+        (await erreursDe(() => depot.enregistrer(formulaire(espece: escargots, identifiant: 'ESC-2')))).keys,
+        ['species_id'],
+      );
     });
   });
 
@@ -605,7 +667,8 @@ void main() {
       expect(find.text('LAP-A'), findsOneWidget);
       expect(find.text('Californien'), findsOneWidget);
       expect(find.text('LOT-CUNI-1'), findsOneWidget);
-      expect(find.text('Reforme'), findsOneWidget, reason: 'ucfirst(\$status) du Blade : sans accent (BS-Q11)');
+      expect(find.text('Réformé'), findsOneWidget, reason: 'BS-Q11 : « Réformé » avec son accent (plus d `ucfirst` sur la valeur technique)');
+      expect(find.text('Reforme'), findsNothing);
       expect(find.byKey(const Key('reproducteur-nouveau')), findsNothing);
       expect(find.byKey(Key('reproducteur-modifier-${uuid('s1')}')), findsNothing);
       expect(find.byKey(Key('reproducteur-fiche-${uuid('s1')}')), findsOneWidget, reason: 'consulter la fiche reste ouvert (view-elevage)');
@@ -672,6 +735,48 @@ void main() {
       final a = (await t.runAsync(() => lu(sujet1)))!;
       expect([a.cage, a.syncStatus], ['C7', SyncStatus.pending]);
       expect(find.text('Reproducteur mis à jour.'), findsOneWidget);
+      await t.pump(ToastAgri.duree);
+    });
+
+    testWidgets('⚠️ BS-Q11 — chaque statut de sortie s écrit avec son accent et sa majuscule : Réformé, Vendu, Mort', (t) async {
+      await t.runAsync(() async {
+        await unSujet(uuid('s1'), 'A-PRESENT');
+        await unSujet(uuid('s2'), 'B-REFORME', statut: 'reforme');
+        await unSujet(uuid('s3'), 'C-VENDU', statut: 'vendu');
+        await unSujet(uuid('s4'), 'D-MORT', statut: 'mort');
+      });
+      await monter(t);
+
+      for (final (cle, texte) in [('s1', 'Actif'), ('s2', 'Réformé'), ('s3', 'Vendu'), ('s4', 'Mort')]) {
+        expect(texteDe(t, 'reproducteur-statut-${uuid(cle)}'), texte, reason: cle);
+      }
+      expect((await t.runAsync(() => lu(uuid('s2'))))!.status, 'reforme', reason: 'la valeur technique reste sans accent');
+    });
+
+    testWidgets('⚠️⚠️ BS-Q13 — Modifier : le champ Identifiant est GRISÉ avec son info-bulle ; à la création il reste saisissable', (t) async {
+      await t.runAsync(() => unSujet(sujet1, 'LAP-1'));
+      await monter(t);
+
+      await t.tap(find.byKey(const Key('reproducteur-nouveau')));
+      await t.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('repro-identifiant')), matching: find.byType(TextField)), findsOneWidget, reason: 'création : saisie libre');
+      expect(find.byTooltip(ReproducteursRepository.messageIdentifiantFige), findsNothing);
+      await t.tap(find.text('Annuler'));
+      await t.pumpAndSettle();
+
+      await t.tap(find.byKey(const Key('reproducteur-modifier-$sujet1')));
+      await t.pumpAndSettle();
+
+      expect(find.descendant(of: find.byKey(const Key('repro-identifiant')), matching: find.byType(TextField)), findsNothing, reason: 'plus de champ saisissable');
+      expect(find.descendant(of: find.byKey(const Key('repro-identifiant')), matching: find.text('LAP-1')), findsOneWidget, reason: 'la valeur reste lisible');
+      expect(find.byTooltip(ReproducteursRepository.messageIdentifiantFige), findsOneWidget);
+      expect(find.text(ReproducteursRepository.messageIdentifiantFige), findsOneWidget, reason: 'l aide sous le champ dit pourquoi');
+
+      await saisir(t, 'repro-cage', 'C7');
+      await t.tap(find.byKey(const Key('repro-enregistrer')));
+      await attendre(t);
+      final a = (await t.runAsync(() => lu(sujet1)))!;
+      expect([a.identifier, a.cage, a.syncStatus], ['LAP-1', 'C7', SyncStatus.pending]);
       await t.pump(ToastAgri.duree);
     });
 

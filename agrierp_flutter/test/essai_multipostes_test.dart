@@ -1012,6 +1012,8 @@ class _Essai {
   bool retourFait = false;
   bool remboursementFait = false;
   int reglements = 0;
+  /// Décision BS-Q13 : changer l'identifiant du reproducteur enregistré est REFUSÉ au poste (le geste a bien eu lieu).
+  bool identifiantRefuse = false;
   static const produitFusionNom = 'ESSAI Savon de karité (pain)';
   String? produitFusionPoste;
   String? produitFusionWeb;
@@ -1285,6 +1287,18 @@ class _Essai {
           await p.reproducteurs.modifier(reproducteur!, FormulaireReproducteur.depuis(actuel).copieAvec(cage: 'C2'));
           _saisi('animals', reproducteur!, {'cage': 'C2'});
         });
+        // Décision BS-Q13 — l'identifiant d'un sujet enregistré ne change plus : refusé au poste, rien mis en file ; le
+        // serveur garde « REP-ESSAI-1 » (l'identifiant des lignes comparées en fin d'essai est celui de l'enregistrement).
+        {
+          final actuel = (await p.reproducteurs.sujet(reproducteur!))!;
+          try {
+            await p.reproducteurs.modifier(reproducteur!, FormulaireReproducteur.depuis(actuel).copieAvec(identifier: 'REP-ESSAI-9'));
+            journaliser('${p.nom}  ✎ reproducteur REP-ESSAI-1 : identifiant → REP-ESSAI-9 ACCEPTÉ AU POSTE (BS-Q13 violée)');
+          } on ReproducteurRefuse catch (e) {
+            identifiantRefuse = e.erreurs['identifier'] == ReproducteursRepository.messageIdentifiantFige;
+            journaliser('${p.nom}  ✎ reproducteur REP-ESSAI-1 : changer l\'identifiant refusé au poste, comme voulu (BS-Q13)');
+          }
+        }
         // Ticket BS1 — le stade d'ESSAI-C change (sans correction d'effectif : il reste celui des fiches).
         await _geste(p, 'bande ESSAI-C : stade → ponte', () async {
           final b = (await p.db.select(p.db.livestockLots).get()).firstWhere((x) => x.id == bandeC);
@@ -1891,6 +1905,7 @@ class _Essai {
       if (infirmerie == null || intervention == null || soinAArchiver == null) 'infirmerie, calendrier, soin archivé',
       if (rationPoste == null || provende == null || rappelSoins == null) 'Paramètres Élevage au poste',
       if (reproducteur == null) 'reproducteur nominatif enregistré, modifié puis sorti au poste (BS3)',
+      if (!identifiantRefuse) 'changement d\'identifiant du reproducteur refusé au poste (BS-Q13)',
       if (bandeC == null || bandeD == null || ficheNaissance == null || ficheAchat == null)
         'bandes créées au poste (ESSAI-C, ESSAI-D) et entrées de sujets modifiée et archivée (BS1, BS2)',
       if (!saisiElevage.containsKey('expenses|$depenseAModifier') || !saisiElevage.containsKey('expenses|$depenseAArchiverPoste'))

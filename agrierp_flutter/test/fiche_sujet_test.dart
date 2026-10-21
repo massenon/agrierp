@@ -312,7 +312,7 @@ void main() {
         f = (await depot().charger(sujetId, maintenant: maintenant))!;
 
         expect(f.mouvements, hasLength(2));
-        expect(f.mouvements.last.libelle, 'Sortie — vendu');
+        expect(f.mouvements.last.libelle, 'Sortie — Vendu', reason: 'BS-Q11 : le libellé du statut, plus la valeur technique');
         expect(f.mouvements.last.detail, 'Vente à un éleveur');
       },
     );
@@ -365,6 +365,20 @@ void main() {
 
       expect(f.badge, 'Vendu');
       expect(f.sexe, 'Mâle');
+    });
+
+    test('⚠️ BS-Q11 — un sujet réformé s écrit « Réformé » (badge et mouvement), jamais « Reforme »', () async {
+      await sujet(
+        statut: 'reforme',
+        sortie: DateTime(2026, 6, 1),
+        motifSortie: 'Réforme pour âge',
+        actif: false,
+      );
+      final f = (await depot().charger(sujetId, maintenant: maintenant))!;
+
+      expect(f.badge, 'Réformé');
+      expect(f.mouvements.last.libelle, 'Sortie — Réformé');
+      expect(f.historique.map((l) => l.libelle).join('|'), isNot(contains('Reforme')));
     });
 
     test('un sujet inconnu rend null', () async {

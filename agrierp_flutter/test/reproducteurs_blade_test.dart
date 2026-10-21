@@ -140,6 +140,49 @@ void main() {
     expect(ecran, contains('if (present)'));
   }, skip: saut);
 
+  test('⚠️ BS-Q11 — le Blade écrit le statut par la correspondance unique du modèle, et le poste en reprend les littéraux', () {
+    final b = sansCommentairesBlade(blade.readAsStringSync());
+    expect(b, contains(r'$animal->status_label'));
+    expect(b, isNot(contains(r'ucfirst($animal->status)')));
+    expect(b, contains(r'\App\Models\Animal::LIBELLES_STATUT'), reason: 'les options du filtre viennent de la même correspondance');
+
+    final modele = File('$dossierLaravel/app/Models/Animal.php').readAsStringSync();
+    final correspondance = RegExp(r"LIBELLES_STATUT = \[([^\]]+)\]").firstMatch(modele)!.group(1)!;
+    final paires = {for (final m in RegExp(r"'(\w+)' => '([^']+)'").allMatches(correspondance)) m.group(1)!: m.group(2)!};
+    expect(paires, {'actif': 'Actif', 'reforme': 'Réformé', 'vendu': 'Vendu', 'mort': 'Mort'});
+    final depot = File('lib/features/elevage/reproducteurs_repository.dart').readAsStringSync();
+    for (final MapEntry(:key, :value) in paires.entries) {
+      expect(depot, contains("'$key' => '$value'"), reason: 'libellé du statut « $key » au poste');
+    }
+    final ecran = File('lib/features/elevage/registre_reproducteurs_screen.dart').readAsStringSync();
+    expect(ecran, isNot(contains('_ucfirst(a.status)')), reason: 'plus d ucfirst sur la valeur technique');
+    expect(ecran, contains('ReproducteursRepository.libelleStatut(a.status)'));
+  }, skip: saut);
+
+  test('⚠️ BS-Q12 — le composant web propose les modules actifs (`enabled()`), le poste lit la table que le tirage sert', () {
+    final php = composant.readAsStringSync();
+    expect(php, contains('LivestockSpecies::enabled()'), reason: 'un seul point de vérité : les modules actifs');
+    expect(php, isNot(contains("where('is_enabled', true)")), reason: 'plus de filtre sur l indicateur `is_enabled`');
+    final tirage = File('$dossierLaravel/app/Http/Controllers/Api/SyncController.php').readAsStringSync();
+    expect(tirage, contains("'livestock_species' => fn () => LivestockSpecies::query()\n                ->enabled()"));
+    expect(File('lib/features/elevage/registre_reproducteurs_screen.dart').readAsStringSync(), contains('especesDuFormulaire'));
+  }, skip: saut);
+
+  test('⚠️ BS-Q13 — le Blade grise l identifiant en modification (disabled, info-bulle, aide), le composant et le poste portent le même message', () {
+    final b = sansCommentairesBlade(blade.readAsStringSync());
+    expect(b, contains(r'@if($editingId)'));
+    expect(RegExp(r'<input wire:model="identifier"[^>]*\bdisabled\b[^>]*title="\{\{ \\App\\Actions\\SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE \}\}"').hasMatch(b), isTrue);
+    expect(RegExp(r'<p class="text-\[10px\] text-outline mt-xs">\{\{ \\App\\Actions\\SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE \}\}</p>').hasMatch(b), isTrue);
+
+    final action = File('$dossierLaravel/app/Actions/SaisieReproducteurAction.php').readAsStringSync();
+    final message = RegExp(r'MESSAGE_IDENTIFIANT_FIGE = "([^"]+)"').firstMatch(action)!.group(1)!;
+    expect(litterauxDe(fichiers), contains(norme(message)), reason: 'le message du web est un littéral du poste');
+    final ecran = File('lib/features/elevage/registre_reproducteurs_screen.dart').readAsStringSync();
+    expect(ecran, contains('ReproducteursRepository.messageIdentifiantFige'));
+    expect(ecran, contains('Tooltip('));
+    expect(action, contains("'identifier' => self::MESSAGE_IDENTIFIANT_FIGE"));
+  }, skip: saut);
+
   test('⚠️ BS3 — « Bandes & Sujets » offre le bouton « Registre des Reproducteurs », au web comme au poste', () {
     final bandes = bladeDe('gestion-bandes').readAsStringSync();
     expect(bandes, contains("route('elevage.reproducteurs')"));
