@@ -402,76 +402,126 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Panneau gauche : dégradé forestier et mentions institutionnelles.
+/// Image de fond du panneau gauche : le même fichier que le web (`public/assets/images/image_login.png`).
+const _imageConnexion = 'assets/images/image_login.png';
+
+/// Voile du Blade : `linear-gradient(180deg, rgba(5,46,22,0.10) 0%, rgba(0,33,13,0.55) 100%)`. Valeurs en ligne dans
+/// le Blade (`style=`), absentes de `tailwind.config.js` : elles n'ont donc pas de jeton ; le test
+/// `login_image_gauche_test.dart` les compare au Blade.
+const _voileHaut = Color.fromRGBO(5, 46, 22, 0.10);
+const _voileBas = Color.fromRGBO(0, 33, 13, 0.55);
+
+/// Panneau gauche : image de la ferme sous un voile forestier, marque en haut, mentions institutionnelles en pied
+/// (`<aside class="relative hidden lg:flex lg:w-[50%] … p-8 overflow-hidden" style="background: linear-gradient(…),
+/// url(image_login.png); background-size: cover; background-position: center;">`).
+///
+/// ⚠️ SANS LE FICHIER, JAMAIS D'ÉCRAN CASSÉ. Un poste dont l'image n'a pas été commitée (fichier gardé en local)
+/// affiche le dégradé aux couleurs de la marque (`login-panneau-repli`) : le texte, lui, reste lisible.
 class _PanneauFerme extends StatelessWidget {
   const _PanneauFerme();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AgriColors.brandForest, AgriColors.brandEmerald],
-        ),
-      ),
-      padding: const EdgeInsets.all(AgriSpacing.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ClipRect(
+      key: const Key('login-panneau-gauche'),
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Row(
-            children: [
-              const Icon(
-                SymbolesAgri.agriculture,
-                color: AgriColors.accentYellow,
-                size: 26,
-              ),
-              const SizedBox(width: AgriSpacing.sm),
-              RichText(
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                  children: [
-                    TextSpan(text: 'Agri'),
-                    TextSpan(
-                      text: 'ERP',
-                      style: TextStyle(color: AgriColors.accentYellow),
-                    ),
-                  ],
+          // 1. Image `cover`, centrée. `errorBuilder` : repli de marque.
+          Image.asset(
+            _imageConnexion,
+            key: const Key('login-image-gauche'),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            errorBuilder: (_, _, _) => const DecoratedBox(
+              key: Key('login-panneau-repli'),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AgriColors.brandForest, AgriColors.brandEmerald],
                 ),
               ),
-            ],
-          ),
-          const Spacer(),
-          const Divider(color: Colors.white24),
-          const SizedBox(height: AgriSpacing.md),
-          const Text(
-            "PROJET D'APPUI À L'ENTREPRENEURIAT AU BÉNIN (PAEB)",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 10,
-              letterSpacing: 2,
-              fontWeight: FontWeight.bold,
-              color: Colors.white70,
             ),
           ),
-          const SizedBox(height: AgriSpacing.xs),
-          const Text(
-            'FAGUEZ SARL',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 10,
-              letterSpacing: 2,
-              fontWeight: FontWeight.w600,
-              color: Colors.white54,
+          // 2. Voile du Blade.
+          const DecoratedBox(
+            key: Key('login-voile'),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [_voileHaut, _voileBas],
+              ),
             ),
           ),
+          // 3. Contenu (`relative z-10`).
+          const Padding(padding: EdgeInsets.all(AgriSpacing.xl), child: _ContenuPanneauFerme()),
         ],
       ),
+    );
+  }
+}
+
+class _ContenuPanneauFerme extends StatelessWidget {
+  const _ContenuPanneauFerme();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              SymbolesAgri.agriculture,
+              color: AgriColors.accentYellow,
+              size: 26,
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+                children: [
+                  TextSpan(text: 'Agri'),
+                  TextSpan(
+                    text: 'ERP',
+                    style: TextStyle(color: AgriColors.accentYellow),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        const Divider(color: Colors.white24),
+        const SizedBox(height: AgriSpacing.md),
+        const Text(
+          "PROJET D'APPUI À L'ENTREPRENEURIAT AU BÉNIN (PAEB)",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 2,
+            fontWeight: FontWeight.bold,
+            color: Colors.white70,
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          'FAGUEZ SARL',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w600,
+            color: Colors.white54,
+          ),
+        ),
+      ],
     );
   }
 }

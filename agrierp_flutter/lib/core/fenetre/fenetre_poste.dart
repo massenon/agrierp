@@ -1,5 +1,3 @@
-import 'dart:ui' show Rect;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
