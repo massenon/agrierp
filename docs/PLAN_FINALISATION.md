@@ -369,3 +369,11 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 ### Lot 3 — avec la clôture de 2026
 | EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
+
+## Sprint MP — Mise en page du poste (demandes du client)
+
+| Ticket | Contenu | État |
+|---|---|---|
+| MP1 | Libellés et champs « Date » et « Mois » : marges, espacements, alignements et proportions repris des classes Tailwind du Blade ; un champ partagé par gabarit (`lib/core/widgets/champs_date_agri.dart`, constantes `AgriChamps`) ; 20 écarts corrigés sur 20 écrans (`docs/AUDIT_FIDELITE_ECRANS.md` § 9) ; mesures à 640 / 1024 / 1440 px et garde-fou qui lit les classes du Blade | ✅ 21/10/2026 (`README_SPRINT0.md` ; rendu réel Windows / navigateur NON vérifié) |
+| MP2 | Mêmes contrôles pour les libellés et champs VOISINS d'une date dans les modales (texte, liste, nombre : `h-11 px-md text-sm`, libellés `text-[10px] uppercase`), `labelText` flottant de Transferts, « Compte : » du Grand Livre ; construire les champs Date que le poste n'a pas (Historique des ventes, Liste d'Achats, Bilan…) relève de tickets de fonctionnalité | 🔧 proposé |
+| MP1-Q1 | ❓ Fiche Reproducteurs : le Blade ne replie pas sa barre « Bande / Date / Mois » (`flex items-center gap-xs` sans `flex-wrap`). Le poste la replie. Ajouter `flex-wrap` au Blade (retouche web) ou garder l'écart ? | ❓ client |
