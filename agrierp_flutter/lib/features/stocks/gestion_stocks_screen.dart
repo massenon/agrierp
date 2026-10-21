@@ -253,14 +253,21 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     ),
   );
 
-  Widget _kpis(DonneesStocks d, bool large) => GridView.count(
+  Widget _kpis(DonneesStocks d, bool large) => GridView(
     // Ticket U11 — `grid-cols-2 md:grid-cols-4` du Blade : quatre colonnes dès 768 px (le poste attendait 1 024 px).
-    crossAxisCount: AgriBreakpoints.moyen(context) ? 4 : 2,
+    //
+    // 🔴→✅ HAUTEUR FIXE, plus un rapport largeur/hauteur : le web laisse la carte prendre la hauteur de son contenu.
+    // Avec `childAspectRatio: 2.6`, la carte « Rotation du Stock » faisait 76,8 px et sa légende sur deux lignes
+    // (police réelle de Windows) débordait de 8 px — bandeau jaune et noir. 104 px loge libellé, valeur et deux lignes
+    // de légende ; au-delà, la légende se coupe plutôt que de déborder.
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: AgriBreakpoints.moyen(context) ? 4 : 2,
+      mainAxisSpacing: AgriSpacing.md,
+      crossAxisSpacing: AgriSpacing.md,
+      mainAxisExtent: large ? 104 : 120,
+    ),
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.6 : 1.6,
     children: [
       // Ticket U8 — `number_format($kpis['valorisation'], 0, ',', ' ').' FCFA'`
       // et la légende du Blade. Le bouton « Recalculer PMP » de la maquette

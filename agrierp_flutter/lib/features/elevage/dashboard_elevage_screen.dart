@@ -448,9 +448,9 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               ),
             )
           else
-            for (final l in avecGmq)
+            for (final (i, l) in avecGmq.indexed)
               Container(
-                key: Key('resume-gmq-${l.code}'),
+                key: Key('resume-gmq-${l.code}${_suffixeDoublon(avecGmq.map((b) => b.code), i)}'),
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
                   border: Border(
@@ -906,7 +906,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
               _enteteTableau(c, aGauche: 2),
               if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
               for (final (i, l) in lignes.indexed)
-                _ligneTableau(Key('ligne-gmq-${l.code}'), i, [
+                _ligneTableau(Key('ligne-gmq-${l.code}${_suffixeDoublon(lignes.map((b) => b.code), i)}'), i, [
                   _cellule(
                     l.code,
                     c[0].$2,
@@ -1002,7 +1002,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
             children: [
               _enteteTableau(c),
               for (final (i, l) in d.sanitaire.indexed)
-                _ligneTableau(Key('ligne-sanitaire-${l.code}'), i, [
+                _ligneTableau(Key('ligne-sanitaire-${l.code}${_suffixeDoublon(d.sanitaire.map((b) => b.code), i)}'), i, [
                   _cellule(
                     l.libelleEspece,
                     c[0].$2,
@@ -1207,7 +1207,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           _enteteTableau(c),
           if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
           for (final (i, l) in lignes.indexed)
-            _ligneTableau(Key('ligne-prevision-${l.code}'), i, [
+            _ligneTableau(Key('ligne-prevision-${l.code}${_suffixeDoublon(lignes.map((b) => b.code), i)}'), i, [
               _cellule(
                 l.code,
                 c[0].$2,
@@ -1583,4 +1583,15 @@ class _CourbesGmqPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CourbesGmqPainter ancien) =>
       ancien.series != series;
+}
+
+/// Suffixe d'une clé de ligne quand deux bandes portent le même code (`-2`, `-3`…) ; vide pour la première.
+///
+/// 🔴→✅ « Duplicate keys found » : deux bandes de même code (ex. `AVI-2026-01`) donnaient deux lignes de clé
+/// identique, ce qui arrête le dessin de l'écran entier sans aucune erreur de compilation. La première garde sa clé
+/// d'origine (les tests la retrouvent), les suivantes reçoivent un rang.
+String _suffixeDoublon(Iterable<String> codes, int index) {
+  final liste = codes.toList();
+  final rang = liste.sublist(0, index + 1).where((c) => c == liste[index]).length;
+  return rang <= 1 ? '' : '-$rang';
 }
