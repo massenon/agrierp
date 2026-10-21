@@ -510,8 +510,7 @@ void main() {
       expect(lignes.where((v) => v[2] == true), isNotEmpty);
       expect(sortie['ecarts'], isNot('0 FCFA'));
       expect(sortie['rotation'], isNot('—'));
-      // Plus de message de couverture sous le ratio (demande client, web et poste).
-      expect(sortie['rotation_legende'], isEmpty);
+      expect(sortie['rotation_legende'], startsWith('Couvre '));
     },
     skip: sautSansPhp(),
     timeout: const Timeout(Duration(minutes: 3)),
@@ -568,7 +567,9 @@ $kpis = $composant->kpis;
 $rotation = $kpis['rotation'];
 $rotationLegende = $rotation['rotation'] === null
     ? 'Disponible après un stock valorisable non nul sur le mois'
-    : '';
+    : ($rotation['couverture'] !== null
+        ? 'Couvre '.number_format($rotation['couverture'], 0, ',', ' ').' % des ventes du mois — '
+        : '')."les marchandises produites à la ferme n'ont pas de coût d'achat";
 $journal = [];
 // Ticket EX7 : le Journal des Mouvements du web est PAGINÉ (25) dans l'exercice affiché (ici l'année civile 2026,
 // aucun exercice enregistré) ; la parité lit toutes ses pages, dans l'ordre.

@@ -14,11 +14,19 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-lg">
         <x-kpi-card label="Valorisation Stocks" icon="payments" color="emerald" :value="number_format($this->kpis['valorisation'], 0, ',', ' ').' FCFA'" caption="Basée sur le PMP réel (achats)" />
         <x-kpi-card label="Alertes de Seuil" icon="warning" color="red" :value="$this->kpis['alertes'].' réf.'" />
-        @php $rotation = $this->kpis['rotation']; @endphp
+        @php
+            $rotation = $this->kpis['rotation'];
+            // Legende construite ici, pas dans l'attribut : le perimetre du
+            // ratio doit se lire en meme temps que le ratio lui-meme.
+            $rotationLegende = ($rotation['couverture'] !== null
+                    ? 'Couvre '.number_format($rotation['couverture'], 0, ',', ' ').' % des ventes du mois — '
+                    : '')
+                ."les marchandises produites à la ferme n'ont pas de coût d'achat";
+        @endphp
         @if($rotation['rotation'] === null)
             <x-kpi-card label="Rotation du Stock" icon="sync" color="blue" :pending="true" pending-since="un stock valorisable non nul sur le mois" />
         @else
-            <x-kpi-card label="Rotation du Stock" icon="sync" color="blue" :value="number_format($rotation['rotation'], 1, ',', ' ').' fois/mois'" />
+            <x-kpi-card label="Rotation du Stock" icon="sync" color="blue" :value="number_format($rotation['rotation'], 1, ',', ' ').' fois/mois'" :caption="$rotationLegende" />
         @endif
         <x-kpi-card label="Écarts d'Inventaire" icon="rule" color="maize" :value="number_format($this->kpis['ecarts'], 0, ',', ' ').' FCFA'" caption="Ajustements du mois" />
     </div>

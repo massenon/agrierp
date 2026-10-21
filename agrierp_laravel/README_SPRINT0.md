@@ -9211,8 +9211,7 @@ de vente portent un coût connu.
 Afficher « 0,04 fois/mois » sans plus serait un contresens — un gestionnaire y
 lirait un stock mort. La carte expose donc le **taux de couverture** dans sa
 légende, à côté du ratio : *« Couvre 24 % des ventes du mois — les marchandises
-produites à la ferme n'ont pas de coût d'achat »* (**message retiré le 21/10/2026 à la demande du client, web et
-poste** : la carte ne montre plus que le libellé et la valeur ; le calcul de `couverture` reste dans `StockRotationService`). Un ratio partiel dont le
+produites à la ferme n'ont pas de coût d'achat »*. Un ratio partiel dont le
 périmètre est affiché reste une information ; le même ratio affiché nu n'en est
 plus une.
 
