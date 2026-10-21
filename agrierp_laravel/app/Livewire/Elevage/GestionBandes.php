@@ -157,6 +157,7 @@ class GestionBandes extends Component
             ->when($this->search, fn ($q) => $q->where('code', 'like', '%'.$this->search.'%'))
             ->when($this->filiere, fn ($q) => $q->whereHas('species', fn ($q2) => $q2->where('code', $this->filiere)))
             ->orderByDesc('created_date')
+            ->orderBy('code')   // ordre stable à date égale (le poste départage de la même façon)
             ->get();
     }
 

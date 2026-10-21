@@ -133,6 +133,7 @@ class EnregistrerSujets extends Component
             ->when($this->statut === 'Naissance', fn ($q) => $q->where('ne', '>', 0))
             ->when($this->statut === 'Achat', fn ($q) => $q->where('achat', '>', 0))
             ->latest('entry_date')
+            ->orderBy('id')   // ordre stable à date égale (le poste départage de la même façon)
             ->limit(50)
             ->get();
 
