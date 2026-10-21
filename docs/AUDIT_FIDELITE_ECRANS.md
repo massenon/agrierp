@@ -311,7 +311,7 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 - *Rapports & Exports :* `ml-auto` aligne les boutons d'export à DROITE même quand ils passent seuls à la ligne ; le poste les laisse à gauche dans ce cas (`WrapAlignment.spaceBetween` ne sait pas aligner un enfant seul). Visible seulement sous ~ 700 px de largeur de contenu.
 - *Police :* le banc de test dessine en police Ahem (toutes les chaînes y sont deux fois plus larges qu'en Inter) ; les mesures de largeur d'un champ sont donc des mesures de STRUCTURE (marges, hauteurs, alignements), pas de largeur réelle.
 
-**Hors périmètre, relevé :** dans les modales de Transferts, de Suivi Reproduction et de Courriers, les champs VOISINS de la date (texte, listes) ont encore le gabarit Material (`labelText` flottant ou `xs`) ; leur reprise est un ticket à part (MP2).
+**Hors périmètre, relevé :** dans les modales de Transferts, de Suivi Reproduction et de Courriers, les champs VOISINS de la date (texte, listes) ont encore le gabarit Material (`labelText` flottant ou `xs`) ; leur reprise est un ticket à part (MP2). Même chose pour les libellés voisins des modales Courriers, Documents, Archivage, Remboursement et Règlement : écrits en `xs` gras sans majuscules, alors que le Blade a `text-[10px] uppercase text-brand-forest` — seul le libellé du champ Date est désormais conforme, il se détache donc de ses voisins jusqu'à MP2.
 
 ### 9.3 Garde-fous (`test/champs_date_mise_en_page_test.dart`)
 

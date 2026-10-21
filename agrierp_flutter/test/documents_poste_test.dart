@@ -1388,7 +1388,8 @@ void main() {
           'Titre du document *',
           'Type de document *',
           'Bénéficiaire *',
-          'Date *',
+          // Ticket MP1 : le libellé d'un champ Date est celui du Blade, `uppercase` compris (`ChampDateFormulaire`).
+          'DATE *',
           'Statut',
         ]) {
           expect(find.text(libelle), findsOneWidget, reason: libelle);
