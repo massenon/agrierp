@@ -115,6 +115,8 @@ class SyncController extends Controller
      */
     private const CLES_DE_PUSH = [
         'livestock_daily_entries', 'sales', 'stock_adjustments', 'veterinary_records', 'expenses',
+        // Ticket BS1 — bandes créées, modifiées et archivées au poste.
+        'livestock_lots',
         'livestock_reproduction_events', 'purchases', 'attendance_records', 'products', 'suppliers',
         'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments',
         'purchase_returns', 'supplier_refunds', 'customer_advances', 'advance_imputations',
@@ -1853,6 +1855,8 @@ class SyncController extends Controller
             'cles_invalides' => $clesInvalides,
             // Ticket S-T9 — `merged` : fiche du poste fusionnée dans celle que le serveur tient pour la même (bande, jour).
             'livestock_daily_entries' => ['accepted' => [], 'rejected' => [], 'merged' => []],
+            // Ticket BS1 — bandes du poste, rejouées par `SaisieBandeAction` (le point de passage de l'écran web).
+            'livestock_lots' => ['accepted' => [], 'rejected' => []],
             'sales' => ['accepted' => [], 'rejected' => []],
             'stock_adjustments' => ['accepted' => [], 'rejected' => []],
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
@@ -1997,6 +2001,12 @@ class SyncController extends Controller
         // d'où un interblocage croisé possible entre un poste qui envoie et la caisse qui vend dans la même bande. Placé
         // APRÈS les produits du même envoi (créés, ou fusionnés : les références sont déjà traduites).
         OrdreDesVerrous::stock($this->produitsDeLEnvoi($request));
+
+        // Ticket BS1 — LES BANDES AVANT LES FICHES ET LES TRANSFERTS : une fiche, un transfert de constitution du même
+        // envoi peut viser la bande que le poste vient de créer.
+        if ($request->has('livestock_lots')) {
+            $result['livestock_lots'] = $this->pushLots($request->input('livestock_lots'));
+        }
 
         if ($request->has('livestock_daily_entries')) {
             $result['livestock_daily_entries'] = $this->pushDailyEntries(
@@ -2174,6 +2184,8 @@ class SyncController extends Controller
      */
     private const PERMISSION_PAR_TABLE = [
         'livestock_daily_entries' => 'manage-elevage',
+        // Ticket BS1 — le droit de l'écran « Bandes & Sujets » du web.
+        'livestock_lots' => 'manage-elevage',
         'livestock_transfers' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'infirmary_records' => 'manage-elevage',
@@ -4233,6 +4245,93 @@ class SyncController extends Controller
     /**
      * @param  array<string, true>  $fichesRecues  fiches du MÊME envoi qui portent déjà ses ventes (15.30 ; S-T9 : créées par l'envoi ou réduites)
      */
+    /**
+     * Ticket BS1 — bandes créées, modifiées ou archivées au poste. `livestock_lots` était un référentiel en lecture
+     * seule : c'est maintenant une table MIXTE (tirée ET saisie), jouée par `SaisieBandeAction` — le point de passage
+     * de l'écran web « Bandes & Sujets » (mêmes règles, mêmes messages, même audit).
+     *
+     * ⚠️ L'EFFECTIF N'APPARTIENT PAS AU POSTE. `current_quantity` est celui des fiches (cascade du serveur) : la ligne
+     * du poste n'y touche JAMAIS, sauf correction explicite de l'exploitant (`effectif_corrige`, « Modifier la Bande »
+     * du web). Sans cela, une bande dont le poste change le stade écraserait l'effectif des fiches reçues d'ailleurs.
+     * Le code, l'espèce, l'effectif initial et la date de création ne changent jamais après la création.
+     *
+     * Idempotent : un renvoi identique n'écrit rien ; une bande archivée n'est plus modifiable (le motif du web) ; un
+     * second archivage est acquitté sans trace.
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>}
+     */
+    private function pushLots(array $bandes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieBandeAction::class);
+
+        foreach ($bandes as $donnees) {
+            $id = is_array($donnees) ? ($donnees['id'] ?? null) : null;
+
+            try {
+                $donnees = is_array($donnees) ? $donnees : [];
+                $existante = is_string($id) && \Illuminate\Support\Str::isUuid($id) ? LivestockLot::find($id) : null;
+                $espece = isset($donnees['species_id']) && is_string($donnees['species_id'])
+                    ? \App\Models\LivestockSpecies::find($donnees['species_id'])
+                    : null;
+
+                $valides = validator($donnees, [
+                    'id' => ['required', 'uuid'],
+                    'code' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('livestock_lots', 'code')->ignore($existante?->id)],
+                    'species_id' => ['required', 'uuid', 'exists:livestock_species,id'],
+                    'stage' => ['required', 'in:'.implode(',', array_keys(LivestockLot::stadesPourEspece($espece?->code)))],
+                    'created_date' => ['required', 'date'],
+                    'initial_quantity' => ['required', 'integer', 'min:1'],
+                    'acquisition_cost' => ['nullable', 'numeric', 'min:0'],
+                    'product_id' => ['nullable', 'uuid', 'exists:products,id'],
+                    'status' => ['sometimes', 'in:actif,cloture'],
+                    'is_active' => ['sometimes', 'boolean'],
+                    'effectif_corrige' => ['nullable', 'integer', 'min:0'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archivee = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                if ($existante !== null && $existante->code !== $valides['code']) {
+                    $rejected[] = ['id' => $id, 'reason' => "Le code d'une bande ne se modifie jamais après sa création."];
+
+                    continue;
+                }
+
+                // Une seule transaction par ligne : une création suivie d'un refus n'écrit rien.
+                DB::transaction(function () use ($saisie, $valides, $existante, $archivee) {
+                    if ($existante === null) {
+                        $saisie->creer([
+                            'code' => $valides['code'], 'species_id' => $valides['species_id'], 'stage' => $valides['stage'],
+                            'created_date' => $valides['created_date'], 'quantity' => $valides['initial_quantity'],
+                            'acquisition_cost' => $valides['acquisition_cost'] ?? null, 'product_id' => $valides['product_id'] ?? null,
+                        ], $valides['id']);
+                        if (($valides['status'] ?? 'actif') !== 'actif') {
+                            $saisie->modifier($valides['id'], ['stage' => $valides['stage'], 'status' => $valides['status']]);
+                        }
+                        if ($archivee) {
+                            $saisie->archiver($valides['id']);
+                        }
+                    } elseif ($archivee) {
+                        $saisie->archiver($valides['id']);
+                    } else {
+                        $saisie->modifier($valides['id'], [
+                            'stage' => $valides['stage'],
+                            'status' => $valides['status'] ?? $existante->status,
+                            'current_quantity' => $valides['effectif_corrige'] ?? null,
+                        ]);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     /**
      * Ticket 15.46 — transferts entre bandes créés ou annulés au poste. Jamais fusionnés : un transfert nouveau
      * est REJOUÉ par `TransferBetweenLotsAction` (mêmes contrôles d'effectif que l'écran web, fiches et cascade

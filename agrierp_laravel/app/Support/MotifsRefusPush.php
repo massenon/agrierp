@@ -67,6 +67,9 @@ class MotifsRefusPush
             'lines.*.product_id' => 'produit de la ligne', 'lines.*.lot_id' => 'bande de la ligne',
             'lines.*.qty' => 'quantité de la ligne', 'lines.*.unit_price' => 'prix unitaire de la ligne',
             'lines.*.manual_total_amount' => 'montant de la ligne',
+            'code' => 'code', 'species_id' => 'espèce', 'stage' => 'stade', 'created_date' => 'date de création',
+            'initial_quantity' => 'effectif initial', 'acquisition_cost' => 'coût d\'acquisition',
+            'effectif_corrige' => 'effectif actuel',
             'lot_id' => 'bande', 'entry_date' => 'date de la fiche', 'saillie_date' => 'date de saillie',
             'mother_ref' => 'référence de la mère', 'sire_ref' => 'référence du mâle',
             'supplier_id' => 'fournisseur', 'customer_id' => 'client', 'treasury_account_id' => 'compte de trésorerie',
@@ -207,6 +210,7 @@ class MotifsRefusPush
         $objet = [
             'livestock_daily_entries' => 'saisir une fiche d\'élevage',
             'livestock_transfers' => 'transférer des sujets entre bandes',
+            'livestock_lots' => 'créer, modifier ou archiver une bande',
             'livestock_reproduction_events' => 'enregistrer un événement de reproduction',
             'veterinary_records' => 'enregistrer un soin vétérinaire',
             'infirmary_records' => 'enregistrer une entrée d\'infirmerie',
