@@ -4288,7 +4288,11 @@ class SyncController extends Controller
 
                 $valides = validator($donnees, [
                     'id' => ['required', 'uuid'],
-                    'code' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('livestock_lots', 'code')->ignore($existante?->id)],
+                    // Ticket UNI : unique parmi TOUTES les bandes, casse et espaces ignorés ; le motif dit au poste quoi faire (renommer).
+                    // ⚠️ Un code que la bande PORTE DÉJÀ n'est pas revérifié : un doublon antérieur à la règle ne bloque ni
+                    // l'archivage, ni la restauration, ni le changement de stade de cette bande (le client le renomme).
+                    'code' => array_merge(['required', 'string', 'max:50'], $existante !== null && trim((string) $existante->code) === trim((string) ($donnees['code'] ?? ''))
+                        ? [] : [\App\Rules\UniqueNormalise::bande($existante?->id, depuisPoste: true)]),
                     'species_id' => ['required', 'uuid', 'exists:livestock_species,id'],
                     'stage' => ['required', 'in:'.implode(',', array_keys(LivestockLot::stadesPourEspece($espece?->code)))],
                     'created_date' => ['required', 'date'],
@@ -4305,14 +4309,16 @@ class SyncController extends Controller
                 $archivee = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
                 $restauree = ! $archivee && filter_var($valides['restauree'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-                if ($existante !== null && $existante->code !== $valides['code']) {
+                // Ticket UNI : le code ne change jamais, SAUF pour corriger un doublon (code partagé avec une autre bande).
+                $renomme = $existante !== null && trim((string) $existante->code) !== $valides['code'];
+                if ($renomme && ! $existante->codeEstEnDoublon()) {
                     $rejected[] = ['id' => $id, 'reason' => "Le code d'une bande ne se modifie jamais après sa création."];
 
                     continue;
                 }
 
                 // Une seule transaction par ligne : une création suivie d'un refus n'écrit rien.
-                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree) {
+                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree, $renomme) {
                     if ($existante === null) {
                         $saisie->creer([
                             'code' => $valides['code'], 'species_id' => $valides['species_id'], 'stage' => $valides['stage'],
@@ -4333,11 +4339,12 @@ class SyncController extends Controller
                     } elseif ($archivee) {
                         // BS-Q3 : la bande doit être vidée AVANT d'être archivée. Une correction d'effectif envoyée avec
                         // l'archivage (bande vidée au poste) se joue d'abord, comme au web (Modifier, puis Archiver).
-                        if (($valides['effectif_corrige'] ?? null) !== null && $existante->is_active) {
+                        if ((($valides['effectif_corrige'] ?? null) !== null || $renomme) && $existante->is_active) {
                             $saisie->modifier($valides['id'], [
                                 'stage' => $valides['stage'],
                                 'status' => $valides['status'] ?? $existante->status,
-                                'current_quantity' => $valides['effectif_corrige'],
+                                'current_quantity' => $valides['effectif_corrige'] ?? null,
+                                'code' => $valides['code'],
                             ]);
                         }
                         $saisie->archiver($valides['id']);
@@ -4350,6 +4357,7 @@ class SyncController extends Controller
                             'stage' => $valides['stage'],
                             'status' => $valides['status'] ?? $existante->status,
                             'current_quantity' => $valides['effectif_corrige'] ?? null,
+                            'code' => $valides['code'],
                         ]);
                     }
                 });

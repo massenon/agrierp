@@ -14,6 +14,31 @@ class LivestockLot extends Model
         'created_date', 'acquisition_cost', 'status', 'cost_center_id', 'is_active', 'product_id',
     ];
 
+    /**
+     * Ticket UNI — refus d'un code déjà porté par une AUTRE bande (en cours ou archivée), insensible à la casse et aux
+     * espaces. Le même texte au web (sous le champ « Code Unique de la Bande ») et au poste.
+     *
+     * [$depuisPoste] : la réponse de l'envoi ajoute la marche à suivre — la bande n'est pas perdue, elle attend sur
+     * le poste, où « Modifier » permet de la renommer. Le poste reconnaît ce refus à `PREFIXE_CODE_PRIS`.
+     */
+    public static function messageCodePris(string $code, bool $depuisPoste = false): string
+    {
+        $message = 'Le code « '.$code.' » est déjà utilisé par une autre bande (en cours ou archivée) : choisissez un autre code.';
+
+        return $depuisPoste
+            ? $message.' Votre bande est conservée sur ce poste : renommez-la (Élevage > Bandes & Sujets, bouton « Modifier ») puis synchronisez de nouveau.'
+            : $message;
+    }
+
+    /** Ticket UNI — une AUTRE bande porte-t-elle déjà ce code (casse, accents, espaces ignorés) ? Alors il se corrige. */
+    public function codeEstEnDoublon(): bool
+    {
+        return \App\Rules\UniqueNormalise::estPris('livestock_lots', 'code', $this->code, $this->id);
+    }
+
+    /** Ticket UNI — refus du renommage d'une bande dont le code n'est partagé avec aucune autre. */
+    public const MESSAGE_CODE_IMMUABLE = "Le code d'une bande ne se modifie jamais après sa création : seul un code partagé avec une autre bande peut être corrigé.";
+
     /** Ticket 15.46 — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés). */
     public function lotSource()
     {

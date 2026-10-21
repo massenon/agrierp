@@ -147,6 +147,11 @@ String cleCommeLeServeur(String t) {
   return sortie.toString();
 }
 
+/// Ticket UNI — clé de comparaison des codes et libellés qui doivent être UNIQUES (code de bande) : celle de
+/// [cleCommeLeServeur] (casse, accents) plus les espaces au début, à la fin et doublés. C'est `CleUnicite::cle()` du
+/// serveur : une valeur est « déjà prise » au poste exactement dans les cas où le serveur la refuserait.
+String cleUnicite(String t) => cleCommeLeServeur(t.replaceAll(RegExp(r'\s+'), ' ').trim());
+
 /// Clé de tri de `orderBy('name')` sous la collation du serveur (`utf8mb4_unicode_ci`) : insensible à la casse et
 /// aux accents ; égalité départagée par le texte brut, pour un ordre stable.
 int comparerCommeLeServeur(String a, String b) {
