@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'caisse_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -562,86 +563,21 @@ class _CaisseScreenState extends State<CaisseScreen> {
   /// calendrier, la date s'affiche en JJ/MM/AAAA. Bornes INDICATIVES (comme le POS web) : du
   /// début du plus ancien exercice ouvert connu à aujourd'hui ; le dépôt juge, le serveur
   /// re-juge. Un refus s'affiche SOUS le champ dès le choix, sans attendre la validation.
-  Widget _champDateVente() {
-    final anterieure = _dateVente.isBefore(widget.depot.aujourdhui());
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'DATE DE LA VENTE',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: AgriColors.brandForest,
-          ),
-        ),
-        const SizedBox(height: AgriSpacing.xs),
-        Material(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            side: BorderSide(
-              color: _refusDate != null
-                  ? AgriColors.errorDeep
-                  : AgriColors.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: InkWell(
-            key: const Key('date-vente'),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-            onTap: _choisirDateVente,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _jourFr(_dateVente),
-                      style: const TextStyle(
-                        fontSize: AgriTypography.xs,
-                        fontWeight: FontWeight.bold,
-                        color: AgriColors.brandForest,
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    SymbolesAgri.calendar_today,
-                    size: 16,
-                    color: AgriColors.outline,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (_refusDate != null)
-          Padding(
-            key: const Key('date-vente-erreur'),
-            padding: const EdgeInsets.only(top: AgriSpacing.xs),
-            child: Text(
-              _refusDate!,
-              style: const TextStyle(fontSize: 10, color: AgriColors.errorDeep),
-            ),
-          )
-        else if (anterieure)
-          Padding(
-            key: const Key('date-vente-aide'),
-            padding: const EdgeInsets.only(top: AgriSpacing.xs),
-            // Texte du POS web (15.32), mot pour mot : au poste, l'écriture et la créance sont
-            // datées par le serveur à la synchronisation, le stock et la fiche dès maintenant.
-            child: Text(
-              'Vente antérieure : écriture, stock, créance et fiche seront '
-              'datés du ${_jourFr(_dateVente)}.',
-              style: const TextStyle(fontSize: 10, color: AgriColors.outline),
-            ),
-          ),
-      ],
-    );
-  }
+  Widget _champDateVente() => ChampDateFormulaire(
+    cle: const Key('date-vente'),
+    etiquette: 'Date de la vente',
+    valeur: _dateVente,
+    caisse: true,
+    onTap: _choisirDateVente,
+    erreur: _refusDate,
+    cleErreur: const Key('date-vente-erreur'),
+    // `text-[10px] text-outline mt-xs` du POS web (15.32), mot pour mot : au poste, l'écriture et la créance sont
+    // datées par le serveur à la synchronisation, le stock et la fiche dès maintenant.
+    aide: _dateVente.isBefore(widget.depot.aujourdhui())
+        ? 'Vente antérieure : écriture, stock, créance et fiche seront datés du ${_jourFr(_dateVente)}.'
+        : null,
+    cleAide: const Key('date-vente-aide'),
+  );
 
   Future<void> _choisirDateVente() async {
     final bornes = await widget.depot.bornesDateVente();

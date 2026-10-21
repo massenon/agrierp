@@ -5,6 +5,7 @@ import '../../core/database/app_database.dart' show FiscalYear;
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
@@ -746,40 +747,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                   onChanged: (v) => setState(() => _compteGrandLivre = v),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AgriSpacing.sm,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AgriColors.surfaceZebra,
-                  borderRadius: BorderRadius.circular(AgriRadius.lg),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _champDate(
-                      const Key('gl-date-debut'),
-                      _debut!,
-                      (v) => _debut = v,
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: AgriSpacing.xs),
-                      child: Text(
-                        'au',
-                        style: TextStyle(
-                          fontSize: AgriTypography.xs,
-                          color: AgriColors.outline,
-                        ),
-                      ),
-                    ),
-                    _champDate(
-                      const Key('gl-date-fin'),
-                      _fin!,
-                      (v) => _fin = v,
-                    ),
-                  ],
-                ),
+              // `flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1` : champs sans bordure (`p-1`) et « au ».
+              PeriodeDatesZebra(
+                key: const Key('gl-periode'),
+                debut: _champDate(const Key('gl-date-debut'), _debut!, (v) => _debut = v),
+                fin: _champDate(const Key('gl-date-fin'), _fin!, (v) => _fin = v),
               ),
             ],
           ),
@@ -953,8 +925,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     DateTime valeur,
     void Function(DateTime) affecter,
   ) {
-    return InkWell(
-      key: cle,
+    return ChampDateSansBordure(
+      cle: cle,
+      valeur: valeur,
       onTap: () async {
         // Ticket EX7 (EF9) — calendrier borné à l'exercice affiché (`min` / `max` du web) sous le socle.
         final etat = _etatPilote();
@@ -967,17 +940,6 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         if (choisie == null) return;
         setState(() => affecter(choisie));
       },
-      child: Padding(
-        padding: const EdgeInsets.all(AgriSpacing.xs),
-        child: Text(
-          _date(valeur),
-          style: const TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: AgriTypography.gras,
-            color: AgriColors.brandForest,
-          ),
-        ),
-      ),
     );
   }
 

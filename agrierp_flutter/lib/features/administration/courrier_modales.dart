@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -138,10 +139,6 @@ class _ModaleCourrierState extends State<_ModaleCourrier> {
     ),
   );
 
-  static String _jour(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
-
   @override
   Widget build(BuildContext context) {
     return ModaleAgri(
@@ -182,12 +179,15 @@ class _ModaleCourrierState extends State<_ModaleCourrier> {
             'partie',
             _texte('partie', _partie),
           ),
-          _bloc(
-            'Date *',
-            'date',
-            OutlinedButton(
-              key: const Key('courrier-date'),
-              onPressed: () async {
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+            child: ChampDateFormulaire(
+              cle: const Key('courrier-date'),
+              etiquette: 'Date *',
+              valeur: _date,
+              erreur: _erreurs['date'],
+              cleErreur: const Key('courrier-erreur-date'),
+              onTap: () async {
                 final choisie = await showDatePicker(
                   context: context,
                   initialDate: _date ?? HeureBenin.maintenant(),
@@ -196,10 +196,6 @@ class _ModaleCourrierState extends State<_ModaleCourrier> {
                 );
                 if (choisie != null) setState(() => _date = choisie);
               },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(_date == null ? 'jj/mm/aaaa' : _jour(_date!)),
-              ),
             ),
           ),
         ],

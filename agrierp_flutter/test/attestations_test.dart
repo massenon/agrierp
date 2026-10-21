@@ -9,6 +9,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
+import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -693,6 +694,23 @@ void main() {
         find.byType(CarteKpi),
         findsNWidgets(cartesAttendues('rh-attestations.html')),
       );
+    });
+
+    testWidgets('MP1 — Date de Début / Date de Fin : grid-cols-2 gap-sm, h-11 (44 px), libellé text-[10px] à mb-xs', (
+      tester,
+    ) async {
+      await afficher(tester);
+
+      final debut = tester.getRect(find.byKey(const Key('att-debut')));
+      final fin = tester.getRect(find.byKey(const Key('att-fin')));
+      expect(debut.height, AgriChamps.hauteurFormulaire);
+      expect(fin.height, AgriChamps.hauteurFormulaire);
+      expect(debut.top, fin.top);
+      expect(debut.width, closeTo(fin.width, 0.01));
+      expect(fin.left - debut.right, closeTo(AgriSpacing.sm, 0.01));
+      final etiquette = tester.getRect(find.text('DATE DE DÉBUT'));
+      expect(debut.top - etiquette.bottom, closeTo(AgriSpacing.xs, 0.01));
+      expect(etiquette.left, debut.left);
     });
 
     testWidgets('choisir une personne préremplit poste, dates et aperçu', (

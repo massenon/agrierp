@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import 'achats_repository.dart';
@@ -403,11 +404,13 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
             erreur: _erreurs['montant'],
             cle: const Key('remb-erreur-montant'),
           ),
-          _bloc(
-            'Date du Remboursement *',
-            OutlinedButton(
-              key: const Key('remb-date'),
-              onPressed: () async {
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+            child: ChampDateFormulaire(
+              cle: const Key('remb-date'),
+              etiquette: 'Date du Remboursement *',
+              valeur: _date,
+              onTap: () async {
                 // Ticket EX6 (EF7) — calendrier borné au plus ancien exercice OUVERT connu (`min` du web).
                 final premier = await widget.depot.premierJourSaisissable();
                 if (!context.mounted) return;
@@ -426,10 +429,6 @@ class _ModaleRemboursementState extends State<_ModaleRemboursement> {
                 );
                 if (choisie != null) setState(() => _date = choisie);
               },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(AchatsRepository.jour(_date)),
-              ),
             ),
           ),
           _bloc(

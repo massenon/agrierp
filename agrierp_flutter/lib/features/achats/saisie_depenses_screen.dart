@@ -7,6 +7,7 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
@@ -442,53 +443,33 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   /// « Date de la Transaction * » — `type="date"` du web, borné (ticket EX6) au plus ancien exercice OUVERT connu
   /// (`min` du web, `AccountingEntryService::premierJourSaisissable`).
-  Widget _champDate() {
-    String deux(int n) => n.toString().padLeft(2, '0');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _etiquette('Date de la Transaction *'),
-        // Ticket EX7 (EX-Q5) — dépense comptabilisée en modification : date grisée, motif du web en info-bulle.
-        LectureSeule.infobulle(
-          _dateVerrouillee ? SaisieDepensesScreen.motifDateVerrouillee : null,
-          InkWell(
-          key: const Key('champ-date'),
-          onTap: _dateVerrouillee ? null : () async {
-            final premier = await widget.depot.premierJourSaisissable();
-            if (!mounted) return;
-            final bornes = ExerciceDeSaisie.calendrier(
-              premier: premier,
-              repli: DateTime(2000),
-              dernier: DateTime(2100),
-              initial: _date,
-            );
-            final choisie = await showDatePicker(
-              context: context,
-              initialDate: bornes.initial,
-              firstDate: bornes.premier,
-              lastDate: DateTime(2100),
-            );
-            if (choisie != null) setState(() => _date = choisie);
-          },
-          child: Container(
-            height: 44,
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-            decoration: _cadre('date'),
-            child: Text(
-              '${deux(_date.day)}/${deux(_date.month)}/${_date.year}',
-              style: TextStyle(
-                fontSize: AgriTypography.sm,
-                color: _dateVerrouillee ? AgriColors.outline : null,
-              ),
-            ),
-          ),
-        ),
-        ),
-        _erreur('date'),
-      ],
-    );
-  }
+  Widget _champDate() => ChampDateFormulaire(
+    cle: const Key('champ-date'),
+    etiquette: 'Date de la Transaction *',
+    valeur: _date,
+    erreur: _erreurs['date'],
+    cleErreur: const Key('erreur-date'),
+    // Ticket EX7 (EX-Q5) — dépense comptabilisée en modification : date grisée, motif du web en info-bulle.
+    desactive: _dateVerrouillee,
+    infobulle: _dateVerrouillee ? SaisieDepensesScreen.motifDateVerrouillee : null,
+    onTap: () async {
+      final premier = await widget.depot.premierJourSaisissable();
+      if (!mounted) return;
+      final bornes = ExerciceDeSaisie.calendrier(
+        premier: premier,
+        repli: DateTime(2000),
+        dernier: DateTime(2100),
+        initial: _date,
+      );
+      final choisie = await showDatePicker(
+        context: context,
+        initialDate: bornes.initial,
+        firstDate: bornes.premier,
+        lastDate: DateTime(2100),
+      );
+      if (choisie != null) setState(() => _date = choisie);
+    },
+  );
 
   Widget _champTexte({
     required String libelle,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/toast_agri.dart';
@@ -1241,27 +1242,19 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                   ],
                 ),
                 const SizedBox(height: AgriSpacing.md),
-                _champ(
-                  'Date de Saillie *',
-                  InkWell(
-                    key: const Key('saillie-date'),
-                    onTap: () async {
-                      final choisie = await showDatePicker(
-                        context: context,
-                        initialDate: date,
-                        firstDate: DateTime(2020),
-                        lastDate: HeureBenin.maintenant(),
-                      );
-                      if (choisie != null) rafraichir(() => date = choisie);
-                    },
-                    child: InputDecorator(
-                      decoration: _decoration(),
-                      child: Text(
-                        _date(date),
-                        style: const TextStyle(fontSize: AgriTypography.sm),
-                      ),
-                    ),
-                  ),
+                ChampDateFormulaire(
+                  cle: const Key('saillie-date'),
+                  etiquette: 'Date de Saillie *',
+                  valeur: date,
+                  onTap: () async {
+                    final choisie = await showDatePicker(
+                      context: context,
+                      initialDate: date,
+                      firstDate: DateTime(2020),
+                      lastDate: HeureBenin.maintenant(),
+                    );
+                    if (choisie != null) rafraichir(() => date = choisie);
+                  },
                 ),
                 if (!porcs) ...[
                   const SizedBox(height: AgriSpacing.md),

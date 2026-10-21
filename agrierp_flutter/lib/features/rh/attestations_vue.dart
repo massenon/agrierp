@@ -4,6 +4,7 @@ import '../../core/erreurs/message_erreur.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import 'attestations_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -395,11 +396,8 @@ class _AttestationsVueState extends State<AttestationsVue> {
 
   // ── Onglet 1 : Générer une Attestation ───────────────────────────────────
 
-  static const _etiquette = TextStyle(
-    fontSize: 10,
-    fontWeight: AgriTypography.gras,
-    color: AgriColors.brandForest,
-  );
+  /// `block text-[10px] text-brand-forest font-bold uppercase mb-xs`.
+  static const _etiquette = StylesChampsAgri.etiquetteFormulaire;
 
   Widget _generer_(bool large) {
     final formulaire = _carteFormulaire();
@@ -617,18 +615,23 @@ class _AttestationsVueState extends State<AttestationsVue> {
     );
   }
 
-  InputDecoration _decor(String aide, {bool erreur = false, Widget? fin}) =>
-      InputDecoration(
+  InputDecoration _decor(
+    String aide, {
+    bool erreur = false,
+    Widget? fin,
+    double? hauteurFixe,
+  }) => InputDecoration(
         hintText: aide,
         hintStyle: const TextStyle(
           fontSize: AgriTypography.sm,
           color: AgriColors.outline,
         ),
         suffixIcon: fin,
+        suffixIconConstraints: const BoxConstraints(),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: AgriSpacing.md,
-          vertical: 14,
+          vertical: hauteurFixe == null ? 14 : (hauteurFixe - AgriTypography.smInterligne) / 2,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AgriRadius.lg),
@@ -658,13 +661,19 @@ class _AttestationsVueState extends State<AttestationsVue> {
         key: Key(cle),
         controller: controleur,
         onChanged: (_) => setState(() {}),
-        style: const TextStyle(fontSize: AgriTypography.sm),
+        style: StylesChampsAgri.valeurFormulaire,
         decoration: _decor(
           'jj/mm/aaaa',
+          // `h-11` : 44 px EXACTS (ticket MP1) — interligne de `text-sm` + marges verticales de part et d'autre.
+          hauteurFixe: AgriChamps.hauteurFormulaire,
           erreur: _erreurs.containsKey(champ),
           fin: IconButton(
             key: Key('$cle-calendrier'),
-            icon: const Icon(SymbolesAgri.calendar_today, size: 16),
+            // Sans zone de toucher de 48 px, qui porterait le champ à 48 px au lieu des 44 px de `h-11`.
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+            constraints: const BoxConstraints(),
+            style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            icon: const Icon(SymbolesAgri.calendar_today, size: AgriChamps.iconeCalendrier),
             onPressed: () async {
               final choisie = await showDatePicker(
                 context: context,

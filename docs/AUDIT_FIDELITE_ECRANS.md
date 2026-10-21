@@ -257,3 +257,65 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 | Le poste crée ou modifie des articles hors ligne | **existe déjà** (`manage-stocks`) | — |
 | Jeton dans `flutter_secure_storage` | **existe déjà** | — |
 | Appairage dans Paramètres Général > Synchronisation (admin) | pas d'appairage : chaque utilisateur se connecte, le jeton porte le nom du poste | ❓ D-SYNC-5 |
+
+---
+
+## 9. Date et Mois — mise en page (ticket MP1, 21/10/2026)
+
+**Demande du client :** « dans le poste, revoir la position des libellés et champs Date et Mois ; il faut contrôler les marges, espacements, alignements et proportions. »
+
+**Maître :** les Blade (`resources/views/livewire/**` et `components/mois-de-fiche.blade.php`). Toutes les valeurs ci-dessous sont **lues** dans les classes Tailwind ; `tailwind.config.js` ÉTEND l'échelle d'espacement (`xs` 4, `sm` 8, `md` 16, `lg` 24, `xl` 32) sans remplacer l'échelle par défaut : `h-9` = 36, `h-10` = 40, `h-11` = 44, `w-8` = 32, `py-1.5` = 6. `text-xs` = 13,6 px, interligne 16 (surcharge de `common.css`) ; `text-sm` = 14 px, interligne 20 ; `text-[10px]` hérite l'interligne 1,5 du préflight.
+
+### 9.1 Les cinq gabarits de champ Date du Blade
+
+| Gabarit | Où | Classes lues dans le Blade | Libellé |
+|---|---|---|---|
+| **Fiche** (`h-9`) | en-tête des 5 fiches journalières (Lapins, Porcs, Pondeuses, Reproducteurs, Escargots) | `h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra`, dans `flex items-center gap-xs flex-wrap` | **à côté, avant** : `text-xs text-outline font-semibold` « Date : » ; `gap-xs` |
+| **Mois** | `components/mois-de-fiche.blade.php` | boîte `flex items-center h-9 border rounded-lg bg-surface-zebra overflow-hidden` ; flèches `w-8 h-9`, icône `text-[18px]` ; mois `px-sm text-xs font-bold text-brand-forest` | « Mois : » `text-xs text-outline font-semibold`, enfant PROPRE du `flex-wrap gap-xs` |
+| **Filtre** (`py-2` / `py-1.5`) | Rapports, Liste d'Achats, Bilan, Historique des ventes, Tableau de bord, Compta analytique… | `text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white` (34 px) ; variante `py-1.5` (30 px) | aucun libellé : le mot « au » (`text-xs text-outline`) sépare début et fin ; `gap-sm` ou `gap-xs` selon le conteneur |
+| **Sans bordure** | Grand Livre, Rapprochement | `text-xs font-bold text-brand-forest border-0 bg-transparent p-1` dans `flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1` | « au » |
+| **Formulaire** (`h-11`) | modales et « Nouvelle Dépense » (~25 champs) ; caisse en `h-10 text-xs bg-white` | `w-full h-11 px-md border rounded-lg text-sm` (+ `is-invalid` : bord `#BA1A1A`, fond `#FFF5F5`) | **au-dessus** : `block text-[10px] text-brand-forest font-bold uppercase mb-xs` ; erreur `.invalid-feedback` 11 px, `mt: 2px` ; paires `grid grid-cols-2 gap-sm` |
+
+### 9.2 Table des écarts (avant correction)
+
+| # | Écran du poste | Blade (maître) | Poste (avant) | Correction |
+|---|---|---|---|---|
+| E1 | 4 fiches (`EnTeteSaisieFiche`) : Lapins, Porcs, Reproducteurs, Escargots | « Mois : » et sa boîte sont deux enfants du `flex-wrap gap-xs` | « Mois : » collé à sa boîte dans un `Row` : le groupe se replie en bloc, jamais séparé | libellé et boîte aplatis dans la barre (`BarreChoixFiche`) |
+| E2 | idem | `flex-wrap gap-xs` : écart de 4 px entre les lignes de repli | `Wrap(spacing: xs)` sans `runSpacing` : 0 px entre deux lignes | `runSpacing: AgriSpacing.xs` |
+| E3 | idem | `<input type="date">` : texte + indicateur de calendrier du navigateur à droite (le champ fait ~ 135 px) | texte seul (~ 110 px) : proportions Date / Mois / Bande différentes | indicateur `calendar_today` 16 px à droite du texte (`ChampDateFiche`) |
+| E4 | idem | libellé `text-xs` : interligne 16 | interligne du moteur (non fixé) : 1 px de décalage vertical possible avec le champ de 36 px | `StylesChampsAgri.etiquetteEnLigne` fixe l'interligne à `xsInterligne` |
+| E5 | Fiche Pondeuses | même en-tête que les quatre autres | **copie** de l'en-tête (`_enTeteSaisie`, `_cadreSelection`, `_etiquetteEnLigne`) avec `36` et `FontWeight.w600` en dur | utilise `EnTeteSaisieFiche` : une seule implémentation |
+| E6 | `MoisDeFiche` | `h-9`, `w-8`, `text-[18px]` | `36`, `32`, `18` en dur | `AgriChamps.hauteurCompacte` / `largeurFleche` / `iconeFleche` |
+| E7 | Rapports & Exports (Du / Au) | `<input>` `px-sm py-2 text-xs bg-white` : 34 px de haut, texte seul, pas d'icône | `OutlinedButton.icon` : hauteur 40 + marges du thème, icône `event` ajoutée (absente du web), forme et teinte du thème Material | `ChampDateFiltre` (34 px, bordure `outlineVariant`, `rounded-lg`) |
+| E8 | Rapports & Exports | trois enfants plats (`champ`, « au », `champ`) puis `ml-auto` dans `flex-wrap gap-sm` | début / « au » / fin regroupés dans un `Wrap` interne sans `runSpacing` | `Wrap` plat, `spacing` et `runSpacing` = `sm` |
+| E9 | Tableau de bord (période) | `py-1.5` (6) | `vertical: 6` en dur ; pas d'indicateur de calendrier ; fond et trait propres | `ChampDateFiltre(compact: true, desactive: true)` |
+| E10 | Tableau de bord | `flex-col sm:flex-row` : ligne dès **640 px** | bascule sur `AgriBreakpoints.large` (**1024 px**) : entre 640 et 1023 px, les dates et le choix d'état s'empilent alors que le web les aligne | `AgriBreakpoints.petit` (`sm:`) |
+| E11 | Tableau de bord | `<select … flex-1 sm:w-56>` : 224 px dès `sm:`, sinon il remplit la ligne | 224 px seulement à partir de 1024 px, 180 px en dessous | 224 px dès `sm:`, `Expanded` en dessous |
+| E12 | Grand Livre | `p-1` (4) dans `px-sm py-1` ; icône de calendrier native | `all(xs)` correct mais `vertical: 4` en dur, pas d'indicateur, pas de clé de zone | `ChampDateSansBordure` ; zone `gl-periode` à `sm` / `margeVerticaleConteneur` |
+| E13 | Courriers, Documents administratifs, Archivage (3 dates : Date, Date d'archivage, Échéance) | `w-full h-11 px-md border rounded-lg text-sm` | `OutlinedButton` : forme en pilule, bord et teinte du thème, hauteur du thème, texte à gauche par `Align` | `ChampDateFormulaire` (44 px, `rounded-lg`) |
+| E14 | Achats : Remboursement ; Fournisseurs : Règlement | idem + libellé `text-[10px] font-bold uppercase text-brand-forest mb-xs` | `OutlinedButton` ; le libellé du Règlement est en `xs` gras SANS majuscules, ni vert forêt, ni `mb-xs` | `ChampDateFormulaire` (libellé et champ ensemble) |
+| E15 | Stocks (Date du Nouveau Stock) ; Soins (Date du Soin, Date Prévue) ; Suivi Reproduction (Date de Saillie) | `h-11` fixe | `InputDecorator` : `vertical: 12` en dur + interligne du moteur : hauteur ≈ 43,5 px qui varie avec le thème | `ChampDateFormulaire` : 44 px exactement |
+| E16 | Transferts entre bandes (Date du Transfert) | libellé au-dessus (`mb-xs`), champ `h-11`, grisé (`bg-surface-zebra text-outline`) en constitution | libellé flottant DANS le cadre (`labelText`), casse « normale » | `ChampDateFormulaire(desactive: constitution)` |
+| E17 | Saisie des Dépenses | `h-11`, erreur `.invalid-feedback` (11 px, `mt: 2px`) | déjà fidèle en valeurs, mais **dupliquée** : `44`, `11` et `2` en dur, `_cadre` local, pas d'indicateur de calendrier | `ChampDateFormulaire` (mêmes valeurs, source unique) |
+| E18 | Caisse (Date de la vente) | `h-10 px-md text-xs bg-white`, texte normal, erreur 11 px `mt: 2px` | hauteur 34 (`vertical: sm`), texte en gras vert forêt, erreur 10 px à `xs` | `ChampDateFormulaire(variante: caisse)` : 40 px, texte `xs` normal |
+| E19 | Attestations (Début / Fin) | `grid grid-cols-2 gap-sm`, `h-11`, libellé `text-[10px]` | libellé conforme ; champ `TextField` à `vertical: 14` en dur et bouton calendrier à zone de toucher de 48 px : **48 px de haut au lieu de 44** (mesuré, rouge avant correction) | hauteur `h-11` exacte (marges calculées sur l'interligne de `text-sm`, zone de toucher réduite) ; saisie au clavier conservée (concession du poste) |
+| E20 | Archivage des documents (Date d'archivage / Date d'expiration) | `grid grid-cols-2 gap-sm` : les deux champs **côte à côte**, libellés « Date d'archivage * » et « Date d'expiration » | empilés l'un sous l'autre, libellé sans l'astérisque | `Row` de deux `Expanded` à `gap-sm` ; bouton « Effacer » (ajout du poste) rangé dans le champ |
+
+**Écrans avec un champ Date au Blade et sans champ au poste** (hors périmètre : le champ n'existe pas, il se construit par un ticket de fonctionnalité) : Historique des ventes, Liste d'Achats (filtre), Bilan, Comptabilité analytique, Rapprochement bancaire, Balance âgée, Immobilisations, Journal comptable (saisie), Devis, Avances, Bons de commande, Feuille de pointage, Registre des stagiaires et des employés, Enregistrer des sujets, Registre des reproducteurs, Transformation. Les champs « Jour / Âge » de Paramètres Élevage sont des nombres, pas des dates.
+
+**Concession du poste, assumée :** le calendrier s'ouvre dans le `showDatePicker` de Flutter, pas dans le sélecteur natif du navigateur ; l'indicateur dessiné à droite du texte (16 px) en tient lieu.
+
+**Écarts relevés et NON corrigés (décision documentée) :**
+
+- *Fiche Reproducteurs :* son Blade écrit la barre `flex items-center gap-xs` SANS `flex-wrap` (les quatre autres : `flex-wrap`). Le poste replie la barre dans les cinq cas : identique dès 640 px, plus sûr en dessous. Si le client préfère la fidélité stricte, c'est une retouche du Blade (ajouter `flex-wrap`), pas du poste.
+- *Rapports & Exports :* `ml-auto` aligne les boutons d'export à DROITE même quand ils passent seuls à la ligne ; le poste les laisse à gauche dans ce cas (`WrapAlignment.spaceBetween` ne sait pas aligner un enfant seul). Visible seulement sous ~ 700 px de largeur de contenu.
+- *Police :* le banc de test dessine en police Ahem (toutes les chaînes y sont deux fois plus larges qu'en Inter) ; les mesures de largeur d'un champ sont donc des mesures de STRUCTURE (marges, hauteurs, alignements), pas de largeur réelle.
+
+**Hors périmètre, relevé :** dans les modales de Transferts, de Suivi Reproduction et de Courriers, les champs VOISINS de la date (texte, listes) ont encore le gabarit Material (`labelText` flottant ou `xs`) ; leur reprise est un ticket à part (MP2). Même chose pour les libellés voisins des modales Courriers, Documents, Archivage, Remboursement et Règlement : écrits en `xs` gras sans majuscules, alors que le Blade a `text-[10px] uppercase text-brand-forest` — seul le libellé du champ Date est désormais conforme, il se détache donc de ses voisins jusqu'à MP2.
+
+### 9.3 Garde-fous (`test/champs_date_mise_en_page_test.dart`)
+
+1. **mesures** à 640, 1024 et 1440 px (et 360 px pour l'en-tête des fiches) : libellé à `mb-xs` au-dessus du champ, champs de même hauteur et de même ordonnée sur une même ligne, libellés en ligne centrés sur leur champ à `gap-xs`, flèches du Mois de 32 × 36 px, aucun débordement ;
+2. **écrans** : Rapports, Tableau de bord (640 / 700 / 1024), Grand Livre, Saisie des Dépenses ;
+3. **épreuve de mutation** (faite, puis annulée) : marge libellé → champ `xs` → `sm` (4 rouges), `hauteurFormulaire` 44 → 40 (2 rouges), `runSpacing` de la barre des fiches retiré (2 rouges), `margeVerticaleCompacte` 6 → 5 (2 rouges) ;
+4. **lecture du Blade** : les classes de chaque `<input type="date">` sont lues et comparées à `AgriChamps` / `AgriSpacing` ; un gabarit nouveau au Blade rougit le test (« à auditer ») ; tout écran du poste qui appelle `showDatePicker` doit passer par un champ partagé (`lib/core/widgets/champs_date_agri.dart`).
