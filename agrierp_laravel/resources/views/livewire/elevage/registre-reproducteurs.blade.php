@@ -39,10 +39,9 @@
             </select>
             <select wire:model.live="statusFilter" class="text-xs font-bold border border-outline-variant rounded-lg px-md py-2 bg-white outline-none">
                 <option value="">Tous les statuts</option>
-                <option value="actif">Actif</option>
-                <option value="reforme">Réformé</option>
-                <option value="vendu">Vendu</option>
-                <option value="mort">Mort</option>
+                @foreach(\App\Models\Animal::LIBELLES_STATUT as $valeur => $libelle)
+                    <option value="{{ $valeur }}">{{ $libelle }}</option>
+                @endforeach
             </select>
         </div>
 
@@ -75,7 +74,7 @@
                                 @if($animal->isPresent())
                                     <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-brand-emerald/10 text-brand-emerald">Actif</span>
                                 @else
-                                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-surface-zebra text-outline" title="{{ $animal->exit_reason }}">{{ ucfirst($animal->status) }}</span>
+                                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-surface-zebra text-outline" title="{{ $animal->exit_reason }}">{{ $animal->status_label }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
@@ -104,14 +103,20 @@
         <form wire:submit="saveAnimal" class="grid grid-cols-1 sm:grid-cols-2 gap-md">
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Identifiant (boucle) *</label>
-                <input wire:model="identifier" type="text" placeholder="ex : LAP-2026-0143" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('identifier') ? 'is-invalid' : 'border-outline-variant' }}">
+                @if($editingId)
+                    {{-- BS-Q13 : l'identifiant d'un sujet enregistré ne change plus (les saillies s'y rattachent par ce nom). --}}
+                    <input wire:model="identifier" type="text" disabled title="{{ \App\Actions\SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE }}" class="w-full h-11 px-md border rounded-lg text-sm bg-surface-zebra text-outline cursor-not-allowed {{ $errors->has('identifier') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <p class="text-[10px] text-outline mt-xs">{{ \App\Actions\SaisieReproducteurAction::MESSAGE_IDENTIFIANT_FIGE }}</p>
+                @else
+                    <input wire:model="identifier" type="text" placeholder="ex : LAP-2026-0143" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('identifier') ? 'is-invalid' : 'border-outline-variant' }}">
+                @endif
                 @error('identifier') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Espèce *</label>
                 <select wire:model.live="species_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('species_id') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Sélectionner --</option>
-                    @foreach($this->speciesOptions as $espece)
+                    @foreach($this->speciesFormOptions as $espece)
                         <option value="{{ $espece->id }}">{{ $espece->label }}</option>
                     @endforeach
                 </select>

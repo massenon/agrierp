@@ -24,6 +24,22 @@ class Animal extends Model
 {
     use HasUuids;
 
+    /**
+     * Décision BS-Q11 (21/10/2026) — LA correspondance libellée du statut d'un sujet : la valeur technique (`reforme`,
+     * `vendu`, `mort`) reste celle de la base et de l'envoi du poste, seul l'affichage est accentué (« Réformé »).
+     * Registre, filtres, fiche du sujet, historique et PDF passent tous par ici ; le poste la reprend à l'identique
+     * (`ReproducteursRepository.libelleStatut`).
+     *
+     * @var array<string, string>
+     */
+    public const LIBELLES_STATUT = ['actif' => 'Actif', 'reforme' => 'Réformé', 'vendu' => 'Vendu', 'mort' => 'Mort'];
+
+    /** Le libellé d'un statut ; une valeur inconnue garde `ucfirst` (jamais de statut avalé). */
+    public static function libelleStatut(string $statut): string
+    {
+        return self::LIBELLES_STATUT[$statut] ?? ucfirst($statut);
+    }
+
     protected $fillable = [
         'identifier', 'species_id', 'lot_id', 'category', 'sex', 'breed',
         'birth_date', 'entry_date', 'origin', 'cage',
@@ -90,6 +106,11 @@ class Animal extends Model
     public function getAgeInMonthsAttribute(): ?int
     {
         return $this->birth_date?->diffInMonths(now());
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::libelleStatut((string) $this->status);
     }
 
     public function isPresent(): bool

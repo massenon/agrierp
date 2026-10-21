@@ -136,15 +136,16 @@ class ReproducteursPosteTest extends TestCase
 
     // ── Envoi du poste : modifier ───────────────────────────────────────────────────────────────────────────────────
 
-    public function test_modifier_un_reproducteur_change_race_cage_bande_et_identifiant_avec_audit(): void
+    /** BS-Q13 (21/10/2026) : l'identifiant ne change plus — le reste de la fiche, si (voir `RegistreReproducteursDecisionsTest`). */
+    public function test_modifier_un_reproducteur_change_race_cage_et_bande_avec_audit_sans_toucher_l_identifiant(): void
     {
         $this->pousser($this->sujet())->assertOk();
 
-        $this->pousser($this->sujet(['breed' => 'Rhode Island', 'cage' => 'C9', 'identifier' => 'POU-2026-0008', 'lot_id' => null]))
+        $this->pousser($this->sujet(['breed' => 'Rhode Island', 'cage' => 'C9', 'lot_id' => null]))
             ->assertJsonPath('animals.accepted', [self::ANIMAL]);
 
         $a = Animal::findOrFail(self::ANIMAL);
-        $this->assertSame(['Rhode Island', 'C9', 'POU-2026-0008', null, 'actif'], [$a->breed, $a->cage, $a->identifier, $a->lot_id, $a->status]);
+        $this->assertSame(['Rhode Island', 'C9', 'POU-2026-0007', null, 'actif'], [$a->breed, $a->cage, $a->identifier, $a->lot_id, $a->status]);
         $this->assertSame(1, AuditLog::where('action', 'animal.updated')->count());
         $this->assertSame(200, (int) $this->pondeuses->fresh()->current_quantity);
     }

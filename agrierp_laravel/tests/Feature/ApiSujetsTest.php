@@ -148,7 +148,7 @@ class ApiSujetsTest extends TestCase
         // Un sujet sorti : entrée ET sortie, avec le motif saisi.
         $m = $service->mouvements($this->vendu);
         $this->assertCount(2, $m);
-        $this->assertSame('Sortie — vendu', $m[1]['libelle']);
+        $this->assertSame('Sortie — Vendu', $m[1]['libelle']);
         $this->assertSame('Vente à un éleveur', $m[1]['detail']);
     }
 }

@@ -85,9 +85,32 @@ class RegistreReproducteurs extends Component
         $this->exit_date = now()->format('Y-m-d');
     }
 
+    /**
+     * Décision BS-Q12 (21/10/2026) — LES ESPÈCES PROPOSÉES SONT LES MODULES ACTIFS (`modules_config`), comme partout
+     * ailleurs et comme le tirage du poste (`LivestockSpecies::enabled()`). Cet écran filtrait sur
+     * `livestock_species.is_enabled`, un indicateur que « Modules actifs » ne pilote pas : un module activé n'y
+     * apparaissait pas, un module éteint y restait proposé.
+     */
     public function getSpeciesOptionsProperty()
     {
-        return LivestockSpecies::where('is_enabled', true)->orderBy('label')->get();
+        return LivestockSpecies::enabled()->orderBy('label')->get();
+    }
+
+    /**
+     * Les espèces de la MODALE : les modules actifs ; en modification, l'espèce PROPRE du sujet s'y ajoute même si son
+     * module vient d'être éteint (sinon le champ s'afficherait vide alors que le sujet a une espèce : la modification
+     * d'une cage ne doit pas dépendre de « Modules actifs »). Les filtres du tableau gardent les modules actifs seuls.
+     */
+    public function getSpeciesFormOptionsProperty()
+    {
+        $propre = $this->editingId ? Animal::whereKey($this->editingId)->value('species_id') : null;
+
+        return LivestockSpecies::where(function ($q) use ($propre) {
+            $q->enabled();
+            if ($propre) {
+                $q->orWhere('id', $propre);
+            }
+        })->orderBy('label')->get();
     }
 
     public function getLotOptionsProperty()
@@ -202,8 +225,10 @@ class RegistreReproducteurs extends Component
                 $message = 'Reproducteur enregistré — l\'effectif de la bande est inchangé, ce sujet y était déjà compté.';
             }
         } catch (ValidationException $e) {
-            // La naissance postérieure à l'entrée : sous « Date de Naissance ».
-            $this->addError('birth_date', collect($e->errors())->flatten()->first());
+            // Chaque refus sous SON champ : « Identifiant » (BS-Q13, formulaire forgé) ou « Date de Naissance ».
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
 
             return;
         }

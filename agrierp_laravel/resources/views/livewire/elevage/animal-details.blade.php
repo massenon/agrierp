@@ -9,7 +9,7 @@
                 @if($animal->isPresent())
                     <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-brand-emerald/10 text-brand-emerald">Actif — {{ ucfirst($animal->category) }}</span>
                 @else
-                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-error-red/10 text-error-deep">{{ ucfirst($animal->status) }}</span>
+                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-error-red/10 text-error-deep">{{ $animal->status_label }}</span>
                 @endif
             </div>
             <p class="text-xs text-outline mt-xs">

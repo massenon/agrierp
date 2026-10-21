@@ -39,12 +39,18 @@ class SaisieReproducteurAction
 
     public const MESSAGE_SORTIE_AVANT_ENTREE = "La date de sortie ne peut pas précéder la date d'entrée du sujet.";
 
-    /** @var array<string, string> */
-    private const LIBELLES_STATUT = ['actif' => 'Actif', 'reforme' => 'Réformé', 'vendu' => 'Vendu', 'mort' => 'Mort'];
+    /**
+     * Décision BS-Q13 (21/10/2026) — l'identifiant d'un sujet enregistré ne change plus : les saillies (`mother_ref` /
+     * `sire_ref`, du texte libre) et tout l'historique du sujet s'y rattachent par ce nom ; le changer les laisserait
+     * orphelins. Refusé ici — donc au web (champ grisé, mais un formulaire forgé passe par le même point) et à l'envoi
+     * du poste (rejet motivé, `conflict`). Un sujet qui n'existe pas encore garde la saisie libre.
+     */
+    public const MESSAGE_IDENTIFIANT_FIGE = "L'identifiant d'un sujet enregistré ne peut pas être modifié : les saillies et l'historique du sujet s'y rattachent par ce nom.";
 
+    /** Décision BS-Q11 : la correspondance unique est celle du modèle. */
     public static function libelleStatut(string $statut): string
     {
-        return self::LIBELLES_STATUT[$statut] ?? ucfirst($statut);
+        return Animal::libelleStatut($statut);
     }
 
     public static function messageDejaSorti(string $statut): string
@@ -80,7 +86,7 @@ class SaisieReproducteurAction
      * La fiche du sujet (identité, bande, cage…). Le statut et la sortie ne changent JAMAIS ici ; une modification
      * identique n'écrit rien (idempotence des renvois du poste).
      *
-     * @throws ValidationException  naissance postérieure à l'entrée
+     * @throws ValidationException  naissance postérieure à l'entrée (`birth_date`), identifiant changé (`identifier`)
      */
     public function modifier(string $id, array $donnees): Animal
     {
@@ -88,6 +94,11 @@ class SaisieReproducteurAction
 
         return DB::transaction(function () use ($id, $donnees) {
             $animal = Animal::lockForUpdate()->findOrFail($id);
+
+            if ((string) $donnees['identifier'] !== (string) $animal->identifier) {
+                throw ValidationException::withMessages(['identifier' => self::MESSAGE_IDENTIFIANT_FIGE]);
+            }
+
             $animal->fill($this->champs($donnees));
 
             if (! $animal->isDirty()) {
