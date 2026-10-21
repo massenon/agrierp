@@ -22378,3 +22378,11 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 - **Commande** `php artisan agrierp:doublons` (lecture seule) : bandes et catégories en double, identifiants, lignes liées.
 - **Poste** : aucune table Drift changée (v52). `cleUnicite()` (`pmp_service.dart`), `BandesRepository` (`messageCodeDejaUtilise`, `nombreDeCodesEnDouble`, `codeRenommable`, `modifier(code:)`), bandeau et champ code de `GestionBandesScreen`, `suffixe_doublon.dart` (clés de ligne).
 
+
+## Tickets AV1 + AV2 — Retours et Avoirs, Historique des Ventes au poste (21/10/2026)
+
+**Contrat de synchronisation.** Table `credit_notes` (poste : Drift v54, UUID, `sync_status`) : le poste enregistre la DEMANDE, le serveur numérote (`AV-AAAA-NNN`), réintègre le stock et écrit l'écriture inverse. Envoi : clé `credit_notes` (`manage-ventes`), traitée après `sales` ; tirage : famille paginée `credit_notes` (`view-ventes`). `sales` descend avec `subtotal` et `discount`. Point de passage unique : `AvoirClientService` (web et envoi), refus dans une transaction (rien d'écrit) : quantité > vendu − déjà retourné, montant > ligne − déjà crédité, vente annulée ou inconnue, produit hors vente, date future ou antérieure à la vente, exercice absent ou clos, plan comptable incomplet. Idempotence par UUID ; annulation d'une vente connue une seule fois (`AnnulerVenteAction`). Route `GET /api/ventes/{id}/pdf` (`export-ventes`).
+
+**Épreuve de mutation.** Laravel : 11/11 tuées. Poste : 8/8 tuées (plafonds quantité et montant, exercice clos, statut « traité », protection des demandes pending/conflict au tirage, sortie anticipée de `_pousser`, accusé de réception, remise de la vente).
+
+**NON vérifié.** Parité exécutée seulement avec PHP local (SQLite) ; aucune recette sur poste Windows ni sur MySQL de production ; ticket PDF non essayé hors ligne réelle. Questions client AV-Q1 à AV-Q5 : `docs/PLAN_FINALISATION.md`.

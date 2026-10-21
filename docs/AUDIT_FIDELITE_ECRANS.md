@@ -301,7 +301,7 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 | E19 | Attestations (Début / Fin) | `grid grid-cols-2 gap-sm`, `h-11`, libellé `text-[10px]` | libellé conforme ; champ `TextField` à `vertical: 14` en dur et bouton calendrier à zone de toucher de 48 px : **48 px de haut au lieu de 44** (mesuré, rouge avant correction) | hauteur `h-11` exacte (marges calculées sur l'interligne de `text-sm`, zone de toucher réduite) ; saisie au clavier conservée (concession du poste) |
 | E20 | Archivage des documents (Date d'archivage / Date d'expiration) | `grid grid-cols-2 gap-sm` : les deux champs **côte à côte**, libellés « Date d'archivage * » et « Date d'expiration » | empilés l'un sous l'autre, libellé sans l'astérisque | `Row` de deux `Expanded` à `gap-sm` ; bouton « Effacer » (ajout du poste) rangé dans le champ |
 
-**Écrans avec un champ Date au Blade et sans champ au poste** (hors périmètre : le champ n'existe pas, il se construit par un ticket de fonctionnalité) : Historique des ventes, Liste d'Achats (filtre), Bilan, Comptabilité analytique, Rapprochement bancaire, Balance âgée, Immobilisations, Journal comptable (saisie), Devis, Avances, Bons de commande, Feuille de pointage, Registre des stagiaires et des employés, Enregistrer des sujets, Registre des reproducteurs, Transformation. Les champs « Jour / Âge » de Paramètres Élevage sont des nombres, pas des dates.
+**Écrans avec un champ Date au Blade et sans champ au poste** (hors périmètre : le champ n'existe pas, il se construit par un ticket de fonctionnalité) : Liste d'Achats (filtre) — ⚠️ « Historique des ventes » est porté depuis AV2 (§ 11, `ChampDateFiltre` compact), Bilan, Comptabilité analytique, Rapprochement bancaire, Balance âgée, Immobilisations, Journal comptable (saisie), Devis, Avances, Bons de commande, Feuille de pointage, Registre des stagiaires et des employés, Enregistrer des sujets, Registre des reproducteurs, Transformation. Les champs « Jour / Âge » de Paramètres Élevage sont des nombres, pas des dates.
 
 **Concession du poste, assumée :** le calendrier s'ouvre dans le `showDatePicker` de Flutter, pas dans le sélecteur natif du navigateur ; l'indicateur dessiné à droite du texte (16 px) en tient lieu.
 
@@ -319,3 +319,59 @@ Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les réf
 2. **écrans** : Rapports, Tableau de bord (640 / 700 / 1024), Grand Livre, Saisie des Dépenses ;
 3. **épreuve de mutation** (faite, puis annulée) : marge libellé → champ `xs` → `sm` (4 rouges), `hauteurFormulaire` 44 → 40 (2 rouges), `runSpacing` de la barre des fiches retiré (2 rouges), `margeVerticaleCompacte` 6 → 5 (2 rouges) ;
 4. **lecture du Blade** : les classes de chaque `<input type="date">` sont lues et comparées à `AgriChamps` / `AgriSpacing` ; un gabarit nouveau au Blade rougit le test (« à auditer ») ; tout écran du poste qui appelle `showDatePicker` doit passer par un champ partagé (`lib/core/widgets/champs_date_agri.dart`).
+
+## 11. Historique des Ventes et Retours et Avoirs (tickets AV1 / AV2, 21/10/2026)
+
+**Méthode.** Lecture ligne à ligne de `historique-ventes.blade.php` + `HistoriqueVentes.php` et de `retours-avoirs.blade.php` + `RetoursAvoirs.php` contre le Dart du poste. L'écran avait été porté depuis la MAQUETTE (`historique-ventes.html`) et ses garde-fous comparaient à la maquette : la page sort de `fidelite_libelles_test` / `conformite_structure_test` (le Blade fait foi, comme H7) et est verrouillée par `historique_ventes_blade_test.dart`. Onglets extraits du hub : `historique_ventes_onglet.dart`, `retours_avoirs_onglet.dart`.
+
+### 11.1 Historique des Ventes — écarts trouvés, tous corrigés
+
+| # | Blade (maître) | Poste avant | Poste après |
+|---|---|---|---|
+| H1 | Sous-titre « Toutes les ventes enregistrées de l'entreprise. » | « Ventes encaissées sur ce poste… » (FAUX depuis que `sales` descend) | texte du Blade |
+| H2 | Bouton « Nouvelle Vente » (pilule émeraude, `add_circle`) | absent | présent, ouvre le hub sur « Enregistrer Vente » |
+| H3 | Période : deux `<input type="date">` bornés à l'exercice (`px-sm py-1.5`), défaut = début du mois → aujourd'hui dans l'exercice | absente | `ChampDateFiltre` compact ×2, `periodeParDefaut` / `bornerPeriode`, calendrier borné |
+| H4 | Cartes sur la PÉRIODE (ventes validées) | sur toutes les ventes du poste | sur la période |
+| H5 | Cartes : icônes `payments` / `receipt` / `shopping_cart` / `request_quote`, unité « FCFA » en petit, grille 2 → 4 colonnes dès `md:` (768 px) | sans icône, unité collée, 4 colonnes dès `lg:` (1 024 px), hauteur fixe | icônes, `unite`, `GrilleKpi` (`md:`, hauteur du contenu) |
+| H6 | Panier moyen `0` sans vente | « — » | « 0 FCFA » (c'est un calcul du web, pas une donnée inconnue) |
+| H7 | Recherche « Facture, client... » (id complet ou nom du client, 300 ms) | absente | présente, mêmes règles |
+| H8 | « Statut » = Payée (validée hors crédit) / En attente (validée à CRÉDIT) / Annulée | comparait la colonne `status` à `validee` / `en_attente` : « En attente » ne trouvait jamais rien | règles du web |
+| H9 | « Mode » : cinq modes dont « Avance » | quatre, sans « Avance » | cinq |
+| H10 | « Client » : liste des clients actifs | filtre inerte grisé (« customers ne descend pas » — faux depuis 14.75) | actif, par ordre alphabétique |
+| H11 | « Réinitialiser » (`restart_alt`) vide recherche + 3 listes | sans icône, ne vidait que 2 listes | fidèle |
+| H12 | Pas de boutons « Excel / PDF » | deux boutons inertes | retirés |
+| H13 | Facture = `strtoupper(substr(id, 0, 8))` | « — » (« aucun numéro n'existe » : faux, c'est ce que le web affiche) | idem web |
+| H14 | Client = nom (ou « Client Anonyme ») | « Client non synchronisé » | nom (fichier clients, sinon nom servi avec la vente) |
+| H15 | Remise = `discount` | toujours 0 (`discount` ne descendait pas) | `subtotal` et `discount` servis et absorbés |
+| H16 | Payé = total − reste ; Reste = solde de la créance de la vente ; reste > 0 en rouge gras | issus de `cash_received` (« — » hors espèces) | règle du web ; vente à crédit pas encore reçue : le reste est le total (le serveur ouvrira la créance) |
+| H17 | Mode = libellé (« Espèces ») | valeur brute (`especes`) | libellé |
+| H18 | Pastille : Annulée / En attente (reste > 0) / Payée | statut brut | règle du web, couleurs du Blade |
+| H19 | Ligne annulée à `opacity-50` ; client en gras forêt ; facture `font-mono` émeraude ; colonnes numériques à droite | non | fidèle |
+| H20 | Actions : « Voir » + « Annuler » (sauf vente annulée ; `@lectureSeule`) | une icône PDF inerte | deux boutons de 26 px (`p-1`), « Annuler » grisé en lecture seule ou sans `manage-ventes` |
+| H21 | Détail : tiroir `w-96` (référence mono, Client, Date, Articles, Sous-total, Remise, Total, « Télécharger PDF », « Fermer », Échap, voile) | absent | présent |
+| H22 | Modale « Annuler cette vente ? » (pastille `warning`, texte, « Annuler » / « Oui, Annuler la Vente ») | absente | présente (gabarit `x-modal`, pas `ModaleConfirmation`) |
+| H23 | Tri : date effective puis identifiant décroissants | date seule | idem web |
+| H24 | État vide « Aucune vente pour le moment. » | « — Aucune vente encaissée sur ce poste pour ces critères — » | texte du Blade |
+| H25 | Pagination 25 / page dans l'exercice | idem, mais sans clé de page ramenée à 1 par un filtre | page 1 à chaque changement de filtre |
+
+### 11.2 Retours et Avoirs — construit à l'identique
+
+Neuf colonnes, quatre cartes (`border-l-info-blue` / `accent-yellow` / `brand-emerald` / `error-red`, icônes `assignment_return` / `payments` / `inventory_2` / `percent`), cinq sections de modale, états vides, toasts (`Retour enregistré — produit réintégré au stock.`, `… réformé, aucun impact stock.`, `Avoir marqué comme traité.`), messages de validation (`lang/fr/validation.php`, lus par le garde-fou) et refus du serveur (`AvoirClientService`, lus par le garde-fou).
+
+### 11.3 ÉCARTS ASSUMÉS (hors ligne : le poste enregistre la demande, le serveur fait les effets)
+
+| Écart | Raison | Garde-fou |
+|---|---|---|
+| Numéro d'un avoir non reçu : « — » | `AV-AAAA-NNN` est attribué par le serveur seul (séquence annuelle) | `avoirs_poste_test` |
+| « Non envoyé » (avoir) / « Non envoyée » (vente) sous la pastille ; refus du serveur dit mot pour mot | la demande n'existe pas encore côté ferme | idem |
+| Toast du retour : « Retour enregistré sur ce poste — le stock sera réintégré à la synchronisation. Avoir comptabilisé (débit 701 / crédit 411) par le serveur. » | le web dit « réintégré » parce qu'il le fait à l'instant | `avoirs_blade_test` |
+| Toast d'annulation : « Vente annulée — le stock sera réintégré à la synchronisation. » | idem | `historique_ventes_blade_test` |
+| « Télécharger PDF » exige le réseau et ENREGISTRE le fichier (Documents\AgriERP) au lieu de le télécharger | le ticket est produit par le serveur ; pas de navigateur au poste | `historique_ventes_poste_test` |
+| « Annuler » grisé sans `manage-ventes` | le web laisse le bouton et refuse (403) à l'envoi ; au poste un bouton qui échouerait à la synchronisation tromperait | `historique_ventes_poste_test` |
+| Calendrier Flutter au lieu du `<input type="date">` natif | plateforme (voir § 9) | `champs_date_mise_en_page_test` |
+| Sous 640 px, défilement horizontal au lieu des cartes `rtable` | fenêtre de bureau (≥ 640 × 480) | — |
+
+### 11.4 Défauts du WEB trouvés et corrigés d'abord (le poste les aurait hérités)
+
+Quantité retournée > vendue (50 sur 10), montant > ligne, retour d'une vente annulée, produit hors vente, exercice clos (« enregistré SANS écriture » ou stock bougé puis 500), plan comptable incomplet : tous refusés avant d'écrire, une transaction. **Non corrigés, signalés au client** (ne se décident pas à sa place) : l'avoir ne diminue pas la créance de la vente ; annuler une vente ne contre-passe ni l'écriture ni la créance (AV-Q1, AV-Q2 dans `docs/PLAN_FINALISATION.md`).
+

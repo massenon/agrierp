@@ -30542,6 +30542,844 @@ class SaleLinesCompanion extends UpdateCompanion<SaleLine> {
   }
 }
 
+class $CreditNotesTable extends CreditNotes
+    with TableInfo<$CreditNotesTable, AvoirClient> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CreditNotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($CreditNotesTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _saleIdMeta = const VerificationMeta('saleId');
+  @override
+  late final GeneratedColumn<String> saleId = GeneratedColumn<String>(
+    'sale_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _creditNoteNumberMeta = const VerificationMeta(
+    'creditNoteNumber',
+  );
+  @override
+  late final GeneratedColumn<String> creditNoteNumber = GeneratedColumn<String>(
+    'credit_note_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
+  @override
+  late final GeneratedColumn<double> qty = GeneratedColumn<double>(
+    'qty',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _decisionMeta = const VerificationMeta(
+    'decision',
+  );
+  @override
+  late final GeneratedColumn<String> decision = GeneratedColumn<String>(
+    'decision',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _inspectionNotesMeta = const VerificationMeta(
+    'inspectionNotes',
+  );
+  @override
+  late final GeneratedColumn<String> inspectionNotes = GeneratedColumn<String>(
+    'inspection_notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('en_attente'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    saleId,
+    productId,
+    creditNoteNumber,
+    qty,
+    amount,
+    reason,
+    decision,
+    inspectionNotes,
+    status,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'credit_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AvoirClient> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('sale_id')) {
+      context.handle(
+        _saleIdMeta,
+        saleId.isAcceptableOrUnknown(data['sale_id']!, _saleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_saleIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('credit_note_number')) {
+      context.handle(
+        _creditNoteNumberMeta,
+        creditNoteNumber.isAcceptableOrUnknown(
+          data['credit_note_number']!,
+          _creditNoteNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('qty')) {
+      context.handle(
+        _qtyMeta,
+        qty.isAcceptableOrUnknown(data['qty']!, _qtyMeta),
+      );
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('decision')) {
+      context.handle(
+        _decisionMeta,
+        decision.isAcceptableOrUnknown(data['decision']!, _decisionMeta),
+      );
+    }
+    if (data.containsKey('inspection_notes')) {
+      context.handle(
+        _inspectionNotesMeta,
+        inspectionNotes.isAcceptableOrUnknown(
+          data['inspection_notes']!,
+          _inspectionNotesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AvoirClient map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AvoirClient(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $CreditNotesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      saleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sale_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      creditNoteNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}credit_note_number'],
+      ),
+      qty: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}qty'],
+      ),
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      ),
+      decision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}decision'],
+      ),
+      inspectionNotes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}inspection_notes'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CreditNotesTable createAlias(String alias) {
+    return $CreditNotesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class AvoirClient extends DataClass implements Insertable<AvoirClient> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String saleId;
+  final String productId;
+
+  /// `AV-AAAA-NNN`, attribué par le serveur seul. `null` : demande pas encore reçue.
+  final String? creditNoteNumber;
+
+  /// Quantité retournée (nulle en base web pour un avoir sans produit : jamais saisie ainsi).
+  final double? qty;
+  final double amount;
+  final String? reason;
+
+  /// `reintegre` · `reforme`.
+  final String? decision;
+  final String? inspectionNotes;
+
+  /// `en_attente` · `traite`.
+  final String status;
+
+  /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
+  final DateTime createdAt;
+  const AvoirClient({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.saleId,
+    required this.productId,
+    this.creditNoteNumber,
+    this.qty,
+    required this.amount,
+    this.reason,
+    this.decision,
+    this.inspectionNotes,
+    required this.status,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $CreditNotesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['sale_id'] = Variable<String>(saleId);
+    map['product_id'] = Variable<String>(productId);
+    if (!nullToAbsent || creditNoteNumber != null) {
+      map['credit_note_number'] = Variable<String>(creditNoteNumber);
+    }
+    if (!nullToAbsent || qty != null) {
+      map['qty'] = Variable<double>(qty);
+    }
+    map['amount'] = Variable<double>(amount);
+    if (!nullToAbsent || reason != null) {
+      map['reason'] = Variable<String>(reason);
+    }
+    if (!nullToAbsent || decision != null) {
+      map['decision'] = Variable<String>(decision);
+    }
+    if (!nullToAbsent || inspectionNotes != null) {
+      map['inspection_notes'] = Variable<String>(inspectionNotes);
+    }
+    map['status'] = Variable<String>(status);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CreditNotesCompanion toCompanion(bool nullToAbsent) {
+    return CreditNotesCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      saleId: Value(saleId),
+      productId: Value(productId),
+      creditNoteNumber: creditNoteNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(creditNoteNumber),
+      qty: qty == null && nullToAbsent ? const Value.absent() : Value(qty),
+      amount: Value(amount),
+      reason: reason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reason),
+      decision: decision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(decision),
+      inspectionNotes: inspectionNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(inspectionNotes),
+      status: Value(status),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory AvoirClient.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AvoirClient(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $CreditNotesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      saleId: serializer.fromJson<String>(json['saleId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      creditNoteNumber: serializer.fromJson<String?>(json['creditNoteNumber']),
+      qty: serializer.fromJson<double?>(json['qty']),
+      amount: serializer.fromJson<double>(json['amount']),
+      reason: serializer.fromJson<String?>(json['reason']),
+      decision: serializer.fromJson<String?>(json['decision']),
+      inspectionNotes: serializer.fromJson<String?>(json['inspectionNotes']),
+      status: serializer.fromJson<String>(json['status']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $CreditNotesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'saleId': serializer.toJson<String>(saleId),
+      'productId': serializer.toJson<String>(productId),
+      'creditNoteNumber': serializer.toJson<String?>(creditNoteNumber),
+      'qty': serializer.toJson<double?>(qty),
+      'amount': serializer.toJson<double>(amount),
+      'reason': serializer.toJson<String?>(reason),
+      'decision': serializer.toJson<String?>(decision),
+      'inspectionNotes': serializer.toJson<String?>(inspectionNotes),
+      'status': serializer.toJson<String>(status),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  AvoirClient copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? saleId,
+    String? productId,
+    Value<String?> creditNoteNumber = const Value.absent(),
+    Value<double?> qty = const Value.absent(),
+    double? amount,
+    Value<String?> reason = const Value.absent(),
+    Value<String?> decision = const Value.absent(),
+    Value<String?> inspectionNotes = const Value.absent(),
+    String? status,
+    DateTime? createdAt,
+  }) => AvoirClient(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    saleId: saleId ?? this.saleId,
+    productId: productId ?? this.productId,
+    creditNoteNumber: creditNoteNumber.present
+        ? creditNoteNumber.value
+        : this.creditNoteNumber,
+    qty: qty.present ? qty.value : this.qty,
+    amount: amount ?? this.amount,
+    reason: reason.present ? reason.value : this.reason,
+    decision: decision.present ? decision.value : this.decision,
+    inspectionNotes: inspectionNotes.present
+        ? inspectionNotes.value
+        : this.inspectionNotes,
+    status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  AvoirClient copyWithCompanion(CreditNotesCompanion data) {
+    return AvoirClient(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      saleId: data.saleId.present ? data.saleId.value : this.saleId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      creditNoteNumber: data.creditNoteNumber.present
+          ? data.creditNoteNumber.value
+          : this.creditNoteNumber,
+      qty: data.qty.present ? data.qty.value : this.qty,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      decision: data.decision.present ? data.decision.value : this.decision,
+      inspectionNotes: data.inspectionNotes.present
+          ? data.inspectionNotes.value
+          : this.inspectionNotes,
+      status: data.status.present ? data.status.value : this.status,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvoirClient(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('saleId: $saleId, ')
+          ..write('productId: $productId, ')
+          ..write('creditNoteNumber: $creditNoteNumber, ')
+          ..write('qty: $qty, ')
+          ..write('amount: $amount, ')
+          ..write('reason: $reason, ')
+          ..write('decision: $decision, ')
+          ..write('inspectionNotes: $inspectionNotes, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    saleId,
+    productId,
+    creditNoteNumber,
+    qty,
+    amount,
+    reason,
+    decision,
+    inspectionNotes,
+    status,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AvoirClient &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.saleId == this.saleId &&
+          other.productId == this.productId &&
+          other.creditNoteNumber == this.creditNoteNumber &&
+          other.qty == this.qty &&
+          other.amount == this.amount &&
+          other.reason == this.reason &&
+          other.decision == this.decision &&
+          other.inspectionNotes == this.inspectionNotes &&
+          other.status == this.status &&
+          other.createdAt == this.createdAt);
+}
+
+class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> saleId;
+  final Value<String> productId;
+  final Value<String?> creditNoteNumber;
+  final Value<double?> qty;
+  final Value<double> amount;
+  final Value<String?> reason;
+  final Value<String?> decision;
+  final Value<String?> inspectionNotes;
+  final Value<String> status;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CreditNotesCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.saleId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.creditNoteNumber = const Value.absent(),
+    this.qty = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.decision = const Value.absent(),
+    this.inspectionNotes = const Value.absent(),
+    this.status = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CreditNotesCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String saleId,
+    required String productId,
+    this.creditNoteNumber = const Value.absent(),
+    this.qty = const Value.absent(),
+    required double amount,
+    this.reason = const Value.absent(),
+    this.decision = const Value.absent(),
+    this.inspectionNotes = const Value.absent(),
+    this.status = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       saleId = Value(saleId),
+       productId = Value(productId),
+       amount = Value(amount),
+       createdAt = Value(createdAt);
+  static Insertable<AvoirClient> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? saleId,
+    Expression<String>? productId,
+    Expression<String>? creditNoteNumber,
+    Expression<double>? qty,
+    Expression<double>? amount,
+    Expression<String>? reason,
+    Expression<String>? decision,
+    Expression<String>? inspectionNotes,
+    Expression<String>? status,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (saleId != null) 'sale_id': saleId,
+      if (productId != null) 'product_id': productId,
+      if (creditNoteNumber != null) 'credit_note_number': creditNoteNumber,
+      if (qty != null) 'qty': qty,
+      if (amount != null) 'amount': amount,
+      if (reason != null) 'reason': reason,
+      if (decision != null) 'decision': decision,
+      if (inspectionNotes != null) 'inspection_notes': inspectionNotes,
+      if (status != null) 'status': status,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CreditNotesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? saleId,
+    Value<String>? productId,
+    Value<String?>? creditNoteNumber,
+    Value<double?>? qty,
+    Value<double>? amount,
+    Value<String?>? reason,
+    Value<String?>? decision,
+    Value<String?>? inspectionNotes,
+    Value<String>? status,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return CreditNotesCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      saleId: saleId ?? this.saleId,
+      productId: productId ?? this.productId,
+      creditNoteNumber: creditNoteNumber ?? this.creditNoteNumber,
+      qty: qty ?? this.qty,
+      amount: amount ?? this.amount,
+      reason: reason ?? this.reason,
+      decision: decision ?? this.decision,
+      inspectionNotes: inspectionNotes ?? this.inspectionNotes,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $CreditNotesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (saleId.present) {
+      map['sale_id'] = Variable<String>(saleId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (creditNoteNumber.present) {
+      map['credit_note_number'] = Variable<String>(creditNoteNumber.value);
+    }
+    if (qty.present) {
+      map['qty'] = Variable<double>(qty.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (decision.present) {
+      map['decision'] = Variable<String>(decision.value);
+    }
+    if (inspectionNotes.present) {
+      map['inspection_notes'] = Variable<String>(inspectionNotes.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CreditNotesCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('saleId: $saleId, ')
+          ..write('productId: $productId, ')
+          ..write('creditNoteNumber: $creditNoteNumber, ')
+          ..write('qty: $qty, ')
+          ..write('amount: $amount, ')
+          ..write('reason: $reason, ')
+          ..write('decision: $decision, ')
+          ..write('inspectionNotes: $inspectionNotes, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StockAdjustmentsTable extends StockAdjustments
     with TableInfo<$StockAdjustmentsTable, StockAdjustment> {
   @override
@@ -34384,6 +35222,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $VeterinaryCalendarEventsTable(this);
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
+  late final $CreditNotesTable creditNotes = $CreditNotesTable(this);
   late final $StockAdjustmentsTable stockAdjustments = $StockAdjustmentsTable(
     this,
   );
@@ -34454,6 +35293,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     veterinaryCalendarEvents,
     sales,
     saleLines,
+    creditNotes,
     stockAdjustments,
     stockMovements,
     syncConflicts,
@@ -49437,6 +50277,385 @@ typedef $$SaleLinesTableProcessedTableManager =
       SaleLine,
       PrefetchHooks Function()
     >;
+typedef $$CreditNotesTableCreateCompanionBuilder =
+    CreditNotesCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String saleId,
+      required String productId,
+      Value<String?> creditNoteNumber,
+      Value<double?> qty,
+      required double amount,
+      Value<String?> reason,
+      Value<String?> decision,
+      Value<String?> inspectionNotes,
+      Value<String> status,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$CreditNotesTableUpdateCompanionBuilder =
+    CreditNotesCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> saleId,
+      Value<String> productId,
+      Value<String?> creditNoteNumber,
+      Value<double?> qty,
+      Value<double> amount,
+      Value<String?> reason,
+      Value<String?> decision,
+      Value<String?> inspectionNotes,
+      Value<String> status,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$CreditNotesTableFilterComposer
+    extends Composer<_$AppDatabase, $CreditNotesTable> {
+  $$CreditNotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get creditNoteNumber => $composableBuilder(
+    column: $table.creditNoteNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get decision => $composableBuilder(
+    column: $table.decision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get inspectionNotes => $composableBuilder(
+    column: $table.inspectionNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CreditNotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CreditNotesTable> {
+  $$CreditNotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get creditNoteNumber => $composableBuilder(
+    column: $table.creditNoteNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get decision => $composableBuilder(
+    column: $table.decision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get inspectionNotes => $composableBuilder(
+    column: $table.inspectionNotes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CreditNotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CreditNotesTable> {
+  $$CreditNotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get creditNoteNumber => $composableBuilder(
+    column: $table.creditNoteNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get qty =>
+      $composableBuilder(column: $table.qty, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<String> get decision =>
+      $composableBuilder(column: $table.decision, builder: (column) => column);
+
+  GeneratedColumn<String> get inspectionNotes => $composableBuilder(
+    column: $table.inspectionNotes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CreditNotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CreditNotesTable,
+          AvoirClient,
+          $$CreditNotesTableFilterComposer,
+          $$CreditNotesTableOrderingComposer,
+          $$CreditNotesTableAnnotationComposer,
+          $$CreditNotesTableCreateCompanionBuilder,
+          $$CreditNotesTableUpdateCompanionBuilder,
+          (
+            AvoirClient,
+            BaseReferences<_$AppDatabase, $CreditNotesTable, AvoirClient>,
+          ),
+          AvoirClient,
+          PrefetchHooks Function()
+        > {
+  $$CreditNotesTableTableManager(_$AppDatabase db, $CreditNotesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CreditNotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CreditNotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CreditNotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> saleId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String?> creditNoteNumber = const Value.absent(),
+                Value<double?> qty = const Value.absent(),
+                Value<double> amount = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<String?> decision = const Value.absent(),
+                Value<String?> inspectionNotes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CreditNotesCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                saleId: saleId,
+                productId: productId,
+                creditNoteNumber: creditNoteNumber,
+                qty: qty,
+                amount: amount,
+                reason: reason,
+                decision: decision,
+                inspectionNotes: inspectionNotes,
+                status: status,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String saleId,
+                required String productId,
+                Value<String?> creditNoteNumber = const Value.absent(),
+                Value<double?> qty = const Value.absent(),
+                required double amount,
+                Value<String?> reason = const Value.absent(),
+                Value<String?> decision = const Value.absent(),
+                Value<String?> inspectionNotes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CreditNotesCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                saleId: saleId,
+                productId: productId,
+                creditNoteNumber: creditNoteNumber,
+                qty: qty,
+                amount: amount,
+                reason: reason,
+                decision: decision,
+                inspectionNotes: inspectionNotes,
+                status: status,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CreditNotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CreditNotesTable,
+      AvoirClient,
+      $$CreditNotesTableFilterComposer,
+      $$CreditNotesTableOrderingComposer,
+      $$CreditNotesTableAnnotationComposer,
+      $$CreditNotesTableCreateCompanionBuilder,
+      $$CreditNotesTableUpdateCompanionBuilder,
+      (
+        AvoirClient,
+        BaseReferences<_$AppDatabase, $CreditNotesTable, AvoirClient>,
+      ),
+      AvoirClient,
+      PrefetchHooks Function()
+    >;
 typedef $$StockAdjustmentsTableCreateCompanionBuilder =
     StockAdjustmentsCompanion Function({
       required String id,
@@ -51533,6 +52752,8 @@ class $AppDatabaseManager {
       $$SalesTableTableManager(_db, _db.sales);
   $$SaleLinesTableTableManager get saleLines =>
       $$SaleLinesTableTableManager(_db, _db.saleLines);
+  $$CreditNotesTableTableManager get creditNotes =>
+      $$CreditNotesTableTableManager(_db, _db.creditNotes);
   $$StockAdjustmentsTableTableManager get stockAdjustments =>
       $$StockAdjustmentsTableTableManager(_db, _db.stockAdjustments);
   $$StockMovementsTableTableManager get stockMovements =>

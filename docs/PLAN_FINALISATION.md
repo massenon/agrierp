@@ -458,6 +458,36 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 **Poste / serveur :** `animals` table mixte (`pushAnimals`), Drift v51, `ReproducteursRepository`, `RegistreReproducteursScreen`, absorbeur strict qui protège `pending` / `conflict`. Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 ».
 **Questions au client — ✅ tranché 21/10/2026 (OUI aux trois), livré web puis poste (voir `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 sur le registre des reproducteurs ») :** **BS-Q11** ✅ tranché 21/10/2026 — « Reforme » sans accent au registre : désormais « Réformé », « Vendu », « Mort » (correspondance unique `Animal::LIBELLES_STATUT`, valeur technique inchangée) · **BS-Q12** ✅ tranché 21/10/2026 — espèces du registre : un seul critère, les modules actifs (`LivestockSpecies::enabled()`, celui du tirage), web et poste · **BS-Q13** ✅ tranché 21/10/2026 — l'identifiant d'un sujet enregistré ne change plus (champ grisé, refus serveur y compris à l'envoi du poste).
 
+## Sprint AV — « Retours et Avoirs » et « Historique des Ventes » au poste (demande du client du 21/10/2026)
+
+> Demande : « screen Retours et Avoirs doit être la même chose que celle de la version web » ; « même chose pour le screen Historique des Ventes ». PRD : `docs/prd/avoirs-historique-poste.md` ; audit ligne à ligne : `docs/AUDIT_FIDELITE_ECRANS.md` § 11.
+
+### AV1 ✅ (21/10/2026) Retours et Avoirs au poste (web d'abord)
+
+**Objectif :** l'onglet « Retours et Avoirs » du hub Ventes & Devis, à l'identique du Blade ; le poste enregistre la DEMANDE, le serveur fait les effets (motif F0.74).
+**Web :** `AvoirClientService` (point de passage UNIQUE de `RetoursAvoirs::saveReturn()` et de l'envoi du poste) ; refus nouveaux, construits d'abord ici : quantité > « vendu − déjà retourné », montant > « ligne − déjà crédité », vente annulée / inconnue, produit hors vente, date future ou antérieure à la vente, exercice absent ou clos, plan comptable incomplet — rien n'est écrit (une transaction ; fini « retour enregistré SANS écriture »). `CreditNote::generateCreditNoteNumber()` prend l'année du jour du retour.
+**Serveur :** famille de tirage paginée `credit_notes` (`view-ventes`) ; `pushCreditNotes` (`manage-ventes`, après les ventes, idempotent par UUID, `traite` une seule fois, date du fait `credit_date`) ; `MotifsRefusPush`.
+**Poste :** Drift **v54** (`credit_notes`, table mixte ; palier `from < 54`, le 53 est réservé à la branche « Devis Prestations »), absorbeur STRICT, `_avoirEnJson`, acquittement, relance d'un refus, libellés, purge à la réinitialisation ; `AvoirsRepository` + `RetoursAvoirsOnglet`.
+
+### AV2 ✅ (21/10/2026) Historique des Ventes au poste, identique au Blade
+
+**Objectif :** audit ligne à ligne Blade ↔ Dart (25 écarts, tous corrigés : § 11.1 de l'audit) ; toutes les actions du Blade.
+**Web / serveur :** `AnnulerVenteAction` (extraite de `cancelSale()`, partagée avec l'envoi) ; `pushSales` : une vente connue renvoyée `annulee` est annulée une fois (stock réintégré, audit), une vente inconnue annulée avant son premier envoi est reçue puis annulée ; `sales` servi avec `subtotal` et `discount` ; `GET /api/ventes/{id}/pdf` (`export-ventes`, ticket du web).
+**Poste :** `HistoriqueVentesOnglet` (extrait du hub) + `HistoriqueVentesRepository` (cartes sur la période, filtres, détail, annulation en demande, `ClientVentes` pour le PDF) ; `ChampDateFiltre` compact pour la période ; pièces communes `elements_ventes.dart`, `GrilleKpi`.
+
+**Tests (écrits d'abord, mutation faite) :** Laravel `AvoirsClientsSyncTest` (30) ; poste `avoirs_poste_test` (35), `avoirs_sync_poste_test`, `avoirs_blade_test`, `avoirs_schema_test`, `avoirs_parite_php_test` (le VRAI `SyncController` reçoit l'envoi du poste), `historique_ventes_poste_test`, `historique_ventes_blade_test`, `migration_toutes_versions_test` (v54). Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « AV1 + AV2 ».
+
+**Questions au client (non tranchées) :**
+- **AV-Q1** L'avoir ne diminue pas la créance d'une vente à crédit (web inchangé). Imputer l'avoir sur la créance ? (recommandé : OUI)
+- **AV-Q2** Annuler une vente ne contre-passe ni l'écriture, ni la créance, ni l'encaissement : seul le stock revient (web inchangé depuis 4.4). Contre-passer ? (recommandé : OUI, écriture inverse datée du jour)
+- **AV-Q3** Remboursement d'un avoir (D 411 / C trésorerie) : à construire au web d'abord, avec le choix du compte. (recommandé : OUI)
+- **AV-Q4** Un retour en exercice clos ou sur plan comptable incomplet est désormais REFUSÉ au web et à l'envoi (avant : enregistré sans écriture). À faire confirmer par le cabinet FAGUEZ.
+- **AV-Q5** Export Excel / PDF en masse de l'historique : le web ne l'a pas (le poste retire ses deux boutons inertes). En vouloir un ? (web d'abord)
+
+**NON vérifié :** poste Windows réel (rendu du tiroir, du calendrier, de l'enregistrement du PDF dans Documents\AgriERP) ; navigateur (Dusk) pour les modifications du Blade (aucune : seul le composant a changé) ; une base MySQL / MariaDB peuplée (numérotation `AV-AAAA-NNN` par `MAX(CAST(...))` sous envois simultanés de deux postes : sérialisée par la transaction d'envoi, non éprouvée sur MariaDB) ; l'essai à cinq postes n'a pas été étendu aux retours.
+
+**Reste :** `VentesDevisRepository.charger()` et ses classes `DonneesHistorique` / `LigneHistorique` ne servent plus à rien (laissés pour ne pas heurter la branche `t-devis` ; à supprimer après la fusion).
+
 ## Sprint MP — Mise en page du poste (demandes du client)
 
 | Ticket | Contenu | État |

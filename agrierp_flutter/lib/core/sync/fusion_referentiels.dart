@@ -58,6 +58,8 @@ class FusionReferentiels {
       ('stock_movements', 'product_id'),
       ('livestock_lots', 'product_id'),
       ('lot_revenues', 'product_id'),
+      // Tickets AV1 / AV2 — un avoir en attente désigne son produit.
+      ('credit_notes', 'product_id'),
       ('livestock_daily_entries', 'treatment_product_id'),
     ],
   };

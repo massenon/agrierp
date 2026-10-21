@@ -32,9 +32,10 @@ class CreditNote extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    public static function generateCreditNoteNumber(): string
+    /** Ticket AV1 — l'année est celle de la DATE de l'avoir (un retour du poste daté de décembre reçu en janvier). */
+    public static function generateCreditNoteNumber(?\DateTimeInterface $quand = null): string
     {
-        $year = now()->format('Y');
+        $year = ($quand ? \Carbon\Carbon::instance($quand) : now())->format('Y');
         $prefix = "AV-{$year}-";
 
         $lastNumber = static::where('credit_note_number', 'like', $prefix.'%')
