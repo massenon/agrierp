@@ -158,6 +158,8 @@ class AuditLog extends Model
         'livestock_lot.updated' => 'Lot modifié',
         'livestock_lot.archived' => 'Lot archivé',
         'livestock_entry.recorded' => 'Sujet enregistré',
+        'livestock_entry.updated' => 'Sujet modifié',
+        'livestock_entry.archived' => 'Sujet archivé',
         'livestock_daily_entry.saved' => 'Saisie quotidienne enregistrée',
         'reproduction_event.created' => 'Événement de reproduction créé',
         'reproduction_event.palpation_recorded' => 'Palpation enregistrée',

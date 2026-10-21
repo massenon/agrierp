@@ -6,9 +6,11 @@
             </h2>
             <p class="text-xs lg:text-sm text-outline mt-xs">Journal des ENTRÉES (Phase 1 du cycle) : naissances locales et acquisitions externes. Chaque entrée valide alimente ensuite une Bande/Lot pour le suivi continu de l'effectif.</p>
         </div>
+        @can('manage-elevage')
         <button type="button" wire:click="newEntry" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
             <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Sujet
         </button>
+        @endcan
     </div>
 
     <x-kpi-accordion title="Indicateurs de performance">
@@ -38,15 +40,17 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase tracking-wider">Espèce</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase tracking-wider">Origine</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase tracking-wider">Quantité</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($this->entries as $i => $entry)
+                    @forelse($this->entries as $i => $ligne)
                         @php
-                            $origine = $entry->ne > 0 ? 'Naissance' : ($entry->achat > 0 ? 'Achat' : 'Don');
-                            $qty = $entry->ne > 0 ? $entry->ne : ($entry->achat > 0 ? $entry->achat : $entry->don);
+                            $entry = $ligne->entry;
+                            $origine = $ligne->origine;
+                            $qty = $ligne->quantite;
                         @endphp
-                        <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 transition-colors {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
+                        <tr wire:key="sujet-{{ $entry->id }}-{{ $origine }}" class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 transition-colors {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                             <td data-label="Date" class="px-md py-sm text-xs whitespace-nowrap">{{ $entry->entry_date->format('d/m/Y') }}</td>
                             <td data-label="Bande" class="px-md py-sm text-xs font-bold text-brand-emerald whitespace-nowrap">{{ $entry->lot?->code }}</td>
                             <td data-label="Espèce" class="px-md py-sm text-xs whitespace-nowrap">{{ $entry->lot?->species?->label }}</td>
@@ -54,13 +58,28 @@
                                 <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border {{ $origine === 'Naissance' ? 'bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30' : 'bg-blue-100 text-info-blue border-blue-300' }}">{{ $origine }}</span>
                             </td>
                             <td data-label="Quantité" class="px-md py-sm text-xs whitespace-nowrap">{{ $qty }}</td>
+                            <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @can('manage-elevage')
+                                <button type="button" wire:click="editEntry('{{ $entry->id }}', '{{ $origine }}')" class="text-info-blue hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[16px]">edit</span></button>
+                                @can('archive-elevage')
+                                <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-sujet-{{ $entry->id }}-{{ $origine }}' })" class="text-error-deep hover:text-error-deep/70 p-1" title="Archiver"><span class="material-symbols-outlined text-[16px]">delete</span></button>
+                                @endcan
+                                @else
+                                <span class="text-outline text-[10px] italic">Lecture seule</span>
+                                @endcan
+                            </td>
                         </tr>
+                        @can('archive-elevage')
+                        <x-modal-confirm-delete :name="'archive-sujet-'.$entry->id.'-'.$origine" :item-label="$entry->lot?->code.' — '.$origine.' ('.$qty.') du '.$entry->entry_date->format('d/m/Y')" :action="'archiveEntry(\''.$entry->id.'\', \''.$origine.'\')'" />
+                        @endcan
                     @empty
                         <tr>
-                            <td colspan="5" class="px-md py-xl text-center">
+                            <td colspan="6" class="px-md py-xl text-center">
                                 <span class="material-symbols-outlined text-outline-variant text-[44px] block mb-sm">inbox</span>
                                 <p class="text-sm font-semibold text-on-surface">Aucun résultat trouvé</p>
+                                @can('manage-elevage')
                                 <button type="button" wire:click="newEntry" class="text-xs font-bold text-brand-emerald mt-sm">+ Nouveau Sujet</button>
+                                @endcan
                             </td>
                         </tr>
                     @endforelse
@@ -113,11 +132,49 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Date *</label>
-                <input wire:model="entry_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg bg-white text-sm">
+                <input wire:model="entry_date" type="date" class="w-full h-11 px-md border rounded-lg bg-white text-sm {{ $errors->has('entry_date') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('entry_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-sujet' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
                 <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+            </div>
+        </form>
+    </x-modal>
+
+    <x-modal name="modal-edit-sujet" max-width="md">
+        <div class="flex items-center justify-between mb-md">
+            <h3 class="font-bold text-lg text-brand-forest">Modifier le Sujet</h3>
+            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-edit-sujet' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <form wire:submit="updateEntry" class="space-y-md">
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Bande / Lot</label>
+                <input value="{{ \App\Models\LivestockLot::find($lot_id)?->code }}" type="text" disabled class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline">
+                <p class="text-[10px] text-outline mt-xs">La bande d'une entrée n'est jamais modifiable : archivez l'entrée puis saisissez-la sur la bonne bande.</p>
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Origine *</label>
+                <select wire:model="origine" class="w-full h-11 px-md border rounded-lg bg-white text-sm {{ $errors->has('origine') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <option value="Naissance">Naissance</option>
+                    <option value="Achat">Achat</option>
+                    <option value="Don">Don</option>
+                </select>
+                @error('origine') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Quantité *</label>
+                <input wire:model="quantite" type="number" min="1" class="w-full h-11 px-md border rounded-lg bg-white text-sm {{ $errors->has('quantite') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('quantite') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Date *</label>
+                <input wire:model="entry_date" type="date" class="w-full h-11 px-md border rounded-lg bg-white text-sm {{ $errors->has('entry_date') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('entry_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-edit-sujet' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer les Modifications</button>
             </div>
         </form>
     </x-modal>
