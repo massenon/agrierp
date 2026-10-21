@@ -228,6 +228,7 @@ class MotifsRefusPush
             'purchases' => 'enregistrer un achat',
             'attendance_records' => 'enregistrer un pointage',
             'sales' => 'enregistrer une vente',
+            'quotes' => 'saisir un devis',
             'stock_adjustments' => 'ajuster le stock',
         ][$table] ?? 'écrire ces données';
 

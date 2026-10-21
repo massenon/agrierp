@@ -296,6 +296,7 @@ class DevisPosteTest extends TestCase
 
         $this->assertSame([], $reponse->json('quotes.accepted'));
         $this->assertSame(self::DEVIS, $reponse->json('quotes.rejected.0.id'));
+        $this->assertStringContainsString('votre rôle ne permet pas de saisir un devis', $reponse->json('quotes.rejected.0.reason'));
         $this->assertSame(0, Quote::count());
     }
 

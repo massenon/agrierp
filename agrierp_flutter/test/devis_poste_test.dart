@@ -726,6 +726,9 @@ void main() {
       await afficher(tester);
 
       expect(find.text('Devis & Proforma'), findsOneWidget);
+      // Les deux boutons de l'en-tête portent le libellé du Blade (et non, ailleurs, le titre de la modale).
+      expect(find.descendant(of: find.byKey(const Key('devis-nouveau')), matching: find.text('Nouveau Devis')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('devis-exporter')), matching: find.text('Exporter')), findsOneWidget);
       expect(find.byKey(const Key('devis-vide')), findsOneWidget);
       expect(find.text('Aucun devis pour le moment.'), findsOneWidget);
       expect(find.text('0 FCFA'), findsOneWidget);

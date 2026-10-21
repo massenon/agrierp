@@ -6,6 +6,7 @@ import 'package:agrierp/core/theme/symboles_agri.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/ventes/devis_onglet.dart';
 import 'package:agrierp/features/ventes/devis_repository.dart';
+import 'package:drift/drift.dart' show DriftSqlType;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +34,7 @@ final String? _modele = _lire('app/Models/Quote.php');
 final String? _hub = _lire('resources/views/livewire/ventes/ventes-devis-hub.blade.php');
 final String? _export = _lire('resources/views/exports/devis.blade.php');
 final String? _validation = _lire('lang/fr/validation.php');
+final String? _migration = _lire('database/migrations/2026_02_17_000001_create_quotes_table.php');
 
 const _fichiers = [
   'lib/features/ventes/devis_onglet.dart',
@@ -57,13 +59,35 @@ void main() {
           _modele == null ||
           _hub == null ||
           _export == null ||
-          _validation == null
+          _validation == null ||
+          _migration == null
       ? 'SAUT : dépôt Laravel absent ($dossierLaravel) — comparaison au web impossible'
       : null;
 
   late AppDatabase db;
   setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
   tearDown(() => db.close());
+
+  test('⚠️⚠️ SCHÉMA — la table Drift `quotes` a les colonnes de la migration Laravel, aux écarts documentés près', () {
+    final colonnesServeur = <String>{
+      for (final m in RegExp(r"\$table->(?:uuid|string|text|decimal|unsignedSmallInteger|date|boolean|enum|foreignUuid)\('(\w+)'").allMatches(_migration!))
+        m.group(1)!,
+      // `$table->timestamps()`.
+      'created_at',
+      'updated_at',
+    };
+    final colonnesPoste = {for (final c in db.quotes.$columns) c.name};
+
+    // Écarts, chacun justifié : `device_id` et `sync_status` sont les métadonnées de toute table synchronisable (CDC §292) ;
+    // `converted_sale_id` n'est lu ni écrit nulle part au web (la conversion en facture n'existe pas : DEV-Q1) ;
+    // `created_at` : le poste ne garde que l'instant de dernière saisie (`updated_at`).
+    expect(colonnesPoste.difference(colonnesServeur), {'device_id', 'sync_status'});
+    expect(colonnesServeur.difference(colonnesPoste), {'converted_sale_id', 'created_at'});
+    expect(db.quotes.id.type, DriftSqlType.string, reason: 'clé UUID, jamais un entier auto-incrémenté');
+    // Les statuts de l'énumération de la migration sont ceux du poste.
+    final enumeration = RegExp(r"enum\('status', \[([^\]]*)\]\)").firstMatch(_migration!)!.group(1)!;
+    expect([for (final m in RegExp(r"'(\w+)'").allMatches(enumeration)) m.group(1)!], DevisRepository.statuts.keys.toList());
+  }, skip: absent);
 
   test('⚠️⚠️ chaque libellé du Blade (titre, boutons, cartes, filtres, colonnes, modale, champs, aides, état vide) est un littéral du poste', () {
     final b = _sansCommentairesBlade(_blade!);

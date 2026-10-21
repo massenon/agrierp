@@ -126,6 +126,20 @@ class DevisSaisieWebTest extends TestCase
         $this->assertSame(1, AuditLog::where('action', 'quote.updated')->count());
     }
 
+    public function test_enregistrer_sans_rien_changer_n_ecrit_rien_et_ne_laisse_aucune_trace(): void
+    {
+        $devis = $this->devis(['note' => 'Remise accordée']);
+        $avant = $devis->updated_at;
+        Carbon::setTestNow('2026-10-21 11:00:00');
+
+        Livewire::test(Devis::class)->call('editQuote', $devis->id)->call('saveQuote')
+            ->assertHasNoErrors()
+            ->assertDispatched('toast', message: 'Devis modifié avec succès.', type: 'success');
+
+        $this->assertSame(0, AuditLog::where('action', 'quote.updated')->count());
+        $this->assertTrue($avant->equalTo($devis->fresh()->updated_at), 'aucune écriture');
+    }
+
     public function test_le_cycle_brouillon_envoye_accepte_et_les_messages_du_web(): void
     {
         $devis = $this->devis();
