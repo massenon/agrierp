@@ -372,4 +372,50 @@ void main() {
 
     expect(fautifs, isEmpty, reason: 'Employer afficherModale.');
   });
+
+  /// ⚠️⚠️ **UNE CLÉ DE WIDGET BÂTIE SUR UN CODE OU UN LIBELLÉ DE DONNÉE EST UNE COLLISION EN ATTENTE.**
+  /// Le client avait deux bandes `AVI-2026-01` et deux catégories « Aliments » : `Key('ligne-gmq-${l.code}')` et
+  /// `Key('pastille-$c')` sont devenues identiques — « Duplicate keys found », puis une cascade de « dirty widget in
+  /// the wrong build scope ». Les jeux d'essai étaient propres, aucun test ne le voyait ; la lecture du code, si.
+  ///
+  /// Règle : une ligne qui fabrique un `Key('…${x.code}…')` (ou `.label`, `.libelle`) doit porter un suffixe de
+  /// doublon (`_suffixeDoublon`, ou le `take(i)` de la caisse) — ou figurer ci-dessous avec la raison pour laquelle
+  /// ses valeurs ne peuvent pas se répéter entre frères.
+  ///
+  /// ⚠️ Limite assumée : une lecture par lignes ne voit pas `Key('pastille-$c')` (variable nue, sans `.code`) ni une
+  /// clé construite sur deux lignes. C'est un filet contre la forme la plus courante, pas une preuve ; les vrais
+  /// garde-fous sont les tests à données en double de `cles_uniques_test.dart`.
+  test('⚠️⚠️ aucune clé de widget bâtie sur un code ou un libellé sans suffixe de doublon', () {
+    // fichier + préfixe de clé → raison.
+    const exemptions = <String, String>{
+      'parametres_generaux_screen.dart|module-':
+          'liste fixe des modules du logiciel (un code par module, posée dans le code, pas lue en base)',
+      'dashboard_elevage_screen.dart|carte-espece-':
+          'une carte par espèce ; deux espèces de même code passent sans exception (cles_uniques_test.dart)',
+      'elements_fiche.dart|kpi-':
+          'cartes d\'une fiche, libellés posés dans le code de la fiche, distincts par construction',
+    };
+
+    final cle = RegExp(r"Key\('([^'$]*)[^']*\$\{?\w+\.(code|label|libelle)\b");
+    final fautifs = <String>[];
+
+    for (final f in sources()) {
+      final nom = f.path.split(RegExp(r'[\\/]')).last;
+      for (final ligne in f.readAsLinesSync()) {
+        if (!estDuCode(ligne)) continue;
+        final m = cle.firstMatch(ligne);
+        if (m == null) continue;
+        if (ligne.contains('_suffixeDoublon') || ligne.contains('.take(i')) continue;
+        if (exemptions.containsKey('$nom|${m.group(1)}')) continue;
+        fautifs.add('${f.path} : ${ligne.trim()}');
+      }
+    }
+
+    expect(
+      fautifs,
+      isEmpty,
+      reason: 'Ajouter un suffixe de doublon (_suffixeDoublon) ou, si les valeurs sont uniques par construction, '
+          'déclarer l\'exemption avec sa raison.',
+    );
+  });
 }
