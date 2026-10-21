@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../fenetre/fenetre_poste.dart';
 import '../theme/agri_tokens.dart';
+import 'cadre_recherche_globale.dart';
 import 'modale_agri.dart';
 import '../theme/symboles_agri.dart';
 
@@ -195,24 +196,12 @@ class BarreSuperieure extends StatelessWidget {
           // le poste n'en embarque qu'une poignée. Le champ est donc présent et
           // à sa place, mais annonce sa portée au lieu de promettre une
           // recherche qu'il ne peut pas rendre.
-          if (recherche != null) recherche! else SizedBox(
-            width: 220,
-            height: 34,
-            child: TextField(
-              key: const Key('recherche-globale'),
-              style: const TextStyle(fontSize: AgriTypography.xs),
-              decoration: InputDecoration(
-                hintText: 'Recherche (application web)',
-                hintStyle: const TextStyle(fontSize: 11.5),
-                prefixIcon: const Icon(SymbolesAgri.search, size: 16),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                enabled: false,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
+          if (recherche != null) recherche! else CadreRechercheGlobale(
+            controleur: _rechercheInerte,
+            focus: _focusRechercheInerte,
+            indice: 'Recherche (application web)',
+            actif: false,
+            cleSaisie: const Key('recherche-globale-inerte'),
           ),
           const SizedBox(width: AgriSpacing.md),
 
@@ -551,6 +540,10 @@ class BarreSuperieure extends StatelessWidget {
     if (confirme == true) await FenetrePoste.fermer();
   }
 }
+
+/// Contrôleur et focus du champ inerte (barre sans source de recherche) : jamais écrits, jamais focalisés.
+final _rechercheInerte = TextEditingController();
+final _focusRechercheInerte = FocusNode(canRequestFocus: false);
 
 /// Gabarit des trois commandes de fenêtre : 36 px, comme les boutons de légende de Windows (le gabarit par défaut
 /// d'un `IconButton`, 48 px, faisait déborder la barre d'un poste étroit une fois le bouton « Agrandir » ajouté).

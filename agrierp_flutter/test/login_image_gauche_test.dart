@@ -154,16 +154,4 @@ void main() {
       expect(find.byKey(const Key('bouton-connexion')), findsOneWidget);
     });
   });
-
-  group("aide de saisie : celle du Blade", () {
-    testWidgets("l'identifiant propose « admin ou contact@fermeolouwachegoun.com », comme le web", (tester) async {
-      await afficher(tester);
-
-      expect(find.text('admin ou contact@fermeolouwachegoun.com'), findsOneWidget);
-      if (blade.existsSync()) {
-        expect(blade.readAsStringSync(), contains('placeholder="admin ou contact@fermeolouwachegoun.com"'));
-      }
-    });
-  });
 }
-

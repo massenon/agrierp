@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/cadre_recherche_globale.dart';
 import 'recherche_globale_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -41,10 +42,28 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
   List<DomaineRecherche> _domaines = const [];
   int _actif = -1;
 
+  /// Sous `md`, le champ n'existe qu'une fois l'icône cliquée (ou Ctrl+K) : le web ouvre alors un plein écran ;
+  /// le poste de bureau déploie la même pastille sur place. Il se replie quand il perd le focus, vide.
+  bool _deploye = false;
+
+  void _deployer() {
+    setState(() => _deploye = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  void _focusChange() {
+    if (!_focus.hasFocus && _deploye && _saisie.text.isEmpty && mounted) {
+      setState(() => _deploye = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_raccourci);
+    _focus.addListener(_focusChange);
   }
 
   @override
@@ -61,6 +80,10 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
     if (e is KeyDownEvent &&
         e.logicalKey == LogicalKeyboardKey.keyK &&
         (HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed)) {
+      if (!AgriBreakpoints.moyen(context) && !_deploye) {
+        _deployer();
+        return true;
+      }
       _focus.requestFocus();
       _saisie.selection = TextSelection(baseOffset: 0, extentOffset: _saisie.text.length);
       return true;
@@ -147,6 +170,8 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
 
   @override
   Widget build(BuildContext context) {
+    // `hidden md:flex` / `md:hidden` : sous 768 px le web n'affiche que l'icône `search`.
+    final pastille = AgriBreakpoints.moyen(context) || _deploye;
     return CompositedTransformTarget(
       link: _lien,
       child: OverlayPortal(
@@ -154,48 +179,26 @@ class _RechercheGlobaleChampState extends State<RechercheGlobaleChamp> {
         overlayChildBuilder: (_) => _resultats(context),
         child: Focus(
           onKeyEvent: _clavier,
-          child: SizedBox(
-            key: const Key('recherche-globale'),
-            width: 256,
-            height: 32,
-            child: TextField(
-              key: const Key('recherche-globale-saisie'),
-              controller: _saisie,
-              focusNode: _focus,
-              onChanged: _modifie,
-              style: const TextStyle(fontSize: AgriTypography.xs),
-              decoration: InputDecoration(
-                hintText: 'Recherche globale ERP… (Ctrl+K)',
-                hintStyle: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
-                prefixIcon: const Icon(SymbolesAgri.search, size: 16, color: AgriColors.outline),
-                prefixIconConstraints: const BoxConstraints(minWidth: 36),
-                suffixIcon: _saisie.text.isEmpty
-                    ? null
-                    : IconButton(
-                        key: const Key('recherche-globale-effacer'),
-                        iconSize: 14,
-                        color: AgriColors.outline,
-                        icon: const Icon(SymbolesAgri.close),
-                        onPressed: () {
-                          _saisie.clear();
-                          _fermer();
-                        },
-                      ),
-                isDense: true,
-                filled: true,
-                fillColor: AgriColors.surfaceZebra,
-                contentPadding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AgriRadius.full),
-                  borderSide: const BorderSide(color: AgriColors.outlineVariant),
+          child: pastille
+              ? CadreRechercheGlobale(
+                  controleur: _saisie,
+                  focus: _focus,
+                  indice: 'Recherche globale ERP… (Ctrl+K)',
+                  onChange: _modifie,
+                  onEffacer: _fermer,
+                )
+              : GestureDetector(
+                  key: const Key('recherche-globale-icone'),
+                  onTap: _deployer,
+                  child: const Tooltip(
+                    message: 'Recherche globale ERP… (Ctrl+K)',
+                    child: Icon(
+                      SymbolesAgri.search,
+                      size: AgriChamps.iconeRechercheMobile,
+                      color: AgriColors.outline,
+                    ),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AgriRadius.full),
-                  borderSide: const BorderSide(color: AgriColors.brandEmerald, width: 2),
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );

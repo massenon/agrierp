@@ -29,7 +29,7 @@ void main() {
     id: '00000000-0000-0000-0000-00000000aaaa',
     nom: 'M. Olouchègoun',
     identifiant: 'admin',
-    email: 'contact@fermeolouwachegoun.com',
+    email: 'dg@olouwachegoun.bj',
     role: 'admin',
     roleLibelle: 'Administrateur Principal',
   );
@@ -104,7 +104,7 @@ void main() {
       await afficher(tester);
 
       expect(texte(tester, 'profil-nom'), 'M. Olouchègoun');
-      expect(texte(tester, 'profil-email'), 'contact@fermeolouwachegoun.com');
+      expect(texte(tester, 'profil-email'), 'dg@olouwachegoun.bj');
       expect(texte(tester, 'profil-initiales'), 'MO');
       expect(find.text('Administrateur Principal'), findsOneWidget);
       expect(texte(tester, 'profil-statut'), 'Actif');

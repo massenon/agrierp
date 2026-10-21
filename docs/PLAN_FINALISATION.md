@@ -439,6 +439,18 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?
 
+## Sprint ENV — Enveloppe du poste Windows (demandes du client du 21/10/2026)
+
+### ENV1 ✅ (21/10/2026) Nom de l'administrateur, icône, recherche globale, image de connexion, barre des tâches
+
+1. **Compte administrateur** : le seeder web avait DÉJÀ « M. Olouchègoun » (`DemoUsersSeeder`, identifiant `admin`) ; il restait l'ancien nom de démonstration au poste (repli du socle, tableau de bord, jeux d'essai) — remplacé ; test web `AdministrateurPrincipalNomTest` (nom, rôle, mot de passe, connexion par `admin`, base existante renommée sans toucher au mot de passe). Garde-fou poste `nom_admin_principal_test.dart`.
+2. **Icône** : `app_icon.ico` multi-tailles généré depuis le logo (`outils/generer_icone.py`), installateur (raccourcis, désinstallation), icônes de fenêtre ; test `icone_application_test.dart`.
+3. **Recherche globale** : 32 px → 44 px, la hauteur du web (elle sort des classes : pastille + base `@tailwindcss/forms` de l'input) ; sous `md`, icône seule comme le web. **Question ENV-Q1** : le web dessine une boîte grise carrée DANS la pastille ronde (l'input n'a ni `border-0` ni `p-0`) ; reprise telle quelle. Si elle déplaît, la corriger d'abord au web.
+4. **Image de connexion** : `image_login.png` copiée du web (`public/assets/images/`), déclarée, voile du Blade, panneau de repli si le fichier manque.
+5. **Barre des tâches** : la fenêtre occupe la zone de travail ; boutons Agrandir/Restaurer, glisser et double-clic ajoutés (ils n'existaient pas, malgré la consigne). **ENV-Q2** : taille minimale de fenêtre retenue 640×480 — à confirmer.
+
+**NON vérifié** : tout le comportement Windows (voir `agrierp_laravel/README_SPRINT0.md`, ENV1).
+
 ## Sprint MP — Mise en page du poste (demandes du client)
 
 | Ticket | Contenu | État |

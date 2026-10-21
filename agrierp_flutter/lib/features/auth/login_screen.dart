@@ -198,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         libelle: "NOM D'UTILISATEUR OU EMAIL",
                         controleur: _identifiant,
                         icone: SymbolesAgri.person_outline,
-                        indice: 'admin ou contact@fermeolouwachegoun.com',
+                        indice: 'admin ou dg@olouwachegoun.bj',
                       ),
                       const SizedBox(height: AgriSpacing.md),
                       _champ(
