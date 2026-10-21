@@ -195,6 +195,7 @@ void main() {
       SyncEngine.cleMouvementsResync,
       SyncEngine.cleDepensesResync,
       SyncEngine.cleDepensesResyncU14,
+      SyncEngine.cleDepensesResyncDep1,
     ]) {
       await db
           .into(db.appSettings)

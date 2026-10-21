@@ -454,23 +454,23 @@ echo json_encode($sortie);
       expect(find.text("1 ligne dans l'exercice 2027 — page 1 sur 1"), findsOneWidget);
     });
 
-    testWidgets('exercice clos : « Enregistrer la Dépense » grisé avec son motif', (tester) async {
+    testWidgets('exercice clos : « Nouvelle Dépense » grisé avec son motif', (tester) async {
       grandEcran(tester);
       await service.choisir(2026);
       await tester.pumpWidget(sousPortee(SaisieDepensesScreen(depot: DepensesRepository(database: db, deviceId: 'poste-test'))));
       await tester.pumpAndSettle();
-      final bouton = tester.widget<FilledButton>(find.byKey(const Key('bouton-enregistrer-depense')));
+      final bouton = tester.widget<FilledButton>(find.byKey(const Key('bouton-nouvelle-depense')));
       expect(bouton.onPressed, isNull);
       expect(
         find.ancestor(
-          of: find.byKey(const Key('bouton-enregistrer-depense')),
+          of: find.byKey(const Key('bouton-nouvelle-depense')),
           matching: find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Exercice 2026 clôturé — lecture seule'),
         ),
         findsOneWidget,
       );
     });
 
-    testWidgets('EX-Q5 : la date d’une dépense comptabilisée est grisée, motif du web en info-bulle', (tester) async {
+    testWidgets('DEP1 (remplace EX-Q5) : une dépense comptabilisée n’a plus de « Modifier » — sa date comprise', (tester) async {
       grandEcran(tester);
       await db.into(db.treasuryAccounts).insert(TreasuryAccountsCompanion.insert(id: _uuid('t1'), label: 'Caisse', balance: const Value(1000)));
       await db
@@ -491,18 +491,10 @@ echo json_encode($sortie);
           );
       await tester.pumpWidget(sousPortee(SaisieDepensesScreen(depot: DepensesRepository(database: db, deviceId: 'poste-test'))));
       await tester.pumpAndSettle();
-      expect(tester.widget<InkWell>(find.byKey(const Key('champ-date'))).onTap, isNotNull, reason: 'nouvelle dépense : date libre');
 
-      await tester.tap(find.byKey(Key('depense-modifier-${_uuid('d1')}')));
-      await tester.pumpAndSettle();
-      expect(tester.widget<InkWell>(find.byKey(const Key('champ-date'))).onTap, isNull, reason: 'dépense comptabilisée : date grisée');
-      expect(
-        find.ancestor(
-          of: find.byKey(const Key('champ-date')),
-          matching: find.byWidgetPredicate((w) => w is Tooltip && w.message == SaisieDepensesScreen.motifDateVerrouillee),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Carburant'), findsOneWidget);
+      expect(find.byKey(Key('depense-modifier-${_uuid('d1')}')), findsNothing, reason: 'immuable : le web n’offre pas le crayon');
+      expect(find.byKey(Key('depense-archiver-${_uuid('d1')}')), findsOneWidget, reason: 'se corrige par archivage (contre-passation)');
     });
   });
 
@@ -553,10 +545,6 @@ echo json_encode($sortie);
     );
     expect(PaginationAgri.texte(total: 1, page: 1, pages: 1, annee: 2027), "1 ligne dans l'exercice 2027 — page 1 sur 1");
     expect(pagination, contains("{{ \$total }} {{ \$total > 1 ? 'lignes' : 'ligne' }} dans l'exercice {{ \\App\\Support\\ExerciceChoisi::annee() }} — page {{ \$paginator->currentPage() }} sur {{ \$paginator->lastPage() }}"));
-
-    // EX-Q5 : l'info-bulle de la date grisée est celle du web.
-    final action = File('$dossierLaravel/app/Actions/SaisieDepenseAction.php').readAsStringSync();
-    expect(action, contains("MOTIF_DATE_VERROUILLEE = '${SaisieDepensesScreen.motifDateVerrouillee}';"));
   }, skip: sansLaravel);
 
   test('garde-fou : chaque écran piloté lit l’exercice affiché par le point de passage commun', () {

@@ -230,6 +230,7 @@ void main() {
       SyncEngine.cleFichesResyncU10,
       SyncEngine.cleDepensesResync,
       SyncEngine.cleDepensesResyncU14,
+      SyncEngine.cleDepensesResyncDep1,
     ]) {
       await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: cle, value: '1'));
     }

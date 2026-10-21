@@ -365,22 +365,27 @@ void main() {
         addTearDown(tester.view.reset);
         await tester.pumpWidget(MaterialApp(home: SaisieDepensesScreen(depot: depot)));
         await tester.pumpAndSettle();
+        // Ticket DEP5 — le champ vit dans la modale « Nouvelle Dépense » (`x-modal`), plus dans un formulaire en page.
+        await tester.tap(find.byKey(const Key('bouton-nouvelle-depense')));
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'débordement à $largeur px');
         final etiquette = rect(tester, find.text('DATE DE LA TRANSACTION *'));
         final champ = rect(tester, find.byKey(const Key('champ-date')));
         expect(champ.height, AgriChamps.hauteurFormulaire);
         expect(champ.top - etiquette.bottom, closeTo(AgriSpacing.xs, 0.01));
         expect(champ.left, etiquette.left);
-        final libelle = rect(tester, find.byKey(const Key('champ-libelle')));
+        final libelle = rect(tester, find.text('MODE DE PAIEMENT *'));
         // md:grid-cols-2 gap-md : deux colonnes égales dès 768 px, une colonne en dessous.
         if (largeur >= AgriBreakpoints.md) {
           expect(libelle.left - champ.right, closeTo(AgriSpacing.md, 0.01));
-          expect(libelle.width, champ.width);
-          expect(libelle.height, champ.height, reason: 'même hauteur h-11 sur une même ligne');
+          expect(libelle.top, etiquette.top, reason: 'même ligne de la grille');
         } else {
           expect(libelle.top, greaterThan(champ.bottom));
           expect(libelle.left, champ.left);
         }
+        // La modale se ferme avant la mesure suivante (la route survit à un nouveau `pumpWidget`).
+        await tester.tap(find.byKey(const Key('modale-fermer')));
+        await tester.pumpAndSettle();
       }
     });
   });

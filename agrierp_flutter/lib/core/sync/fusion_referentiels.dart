@@ -50,6 +50,8 @@ class FusionReferentiels {
       ('supplier_payments', 'supplier_id'),
       ('supplier_refunds', 'supplier_id'),
       ('supplier_credits', 'supplier_id'),
+      // Ticket DEP4 — le fournisseur (facultatif) d'une dépense.
+      ('expenses', 'supplier_id'),
     ],
     'products': [
       ('sale_lines', 'product_id'),

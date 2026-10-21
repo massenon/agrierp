@@ -90,6 +90,9 @@ void main() {
     'expense_categories': 'expense_categories',
     // Ticket U13 — dépenses (table mixte : saisies au poste ET tirées) et paie réglée (lecture seule).
     'expenses': 'expenses',
+    // Ticket DEP4 — lignes de dépense (avec leur dépense) et centres de coût (référentiel).
+    'expense_lines': 'expense_lines',
+    'cost_centers': 'cost_centers',
     'payslips': 'payslips',
   };
 

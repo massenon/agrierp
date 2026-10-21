@@ -350,6 +350,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final DepensesRepository _depenses = DepensesRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    // Ticket DEP4 — l'auteur d'une dépense : le compte connecté au poste.
+    auteurId: () => _auth.utilisateur?.id,
   );
 
   /// Ticket VL-1 — le verrou local (code PIN, hors ligne) et la porte qui décide de l'écran montré : chargement,

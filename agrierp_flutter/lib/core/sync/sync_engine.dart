@@ -391,6 +391,13 @@ class SyncEngine {
   /// les absorbeurs, et seulement si les dépenses servies portent ces deux clés (serveur postérieur à U14).
   static const cleDepensesResyncU14 = 'depenses_resync_u14';
 
+  /// Ticket DEP4 — resynchronisation UNIQUE des dépenses après le passage au schéma v56 : les dépenses `synced` absorbées
+  /// avant n'ont pas leurs LIGNES (et le plan local peut manquer pour la conversion locale) ; le curseur est passé.
+  /// Écrite après tous les absorbeurs, et seulement si le serveur sert les lignes (`expense_lines`) — ou ne sert pas les
+  /// dépenses du tout (rien à resynchroniser). Un serveur qui sert les dépenses SANS leurs lignes est antérieur à DEP3 :
+  /// le tirage reste complet tant que cela dure (même règle que U9).
+  static const cleDepensesResyncDep1 = 'depenses_resync_dep1';
+
   /// Vrai si le dernier tirage a servi au moins une dépense SANS `status` (serveur antérieur à U14) — renseigné par
   /// [_absorberDepenses].
   bool _depensesSansStatut = false;
@@ -508,6 +515,8 @@ class SyncEngine {
         await _lireReglage(cleDepensesResync) != null;
     final resyncDepensesU14Faite =
         await _lireReglage(cleDepensesResyncU14) != null;
+    final resyncDepensesDep1Faite =
+        await _lireReglage(cleDepensesResyncDep1) != null;
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -520,7 +529,8 @@ class SyncEngine {
         !resyncMouvementsFaite ||
         !resyncFichesU10Faite ||
         !resyncDepensesFaite ||
-        !resyncDepensesU14Faite;
+        !resyncDepensesU14Faite ||
+        !resyncDepensesDep1Faite;
     final since = !toutRedemander && etat?.lastPulledAt != null
         ? etat!.lastPulledAt!.toUtc().toIso8601String()
         : null;
@@ -647,6 +657,11 @@ class SyncEngine {
     // U14 : même place, et seulement si les dépenses servies portent leur statut et leur écriture.
     if (!resyncDepensesU14Faite && !_depensesSansStatut) {
       await _ecrireReglage(cleDepensesResyncU14, '1');
+    }
+    // DEP4 : même place, et seulement si le serveur sert les lignes des dépenses (ou ne sert pas les dépenses).
+    if (!resyncDepensesDep1Faite &&
+        (cles.contains('expense_lines') || !cles.contains('expenses'))) {
+      await _ecrireReglage(cleDepensesResyncDep1, '1');
     }
     // U4, U8, U9 : « serveur antérieur » se lit à une pièce servie SANS ses lignes (ou des produits sans leur
     // grand livre). ⚠️ Ticket S-T4 — un serveur qui PAGINE est postérieur à U10 : la question ne se pose plus, et
@@ -797,7 +812,10 @@ class SyncEngine {
     recus += await _absorberComptesTresorerie(corps['treasury_accounts']);
     recus += await _absorberCategoriesDepense(corps['expense_categories']);
     // Ticket U13 — dépenses du serveur (table mixte) et paie réglée (lecture seule).
-    recus += await _absorberDepenses(corps['expenses']);
+    // Ticket DEP4 — centres de coût (référentiel), puis les dépenses AVEC leurs lignes (`expense_lines`, au curseur de leur
+    // dépense : jamais une ligne sans son en-tête).
+    recus += await _absorberCentresDeCout(corps['cost_centers']);
+    recus += await _absorberDepenses(corps['expenses'], corps['expense_lines']);
     recus += await _absorberPaie(corps['payslips']);
 
     return recus;
@@ -4098,7 +4116,7 @@ class SyncEngine {
   /// refusée et en attente de correction) : le tirage précède toujours l'envoi. Une dépense acquittée (`synced`) prend
   /// la dernière version du serveur (modification ou archivage au web) et garde son `device_id` d'origine.
   /// Clé absente (serveur antérieur à U13, ou table non servie) : rien n'est touché.
-  Future<int> _absorberDepenses(Object? brut) async {
+  Future<int> _absorberDepenses(Object? brut, [Object? lignesBrutes]) async {
     if (brut == null) return 0;
 
     const quoi = 'Dépense';
@@ -4137,9 +4155,16 @@ class SyncEngine {
           '$quoi $id refusée : date illisible (${l['expense_date']}).',
         );
       }
-      if (libelle == null || categorie == null || compte == null || compte.isEmpty) {
+      if (libelle == null || compte == null || compte.isEmpty) {
         throw FormatException(
-          '$quoi $id refusée : libellé, compte de charge ou compte de trésorerie absent.',
+          '$quoi $id refusée : libellé ou compte de trésorerie absent.',
+        );
+      }
+      // Ticket DEP4 — la « catégorie » n'est plus qu'une valeur de compatibilité (compte de la première ligne) : un
+      // serveur migré peut la servir vide pour une dépense sans compte connu ; le COMPTE vit sur la ligne.
+      if (categorie == null && !l.containsKey('payment_mode')) {
+        throw FormatException(
+          '$quoi $id refusée : compte de charge absent.',
         );
       }
       if (montant == null || montant < 0) {
@@ -4147,6 +4172,13 @@ class SyncEngine {
           '$quoi $id refusée : montant absent ou négatif ($montant).',
         );
       }
+      // Ticket DEP4 — l'en-tête enrichi : mode, centre de coût, fournisseur, bénéficiaire, auteur (tous facultatifs ;
+      // présent et illisible : refus). Absent : serveur antérieur à DEP3 (rien n'est touché).
+      final mode = _texteStrict(l['payment_mode'], '$quoi $id : mode de paiement');
+      final centre = _texteStrict(l['cost_center_id'], '$quoi $id : centre de coût');
+      final fournisseur = _texteStrict(l['supplier_id'], '$quoi $id : fournisseur');
+      final beneficiaire = _texteStrict(l['beneficiary'], '$quoi $id : bénéficiaire');
+      final auteur = _texteStrict(l['created_by'], '$quoi $id : auteur');
       recues.add(
         ExpensesCompanion.insert(
           id: id,
@@ -4156,7 +4188,7 @@ class SyncEngine {
           // Une DATE pure, au jour du Bénin (minuit, heure murale) : celle que le web compare (`whereDate`).
           expenseDate: DateTime(date.year, date.month, date.day),
           label: libelle,
-          category: categorie,
+          category: categorie ?? '',
           amount: montant,
           treasuryAccountId: compte,
           isActive: Value(actif),
@@ -4164,8 +4196,50 @@ class SyncEngine {
           accountingEntryId: l.containsKey('accounting_entry_id')
               ? Value(ecriture as String?)
               : const Value.absent(),
+          paymentMode: l.containsKey('payment_mode') ? Value(mode) : const Value.absent(),
+          costCenterId: l.containsKey('cost_center_id') ? Value(centre) : const Value.absent(),
+          supplierId: l.containsKey('supplier_id') ? Value(fournisseur) : const Value.absent(),
+          beneficiary: l.containsKey('beneficiary') ? Value(beneficiaire) : const Value.absent(),
+          createdBy: l.containsKey('created_by') ? Value(auteur) : const Value.absent(),
+          // Un tirage ne dit jamais « refusée » : la saisie acquittée n'a plus de refus de pièce.
+          ecritureRefus: const Value(null),
         ),
       );
+    }
+
+    // Ticket DEP4 — les lignes servies, STRICTES : liste de maps, identifiant unique, dépense servie dans CE tirage,
+    // libellé, compte de charge, rang et montant lisibles. Clé absente (serveur antérieur à DEP3) : rien n'est touché.
+    final lignesParDepense = <String, List<ExpenseLinesCompanion>>{};
+    if (lignesBrutes != null) {
+      const quoiLigne = 'Ligne de dépense';
+      final vuesLignes = <String>{};
+      for (final l in _lignesStrictes(lignesBrutes, quoiLigne)) {
+        final id = _identifiantStrict(l, vuesLignes, quoiLigne);
+        final depense = _texteStrict(l['expense_id'], '$quoiLigne $id : dépense');
+        final libelle = _texteStrict(l['label'], '$quoiLigne $id : libellé');
+        final compte = _texteStrict(l['charge_account_id'], '$quoiLigne $id : compte de charge');
+        final montant = _nombreStrict(l['amount'], '$quoiLigne $id : montant');
+        final rang = _nombreStrict(l['position'], '$quoiLigne $id : rang');
+        if (depense == null || !vus.contains(depense)) {
+          throw FormatException('$quoiLigne $id refusée : sa dépense n\'est pas servie avec elle ($depense).');
+        }
+        if (libelle == null || compte == null || compte.isEmpty) {
+          throw FormatException('$quoiLigne $id refusée : libellé ou compte de charge absent.');
+        }
+        if (montant == null || montant < 0) {
+          throw FormatException('$quoiLigne $id refusée : montant absent ou négatif ($montant).');
+        }
+        lignesParDepense.putIfAbsent(depense, () => []).add(
+          ExpenseLinesCompanion.insert(
+            id: id,
+            expenseId: depense,
+            position: Value(rang?.round() ?? 0),
+            label: libelle,
+            chargeAccountId: compte,
+            amount: montant,
+          ),
+        );
+      }
     }
 
     await _db.transaction(() async {
@@ -4187,10 +4261,53 @@ class SyncEngine {
                 (_) => d.copyWith(deviceId: const Value.absent()),
               ),
             );
+        // Les lignes servies REMPLACENT celles que le poste tient : une ligne retirée ici disparaît là-bas.
+        if (lignesBrutes != null) {
+          await (_db.delete(_db.expenseLines)..where((l) => l.expenseId.equals(d.id.value))).go();
+          for (final ligne in lignesParDepense[d.id.value] ?? const <ExpenseLinesCompanion>[]) {
+            await _db.into(_db.expenseLines).insert(ligne, mode: InsertMode.insertOrReplace);
+          }
+        }
       }
     });
 
     return recues.length;
+  }
+
+  /// Ticket DEP4 — centres de coût (filières) servis par le serveur : référentiel, LE SERVEUR GAGNE (jamais écrit au
+  /// poste). Strict : un élément illisible refuse le lot. Clé absente (compte sans `view-achats` / `view-comptabilite`,
+  /// ou serveur antérieur) : rien n'est touché.
+  Future<int> _absorberCentresDeCout(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Centre de coût';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final recus = <CostCentersCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final libelle = _texteStrict(l['label'], '$quoi $id : libellé');
+      final type = _texteStrict(l['type'], '$quoi $id : type');
+      if (libelle == null || type == null) {
+        throw FormatException('$quoi $id refusé : libellé ou type absent.');
+      }
+      recus.add(
+        CostCentersCompanion.insert(
+          id: id,
+          label: libelle,
+          type: type,
+          parentSpeciesId: Value(_texteStrict(l['parent_species_id'], '$quoi $id : espèce')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.costCenters).go();
+      await _db.batch((b) => b.insertAll(_db.costCenters, recus));
+    });
+
+    return recus.length;
   }
 
   /// 🔴→✅ Ticket U13 — LA PAIE RÉGLÉE DESCEND AU POSTE (lecture seule), pour le rapport « Recettes et Dépenses ».
@@ -4490,6 +4607,16 @@ class SyncEngine {
       )..where((t) => t.saleId.equals(v.id))).get();
     }
 
+    // Ticket DEP4 — les lignes de chaque dépense en attente, dans l'ordre : elles partent DANS le document de l'en-tête.
+    final lignesDeDepense = <String, List<ExpenseLine>>{};
+    for (final d in depenses) {
+      lignesDeDepense[d.id] =
+          await (_db.select(_db.expenseLines)
+                ..where((l) => l.expenseId.equals(d.id))
+                ..orderBy([(l) => OrderingTerm(expression: l.position), (l) => OrderingTerm(expression: l.id)]))
+              .get();
+    }
+
     // ⚠️ F0.90 — fiches COMPLÈTES (modifiées au poste) et fiches D'IDENTITÉ (ventes en file dont la
     // fiche est déjà synchronisée) partent ensemble, triées par jour puis bande comme ci-dessus.
     // Une fiche `pending` n'est jamais aussi « d'identité » (filtre `synced`) : pas de doublon.
@@ -4565,7 +4692,7 @@ class SyncEngine {
             .toList(),
         'stock_adjustments': ajustements.map(_ajustementEnJson).toList(),
         'veterinary_records': soins.map(_soinEnJson).toList(),
-        'expenses': depenses.map(_depenseEnJson).toList(),
+        'expenses': depenses.map((d) => _depenseEnJson(d, lignesDeDepense[d.id] ?? const [])).toList(),
         'livestock_reproduction_events': saillies.map(_saillieEnJson).toList(),
         'purchases': achats
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
@@ -4921,8 +5048,27 @@ class SyncEngine {
     accepte += await _acquitter(
       'expenses',
       corps['expenses'],
-      (ids, statut) => (_db.update(_db.expenses)..where((t) => t.id.isIn(ids)))
-          .write(ExpensesCompanion(syncStatus: Value(statut))),
+      (ids, statut) async {
+        // Ticket DEP4 — un acquittement efface le refus de la pièce ; un refus le COPIE sur la dépense
+        // (`ecriture_refus`, mot pour mot : le conflit vient d'être écrit par [_acquitter]).
+        await (_db.update(_db.expenses)..where((t) => t.id.isIn(ids))).write(
+          ExpensesCompanion(
+            syncStatus: Value(statut),
+            ecritureRefus: statut == SyncStatus.synced ? const Value(null) : const Value.absent(),
+          ),
+        );
+        if (statut == SyncStatus.conflict) {
+          for (final id in ids) {
+            final conflit = await (_db.select(_db.syncConflicts)
+                  ..where((c) => c.id.equals('expenses:$id')))
+                .getSingleOrNull();
+            if (conflit == null) continue;
+            await (_db.update(_db.expenses)..where((t) => t.id.equals(id))).write(
+              ExpensesCompanion(ecritureRefus: Value(conflit.reason)),
+            );
+          }
+        }
+      },
       motifs,
       (n) => rejete += n,
     );
@@ -6356,16 +6502,36 @@ class SyncEngine {
     'device_id': e.deviceId,
   };
 
-  /// ⚠️ LA CATEGORIE PART TELLE QUELLE : le serveur la valide contre sa propre
-  /// liste (`Expense::CATEGORIES`) et refuse tout compte inconnu. C'est ce qui
-  /// empeche un poste desynchronise d'imputer une charge sur un compte retire.
-  Map<String, dynamic> _depenseEnJson(Expense d) => {
+  /// 🔴→✅ Ticket DEP4 — la dépense part AVEC SES LIGNES dans le même document (`lines` : `id`, `label`,
+  /// `charge_account_id`, `amount`) et son TOTAL (`amount`, que le serveur contrôle contre la somme des lignes) ; le
+  /// serveur la rejoue par `SaisieDepenseAction` et passe SA pièce. Montants entiers.
+  ///
+  /// ⚠️ UNE DÉPENSE SANS LIGNE (poste qui n'a pas pu convertir la sienne à la migration, plan local absent) part À PLAT
+  /// (`label`, `category`, `amount`) : le serveur, déployé avant les postes, la convertit en UNE ligne.
+  Map<String, dynamic> _depenseEnJson(Expense d, List<ExpenseLine> lignes) => {
     'id': d.id,
     'expense_date': _jour(d.expenseDate),
-    'label': d.label,
-    'category': d.category,
-    'amount': d.amount,
     'treasury_account_id': d.treasuryAccountId,
+    if (lignes.isEmpty) ...{
+      'label': d.label,
+      'category': d.category,
+      'amount': d.amount,
+    } else ...{
+      'payment_mode': d.paymentMode,
+      'cost_center_id': d.costCenterId,
+      'supplier_id': d.supplierId,
+      'beneficiary': d.beneficiary,
+      'amount': d.amount,
+      'lines': [
+        for (final l in lignes)
+          {
+            'id': l.id,
+            'label': l.label,
+            'charge_account_id': l.chargeAccountId,
+            'amount': l.amount == l.amount.roundToDouble() ? l.amount.round() : l.amount,
+          },
+      ],
+    },
     // Ticket U14 — archivage fait au poste (`DepensesRepository.archiver`), rejoué par le serveur comme
     // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
     'is_active': d.isActive,

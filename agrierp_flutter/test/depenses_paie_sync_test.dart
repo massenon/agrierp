@@ -9,6 +9,8 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'depenses_aide.dart';
+
 /// Ticket U13 — `expenses` ET `payslips` DESCENDENT AU POSTE.
 ///
 /// Verrouillé ici : l'absorbeur STRICT des dépenses (tout ou rien, curseur immobile sur refus), qui n'écrase JAMAIS une
@@ -30,6 +32,10 @@ class _Serveur extends Interceptor {
 
   final List<Object?> demandes = [];
   final List<Map<String, dynamic>> envois = [];
+
+  /// Ticket DEP4 — vrai : un serveur ANTÉRIEUR à DEP3 (sert les dépenses SANS leurs lignes) ; faux (défaut) : il sert
+  /// `expense_lines` avec elles, comme le serveur d'aujourd'hui.
+  bool sansLignesDeDepense = false;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -56,7 +62,17 @@ class _Serveur extends Interceptor {
       return;
     }
     demandes.add(options.queryParameters['since']);
-    handler.resolve(Response<Map<String, dynamic>>(requestOptions: options, statusCode: 200, data: tirage));
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          ...tirage,
+          if (!sansLignesDeDepense && tirage.containsKey('expenses') && !tirage.containsKey('expense_lines'))
+            'expense_lines': <Object?>[],
+        },
+      ),
+    );
   }
 }
 
@@ -396,12 +412,12 @@ void main() {
       await moteur.synchroniser();
       final depot = DepensesRepository(database: db, deviceId: 'poste-test');
       await db.into(db.treasuryAccounts).insert(TreasuryAccountsCompanion.insert(id: caisse, label: 'Caisse'));
-      await db.into(db.expenseCategories).insert(ExpenseCategoriesCompanion.insert(label: '605 - Énergie'));
+      await semerPlanDeCharge(db);
 
-      await depot.enregistrer(
+      await depot.enregistrerUneLigne(
         date: DateTime(2026, 10, 12),
         libelle: 'Électricité SBEE octobre',
-        categorie: '605 - Énergie',
+        compteChargeId: compte605,
         montant: 42000,
         compteTresorerieId: caisse,
         idEnModification: uuid('w1'),
@@ -413,7 +429,13 @@ void main() {
       final envoyees = {
         for (final e in (serveur.envois.last['expenses'] as List).cast<Map<String, dynamic>>()) e['id']: e,
       };
-      expect(envoyees[uuid('w1')]!['label'], 'Électricité SBEE octobre');
+      // Ticket DEP4 — la dépense part AVEC SES LIGNES (et son total), plus à plat.
+      expect((envoyees[uuid('w1')]!['lines'] as List).single['label'], 'Électricité SBEE octobre');
+      expect((envoyees[uuid('w1')]!['lines'] as List).single['charge_account_id'], compte605);
+      expect((envoyees[uuid('w1')]!['lines'] as List).single['amount'], 42000);
+      expect(envoyees[uuid('w1')]!['amount'], 42000.0);
+      expect(envoyees[uuid('w1')]!['payment_mode'], 'caisse');
+      expect(envoyees[uuid('w1')]!.containsKey('label'), isFalse);
       expect(envoyees[uuid('w1')]!['is_active'], isTrue);
       expect(envoyees[uuid('w2')]!['is_active'], isFalse);
       expect((await depense(uuid('w2')))!.syncStatus, SyncStatus.synced, reason: 'acquittée');

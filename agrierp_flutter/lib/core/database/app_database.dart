@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../config/domaine_email.dart';
+import 'identifiant_ligne_depense.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -1608,6 +1609,55 @@ class Expenses extends Table with SyncColumns {
   /// compte de charge ni de compte de trésorerie (`SaisieDepenseAction`). Le poste refuse avant d'écrire, comme le web.
   /// `null` : pas d'écriture connue (saisie de ce poste pas encore reçue, ou plan comptable incomplet au serveur).
   TextColumn get accountingEntryId => text().nullable()();
+
+  /// Ticket DEP4 (PRD `docs/prd/depenses-multilignes.md`) — UNE DÉPENSE, PLUSIEURS LIGNES : `expenses` est l'EN-TÊTE.
+  /// `amount` est le TOTAL (somme des lignes, jamais saisi), `label` le résumé (« premier libellé (+N autres) »), `category`
+  /// n'est conservée que pour les serveurs non migrés (compte de la première ligne).
+  ///
+  /// Mode de paiement = type du compte de trésorerie (`caisse`, `banque`, `mobile_money`, `Expense::MODES_DE_PAIEMENT`).
+  TextColumn get paymentMode => text().nullable()();
+
+  /// Centre de coût facultatif (`cost_centers`, filières) ; fournisseur (`suppliers`) ou bénéficiaire (texte), facultatifs.
+  TextColumn get costCenterId => text().nullable()();
+  TextColumn get supplierId => text().nullable()();
+  TextColumn get beneficiary => text().nullable()();
+
+  /// Auteur de la saisie (`users.id`) : celui du compte connecté au poste, ou celui que le serveur a servi.
+  TextColumn get createdBy => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE (absent du schéma Laravel, déclaré dans `SchemaDepensesPosteTest`) — le REFUS de la pièce par le
+  /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
+  /// Effacé quand la saisie est acquittée ou corrigée. Le web n'a pas de file d'envoi : il dit le refus tout de suite.
+  TextColumn get ecritureRefus => text().nullable()();
+}
+
+/// Ticket DEP4 — une LIGNE de dépense : libellé, COMPTE DE CHARGE du plan (classe 6) et montant. Elle suit son en-tête :
+/// jamais envoyée ni tirée seule (clé `lines` du document de la dépense, `expense_lines` du tirage, au curseur de sa
+/// dépense), donc sans colonnes de synchronisation. Identifiant UUID créé sur le poste ; celui d'une dépense CONVERTIE
+/// est l'UUID v5 de la dépense (`ExpenseLine::idDeConversion` au serveur) : la même ligne des deux côtés.
+class ExpenseLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get expenseId => text().withLength(min: 36, max: 36)();
+  IntColumn get position => integer().withDefault(const Constant(0))();
+  TextColumn get label => text()();
+  TextColumn get chargeAccountId => text()();
+  RealColumn get amount => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket DEP4 — centres de coût (filières) servis par le serveur, en lecture seule : le « Centre de Coût » facultatif de
+/// l'en-tête d'une dépense. Référentiel : le serveur gagne.
+class CostCenters extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get label => text()();
+  TextColumn get type => text()();
+  TextColumn get parentSpeciesId => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
@@ -1717,6 +1767,8 @@ class SyncState extends Table {
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    ExpenseLines,
+    CostCenters,
     Payslips,
     AppSettings,
     SyncState,
@@ -1727,6 +1779,11 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
+  /// ⚠️ **SCHÉMA 56 SUR CETTE BRANCHE (ticket DEP4).** Les numéros 53 (devis), 54 (avoirs) et 55 (unicité) sont réservés
+  /// à d'autres branches : le palier `from < 56` ne dépend d'aucun des trois. **La fusion renumérotera si un palier
+  /// manque** (renommer `56` et mettre à jour `migration_toutes_versions_test.dart`, `depenses_multilignes_test.dart` et
+  /// `docs/prd/depenses-multilignes.md`).
+  ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
   /// présente sur un poste garde l'ancien schéma : la première requête sur la
@@ -1734,7 +1791,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 52;
+  int get schemaVersion => 56;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2255,8 +2312,82 @@ class AppDatabase extends _$AppDatabase {
       if (from < 52) {
         await _convertirAdressesEmail();
       }
+
+      // v56 — ticket DEP4 (une dépense, plusieurs lignes) : lignes, centres de coût, en-tête enrichi, et la
+      // transformation locale de chaque ancienne dépense en 1 en-tête + 1 ligne. Voir [_convertirDepensesEnLignes].
+      // ⚠️ Numéro 56 : 53 (devis), 54 (avoirs) et 55 (unicité) sont réservés ailleurs.
+      if (from < 56) {
+        if (!await _tableExiste(m, expenseLines)) await m.createTable(expenseLines);
+        if (!await _tableExiste(m, costCenters)) await m.createTable(costCenters);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.paymentMode);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.costCenterId);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.supplierId);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.beneficiary);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.createdBy);
+        await _ajouterColonneSiAbsente(m, expenses, expenses.ecritureRefus);
+        await _convertirDepensesEnLignes();
+      }
     },
   );
+
+  /// Compte « charges diverses » du plan (`ConversionDepensesEnLignes::COMPTE_DIVERS` au serveur).
+  static const compteChargesDiverses = '628';
+
+  /// Palier v56 (ticket DEP4) — CHAQUE ANCIENNE DÉPENSE DEVIENT 1 EN-TÊTE + 1 LIGNE, aucune n'est perdue : libellé de la
+  /// ligne = ancien libellé, montant = ancien montant (le total de l'en-tête reste cohérent), compte de charge déduit de
+  /// l'ancienne catégorie (« 605 - Énergie » → le compte de classe 6 de code 605 du plan LOCAL — la règle de la
+  /// comptabilisation d'origine), sinon 628 « Autres charges ». Identifiant de la ligne = UUID v5 de la dépense (le même
+  /// qu'au serveur). Le mode de paiement se déduit du type du compte de trésorerie.
+  ///
+  /// ⚠️ NE TOUCHE NI `sync_status` NI `updated_at` NI `accounting_entry_id` : une saisie `pending` le reste (elle partira
+  /// avec sa ligne), une `synced` le reste, une pièce déjà passée n'est jamais régénérée.
+  /// ⚠️ Un compte introuvable au plan local (poste sans plan : jamais tiré) ne crée AUCUNE ligne : la dépense reste
+  /// lisible (l'écran en fabrique une à l'affichage), part à plat si elle est en attente (le serveur la convertit), et
+  /// redescend avec ses vraies lignes à la resynchronisation unique (`depenses_resync_dep1`).
+  Future<void> _convertirDepensesEnLignes() async {
+    final depenses = await customSelect(
+      'SELECT id, label, category, amount, treasury_account_id, payment_mode FROM expenses '
+      'WHERE id NOT IN (SELECT expense_id FROM expense_lines)',
+    ).get();
+    if (depenses.isEmpty) return;
+
+    final comptes = {
+      for (final c in await customSelect(
+        'SELECT id, code FROM chart_of_accounts WHERE account_class = 6',
+      ).get())
+        c.read<String>('code'): c.read<String>('id'),
+    };
+    final types = {
+      for (final t in await customSelect('SELECT id, type FROM treasury_accounts').get())
+        t.read<String>('id'): t.read<String?>('type'),
+    };
+
+    for (final d in depenses) {
+      final id = d.read<String>('id');
+      final code = RegExp(r'^\s*(\d{2,4})').firstMatch(d.read<String>('category'))?.group(1);
+      final compte = (code == null ? null : comptes[code]) ?? comptes[compteChargesDiverses];
+      if (compte != null) {
+        await customInsert(
+          'INSERT INTO expense_lines (id, expense_id, position, label, charge_account_id, amount) '
+          'VALUES (?, ?, 0, ?, ?, ?)',
+          variables: [
+            Variable.withString(idLigneConvertie(id)),
+            Variable.withString(id),
+            Variable.withString(d.read<String>('label')),
+            Variable.withString(compte),
+            Variable.withReal(d.read<double>('amount')),
+          ],
+        );
+      }
+      final type = types[d.read<String>('treasury_account_id')];
+      if (type != null && d.read<String?>('payment_mode') == null) {
+        await customUpdate(
+          'UPDATE expenses SET payment_mode = ? WHERE id = ?',
+          variables: [Variable.withString(type), Variable.withString(id)],
+        );
+      }
+    }
+  }
 
   /// Palier v52 (ticket MAIL1) — remplace `@olouwachegoun.bj` par `@fermeolouwachegoun.com` (insensible à la casse, en
   /// SQL) dans TOUTES les colonnes locales susceptibles de porter une adresse : l'e-mail des clients, des fournisseurs,
@@ -2458,7 +2589,7 @@ class AppDatabase extends _$AppDatabase {
     'advance_imputations', 'sales', 'sale_lines',
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
-    'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'expense_lines', 'expenses', 'stock_adjustments', 'stock_movements', // U9, DEP4
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',
@@ -2471,7 +2602,7 @@ class AppDatabase extends _$AppDatabase {
   static const tablesConservees = [
     'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
     'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
-    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories',
+    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers',
     'company_settings', 'modules_config', 'attestation_templates',
     'roles_applicatifs', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',

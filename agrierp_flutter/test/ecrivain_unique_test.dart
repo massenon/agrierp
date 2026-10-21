@@ -80,6 +80,9 @@ void main() {
         'constitution : lot_source_id DÉRIVÉ du transfert (le serveur le pose lui-même en rejouant le transfert), jamais remis en file',
     'products <- lib/core/database/app_database.dart':
         'purge après réinitialisation du serveur (15.50) : stock_qty remis à zéro, comme au serveur',
+    'expenses <- lib/core/database/app_database.dart':
+        'palier v56 (DEP4) : mode de paiement DÉDUIT du type du compte payeur lors de la transformation 1 en-tête = 1 ligne ; '
+        'sync_status et updated_at ne bougent pas (la saisie en attente le reste, la pièce n\'est jamais touchée)',
   };
 
   /// Seules colonnes qu'une exception peut écrire, par table : `products.stock_qty` (miroir du grand livre) ; ticket BS1,
@@ -88,6 +91,8 @@ void main() {
   const colonnesPermises = <String, Set<String>>{
     'products': {'stockQty', 'stock_qty'},
     'livestock_lots': {'currentQuantity', 'current_quantity', 'lotSourceId', 'lot_source_id'},
+    // Ticket DEP4 — le mode de paiement déduit par le palier v56 (jamais remis en file).
+    'expenses': {'paymentMode', 'payment_mode'},
   };
 
   String sqlDe(String getter) =>
@@ -180,7 +185,9 @@ void main() {
         final hors = RegExp(r'(\w+):').allMatches(extrait.split('Companion').skip(1).join()).map((m) => m[1]!).toSet()
           ..removeAll(colonnesPermises[table] ?? const <String>{});
         // SQL brut : `SET stock_qty = 0` et rien d'autre (aucune seconde colonne après une virgule).
-        final sqlHors = extrait.contains('SET') && !RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait);
+        final sqlPermis = RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait) ||
+            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait));
+        final sqlHors = extrait.contains('SET') && !sqlPermis;
         if (hors.isNotEmpty || sqlHors || extrait.contains('syncStatus') || extrait.contains('sync_status')) {
           parasites.add('$cle écrit au-delà de ses colonnes dérivées : $extrait');
         }

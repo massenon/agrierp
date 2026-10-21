@@ -67,6 +67,9 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   44: [d.stockMovements],
   // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
   47: [d.payslips],
+  // Ticket DEP4 — lignes de dépense et centres de coût. ⚠️ Numéro 56 : 53 (devis), 54 (avoirs) et 55 (unicité) sont
+  // réservés à d'autres branches ; la fusion renumérotera si un palier manque.
+  56: [d.expenseLines, d.costCenters],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -222,6 +225,16 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket MAIL1 — palier de DONNÉES (adresses e-mail du nouveau domaine) : aucune table ni colonne ajoutée.
   52: [],
+  // Ticket DEP4 — l'en-tête d'une dépense à plusieurs lignes (mode, centre de coût, fournisseur, bénéficiaire, auteur,
+  // refus de la pièce) ; la transformation 1 en-tête = 1 ligne est vérifiée par `depenses_multilignes_test.dart`.
+  56: [
+    (d.expenses, d.expenses.paymentMode),
+    (d.expenses, d.expenses.costCenterId),
+    (d.expenses, d.expenses.supplierId),
+    (d.expenses, d.expenses.beneficiary),
+    (d.expenses, d.expenses.createdBy),
+    (d.expenses, d.expenses.ecritureRefus),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

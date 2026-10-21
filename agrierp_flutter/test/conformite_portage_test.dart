@@ -142,6 +142,9 @@ void main() {
     'expense_categories',
     // Ticket U13 — dépenses (table mixte) et paie réglée (lecture seule), pour « Recettes et Dépenses ».
     'expenses',
+    // Ticket DEP4 — les lignes d'une dépense (avec leur dépense) et les centres de coût (référentiel).
+    'expense_lines',
+    'cost_centers',
     'payslips',
   };
 
