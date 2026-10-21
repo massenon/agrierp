@@ -126,6 +126,15 @@ echo === AgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
 
 where flutter >nul 2>nul || (echo [ERREUR] Flutter introuvable dans le PATH. & exit /b 1)
 
+rem  Ticket ENV1 : l'icone de l'application (exe, fenetre, barre des taches, raccourcis, installateur) est le logo
+rem  de la ferme, dans windows\runner\resources\app_icon.ico (Runner.rc l'embarque dans agrierp.exe, agrierp.iss
+rem  s'en sert pour l'assistant). Sans lui, la compilation echoue plus loin sur un message de ressource obscur.
+rem  Pour le regenerer depuis assets\images\logo.png : py outils\generer_icone.py
+if not exist "windows\runner\resources\app_icon.ico" (
+  echo [ERREUR] windows\runner\resources\app_icon.ico absent : lancez  py outils\generer_icone.py
+  exit /b 1
+)
+
 echo.
 echo [1/6] Dependances...
 call flutter pub get || goto :echec

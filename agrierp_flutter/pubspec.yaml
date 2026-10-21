@@ -84,8 +84,14 @@ flutter:
   # l'apostrophe typographique « ’ » y sortent en CARRÉ BARRÉ, y compris dans le
   # pied de page des trois structures. Licence Apache 2.0 (fichier joint), copiée
   # du SDK Flutter.
+  #
+  # Ticket ENV1 — `assets/images/image_login.png` : l'image du panneau gauche de l'écran de connexion. Copie OCTET
+  # POUR OCTET de `agrierp_laravel/public/assets/images/image_login.png` (que le Blade `auth/login.blade.php` pose en
+  # fond, sous un voile). ⚠️ Le fichier du web est un JPEG au nom en `.png` : Flutter décode d'après le contenu, ne
+  # pas le « convertir » (ce ne serait plus le même fichier). Absent, l'écran se rabat sur un panneau de marque.
   assets:
     - assets/images/logo.png
+    - assets/images/image_login.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
 

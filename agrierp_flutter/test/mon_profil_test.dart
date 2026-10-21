@@ -27,7 +27,7 @@ void main() {
 
   const session = SessionUtilisateur(
     id: '00000000-0000-0000-0000-00000000aaaa',
-    nom: 'Manager Olouwachegoun',
+    nom: 'M. Olouchègoun',
     identifiant: 'admin',
     email: 'dg@fermeolouwachegoun.com',
     role: 'admin',
@@ -103,7 +103,7 @@ void main() {
       await utilisateur();
       await afficher(tester);
 
-      expect(texte(tester, 'profil-nom'), 'Manager Olouwachegoun');
+      expect(texte(tester, 'profil-nom'), 'M. Olouchègoun');
       expect(texte(tester, 'profil-email'), 'dg@fermeolouwachegoun.com');
       expect(texte(tester, 'profil-initiales'), 'MO');
       expect(find.text('Administrateur Principal'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
     });
 
     test('initiales : deux mots au plus, majuscules, « ? » si vide', () {
-      expect(MonProfilRepository.initialesDe('Manager Olouwachegoun'), 'MO');
+      expect(MonProfilRepository.initialesDe('M. Olouchègoun'), 'MO');
       expect(MonProfilRepository.initialesDe('  éric  gbaguidi  tossou'), 'ÉG');
       expect(MonProfilRepository.initialesDe('admin'), 'A');
       expect(MonProfilRepository.initialesDe('   '), '?');
@@ -584,7 +584,7 @@ void main() {
               ecran: 'Mon Profil',
               enAttente: 0,
               onBasculerMenu: () {},
-              nomUtilisateur: 'Manager Olouwachegoun',
+              nomUtilisateur: 'M. Olouchègoun',
               onMonProfil: onMonProfil,
             ),
           ),

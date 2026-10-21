@@ -55,6 +55,31 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
+  // ---- AgriERP : fenetre sans cadre qui respecte la barre des taches ----------
+  //
+  // La fenetre est un `WS_POPUP`. Un `ShowWindow(SW_SHOWMAXIMIZED)` sur un
+  // popup le fait couvrir TOUT le moniteur, barre des taches comprise. Ces
+  // methodes placent donc la fenetre elles-memes sur la ZONE DE TRAVAIL du
+  // moniteur qui la porte (`rcWork` : le moniteur moins la barre des taches,
+  // quel que soit son cote ou sa taille).
+
+  // Zone de travail (coordonnees ecran, pixels physiques) du moniteur qui porte
+  // la fenetre, ou du moniteur principal a defaut.
+  RECT GetWorkArea() const;
+
+  // Vrai tant que la fenetre est « agrandie » (calee sur la zone de travail).
+  bool IsMaximizedToWorkArea() const;
+
+  // Cale la fenetre sur la zone de travail ; memorise la position de restauration.
+  void MaximizeToWorkArea();
+
+  // Ramene la fenetre a sa position et sa taille de restauration, ramenees dans
+  // la zone de travail si le moniteur ou la resolution ont change entre-temps.
+  void RestoreFromMaximized();
+
+  // Agrandit si la fenetre est restauree, restaure sinon. Rend le nouvel etat.
+  bool ToggleMaximize();
+
  protected:
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
@@ -70,6 +95,17 @@ class Win32Window {
 
   // Called when Destroy is called.
   virtual void OnDestroy();
+
+  // Messages qui changent la zone de travail : resolution (WM_DISPLAYCHANGE),
+  // barre des taches deplacee / redimensionnee / masquee automatiquement
+  // (WM_SETTINGCHANGE + SPI_SETWORKAREA). Une fenetre agrandie se recale. Le
+  // message n'est JAMAIS consomme : Flutter et le systeme le voient ensuite.
+  void OnWorkAreaMessage(UINT const message, WPARAM const wparam);
+
+  // WM_GETMINMAXINFO : taille minimale de la fenetre, et zone de travail comme
+  // limite d'un agrandissement fait par le systeme (filet de securite : le
+  // poste agrandit lui-meme). |lparam| est le MINMAXINFO du message.
+  void FillMinMaxInfo(LPARAM const lparam) const;
 
  private:
   friend class WindowClassRegistrar;
@@ -97,6 +133,14 @@ class Win32Window {
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // Cale la fenetre sur la zone de travail courante (sans toucher a la position
+  // de restauration). Ne fait rien si elle y est deja : pas de boucle de WM_SIZE.
+  void FitToWorkArea();
+
+  // Fenetre agrandie dans la zone de travail, et position de restauration.
+  bool maximized_ = false;
+  RECT restore_rect_ = {0, 0, 0, 0};
 };
 
 #endif  // RUNNER_WIN32_WINDOW_H_

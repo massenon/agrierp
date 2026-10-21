@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../fenetre/fenetre_poste.dart';
 import '../theme/agri_tokens.dart';
+import 'cadre_recherche_globale.dart';
 import 'modale_agri.dart';
 import '../theme/symboles_agri.dart';
 
@@ -162,23 +163,32 @@ class BarreSuperieure extends StatelessWidget {
           const SizedBox(width: AgriSpacing.xs),
 
           // 2. Fil d'Ariane — « Groupe > Écran », comme la maquette.
+          //
+          // ⚠️ La fenêtre est sans cadre : la barre EST sa barre de titre. Le fil d'Ariane (texte, pas un
+          // contrôle) et l'espace libre qui le suit se glissent pour déplacer la fenêtre, et un double-clic les
+          // agrandit / restaure (voir `_SurfaceFenetre`).
           Flexible(
-            child: Text(
-              // ⚠️ Groupe vide = écran hors barre latérale (« Mon Profil ») :
-              // la maquette n'y affiche que le nom de l'écran.
-              groupe.isEmpty ? ecran : '$groupe > $ecran',
-              key: const Key('fil-ariane'),
-              overflow: TextOverflow.ellipsis,
-              // Web : `text-brand-emerald font-bold text-xs truncate`.
-              style: const TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.bold,
-                color: AgriColors.brandEmerald,
+            child: _SurfaceFenetre(
+              child: Text(
+                // ⚠️ Groupe vide = écran hors barre latérale (« Mon Profil ») :
+                // la maquette n'y affiche que le nom de l'écran.
+                groupe.isEmpty ? ecran : '$groupe > $ecran',
+                key: const Key('fil-ariane'),
+                overflow: TextOverflow.ellipsis,
+                // Web : `text-brand-emerald font-bold text-xs truncate`.
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  color: AgriColors.brandEmerald,
+                ),
               ),
             ),
           ),
 
-          const Spacer(),
+          // Espace libre de la barre (le `Spacer` d'origine) : même mise en page, mais c'est une prise de
+          // glissement de la fenêtre. Hauteur de la barre entière : on attrape la barre n'importe où entre le
+          // fil d'Ariane et la recherche.
+          const Expanded(child: _SurfaceFenetre(cle: Key('fenetre-zone-glissement'))),
 
           // 3. Recherche.
           //
@@ -186,24 +196,12 @@ class BarreSuperieure extends StatelessWidget {
           // le poste n'en embarque qu'une poignée. Le champ est donc présent et
           // à sa place, mais annonce sa portée au lieu de promettre une
           // recherche qu'il ne peut pas rendre.
-          if (recherche != null) recherche! else SizedBox(
-            width: 220,
-            height: 34,
-            child: TextField(
-              key: const Key('recherche-globale'),
-              style: const TextStyle(fontSize: AgriTypography.xs),
-              decoration: InputDecoration(
-                hintText: 'Recherche (application web)',
-                hintStyle: const TextStyle(fontSize: 11.5),
-                prefixIcon: const Icon(SymbolesAgri.search, size: 16),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                enabled: false,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
+          if (recherche != null) recherche! else CadreRechercheGlobale(
+            controleur: _rechercheInerte,
+            focus: _focusRechercheInerte,
+            indice: 'Recherche (application web)',
+            actif: false,
+            cleSaisie: const Key('recherche-globale-inerte'),
           ),
           const SizedBox(width: AgriSpacing.md),
 
@@ -252,14 +250,21 @@ class BarreSuperieure extends StatelessWidget {
             iconSize: 18,
             color: AgriColors.outline,
             icon: const Icon(SymbolesAgri.remove),
+            padding: EdgeInsets.zero,
+            constraints: _gabaritCommandeFenetre,
+            style: _styleCommandeFenetre,
             tooltip: 'Réduire',
             onPressed: FenetrePoste.reduire,
           ),
+          const _BoutonAgrandir(),
           IconButton(
             key: const Key('fenetre-fermer'),
             iconSize: 18,
             color: AgriColors.errorDeep,
             icon: const Icon(SymbolesAgri.close),
+            padding: EdgeInsets.zero,
+            constraints: _gabaritCommandeFenetre,
+            style: _styleCommandeFenetre,
             tooltip: 'Fermer AgriERP',
             onPressed: () => _confirmerFermeture(context),
           ),
@@ -533,6 +538,78 @@ class BarreSuperieure extends StatelessWidget {
     );
 
     if (confirme == true) await FenetrePoste.fermer();
+  }
+}
+
+/// Contrôleur et focus du champ inerte (barre sans source de recherche) : jamais écrits, jamais focalisés.
+final _rechercheInerte = TextEditingController();
+final _focusRechercheInerte = FocusNode(canRequestFocus: false);
+
+/// Gabarit des trois commandes de fenêtre : 36 px, comme les boutons de légende de Windows (le gabarit par défaut
+/// d'un `IconButton`, 48 px, faisait déborder la barre d'un poste étroit une fois le bouton « Agrandir » ajouté).
+const _gabaritCommandeFenetre = BoxConstraints.tightFor(width: 36, height: 36);
+
+/// ⚠️ `shrinkWrap` : par défaut Material GONFLE la zone d'appui à 48 px et le bouton reprend alors cette taille dans
+/// la `Row`, quoi que dise `constraints`.
+final _styleCommandeFenetre = IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap);
+
+/// Ticket ENV1 — prise de la fenêtre sans cadre : glisser déplace la fenêtre, un double-clic l'agrandit sur la
+/// zone de travail ou la restaure (comme la barre de titre d'une fenêtre Windows). Un simple clic ne fait rien.
+///
+/// ⚠️ `HitTestBehavior.opaque` : sans lui, l'espace libre (un `SizedBox` vide) ne recevrait aucun geste. Aucun
+/// contrôle n'est enfant d'une surface : le bouton Synchroniser, la cloche, le menu du compte et la recherche gardent
+/// leurs propres gestes.
+class _SurfaceFenetre extends StatelessWidget {
+  const _SurfaceFenetre({this.child, this.cle}) : super(key: cle);
+
+  final Widget? child;
+  final Key? cle;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) => FenetrePoste.deplacer(),
+      onDoubleTap: FenetrePoste.basculerAgrandissement,
+      child: child ?? const SizedBox.expand(),
+    );
+  }
+}
+
+/// Ticket ENV1 — bouton « Agrandir » / « Restaurer » de la fenêtre, entre « Réduire » et « Fermer » (l'ordre de
+/// Windows). Il relit l'état du natif à son affichage : la fenêtre s'ouvre agrandie, mais l'état vient toujours du
+/// système, jamais d'une supposition.
+class _BoutonAgrandir extends StatefulWidget {
+  const _BoutonAgrandir();
+
+  @override
+  State<_BoutonAgrandir> createState() => _BoutonAgrandirEtat();
+}
+
+class _BoutonAgrandirEtat extends State<_BoutonAgrandir> {
+  @override
+  void initState() {
+    super.initState();
+    FenetrePoste.etat();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: FenetrePoste.agrandie,
+      builder: (context, agrandie, _) => IconButton(
+        key: const Key('fenetre-agrandir'),
+        iconSize: 18,
+        color: AgriColors.outline,
+        // Windows : un carré pour « Agrandir », deux carrés superposés pour « Restaurer ».
+        icon: Icon(agrandie ? SymbolesAgri.filter_none : SymbolesAgri.crop_square),
+        padding: EdgeInsets.zero,
+        constraints: _gabaritCommandeFenetre,
+            style: _styleCommandeFenetre,
+        tooltip: agrandie ? 'Restaurer' : 'Agrandir',
+        onPressed: FenetrePoste.basculerAgrandissement,
+      ),
+    );
   }
 }
 

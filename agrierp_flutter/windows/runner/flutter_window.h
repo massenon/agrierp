@@ -24,6 +24,10 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+  // AgriERP : etat rendu au canal `agrierp/fenetre` — {agrandie, x, y, largeur,
+  // hauteur}, la zone etant la ZONE DE TRAVAIL du moniteur (pixels physiques).
+  flutter::EncodableValue EtatFenetre();
+
   // The project to run.
   flutter::DartProject project_;
 

@@ -268,6 +268,36 @@ class AgriChamps {
   /// `border` : épaisseur d'un trait de champ.
   static const double bordure = 1;
 
+  // ---- Recherche globale du topbar (`livewire/shared/global-search.blade.php`) — ticket ENV1 ----
+
+  /// `w-64` : largeur de la pastille de recherche globale (16 rem).
+  static const double largeurRechercheGlobale = 256;
+
+  /// Hauteur de la pastille du web : 44 px. ⚠️ Elle n'est écrite nulle part dans le Blade, elle SORT des classes :
+  /// `border` 1 + `py-xs` 4 + [champ : trait 1 + `.5rem` + interligne `text-xs` 16 + `.5rem` + trait 1] + `py-xs` 4 +
+  /// `border` 1. Ce jeton ne sert QU'À la comparer au rendu (le widget ne la lit pas : il la fait sortir des mêmes
+  /// termes, comme le navigateur).
+  static const double hauteurRechercheGlobale = 44;
+
+  /// Base de `@tailwindcss/forms` sur un `<input type=text>` auquel le Blade ne met ni `border-0` ni `p-0` :
+  /// `padding: .5rem .75rem` (12 px de côté, 8 px dessus/dessous).
+  static const double rembourrageHorizontalChampBrut = 12;
+  static const double rembourrageVerticalChampBrut = 8;
+
+  /// Trait de ce même champ : `border-color: #6b7280` (gris 500 de Tailwind, posé par `@tailwindcss/forms`) ; il
+  /// devient `info-blue` au focus (`--tw-ring-color: #2563eb`). Hors des 14 couleurs du design system : c'est le
+  /// défaut d'un greffon, pas une couleur de la charte.
+  static const Color bordureChampBrut = Color(0xFF6B7280);
+
+  /// `ring-2` : anneau de focus de la pastille (`focus-within:ring-2 focus-within:ring-brand-emerald`).
+  static const double anneauFocus = 2;
+
+  /// `text-[16px]` de l'icône `search` de la pastille, `text-[14px]` du bouton `close`, et `search` 24 px
+  /// (taille par défaut de Material Symbols) du bouton qui remplace la pastille sous `md`.
+  static const double iconeRecherche = 16;
+  static const double iconeEffacerRecherche = 14;
+  static const double iconeRechercheMobile = 24;
+
   /// `.invalid-feedback` de `resources/css/app.css` : 11 px, `margin-top: 2px`.
   static const double erreurTaille = 11;
   static const double erreurMarge = 2;

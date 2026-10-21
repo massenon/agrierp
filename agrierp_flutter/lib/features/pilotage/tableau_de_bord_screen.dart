@@ -32,7 +32,7 @@ class TableauDeBordScreen extends StatefulWidget {
     this.onEnregistrerVente,
     this.onElevage,
     this.onOuvrir,
-    this.nomUtilisateur = 'Manager Olouwachegoun',
+    this.nomUtilisateur = 'M. Olouchègoun',
   });
 
   final TableauDeBordRepository depot;
