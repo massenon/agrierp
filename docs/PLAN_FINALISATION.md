@@ -383,7 +383,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **Serveur** : `livestock_lots` est un référentiel en tirage seul (aucun envoi accepté, aucune table de droit) ; les entrées de sujets sont des colonnes `achat` / `ne` / `don` de `livestock_daily_entries`, déjà acceptées à l'envoi (dernier écrivain gagne, cascade).
 - **Poste** : `livestock_lots` n'a ni `sync_status` ni `device_id` ; son absorbeur écrase tout. Les entrées de sujets passent par `FicheJournaliereRepository`.
 
-### BS1 🔧 Bandes — créer, modifier, archiver au poste (web d'abord)
+### BS1 ✅ (21/10/2026) Bandes — créer, modifier, archiver au poste (web d'abord)
 
 **Objectif :** « Bandes & Sujets » au poste, à l'identique du Blade (KPI, filtres, tableau, tiroir, modales Nouvelle Bande / Modifier la Bande, confirmation d'archivage, toasts), saisies hors ligne en file, rejouées au serveur par le même point de passage que le web.
 **Décisions client requises :** aucune pour coder (les huit questions BS-Q1 à BS-Q8 ci-dessous se tranchent après). Le poste reprend le web tel qu'il est, défauts compris.
@@ -406,7 +406,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - Flutter : `bandes_poste_crud_test.dart` (repository, écran, file de sync, absorbeur), `bandes_blade_test.dart` (libellés lus dans le Blade).
 - Épreuve de mutation : retirer le refus d'exercice, l'archivage logique, la protection `pending` de l'absorbeur, le droit.
 
-### BS2 🔧 Sujets — nouveau, modifier, archiver (web d'abord, puis poste)
+### BS2 ✅ (21/10/2026) Sujets — nouveau, modifier, archiver (web d'abord, puis poste)
 
 **Objectif :** « Enregistrer des Sujets » au poste avec toutes ses actions ; le web gagne d'abord Modifier et Archiver.
 **Décision de modélisation (à confirmer, BS-Q2) :** une ligne du journal = une origine d'une fiche du jour (Naissance → `ne`, Achat → `achat`, Don → `don`). Modifier = changer la quantité (et/ou l'origine, la date) ; Archiver = retirer l'entrée (colonne remise à 0, la ligne quitte le journal, trace à l'audit). Dans les deux cas : cascade unique, et refus si un effectif deviendrait négatif un jour suivant.
@@ -436,3 +436,5 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **BS-Q6** : une bande datée dans un exercice clos est maintenant refusée (règle nouvelle, web puis poste). Confirmé ?
 - **BS-Q7** : restaurer une bande au poste (Corbeille absente du poste) ?
 - **BS-Q8** : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé « La valeur du champ code est déjà utilisée » et reste en conflit à corriger. Suffisant ?
+
+**Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?

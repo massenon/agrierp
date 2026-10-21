@@ -537,7 +537,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   }
 
   /// Une alerte : icône `warning`, fond rouge (critique) ou jaune (moyen), et lien vers l'écran du poste quand
-  /// il existe (`<a href="{{ $alert['link'] }}">`). `/gestion-bandes` n'a pas d'écran au poste : pas de lien.
+  /// il existe (`<a href="{{ $alert['link'] }}">`). `/gestion-bandes` mène à « Bandes & Sujets » (BS1).
   Widget _alerte(int i, AlerteCritique a) {
     final ecran = TableauDeBordRepository.ecranDuLien(a.lien);
     final couleur = a.grave ? AgriColors.errorDeep : AgriColors.brandForest;

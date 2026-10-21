@@ -330,7 +330,9 @@ void main() {
     });
 
     test('⚠️ une page que le poste n\'a pas ne donne PAS de flèche', () {
-      expect(avec('/gestion-bandes?search=LOT1').ecranDuLien, isNull);
+      // BS1 : « Bandes & Sujets » a son écran au poste, la flèche y mène.
+      expect(avec('/gestion-bandes?search=LOT1').ecranDuLien, EcranPoste.gestionBandes);
+      expect(avec('/transferts-bandes').ecranDuLien, isNull);
       expect(avec('/page-inconnue').ecranDuLien, isNull);
       expect(avec(null).ecranDuLien, isNull);
       expect(avec('').ecranDuLien, isNull);
@@ -662,7 +664,7 @@ void main() {
           'z',
           'Lot à surveiller',
           date: DateTime(2026, 7, 29),
-          lien: '/gestion-bandes?search=L1',
+          lien: '/page-sans-ecran-au-poste',
         );
         EcranPoste? ouvert;
         await afficher(tester, onOuvrir: (e) => ouvert = e);
