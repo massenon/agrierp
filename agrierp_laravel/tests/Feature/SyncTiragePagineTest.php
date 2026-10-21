@@ -53,7 +53,7 @@ class SyncTiragePagineTest extends TestCase
         'company_settings', 'modules_config', 'roles', 'users', 'audit_logs', 'notifications', 'sales', 'sale_lines',
         'treasury_accounts',
         // Ticket U13 — les dépenses : le Tableau de bord (quatre rôles) les liste au web.
-        'expenses',
+        'expenses', 'expense_lines',
     ];
 
     protected function setUp(): void
@@ -215,7 +215,7 @@ class SyncTiragePagineTest extends TestCase
                 'veterinary_calendar_events', 'feed_types', 'elevage_numbering', 'lot_revenues', 'animals',
                 'livestock_species', 'stock_movements'],
             'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'accounting_entries', 'accounting_entry_lines',
-                'accounting_entry_ids', 'stock_movements', 'payslips'],
+                'accounting_entry_ids', 'stock_movements', 'payslips', 'cost_centers'],
             'admin' => array_keys(SyncController::PERMISSIONS_DE_TIRAGE),
         ];
 

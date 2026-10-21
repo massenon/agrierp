@@ -216,7 +216,11 @@ class SyncController extends Controller
         'mails' => ['view-administration'],
         'administrative_documents' => ['view-administration'],
         'archived_documents' => ['view-administration'],
-        'chart_of_accounts' => ['view-comptabilite'],
+        // Ticket DEP3 — les comptes de CHARGE (classe 6) de la modale « Nouvelle Dépense » : l'écran est celui de
+        // `view-achats`, qui n'a pas le journal. Le plan comptable n'a rien de confidentiel (numéros et intitulés).
+        'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
+        // Ticket DEP3 — centres de coût (filières) de l'en-tête d'une dépense : petit référentiel, lecture seule.
+        'cost_centers' => ['view-achats', 'view-comptabilite'],
         'fiscal_years' => null,
         'accounting_entries' => ['view-comptabilite'],
         'accounting_entry_lines' => ['view-comptabilite'],
@@ -242,6 +246,9 @@ class SyncController extends Controller
         // « Recettes et Dépenses » les compte. Libellé, compte de charge, montant, date, compte payeur, archivage :
         // rien qu'un compte connecté ne voie déjà au web.
         'expenses' => null,
+        // Ticket DEP3 — les LIGNES d'une dépense voyagent avec elle (même permission, même curseur : jamais une ligne
+        // sans son en-tête).
+        'expense_lines' => null,
         // Ticket U13 — PAIE RÉGLÉE : aux seuls comptes qui lisent les RAPPORTS (`view-rapports`, la permission de la
         // route du hub où « Recettes et Dépenses » l'affiche). ⚠️ Protection S3 des salaires : ni `view-rh` (le poste
         // n'affiche aucun bulletin : les cartes de la paie y sont des « — »), ni base ; et seulement ce que le rapport
@@ -1307,7 +1314,17 @@ class SyncController extends Controller
                 ->where('is_active', true)
                 ->orderBy('label')
                 ->get(['id', 'label', 'account_code', 'type', 'balance']),
+            // Ticket DEP3 — N'EST PLUS LU PAR LE POSTE MIGRÉ (le compte de charge d'une ligne se choisit dans le plan
+            // comptable, classe 6) ; CONSERVÉ pour les postes non migrés, qui l'attendent (le serveur est déployé avant eux).
             'expense_categories' => fn () => \App\Models\Expense::CATEGORIES,
+            // Ticket DEP3 — centres de coût (filières) : le Centre de Coût facultatif de l'en-tête d'une dépense.
+            'cost_centers' => fn () => \App\Models\CostCenter::query()
+                ->orderBy('label')
+                ->get(['id', 'label', 'type', 'parent_species_id', 'is_active'])
+                ->map(fn ($c) => [
+                    'id' => $c->id, 'label' => $c->label, 'type' => $c->type,
+                    'parent_species_id' => $c->parent_species_id, 'is_active' => (bool) $c->is_active,
+                ]),
         ];
     }
 
@@ -1564,7 +1581,8 @@ class SyncController extends Controller
                 'requete' => fn () => \App\Models\Expense::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                     ->select(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active',
-                        'status', 'accounting_entry_id', 'updated_at']),
+                        'status', 'accounting_entry_id', 'payment_mode', 'cost_center_id', 'supplier_id', 'beneficiary',
+                        'created_by', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('expense_date')->orderBy('id'),
                 'enJson' => fn (\App\Models\Expense $d) => [
                     'id' => $d->id,
@@ -1578,7 +1596,33 @@ class SyncController extends Controller
                     // modification d'une dépense COMPTABILISÉE, que le poste applique avant d'écrire (`SaisieDepenseAction`).
                     'status' => $d->status,
                     'accounting_entry_id' => $d->accounting_entry_id,
+                    // Ticket DEP3 — l'en-tête d'une dépense à plusieurs lignes (le total reste `amount`, le résumé `label`).
+                    'payment_mode' => $d->payment_mode,
+                    'cost_center_id' => $d->cost_center_id,
+                    'supplier_id' => $d->supplier_id,
+                    'beneficiary' => $d->beneficiary,
+                    'created_by' => $d->created_by,
                     'updated_at' => $d->updated_at?->toIso8601String(),
+                ],
+                'lignes' => [
+                    // 🔴→✅ TICKET DEP3 — LES LIGNES DES DÉPENSES SERVIES DESCENDENT AVEC ELLES, au même curseur : TOUTES les
+                    // lignes de chaque dépense servie (une dépense modifiée renvoie la liste COMPLÈTE de ses lignes : le
+                    // poste remplace celles qu'il tient), JAMAIS une ligne d'une dépense non servie. Même patron que
+                    // `purchase_lines`. Le poste n'a pas à recalculer le total : `expenses.amount` en est la somme.
+                    'expense_lines' => ['expense_id', fn (Collection $ids) => $this->lignesDesPieces(
+                        \App\Models\ExpenseLine::class,
+                        'expense_id',
+                        $ids,
+                        fn ($ligne) => [
+                            'id' => $ligne->id,
+                            'expense_id' => $ligne->expense_id,
+                            'position' => (int) $ligne->position,
+                            'label' => $ligne->label,
+                            'charge_account_id' => $ligne->charge_account_id,
+                            'amount' => (float) $ligne->amount,
+                        ],
+                        'position',   // l'ordre de saisie des lignes, pas celui de leur création (même seconde)
+                    )],
                 ],
             ],
             [
@@ -1720,13 +1764,13 @@ class SyncController extends Controller
      *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modele
      */
-    private function lignesDesPieces(string $modele, string $cle, Collection $ids, \Closure $enJson): Collection
+    private function lignesDesPieces(string $modele, string $cle, Collection $ids, \Closure $enJson, string $ordre = 'created_at'): Collection
     {
         return $ids->chunk(500)
             ->flatMap(fn ($paquet) => $modele::query()
-                ->with('product:id,name')
+                ->when(method_exists($modele, 'product'), fn ($q) => $q->with('product:id,name'))
                 ->whereIn($cle, $paquet->values())
-                ->orderBy('created_at')
+                ->orderBy($ordre)
                 ->orderBy('id')
                 ->get())
             ->map($enJson)
@@ -4183,6 +4227,14 @@ class SyncController extends Controller
      *  - différente → modifiée comme par `submitExpense()` en modification (dernier écrivain gagne, comme au web).
      * Une ligne INCONNUE est créée (décaissée, comptabilisée) ; arrivée archivée (saisie puis archivée hors ligne), elle
      * est créée PUIS archivée, comme au web : la trace des deux gestes reste au grand livre et au journal d'audit.
+     *
+     * 🔴→✅ TICKET DEP3 — UNE DÉPENSE, PLUSIEURS LIGNES. Le document porte ses lignes (`lines` : `id`, `label`,
+     * `charge_account_id`, `amount`) dans le MÊME envoi que l'en-tête. ABSORBEUR STRICT (`SaisieDepenseAction::valider`) :
+     * au moins une ligne, compte de charge existant de classe 6, montants entiers > 0, total annoncé = somme des lignes,
+     * identifiants de ligne uniques, exercice clos refusé, motifs en français. Un poste non migré qui envoie encore la
+     * dépense PLATE (`label`, `category`, `amount`) est accepté et converti en UNE ligne (le serveur est déployé avant
+     * les postes). Une dépense comptabilisée est IMMUABLE : un renvoi identique est acquitté, toute différence refusée
+     * ([SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE]). Pièce impossible : la dépense n'est pas enregistrée.
      */
     private function pushExpenses(array $expenses): array
     {
@@ -4192,15 +4244,17 @@ class SyncController extends Controller
 
         foreach ($expenses as $data) {
             try {
-                $validated = validator($data, [
+                // Ticket DEP3 — ABSORBEUR STRICT : le document à lignes, ou le document PLAT d'un poste non migré (converti en
+                // UNE ligne : le serveur est déployé AVANT les postes). Mêmes règles que le web, par `SaisieDepenseAction`.
+                validator(is_array($data) ? $data : [], [
                     'id' => ['required', 'uuid'],
-                    'expense_date' => ['required', 'date'],
-                    'label' => ['required', 'string', 'max:255'],
-                    'category' => ['required', 'string', 'in:'.implode(',', \App\Models\Expense::CATEGORIES)],
-                    'amount' => ['required', 'numeric', 'min:1'],
-                    'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
                     'is_active' => ['sometimes', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                $validated = $saisie->valider($data, $data['id'], pourLEnvoi: true);
+                $validated['id'] = $data['id'];
+                if (array_key_exists('is_active', $data)) {
+                    $validated['is_active'] = $data['is_active'];
+                }
 
                 $archivee = array_key_exists('is_active', $validated) && ! filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
                 $existante = \App\Models\Expense::find($validated['id']);
@@ -4222,6 +4276,9 @@ class SyncController extends Controller
                 $accepted[] = $validated['id'];
             } catch (ValidationException $e) {
                 $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\DepenseNonComptabilisableException $e) {
+                // Ticket DEP3 — la pièce ne peut pas être passée : la dépense n'est PAS enregistrée (motif du web).
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => $e->getMessage()];
             } catch (\App\Exceptions\DepenseNonModifiableException $e) {
                 // Le refus du web, mot pour mot (dépense comptabilisée, ou archivée entre-temps au web).
                 $rejected[] = ['id' => $data['id'] ?? null, 'reason' => $e->getMessage()];
