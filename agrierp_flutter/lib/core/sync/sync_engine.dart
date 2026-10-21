@@ -774,6 +774,8 @@ class SyncEngine {
     recus += await _absorberStagiaires(corps['internships']);
     recus += await _absorberPointages(corps['attendance_records']);
     recus += await _absorberCourriers(corps['mails']);
+    // Ticket DEV — devis du serveur (table mixte : les saisies du poste en attente ne sont jamais écrasées).
+    recus += await _absorberDevis(corps['quotes']);
     recus += await _absorberDocuments(corps['administrative_documents']);
     recus += await _absorberArchives(corps['archived_documents']);
     recus += await _absorberPlanComptable(corps['chart_of_accounts']);
@@ -4193,6 +4195,109 @@ class SyncEngine {
     return recues.length;
   }
 
+  /// 🔴→✅ Ticket DEV — LES DEVIS DU SERVEUR DESCENDENT AU POSTE (table mixte : saisis ici ET tirés).
+  ///
+  /// Le serveur sert tout devis créé, modifié, avancé dans son cycle ou archivé au web ou sur un autre poste, au curseur
+  /// (`updated_at`), archivés compris (`is_active`) : le numéro `DEV-AAAA-NNN` (que le poste n'invente jamais), le client,
+  /// la description, le montant HT, la TVA, la validité, la date, la note et le statut.
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberDepenses] : élément illisible, identifiant invalide ou servi deux fois, numéro,
+  /// client, description, montant (absent, illisible ou négatif), TVA, validité, date, statut ou `is_active` illisibles →
+  /// [FormatException] : rien n'est écrit, la page est annulée, le curseur n'avance pas. Lisser — un montant illisible
+  /// devenu 0 — fausserait « Valeur Totale » sans que rien ne le dise.
+  ///
+  /// ⚠️⚠️ **UN DEVIS LOCAL `pending` OU `conflict` N'EST JAMAIS ÉCRASÉ** (saisi ou avancé ici, pas encore acquitté, ou refusé
+  /// et en attente de correction) : le tirage précède toujours l'envoi. Un devis acquitté (`synced`) prend la dernière
+  /// version du serveur et garde son `device_id` d'origine. Clé absente (table non servie à ce compte, serveur antérieur à
+  /// DEV) : rien n'est touché.
+  Future<int> _absorberDevis(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Devis';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <QuotesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final numero = _texteStrict(l['quote_number'], '$quoi $id : numéro');
+      final client = _texteStrict(l['customer_id'], '$quoi $id : client');
+      final description = _texteStrict(
+        l['articles_description'],
+        '$quoi $id : description',
+      );
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final tva = _nombreStrict(l['tva_rate'], '$quoi $id : TVA');
+      final validite = _nombreStrict(l['validity_days'], '$quoi $id : validité');
+      final date = l['quote_date'] is String ? HeureBenin.lire(l['quote_date']) : null;
+      final remarque = _texteStrict(l['note'], '$quoi $id : note');
+      final statut = l['status'];
+      final actif = _actifStrict(l, '$quoi $id');
+      if (date == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['quote_date']}).');
+      }
+      if (client == null || client.isEmpty || description == null) {
+        throw FormatException('$quoi $id refusé : client ou description absent.');
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException('$quoi $id refusé : montant absent ou négatif ($montant).');
+      }
+      if (tva == null || tva < 0 || tva > 100) {
+        throw FormatException('$quoi $id refusé : TVA absente ou hors de 0 à 100 ($tva).');
+      }
+      if (validite == null || validite < 1 || validite != validite.roundToDouble()) {
+        throw FormatException('$quoi $id refusé : validité absente ou illisible ($validite).');
+      }
+      if (statut is! String || !const ['brouillon', 'envoye', 'accepte', 'refuse', 'facture'].contains(statut)) {
+        throw FormatException('$quoi $id refusé : statut illisible ($statut).');
+      }
+      recus.add(
+        QuotesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          quoteNumber: Value(numero),
+          customerId: client,
+          articlesDescription: description,
+          amount: montant,
+          tvaRate: Value(tva),
+          validityDays: Value(validite.round()),
+          // Une DATE pure, au jour du Bénin (minuit, heure murale) : celle que le web compare (`whereMonth`).
+          quoteDate: DateTime(date.year, date.month, date.day),
+          note: Value(remarque),
+          status: Value(statut),
+          isActive: Value(actif),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final d in await (_db.select(
+          _db.quotes,
+        )..where((t) => t.id.isIn(vus))).get())
+          d.id: d.syncStatus,
+      };
+      for (final d in recus) {
+        final statut = locales[d.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Un devis acquitté de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.quotes)
+            .insert(
+              d,
+              onConflict: DoUpdate(
+                (_) => d.copyWith(deviceId: const Value.absent()),
+              ),
+            );
+      }
+    });
+
+    return recus.length;
+  }
+
   /// 🔴→✅ Ticket U13 — LA PAIE RÉGLÉE DESCEND AU POSTE (lecture seule), pour le rapport « Recettes et Dépenses ».
   ///
   /// Le serveur ne sert que ce que `RecettesDepenses::depensesRows()` lit : l'instant du règlement (`created_at`, heure
@@ -4347,6 +4452,11 @@ class SyncEngine {
       _db.expenses,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket DEV — devis saisis, avancés ou archivés au poste.
+    final devis = await (_db.select(
+      _db.quotes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final saillies = await (_db.select(
       _db.livestockReproductionEvents,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4470,6 +4580,7 @@ class SyncEngine {
         ajustements.isEmpty &&
         soins.isEmpty &&
         depenses.isEmpty &&
+        devis.isEmpty &&
         saillies.isEmpty &&
         achats.isEmpty &&
         pointages.isEmpty) {
@@ -4566,6 +4677,8 @@ class SyncEngine {
         'stock_adjustments': ajustements.map(_ajustementEnJson).toList(),
         'veterinary_records': soins.map(_soinEnJson).toList(),
         'expenses': depenses.map(_depenseEnJson).toList(),
+        // Ticket DEV — `pushQuotes` (manage-ventes) : le numéro `DEV-AAAA-NNN` ne part JAMAIS, le serveur l'attribue.
+        'quotes': devis.map(_devisEnJson).toList(),
         'livestock_reproduction_events': saillies.map(_saillieEnJson).toList(),
         'purchases': achats
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
@@ -4927,6 +5040,28 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket DEV — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un devis
+    // avancé dans son cycle ou archivé PENDANT l'envoi de sa version précédente reste `pending` et repart.
+    accepte += await _acquitter(
+      'quotes',
+      corps['quotes'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final d in devis) (d.id, d.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.quotes)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    t.updatedAt.equals(saisie!),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(QuotesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // Ticket U3 — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un
     // soin archivé PENDANT l'envoi de sa création reste `pending`, et son archivage part au prochain envoi.
     accepte += await _acquitter(
@@ -5103,6 +5238,8 @@ class SyncEngine {
     'company_settings',
     'suppliers',
     'customers',
+    // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
+    'quotes',
     'mails',
     'archived_documents',
     'administrative_documents',
@@ -5636,6 +5773,12 @@ class SyncEngine {
               _db.customers,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const CustomersCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket DEV — un devis refusé (exercice clos, statut interdit, client inconnu…) se corrige puis se relance.
+      'quotes' =>
+        () =>
+            (_db.update(_db.quotes)..where((t) => t.id.equals(conflit.recordId))).write(
+              const QuotesCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       'mails' =>
         () =>
@@ -6368,6 +6511,23 @@ class SyncEngine {
     'treasury_account_id': d.treasuryAccountId,
     // Ticket U14 — archivage fait au poste (`DepensesRepository.archiver`), rejoué par le serveur comme
     // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
+    'is_active': d.isActive,
+    'device_id': d.deviceId,
+  };
+
+  /// Ticket DEV — un devis tel qu'il est (le FAIT) : `pushQuotes` le rejoue par `SaisieDevisAction`. ⚠️ Le numéro
+  /// `DEV-AAAA-NNN` ne part JAMAIS (le serveur l'attribue, le poste le reçoit au tirage) ; un devis archivé repart entier
+  /// (`is_active: false`) ; `status` avance d'un cycle que le serveur parcourt pas à pas.
+  Map<String, dynamic> _devisEnJson(Quote d) => {
+    'id': d.id,
+    'customer_id': d.customerId,
+    'articles_description': d.articlesDescription,
+    'amount': d.amount,
+    'tva_rate': d.tvaRate,
+    'validity_days': d.validityDays,
+    'quote_date': _jour(d.quoteDate),
+    'note': d.note,
+    'status': d.status,
     'is_active': d.isActive,
     'device_id': d.deviceId,
   };

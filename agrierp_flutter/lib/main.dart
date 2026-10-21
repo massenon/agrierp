@@ -102,6 +102,7 @@ import 'features/stocks/catalogue_produits_screen.dart';
 import 'features/stocks/gestion_stocks_screen.dart';
 import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
+import 'features/ventes/devis_repository.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
 import 'core/theme/symboles_agri.dart';
@@ -267,6 +268,12 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   late final VentesDevisRepository _ventesDevis = VentesDevisRepository(
     database: _db,
+  );
+
+  /// Ticket DEV — « Devis & Proforma » (onglet « Devis Prestations » du hub Ventes & Devis).
+  late final DevisRepository _devis = DevisRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
   );
 
   late final ParametresElevageRepository _parametresElevage =
@@ -456,6 +463,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
           ventesDevis: _ventesDevis,
+          devis: _devis,
           stocks: _stocks,
           clients: _clients,
           notifications: _notifications,
@@ -511,6 +519,7 @@ class SocleAccueil extends StatefulWidget {
     required this.soinsVaccins,
     required this.parametresElevage,
     required this.ventesDevis,
+    required this.devis,
     required this.stocks,
     required this.clients,
     required this.notifications,
@@ -571,6 +580,7 @@ class SocleAccueil extends StatefulWidget {
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
   final VentesDevisRepository ventesDevis;
+  final DevisRepository devis;
   final StocksRepository stocks;
   final ClientsCreancesRepository clients;
   final NotificationsRepository notifications;
@@ -1071,6 +1081,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.ventesEtDevis => VentesDevisScreen(
           depot: widget.ventesDevis,
           caisse: widget.caisse,
+          // Ticket DEV — onglet « Devis Prestations » : `manage-ventes` (écrire) et `export-ventes` (« Exporter »).
+          devis: widget.devis,
+          peutGererDevis: PermissionsPoste.peut(_role, 'manage-ventes'),
+          peutExporterDevis: PermissionsPoste.peut(_role, 'export-ventes'),
+          imprimer: EditeursRapports.imprimer,
         ),
         EcranPoste.caisse => CaisseScreen(depot: widget.caisse),
         EcranPoste.synchronisation => SynchronisationScreen(

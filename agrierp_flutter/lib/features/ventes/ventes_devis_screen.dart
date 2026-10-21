@@ -6,6 +6,9 @@ import '../../core/widgets/pagination_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'caisse_repository.dart';
 import 'caisse_screen.dart';
+import '../rapports/rapports_exports_screen.dart' show Editeur;
+import 'devis_onglet.dart';
+import 'devis_repository.dart';
 import 'ventes_devis_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -26,10 +29,24 @@ class VentesDevisScreen extends StatefulWidget {
     super.key,
     required this.depot,
     required this.caisse,
+    required this.devis,
+    this.peutGererDevis = true,
+    this.peutExporterDevis = true,
+    this.imprimer,
   });
 
   final VentesDevisRepository depot;
   final CaisseRepository caisse;
+
+  /// Ticket DEV — l'onglet « Devis Prestations » (table `quotes`, saisie ET tirée).
+  final DevisRepository devis;
+
+  /// `manage-ventes` / `export-ventes` du web, pour l'onglet Devis.
+  final bool peutGererDevis;
+  final bool peutExporterDevis;
+
+  /// Éditeur PDF de « Exporter » (onglet Devis), injecté — `EditeursRapports.imprimer` en production.
+  final Editeur? imprimer;
 
   @override
   State<VentesDevisScreen> createState() => _VentesDevisScreenState();
@@ -75,17 +92,12 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
           _barreOnglets(),
           Expanded(
             child: switch (_onglet) {
-              'Devis Prestations' => _ongletIndisponible(
-                titre: 'Devis Prestations',
-                icone: SymbolesAgri.description,
-                sousTitre: 'Devis et proformas adressés aux clients.',
-                raison:
-                    'Un devis se négocie au bureau, avec la fiche du client '
-                    'sous les yeux : ni le catalogue de devis ni le fichier '
-                    'clients ne descendent au poste. Le proposer ici sans '
-                    'client à qui l\'adresser produirait un document '
-                    'incomplet.',
-                cle: 'devis-non-embarque',
+              // Ticket DEV — « Devis & Proforma » : saisie, cycle de vie et archivage (`devis_onglet.dart`).
+              'Devis Prestations' => DevisOnglet(
+                depot: widget.devis,
+                peutGerer: widget.peutGererDevis,
+                peutExporter: widget.peutExporterDevis,
+                imprimer: widget.imprimer,
               ),
               'Historique des Ventes' => _ongletHistorique(),
               'Retours et Avoirs' => _ongletIndisponible(

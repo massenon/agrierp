@@ -49,6 +49,8 @@ void main() {
     'veterinary_calendar_events': 'veterinary_calendar_events',
     'livestock_reproduction_events': 'livestock_reproduction_events',
     'customers': 'customers',
+    // Ticket DEV — devis (table mixte : saisie ET tirée), lus par l'onglet « Devis Prestations » de Ventes & Devis.
+    'quotes': 'quotes',
     'receivables': 'receivables',
     'customer_advances': 'customer_advances',
     'customer_reminders': 'customer_reminders',

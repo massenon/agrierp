@@ -67,6 +67,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   44: [d.stockMovements],
   // Ticket U13 — paie réglée du serveur, en lecture seule (Recettes et Dépenses).
   47: [d.payslips],
+  // Ticket DEV — « Devis & Proforma » au poste.
+  53: [d.quotes],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -222,6 +224,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket MAIL1 — palier de DONNÉES (adresses e-mail du nouveau domaine) : aucune table ni colonne ajoutée.
   52: [],
+  // Ticket DEV — table `quotes` créée (aucune colonne ajoutée à une table existante).
+  53: [],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

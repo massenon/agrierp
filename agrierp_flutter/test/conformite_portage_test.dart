@@ -98,6 +98,8 @@ void main() {
     'veterinary_calendar_events',
     'livestock_reproduction_events',
     'customers',
+    // Ticket DEV — devis (table mixte : saisie ET tirée).
+    'quotes',
     'receivables',
     'customer_advances',
     'customer_reminders',

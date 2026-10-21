@@ -160,6 +160,7 @@ class ReinitialisationPoste {
     'stock_adjustments': 'Ajustements de stock',
     'veterinary_records': 'Soins vétérinaires',
     'expenses': 'Dépenses',
+    'quotes': 'Devis',
     'livestock_reproduction_events': 'Saillies et mises bas',
     'purchases': 'Achats',
     'attendance_records': 'Pointages',

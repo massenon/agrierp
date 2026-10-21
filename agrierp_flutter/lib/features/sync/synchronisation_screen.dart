@@ -708,6 +708,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'sales' => 'Vente',
     'stock_adjustments' => 'Ajustement de stock',
     'expenses' => 'Dépense',
+    // Ticket DEV — devis saisi, avancé ou archivé au poste.
+    'quotes' => 'Devis',
     'purchases' => 'Achat',
     'livestock_reproduction_events' => 'Saillie',
     'mails' => 'Courrier',

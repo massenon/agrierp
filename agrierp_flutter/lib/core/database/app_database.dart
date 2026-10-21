@@ -1610,6 +1610,36 @@ class Expenses extends Table with SyncColumns {
   TextColumn get accountingEntryId => text().nullable()();
 }
 
+/// Ticket DEV — DEVIS (« Devis & Proforma » : `quotes` du serveur), TABLE MIXTE comme les dépenses : saisis, avancés dans
+/// leur cycle et archivés au poste (`pending`, envoyés), ET tirés du serveur (web, autres postes) au curseur, archivés
+/// compris. Un devis y est, comme au web, une description libre des prestations + un montant HT global + une TVA + une
+/// validité en jours — jamais des lignes de produits.
+///
+/// ⚠️ **LE NUMÉRO `DEV-AAAA-NNN` N'EST JAMAIS INVENTÉ PAR LE POSTE** (même principe que la référence des courriers) : le
+/// serveur l'attribue à la réception, `NULL` tant que le devis n'est pas acquitté puis tiré (« — » à l'écran). Deux postes
+/// hors ligne auraient sinon deux devis au même numéro.
+///
+/// ⚠️ `status` : `brouillon` → `envoye` → `accepte` | `refuse` (le poste ne pose jamais `facture`, que le serveur seul
+/// pourrait poser). Une saisie locale `pending` ou `conflict` n'est jamais écrasée par le tirage
+/// (`SyncEngine._absorberDevis`).
+class Quotes extends Table with SyncColumns {
+  /// `DEV-AAAA-NNN`, attribué par le serveur (voir plus haut).
+  TextColumn get quoteNumber => text().nullable()();
+  TextColumn get customerId => text()();
+  TextColumn get articlesDescription => text()();
+
+  /// Montant HT global (FCFA).
+  RealColumn get amount => real()();
+  RealColumn get tvaRate => real().withDefault(const Constant(0))();
+  IntColumn get validityDays => integer().withDefault(const Constant(15))();
+  DateTimeColumn get quoteDate => dateTime()();
+  TextColumn get note => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('brouillon'))();
+
+  /// Archivage logique (`false` : archivé, rien n'est supprimé).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
 /// et Dépenses » du web lit (`RecettesDepenses::depensesRows()`) descendent — l'instant du règlement, le nom de
 /// l'employé et le net versé. ⚠️ RIEN D'AUTRE SUR LA PAIE (protections S3 sur les salaires) : ni brut, ni retenues,
@@ -1717,6 +1747,7 @@ class SyncState extends Table {
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
+    Quotes,
     Payslips,
     AppSettings,
     SyncState,
@@ -1734,7 +1765,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 52;
+  int get schemaVersion => 53;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2255,6 +2286,13 @@ class AppDatabase extends _$AppDatabase {
       if (from < 52) {
         await _convertirAdressesEmail();
       }
+
+      // v53 — ticket DEV : « Devis & Proforma » au poste (table `quotes`, saisie ET tirée).
+      if (from < 53) {
+        if (!await _tableExiste(m, quotes)) {
+          await m.createTable(quotes);
+        }
+      }
     },
   );
 
@@ -2383,6 +2421,8 @@ class AppDatabase extends _$AppDatabase {
     'stock_adjustments',
     'veterinary_records',
     'expenses',
+    // Ticket DEV — devis saisis au poste.
+    'quotes',
     'livestock_reproduction_events',
     'purchases',
     'attendance_records',
@@ -2459,6 +2499,7 @@ class AppDatabase extends _$AppDatabase {
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expenses', 'stock_adjustments', 'stock_movements', // U9
+    'quotes', // DEV
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
     'accounting_entries', 'accounting_entry_lines',

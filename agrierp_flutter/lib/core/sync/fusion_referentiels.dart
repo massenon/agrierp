@@ -42,6 +42,8 @@ class FusionReferentiels {
       ('receivables', 'customer_id'),
       ('customer_advances', 'customer_id'),
       ('customer_reminders', 'customer_id'),
+      // Ticket DEV — le client d'un devis du poste.
+      ('quotes', 'customer_id'),
     ],
     'suppliers': [
       ('purchases', 'supplier_id'),

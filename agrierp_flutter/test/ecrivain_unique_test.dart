@@ -31,6 +31,8 @@ void main() {
     'stock_adjustments': 'lib/features/stocks/stocks_repository.dart',
     'veterinary_records': 'lib/features/elevage/soins_repository.dart',
     'expenses': 'lib/features/achats/depenses_repository.dart',
+    // Ticket DEV — « Devis & Proforma » : le devis se crée, avance et s'archive par ce dépôt.
+    'quotes': 'lib/features/ventes/devis_repository.dart',
     'livestock_reproduction_events': 'lib/features/elevage/suivi_reproduction_repository.dart',
     'purchases': 'lib/features/achats/achats_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',

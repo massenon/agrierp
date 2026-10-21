@@ -33424,6 +33424,835 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   }
 }
 
+class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($QuotesTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quoteNumberMeta = const VerificationMeta(
+    'quoteNumber',
+  );
+  @override
+  late final GeneratedColumn<String> quoteNumber = GeneratedColumn<String>(
+    'quote_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _customerIdMeta = const VerificationMeta(
+    'customerId',
+  );
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+    'customer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _articlesDescriptionMeta =
+      const VerificationMeta('articlesDescription');
+  @override
+  late final GeneratedColumn<String> articlesDescription =
+      GeneratedColumn<String>(
+        'articles_description',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tvaRateMeta = const VerificationMeta(
+    'tvaRate',
+  );
+  @override
+  late final GeneratedColumn<double> tvaRate = GeneratedColumn<double>(
+    'tva_rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _validityDaysMeta = const VerificationMeta(
+    'validityDays',
+  );
+  @override
+  late final GeneratedColumn<int> validityDays = GeneratedColumn<int>(
+    'validity_days',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(15),
+  );
+  static const VerificationMeta _quoteDateMeta = const VerificationMeta(
+    'quoteDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> quoteDate = GeneratedColumn<DateTime>(
+    'quote_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('brouillon'),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    quoteNumber,
+    customerId,
+    articlesDescription,
+    amount,
+    tvaRate,
+    validityDays,
+    quoteDate,
+    note,
+    status,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quotes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Quote> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('quote_number')) {
+      context.handle(
+        _quoteNumberMeta,
+        quoteNumber.isAcceptableOrUnknown(
+          data['quote_number']!,
+          _quoteNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+        _customerIdMeta,
+        customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('articles_description')) {
+      context.handle(
+        _articlesDescriptionMeta,
+        articlesDescription.isAcceptableOrUnknown(
+          data['articles_description']!,
+          _articlesDescriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_articlesDescriptionMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('tva_rate')) {
+      context.handle(
+        _tvaRateMeta,
+        tvaRate.isAcceptableOrUnknown(data['tva_rate']!, _tvaRateMeta),
+      );
+    }
+    if (data.containsKey('validity_days')) {
+      context.handle(
+        _validityDaysMeta,
+        validityDays.isAcceptableOrUnknown(
+          data['validity_days']!,
+          _validityDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quote_date')) {
+      context.handle(
+        _quoteDateMeta,
+        quoteDate.isAcceptableOrUnknown(data['quote_date']!, _quoteDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quoteDateMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Quote map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Quote(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $QuotesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      quoteNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quote_number'],
+      ),
+      customerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_id'],
+      )!,
+      articlesDescription: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}articles_description'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
+      tvaRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tva_rate'],
+      )!,
+      validityDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}validity_days'],
+      )!,
+      quoteDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}quote_date'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $QuotesTable createAlias(String alias) {
+    return $QuotesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class Quote extends DataClass implements Insertable<Quote> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+
+  /// `DEV-AAAA-NNN`, attribué par le serveur (voir plus haut).
+  final String? quoteNumber;
+  final String customerId;
+  final String articlesDescription;
+
+  /// Montant HT global (FCFA).
+  final double amount;
+  final double tvaRate;
+  final int validityDays;
+  final DateTime quoteDate;
+  final String? note;
+  final String status;
+
+  /// Archivage logique (`false` : archivé, rien n'est supprimé).
+  final bool isActive;
+  const Quote({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    this.quoteNumber,
+    required this.customerId,
+    required this.articlesDescription,
+    required this.amount,
+    required this.tvaRate,
+    required this.validityDays,
+    required this.quoteDate,
+    this.note,
+    required this.status,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $QuotesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || quoteNumber != null) {
+      map['quote_number'] = Variable<String>(quoteNumber);
+    }
+    map['customer_id'] = Variable<String>(customerId);
+    map['articles_description'] = Variable<String>(articlesDescription);
+    map['amount'] = Variable<double>(amount);
+    map['tva_rate'] = Variable<double>(tvaRate);
+    map['validity_days'] = Variable<int>(validityDays);
+    map['quote_date'] = Variable<DateTime>(quoteDate);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['status'] = Variable<String>(status);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  QuotesCompanion toCompanion(bool nullToAbsent) {
+    return QuotesCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      quoteNumber: quoteNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteNumber),
+      customerId: Value(customerId),
+      articlesDescription: Value(articlesDescription),
+      amount: Value(amount),
+      tvaRate: Value(tvaRate),
+      validityDays: Value(validityDays),
+      quoteDate: Value(quoteDate),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      status: Value(status),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory Quote.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Quote(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $QuotesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      quoteNumber: serializer.fromJson<String?>(json['quoteNumber']),
+      customerId: serializer.fromJson<String>(json['customerId']),
+      articlesDescription: serializer.fromJson<String>(
+        json['articlesDescription'],
+      ),
+      amount: serializer.fromJson<double>(json['amount']),
+      tvaRate: serializer.fromJson<double>(json['tvaRate']),
+      validityDays: serializer.fromJson<int>(json['validityDays']),
+      quoteDate: serializer.fromJson<DateTime>(json['quoteDate']),
+      note: serializer.fromJson<String?>(json['note']),
+      status: serializer.fromJson<String>(json['status']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $QuotesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'quoteNumber': serializer.toJson<String?>(quoteNumber),
+      'customerId': serializer.toJson<String>(customerId),
+      'articlesDescription': serializer.toJson<String>(articlesDescription),
+      'amount': serializer.toJson<double>(amount),
+      'tvaRate': serializer.toJson<double>(tvaRate),
+      'validityDays': serializer.toJson<int>(validityDays),
+      'quoteDate': serializer.toJson<DateTime>(quoteDate),
+      'note': serializer.toJson<String?>(note),
+      'status': serializer.toJson<String>(status),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  Quote copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    Value<String?> quoteNumber = const Value.absent(),
+    String? customerId,
+    String? articlesDescription,
+    double? amount,
+    double? tvaRate,
+    int? validityDays,
+    DateTime? quoteDate,
+    Value<String?> note = const Value.absent(),
+    String? status,
+    bool? isActive,
+  }) => Quote(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    quoteNumber: quoteNumber.present ? quoteNumber.value : this.quoteNumber,
+    customerId: customerId ?? this.customerId,
+    articlesDescription: articlesDescription ?? this.articlesDescription,
+    amount: amount ?? this.amount,
+    tvaRate: tvaRate ?? this.tvaRate,
+    validityDays: validityDays ?? this.validityDays,
+    quoteDate: quoteDate ?? this.quoteDate,
+    note: note.present ? note.value : this.note,
+    status: status ?? this.status,
+    isActive: isActive ?? this.isActive,
+  );
+  Quote copyWithCompanion(QuotesCompanion data) {
+    return Quote(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      quoteNumber: data.quoteNumber.present
+          ? data.quoteNumber.value
+          : this.quoteNumber,
+      customerId: data.customerId.present
+          ? data.customerId.value
+          : this.customerId,
+      articlesDescription: data.articlesDescription.present
+          ? data.articlesDescription.value
+          : this.articlesDescription,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      tvaRate: data.tvaRate.present ? data.tvaRate.value : this.tvaRate,
+      validityDays: data.validityDays.present
+          ? data.validityDays.value
+          : this.validityDays,
+      quoteDate: data.quoteDate.present ? data.quoteDate.value : this.quoteDate,
+      note: data.note.present ? data.note.value : this.note,
+      status: data.status.present ? data.status.value : this.status,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Quote(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('quoteNumber: $quoteNumber, ')
+          ..write('customerId: $customerId, ')
+          ..write('articlesDescription: $articlesDescription, ')
+          ..write('amount: $amount, ')
+          ..write('tvaRate: $tvaRate, ')
+          ..write('validityDays: $validityDays, ')
+          ..write('quoteDate: $quoteDate, ')
+          ..write('note: $note, ')
+          ..write('status: $status, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    quoteNumber,
+    customerId,
+    articlesDescription,
+    amount,
+    tvaRate,
+    validityDays,
+    quoteDate,
+    note,
+    status,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Quote &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.quoteNumber == this.quoteNumber &&
+          other.customerId == this.customerId &&
+          other.articlesDescription == this.articlesDescription &&
+          other.amount == this.amount &&
+          other.tvaRate == this.tvaRate &&
+          other.validityDays == this.validityDays &&
+          other.quoteDate == this.quoteDate &&
+          other.note == this.note &&
+          other.status == this.status &&
+          other.isActive == this.isActive);
+}
+
+class QuotesCompanion extends UpdateCompanion<Quote> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String?> quoteNumber;
+  final Value<String> customerId;
+  final Value<String> articlesDescription;
+  final Value<double> amount;
+  final Value<double> tvaRate;
+  final Value<int> validityDays;
+  final Value<DateTime> quoteDate;
+  final Value<String?> note;
+  final Value<String> status;
+  final Value<bool> isActive;
+  final Value<int> rowid;
+  const QuotesCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.quoteNumber = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.articlesDescription = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.tvaRate = const Value.absent(),
+    this.validityDays = const Value.absent(),
+    this.quoteDate = const Value.absent(),
+    this.note = const Value.absent(),
+    this.status = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuotesCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    this.quoteNumber = const Value.absent(),
+    required String customerId,
+    required String articlesDescription,
+    required double amount,
+    this.tvaRate = const Value.absent(),
+    this.validityDays = const Value.absent(),
+    required DateTime quoteDate,
+    this.note = const Value.absent(),
+    this.status = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       customerId = Value(customerId),
+       articlesDescription = Value(articlesDescription),
+       amount = Value(amount),
+       quoteDate = Value(quoteDate);
+  static Insertable<Quote> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? quoteNumber,
+    Expression<String>? customerId,
+    Expression<String>? articlesDescription,
+    Expression<double>? amount,
+    Expression<double>? tvaRate,
+    Expression<int>? validityDays,
+    Expression<DateTime>? quoteDate,
+    Expression<String>? note,
+    Expression<String>? status,
+    Expression<bool>? isActive,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (quoteNumber != null) 'quote_number': quoteNumber,
+      if (customerId != null) 'customer_id': customerId,
+      if (articlesDescription != null)
+        'articles_description': articlesDescription,
+      if (amount != null) 'amount': amount,
+      if (tvaRate != null) 'tva_rate': tvaRate,
+      if (validityDays != null) 'validity_days': validityDays,
+      if (quoteDate != null) 'quote_date': quoteDate,
+      if (note != null) 'note': note,
+      if (status != null) 'status': status,
+      if (isActive != null) 'is_active': isActive,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuotesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String?>? quoteNumber,
+    Value<String>? customerId,
+    Value<String>? articlesDescription,
+    Value<double>? amount,
+    Value<double>? tvaRate,
+    Value<int>? validityDays,
+    Value<DateTime>? quoteDate,
+    Value<String?>? note,
+    Value<String>? status,
+    Value<bool>? isActive,
+    Value<int>? rowid,
+  }) {
+    return QuotesCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      quoteNumber: quoteNumber ?? this.quoteNumber,
+      customerId: customerId ?? this.customerId,
+      articlesDescription: articlesDescription ?? this.articlesDescription,
+      amount: amount ?? this.amount,
+      tvaRate: tvaRate ?? this.tvaRate,
+      validityDays: validityDays ?? this.validityDays,
+      quoteDate: quoteDate ?? this.quoteDate,
+      note: note ?? this.note,
+      status: status ?? this.status,
+      isActive: isActive ?? this.isActive,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $QuotesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (quoteNumber.present) {
+      map['quote_number'] = Variable<String>(quoteNumber.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (articlesDescription.present) {
+      map['articles_description'] = Variable<String>(articlesDescription.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (tvaRate.present) {
+      map['tva_rate'] = Variable<double>(tvaRate.value);
+    }
+    if (validityDays.present) {
+      map['validity_days'] = Variable<int>(validityDays.value);
+    }
+    if (quoteDate.present) {
+      map['quote_date'] = Variable<DateTime>(quoteDate.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuotesCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('quoteNumber: $quoteNumber, ')
+          ..write('customerId: $customerId, ')
+          ..write('articlesDescription: $articlesDescription, ')
+          ..write('amount: $amount, ')
+          ..write('tvaRate: $tvaRate, ')
+          ..write('validityDays: $validityDays, ')
+          ..write('quoteDate: $quoteDate, ')
+          ..write('note: $note, ')
+          ..write('status: $status, ')
+          ..write('isActive: $isActive, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PayslipsTable extends Payslips with TableInfo<$PayslipsTable, Payslip> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -34395,6 +35224,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ExpenseCategoriesTable expenseCategories =
       $ExpenseCategoriesTable(this);
   late final $ExpensesTable expenses = $ExpensesTable(this);
+  late final $QuotesTable quotes = $QuotesTable(this);
   late final $PayslipsTable payslips = $PayslipsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $SyncStateTable syncState = $SyncStateTable(this);
@@ -34460,6 +35290,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     treasuryAccounts,
     expenseCategories,
     expenses,
+    quotes,
     payslips,
     appSettings,
     syncState,
@@ -50909,6 +51740,383 @@ typedef $$ExpensesTableProcessedTableManager =
       Expense,
       PrefetchHooks Function()
     >;
+typedef $$QuotesTableCreateCompanionBuilder =
+    QuotesCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      Value<String?> quoteNumber,
+      required String customerId,
+      required String articlesDescription,
+      required double amount,
+      Value<double> tvaRate,
+      Value<int> validityDays,
+      required DateTime quoteDate,
+      Value<String?> note,
+      Value<String> status,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+typedef $$QuotesTableUpdateCompanionBuilder =
+    QuotesCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String?> quoteNumber,
+      Value<String> customerId,
+      Value<String> articlesDescription,
+      Value<double> amount,
+      Value<double> tvaRate,
+      Value<int> validityDays,
+      Value<DateTime> quoteDate,
+      Value<String?> note,
+      Value<String> status,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+
+class $$QuotesTableFilterComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
+  $$QuotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quoteNumber => $composableBuilder(
+    column: $table.quoteNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get articlesDescription => $composableBuilder(
+    column: $table.articlesDescription,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get tvaRate => $composableBuilder(
+    column: $table.tvaRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get validityDays => $composableBuilder(
+    column: $table.validityDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get quoteDate => $composableBuilder(
+    column: $table.quoteDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$QuotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
+  $$QuotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quoteNumber => $composableBuilder(
+    column: $table.quoteNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get articlesDescription => $composableBuilder(
+    column: $table.articlesDescription,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get tvaRate => $composableBuilder(
+    column: $table.tvaRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get validityDays => $composableBuilder(
+    column: $table.validityDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get quoteDate => $composableBuilder(
+    column: $table.quoteDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$QuotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
+  $$QuotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get quoteNumber => $composableBuilder(
+    column: $table.quoteNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get articlesDescription => $composableBuilder(
+    column: $table.articlesDescription,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<double> get tvaRate =>
+      $composableBuilder(column: $table.tvaRate, builder: (column) => column);
+
+  GeneratedColumn<int> get validityDays => $composableBuilder(
+    column: $table.validityDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get quoteDate =>
+      $composableBuilder(column: $table.quoteDate, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$QuotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $QuotesTable,
+          Quote,
+          $$QuotesTableFilterComposer,
+          $$QuotesTableOrderingComposer,
+          $$QuotesTableAnnotationComposer,
+          $$QuotesTableCreateCompanionBuilder,
+          $$QuotesTableUpdateCompanionBuilder,
+          (Quote, BaseReferences<_$AppDatabase, $QuotesTable, Quote>),
+          Quote,
+          PrefetchHooks Function()
+        > {
+  $$QuotesTableTableManager(_$AppDatabase db, $QuotesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> quoteNumber = const Value.absent(),
+                Value<String> customerId = const Value.absent(),
+                Value<String> articlesDescription = const Value.absent(),
+                Value<double> amount = const Value.absent(),
+                Value<double> tvaRate = const Value.absent(),
+                Value<int> validityDays = const Value.absent(),
+                Value<DateTime> quoteDate = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuotesCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                quoteNumber: quoteNumber,
+                customerId: customerId,
+                articlesDescription: articlesDescription,
+                amount: amount,
+                tvaRate: tvaRate,
+                validityDays: validityDays,
+                quoteDate: quoteDate,
+                note: note,
+                status: status,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                Value<String?> quoteNumber = const Value.absent(),
+                required String customerId,
+                required String articlesDescription,
+                required double amount,
+                Value<double> tvaRate = const Value.absent(),
+                Value<int> validityDays = const Value.absent(),
+                required DateTime quoteDate,
+                Value<String?> note = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuotesCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                quoteNumber: quoteNumber,
+                customerId: customerId,
+                articlesDescription: articlesDescription,
+                amount: amount,
+                tvaRate: tvaRate,
+                validityDays: validityDays,
+                quoteDate: quoteDate,
+                note: note,
+                status: status,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$QuotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $QuotesTable,
+      Quote,
+      $$QuotesTableFilterComposer,
+      $$QuotesTableOrderingComposer,
+      $$QuotesTableAnnotationComposer,
+      $$QuotesTableCreateCompanionBuilder,
+      $$QuotesTableUpdateCompanionBuilder,
+      (Quote, BaseReferences<_$AppDatabase, $QuotesTable, Quote>),
+      Quote,
+      PrefetchHooks Function()
+    >;
 typedef $$PayslipsTableCreateCompanionBuilder =
     PayslipsCompanion Function({
       required String id,
@@ -51545,6 +52753,8 @@ class $AppDatabaseManager {
       $$ExpenseCategoriesTableTableManager(_db, _db.expenseCategories);
   $$ExpensesTableTableManager get expenses =>
       $$ExpensesTableTableManager(_db, _db.expenses);
+  $$QuotesTableTableManager get quotes =>
+      $$QuotesTableTableManager(_db, _db.quotes);
   $$PayslipsTableTableManager get payslips =>
       $$PayslipsTableTableManager(_db, _db.payslips);
   $$AppSettingsTableTableManager get appSettings =>
