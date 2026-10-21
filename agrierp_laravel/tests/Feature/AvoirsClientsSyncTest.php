@@ -405,6 +405,15 @@ class AvoirsClientsSyncTest extends TestCase
         $this->assertRejete($d, "L'exercice 2025 est clôturé");
     }
 
+    public function test_refus_exercice_clos_meme_quand_ni_stock_ni_ecriture_ne_le_diraient(): void
+    {
+        // Retour « réformé » d'un montant nul : aucun mouvement de stock, aucune écriture — SEUL le contrôle du retour juge
+        // l'exercice. Sans lui, un avoir daté d'un exercice clos serait accepté.
+        FiscalYear::where('year', 2026)->update(['status' => 'cloture']);
+
+        $this->assertRejete($this->demande(['decision' => 'reforme', 'amount' => 0]), "L'exercice 2026 est clôturé");
+    }
+
     public function test_refus_plan_comptable_incomplet(): void
     {
         ChartOfAccount::where('code', '443')->delete();
