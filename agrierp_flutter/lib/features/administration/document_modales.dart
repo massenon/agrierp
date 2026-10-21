@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -155,10 +156,6 @@ class _ModaleDocumentState extends State<_ModaleDocument> {
     ),
   );
 
-  static String _jour(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
-
   Future<DateTime?> _choisir(DateTime? depart) => showDatePicker(
     context: context,
     initialDate: depart ?? HeureBenin.maintenant(),
@@ -219,19 +216,18 @@ class _ModaleDocumentState extends State<_ModaleDocument> {
             'beneficiaire',
             _texte('document-beneficiaire', _beneficiaire),
           ),
-          _bloc(
-            'Date *',
-            'date',
-            OutlinedButton(
-              key: const Key('document-date'),
-              onPressed: () async {
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+            child: ChampDateFormulaire(
+              cle: const Key('document-date'),
+              etiquette: 'Date *',
+              valeur: _date,
+              erreur: _erreurs['date'],
+              cleErreur: const Key('document-erreur-date'),
+              onTap: () async {
                 final choisie = await _choisir(_date);
                 if (choisie != null) setState(() => _date = choisie);
               },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(_date == null ? 'jj/mm/aaaa' : _jour(_date!)),
-              ),
             ),
           ),
           _bloc(

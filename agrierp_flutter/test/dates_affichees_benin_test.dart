@@ -74,7 +74,7 @@ void main() {
         .insert(
           AuditLogsCompanion.insert(
             id: 'a'.padRight(36, '0'),
-            userName: const Value('Manager Olouwachegoun'),
+            userName: const Value('M. Olouchègoun'),
             action: 'login',
             module: const Value('auth'),
             createdAt: Value(instant),

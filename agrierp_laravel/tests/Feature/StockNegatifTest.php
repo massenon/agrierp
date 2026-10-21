@@ -50,7 +50,7 @@ class StockNegatifTest extends TestCase
         $role->givePermissionTo(['view-ventes', 'manage-ventes', 'view-stocks', 'manage-stocks', 'view-rapports', 'view-comptabilite']);
 
         $user = User::create([
-            'name' => 'Gérant', 'email' => 'stock@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Gérant', 'email' => 'stock@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

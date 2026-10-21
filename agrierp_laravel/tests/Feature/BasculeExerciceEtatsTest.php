@@ -313,7 +313,7 @@ class BasculeExerciceEtatsTest extends TestCase
     {
         $this->jeuDuParagraphe5();
         $caissier = \App\Models\User::create([
-            'name' => 'Caissier', 'username' => 'caisse-bascule', 'email' => 'caisse-bascule@olouwachegoun.bj',
+            'name' => 'Caissier', 'username' => 'caisse-bascule', 'email' => 'caisse-bascule@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

@@ -44,7 +44,7 @@ class SyncFichesVentilationTest extends TestCase
         Carbon::setTestNow('2026-10-15 12:00:00');
 
         $this->utilisateur = User::create([
-            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@olouwachegoun.bj',
+            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 

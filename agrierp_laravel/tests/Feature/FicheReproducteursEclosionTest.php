@@ -37,7 +37,7 @@ class FicheReproducteursEclosionTest extends TestCase
 
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin',
-            'email' => 'dg@olouwachegoun.bj',
+            'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');

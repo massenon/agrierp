@@ -703,6 +703,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
 
   static String _libelleTable(String table) => switch (table) {
     'livestock_daily_entries' => 'Fiche journalière d\'élevage',
+    // Ticket BS1 — bande créée, modifiée ou archivée au poste.
+    'livestock_lots' => 'Bande',
     'sales' => 'Vente',
     'stock_adjustments' => 'Ajustement de stock',
     'expenses' => 'Dépense',

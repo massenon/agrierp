@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\SaisieBandeAction;
 use App\Actions\TransferBetweenLotsAction;
-use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
 use App\Services\EffectifParCategorieService;
@@ -58,6 +58,13 @@ class GestionBandes extends Component
 
     #[Url]
     public string $filiere = '';
+
+    /** BS-Q7 : `''` = bandes en cours (par défaut), `archivees` = bandes archivées (restaurables). */
+    #[Url]
+    public string $affichage = '';
+
+    /** BS-Q4 : la bande éditée a des fiches journalières — son effectif se corrige depuis la fiche. */
+    public bool $effectifVerrouille = false;
 
     public ?string $editingLotId = null;
 
@@ -153,10 +160,11 @@ class GestionBandes extends Component
     public function getLotsProperty()
     {
         return LivestockLot::with('species')
-            ->where('is_active', true)
+            ->where('is_active', $this->affichage !== 'archivees')
             ->when($this->search, fn ($q) => $q->where('code', 'like', '%'.$this->search.'%'))
             ->when($this->filiere, fn ($q) => $q->whereHas('species', fn ($q2) => $q2->where('code', $this->filiere)))
             ->orderByDesc('created_date')
+            ->orderBy('code')   // ordre stable à date égale (le poste départage de la même façon)
             ->get();
     }
 
@@ -298,13 +306,18 @@ class GestionBandes extends Component
         try {
             DB::transaction(fn () => $this->creerLaBande());
         } catch (ValidationException $e) {
-            // La constitution est refusée (bande d'origine insuffisante…) : la bande n'est pas créée non plus.
-            $this->addError('lot_origine_id', collect($e->errors())->flatten()->first());
+            // La date dans un exercice clos (BS1) se lit sous « Date de Création » ; la constitution refusée (bande
+            // d'origine insuffisante…) sous « Bande d'Origine » : dans les deux cas la bande n'est pas créée.
+            $erreurs = $e->errors();
+            if (isset($erreurs['created_date'])) {
+                $this->addError('created_date', $erreurs['created_date'][0]);
+            } else {
+                $this->addError('lot_origine_id', collect($erreurs)->flatten()->first());
+            }
 
             return;
         }
 
-        AuditLog::record('livestock_lot.created', 'elevage');
         $this->dispatch('close-modal', name: 'modal-create-bande');
         $this->dispatch('toast', message: 'Bande créée avec succès.', type: 'success');
         $this->reset(['code', 'species_id', 'quantity', 'acquisition_cost', 'product_id', 'lot_origine_id']);
@@ -312,18 +325,15 @@ class GestionBandes extends Component
 
     private function creerLaBande(): void
     {
-        $lot = LivestockLot::create([
+        // Ticket BS1 — le point de passage unique de la bande (le poste envoie la sienne par le même).
+        $lot = app(SaisieBandeAction::class)->creer([
             'code' => $this->code,
             'species_id' => $this->species_id,
-            // Ticket 14.37 : ce que la bande produit, décidé par l'exploitant.
-            'product_id' => $this->product_id ?: null,
+            'product_id' => $this->product_id,
             'stage' => $this->stage,
-            'initial_quantity' => $this->quantity,
-            'current_quantity' => $this->quantity,
+            'quantity' => $this->quantity,
             'created_date' => $this->created_date,
             'acquisition_cost' => $this->acquisition_cost,
-            'status' => 'actif',
-            'is_active' => true,
         ]);
 
         if ($this->lot_origine_id !== '') {
@@ -352,6 +362,7 @@ class GestionBandes extends Component
         $this->stage = $lot->stage;
         $this->quantity = $lot->current_quantity;
         $this->status = $lot->status;
+        $this->effectifVerrouille = SaisieBandeAction::aDesFiches($lot->id);
         $this->dispatch('open-modal', name: 'modal-edit-bande');
     }
 
@@ -365,13 +376,20 @@ class GestionBandes extends Component
             'status' => ['required', 'in:actif,cloture'],
         ]);
 
-        LivestockLot::findOrFail($this->editingLotId)->update([
-            'stage' => $this->stage,
-            'current_quantity' => $this->quantity,
-            'status' => $this->status,
-        ]);
+        try {
+            app(SaisieBandeAction::class)->modifier($this->editingLotId, [
+                'stage' => $this->stage,
+                'current_quantity' => $this->quantity,
+                'status' => $this->status,
+            ]);
+        } catch (ValidationException $e) {
+            // Bande archivée depuis l'ouverture de la modale (autre onglet, autre poste).
+            $this->dispatch('close-modal', name: 'modal-edit-bande');
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
-        AuditLog::record('livestock_lot.updated', 'elevage');
+            return;
+        }
+
         $this->dispatch('close-modal', name: 'modal-edit-bande');
         $this->dispatch('toast', message: 'Bande modifiée avec succès.', type: 'success');
     }
@@ -380,9 +398,34 @@ class GestionBandes extends Component
     {
         $this->authorize('manage-elevage');
 
-        LivestockLot::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('livestock_lot.archived', 'elevage');
+        try {
+            app(SaisieBandeAction::class)->archiver($id);
+        } catch (ValidationException $e) {
+            // BS-Q3 : une bande qui a des sujets vivants ne s'archive pas.
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
+
+            return;
+        }
+
         $this->dispatch('toast', message: 'Bande archivée avec succès.', type: 'warning');
+    }
+
+    /** BS-Q7 — restaure une bande archivée (même droit que l'archivage). */
+    public function restoreLot(string $id): void
+    {
+        $this->authorize('manage-elevage');
+
+        try {
+            $resultat = app(SaisieBandeAction::class)->restaurer($id);
+        } catch (ValidationException $e) {
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
+
+            return;
+        }
+
+        if ($resultat === SaisieBandeAction::RESTAUREE_MAINTENANT) {
+            $this->dispatch('toast', message: 'Bande restaurée avec succès.', type: 'success');
+        }
     }
 
     public function render()

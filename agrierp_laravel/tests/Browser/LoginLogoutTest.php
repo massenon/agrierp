@@ -64,7 +64,7 @@ class LoginLogoutTest extends DuskTestCase
     public function test_logout_invalidates_session_and_blocks_back_navigation(): void
     {
         $this->seed();
-        $user = User::where('email', 'dg@olouwachegoun.bj')->firstOrFail();
+        $user = User::where('email', 'dg@fermeolouwachegoun.com')->firstOrFail();
 
         $this->browse(function (Browser $browser) use ($user) {
             $browser->loginAs($user)

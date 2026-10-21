@@ -174,6 +174,8 @@ class ReinitialisationPoste {
     'purchase_returns': 'Retours fournisseurs',
     'supplier_refunds': 'Remboursements fournisseurs',
     'livestock_transfers': 'Transferts entre bandes',
+    'livestock_lots': 'Bandes',
+    'animals': 'Reproducteurs (registre nominatif)',
     'infirmary_records': 'Infirmerie',
     'veterinary_calendar_events': 'Calendrier vétérinaire',
   };

@@ -52,7 +52,7 @@ class AnimalFicheService
         if ($animal->exit_date) {
             $mouvements[] = [
                 'date' => $animal->exit_date->format('Y-m-d'),
-                'libelle' => 'Sortie — '.$animal->status,
+                'libelle' => 'Sortie — '.$animal->status_label,
                 'detail' => $animal->exit_reason ?: 'Motif non précisé',
             ];
         }

@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../config/domaine_email.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -184,6 +185,22 @@ class LivestockLots extends Table {
 
   /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
   TextColumn get lotSourceId => text().nullable()();
+
+  /// ⚠️ **UNE BANDE CRÉÉE, MODIFIÉE OU ARCHIVÉE AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT** (ticket BS1, v49). Défaut
+  /// `synced` : tout ce qui descend du serveur l'est, et les bandes d'avant la migration aussi. Le tirage ne touche
+  /// JAMAIS une bande qui ne l'est pas (`_absorberBandes`, strict).
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket BS1 (v49) — CORRECTION MANUELLE DE L'EFFECTIF ACTUEL (« Modifier la Bande » du web), à envoyer. `null` :
+  /// aucune. ⚠️ L'effectif d'une bande est celui de ses fiches (cascade) : la ligne envoyée ne porte `effectif_corrige`
+  /// que si l'exploitant l'a explicitement corrigé, sinon le serveur garderait un effectif périmé du poste. Vidé à
+  /// l'acquittement.
+  IntColumn get effectifCorrige => integer().nullable()();
+
+  /// Ticket BS-Q7 (v50) — RESTAURATION d'une bande archivée, à envoyer : geste EXPLICITE (jamais déduit de
+  /// `is_active = true`, qui peut venir d'une copie périmée d'un autre poste). Vidé à l'acquittement.
+  BoolColumn get restauree => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -783,6 +800,19 @@ class Animals extends Table {
   DateTimeColumn get exitDate => dateTime().nullable()();
   TextColumn get exitReason => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Ticket BS3 (v51) — l'identifiant de l'ESPÈCE du sujet (le serveur le sert depuis BS3) : le poste écrit désormais un
+  /// sujet nominatif et l'envoie avec `species_id`. `null` : sujet reçu d'un serveur antérieur.
+  TextColumn get speciesId => text().nullable()();
+
+  /// ⚠️ **UN SUJET ENREGISTRÉ, MODIFIÉ OU SORTI AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT** (ticket BS3, v51). Défaut
+  /// `synced` : tout ce qui descend du serveur l'est. Le tirage ne touche JAMAIS un sujet qui ne l'est pas
+  /// (`_absorberSujets`).
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket BS3 (v51) — instant de la dernière saisie au poste : l'accusé de réception n'acquitte que la VERSION partie.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1704,7 +1734,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 48;
+  int get schemaVersion => 52;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2200,8 +2230,79 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(m, expenses, expenses.status);
         await _ajouterColonneSiAbsente(m, expenses, expenses.accountingEntryId);
       }
+
+      // v49 — ticket BS1 : bandes créées, modifiées et archivées au poste (statut d'envoi, correction d'effectif).
+      if (from < 49) {
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.syncStatus);
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.effectifCorrige);
+      }
+
+      // v50 — décision BS-Q7 : une bande archivée se restaure au poste (geste explicite à envoyer).
+      if (from < 50) {
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.restauree);
+      }
+
+      // v51 — décision BS-Q1 (ticket BS3) : le registre nominatif des reproducteurs s'écrit au poste.
+      if (from < 51) {
+        await _ajouterColonneSiAbsente(m, animals, animals.speciesId);
+        await _ajouterColonneSiAbsente(m, animals, animals.syncStatus);
+        await _ajouterColonneSiAbsente(m, animals, animals.updatedAt);
+      }
+
+      // v52 — ticket MAIL1 (décision du client du 21/10/2026) : les anciennes adresses `@olouwachegoun.bj` déjà
+      // enregistrées au poste passent à `@fermeolouwachegoun.com`. AUCUN changement de table : `app_database.g.dart` ne
+      // bouge pas. Voir [_convertirAdressesEmail].
+      if (from < 52) {
+        await _convertirAdressesEmail();
+      }
     },
   );
+
+  /// Palier v52 (ticket MAIL1) — remplace `@olouwachegoun.bj` par `@fermeolouwachegoun.com` (insensible à la casse, en
+  /// SQL) dans TOUTES les colonnes locales susceptibles de porter une adresse : l'e-mail des clients, des fournisseurs,
+  /// de l'identité de la ferme et des utilisateurs, le titre et le message des notifications, et les valeurs de
+  /// `app_settings` (réglages non secrets de l'onglet « Email (SMTP) » : utilisateur, expéditeur).
+  ///
+  /// ⚠️ **UNE LIGNE RESTE CE QU'ELLE ÉTAIT** : seule la colonne d'adresse est écrite. NI `sync_status` NI `updated_at` ne
+  /// bougent — une fiche `pending` reste `pending`, une `synced` reste `synced` ; le serveur, migré lui aussi, fait converger
+  /// les postes au tirage. Les adresses d'un autre domaine sont intactes.
+  ///
+  /// ⚠️ Aucune contrainte d'unicité locale sur ces colonnes (la clé primaire est l'UUID), donc aucun conflit à arbitrer
+  /// (le web, lui, journalise un `users.email` déjà pris). Le journal d'audit local n'est pas réécrit (historique).
+  ///
+  /// ⚠️ **AUCUN SECRET N'EST LU** : le mot de passe SMTP et le jeton vivent au coffre du système (`flutter_secure_storage`),
+  /// jamais dans ces tables ; la base n'ouvre pas le coffre. L'e-mail de la session mise en cache (au coffre) est converti
+  /// à la lecture, par `convertirDomaineEmail` (`SessionUtilisateur.depuisJson`).
+  ///
+  /// Une valeur qui porterait l'adresse DEUX fois est reprise à la passe suivante (au plus dix) ; un nom de serveur
+  /// (`smtp.olouwachegoun.bj`, sans « @ ») n'est pas une adresse et n'est pas touché.
+  Future<void> _convertirAdressesEmail() async {
+    final cibles = <(String, String)>[
+      (customers.actualTableName, customers.email.name),
+      (suppliers.actualTableName, suppliers.email.name),
+      (companySettings.actualTableName, companySettings.email.name),
+      (utilisateurs.actualTableName, utilisateurs.email.name),
+      (notifications.actualTableName, notifications.title.name),
+      (notifications.actualTableName, notifications.message.name),
+      (appSettings.actualTableName, appSettings.value.name),
+    ];
+    const ancien = '@$ancienDomaineEmail';
+    const nouveau = '@$nouveauDomaineEmail';
+    const longueur = ancien.length;
+
+    for (final (table, colonne) in cibles) {
+      final c = '"$colonne"';
+      final position = "instr(lower($c), '$ancien')";
+      for (var passe = 0; passe < 10; passe++) {
+        final modifiees = await customUpdate(
+          'UPDATE "$table" SET $c = substr($c, 1, $position - 1) || \'$nouveau\' || substr($c, $position + $longueur) '
+          "WHERE $c IS NOT NULL AND $position > 0 "
+          "AND NOT (substr(lower($c), $position + $longueur, 1) GLOB '[a-z0-9-]')",
+        );
+        if (modifiees == 0) break;
+      }
+    }
+  }
 
   /// Vrai si [table] existe déjà (un `createTable` d'un palier antérieur pose le schéma COURANT).
   Future<bool> _tableExiste(Migrator m, TableInfo table) async {
@@ -2297,6 +2398,10 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Ticket BS1 — bandes saisies au poste.
+    'livestock_lots',
+    // Ticket BS3 — reproducteurs nominatifs saisis au poste.
+    'animals',
     // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
     'infirmary_records',
     'veterinary_calendar_events',

@@ -31,6 +31,11 @@ void main() {
 
   testWidgets('menu du compte : Paramètres puis, sous un séparateur, Déconnexion qui prévient le socle', (t) async {
     var deconnexions = 0;
+    // Ticket ENV1 : la pastille de recherche a la largeur du web (`w-64`, 256 px). La police de test (Ahem, un em par
+    // lettre) élargit le nom du compte au double d'Inter : à 800 px la barre déborde, ce qui n'arrive pas en vrai.
+    t.view.physicalSize = const Size(1100, 700);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
     await t.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -88,6 +93,8 @@ void main() {
       EcranPoste.fichePorcs: '/fiche-porcs',
       EcranPoste.ficheEscargots: '/fiche-escargots',
       EcranPoste.transfertsBandes: '/transferts-bandes',
+      EcranPoste.gestionBandes: '/gestion-bandes',
+      EcranPoste.enregistrerSujets: '/enregistrer-sujets',
       EcranPoste.ventesEtDevis: '/ventes-devis',
       EcranPoste.clientsEtCreances: '/creances-clients',
       EcranPoste.achatsEtCommandes: '/achats-commandes',

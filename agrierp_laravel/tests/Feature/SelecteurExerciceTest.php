@@ -78,7 +78,7 @@ class SelecteurExerciceTest extends TestCase
     private function administrateur(): User
     {
         $admin = User::create([
-            'name' => 'Direction', 'username' => 'admin-selecteur', 'email' => 'admin-selecteur@olouwachegoun.bj',
+            'name' => 'Direction', 'username' => 'admin-selecteur', 'email' => 'admin-selecteur@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');

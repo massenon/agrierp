@@ -61,7 +61,7 @@ class PosChampDateVenteTest extends TestCase
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
-        $user = User::create(['name' => 'Caissière', 'email' => 'champdate@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $user = User::create(['name' => 'Caissière', 'email' => 'champdate@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $user->assignRole($role);
         $this->actingAs($user);
 
@@ -380,7 +380,7 @@ class PosChampDateVenteTest extends TestCase
 
     public function test_un_utilisateur_sans_manage_ventes_ne_peut_pas_vendre_meme_avec_une_date(): void
     {
-        $lecteur = User::create(['name' => 'Lecteur', 'email' => 'lecteur@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $lecteur = User::create(['name' => 'Lecteur', 'email' => 'lecteur@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $lecteur->givePermissionTo('view-ventes');
         $this->actingAs($lecteur);
 

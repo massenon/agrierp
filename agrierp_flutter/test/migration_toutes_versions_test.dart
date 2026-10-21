@@ -207,6 +207,21 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.expenses, d.expenses.status),
     (d.expenses, d.expenses.accountingEntryId),
   ],
+  // Ticket BS1 — bandes saisies au poste : statut d'envoi et correction d'effectif.
+  49: [
+    (d.livestockLots, d.livestockLots.syncStatus),
+    (d.livestockLots, d.livestockLots.effectifCorrige),
+  ],
+  // Ticket BS-Q7 — restauration d'une bande archivée, à envoyer.
+  50: [(d.livestockLots, d.livestockLots.restauree)],
+  // Ticket BS3 — reproducteurs nominatifs saisis au poste : identifiant d'espèce, statut d'envoi, instant de saisie.
+  51: [
+    (d.animals, d.animals.speciesId),
+    (d.animals, d.animals.syncStatus),
+    (d.animals, d.animals.updatedAt),
+  ],
+  // Ticket MAIL1 — palier de DONNÉES (adresses e-mail du nouveau domaine) : aucune table ni colonne ajoutée.
+  52: [],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

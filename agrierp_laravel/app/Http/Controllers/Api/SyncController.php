@@ -115,6 +115,8 @@ class SyncController extends Controller
      */
     private const CLES_DE_PUSH = [
         'livestock_daily_entries', 'sales', 'stock_adjustments', 'veterinary_records', 'expenses',
+        // Ticket BS1 — bandes créées, modifiées et archivées au poste.
+        'livestock_lots',
         'livestock_reproduction_events', 'purchases', 'attendance_records', 'products', 'suppliers',
         'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments',
         'purchase_returns', 'supplier_refunds', 'customer_advances', 'advance_imputations',
@@ -1237,6 +1239,8 @@ class SyncController extends Controller
                 ->map(fn (Animal $a) => [
                     'id' => $a->id,
                     'identifier' => $a->identifier,
+                    // Ticket BS3 — l'identifiant de l'espèce descend aussi : le poste écrit désormais un sujet (envoi `animals`).
+                    'species_id' => $a->species_id,
                     'species_label' => $a->species?->label,
                     'lot_id' => $a->lot_id,
                     'lot_code' => $a->lot?->code,
@@ -1853,6 +1857,10 @@ class SyncController extends Controller
             'cles_invalides' => $clesInvalides,
             // Ticket S-T9 — `merged` : fiche du poste fusionnée dans celle que le serveur tient pour la même (bande, jour).
             'livestock_daily_entries' => ['accepted' => [], 'rejected' => [], 'merged' => []],
+            // Ticket BS1 — bandes du poste, rejouées par `SaisieBandeAction` (le point de passage de l'écran web).
+            'livestock_lots' => ['accepted' => [], 'rejected' => []],
+            // Ticket BS3 — reproducteurs nominatifs du poste, rejoués par `SaisieReproducteurAction` (l'écran web du registre).
+            'animals' => ['accepted' => [], 'rejected' => []],
             'sales' => ['accepted' => [], 'rejected' => []],
             'stock_adjustments' => ['accepted' => [], 'rejected' => []],
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
@@ -1905,7 +1913,6 @@ class SyncController extends Controller
             'audit_logs',
             'notifications',
             'lot_revenues',
-            'animals',
             'livestock_species',
             'attestation_templates',
             'attestation_counts',
@@ -1997,6 +2004,17 @@ class SyncController extends Controller
         // d'où un interblocage croisé possible entre un poste qui envoie et la caisse qui vend dans la même bande. Placé
         // APRÈS les produits du même envoi (créés, ou fusionnés : les références sont déjà traduites).
         OrdreDesVerrous::stock($this->produitsDeLEnvoi($request));
+
+        // Ticket BS1 — LES BANDES AVANT LES FICHES ET LES TRANSFERTS : une fiche, un transfert de constitution du même
+        // envoi peut viser la bande que le poste vient de créer.
+        if ($request->has('livestock_lots')) {
+            $result['livestock_lots'] = $this->pushLots($request->input('livestock_lots'));
+        }
+
+        // Ticket BS3 — LES REPRODUCTEURS APRÈS LES BANDES : le sujet d'une bande créée au poste dans le même envoi.
+        if ($request->has('animals')) {
+            $result['animals'] = $this->pushAnimals($request->input('animals'));
+        }
 
         if ($request->has('livestock_daily_entries')) {
             $result['livestock_daily_entries'] = $this->pushDailyEntries(
@@ -2174,6 +2192,10 @@ class SyncController extends Controller
      */
     private const PERMISSION_PAR_TABLE = [
         'livestock_daily_entries' => 'manage-elevage',
+        // Ticket BS1 — le droit de l'écran « Bandes & Sujets » du web.
+        'livestock_lots' => 'manage-elevage',
+        // Ticket BS3 — le droit de l'écran « Registre des Reproducteurs » du web.
+        'animals' => 'manage-elevage',
         'livestock_transfers' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'infirmary_records' => 'manage-elevage',
@@ -4233,6 +4255,188 @@ class SyncController extends Controller
     /**
      * @param  array<string, true>  $fichesRecues  fiches du MÊME envoi qui portent déjà ses ventes (15.30 ; S-T9 : créées par l'envoi ou réduites)
      */
+    /**
+     * Ticket BS1 — bandes créées, modifiées ou archivées au poste. `livestock_lots` était un référentiel en lecture
+     * seule : c'est maintenant une table MIXTE (tirée ET saisie), jouée par `SaisieBandeAction` — le point de passage
+     * de l'écran web « Bandes & Sujets » (mêmes règles, mêmes messages, même audit).
+     *
+     * ⚠️ L'EFFECTIF N'APPARTIENT PAS AU POSTE. `current_quantity` est celui des fiches (cascade du serveur) : la ligne
+     * du poste n'y touche JAMAIS, sauf correction explicite de l'exploitant (`effectif_corrige`, « Modifier la Bande »
+     * du web). Sans cela, une bande dont le poste change le stade écraserait l'effectif des fiches reçues d'ailleurs.
+     * Le code, l'espèce, l'effectif initial et la date de création ne changent jamais après la création.
+     *
+     * Idempotent : un renvoi identique n'écrit rien ; une bande archivée n'est plus modifiable (le motif du web) ; un
+     * second archivage est acquitté sans trace.
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>}
+     */
+    private function pushLots(array $bandes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieBandeAction::class);
+
+        foreach ($bandes as $donnees) {
+            $id = is_array($donnees) ? ($donnees['id'] ?? null) : null;
+
+            try {
+                $donnees = is_array($donnees) ? $donnees : [];
+                $existante = is_string($id) && \Illuminate\Support\Str::isUuid($id) ? LivestockLot::find($id) : null;
+                $espece = isset($donnees['species_id']) && is_string($donnees['species_id'])
+                    ? \App\Models\LivestockSpecies::find($donnees['species_id'])
+                    : null;
+
+                $valides = validator($donnees, [
+                    'id' => ['required', 'uuid'],
+                    'code' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('livestock_lots', 'code')->ignore($existante?->id)],
+                    'species_id' => ['required', 'uuid', 'exists:livestock_species,id'],
+                    'stage' => ['required', 'in:'.implode(',', array_keys(LivestockLot::stadesPourEspece($espece?->code)))],
+                    'created_date' => ['required', 'date'],
+                    'initial_quantity' => ['required', 'integer', 'min:1'],
+                    'acquisition_cost' => ['nullable', 'numeric', 'min:0'],
+                    'product_id' => ['nullable', 'uuid', 'exists:products,id'],
+                    'status' => ['sometimes', 'in:actif,cloture'],
+                    'is_active' => ['sometimes', 'boolean'],
+                    'effectif_corrige' => ['nullable', 'integer', 'min:0'],
+                    // BS-Q7 : geste EXPLICITE de restauration (jamais déduit de `is_active: true`, qui peut venir d'une copie périmée).
+                    'restauree' => ['sometimes', 'nullable', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archivee = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $restauree = ! $archivee && filter_var($valides['restauree'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                if ($existante !== null && $existante->code !== $valides['code']) {
+                    $rejected[] = ['id' => $id, 'reason' => "Le code d'une bande ne se modifie jamais après sa création."];
+
+                    continue;
+                }
+
+                // Une seule transaction par ligne : une création suivie d'un refus n'écrit rien.
+                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree) {
+                    if ($existante === null) {
+                        $saisie->creer([
+                            'code' => $valides['code'], 'species_id' => $valides['species_id'], 'stage' => $valides['stage'],
+                            'created_date' => $valides['created_date'], 'quantity' => $valides['initial_quantity'],
+                            'acquisition_cost' => $valides['acquisition_cost'] ?? null, 'product_id' => $valides['product_id'] ?? null,
+                        ], $valides['id']);
+                        // Créée puis clôturée ou corrigée avant tout envoi : les deux gestes se rejouent dans l'ordre.
+                        if (($valides['status'] ?? 'actif') !== 'actif' || ($valides['effectif_corrige'] ?? null) !== null) {
+                            $saisie->modifier($valides['id'], [
+                                'stage' => $valides['stage'],
+                                'status' => $valides['status'] ?? 'actif',
+                                'current_quantity' => $valides['effectif_corrige'] ?? null,
+                            ]);
+                        }
+                        if ($archivee) {
+                            $saisie->archiver($valides['id']);
+                        }
+                    } elseif ($archivee) {
+                        // BS-Q3 : la bande doit être vidée AVANT d'être archivée. Une correction d'effectif envoyée avec
+                        // l'archivage (bande vidée au poste) se joue d'abord, comme au web (Modifier, puis Archiver).
+                        if (($valides['effectif_corrige'] ?? null) !== null && $existante->is_active) {
+                            $saisie->modifier($valides['id'], [
+                                'stage' => $valides['stage'],
+                                'status' => $valides['status'] ?? $existante->status,
+                                'current_quantity' => $valides['effectif_corrige'],
+                            ]);
+                        }
+                        $saisie->archiver($valides['id']);
+                    } else {
+                        // BS-Q7 : la restauration est un geste explicite du poste, jouée avant la modification éventuelle.
+                        if ($restauree) {
+                            $saisie->restaurer($valides['id']);
+                        }
+                        $saisie->modifier($valides['id'], [
+                            'stage' => $valides['stage'],
+                            'status' => $valides['status'] ?? $existante->status,
+                            'current_quantity' => $valides['effectif_corrige'] ?? null,
+                        ]);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket BS3 (décision BS-Q1 du 21/10/2026) — reproducteurs nominatifs créés, modifiés ou sortis au poste. `animals`
+     * était un référentiel en lecture seule : c'est maintenant une table MIXTE (tirée ET saisie), jouée par
+     * `SaisieReproducteurAction` — le point de passage de l'écran web « Registre des Reproducteurs » (mêmes règles,
+     * mêmes messages, même audit).
+     *
+     * ⚠️ IDENTIFIER UN SUJET N'EST PAS LE FAIRE ENTRER : aucune écriture ne touche l'effectif d'une bande (le sujet est
+     * déjà compté dans sa bande, la fiche journalière fait foi) — comme au web, aucune cascade.
+     *
+     * Idempotent : un renvoi identique n'écrit rien ; la même sortie rejouée est acquittée sans trace ; une sortie
+     * différente d'un sujet déjà sorti est refusée. La catégorie est toujours « reproducteur » (seul suivi nominatif).
+     *
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: mixed, reason: string}>}
+     */
+    private function pushAnimals(array $sujets): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieReproducteurAction::class);
+
+        foreach ($sujets as $donnees) {
+            $id = is_array($donnees) ? ($donnees['id'] ?? null) : null;
+
+            try {
+                $donnees = is_array($donnees) ? $donnees : [];
+                $existant = is_string($id) && \Illuminate\Support\Str::isUuid($id) ? Animal::find($id) : null;
+                $sorti = ($donnees['status'] ?? 'actif') !== 'actif';
+
+                $valides = validator($donnees, [
+                    'id' => ['required', 'uuid'],
+                    'identifier' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('animals', 'identifier')->ignore($existant?->id)],
+                    'species_id' => ['required', 'uuid', 'exists:livestock_species,id'],
+                    'lot_id' => ['nullable', 'uuid', 'exists:livestock_lots,id'],
+                    'sex' => ['required', 'in:M,F'],
+                    'breed' => ['nullable', 'string', 'max:100'],
+                    'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
+                    'entry_date' => ['required', 'date', 'before_or_equal:today'],
+                    'origin' => ['nullable', 'string', 'max:150'],
+                    'cage' => ['nullable', 'string', 'max:30'],
+                    'status' => ['sometimes', 'in:actif,reforme,vendu,mort'],
+                    'exit_date' => [\Illuminate\Validation\Rule::requiredIf($sorti), 'nullable', 'date', 'before_or_equal:today'],
+                    'exit_reason' => ['nullable', 'string', 'max:150'],
+                ], MotifsRefusPush::messages(), array_merge(MotifsRefusPush::attributs(), [
+                    'identifier' => 'identifiant', 'sex' => 'sexe', 'breed' => 'race', 'birth_date' => 'date de naissance',
+                    'entry_date' => "date d'entrée", 'origin' => 'origine', 'cage' => 'cage', 'status' => 'statut',
+                    'exit_date' => 'date de sortie', 'exit_reason' => 'motif de sortie',
+                ]))->validate();
+
+                // Une seule transaction par ligne : une création suivie d'un refus de sortie n'écrit rien.
+                DB::transaction(function () use ($saisie, $valides, $existant, $sorti) {
+                    $fiche = Arr::only($valides, ['identifier', 'species_id', 'lot_id', 'sex', 'breed', 'birth_date', 'entry_date', 'origin', 'cage']);
+
+                    if ($existant === null) {
+                        $saisie->enregistrer($fiche, $valides['id']);
+                    } else {
+                        $saisie->modifier($valides['id'], $fiche);
+                    }
+
+                    if ($sorti) {
+                        $saisie->sortir($valides['id'], [
+                            'status' => $valides['status'], 'exit_date' => $valides['exit_date'], 'exit_reason' => $valides['exit_reason'] ?? null,
+                        ]);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     /**
      * Ticket 15.46 — transferts entre bandes créés ou annulés au poste. Jamais fusionnés : un transfert nouveau
      * est REJOUÉ par `TransferBetweenLotsAction` (mêmes contrôles d'effectif que l'écran web, fiches et cascade

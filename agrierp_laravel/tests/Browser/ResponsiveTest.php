@@ -42,7 +42,7 @@ class ResponsiveTest extends DuskTestCase
     public function test_navigation_remains_reachable_at_all_three_viewports(): void
     {
         $this->seed();
-        $admin = User::where('email', 'dg@olouwachegoun.bj')->firstOrFail();
+        $admin = User::where('email', 'dg@fermeolouwachegoun.com')->firstOrFail();
 
         $hubs = ['/gestion-elevage', '/ventes-devis', '/comptabilite-hub'];
 

@@ -51,7 +51,7 @@ class CorrectionsElevage17OctobreTest extends TestCase
             Permission::findOrCreate($nom, 'web');
         }
         Role::findOrCreate('admin', 'web')->givePermissionTo(['view-elevage', 'manage-elevage']);
-        $admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
 
@@ -261,7 +261,8 @@ class CorrectionsElevage17OctobreTest extends TestCase
         $kpis = Livewire::test(GestionBandes::class)->instance()->kpis;
         $this->assertSame([2, 1, 100, 1], [$kpis['bandes_actives'], $kpis['en_reproduction'], $kpis['effectif_total'], $kpis['alertes_sanitaires']]);
 
-        Livewire::test(GestionBandes::class)->call('archiveLot', $archivee->id);
+        // BS-Q3 : une bande vivante ne s'archive plus par l'écran ; l'archivage est posé directement (le test porte sur les indicateurs).
+        $archivee->update(['is_active' => false]);
 
         $this->assertSame(60, Livewire::test(GestionElevage::class)->instance()->effectifTotal);
         $this->assertSame(1, Livewire::test(GestionElevage::class)->instance()->bandesActives);
@@ -321,7 +322,7 @@ class CorrectionsElevage17OctobreTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(DemoUsersSeeder::class);
 
-        // L'administrateur du setUp (dg@olouwachegoun.bj) existe déjà : il est retrouvé par son identifiant et mis à jour,
+        // L'administrateur du setUp (dg@fermeolouwachegoun.com) existe déjà : il est retrouvé par son identifiant et mis à jour,
         // jamais dupliqué.
         $this->assertSame(1, User::where('username', 'admin')->count());
         $admin = User::where('username', 'admin')->first();

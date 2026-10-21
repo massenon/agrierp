@@ -43,7 +43,7 @@ class PosVenteDateeSocleTest extends TestCase
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
-        $user = User::create(['name' => 'Caissière', 'email' => 'posdate@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $user = User::create(['name' => 'Caissière', 'email' => 'posdate@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $user->assignRole($role);
         $this->actingAs($user);
 

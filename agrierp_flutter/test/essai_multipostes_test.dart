@@ -18,7 +18,10 @@ import 'package:agrierp/features/achats/achats_repository.dart';
 import 'package:agrierp/features/achats/depenses_repository.dart';
 import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
+import 'package:agrierp/features/elevage/bandes_repository.dart';
+import 'package:agrierp/features/elevage/reproducteurs_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
+import 'package:agrierp/features/elevage/sujets_entrees_repository.dart';
 import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
 import 'package:agrierp/features/elevage/soins_repository.dart';
 import 'package:agrierp/features/elevage/soins_vaccins_repository.dart';
@@ -436,6 +439,9 @@ class _Poste {
   AchatsRepository get achats => AchatsRepository(database: db, identifiantPoste: nom, horloge: maintenant);
   StocksRepository get stocks => StocksRepository(database: db, deviceId: nom, horloge: maintenant);
   TransfertsRepository get transferts => TransfertsRepository(database: db, deviceId: nom);
+  BandesRepository get bandes => BandesRepository(database: db, deviceId: nom, gestes: gestes, horloge: maintenant);
+  ReproducteursRepository get reproducteurs => ReproducteursRepository(database: db, deviceId: nom, gestes: gestes, horloge: maintenant);
+  SujetsEntreesRepository get sujetsEntrees => SujetsEntreesRepository(database: db, fiches: fiches, horloge: maintenant);
   DepensesRepository get depenses => DepensesRepository(database: db, deviceId: nom);
   ProduitsRepository get produits => ProduitsRepository(database: db);
   ParametresElevageRepository get parametresElevage => ParametresElevageRepository(database: db, maintenant: maintenant);
@@ -1006,6 +1012,8 @@ class _Essai {
   bool retourFait = false;
   bool remboursementFait = false;
   int reglements = 0;
+  /// Décision BS-Q13 : changer l'identifiant du reproducteur enregistré est REFUSÉ au poste (le geste a bien eu lieu).
+  bool identifiantRefuse = false;
   static const produitFusionNom = 'ESSAI Savon de karité (pain)';
   String? produitFusionPoste;
   String? produitFusionWeb;
@@ -1237,7 +1245,83 @@ class _Essai {
           p.noter('livestock_reproduction_events', cycle1!);
           _saisi('livestock_reproduction_events', cycle1!, {'status': 'en_cours'});
         });
+        // Ticket BS1 — « Bandes & Sujets » : deux bandes CRÉÉES au poste (l'une sera archivée au jour 3).
+        for (final (code, effectif) in [('ESSAI-C', 20), ('ESSAI-D', 8)]) {
+          await _geste(p, 'bande $code créée au poste ($effectif sujets)', () async {
+            final modele = await p.bande('ESSAI-A');
+            final b = await p.bandes.creer(
+              FormulaireBande(speciesId: modele.speciesId, code: code, stage: 'croissance', createdDate: p.jour, quantite: '$effectif'),
+            );
+            p.noter('livestock_lots', b.id);
+            if (code == 'ESSAI-C') {
+              bandeC = b.id;
+              _saisi('livestock_lots', b.id, {'code': code, 'stage': 'croissance', 'is_active': true, 'initial_quantity': effectif});
+            } else {
+              bandeD = b.id;
+              _saisi('livestock_lots', b.id, {'code': code, 'is_active': true, 'initial_quantity': effectif});
+            }
+          });
+        }
+        // Ticket BS3 — « Registre des Reproducteurs » : un sujet nominatif enregistré au poste, dans la bande ESSAI-A.
+        await _geste(p, 'reproducteur REP-ESSAI-1 enregistré au poste (BS3)', () async {
+          final modele = await p.bande('ESSAI-A');
+          final a = await p.reproducteurs.enregistrer(
+            FormulaireReproducteur(speciesId: modele.speciesId, identifier: 'REP-ESSAI-1', lotId: modele.id, sex: 'F', breed: 'Sussex', entryDate: p.jour, cage: 'C1'),
+          );
+          reproducteur = a.id;
+          p.noter('animals', a.id);
+          _saisi('animals', a.id, {'identifier': 'REP-ESSAI-1', 'breed': 'Sussex', 'cage': 'C1', 'status': 'actif'});
+        });
+        // Ticket BS2 — « Enregistrer des Sujets » : 6 naissances dans ESSAI-C (20 + 6 = 26).
+        await _geste(p, 'sujets : 6 naissances dans ESSAI-C', () async {
+          final f = await p.sujetsEntrees.ajouter(FormulaireSujet(speciesId: (await p.bande('ESSAI-A')).speciesId, lotId: bandeC!, origine: 'Naissance', quantite: '6', date: p.jour));
+          ficheNaissance = f.id;
+          jourNaissance = p.jour;
+          p.noter('livestock_daily_entries', f.id);
+          _saisi('livestock_daily_entries', f.id, {'ne': 6, 'achat': 0, 'effectif_final': 26});
+        });
       case 1:
+        // Ticket BS3 — la cage du reproducteur change (modification d'un sujet déjà envoyé).
+        await _geste(p, 'reproducteur REP-ESSAI-1 : cage C1 → C2 (BS3)', () async {
+          final actuel = (await p.reproducteurs.sujet(reproducteur!))!;
+          await p.reproducteurs.modifier(reproducteur!, FormulaireReproducteur.depuis(actuel).copieAvec(cage: 'C2'));
+          _saisi('animals', reproducteur!, {'cage': 'C2'});
+        });
+        // Décision BS-Q13 — l'identifiant d'un sujet enregistré ne change plus : refusé au poste, rien mis en file ; le
+        // serveur garde « REP-ESSAI-1 » (l'identifiant des lignes comparées en fin d'essai est celui de l'enregistrement).
+        {
+          final actuel = (await p.reproducteurs.sujet(reproducteur!))!;
+          try {
+            await p.reproducteurs.modifier(reproducteur!, FormulaireReproducteur.depuis(actuel).copieAvec(identifier: 'REP-ESSAI-9'));
+            journaliser('${p.nom}  ✎ reproducteur REP-ESSAI-1 : identifiant → REP-ESSAI-9 ACCEPTÉ AU POSTE (BS-Q13 violée)');
+          } on ReproducteurRefuse catch (e) {
+            identifiantRefuse = e.erreurs['identifier'] == ReproducteursRepository.messageIdentifiantFige;
+            journaliser('${p.nom}  ✎ reproducteur REP-ESSAI-1 : changer l\'identifiant refusé au poste, comme voulu (BS-Q13)');
+          }
+        }
+        // Ticket BS1 — le stade d'ESSAI-C change (sans correction d'effectif : il reste celui des fiches).
+        await _geste(p, 'bande ESSAI-C : stade → ponte', () async {
+          final b = (await p.db.select(p.db.livestockLots).get()).firstWhere((x) => x.id == bandeC);
+          await p.bandes.modifier(bandeC!, stage: 'ponte', quantite: '${b.currentQuantity}', status: 'actif');
+          _saisi('livestock_lots', bandeC!, {'stage': 'ponte'});
+        });
+        // Ticket BS2 — 4 achats ; puis les naissances du jour 1 corrigées (6 → 5) : la cascade refait les deux fiches.
+        await _geste(p, 'sujets : 4 achats dans ESSAI-C', () async {
+          final f = await p.sujetsEntrees.ajouter(FormulaireSujet(speciesId: (await p.bande('ESSAI-A')).speciesId, lotId: bandeC!, origine: 'Achat', quantite: '4', date: p.jour));
+          ficheAchat = f.id;
+          p.noter('livestock_daily_entries', f.id);
+          _saisi('livestock_daily_entries', f.id, {'ne': 0, 'achat': 4, 'effectif_final': 30});
+        });
+        await _geste(p, 'sujets : naissances de la journée 1 corrigées (6 → 5)', () async {
+          await p.sujetsEntrees.modifier(
+            ficheNaissance!,
+            'Naissance',
+            FormulaireSujet(origine: 'Naissance', quantite: '5', date: jourNaissance),
+          );
+          // 20 + 5 = 25 ; 25 + 4 = 29 : la cascade a refait la fiche des achats.
+          _saisi('livestock_daily_entries', ficheNaissance!, {'ne': 5, 'effectif_final': 25});
+          _saisi('livestock_daily_entries', ficheAchat!, {'effectif_final': 29});
+        });
         await _geste(p, 'soin : vitamines sur ESSAI-B (sans délai d\'attente)', () async {
           final s = await p.soins.enregistrer(lotId: (await p.bande('ESSAI-B')).id, typeAction: 'Traitement', produit: 'Vitamines AD3E', dose: '1 g/L', cout: 2500, quand: p.maintenant());
           p.noter('veterinary_records', s.id);
@@ -1264,6 +1348,35 @@ class _Essai {
           _saisi('feed_types', provende!, {'name': 'ESSAI Provende lapin', 'price_per_kg': 310, 'is_active': true});
         });
       case 2:
+        // Ticket BS1/BS2 — ESSAI-D archivée ; les achats d'ESSAI-C archivés (29 → 25 sur la fiche, 25 sur la bande).
+        // Décisions du 21/10/2026 — BS-Q3 : une bande qui a des sujets vivants ne s'archive pas ; il faut la VIDER d'abord.
+        await _geste(p, 'bande ESSAI-D : archivage refusé tant qu\'elle a 8 sujets vivants (BS-Q3)', () async {
+          try {
+            await p.bandes.archiver(bandeD!);
+          } on BandeRefusee {
+            return;
+          }
+          throw StateError('ESSAI-D archivée à tort avec 8 sujets vivants');
+        });
+        // BS-Q4 : ESSAI-C a des fiches — sa correction d'effectif passe par la fiche, jamais par « Modifier la Bande ».
+        await _geste(p, 'bande ESSAI-C : correction d\'effectif refusée, elle a des fiches (BS-Q4)', () async {
+          try {
+            await p.bandes.modifier(bandeC!, stage: 'ponte', quantite: '3', status: 'actif');
+          } on BandeRefusee {
+            return;
+          }
+          throw StateError('effectif d\'ESSAI-C corrigé à tort alors qu\'elle a des fiches');
+        });
+        await _geste(p, 'bande ESSAI-D vidée (effectif 0, sans fiche) puis archivée au poste', () async {
+          await p.bandes.modifier(bandeD!, stage: 'croissance', quantite: '0', status: 'actif');
+          await p.bandes.archiver(bandeD!);
+          _saisi('livestock_lots', bandeD!, {'is_active': false, 'current_quantity': 0});
+        });
+        await _geste(p, 'sujets : achats d\'ESSAI-C archivés', () async {
+          await p.sujetsEntrees.archiver(ficheAchat!, 'Achat');
+          _saisi('livestock_daily_entries', ficheAchat!, {'achat': 0, 'effectif_final': 25});
+          _saisi('livestock_lots', bandeC!, {'current_quantity': 25});
+        });
         // Hors ligne toute la journée : la saillie et sa palpation (négative) partent dans le MÊME envoi.
         await _geste(p, 'saillie de L-ESSAI-2 puis palpation négative, hors ligne', () async {
           cycle2 = await p.reproduction.declarerSaillie(lotId: (await p.bande('CUN-2026-01')).id, numeroFemelle: 'L-ESSAI-2', dateSaillie: p.jour, maintenant: p.maintenant());
@@ -1284,6 +1397,16 @@ class _Essai {
           p.noter('livestock_transfers', t.id);
         });
       case 3:
+        // BS-Q7 : la bande archivée la veille est RESTAURÉE au poste (geste explicite, absorbeur strict, droits).
+        await _geste(p, 'bande ESSAI-D restaurée au poste (BS-Q7)', () async {
+          await p.bandes.restaurer(bandeD!);
+          _saisi('livestock_lots', bandeD!, {'is_active': true, 'current_quantity': 0});
+        });
+        // Ticket BS3 — la sortie du reproducteur (réforme) : le sujet reste, l'effectif de la bande n'est pas touché.
+        await _geste(p, 'reproducteur REP-ESSAI-1 réformé (BS3)', () async {
+          await p.reproducteurs.sortir(reproducteur!, FormulaireSortie(status: 'reforme', exitDate: p.jour, reason: 'Réforme pour âge'));
+          _saisi('animals', reproducteur!, {'status': 'reforme', 'exit_reason': 'Réforme pour âge'});
+        });
         await _geste(p, 'mise bas de L-ESSAI-1 : 7 vivants, 1 mort', () async {
           await p.reproduction.enregistrerMiseBas(cycle1!, nesVivants: 7, nesMorts: 1, maintenant: p.maintenant());
           _saisi('livestock_reproduction_events', cycle1!, {'mise_bas_date_actual': _jourIso(p.jour), 'nes_vivants': 7, 'nes_morts': 1});
@@ -1318,6 +1441,14 @@ class _Essai {
 
   /// Ticket S-T12 — lignes saisies à l'élevage dont le serveur doit détenir l'état FINAL du poste.
   String? infirmerie, intervention, cycle1, cycle2, soinAArchiver, rationPoste, provende;
+
+  /// Tickets BS1 et BS2 — les bandes ESSAI-C (modifiée, effectif par les sujets) et ESSAI-D (archivée) créées au poste, les
+  /// fiches de leurs entrées de sujets.
+  String? bandeC, bandeD, ficheNaissance, ficheAchat;
+
+  /// Ticket BS3 — le reproducteur nominatif REP-ESSAI-1 : enregistré (jour 1), cage modifiée (jour 2), sorti (jour 4).
+  String? reproducteur;
+  DateTime? jourNaissance;
   int? rappelSoins;
 
   /// Ticket S-T12 — ce que l'animalier a SAISI (dernière valeur de chaque champ), par `table|id` : c'est l'attendu, au
@@ -1509,6 +1640,25 @@ class _Essai {
     if (provende != null) {
       final f = await (p.db.select(p.db.feedTypes)..where((t) => t.id.equals(provende!))).getSingleOrNull();
       lignesLocales['feed_types|$provende'] = {'name': f?.name, 'price_per_kg': f?.pricePerKg, 'is_active': f?.isActive};
+    }
+    // Tickets BS1 et BS2 — bandes et entrées de sujets de l'élevage, telles que le poste les détient en fin d'essai.
+    for (final id in [?bandeC, ?bandeD]) {
+      final b = await (p.db.select(p.db.livestockLots)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['livestock_lots|$id'] = {
+        'code': b?.code,
+        'stage': b?.stage,
+        'is_active': b?.isActive,
+        'initial_quantity': b?.initialQuantity,
+        'current_quantity': b?.currentQuantity,
+      };
+    }
+    if (reproducteur != null) {
+      final a = await p.reproducteurs.sujet(reproducteur!);
+      lignesLocales['animals|$reproducteur'] = {'identifier': a?.identifier, 'breed': a?.breed, 'cage': a?.cage, 'status': a?.status, 'exit_reason': a?.exitReason};
+    }
+    for (final id in [?ficheNaissance, ?ficheAchat]) {
+      final f = await (p.db.select(p.db.livestockDailyEntries)..where((t) => t.id.equals(id))).getSingleOrNull();
+      lignesLocales['livestock_daily_entries|$id'] = {'ne': f?.ne, 'achat': f?.achat, 'don': f?.don, 'effectif_final': f?.effectifFinal};
     }
     // Ticket U14 — les dépenses modifiée et archivée au bureau.
     for (final id in [?depenseAModifier, ?depenseAArchiverPoste]) {
@@ -1754,6 +1904,10 @@ class _Essai {
       if (cycle1 == null || cycle2 == null) 'cycles de reproduction',
       if (infirmerie == null || intervention == null || soinAArchiver == null) 'infirmerie, calendrier, soin archivé',
       if (rationPoste == null || provende == null || rappelSoins == null) 'Paramètres Élevage au poste',
+      if (reproducteur == null) 'reproducteur nominatif enregistré, modifié puis sorti au poste (BS3)',
+      if (!identifiantRefuse) 'changement d\'identifiant du reproducteur refusé au poste (BS-Q13)',
+      if (bandeC == null || bandeD == null || ficheNaissance == null || ficheAchat == null)
+        'bandes créées au poste (ESSAI-C, ESSAI-D) et entrées de sujets modifiée et archivée (BS1, BS2)',
       if (!saisiElevage.containsKey('expenses|$depenseAModifier') || !saisiElevage.containsKey('expenses|$depenseAArchiverPoste'))
         'dépense modifiée et dépense archivée au poste (U14)',
       if (!sessionsRefusees.containsKey(caisse1.nom) || !sessionsRefusees.containsKey(compta.nom)) 'sessions refusées',

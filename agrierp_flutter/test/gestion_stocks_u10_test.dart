@@ -670,7 +670,7 @@ void main() {
 const _script = r'''
 Carbon\Carbon::setTestNow('2026-10-19 14:00:00');
 $entree = json_decode(file_get_contents($argv[1]), true);
-$admin = App\Models\User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+$admin = App\Models\User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
     'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
 (new Database\Seeders\RolesAndPermissionsSeeder())->run();
 $admin->assignRole('admin');

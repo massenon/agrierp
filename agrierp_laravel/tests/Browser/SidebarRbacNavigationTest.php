@@ -51,17 +51,17 @@ class SidebarRbacNavigationTest extends DuskTestCase
     {
         return [
             'animalier' => [
-                'email' => 'elevage@olouwachegoun.bj',
+                'email' => 'elevage@fermeolouwachegoun.com',
                 'allowed' => ['/gestion-elevage', '/gestion-bandes'],
                 'forbidden' => ['/plan-comptable', '/cloture-exercice', '/administration', '/personnel-stages'],
             ],
             'caissier' => [
-                'email' => 'caisse@olouwachegoun.bj',
+                'email' => 'caisse@fermeolouwachegoun.com',
                 'allowed' => ['/ventes-devis', '/creances-clients'],
                 'forbidden' => ['/gestion-elevage', '/plan-comptable', '/cloture-exercice', '/administration'],
             ],
             'comptable' => [
-                'email' => 'compta@olouwachegoun.bj',
+                'email' => 'compta@fermeolouwachegoun.com',
                 'allowed' => ['/plan-comptable', '/journal-comptable', '/cloture-exercice', '/rapports-exports'],
                 'forbidden' => ['/gestion-elevage', '/ventes-devis', '/administration', '/personnel-stages'],
             ],
@@ -110,7 +110,7 @@ class SidebarRbacNavigationTest extends DuskTestCase
     public function test_admin_reaches_every_hub_route(): void
     {
         $this->seed();
-        $admin = User::where('email', 'dg@olouwachegoun.bj')->firstOrFail();
+        $admin = User::where('email', 'dg@fermeolouwachegoun.com')->firstOrFail();
 
         $hubs = [
             '/gestion-elevage', '/ventes-devis', '/achats-commandes', '/gestion-stocks',

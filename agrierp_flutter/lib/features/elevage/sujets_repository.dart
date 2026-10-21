@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../core/temps/heure_benin.dart';
+import 'reproducteurs_repository.dart';
 
 /// Échec d'une opération sur la fiche d'un sujet, avec une phrase lisible.
 class EchecSujet implements Exception {
@@ -166,10 +167,11 @@ class FicheSujet {
 
   bool get present => sujet.status == 'actif';
 
-  /// « Actif — Reproducteur » ou, pour un sujet sorti, son statut (« Vendu »).
+  /// « Actif — Reproducteur » ou, pour un sujet sorti, son statut (« Réformé », « Vendu », « Mort » — BS-Q11 : la
+  /// correspondance unique du registre, `Animal::libelleStatut()` du web).
   String get badge => present
       ? 'Actif — ${SujetsRepository.majuscule(sujet.category)}'
-      : SujetsRepository.majuscule(sujet.status);
+      : ReproducteursRepository.libelleStatut(sujet.status);
 
   String get sexe => sujet.sex == 'F' ? 'Femelle' : 'Mâle';
 }
@@ -272,7 +274,7 @@ class SujetsRepository {
       if (sujet.exitDate != null)
         MouvementSujet(
           date: sujet.exitDate,
-          libelle: 'Sortie — ${sujet.status}',
+          libelle: 'Sortie — ${ReproducteursRepository.libelleStatut(sujet.status)}',
           detail: _ou(sujet.exitReason, 'Motif non précisé'),
         ),
     ];

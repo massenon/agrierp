@@ -53,7 +53,7 @@ class CycleMetierCompletTest extends TestCase
 
         $user = User::create([
             'name' => 'Caissière',
-            'email' => 'cycle@olouwachegoun.bj',
+            'email' => 'cycle@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);

@@ -58,7 +58,7 @@ class CreditsProjetTest extends TestCase
         $u = User::create([
             'name' => 'Test Crédits',
             'username' => 'credits',
-            'email' => 'credits@olouwachegoun.bj',
+            'email' => 'credits@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
             'is_active' => true,
         ]);

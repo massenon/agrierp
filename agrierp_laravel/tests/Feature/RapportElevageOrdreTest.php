@@ -37,7 +37,7 @@ class RapportElevageOrdreTest extends TestCase
         $role = Role::findOrCreate('admin', 'web');
         $role->givePermissionTo('view-rapports');
         $user = User::create([
-            'name' => 'DG', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'DG', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);

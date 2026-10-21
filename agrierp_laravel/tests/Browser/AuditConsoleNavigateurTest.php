@@ -59,7 +59,7 @@ class AuditConsoleNavigateurTest extends DuskTestCase
     {
         $this->seed();
 
-        $admin = User::where('email', 'dg@olouwachegoun.bj')->firstOrFail();
+        $admin = User::where('email', 'dg@fermeolouwachegoun.com')->firstOrFail();
         $ecrans = $this->ecrans();
 
         $this->assertGreaterThan(40, count($ecrans), 'L audit doit couvrir la grande majorite des ecrans.');

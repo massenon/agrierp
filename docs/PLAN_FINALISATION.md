@@ -291,7 +291,7 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | D-CFG-3 | Recette = **le serveur de la ferme** (`https://agrierp.fermeolouwachegoun.com`) ; les données d'essai sont vidées ensuite par « Réinitialisation des données » (Paramètres, 15.50) — vérifiée le 19/10 sur le jeu de démonstration : 7 390 lignes d'activité → 0, référentiels gardés, stocks et trésorerie à 0, marque posée |
 | D-CFG-4 | En-têtes du tableau des stocks au poste **accentués comme le Blade** (« DÉSIGNATION », « CATÉGORIE ») |
 | D-R1 | Réinitialisation lancée au poste dont la réponse se perd : **accepté** — le poste purge au tirage suivant (règle 15.50) et la perte des saisies non envoyées est annoncée par l'avertissement de synchronisation |
-| D-MECEF-1 | ❓ **À trancher avec le client et la DGI** : une facture acceptée par le dispositif MeCeF dont la réponse se perd serait déclarée deux fois à la retransmission — seule la future passerelle réelle peut l'empêcher (identifiant de la vente comme clé d'idempotence, ou interrogation avant retransmission). Et : faut-il un bouton de retransmission pour une vente restée « En attente » (aujourd'hui seulement pour « Erreur MeCeF ») ? |
+| D-MECEF-1 | ⏸ laissé de côté à la demande du client (21/10/2026) — aucun code touché. *Question d'origine, restée ouverte :* une facture acceptée par le dispositif MeCeF dont la réponse se perd serait déclarée deux fois à la retransmission — seule la future passerelle réelle peut l'empêcher (identifiant de la vente comme clé d'idempotence, ou interrogation avant retransmission). Et : faut-il un bouton de retransmission pour une vente restée « En attente » (aujourd'hui seulement pour « Erreur MeCeF ») ? |
 
 | # | Ticket | Statut |
 |---|---|---|
@@ -319,9 +319,9 @@ Source : [`AUDIT_FIDELITE_ECRANS.md`](AUDIT_FIDELITE_ECRANS.md). Les directives 
 | Réf. | Question au client |
 |---|---|
 | D-U14-1 | ✅ 20/10/2026 : **verrouillée** comme le montant (ticket EX5). La DATE d'une dépense comptabilisée reste modifiable (web et poste) ; l'écriture garde la date d'origine : registre des dépenses et grand livre peuvent se décaler d'une période. La verrouiller comme le montant, le compte de charge et le compte de trésorerie ? |
-| D-U14-2 | ❓ Export du journal d'audit au poste : non proposé (le poste ne détient que les 200 dernières lignes ; l'export ne pourrait pas être journalisé au serveur). Le garder au web seul, ou tirer la période entière ? |
-| D-U14-3 | ❓ Taux de mortalité sans effectif (fiches du jour, Dashboard Élevage, Tableau de bord) : « 0,0 % » des deux côtés ; appliquer « inconnu = — » comme pour l'éclosion ? |
-| D-U14-4 | ❓ Dépense saisie puis archivée au poste avant tout envoi : créée puis archivée au serveur (deux écritures, deux lignes d'audit), pour garder la trace — à confirmer (alternative : effacée du poste, rien n'est envoyé) |
+| D-U14-2 | ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement. *Question d'origine :* Export du journal d'audit au poste : non proposé (le poste ne détient que les 200 dernières lignes ; l'export ne pourrait pas être journalisé au serveur). Le garder au web seul, ou tirer la période entière ? |
+| D-U14-3 | ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement. *Question d'origine :* Taux de mortalité sans effectif (fiches du jour, Dashboard Élevage, Tableau de bord) : « 0,0 % » des deux côtés ; appliquer « inconnu = — » comme pour l'éclosion ? |
+| D-U14-4 | ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement. *Question d'origine :* Dépense saisie puis archivée au poste avant tout envoi : créée puis archivée au serveur (deux écritures, deux lignes d'audit), pour garder la trace — à confirmer (alternative : effacée du poste, rien n'est envoyé) |
 
 ## Sprint EX — Bascule et clôture d'exercice (PRD `docs/prd/exercices-comptables.md`)
 
@@ -339,28 +339,28 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 | EX5 | Exercice clos verrouillé au serveur (EF5, EF6, R4) : stock, fiches (Q3), paie (Q4), déplacement d'écriture, date de dépense comptabilisée (D-U14-1) ; plus aucune erreur 500 ; messages R4 en JJ/MM/AAAA | ✅ (20/10/2026, `README_SPRINT0.md`) |
 | EX6 | Refus local au poste sur tous les écrans de saisie (EF7), messages du serveur mot pour mot, calendriers bornés | ✅ (20/10/2026, `README_SPRINT0.md`) |
 
-**Questions nées d'EX3–EX5 (au client / au cabinet FAGUEZ, non tranchées)** — détail dans `README_SPRINT0.md` :
-- **EX-Q1** : l'étape 2 ne solde que les classes 6 et 7 ; un compte de classe 8 (HAO) qui porte un solde rend l'à-nouveau déséquilibré, et la clôture est désormais refusée avec son motif (avant : erreur 500). L'étape 2 doit-elle solder aussi la classe 8 ?
-- **EX-Q2** : paie (Q4) — la charge est datée du dernier jour de la période, **sauf** si le règlement a lieu avant (charge au jour du règlement, une seule écriture). Les deux écritures (par le 422) ne sont passées que quand les deux dates diffèrent. À confirmer.
-- **EX-Q3** : au Journal, une écriture ne change plus d'exercice, même entre deux exercices ouverts (EF5 « vers un autre exercice ») : archiver puis ressaisir. À confirmer.
-- **EX-Q4** : au plus deux exercices ouverts (R2) : si N n'est pas clôturé au 31/12/N+1, N+2 ne s'ouvre pas et toute saisie de N+2 est refusée (l'administrateur est prévenu). Est-ce voulu, ou faut-il une marge ?
-- **EX-Q5** : « griser la date d'une dépense comptabilisée comme le montant » — ni le web ni le poste ne grisent le montant : le refus se fait à l'enregistrement, sous « Montant ». La date suit ce comportement ; le grisé relève d'EF10 (lot 2), à construire d'abord au web. → **Fait en EX7** : la date d'une dépense comptabilisée est grisée en modification, au web puis au poste, motif « Dépense déjà comptabilisée : sa date ne peut plus être modifiée. » en info-bulle ; le montant reste refusé à l'enregistrement (non grisé : à décider s'il doit l'être aussi).
+**Questions nées d'EX3–EX5 (au client / au cabinet FAGUEZ) — ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement (21/10/2026)** — détail dans `README_SPRINT0.md` :
+- **EX-Q1** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : l'étape 2 ne solde que les classes 6 et 7 ; un compte de classe 8 (HAO) qui porte un solde rend l'à-nouveau déséquilibré, et la clôture est désormais refusée avec son motif (avant : erreur 500). L'étape 2 doit-elle solder aussi la classe 8 ?
+- **EX-Q2** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : paie (Q4) — la charge est datée du dernier jour de la période, **sauf** si le règlement a lieu avant (charge au jour du règlement, une seule écriture). Les deux écritures (par le 422) ne sont passées que quand les deux dates diffèrent. À confirmer.
+- **EX-Q3** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : au Journal, une écriture ne change plus d'exercice, même entre deux exercices ouverts (EF5 « vers un autre exercice ») : archiver puis ressaisir. À confirmer.
+- **EX-Q4** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : au plus deux exercices ouverts (R2) : si N n'est pas clôturé au 31/12/N+1, N+2 ne s'ouvre pas et toute saisie de N+2 est refusée (l'administrateur est prévenu). Est-ce voulu, ou faut-il une marge ?
+- **EX-Q5** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : « griser la date d'une dépense comptabilisée comme le montant » — ni le web ni le poste ne grisent le montant : le refus se fait à l'enregistrement, sous « Montant ». La date suit ce comportement ; le grisé relève d'EF10 (lot 2), à construire d'abord au web. → **Fait en EX7** : la date d'une dépense comptabilisée est grisée en modification, au web puis au poste, motif « Dépense déjà comptabilisée : sa date ne peut plus être modifiée. » en info-bulle ; le montant reste refusé à l'enregistrement (non grisé : à décider s'il doit l'être aussi).
 
 **Questions nées d'EX6 (non tranchées)** — détail dans `README_SPRINT0.md` :
-- **EX-Q6** : les **transferts entre bandes** (web et poste) ne sont jugés par aucun exercice au serveur, alors qu'ils écrivent les fiches des deux bandes ; au poste, la fiche du transfert part ensuite à l'envoi et le serveur la refuse si l'exercice est clos (transfert accepté, fiche refusée). Faut-il refuser le transfert lui-même dans un exercice clos (Q3 étendue), d'abord au web ?
-- **EX-Q7** : les calendriers bornés (EF7) ne l'étaient qu'à la caisse ; EX6 a borné au web d'abord (`min`) la Saisie des Dépenses, les Dettes Fournisseurs, le remboursement, les Avances et l'Ajout de stock, puis le poste. Le sélecteur de date des **fiches d'élevage** n'est PAS borné (il sert aussi à consulter un jour passé, EF12) : le refus vient à l'enregistrement. À confirmer.
+- **EX-Q6** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : les **transferts entre bandes** (web et poste) ne sont jugés par aucun exercice au serveur, alors qu'ils écrivent les fiches des deux bandes ; au poste, la fiche du transfert part ensuite à l'envoi et le serveur la refuse si l'exercice est clos (transfert accepté, fiche refusée). Faut-il refuser le transfert lui-même dans un exercice clos (Q3 étendue), d'abord au web ?
+- **EX-Q7** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : les calendriers bornés (EF7) ne l'étaient qu'à la caisse ; EX6 a borné au web d'abord (`min`) la Saisie des Dépenses, les Dettes Fournisseurs, le remboursement, les Avances et l'Ajout de stock, puis le poste. Le sélecteur de date des **fiches d'élevage** n'est PAS borné (il sert aussi à consulter un jour passé, EF12) : le refus vient à l'enregistrement. À confirmer.
 
 **Questions nées d'EX7 (non tranchées)** — détail dans `README_SPRINT0.md` :
-- **EX-Q8** : un exercice clos grise les saisies des écrans PILOTÉS (EF9 : Journal, Achats, Dépenses, Stocks, Soins, Transferts, Rapprochement, Historique des ventes) ; la **caisse**, les **fiches d'élevage**, la **paie** et les écrans clients ne lisent pas l'exercice affiché (une vente se date du jour). Faut-il les griser aussi quand 2026 clos est affiché ?
-- **EX-Q9** : les indicateurs « du mois » des écrans pilotés suivent le mois de référence de l'exercice affiché (le mois du jour, ou décembre 2026 lu en 2027) ; ceux qui ne sont pas « du mois » (Liste d'Achats, Historique des ventes au poste, totaux du Journal au poste) restent sur toute la ferme, comme avant. À confirmer.
-- **EX-Q10** : la Déclaration TVA et le Rapport mensuel ne proposent plus que les mois de l'exercice affiché (avant : les 12 derniers mois glissants, à cheval sur deux exercices). À confirmer.
-- **EX-Q11** (suite d'EX-Q5) : la date d'une dépense comptabilisée est grisée en modification ; son **montant** ne l'est pas (refus à l'enregistrement, sous « Montant »). Faut-il le griser aussi, d'abord au web ?
+- **EX-Q8** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : un exercice clos grise les saisies des écrans PILOTÉS (EF9 : Journal, Achats, Dépenses, Stocks, Soins, Transferts, Rapprochement, Historique des ventes) ; la **caisse**, les **fiches d'élevage**, la **paie** et les écrans clients ne lisent pas l'exercice affiché (une vente se date du jour). Faut-il les griser aussi quand 2026 clos est affiché ?
+- **EX-Q9** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : les indicateurs « du mois » des écrans pilotés suivent le mois de référence de l'exercice affiché (le mois du jour, ou décembre 2026 lu en 2027) ; ceux qui ne sont pas « du mois » (Liste d'Achats, Historique des ventes au poste, totaux du Journal au poste) restent sur toute la ferme, comme avant. À confirmer.
+- **EX-Q10** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : la Déclaration TVA et le Rapport mensuel ne proposent plus que les mois de l'exercice affiché (avant : les 12 derniers mois glissants, à cheval sur deux exercices). À confirmer.
+- **EX-Q11** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement — (suite d'EX-Q5) : la date d'une dépense comptabilisée est grisée en modification ; son **montant** ne l'est pas (refus à l'enregistrement, sous « Montant »). Faut-il le griser aussi, d'abord au web ?
 
-**Questions nées d'EX8 (non tranchées)** — détail dans `README_SPRINT0.md` (numérotées EX-Q8 à EX-Q11 sur la branche d'EX8, renumérotées EX-Q12 à EX-Q15 à la fusion avec EX7, dont les EX-Q8 à EX-Q10 gardent leur numéro) :
-- **EX-Q12** : le Bilan et le Compte de résultat écartent l'écriture de solde des comptes de gestion (étape 2, `closing`) et sa contrepartie 131/139 : le résultat d'un exercice dont l'étape 2 est passée reste sur la ligne « Résultat de l'exercice » (avant : au 131, résultat 0) — mêmes totaux. Présentation « avant affectation » à confirmer par le cabinet FAGUEZ.
-- **EX-Q13** : la colonne N-1 présente l'exercice précédent À SA CLÔTURE (Bilan au 31/12/N-1, Compte de résultat de l'année entière), quelle que soit la date d'arrêté de N. Un comparatif « à date égale » (N au 31/01 contre N-1 au 31/01) n'est pas fait. À confirmer.
-- **EX-Q14** : le « Rapport mensuel » et la carte « Recettes du Mois » du hub (`produitsPeriode` / `chargesPeriode`) comptent encore l'écriture de solde : décembre d'un exercice dont l'étape 2 est passée affiche un chiffre d'affaires NÉGATIF (ventes de décembre − ventes de l'année). Relevé, non corrigé (hors du périmètre d'EX8). À corriger comme le Compte de résultat ?
-- **EX-Q15** : au poste, l'onglet « Flux de Trésorerie » et les « Notes Annexes » des États financiers restent sur le web (la décision Q5 ne vise que le Bilan et le Compte de résultat ; les Notes lisent le registre des immobilisations, qui ne descend pas). Les porter aussi ?
+**Questions nées d'EX8 — ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement** — détail dans `README_SPRINT0.md` (numérotées EX-Q8 à EX-Q11 sur la branche d'EX8, renumérotées EX-Q12 à EX-Q15 à la fusion avec EX7, dont les EX-Q8 à EX-Q10 gardent leur numéro) :
+- **EX-Q12** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : le Bilan et le Compte de résultat écartent l'écriture de solde des comptes de gestion (étape 2, `closing`) et sa contrepartie 131/139 : le résultat d'un exercice dont l'étape 2 est passée reste sur la ligne « Résultat de l'exercice » (avant : au 131, résultat 0) — mêmes totaux. Présentation « avant affectation » à confirmer par le cabinet FAGUEZ.
+- **EX-Q13** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : la colonne N-1 présente l'exercice précédent À SA CLÔTURE (Bilan au 31/12/N-1, Compte de résultat de l'année entière), quelle que soit la date d'arrêté de N. Un comparatif « à date égale » (N au 31/01 contre N-1 au 31/01) n'est pas fait. À confirmer.
+- **EX-Q14** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : le « Rapport mensuel » et la carte « Recettes du Mois » du hub (`produitsPeriode` / `chargesPeriode`) comptent encore l'écriture de solde : décembre d'un exercice dont l'étape 2 est passée affiche un chiffre d'affaires NÉGATIF (ventes de décembre − ventes de l'année). Relevé, non corrigé (hors du périmètre d'EX8). À corriger comme le Compte de résultat ?
+- **EX-Q15** ✅ clos 21/10/2026 — le client les considère terminées : le comportement actuel est retenu, sans changement : au poste, l'onglet « Flux de Trésorerie » et les « Notes Annexes » des États financiers restent sur le web (la décision Q5 ne vise que le Bilan et le Compte de résultat ; les Notes lisent le registre des immobilisations, qui ne descend pas). Les porter aussi ?
 
 ### Lot 2 — avant la clôture de 2026 (mars 2027)
 | EX7 | Sélecteur d'exercice global web + poste, listes paginées dans l'exercice choisi, lecture seule (EF8–EF10) | ✅ 20/10/2026 (+ EX-Q5 : date d'une dépense comptabilisée grisée ; voir README_SPRINT0) |
@@ -369,3 +369,113 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 ### Lot 3 — avec la clôture de 2026
 | EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
+
+---
+
+## Sprint BS — Bandes & Sujets au poste, avec toutes les actions (demande du client du 21/10/2026)
+
+> Demande : « dans le poste on doit avoir la possibilité de créer Bandes & Sujets avec CRUD, toutes les actions ».
+
+**Constat (lu dans le code, pas supposé).**
+- **Le poste n'a AUCUN écran « Bandes & Sujets » ni « Enregistrer des Sujets »** : la carte « Bandes & Sujets » de Gestion Élevage renvoie vers le web (`GestionElevageScreen.messageBandesWeb`), et `gestion-bandes.html` / `enregistrer-sujets.html` sont dans la liste de l'animalier mais sans `EcranPoste`. Ce n'est donc pas « une lecture seule » : les deux écrans sont à porter en entier, lecture comprise, avec leurs actions.
+- **Web, bandes** (`GestionBandes`) : Créer (`saveLot`), Lire (liste, tiroir), Modifier (`updateLot` : stade, effectif actuel, statut), Archiver (`archiveLot`, `is_active = false`, confirmation `x-modal-confirm-delete`), droit `manage-elevage` partout, audit `livestock_lot.*`. Pas d'exercice jugé, pas de règle sur l'effectif à l'archivage (le web archive toute bande), restauration seulement par la Corbeille (Administration), absente du poste.
+- **Web, sujets** (`EnregistrerSujets`) : seul « Nouveau Sujet » existe. Le docblock retire volontairement Modifier / Archiver (« romprait la cascade ») : c'était avant A1 ; la cascade unique `recalculerEnCascade()` rend maintenant la correction sûre. `newEntry` n'appelle pas `authorize`, l'exercice clos n'est pas jugé (la fiche écrite l'est pourtant à la saisie des fiches, Q3).
+- **Serveur** : `livestock_lots` est un référentiel en tirage seul (aucun envoi accepté, aucune table de droit) ; les entrées de sujets sont des colonnes `achat` / `ne` / `don` de `livestock_daily_entries`, déjà acceptées à l'envoi (dernier écrivain gagne, cascade).
+- **Poste** : `livestock_lots` n'a ni `sync_status` ni `device_id` ; son absorbeur écrase tout. Les entrées de sujets passent par `FicheJournaliereRepository`.
+
+### BS1 ✅ (21/10/2026) Bandes — créer, modifier, archiver au poste (web d'abord)
+
+**Objectif :** « Bandes & Sujets » au poste, à l'identique du Blade (KPI, filtres, tableau, tiroir, modales Nouvelle Bande / Modifier la Bande, confirmation d'archivage, toasts), saisies hors ligne en file, rejouées au serveur par le même point de passage que le web.
+**Décisions client requises :** aucune pour coder (les huit questions BS-Q1 à BS-Q8 ci-dessous se tranchent après). Le poste reprend le web tel qu'il est, défauts compris.
+
+**Web (agrierp_laravel)**
+- `app/Actions/SaisieBandeAction.php` (nouveau) : point de passage UNIQUE de création, modification et archivage d'une bande — pour `GestionBandes` et `SyncController::pushLots`. Mêmes règles, mêmes messages.
+- Règle nouvelle, web d'abord : une bande dont la date de création tombe dans un exercice CLOS est refusée (`AccountingEntryService::refusExerciceClos`, motif R4, sous « Date de Création » — l'erreur est ajoutée au Blade).
+- `GestionBandes` : appelle l'Action ; `newLot` / `saveLot` / `editLot` / `updateLot` / `archiveLot` inchangés pour l'utilisateur. Archiver une bande déjà archivée n'a aucun effet.
+
+**Poste (agrierp_flutter)**
+- Drift v49 : `livestock_lots.sync_status` (défaut `synced`), `device_id` (nul), `effectif_corrige` (nul : correction manuelle d'effectif à envoyer) ; palier de migration + `migration_toutes_versions_test`.
+- `BandesRepository` (nouveau) : liste, KPI, tiroir, `creer` / `modifier` / `archiver`, refus avant écriture avec les motifs du web, UUID au poste, `pending`, constitution par `TransfertsRepository.creer` (bande d'origine).
+- `GestionBandesScreen` (nouveau) ; `EcranPoste.gestionBandes`, carte du hub rendue active, titre, droits (`manage-elevage`), `@lectureSeule`.
+- Absorbeur `_absorberBandes` STRICT : une bande `pending` / `conflict` n'est jamais écrasée.
+
+**Synchronisation :** `livestock_lots` devient une table MIXTE (tirée ET saisie). Envoi : `pushLots` (droit `manage-elevage`, refus motivés, idempotent, une bande archivée n'est plus modifiable, l'effectif n'est écrit que sur correction explicite `effectif_corrige`). Avant les fiches et les transferts du même envoi.
+
+**Tests (écrits AVANT, rouges d'abord) :**
+- Laravel : `BandesSujetsPosteTest` (création, modification, archivage, droits, rejets motivés, idempotence, exercice clos, bande archivée) ; `BandesSaisieActionTest` (le web passe par la même Action).
+- Flutter : `bandes_poste_crud_test.dart` (repository, écran, file de sync, absorbeur), `bandes_blade_test.dart` (libellés lus dans le Blade).
+- Épreuve de mutation : retirer le refus d'exercice, l'archivage logique, la protection `pending` de l'absorbeur, le droit.
+
+### BS2 ✅ (21/10/2026) Sujets — nouveau, modifier, archiver (web d'abord, puis poste)
+
+**Objectif :** « Enregistrer des Sujets » au poste avec toutes ses actions ; le web gagne d'abord Modifier et Archiver.
+**Décision de modélisation (à confirmer, BS-Q2) :** une ligne du journal = une origine d'une fiche du jour (Naissance → `ne`, Achat → `achat`, Don → `don`). Modifier = changer la quantité (et/ou l'origine, la date) ; Archiver = retirer l'entrée (colonne remise à 0, la ligne quitte le journal, trace à l'audit). Dans les deux cas : cascade unique, et refus si un effectif deviendrait négatif un jour suivant.
+
+**Web**
+- `app/Actions/SaisieSujetAction.php` (nouveau) : `ajouter` (le code de `saveEntry`, déplacé), `modifier`, `archiver` ; exercice clos refusé (Q3) ; effectif négatif refusé.
+- `EnregistrerSujets` : modale « Modifier le Sujet », confirmation d'archivage, colonne Actions (`manage-elevage` / `archive-elevage`), `authorize` aussi sur `newEntry`, une ligne par origine, audit `livestock_entry.updated` / `.archived`.
+
+**Poste**
+- `SujetsEntreesRepository` (nouveau, sur `FicheJournaliereRepository` : une seule écriture de fiche) ; `EnregistrerSujetsScreen` (nouveau) ; `EcranPoste.enregistrerSujets`.
+
+**Synchronisation :** aucune table nouvelle : les fiches partent par `livestock_daily_entries` (déjà accepté, cascade du serveur). Tests de bout en bout : création, modification et archivage d'une entrée envoyés par le poste.
+
+**Tests :** `BandesSujetsPosteTest` (volet sujets), `EnregistrerSujetsActionsTest` (web), `sujets_poste_crud_test.dart`, `sujets_blade_test.dart`, essai multipostes étendu.
+
+**Hors périmètre / risques (BS1 + BS2) :**
+- Registre des Reproducteurs (`Animal`, fiche sujet nominative) : le web le crée / modifie / sort, le poste le lit seulement ; non traité ici (BS-Q1).
+- Restauration d'une bande : web = Corbeille uniquement ; non portée.
+- Le prototype HTML est absent (A8) : les garde-fous lisent le Blade.
+
+**Questions au client (non tranchées) :**
+- **BS-Q1** ✅ *tranché 21/10/2026* : « Sujets » inclut le registre nominatif des reproducteurs (`Animal`) : porté en écriture au poste (ticket BS3 ci-dessous).
+- **BS-Q2** : « Archiver un sujet » = retirer l'entrée du journal (quantité remise à 0, tracé à l'audit) : confirmé ? Sinon, quelle trace garder ?
+- **BS-Q3** ✅ *tranché 21/10/2026* : une bande qui a un effectif vivant (> 0) ne s'archive pas (« Cette bande compte encore N sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants. ») ; une bande à effectif 0 s'archive. Web (`SaisieBandeAction` + `GestionBandes`), poste et envoi du poste (rejet motivé, `conflict`). Le vidage reste possible : fiche (mort, vente, don), transfert, correction d'effectif d'une bande sans fiche.
+- **BS-Q4** ✅ *tranché 21/10/2026* : « Effectif Actuel » de « Modifier la Bande » n'est plus modifiable dès que la bande a des fiches (champ grisé, info-bulle explicative, refus du serveur aussi) ; la correction passe par la fiche (cascade unique). Une bande sans fiche garde l'édition libre.
+- **BS-Q5** : l'archivage d'une bande utilise `manage-elevage` au web (le droit `archive-elevage` existe mais n'est lu nulle part). Passer à `archive-elevage` ?
+- **BS-Q6** ✅ *tranché 21/10/2026* : une bande datée dans un exercice clos est refusée (déjà livré en BS1) ; tests de non-régression au web, à l'envoi et au poste.
+- **BS-Q7** ✅ *tranché 21/10/2026* : restauration d'une bande archivée au poste. Web d'abord : filtre « Bandes archivées » et bouton « Restaurer » (`manage-elevage`, audit `livestock_lot.restored`, refusée si une autre bande en cours porte le même code) dans « Bandes & Sujets » ; puis poste (Drift v50) et envoi (`restauree`, geste explicite).
+- **BS-Q8** : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé « La valeur du champ code est déjà utilisée » et reste en conflit à corriger. Suffisant ?
+
+**Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?
+
+## Sprint ENV — Enveloppe du poste Windows (demandes du client du 21/10/2026)
+
+### ENV1 ✅ (21/10/2026) Nom de l'administrateur, icône, recherche globale, image de connexion, barre des tâches
+
+1. **Compte administrateur** : le seeder web avait DÉJÀ « M. Olouchègoun » (`DemoUsersSeeder`, identifiant `admin`) ; il restait l'ancien nom de démonstration au poste (repli du socle, tableau de bord, jeux d'essai) — remplacé ; test web `AdministrateurPrincipalNomTest` (nom, rôle, mot de passe, connexion par `admin`, base existante renommée sans toucher au mot de passe). Garde-fou poste `nom_admin_principal_test.dart`.
+2. **Icône** : `app_icon.ico` multi-tailles généré depuis le logo (`outils/generer_icone.py`), installateur (raccourcis, désinstallation), icônes de fenêtre ; test `icone_application_test.dart`.
+3. **Recherche globale** : 32 px → 44 px, la hauteur du web (elle sort des classes : pastille + base `@tailwindcss/forms` de l'input) ; sous `md`, icône seule comme le web. **Question ENV-Q1** ✅ tranché 21/10/2026 (OUI : la boîte grise de la recherche est gardée, comme au web) : le web dessine une boîte grise carrée DANS la pastille ronde (l'input n'a ni `border-0` ni `p-0`) ; reprise telle quelle. Si elle déplaît, la corriger d'abord au web.
+4. **Image de connexion** : `image_login.png` copiée du web (`public/assets/images/`), déclarée, voile du Blade, panneau de repli si le fichier manque.
+5. **Barre des tâches** : la fenêtre occupe la zone de travail ; boutons Agrandir/Restaurer, glisser et double-clic ajoutés (ils n'existaient pas, malgré la consigne). **ENV-Q2** : taille minimale de fenêtre retenue 640×480 — à confirmer.
+
+**NON vérifié** : tout le comportement Windows (voir `agrierp_laravel/README_SPRINT0.md`, ENV1).
+
+### BS3 ✅ (21/10/2026) Registre nominatif des reproducteurs au poste (BS-Q1 tranché)
+
+**Objectif :** « Sujets » inclut le registre nominatif (`Animal`, `RegistreReproducteurs`, `AnimalDetails`) : le poste l'ÉCRIT (enregistrer, modifier, sortir), à l'identique du web.
+**Vérifié d'abord au web :** Créer, Modifier et Sortir existent déjà (`manage-elevage`, audit, aucune cascade d'effectif : identifier n'est pas faire entrer) ; construit au web : point de passage `SaisieReproducteurAction`, bouton « Registre des Reproducteurs » dans « Bandes & Sujets » (l'écran n'était relié à rien), seconde sortie refusée.
+**Poste / serveur :** `animals` table mixte (`pushAnimals`), Drift v51, `ReproducteursRepository`, `RegistreReproducteursScreen`, absorbeur strict qui protège `pending` / `conflict`. Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 ».
+**Questions au client — ✅ tranché 21/10/2026 (OUI aux trois), livré web puis poste (voir `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 sur le registre des reproducteurs ») :** **BS-Q11** ✅ tranché 21/10/2026 — « Reforme » sans accent au registre : désormais « Réformé », « Vendu », « Mort » (correspondance unique `Animal::LIBELLES_STATUT`, valeur technique inchangée) · **BS-Q12** ✅ tranché 21/10/2026 — espèces du registre : un seul critère, les modules actifs (`LivestockSpecies::enabled()`, celui du tirage), web et poste · **BS-Q13** ✅ tranché 21/10/2026 — l'identifiant d'un sujet enregistré ne change plus (champ grisé, refus serveur y compris à l'envoi du poste).
+
+## Sprint MP — Mise en page du poste (demandes du client)
+
+| Ticket | Contenu | État |
+|---|---|---|
+| MP1 | Libellés et champs « Date » et « Mois » : marges, espacements, alignements et proportions repris des classes Tailwind du Blade ; un champ partagé par gabarit (`lib/core/widgets/champs_date_agri.dart`, constantes `AgriChamps`) ; 20 écarts corrigés sur 20 écrans (`docs/AUDIT_FIDELITE_ECRANS.md` § 9) ; mesures à 640 / 1024 / 1440 px et garde-fou qui lit les classes du Blade | ✅ 21/10/2026 (`README_SPRINT0.md` ; rendu réel Windows / navigateur NON vérifié) |
+| MP2 | Mêmes contrôles pour les libellés et champs VOISINS d'une date dans les modales (texte, liste, nombre : `h-11 px-md text-sm`, libellés `text-[10px] uppercase`), `labelText` flottant de Transferts, « Compte : » du Grand Livre ; construire les champs Date que le poste n'a pas (Historique des ventes, Liste d'Achats, Bilan…) relève de tickets de fonctionnalité | 🔧 proposé |
+| MP1-Q1 | ✅ *tranché 21/10/2026* : `flex-wrap` ajouté à la barre « Bande / Date / Mois » du Blade de la fiche Reproducteurs (retouche web) ; l'écart disparaît, garde-fou `champs_date_mise_en_page_test.dart` et `docs/AUDIT_FIDELITE_ECRANS.md` § 9 mis à jour | ✅ 21/10/2026 |
+
+| MP1-Q1 | ❓ Fiche Reproducteurs : le Blade ne replie pas sa barre « Bande / Date / Mois » (`flex items-center gap-xs` sans `flex-wrap`). Le poste la replie. Ajouter `flex-wrap` au Blade (retouche web) ou garder l'écart ? | ❓ client |
+
+## Sprint MAIL — Domaine des adresses e-mail (décision du client du 21/10/2026)
+
+### MAIL1 ✅ (21/10/2026) Anciennes adresses `@olouwachegoun.bj` converties en `@fermeolouwachegoun.com`, au web et au poste
+
+**Décision (impérative) :** tous les e-mails en `@olouwachegoun.bj` deviennent `@fermeolouwachegoun.com`, AUSSI ceux déjà enregistrés, au web comme au poste, placeholders compris. Le code, les seeders, les tests et les écrans l'étaient depuis le commit `1505a53` ; ce ticket convertit les DONNÉES.
+
+**Web :** migration `2026_10_21_000001_migrer_les_adresses_email_du_domaine` (parcours générique du schéma ; colonnes dont le nom évoque une adresse, `company_settings`, titre et message des notifications ; secrets écartés par leur nom et jamais lus ; `audit_logs` et `journal_synchronisation` exclus, l'historique ne se réécrit pas ; `users.email` unique respecté, un conflit est journalisé et la ligne reste ; compte `admin` : `dg@` devient `contact@fermeolouwachegoun.com` ; `updated_at` rafraîchi sur les seules lignes changées pour que les postes les reprennent). Test `MigrationAdressesEmailTest`.
+**Poste :** palier Drift v50 (`_convertirAdressesEmail`, SQL, insensible à la casse) sur `customers`, `suppliers`, `company_settings`, `utilisateurs`, `notifications` (titre, message) et `app_settings` ; `sync_status` et `updated_at` intacts ; aucune table changée (`app_database.g.dart` inchangé). L'e-mail de la session mise en cache au coffre est converti à la lecture (`convertirDomaineEmail`). Test `migration_emails_poste_test.dart`.
+
+**Non vérifié :** migration sur une base réelle peuplée (MySQL/MariaDB de production) ; poste Windows réel (mise à jour d'une base locale existante).
+**Laissé tel quel, à confirmer :** le nom de serveur SMTP `smtp.olouwachegoun.bj` éventuellement saisi (pas une adresse : à corriger à la main dans Paramètres → Email (SMTP) si le serveur a changé) ; `support@faguez-sarl.bj` (adresse de l'éditeur, autre organisation) ; les adresses fictives des tests (`@ferme.bj`, `@resto.bj`).

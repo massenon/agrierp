@@ -567,7 +567,7 @@ class DemoElevageSeeder extends Seeder
      */
     private function creerTransformations(): void
     {
-        $operateur = \App\Models\User::where('email', 'elevage@olouwachegoun.bj')->value('id')
+        $operateur = \App\Models\User::where('email', 'elevage@fermeolouwachegoun.com')->value('id')
             ?? \App\Models\User::value('id');
 
         $lots = LivestockLot::whereHas('species', fn ($q) => $q->where('code', 'aviculture'))

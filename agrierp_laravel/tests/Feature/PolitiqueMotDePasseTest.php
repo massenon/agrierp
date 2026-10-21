@@ -37,7 +37,7 @@ class PolitiqueMotDePasseTest extends TestCase
 
         $u = User::create([
             'name' => 'Directeur', 'username' => 'admin',
-            'email' => 'dg@olouwachegoun.bj',
+            'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole('admin');
@@ -55,7 +55,7 @@ class PolitiqueMotDePasseTest extends TestCase
             ->test(\App\Livewire\Parametres\GestionUtilisateurs::class)
             ->set('name', 'Nouvel Agent')
             ->set('username', 'agent')
-            ->set('email', 'agent@olouwachegoun.bj')
+            ->set('email', 'agent@fermeolouwachegoun.com')
             ->set('password', '12345678')
             ->call('saveUser')
             ->assertHasErrors('password');
@@ -71,7 +71,7 @@ class PolitiqueMotDePasseTest extends TestCase
             ->test(\App\Livewire\Parametres\GestionUtilisateurs::class)
             ->set('name', 'Nouvel Agent')
             ->set('username', 'agent')
-            ->set('email', 'agent@olouwachegoun.bj')
+            ->set('email', 'agent@fermeolouwachegoun.com')
             ->set('password', 'motdepasse')
             ->call('saveUser')
             ->assertHasErrors('password');
@@ -88,7 +88,7 @@ class PolitiqueMotDePasseTest extends TestCase
             ->test(\App\Livewire\Parametres\GestionUtilisateurs::class)
             ->set('name', 'Nouvel Agent')
             ->set('username', 'agent')
-            ->set('email', 'agent@olouwachegoun.bj')
+            ->set('email', 'agent@fermeolouwachegoun.com')
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')
             ->assertHasNoErrors('password');
@@ -103,7 +103,7 @@ class PolitiqueMotDePasseTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => 'Caissier', 'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 

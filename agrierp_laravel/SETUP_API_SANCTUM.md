@@ -120,7 +120,7 @@ Puis, dans un autre terminal (ou Postman/Insomnia) :
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"dg@olouwachegoun.bj","password":"AgriERP@2026","device_name":"test-curl"}'
+  -d '{"email":"dg@fermeolouwachegoun.com","password":"AgriERP@2026","device_name":"test-curl"}'
 ```
 
 Réponse attendue : un JSON avec `token` (chaîne longue commençant par un
@@ -132,7 +132,7 @@ curl http://127.0.0.1:8000/api/auth/me \
   -H "Authorization: Bearer VOTRE_TOKEN_ICI"
 ```
 
-Réponse attendue : les informations de `dg@olouwachegoun.bj`. Si vous
+Réponse attendue : les informations de `dg@fermeolouwachegoun.com`. Si vous
 obtenez une 401, le jeton n'est pas transmis correctement. Si vous
 obtenez une 404 sur `/api/auth/login` lui-même, l'Étape 1
 (`bootstrap/app.php`) n'a pas été faite correctement — c'est la cause la

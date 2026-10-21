@@ -2,12 +2,11 @@
 
 namespace App\Livewire\Elevage;
 
-use App\Actions\RecordSaleOnFicheElevageAction;
-use App\Models\AuditLog;
+use App\Actions\SaisieSujetAction;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -42,17 +41,12 @@ use Livewire\Component;
  * registre de sujets) — cohérent avec ce choix de modélisation déjà acté,
  * pas une omission de ce ticket.
  *
- * ⚠️ ÉCART DÉLIBÉRÉ TROUVÉ PAR L'AUDIT DE FIDÉLITÉ : le prototype affiche
- * "Statut" (badge redondant avec la colonne Origine — "Naissance" répété
- * tel quel) et "Actions" (Modifier/Archiver, `openModal(...)` de
- * démonstration sans logique réelle). Non repris ici, même raisonnement
- * que `GestionStocks` (Journal des Mouvements) : chaque ligne dérive
- * d'une écriture sur `livestock_daily_entries`, dont l'effectif de CHAQUE
- * jour suivant se calcule en cascade à partir du jour précédent (Document
- * 05, formule Effectif Final) — modifier ou archiver une entrée passée
- * romprait cette cascade pour tous les jours suivants de la bande
- * concernée. Retrait volontaire, même discipline que les outils de démo
- * retirés depuis le Sprint 0 — jamais un oubli.
+ * 🔴→✅ TICKET BS2 — MODIFIER ET ARCHIVER. Le prototype affiche « Actions » (Modifier / Archiver) ; ils avaient été
+ * retirés parce qu'une entrée passée « romprait la cascade » des effectifs. Depuis A1 la cascade unique
+ * (`RecordSaleOnFicheElevageAction::recalculerEnCascade`) sait corriger un jour passé : les trois gestes (Nouveau,
+ * Modifier, Archiver) passent par `SaisieSujetAction`, qui la fait jouer. Une ligne du journal est UNE ORIGINE d'une
+ * fiche du jour ; archiver la retire du journal (colonne remise à 0, fiche gardée, trace à l'audit). Droits :
+ * `manage-elevage` (nouveau, modifier) et `archive-elevage` (archiver) ; le poste a les mêmes.
  */
 #[Layout('layouts.app')]
 class EnregistrerSujets extends Component
@@ -64,6 +58,11 @@ class EnregistrerSujets extends Component
     public string $statut = '';
 
     public ?string $editingEntryId = null;
+
+    /** Jour et origine de la ligne en cours de modification (sa clé dans le journal). */
+    public string $editingDate = '';
+
+    public string $editingOrigine = '';
 
     public string $species_id = '';
 
@@ -119,22 +118,42 @@ class EnregistrerSujets extends Component
      * don > 0 (les "entrées" au sens de cet écran) sur les bandes
      * actives — un seul point de vérité (`livestock_daily_entries`),
      * jamais une table dupliquée localement pour ce journal.
+     *
+     * 🔴→✅ BS2 : UNE LIGNE PAR ORIGINE. Une fiche qui porte une naissance ET un achat donnait une seule ligne (la
+     * naissance), l'achat restait invisible et ne pouvait ni se modifier ni s'archiver. Chaque origine > 0 a
+     * maintenant sa ligne, avec ses propres actions.
+     *
+     * @return \Illuminate\Support\Collection<int, object{entry: LivestockDailyEntry, origine: string, quantite: int}>
      */
     public function getEntriesProperty()
     {
-        return LivestockDailyEntry::with('lot.species')
+        $fiches = LivestockDailyEntry::with('lot.species')
             ->where(fn ($q) => $q->where('achat', '>', 0)->orWhere('ne', '>', 0)->orWhere('don', '>', 0))
             ->when($this->search, fn ($q) => $q->whereHas('lot', fn ($q2) => $q2->where('code', 'like', '%'.$this->search.'%')))
             ->when($this->statut === 'Naissance', fn ($q) => $q->where('ne', '>', 0))
             ->when($this->statut === 'Achat', fn ($q) => $q->where('achat', '>', 0))
             ->latest('entry_date')
+            ->orderBy('id')   // ordre stable à date égale (le poste départage de la même façon)
             ->limit(50)
             ->get();
+
+        return $fiches->flatMap(function (LivestockDailyEntry $fiche) {
+            $lignes = collect();
+            foreach (SaisieSujetAction::ORIGINES as $origine => $colonne) {
+                if ((int) $fiche->{$colonne} > 0 && ($this->statut === '' || $this->statut === $origine)) {
+                    $lignes->push((object) ['entry' => $fiche, 'origine' => $origine, 'quantite' => (int) $fiche->{$colonne}]);
+                }
+            }
+
+            return $lignes;
+        })->values();
     }
 
     public function newEntry(): void
     {
-        $this->reset(['editingEntryId', 'species_id', 'lot_id', 'origine']);
+        $this->authorize('manage-elevage');
+
+        $this->reset(['editingEntryId', 'editingDate', 'editingOrigine', 'species_id', 'lot_id', 'origine']);
         $this->quantite = 1;
         $this->entry_date = now()->format('Y-m-d');
         $this->dispatch('open-modal', name: 'modal-create-sujet');
@@ -152,40 +171,108 @@ class EnregistrerSujets extends Component
             'entry_date' => ['required', 'date'],
         ]);
 
-        $field = match ($this->origine) {
-            'Naissance' => 'ne',
-            'Achat' => 'achat',
-            'Don' => 'don',
-        };
+        try {
+            app(SaisieSujetAction::class)->ajouter($this->lot_id, $this->origine, $this->quantite, $this->entry_date);
+        } catch (ValidationException $e) {
+            $this->afficherLeRefus($e);
 
-        $entry = LivestockDailyEntry::firstOrNew([
-            'lot_id' => $this->lot_id,
-            'entry_date' => $this->entry_date,
-        ]);
+            return;
+        }
 
-        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — une NOUVELLE fiche partait de
-        // `current_quantity`, c'est-à-dire de l'effectif d'AUJOURD'HUI : une entrée antidatée
-        // comptait donc aussi les mouvements des jours suivants. La veille réelle de la date
-        // saisie fait foi, que la fiche existe ou non.
-        $previousEffectif = $entry->previousEffectif();
-
-        $entry->$field = ($entry->$field ?? 0) + $this->quantite;
-        // Ticket 15.46 : transferts entre bandes compris.
-        $entry->effectif_final = $entry->effectifFinalDepuis($previousEffectif);
-        // 🔴→✅ CORRECTIF « EFFECTIF TOTAL VIVANT » — `increment()` ajoutait la quantité à la
-        // bande quelle que soit la date, sans recalculer les fiches suivantes : une entrée
-        // antidatée laissait les jours postérieurs (et donc la bande) désaccordés. Cascade
-        // commune à toutes les fiches : jours suivants recalculés, bande = DERNIÈRE fiche.
-        DB::transaction(function () use ($entry) {
-            $entry->save();
-            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($this->lot_id, $this->entry_date);
-        });
-
-        AuditLog::record('livestock_entry.recorded', 'elevage');
         $this->dispatch('close-modal', name: 'modal-create-sujet');
         $this->dispatch('toast', message: 'Enregistrement effectué avec succès.', type: 'success');
         $this->reset(['species_id', 'lot_id', 'origine']);
         $this->quantite = 1;
+    }
+
+    /** Ouvre « Modifier le Sujet » sur la ligne (fiche, origine) du journal. */
+    public function editEntry(string $entryId, string $origine): void
+    {
+        $this->authorize('manage-elevage');
+
+        $fiche = LivestockDailyEntry::with('lot.species')->findOrFail($entryId);
+        $colonne = SaisieSujetAction::ORIGINES[$origine] ?? null;
+        if ($colonne === null || (int) $fiche->{$colonne} <= 0) {
+            $this->dispatch('toast', message: SaisieSujetAction::MESSAGE_INTROUVABLE, type: 'error');
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->editingEntryId = $fiche->id;
+        $this->editingDate = $fiche->entry_date->format('Y-m-d');
+        $this->editingOrigine = $origine;
+        $this->species_id = (string) $fiche->lot->species_id;
+        $this->lot_id = $fiche->lot_id;
+        $this->origine = $origine;
+        $this->quantite = (int) $fiche->{$colonne};
+        $this->entry_date = $this->editingDate;
+        $this->dispatch('open-modal', name: 'modal-edit-sujet');
+    }
+
+    public function updateEntry(): void
+    {
+        $this->authorize('manage-elevage');
+
+        $this->validate([
+            'origine' => ['required', 'in:Naissance,Achat,Don'],
+            'quantite' => ['required', 'integer', 'min:1'],
+            'entry_date' => ['required', 'date'],
+        ]);
+
+        try {
+            app(SaisieSujetAction::class)->modifier($this->lot_id, $this->editingDate, $this->editingOrigine, $this->origine, $this->quantite, $this->entry_date);
+        } catch (ValidationException $e) {
+            $this->afficherLeRefus($e);
+
+            return;
+        }
+
+        $this->dispatch('close-modal', name: 'modal-edit-sujet');
+        $this->dispatch('toast', message: 'Modification enregistrée avec succès.', type: 'success');
+        $this->reset(['editingEntryId', 'editingDate', 'editingOrigine', 'species_id', 'lot_id', 'origine']);
+        $this->quantite = 1;
+    }
+
+    /** Archive la ligne (fiche, origine) : l'entrée quitte le journal, la fiche est gardée. */
+    public function archiveEntry(string $entryId, string $origine): void
+    {
+        $this->authorize('archive-elevage');
+
+        $fiche = LivestockDailyEntry::findOrFail($entryId);
+
+        try {
+            app(SaisieSujetAction::class)->archiver($fiche->lot_id, $fiche->entry_date->format('Y-m-d'), $origine);
+        } catch (ValidationException $e) {
+            // Pas de modale ouverte : le refus se lit aussi en toast.
+            $this->afficherLeRefus($e, true);
+
+            return;
+        }
+
+        $this->dispatch('toast', message: 'Entrée archivée avec succès.', type: 'warning');
+    }
+
+    /**
+     * Le refus de l'Action : la date (exercice clos) et la quantité (effectif négatif) se lisent sous leur champ — dans
+     * la modale ouverte — ; une entrée introuvable est un toast d'erreur.
+     */
+    private function afficherLeRefus(ValidationException $e, bool $enToast = false): void
+    {
+        $erreurs = $e->errors();
+
+        foreach (['entry_date', 'quantite'] as $champ) {
+            if (isset($erreurs[$champ])) {
+                $this->addError($champ, $erreurs[$champ][0]);
+                if ($enToast) {
+                    $this->dispatch('toast', message: $erreurs[$champ][0], type: 'error');
+                }
+
+                return;
+            }
+        }
+
+        $this->dispatch('toast', message: collect($erreurs)->flatten()->first(), type: 'error');
     }
 
     public function render()

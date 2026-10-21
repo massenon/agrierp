@@ -158,7 +158,7 @@ class TauxLettrageClotureTest extends TestCase
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
 
         $user = User::create([
-            'name' => 'DG', 'email' => 'dg@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'name' => 'DG', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

@@ -69,7 +69,7 @@ class VenteDateeCascadeFichesTest extends TestCase
         }
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes', 'manage-ventes']);
         User::create([
-            'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+            'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ])->assignRole('caissier');
 

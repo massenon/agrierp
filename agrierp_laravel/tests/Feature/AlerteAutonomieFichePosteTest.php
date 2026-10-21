@@ -79,7 +79,7 @@ class AlerteAutonomieFichePosteTest extends TestCase
     private function compte(string $role): User
     {
         $u = User::create([
-            'name' => 'Compte '.$role, 'username' => $role.'-u13', 'email' => $role.'-u13@olouwachegoun.bj',
+            'name' => 'Compte '.$role, 'username' => $role.'-u13', 'email' => $role.'-u13@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);

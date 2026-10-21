@@ -60,7 +60,7 @@ class SyncVenteHorsLigneTest extends TestCase
 
         $this->caissier = User::create([
             'name' => 'Caissière POS', 'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $this->caissier->assignRole('caissier');

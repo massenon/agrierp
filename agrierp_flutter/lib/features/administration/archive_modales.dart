@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'administration_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -136,10 +137,6 @@ class _ModaleArchiveState extends State<_ModaleArchive> {
     ),
   );
 
-  static String _jour(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
-
   Future<DateTime?> _choisir(DateTime? depart) => showDatePicker(
     context: context,
     initialDate: depart ?? HeureBenin.maintenant(),
@@ -203,52 +200,42 @@ class _ModaleArchiveState extends State<_ModaleArchive> {
               onChanged: (v) => setState(() => _categorie = v ?? ''),
             ),
           ),
-          _bloc(
-            "Date d'archivage",
-            'dateArchivage',
-            OutlinedButton(
-              key: const Key('archive-date-archivage'),
-              onPressed: () async {
-                final choisie = await _choisir(_dateArchivage);
-                if (choisie != null) setState(() => _dateArchivage = choisie);
-              },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _dateArchivage == null
-                      ? 'jj/mm/aaaa'
-                      : _jour(_dateArchivage!),
-                ),
-              ),
-            ),
-          ),
-          _bloc(
-            "Date d'expiration",
-            'echeance',
-            Row(
+          // `grid grid-cols-2 gap-sm` : « Date d'archivage * » et « Date d'expiration » côte à côte (ticket MP1).
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    key: const Key('archive-echeance'),
-                    onPressed: () async {
+                  child: ChampDateFormulaire(
+                    cle: const Key('archive-date-archivage'),
+                    etiquette: "Date d'archivage *",
+                    valeur: _dateArchivage,
+                    erreur: _erreurs['dateArchivage'],
+                    cleErreur: const Key('archive-erreur-dateArchivage'),
+                    onTap: () async {
+                      final choisie = await _choisir(_dateArchivage);
+                      if (choisie != null) setState(() => _dateArchivage = choisie);
+                    },
+                  ),
+                ),
+                const SizedBox(width: AgriSpacing.sm),
+                Expanded(
+                  child: ChampDateFormulaire(
+                    cle: const Key('archive-echeance'),
+                    etiquette: "Date d'expiration",
+                    valeur: _echeance,
+                    erreur: _erreurs['echeance'],
+                    cleErreur: const Key('archive-erreur-echeance'),
+                    // Ajout du poste : effacer l'échéance (le navigateur le fait au clavier).
+                    cleEffacer: const Key('archive-echeance-effacer'),
+                    surEffacer: _echeance == null ? null : () => setState(() => _echeance = null),
+                    onTap: () async {
                       final choisie = await _choisir(_echeance);
                       if (choisie != null) setState(() => _echeance = choisie);
                     },
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _echeance == null ? 'jj/mm/aaaa' : _jour(_echeance!),
-                      ),
-                    ),
                   ),
                 ),
-                if (_echeance != null)
-                  IconButton(
-                    key: const Key('archive-echeance-effacer'),
-                    tooltip: 'Effacer',
-                    onPressed: () => setState(() => _echeance = null),
-                    icon: const Icon(SymbolesAgri.close, size: 18),
-                  ),
               ],
             ),
           ),

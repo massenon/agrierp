@@ -40,7 +40,7 @@ class SoinsVaccinsAjoutsPosteTest extends TestCase
         }
         $role = Role::findOrCreate('animalier', 'web');
         $role->givePermissionTo(['view-elevage', 'manage-elevage']);
-        $u = User::create(['name' => 'Animalier', 'email' => 'soins.h11@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => 'Animalier', 'email' => 'soins.h11@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $u->assignRole($role);
         $this->actingAs($u);
 

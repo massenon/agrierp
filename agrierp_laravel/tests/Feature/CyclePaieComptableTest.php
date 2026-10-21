@@ -42,7 +42,7 @@ class CyclePaieComptableTest extends TestCase
         $role->givePermissionTo(['view-rh', 'manage-rh']);
 
         $user = User::create([
-            'name' => 'DG', 'email' => 'paie@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'DG', 'email' => 'paie@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

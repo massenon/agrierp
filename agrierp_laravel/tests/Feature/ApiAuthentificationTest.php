@@ -41,7 +41,7 @@ class ApiAuthentificationTest extends TestCase
         $this->comptable = User::create([
             'name' => 'Comptable Ferme École',
             'username' => 'compta',
-            'email' => 'compta@olouwachegoun.bj',
+            'email' => 'compta@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP),
             'is_active' => true,
         ]);
@@ -71,7 +71,7 @@ class ApiAuthentificationTest extends TestCase
     /** ⚠️ L'ADRESSE CONTINUE DE FONCTIONNER : elle n'est pas remplacée. */
     public function test_the_email_still_works(): void
     {
-        $this->connexion(['identifiant' => 'compta@olouwachegoun.bj'])->assertOk();
+        $this->connexion(['identifiant' => 'compta@fermeolouwachegoun.com'])->assertOk();
     }
 
     /**
@@ -81,7 +81,7 @@ class ApiAuthentificationTest extends TestCase
      */
     public function test_the_previous_contract_still_works(): void
     {
-        $this->connexion(['email' => 'compta@olouwachegoun.bj'])->assertOk();
+        $this->connexion(['email' => 'compta@fermeolouwachegoun.com'])->assertOk();
     }
 
     /** Un identifiant absent est refusé par la validation, pas par une erreur 500. */
@@ -172,7 +172,7 @@ class ApiAuthentificationTest extends TestCase
             ->getJson('/api/auth/me')
             ->assertOk()
             ->assertJsonPath('username', 'compta')
-            ->assertJsonPath('email', 'compta@olouwachegoun.bj')
+            ->assertJsonPath('email', 'compta@fermeolouwachegoun.com')
             ->assertJsonPath('role', 'comptable');
     }
 

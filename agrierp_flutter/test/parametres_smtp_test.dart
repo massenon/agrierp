@@ -44,8 +44,8 @@ void main() {
     hote: 'smtp.ferme.bj',
     port: 465,
     securite: SecuriteSmtp.ssl,
-    utilisateur: 'notifications@olouwachegoun.bj',
-    expediteur: 'ne-pas-repondre@olouwachegoun.bj',
+    utilisateur: 'notifications@fermeolouwachegoun.com',
+    expediteur: 'ne-pas-repondre@fermeolouwachegoun.com',
     motDePasse: motDePasse,
   );
 
@@ -82,8 +82,8 @@ void main() {
         'smtp.ferme.bj',
         465,
         SecuriteSmtp.ssl,
-        'notifications@olouwachegoun.bj',
-        'ne-pas-repondre@olouwachegoun.bj',
+        'notifications@fermeolouwachegoun.com',
+        'ne-pas-repondre@fermeolouwachegoun.com',
         true,
       ]);
       expect(coffre.contenu[ParametresSmtp.cleCoffreMotDePasse], secret);
@@ -238,7 +238,7 @@ void main() {
     test('part réellement avec la configuration enregistrée et le mot de passe du coffre', () async {
       await enregistrerComplet();
 
-      expect(await envoi.envoyer('dg@olouwachegoun.bj'), 'E-mail de test envoyé à dg@olouwachegoun.bj.');
+      expect(await envoi.envoyer('dg@fermeolouwachegoun.com'), 'E-mail de test envoyé à dg@fermeolouwachegoun.com.');
 
       expect(envoyes, hasLength(1));
       final (message, serveur) = envoyes.single;
@@ -247,11 +247,11 @@ void main() {
         465,
         true,
         false,
-        'notifications@olouwachegoun.bj',
+        'notifications@fermeolouwachegoun.com',
         secret,
       ]);
-      expect((message.from as Address).mailAddress, 'ne-pas-repondre@olouwachegoun.bj');
-      expect(message.recipients, ['dg@olouwachegoun.bj']);
+      expect((message.from as Address).mailAddress, 'ne-pas-repondre@fermeolouwachegoun.com');
+      expect(message.recipients, ['dg@fermeolouwachegoun.com']);
       expect(message.subject, EnvoiEmailTest.sujet);
     });
 
@@ -268,7 +268,7 @@ void main() {
 
     test('sans hôte enregistré, le test est refusé avec le message du web', () async {
       await expectLater(
-        envoi.envoyer('dg@olouwachegoun.bj'),
+        envoi.envoyer('dg@fermeolouwachegoun.com'),
         throwsA(
           isA<EchecEnvoiEmail>().having(
             (e) => e.message,
@@ -285,7 +285,7 @@ void main() {
       enLigne = false;
 
       await expectLater(
-        envoi.envoyer('dg@olouwachegoun.bj'),
+        envoi.envoyer('dg@fermeolouwachegoun.com'),
         throwsA(isA<EchecEnvoiEmail>().having((e) => e.message, 'message', contains('Poste hors ligne'))),
       );
       expect(envoyes, isEmpty);
@@ -311,7 +311,7 @@ void main() {
       for (final MapEntry(key: erreur, value: attendu) in cas.entries) {
         echec = erreur;
         try {
-          await envoi.envoyer('dg@olouwachegoun.bj');
+          await envoi.envoyer('dg@fermeolouwachegoun.com');
           fail('un échec était attendu');
         } on EchecEnvoiEmail catch (e) {
           expect(e.message, startsWith("Échec de l'envoi — vérifiez la configuration SMTP ("));
@@ -440,12 +440,12 @@ void main() {
       await enregistrerComplet();
       await afficher(tester);
       // Destinataire proposé : l'expéditeur réel, comme au web.
-      expect(champ(tester, 'smtp-destinataire'), 'ne-pas-repondre@olouwachegoun.bj');
+      expect(champ(tester, 'smtp-destinataire'), 'ne-pas-repondre@fermeolouwachegoun.com');
 
-      await tester.enterText(find.byKey(const Key('smtp-destinataire')), 'dg@olouwachegoun.bj');
+      await tester.enterText(find.byKey(const Key('smtp-destinataire')), 'dg@fermeolouwachegoun.com');
       await tester.tap(find.byKey(const Key('smtp-envoyer-test')));
       await tester.pumpAndSettle();
-      expect(find.text('E-mail de test envoyé à dg@olouwachegoun.bj.'), findsOneWidget);
+      expect(find.text('E-mail de test envoyé à dg@fermeolouwachegoun.com.'), findsOneWidget);
       expect(envoyes, hasLength(1));
 
       ToastAgri.toutRetirer();

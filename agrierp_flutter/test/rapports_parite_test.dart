@@ -1060,7 +1060,7 @@ $sortie = [];
 
 // Ticket U13 — le VRAI tirage paginé (S-T4) d'un compte qui lit les rapports : les dépenses et la paie que le poste
 // absorbera, page par page (taille 7 : plusieurs pages).
-$compte = App\Models\User::create(['name' => 'Comptable', 'username' => 'compta-parite', 'email' => 'compta-parite@olouwachegoun.bj', 'password' => 'AgriERP@2026', 'is_active' => true]);
+$compte = App\Models\User::create(['name' => 'Comptable', 'username' => 'compta-parite', 'email' => 'compta-parite@fermeolouwachegoun.com', 'password' => 'AgriERP@2026', 'is_active' => true]);
 $tirage = ['expenses' => [], 'payslips' => []];
 $jeton = null;
 $pagesLues = 0;

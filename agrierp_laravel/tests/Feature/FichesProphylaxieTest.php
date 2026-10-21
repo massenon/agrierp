@@ -51,7 +51,7 @@ class FichesProphylaxieTest extends TestCase
         $animalier = Role::findOrCreate('animalier', 'web');
         $animalier->givePermissionTo(['view-elevage', 'manage-elevage']);
 
-        $this->actingAs($this->utilisateur('animalier.prophylaxie@olouwachegoun.bj', $animalier));
+        $this->actingAs($this->utilisateur('animalier.prophylaxie@fermeolouwachegoun.com', $animalier));
 
         $this->lapins = LivestockSpecies::create(['code' => 'cuniculture', 'label' => 'Lapins', 'is_enabled' => true]);
 
@@ -398,7 +398,7 @@ class FichesProphylaxieTest extends TestCase
         Permission::findOrCreate('view-ventes', 'web');
         $lecteur = Role::findOrCreate('lecteur-elevage', 'web');
         $lecteur->givePermissionTo('view-elevage');
-        $this->actingAs($this->utilisateur('lecteur.prophylaxie@olouwachegoun.bj', $lecteur));
+        $this->actingAs($this->utilisateur('lecteur.prophylaxie@fermeolouwachegoun.com', $lecteur));
 
         Livewire::test(FicheLapins::class)
             ->set('traitementsCoches', [$this->idDe('Anti-coccidien')])

@@ -31,7 +31,7 @@ class SyncObjectifsCroissanceTest extends TestCase
     private function compte(string $role): User
     {
         $u = User::create([
-            'name' => ucfirst($role), 'username' => $role, 'email' => $role.'.u2@olouwachegoun.bj',
+            'name' => ucfirst($role), 'username' => $role, 'email' => $role.'.u2@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);

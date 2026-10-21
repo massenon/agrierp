@@ -569,7 +569,7 @@ use Illuminate\Support\Facades\Artisan;
 use Livewire\Livewire;
 
 Artisan::call('db:seed', ['--class' => Database\Seeders\RolesAndPermissionsSeeder::class, '--force' => true]);
-$comptable = User::create(['name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@olouwachegoun.bj',
+$comptable = User::create(['name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
     'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
 $comptable->assignRole('comptable');
 Illuminate\Support\Facades\Auth::login($comptable);

@@ -33,11 +33,11 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     {
         parent::setUp();
 
-        RateLimiter::clear('compta@olouwachegoun.bj|127.0.0.1');
+        RateLimiter::clear('compta@fermeolouwachegoun.com|127.0.0.1');
         RateLimiter::clear('compta|127.0.0.1');
 
         $this->comptable = User::create([
-            'name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@olouwachegoun.bj',
+            'name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
     }
@@ -53,7 +53,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     /** LE FLUX MANQUANT : un échec laisse désormais une trace. */
     public function test_a_failed_attempt_is_journalled(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', 'mauvais-mot-de-passe');
+        $this->tenter('compta@fermeolouwachegoun.com', 'mauvais-mot-de-passe');
 
         $trace = AuditLog::where('action', 'login.failed')->firstOrFail();
 
@@ -67,7 +67,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
      */
     public function test_the_targeted_account_is_identified(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', 'mauvais-mot-de-passe');
+        $this->tenter('compta@fermeolouwachegoun.com', 'mauvais-mot-de-passe');
 
         $this->assertEquals(
             $this->comptable->id,
@@ -89,7 +89,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     /** ⚠️ LE MOT DE PASSE SAISI N'EST JAMAIS ÉCRIT NULLE PART. */
     public function test_the_submitted_password_is_never_stored(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', 'Secret-Tres-Reconnaissable-123');
+        $this->tenter('compta@fermeolouwachegoun.com', 'Secret-Tres-Reconnaissable-123');
 
         foreach (AuditLog::all() as $trace) {
             $this->assertStringNotContainsString('Secret-Tres-Reconnaissable', $trace->action);
@@ -101,7 +101,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     public function test_the_lockout_itself_is_journalled_once(): void
     {
         for ($i = 0; $i < 7; $i++) {
-            $this->tenter('compta@olouwachegoun.bj', 'mauvais-mot-de-passe');
+            $this->tenter('compta@fermeolouwachegoun.com', 'mauvais-mot-de-passe');
         }
 
         $this->assertEquals(1, AuditLog::where('action', 'login.locked')->count(),
@@ -115,7 +115,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     /** Une connexion réussie ne produit aucun échec. */
     public function test_a_successful_login_produces_no_failure(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', self::MDP);
+        $this->tenter('compta@fermeolouwachegoun.com', self::MDP);
 
         $this->assertEquals(0, AuditLog::where('action', 'login.failed')->count());
         $this->assertEquals(1, AuditLog::where('action', 'login')->count());
@@ -124,8 +124,8 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     /** Le KPI de l'écran Audit Logs compte réellement, et seulement les échecs. */
     public function test_the_kpi_counts_the_failures_of_the_last_24h(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', 'faux-1');
-        $this->tenter('compta@olouwachegoun.bj', 'faux-2');
+        $this->tenter('compta@fermeolouwachegoun.com', 'faux-1');
+        $this->tenter('compta@fermeolouwachegoun.com', 'faux-2');
 
         // Un échec d'avant-hier ne doit pas entrer dans la fenêtre de 24 h.
         AuditLog::where('action', 'login.failed')->first()
@@ -182,7 +182,7 @@ class TracabiliteConnexionsEchoueesTest extends TestCase
     /** Le libellé français existe : jamais une clé technique affichée brute. */
     public function test_the_french_label_exists(): void
     {
-        $this->tenter('compta@olouwachegoun.bj', 'faux');
+        $this->tenter('compta@fermeolouwachegoun.com', 'faux');
 
         $this->assertEquals(
             'Tentative de connexion échouée',

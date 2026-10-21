@@ -38,7 +38,7 @@ class TransfertsEntreBandesTest extends TestCase
         Carbon::setTestNow('2026-10-14 12:00:00');
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->animalier = User::create([
-            'name' => 'Animalier', 'username' => 'animalier', 'email' => 'animalier@olouwachegoun.bj',
+            'name' => 'Animalier', 'username' => 'animalier', 'email' => 'animalier@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->animalier->assignRole('animalier');

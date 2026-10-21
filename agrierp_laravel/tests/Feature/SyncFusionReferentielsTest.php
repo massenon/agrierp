@@ -58,7 +58,7 @@ class SyncFusionReferentielsTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $this->admin = User::create([
-            'name' => 'Admin', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Admin', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');

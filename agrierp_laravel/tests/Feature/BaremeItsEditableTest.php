@@ -49,12 +49,12 @@ class BaremeItsEditableTest extends TestCase
         $roleAdmin->givePermissionTo(['view-parametres', 'view-rh', 'manage-rh']);
 
         $this->comptable = User::create([
-            'name' => 'Christine KOUTON', 'email' => 'bareme-compta@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Christine KOUTON', 'email' => 'bareme-compta@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $this->comptable->assignRole($roleComptable);
 
         $this->admin = User::create([
-            'name' => 'Directeur Général', 'email' => 'bareme-dg@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Directeur Général', 'email' => 'bareme-dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $this->admin->assignRole($roleAdmin);
 

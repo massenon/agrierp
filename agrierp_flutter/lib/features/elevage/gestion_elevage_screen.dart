@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
-import '../../core/widgets/toast_agri.dart';
 import 'gestion_elevage_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// Une carte de navigation du hub (`components/nav-card.blade.php`) : icône, titre, description, écran ouvert.
-///
-/// [ecran] `null` : la cible du web n'existe pas au poste (« Bandes & Sujets »).
 typedef CarteHub = (IconData icone, String titre, String description, EcranPoste? ecran);
 
 /// Ticket H4 — « Gestion Élevage », aligné sur le Blade (maître).
@@ -36,17 +33,13 @@ class GestionElevageScreen extends StatefulWidget {
 
   final GestionElevageRepository depot;
 
-  /// « Bandes & Sujets » (`/gestion-bandes`) n'a pas d'écran au poste : la carte reste, son clic le dit.
-  static const messageBandesWeb =
-      "La gestion des bandes (création, numérotation individuelle) se fait sur l'application web.";
-
   /// Description de la carte Escargots grisée — branche `@else` du Blade.
   static const descriptionEscargotsDesactive = 'Héliciculture — module désactivé';
 
   /// « Registres par Espèce », dans l'ordre du Blade. La description de « Bandes & Sujets » est précédée du nombre de
   /// bandes actives (`$this->bandesActives.' bande(s) …'`).
   static const registres = <CarteHub>[
-    (SymbolesAgri.layers, 'Bandes & Sujets', ' bande(s) active(s) — création, numérotation individuelle', null),
+    (SymbolesAgri.layers, 'Bandes & Sujets', ' bande(s) active(s) — création, numérotation individuelle', EcranPoste.gestionBandes),
     (SymbolesAgri.cruelty_free, 'Fiches Lapins', 'Suivi mensuel du cheptel — Cuniculture', EcranPoste.ficheElevage),
     (SymbolesAgri.egg, 'Fiches Pondeuses', "Suivi quotidien de la ponte et récolte d'œufs", EcranPoste.fichePondeuses),
     (SymbolesAgri.pets, 'Fiches Volailles', 'Reproducteurs, poussins, Goliath/Chair', EcranPoste.ficheReproducteurs),
@@ -125,13 +118,9 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
               ecart: AgriSpacing.md,
               enfants: [
                 for (final carte in GestionElevageScreen.registres)
-                  if (carte.$4 == null)
-                    _carte(
-                      carte,
-                      cle: 'carte-bandes-sujets',
-                      description: '${k.bandesActives}${carte.$3}',
-                      onTap: _bandesSurLeWeb,
-                    )
+                  if (carte.$4 == EcranPoste.gestionBandes)
+                    // Ticket BS1 : « Bandes & Sujets » a son écran au poste (création, modification, archivage).
+                    _carte(carte, cle: 'carte-bandes-sujets', description: '${k.bandesActives}${carte.$3}')
                   else if (carte.$4 == EcranPoste.ficheEscargots && !k.helicoActif)
                     _carte(
                       carte,
@@ -259,12 +248,6 @@ class _GestionElevageScreenState extends State<GestionElevageScreen> {
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rangees);
   }
-
-  void _bandesSurLeWeb() => ToastAgri.afficher(
-    context,
-    GestionElevageScreen.messageBandesWeb,
-    type: TypeToast.avertissement,
-  );
 
   /// `components/nav-card.blade.php` — et sa variante grisée (Escargots, module désactivé) : fond d'icône
   /// `bg-outline-variant/20`, icône `text-outline`, le lien restant actif.

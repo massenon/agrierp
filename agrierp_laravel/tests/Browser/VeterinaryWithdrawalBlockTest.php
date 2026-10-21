@@ -34,7 +34,7 @@ class VeterinaryWithdrawalBlockTest extends DuskTestCase
     public function test_sale_is_blocked_for_lot_under_active_withdrawal_period(): void
     {
         $this->seed();
-        $cashier = User::where('email', 'caisse@olouwachegoun.bj')->firstOrFail();
+        $cashier = User::where('email', 'caisse@fermeolouwachegoun.com')->firstOrFail();
 
         $species = LivestockSpecies::where('code', 'aviculture')->firstOrFail();
         $product = Product::where('species_id', $species->id)->where('is_active', true)->firstOrFail();

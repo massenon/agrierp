@@ -69,7 +69,7 @@ class VentesDateEffectiveTest extends TestCase
         }
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
-        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
         $user->assignRole($role);
         $this->actingAs($user);
 

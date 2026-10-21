@@ -140,6 +140,13 @@ class AgriTypography {
 
   static const double sm = 14;
 
+  /// Interligne de `text-sm` (`1.25rem`) : 20 px.
+  static const double smInterligne = 20;
+
+  /// Interligne hérité du corps par Tailwind (préflight : `line-height: 1.5`), celui d'un texte à taille arbitraire
+  /// comme `text-[10px]`, qui ne fixe aucun interligne.
+  static const double interligneCorps = 1.5;
+
   /// Libellé d'un lien de la barre latérale : `text-[13px]` EXPLICITE de `components/sidebar-link.blade.php`
   /// (ticket H1). Ce n'est pas un `text-xs` mal mesuré : le web l'écrit en pixels.
   static const double lienBarreLaterale = 13;
@@ -211,4 +218,91 @@ class AgriShadows {
       spreadRadius: -6,
     ),
   ];
+}
+
+/// Champs **Date** et **Mois** : gabarits des champs et de leurs libellés, lus dans les classes Tailwind du Blade
+/// (ticket MP1, `docs/AUDIT_FIDELITE_ECRANS.md` § « Date et Mois — mise en page »).
+///
+/// ⚠️ Les nombres de Tailwind qui ne sont PAS dans l'échelle `xs…2xl` du projet gardent leur valeur d'origine
+/// (`h-9` = 36 px, `py-1.5` = 6 px…) : `tailwind.config.js` ÉTEND l'échelle d'espacement, il ne la remplace pas. Le
+/// garde-fou `test/champs_date_blade_test.dart` relit les classes du Blade et compare chaque constante à sa valeur.
+class AgriChamps {
+  const AgriChamps._();
+
+  /// `h-9` : sélecteurs de l'en-tête des fiches journalières (Bande, Date, Mois).
+  static const double hauteurCompacte = 36;
+
+  /// `h-10` : champ « Date de la vente » du panier de la caisse.
+  static const double hauteurCaisse = 40;
+
+  /// `h-11` : champ de formulaire (modales, « Nouvelle Dépense »).
+  static const double hauteurFormulaire = 44;
+
+  /// `w-8` : chaque flèche « ‹ » / « › » du sélecteur de Mois.
+  static const double largeurFleche = 32;
+
+  /// `text-[18px]` des flèches du sélecteur de Mois.
+  static const double iconeFleche = 18;
+
+  /// `text-[18px]` de l'icône `calendar_month` qui précède une période.
+  static const double iconePeriode = 18;
+
+  /// Indicateur de calendrier que le navigateur dessine à droite d'un `<input type="date">`.
+  static const double iconeCalendrier = 16;
+
+  /// `text-[10px]` du libellé au-dessus d'un champ de formulaire.
+  static const double etiquetteFormulaire = 10;
+
+  /// `py-1.5` : champ de période compact (Tableau de bord, Historique des ventes).
+  static const double margeVerticaleCompacte = 6;
+
+  /// `p-1` : champ sans bordure du Grand Livre.
+  static const double margeSansBordure = 4;
+
+  /// `py-1` du conteneur gris du Grand Livre.
+  static const double margeVerticaleConteneur = 4;
+
+  /// `sm:w-56` : liste « Choisir un état / rapport » du Tableau de bord, à côté de la période.
+  static const double largeurChoixEtat = 224;
+
+  /// `border` : épaisseur d'un trait de champ.
+  static const double bordure = 1;
+
+  // ---- Recherche globale du topbar (`livewire/shared/global-search.blade.php`) — ticket ENV1 ----
+
+  /// `w-64` : largeur de la pastille de recherche globale (16 rem).
+  static const double largeurRechercheGlobale = 256;
+
+  /// Hauteur de la pastille du web : 44 px. ⚠️ Elle n'est écrite nulle part dans le Blade, elle SORT des classes :
+  /// `border` 1 + `py-xs` 4 + [champ : trait 1 + `.5rem` + interligne `text-xs` 16 + `.5rem` + trait 1] + `py-xs` 4 +
+  /// `border` 1. Ce jeton ne sert QU'À la comparer au rendu (le widget ne la lit pas : il la fait sortir des mêmes
+  /// termes, comme le navigateur).
+  static const double hauteurRechercheGlobale = 44;
+
+  /// Base de `@tailwindcss/forms` sur un `<input type=text>` auquel le Blade ne met ni `border-0` ni `p-0` :
+  /// `padding: .5rem .75rem` (12 px de côté, 8 px dessus/dessous).
+  static const double rembourrageHorizontalChampBrut = 12;
+  static const double rembourrageVerticalChampBrut = 8;
+
+  /// Trait de ce même champ : `border-color: #6b7280` (gris 500 de Tailwind, posé par `@tailwindcss/forms`) ; il
+  /// devient `info-blue` au focus (`--tw-ring-color: #2563eb`). Hors des 14 couleurs du design system : c'est le
+  /// défaut d'un greffon, pas une couleur de la charte.
+  static const Color bordureChampBrut = Color(0xFF6B7280);
+
+  /// `ring-2` : anneau de focus de la pastille (`focus-within:ring-2 focus-within:ring-brand-emerald`).
+  static const double anneauFocus = 2;
+
+  /// `text-[16px]` de l'icône `search` de la pastille, `text-[14px]` du bouton `close`, et `search` 24 px
+  /// (taille par défaut de Material Symbols) du bouton qui remplace la pastille sous `md`.
+  static const double iconeRecherche = 16;
+  static const double iconeEffacerRecherche = 14;
+  static const double iconeRechercheMobile = 24;
+
+  /// `.invalid-feedback` de `resources/css/app.css` : 11 px, `margin-top: 2px`.
+  static const double erreurTaille = 11;
+  static const double erreurMarge = 2;
+
+  /// Hauteur d'un champ de filtre : interligne + marges verticales + deux traits.
+  static double hauteurFiltre({required double margeVerticale}) =>
+      AgriTypography.xsInterligne + 2 * margeVerticale + 2 * bordure;
 }

@@ -49,7 +49,7 @@ class BilanTechnicoEconomiqueRevenusTest extends TestCase
         $role->givePermissionTo(['view-elevage', 'manage-elevage']);
 
         $user = User::create([
-            'name' => 'Animalier', 'email' => 'elevage@olouwachegoun.bj',
+            'name' => 'Animalier', 'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);

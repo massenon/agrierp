@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/permissions_poste.dart' show EcranPoste;
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart' show AppDatabase, FiscalYear;
 import '../../core/widgets/bandeau_exercice.dart';
@@ -7,8 +8,9 @@ import '../../core/widgets/bandeau_exercice.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/champs_date_agri.dart';
+import '../../core/widgets/navigation_poste.dart';
 import '../../core/widgets/toast_agri.dart';
-import 'gestion_elevage_screen.dart' show GestionElevageScreen;
 import 'ration_volaille.dart';
 import 'soins_repository.dart';
 
@@ -169,7 +171,22 @@ class CartesFiche extends StatelessWidget {
   }
 }
 
-/// Sans bande : la carte du Blade (`inbox`, message, lien vers « Bandes & Sujets », qui n'existe qu'au web).
+/// `route('elevage.bandes')` : ouvre « Bandes & Sujets » dans le socle (ticket BS1). Hors du socle (écran testé seul),
+/// le repli dit où la trouver, jamais un lien mort.
+void ouvrirBandes(BuildContext context) {
+  final navigation = NavigationPoste.maybeOf(context);
+  if (navigation != null) {
+    navigation.ouvrir(EcranPoste.gestionBandes);
+    return;
+  }
+  ToastAgri.afficher(
+    context,
+    'Ouvrez « Bandes & Sujets » depuis Gestion Élevage pour créer une bande.',
+    type: TypeToast.avertissement,
+  );
+}
+
+/// Sans bande : la carte du Blade (`inbox`, message, lien vers « Bandes & Sujets »).
 class AucuneBandeFiche extends StatelessWidget {
   const AucuneBandeFiche({super.key, required this.message});
 
@@ -201,12 +218,8 @@ class AucuneBandeFiche extends StatelessWidget {
           const SizedBox(height: AgriSpacing.sm),
           InkWell(
             key: const Key('lien-bandes'),
-            // `route('elevage.bandes')` : l'écran n'existe qu'au web — le poste le dit, comme Gestion Élevage.
-            onTap: () => ToastAgri.afficher(
-              context,
-              GestionElevageScreen.messageBandesWeb,
-              type: TypeToast.avertissement,
-            ),
+            // `route('elevage.bandes')` : « Bandes & Sujets » s'ouvre (ticket BS1) ; hors du socle, le repli le dit.
+            onTap: () => ouvrirBandes(context),
             child: const Text(
               'Créer une bande depuis Bandes & Sujets →',
               style: TextStyle(
@@ -407,8 +420,9 @@ class MoisDeFiche extends StatelessWidget {
         : s;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// Les DEUX enfants de la barre de choix du Blade (`<span>Mois :</span>` puis la boîte `data-mois-de-fiche`) : ils se
+  /// replient chacun à son tour dans le `flex-wrap gap-xs` ([BarreChoixFiche]), jamais en bloc.
+  List<Widget> enfants() {
     final courant = estMoisCourant(jour, maintenant);
     Widget fleche(String cle, IconData icone, String info, VoidCallback? onTap) => Tooltip(
       message: info,
@@ -416,59 +430,45 @@ class MoisDeFiche extends StatelessWidget {
         key: Key(cle),
         onTap: onTap,
         child: SizedBox(
-          width: 32,
-          height: 36,
+          width: AgriChamps.largeurFleche,
+          height: AgriChamps.hauteurCompacte,
           child: Icon(
             icone,
-            size: 18,
+            size: AgriChamps.iconeFleche,
             color: onTap == null ? AgriColors.brandForest.withValues(alpha: 0.4) : AgriColors.brandForest,
           ),
         ),
       ),
     );
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          etiquette,
-          style: TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: AgriTypography.demiGras,
-            color: AgriColors.outline,
-          ),
+    return [
+      const EtiquetteEnLigneFiche(etiquette),
+      Container(
+        key: const Key('mois-de-fiche'),
+        height: AgriChamps.hauteurCompacte,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AgriColors.surfaceZebra,
+          border: Border.all(color: AgriColors.outlineVariant),
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
         ),
-        const SizedBox(width: AgriSpacing.xs),
-        Container(
-          key: const Key('mois-de-fiche'),
-          height: 36,
-          decoration: BoxDecoration(
-            color: AgriColors.surfaceZebra,
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              fleche('mois-precedent', SymbolesAgri.chevron_left, infoPrecedent, onPrecedent),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
-                child: Text(
-                  libelle(jour),
-                  key: const Key('mois-affiche'),
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                    color: AgriColors.brandForest,
-                  ),
-                ),
-              ),
-              fleche('mois-suivant', SymbolesAgri.chevron_right, infoSuivant, courant ? null : onSuivant),
-            ],
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            fleche('mois-precedent', SymbolesAgri.chevron_left, infoPrecedent, onPrecedent),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+              child: Text(libelle(jour), key: const Key('mois-affiche'), style: StylesChampsAgri.valeurFiche),
+            ),
+            fleche('mois-suivant', SymbolesAgri.chevron_right, infoSuivant, courant ? null : onSuivant),
+          ],
         ),
-      ],
-    );
+      ),
+    ];
   }
+
+  /// Seul : « Mois : » puis sa boîte (hors d'une [BarreChoixFiche]).
+  @override
+  Widget build(BuildContext context) => BarreChoixFiche(enfants: enfants());
 }
 
 /// Titre de la carte de saisie (`edit_note`), puis à droite « Bande : » (s'il y a plusieurs bandes et [bandes] non
@@ -507,37 +507,12 @@ class EnTeteSaisieFiche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget etiquette(String texte) => Text(
-      texte,
-      style: const TextStyle(
-        fontSize: AgriTypography.xs,
-        fontWeight: AgriTypography.demiGras,
-        color: AgriColors.outline,
-      ),
-    );
-    Widget cadre(String cle, Widget enfant) => Container(
-      key: Key(cle),
-      height: 36,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-      decoration: BoxDecoration(
-        color: AgriColors.surfaceZebra,
-        border: Border.all(color: AgriColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: enfant,
-    );
-    const style = TextStyle(
-      fontSize: AgriTypography.xs,
-      fontWeight: AgriTypography.gras,
-      color: AgriColors.brandForest,
-    );
-
     return Container(
       padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
       ),
+      // `flex items-center justify-between border-b pb-sm mb-md flex-wrap gap-xs`.
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -549,29 +524,30 @@ class EnTeteSaisieFiche extends StatelessWidget {
             children: [
               const Icon(SymbolesAgri.edit_note, color: AgriColors.brandEmerald),
               const SizedBox(width: AgriSpacing.xs),
-              Text(
-                titre,
-                style: const TextStyle(
-                  fontSize: AgriTypography.base,
-                  fontWeight: AgriTypography.gras,
-                  color: AgriColors.brandForest,
+              Flexible(
+                child: Text(
+                  titre,
+                  style: const TextStyle(
+                    fontSize: AgriTypography.base,
+                    fontWeight: AgriTypography.gras,
+                    color: AgriColors.brandForest,
+                  ),
                 ),
               ),
             ],
           ),
-          Wrap(
-            spacing: AgriSpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
+          // `flex items-center gap-xs flex-wrap` : chaque libellé et chaque champ se replie SEUL.
+          BarreChoixFiche(
+            enfants: [
               if (bandes.length > 1) ...[
-                etiquette('Bande :'),
-                cadre(
-                  'bande-fiche',
-                  DropdownButtonHideUnderline(
+                const EtiquetteEnLigneFiche('Bande :'),
+                CadreSelectionFiche(
+                  cle: const Key('bande-fiche'),
+                  enfant: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: bandeId,
                       isDense: true,
-                      style: style,
+                      style: StylesChampsAgri.valeurFiche,
                       items: [
                         for (final (id, code) in bandes) DropdownMenuItem(value: id, child: Text(code)),
                       ],
@@ -582,30 +558,29 @@ class EnTeteSaisieFiche extends StatelessWidget {
                   ),
                 ),
               ],
-              etiquette('Date :'),
-              cadre(
-                'date-fiche',
-                InkWell(
-                  onTap: () async {
-                    final choisie = await showDatePicker(
-                      context: context,
-                      initialDate: jour,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                      locale: const Locale('fr'),
-                    );
-                    if (choisie != null) onJour(DateTime(choisie.year, choisie.month, choisie.day));
-                  },
-                  child: Text(dateLongue(jour), key: const Key('date-choisie'), style: style),
-                ),
+              const EtiquetteEnLigneFiche('Date :'),
+              ChampDateFiche(
+                cle: const Key('date-fiche'),
+                cleTexte: const Key('date-choisie'),
+                valeur: jour,
+                onTap: () async {
+                  final choisie = await showDatePicker(
+                    context: context,
+                    initialDate: jour,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                    locale: const Locale('fr'),
+                  );
+                  if (choisie != null) onJour(DateTime(choisie.year, choisie.month, choisie.day));
+                },
               ),
               if (onMoisPrecedent != null && onMoisSuivant != null)
-                MoisDeFiche(
+                ...MoisDeFiche(
                   jour: jour,
                   maintenant: maintenant ?? jour,
                   onPrecedent: onMoisPrecedent!,
                   onSuivant: onMoisSuivant!,
-                ),
+                ).enfants(),
             ],
           ),
         ],

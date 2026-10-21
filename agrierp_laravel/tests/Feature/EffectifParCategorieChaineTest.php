@@ -608,7 +608,7 @@ class EffectifParCategorieChaineTest extends TestCase
         $mdp = 'AgriERP@2026';
         Permission::findOrCreate('view-ventes', 'web');
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes']);
-        User::create(['name' => 'C', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj', 'password' => bcrypt($mdp), 'is_active' => true])->assignRole('caissier');
+        User::create(['name' => 'C', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt($mdp), 'is_active' => true])->assignRole('caissier');
         $token = $this->postJson('/api/auth/login', ['identifiant' => 'caisse', 'password' => $mdp, 'device_name' => 'poste-01'])->json('token');
 
         $fiches = $this->withToken($token)->getJson('/api/sync/pull')->assertOk()->json('livestock_daily_entries');

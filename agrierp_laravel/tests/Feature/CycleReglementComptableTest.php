@@ -51,7 +51,7 @@ class CycleReglementComptableTest extends TestCase
         $role->givePermissionTo(['view-ventes', 'manage-ventes', 'view-achats', 'manage-achats']);
 
         $user = User::create([
-            'name' => 'Gérant', 'email' => 'reglement@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Gérant', 'email' => 'reglement@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

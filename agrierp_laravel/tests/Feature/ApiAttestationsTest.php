@@ -40,7 +40,7 @@ class ApiAttestationsTest extends TestCase
 
         foreach ([['rh', 'rh'], ['lecteur', 'lecteur-rh'], ['caisse', 'caissier']] as [$u, $role]) {
             User::create([
-                'name' => ucfirst($u), 'username' => $u, 'email' => $u.'@olouwachegoun.bj',
+                'name' => ucfirst($u), 'username' => $u, 'email' => $u.'@fermeolouwachegoun.com',
                 'password' => bcrypt(self::MDP), 'is_active' => true,
             ])->assignRole($role);
         }

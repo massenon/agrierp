@@ -846,8 +846,8 @@ void main() {
       await tester.tap(find.text('Mortalité anormale — Lot POR-2026-01 (15,0%)'));
       await tester.tap(find.text('Créance en retard — KPOSSOU Éléonore (10 jours)'));
       await tester.pumpAndSettle();
-      // `/gestion-bandes` n'a pas d'écran au poste : pas de flèche qui ne mène nulle part.
-      expect(ouverts, [EcranPoste.gestionStocks, EcranPoste.clientsEtCreances]);
+      // BS1 : `/gestion-bandes` a son écran au poste, l'alerte de mortalité y mène.
+      expect(ouverts, [EcranPoste.gestionStocks, EcranPoste.gestionBandes, EcranPoste.clientsEtCreances]);
 
       // Vente à crédit en jaune, au comptant en émeraude.
       await tester.ensureVisible(find.text('50 000 F'));

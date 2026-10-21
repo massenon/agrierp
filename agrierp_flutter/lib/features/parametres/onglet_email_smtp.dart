@@ -259,7 +259,7 @@ class _OngletEmailSmtpState extends State<OngletEmailSmtp> {
           _utilisateur,
           const Key('smtp-utilisateur'),
           'utilisateur',
-          aide: 'ex : notifications@olouwachegoun.bj',
+          aide: 'ex : notifications@fermeolouwachegoun.com',
         ),
         const SizedBox(height: AgriSpacing.md),
         _champ(
@@ -320,7 +320,7 @@ class _OngletEmailSmtpState extends State<OngletEmailSmtp> {
           _expediteur,
           const Key('smtp-expediteur'),
           'expediteur',
-          aide: _config?.emailDeContact ?? 'ex : contact@olouwachegoun.bj',
+          aide: _config?.emailDeContact ?? 'ex : contact@fermeolouwachegoun.com',
         ),
         const SizedBox(height: AgriSpacing.xs),
         const Text(

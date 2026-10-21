@@ -1526,7 +1526,8 @@ void main() {
       for (final libelle in [
         'Fournisseur *',
         'Montant Remboursé (FCFA) *',
-        'Date du Remboursement *',
+        // Ticket MP1 : libellé de champ Date en majuscules, comme le `uppercase` du Blade.
+        'DATE DU REMBOURSEMENT *',
         'Compte de Trésorerie',
         'Annuler',
         'Enregistrer',

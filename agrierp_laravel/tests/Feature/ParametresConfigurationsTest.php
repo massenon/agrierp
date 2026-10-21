@@ -41,7 +41,7 @@ class ParametresConfigurationsTest extends TestCase
     private function compte(string $role): User
     {
         $u = User::create([
-            'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@olouwachegoun.bj',
+            'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);
@@ -72,9 +72,9 @@ class ParametresConfigurationsTest extends TestCase
             ->set('smtpHost', 'smtp.ferme.bj')
             ->set('smtpPort', 465)
             ->set('smtpSecurity', 'ssl')
-            ->set('smtpUser', 'notifications@olouwachegoun.bj')
+            ->set('smtpUser', 'notifications@fermeolouwachegoun.com')
             ->set('smtpPassword', 'secret-smtp-de-la-ferme')
-            ->set('fromAddress', 'ne-pas-repondre@olouwachegoun.bj')
+            ->set('fromAddress', 'ne-pas-repondre@fermeolouwachegoun.com')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSet('smtpPassword', '')
@@ -86,7 +86,7 @@ class ParametresConfigurationsTest extends TestCase
         $this->assertSame('secret-smtp-de-la-ferme', decrypt($brut, false));
 
         $s = CompanySetting::current();
-        $this->assertSame(['smtp.ferme.bj', 465, 'ssl', 'notifications@olouwachegoun.bj', 'ne-pas-repondre@olouwachegoun.bj'],
+        $this->assertSame(['smtp.ferme.bj', 465, 'ssl', 'notifications@fermeolouwachegoun.com', 'ne-pas-repondre@fermeolouwachegoun.com'],
             [$s->smtp_host, (int) $s->smtp_port, $s->smtp_security, $s->smtp_user, $s->smtp_from_address]);
         $this->assertTrue(AuditLog::where('action', 'company_settings.smtp_updated')->exists());
 
@@ -153,10 +153,10 @@ class ParametresConfigurationsTest extends TestCase
     {
         $this->actingAs($this->compte('admin'));
         CompanySetting::current()->update([
-            'email' => 'contact@olouwachegoun.bj',
+            'email' => 'contact@fermeolouwachegoun.com',
             'smtp_host' => 'smtp.ferme.bj', 'smtp_port' => 587, 'smtp_security' => 'tls',
-            'smtp_user' => 'notifications@olouwachegoun.bj', 'smtp_password_encrypted' => 'secret',
-            'smtp_from_address' => 'ne-pas-repondre@olouwachegoun.bj',
+            'smtp_user' => 'notifications@fermeolouwachegoun.com', 'smtp_password_encrypted' => 'secret',
+            'smtp_from_address' => 'ne-pas-repondre@fermeolouwachegoun.com',
         ]);
 
         // Le transport SMTP est remplacé par un transport mémoire : le message part par la vraie chaîne d'envoi.
@@ -164,15 +164,15 @@ class ParametresConfigurationsTest extends TestCase
         Mail::extend('smtp', fn () => $transport);
 
         Livewire::test(EmailSmtp::class)
-            ->assertSet('testEmailTo', 'ne-pas-repondre@olouwachegoun.bj')
-            ->set('testEmailTo', 'dg@olouwachegoun.bj')
+            ->assertSet('testEmailTo', 'ne-pas-repondre@fermeolouwachegoun.com')
+            ->set('testEmailTo', 'dg@fermeolouwachegoun.com')
             ->call('sendTestEmail')
-            ->assertDispatched('toast', type: 'success', message: 'E-mail de test envoyé à dg@olouwachegoun.bj.');
+            ->assertDispatched('toast', type: 'success', message: 'E-mail de test envoyé à dg@fermeolouwachegoun.com.');
 
         $this->assertCount(1, $transport->messages());
         $envoye = $transport->messages()->first()->getOriginalMessage();
-        $this->assertSame('dg@olouwachegoun.bj', $envoye->getTo()[0]->getAddress());
-        $this->assertSame('ne-pas-repondre@olouwachegoun.bj', $envoye->getFrom()[0]->getAddress());
+        $this->assertSame('dg@fermeolouwachegoun.com', $envoye->getTo()[0]->getAddress());
+        $this->assertSame('ne-pas-repondre@fermeolouwachegoun.com', $envoye->getFrom()[0]->getAddress());
         $this->assertSame('smtp', config('mail.default'));
         $this->assertSame('smtp.ferme.bj', config('mail.mailers.smtp.host'));
         $this->assertSame('secret', config('mail.mailers.smtp.password'));
@@ -186,7 +186,7 @@ class ParametresConfigurationsTest extends TestCase
         CompanySetting::current()->update(['smtp_host' => '127.0.0.1', 'smtp_port' => 1, 'smtp_security' => null]);
 
         Livewire::test(EmailSmtp::class)
-            ->set('testEmailTo', 'dg@olouwachegoun.bj')
+            ->set('testEmailTo', 'dg@fermeolouwachegoun.com')
             ->call('sendTestEmail')
             ->assertDispatched('toast', type: 'error');
 
@@ -198,7 +198,7 @@ class ParametresConfigurationsTest extends TestCase
         $this->actingAs($this->compte('admin'));
 
         Livewire::test(EmailSmtp::class)
-            ->set('testEmailTo', 'dg@olouwachegoun.bj')
+            ->set('testEmailTo', 'dg@fermeolouwachegoun.com')
             ->call('sendTestEmail')
             ->assertDispatched('toast', type: 'error', message: "Enregistrez d'abord l'hôte SMTP avant d'envoyer un e-mail de test.");
     }
@@ -206,13 +206,13 @@ class ParametresConfigurationsTest extends TestCase
     public function test_l_expediteur_retombe_sur_l_e_mail_de_contact(): void
     {
         $s = CompanySetting::current();
-        $s->update(['email' => 'contact@olouwachegoun.bj', 'smtp_host' => 'smtp.ferme.bj']);
+        $s->update(['email' => 'contact@fermeolouwachegoun.com', 'smtp_host' => 'smtp.ferme.bj']);
         $s->applyMailConfig();
-        $this->assertSame('contact@olouwachegoun.bj', config('mail.from.address'));
+        $this->assertSame('contact@fermeolouwachegoun.com', config('mail.from.address'));
 
-        $s->update(['smtp_from_address' => 'ne-pas-repondre@olouwachegoun.bj']);
+        $s->update(['smtp_from_address' => 'ne-pas-repondre@fermeolouwachegoun.com']);
         $s->fresh()->applyMailConfig();
-        $this->assertSame('ne-pas-repondre@olouwachegoun.bj', config('mail.from.address'));
+        $this->assertSame('ne-pas-repondre@fermeolouwachegoun.com', config('mail.from.address'));
     }
 
     /** ⚠️⚠️ UNE SEULE SAISIE : Données de l'Entreprise et Intégrations ne portent plus de champ SMTP. */
@@ -221,7 +221,7 @@ class ParametresConfigurationsTest extends TestCase
         $this->actingAs($this->compte('admin'));
         CompanySetting::current()->update([
             'smtp_host' => 'smtp.ferme.bj', 'smtp_port' => 465, 'smtp_security' => 'ssl',
-            'smtp_user' => 'notifications@olouwachegoun.bj', 'smtp_password_encrypted' => 'secret', 'ifu' => '3202601234567',
+            'smtp_user' => 'notifications@fermeolouwachegoun.com', 'smtp_password_encrypted' => 'secret', 'ifu' => '3202601234567',
         ]);
 
         $donnees = Livewire::test(DonneesEntreprise::class)

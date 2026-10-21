@@ -46,7 +46,7 @@ class VenteFicheElevageLinkTest extends TestCase
 
         $user = User::create([
             'name' => 'Admin Test',
-            'email' => 'dg.test@olouwachegoun.bj',
+            'email' => 'dg.test@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);

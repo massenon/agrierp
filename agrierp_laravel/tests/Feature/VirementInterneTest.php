@@ -48,7 +48,7 @@ class VirementInterneTest extends TestCase
         $role->givePermissionTo(['view-parametres', 'view-comptabilite', 'manage-comptabilite']);
 
         $user = User::create([
-            'name' => 'Comptable', 'email' => 'virement@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Comptable', 'email' => 'virement@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);
@@ -190,7 +190,7 @@ class VirementInterneTest extends TestCase
     public function test_a_user_without_accounting_rights_cannot_transfer(): void
     {
         $lecteur = User::create([
-            'name' => 'Observateur', 'email' => 'lecture-param@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Observateur', 'email' => 'lecture-param@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $lectureSeule = Role::findOrCreate('observateur', 'web');
         $lectureSeule->givePermissionTo(['view-parametres', 'view-comptabilite']);

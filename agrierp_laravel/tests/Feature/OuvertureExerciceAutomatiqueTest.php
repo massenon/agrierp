@@ -242,7 +242,7 @@ class OuvertureExerciceAutomatiqueTest extends TestCase
         $this->exercice(2026);
 
         $caissier = User::create([
-            'name' => 'Caisse', 'username' => 'caisse-ex', 'email' => 'caisse-ex@olouwachegoun.bj',
+            'name' => 'Caisse', 'username' => 'caisse-ex', 'email' => 'caisse-ex@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

@@ -44,7 +44,7 @@ class ReinitialisationDonneesApiTest extends TestCase
     private function compte(string $role, string $identifiant): User
     {
         $u = User::create([
-            'name' => ucfirst($identifiant), 'username' => $identifiant, 'email' => $identifiant.'@olouwachegoun.bj',
+            'name' => ucfirst($identifiant), 'username' => $identifiant, 'email' => $identifiant.'@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);

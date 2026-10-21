@@ -25,7 +25,7 @@ class TableauDeBordDetailsTest extends TestCase
     {
         parent::setUp();
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $u = User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $u = User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
         $u->assignRole('admin');
         $this->actingAs($u);
     }

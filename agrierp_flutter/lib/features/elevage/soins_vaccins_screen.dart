@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
@@ -1260,8 +1261,8 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 surChangement: (v) => rafraichir(() => bande = v),
               ),
               const SizedBox(height: AgriSpacing.md),
-              _etiquette('Date du Soin *'),
               _champDate(
+                etiquette: 'Date du Soin *',
                 cle: 'soin-date',
                 date: date,
                 // Décision D-U6 étendue (« pas de divergence ») — le web accepte une date future (`'soinDate' =>
@@ -1430,8 +1431,8 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 'plan-intervention',
                 exemple: 'ex : Rappel Myxomatose',
               ),
-              _etiquette('Date Prévue *'),
               _champDate(
+                etiquette: 'Date Prévue *',
                 cle: 'plan-date',
                 date: date,
                 // Une intervention se PLANIFIE : aucune borne haute au web (`'date'`).
@@ -1536,8 +1537,8 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                 surChangement: (v) => rafraichir(() => isolement = v),
               ),
               const SizedBox(height: AgriSpacing.md),
-              _etiquette("Date d'Entrée *"),
               _champDate(
+                etiquette: "Date d'Entrée *",
                 cle: 'infirmerie-date',
                 date: date,
                 // Ticket U6 (décision client D-U6 du 19/10/2026) — mêmes règles que le web (`'infDate' =>
@@ -1624,12 +1625,15 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
   );
 
   Widget _champDate({
+    required String etiquette,
     required String cle,
     required DateTime date,
     required DateTime dernier,
     required ValueChanged<DateTime> surChoix,
-  }) => InkWell(
-    key: Key(cle),
+  }) => ChampDateFormulaire(
+    cle: Key(cle),
+    etiquette: etiquette,
+    valeur: date,
     onTap: () async {
       final choisie = await showDatePicker(
         context: context,
@@ -1639,13 +1643,6 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       );
       if (choisie != null) surChoix(choisie);
     },
-    child: InputDecorator(
-      decoration: _decoration(),
-      child: Text(
-        _date(date),
-        style: const TextStyle(fontSize: AgriTypography.sm),
-      ),
-    ),
   );
 
   Widget _erreur(String cle, String texte) => Padding(

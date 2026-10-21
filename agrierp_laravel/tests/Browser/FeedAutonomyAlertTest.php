@@ -55,7 +55,7 @@ class FeedAutonomyAlertTest extends DuskTestCase
     {
         $this->seed();
 
-        $animalier = User::where('email', 'elevage@olouwachegoun.bj')->firstOrFail();
+        $animalier = User::where('email', 'elevage@fermeolouwachegoun.com')->firstOrFail();
 
         // 2 sacs = 50 kg, pour 40 kg/jour → 1,25 jour d'autonomie.
         $alerte = $this->leverAlerte(2, 40);
@@ -94,7 +94,7 @@ class FeedAutonomyAlertTest extends DuskTestCase
     {
         $this->seed();
 
-        $animalier = User::where('email', 'elevage@olouwachegoun.bj')->firstOrFail();
+        $animalier = User::where('email', 'elevage@fermeolouwachegoun.com')->firstOrFail();
 
         $this->browse(function (Browser $browser) use ($animalier) {
             $browser->loginAs($animalier)

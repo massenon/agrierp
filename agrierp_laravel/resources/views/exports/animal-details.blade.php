@@ -1,6 +1,6 @@
 <p style="font-size:13px;font-weight:bold;">Sujet {{ $animal->identifier }} — {{ $animal->species?->label ?? '—' }}
     @if($animal->breed) ({{ $animal->breed }}) @endif
-    · {{ $animal->sex === 'F' ? 'Femelle' : 'Mâle' }} · {{ ucfirst($animal->status) }}</p>
+    · {{ $animal->sex === 'F' ? 'Femelle' : 'Mâle' }} · {{ $animal->status_label }}</p>
 
 <table class="data-table">
     <thead><tr><th colspan="2" style="text-align:left;">IDENTIFICATION</th></tr></thead>

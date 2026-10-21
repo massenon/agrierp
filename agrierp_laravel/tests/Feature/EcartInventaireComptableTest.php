@@ -49,7 +49,7 @@ class EcartInventaireComptableTest extends TestCase
         $role->givePermissionTo(['view-stocks', 'manage-stocks']);
 
         $user = User::create([
-            'name' => 'Logisticien', 'email' => 'inventaire@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Logisticien', 'email' => 'inventaire@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

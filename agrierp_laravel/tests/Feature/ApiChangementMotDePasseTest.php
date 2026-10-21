@@ -30,7 +30,7 @@ class ApiChangementMotDePasseTest extends TestCase
         $this->user = User::create([
             'name' => 'Caissier Ferme',
             'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::ANCIEN),
             'is_active' => true,
         ]);

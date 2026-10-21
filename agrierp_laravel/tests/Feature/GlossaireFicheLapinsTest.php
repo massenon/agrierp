@@ -53,7 +53,7 @@ class GlossaireFicheLapinsTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $compte = \App\Models\User::create([
             'name' => 'Animalier', 'username' => 'animalier-test',
-            'email' => 'animalier-test@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'email' => 'animalier-test@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $compte->assignRole('animalier');
         $this->actingAs($compte);

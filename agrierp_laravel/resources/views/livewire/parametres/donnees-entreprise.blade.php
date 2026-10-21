@@ -30,7 +30,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Email de Contact</label>
-                        <input wire:model="email" type="email" placeholder="contact@olouwachegoun.bj" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('email') ? 'is-invalid' : 'border-outline-variant' }}">
+                        <input wire:model="email" type="email" placeholder="contact@fermeolouwachegoun.com" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('email') ? 'is-invalid' : 'border-outline-variant' }}">
                         @error('email') <p class="invalid-feedback">{{ $message }}</p> @enderror
                     </div>
                 </div>

@@ -51,7 +51,7 @@ class PagesPubliquesTest extends TestCase
 
         $user = User::create([
             'name' => 'Test',
-            'email' => 'test@olouwachegoun.bj',
+            'email' => 'test@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);

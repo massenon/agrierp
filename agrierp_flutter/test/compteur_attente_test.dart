@@ -31,7 +31,7 @@ void main() {
     // Ticket H8b (19/10/2026) : + `infirmary_records` et `veterinary_calendar_events`, saisies au poste (D-H8).
     // Ticket H9b (19/10/2026) : + les cinq tables des Paramètres Élevage (rations, prophylaxie, provendes,
     // numérotation, entreprise pour le délai du rappel des soins), modifiables au poste (D-H9).
-    expect(lues, hasLength(27), reason: 'vingt-sept tables envoyées depuis H9b : $lues');
+    expect(lues, hasLength(29), reason: 'vingt-neuf tables envoyées (BS1 : les bandes ; BS3 : les reproducteurs) : $lues');
     expect(AppDatabase.tablesEnvoyees.toSet(), lues);
   });
 }

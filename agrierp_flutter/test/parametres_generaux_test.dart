@@ -80,7 +80,7 @@ void main() {
         UtilisateursCompanion.insert(
           id: uuid(cle),
           name: nom,
-          email: Value('$cle@olouwachegoun.bj'),
+          email: Value('$cle@fermeolouwachegoun.com'),
           role: Value(role),
           isActive: Value(actif),
         ),
@@ -114,7 +114,7 @@ void main() {
       .insert(
         AuditLogsCompanion.insert(
           id: uuid(cle),
-          userName: const Value('Manager Olouwachegoun'),
+          userName: const Value('M. Olouchègoun'),
           action: action,
           module: Value(module),
           createdAt: Value(quand ?? DateTime.now()),
@@ -133,7 +133,7 @@ void main() {
           'view-rh, view-comptabilite, view-administration, view-parametres',
     );
     await role('comptable', 'view-comptabilite, view-rapports');
-    await utilisateur('u1', 'Manager Olouwachegoun');
+    await utilisateur('u1', 'M. Olouchègoun');
     await utilisateur('u2', 'Ancien Stagiaire IT', actif: false);
     await compte('t1', 'Caisse Principale', '531', 'caisse', 185000);
     await compte('t2', 'BOA Bénin', '521101', 'banque', 1850000);

@@ -43,9 +43,9 @@ void main() {
   String lireBlade() => blade.readAsStringSync();
   String decoder(String s) => s.replaceAll('&amp;', '&').trim();
 
-  /// Cible de chaque `href` du Blade au poste ; `null` = aucun écran au poste (« Bandes & Sujets »).
+  /// Cible de chaque `href` du Blade au poste (ticket BS1 : « Bandes & Sujets » a désormais son écran).
   const cibles = <String, EcranPoste?>{
-    '/gestion-bandes': null,
+    '/gestion-bandes': EcranPoste.gestionBandes,
     '/fiche-lapins': EcranPoste.ficheElevage,
     '/fiche-volailles-pondeuses': EcranPoste.fichePondeuses,
     '/fiche-volailles-reproducteurs': EcranPoste.ficheReproducteurs,
@@ -226,11 +226,11 @@ void main() {
       for (final (href, icone, titre, description) in cartes) {
         expect(cibles.containsKey(href), isTrue, reason: 'cible inconnue pour $href');
         final cible = cibles[href];
-        final carte = find.byKey(Key(cible == null ? 'carte-bandes-sujets' : 'carte-${cible.name}'));
+        final carte = find.byKey(Key(cible == EcranPoste.gestionBandes ? 'carte-bandes-sujets' : 'carte-${cible!.name}'));
         expect(carte, findsOneWidget, reason: titre);
         expect(find.descendant(of: carte, matching: find.text(titre)), findsOneWidget, reason: titre);
         // « Bandes & Sujets » : le nombre de bandes vivantes précède la partie littérale du Blade.
-        final texte = cible == null ? '2$description' : description;
+        final texte = cible == EcranPoste.gestionBandes ? '2$description' : description;
         expect(find.descendant(of: carte, matching: find.text(texte)), findsOneWidget, reason: titre);
         expect(find.descendant(of: carte, matching: find.byIcon(icones[icone]!)), findsOneWidget, reason: titre);
       }
@@ -350,18 +350,14 @@ void main() {
       expect(ouverts, attendus);
     });
 
-    testWidgets('« Bandes & Sujets » : aucun écran au poste, un avertissement renvoie à l application web', (t) async {
+    testWidgets('⚠️ BS1 — « Bandes & Sujets » OUVRE son écran au poste (plus d avertissement « application web »)', (t) async {
       final ouverts = <EcranPoste>[];
       await monter(t, onOuvrir: ouverts.add);
       await t.tap(find.byKey(const Key('carte-bandes-sujets')));
       await t.pump();
 
-      expect(ouverts, isEmpty);
-      expect(find.text(GestionElevageScreen.messageBandesWeb), findsOneWidget);
-      expect(find.byIcon(SymbolesAgri.warning), findsWidgets);
-      // Le toast se retire seul après 3,5 s, comme au web.
-      await t.pump(ToastAgri.duree);
-      expect(find.text(GestionElevageScreen.messageBandesWeb), findsNothing);
+      expect(ouverts, [EcranPoste.gestionBandes]);
+      expect(find.textContaining('application web'), findsNothing);
     });
   });
 }

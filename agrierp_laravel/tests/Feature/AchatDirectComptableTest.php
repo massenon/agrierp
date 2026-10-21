@@ -59,7 +59,7 @@ class AchatDirectComptableTest extends TestCase
         Role::findOrCreate('acheteur', 'web')->givePermissionTo('manage-achats');
 
         $this->acheteur = User::create([
-            'name' => 'Acheteur', 'username' => 'acheteur', 'email' => 'acheteur@olouwachegoun.bj',
+            'name' => 'Acheteur', 'username' => 'acheteur', 'email' => 'acheteur@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->acheteur->assignRole('acheteur');

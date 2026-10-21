@@ -48,7 +48,7 @@ class IdentifiantConnexionTest extends TestCase
     private function admin(): User
     {
         $user = User::create([
-            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $user->assignRole('admin');
@@ -82,7 +82,7 @@ class IdentifiantConnexionTest extends TestCase
     {
         $this->admin();
 
-        $this->connecter('dg@olouwachegoun.bj', self::MDP);
+        $this->connecter('dg@fermeolouwachegoun.com', self::MDP);
 
         $this->assertTrue(auth()->check());
     }
@@ -95,7 +95,7 @@ class IdentifiantConnexionTest extends TestCase
         $this->connecter('admin', self::MDP);
         $this->assertFalse(auth()->check());
 
-        $this->connecter('dg@olouwachegoun.bj', self::MDP);
+        $this->connecter('dg@fermeolouwachegoun.com', self::MDP);
         $this->assertFalse(auth()->check());
     }
 
@@ -127,7 +127,7 @@ class IdentifiantConnexionTest extends TestCase
         Livewire::test(GestionUtilisateurs::class)
             ->set('name', 'Nouvelle Caissière')
             ->set('username', '')
-            ->set('email', 'caisse2@olouwachegoun.bj')
+            ->set('email', 'caisse2@fermeolouwachegoun.com')
             ->set('role', 'comptable')
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')
@@ -146,8 +146,8 @@ class IdentifiantConnexionTest extends TestCase
 
         Livewire::test(GestionUtilisateurs::class)
             ->set('name', 'Piège')
-            ->set('username', 'compta@olouwachegoun.bj')
-            ->set('email', 'piege@olouwachegoun.bj')
+            ->set('username', 'compta@fermeolouwachegoun.com')
+            ->set('email', 'piege@fermeolouwachegoun.com')
             ->set('role', 'comptable')
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')
@@ -162,7 +162,7 @@ class IdentifiantConnexionTest extends TestCase
         Livewire::test(GestionUtilisateurs::class)
             ->set('name', 'Doublon')
             ->set('username', 'admin')
-            ->set('email', 'doublon@olouwachegoun.bj')
+            ->set('email', 'doublon@fermeolouwachegoun.com')
             ->set('role', 'comptable')
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')
@@ -180,7 +180,7 @@ class IdentifiantConnexionTest extends TestCase
         Livewire::test(GestionUtilisateurs::class)
             ->set('name', 'Nouvelle Caissière')
             ->set('username', 'caisse2')
-            ->set('email', 'caisse2@olouwachegoun.bj')
+            ->set('email', 'caisse2@fermeolouwachegoun.com')
             ->set('role', 'comptable')
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')

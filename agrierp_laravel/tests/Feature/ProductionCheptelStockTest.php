@@ -47,7 +47,7 @@ class ProductionCheptelStockTest extends TestCase
         $role->givePermissionTo(['view-elevage', 'manage-elevage']);
 
         $user = User::create([
-            'name' => 'Animalier', 'email' => 'production@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Animalier', 'email' => 'production@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

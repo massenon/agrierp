@@ -70,7 +70,7 @@ class SyncValeursNullTest extends TestCase
         Role::findOrCreate('animalier', 'web')->givePermissionTo('manage-elevage');
 
         User::create([
-            'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+            'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ])->assignRole('caissier', 'animalier');
 

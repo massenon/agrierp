@@ -49,7 +49,7 @@ trait PreparationExercices
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $this->admin = User::create([
-            'name' => 'Direction', 'username' => 'admin-ex', 'email' => 'admin-ex@olouwachegoun.bj',
+            'name' => 'Direction', 'username' => 'admin-ex', 'email' => 'admin-ex@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');

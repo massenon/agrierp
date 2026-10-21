@@ -48,7 +48,7 @@ class CycleAvoirComptableTest extends TestCase
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
         $user = User::create([
-            'name' => 'Caissière', 'email' => 'avoir@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Caissière', 'email' => 'avoir@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);
@@ -264,7 +264,7 @@ class CycleAvoirComptableTest extends TestCase
     public function test_a_read_only_user_can_neither_create_nor_settle_a_credit_note(): void
     {
         $lecteur = User::create([
-            'name' => 'Observateur', 'email' => 'lecture-ventes@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Observateur', 'email' => 'lecture-ventes@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $lectureSeule = Role::findOrCreate('observateur', 'web');
         $lectureSeule->givePermissionTo('view-ventes');

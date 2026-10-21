@@ -41,7 +41,7 @@ class RegistreReproducteursTest extends TestCase
 
         $user = User::create([
             'name' => 'Animalier Test',
-            'email' => 'elevage.test@olouwachegoun.bj',
+            'email' => 'elevage.test@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
@@ -210,7 +210,7 @@ class RegistreReproducteursTest extends TestCase
 
         $user = User::create([
             'name' => 'Lecture',
-            'email' => 'lecture@olouwachegoun.bj',
+            'email' => 'lecture@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);

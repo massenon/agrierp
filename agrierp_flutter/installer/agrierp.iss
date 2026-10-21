@@ -48,6 +48,8 @@ DefaultGroupName=AgriERP
 DisableProgramGroupPage=yes
 OutputDir=Output
 OutputBaseFilename={#NomInstallateur}
+; Ticket ENV1 : l'icone est le logo de la ferme (outils\generer_icone.py). Assistant d'installation, programme
+; desinstallable (Parametres Windows) et raccourcis la montrent ; agrierp.exe la porte aussi (Runner.rc).
 SetupIconFile=..\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\agrierp.exe
 Compression=lzma2
@@ -67,9 +69,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\AgriERP"; Filename: "{app}\agrierp.exe"
+Name: "{group}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"
 Name: "{group}\{cm:UninstallProgram,AgriERP}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\AgriERP"; Filename: "{app}\agrierp.exe"; Tasks: desktopicon
+Name: "{autodesktop}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags: nowait postinstall skipifsilent

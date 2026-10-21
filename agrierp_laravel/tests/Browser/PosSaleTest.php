@@ -43,7 +43,7 @@ class PosSaleTest extends DuskTestCase
     public function test_full_pos_sale_decrements_stock_with_manual_amount_confirmation(): void
     {
         $this->seed();
-        $cashier = User::where('email', 'caisse@olouwachegoun.bj')->firstOrFail();
+        $cashier = User::where('email', 'caisse@fermeolouwachegoun.com')->firstOrFail();
 
         // ⚠️ Produit SANS espèce liée : un sujet vivant exigerait en plus la
         // sélection d'une bande source (contrôle de rémanence vétérinaire,

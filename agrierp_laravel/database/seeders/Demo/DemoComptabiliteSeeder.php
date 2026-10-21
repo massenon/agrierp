@@ -265,7 +265,7 @@ class DemoComptabiliteSeeder extends Seeder
             PeriodicClosure::create([
                 'period' => $m->format('Y-m'),
                 'closed_at' => $m->endOfMonth()->addDays(3),
-                'closed_by' => \App\Models\User::where('email', 'compta@olouwachegoun.bj')->value('id'),
+                'closed_by' => \App\Models\User::where('email', 'compta@fermeolouwachegoun.com')->value('id'),
             ]);
         }
     }

@@ -5,6 +5,7 @@ import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import 'tableau_de_bord_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -31,7 +32,7 @@ class TableauDeBordScreen extends StatefulWidget {
     this.onEnregistrerVente,
     this.onElevage,
     this.onOuvrir,
-    this.nomUtilisateur = 'Manager Olouwachegoun',
+    this.nomUtilisateur = 'M. Olouchègoun',
   });
 
   final TableauDeBordRepository depot;
@@ -116,7 +117,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
                     children: [
                       _entete(large),
                       const SizedBox(height: AgriSpacing.md),
-                      _filtreEtExport(large),
+                      _filtreEtExport(AgriBreakpoints.petit(context)),
                       const SizedBox(height: AgriSpacing.lg),
                       _kpis(moyen),
                       const SizedBox(height: AgriSpacing.lg),
@@ -227,65 +228,64 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
   /// ⚠️ **PÉRIODE DÉSACTIVÉE, COMME LE WEB** (`<input type="date" … disabled>`) : le tableau de bord est calé
   /// sur le mois courant. Le sélecteur d'état navigue, comme `window.location.href = report`.
-  Widget _filtreEtExport(bool large) {
+  Widget _filtreEtExport(bool petit) {
     final d = _donnees!;
     final dates = Row(
       children: [
-        const Icon(SymbolesAgri.calendar_month, size: 18, color: AgriColors.outline),
+        const Icon(SymbolesAgri.calendar_month, size: AgriChamps.iconePeriode, color: AgriColors.outline),
         const SizedBox(width: AgriSpacing.xs),
         Expanded(child: _champDate(const Key('date-du'), d.debutPeriode)),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: AgriSpacing.xs),
-          child: Text(
-            'au',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
-            ),
-          ),
-        ),
+        const SizedBox(width: AgriSpacing.xs),
+        const Text('au', style: StylesChampsAgri.motPeriode),
+        const SizedBox(width: AgriSpacing.xs),
         Expanded(child: _champDate(const Key('date-au'), d.finPeriode)),
       ],
     );
 
     final cible = _cibleEtat;
     final exports = Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: petit ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Container(
-          width: large ? 224 : 180,
-          padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
-          decoration: BoxDecoration(
-            color: AgriColors.surfaceCard,
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              key: const Key('choix-etat'),
-              value: _etat,
-              isExpanded: true,
-              isDense: true,
-              hint: const Text(
-                '-- Choisir un état / rapport --',
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.outline,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              style: const TextStyle(
-                fontSize: AgriTypography.xs,
-                color: AgriColors.onSurface,
-              ),
-              items: [
-                for (final (libelle, _) in TableauDeBordScreen.etats)
-                  DropdownMenuItem(
-                    value: libelle,
-                    child: Text(libelle, overflow: TextOverflow.ellipsis),
+        // `<select … class="text-xs border rounded-lg px-sm py-2 bg-white flex-1 sm:w-56">` : 224 px dès `sm:`, sinon il
+        // remplit la ligne ; 34 px de haut (`py-2` + interligne + traits).
+        _largeurEtat(
+          petit: petit,
+          enfant: Container(
+            height: ChampDateFiltre.hauteur(compact: false),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+            decoration: BoxDecoration(
+              color: AgriColors.surfaceCard,
+              border: Border.all(color: AgriColors.outlineVariant),
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                key: const Key('choix-etat'),
+                value: _etat,
+                isExpanded: true,
+                isDense: true,
+                hint: const Text(
+                  '-- Choisir un état / rapport --',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.outline,
                   ),
-              ],
-              onChanged: (v) => setState(() => _etat = v),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  color: AgriColors.onSurface,
+                ),
+                items: [
+                  for (final (libelle, _) in TableauDeBordScreen.etats)
+                    DropdownMenuItem(
+                      value: libelle,
+                      child: Text(libelle, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _etat = v),
+              ),
             ),
           ),
         ),
@@ -308,7 +308,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
         border: Border.all(color: AgriColors.outlineVariant),
         borderRadius: BorderRadius.circular(AgriRadius.lg),
       ),
-      child: large
+      // `flex-col sm:flex-row items-stretch sm:items-center gap-sm` : la ligne dès 640 px (`sm:`).
+      child: petit
           ? Row(
               children: [
                 Expanded(child: dates),
@@ -327,28 +328,13 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     );
   }
 
-  /// Champ de date DÉSACTIVÉ : aucun sélecteur ne s'ouvre, fond grisé.
-  Widget _champDate(Key cle, DateTime valeur) {
-    return Container(
-      key: cle,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AgriSpacing.sm,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
-        color: AgriColors.surfaceZebra,
-        border: Border.all(color: AgriColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: Text(
-        _dateCourte(valeur),
-        style: const TextStyle(
-          fontSize: AgriTypography.xs,
-          color: AgriColors.outline,
-        ),
-      ),
-    );
-  }
+  /// `flex-1 sm:w-56` : [enfant] fixe à 224 px dès `sm:`, sinon étiré sur la ligne.
+  Widget _largeurEtat({required bool petit, required Widget enfant}) =>
+      petit ? SizedBox(width: AgriChamps.largeurChoixEtat, child: enfant) : Expanded(child: enfant);
+
+  /// Champ de date DÉSACTIVÉ : aucun sélecteur ne s'ouvre, fond grisé. `px-sm py-1.5 text-xs` (30 px).
+  Widget _champDate(Key cle, DateTime valeur) =>
+      ChampDateFiltre(cle: cle, valeur: valeur, compact: true, desactive: true);
 
   // ── 3. Les huit KPI ───────────────────────────────────────────────────────
 
@@ -537,7 +523,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   }
 
   /// Une alerte : icône `warning`, fond rouge (critique) ou jaune (moyen), et lien vers l'écran du poste quand
-  /// il existe (`<a href="{{ $alert['link'] }}">`). `/gestion-bandes` n'a pas d'écran au poste : pas de lien.
+  /// il existe (`<a href="{{ $alert['link'] }}">`). `/gestion-bandes` mène à « Bandes & Sujets » (BS1).
   Widget _alerte(int i, AlerteCritique a) {
     final ecran = TableauDeBordRepository.ecranDuLien(a.lien);
     final couleur = a.grave ? AgriColors.errorDeep : AgriColors.brandForest;

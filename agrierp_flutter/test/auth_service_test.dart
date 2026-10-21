@@ -104,7 +104,7 @@ void main() {
       'id': 'uuid-utilisateur',
       'name': 'Comptable Ferme École',
       'username': 'compta',
-      'email': 'compta@olouwachegoun.bj',
+      'email': 'compta@fermeolouwachegoun.com',
       'role': 'comptable',
       'role_label': 'Comptable',
     },
@@ -179,7 +179,7 @@ void main() {
         'agrierp.token': 'jeton-conserve',
         'agrierp.user':
             '{"id":"u1","name":"DG","username":"admin",'
-            '"email":"dg@olouwachegoun.bj","role":"admin","role_label":"Admin"}',
+            '"email":"dg@fermeolouwachegoun.com","role":"admin","role_label":"Admin"}',
       },
     );
 

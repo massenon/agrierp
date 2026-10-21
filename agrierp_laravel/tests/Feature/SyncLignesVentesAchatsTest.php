@@ -46,7 +46,7 @@ class SyncLignesVentesAchatsTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->utilisateur = User::create([
             'name' => 'Administrateur', 'username' => 'admin',
-            'email' => 'dg@olouwachegoun.bj',
+            'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->utilisateur->assignRole('admin');

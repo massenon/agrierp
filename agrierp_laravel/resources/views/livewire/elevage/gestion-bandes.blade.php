@@ -6,11 +6,19 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Effectif vivant en temps réel, stade physiologique et statut, par bande.</p>
         </div>
-        @can('manage-elevage')
-        <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-            <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
-        </button>
-        @endcan
+        <div class="flex flex-wrap items-center gap-sm">
+            <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+                <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
+            </a>
+            <a href="{{ route('elevage.reproducteurs') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+                <span class="material-symbols-outlined text-[18px]">badge</span>Registre des Reproducteurs
+            </a>
+            @can('manage-elevage')
+            <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
+            </button>
+            @endcan
+        </div>
     </div>
 
     <x-kpi-accordion title="Indicateurs de performance">
@@ -38,6 +46,10 @@
             <option value="porciculture">Porciculture</option>
             <option value="helico">Héliciculture</option>
         </select>
+        <select wire:model.live="affichage" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+            <option value="">Bandes en cours</option>
+            <option value="archivees">Bandes archivées</option>
+        </select>
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -59,7 +71,7 @@
                 <tbody>
                     @forelse($this->lots as $i => $lot)
                         @php
-                            $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : 0;
+                            $mortaliteRate = $lot->initial_quantity > 0 ? round((($lot->initial_quantity - $lot->current_quantity) / $lot->initial_quantity) * 100, 1) : null;   // effectif initial 0 : mortalité INCONNUE (« — »), jamais 0 %
                         @endphp
                         <tr wire:click="view('{{ $lot->id }}')" class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 cursor-pointer {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                             <td data-label="Code Bande" class="px-md py-sm text-xs font-bold text-brand-emerald">{{ $lot->code }}</td>
@@ -68,7 +80,7 @@
                             <td data-label="Date Création" class="px-md py-sm text-xs">{{ $lot->created_date->format('d/m/Y') }}</td>
                             <td data-label="Effectif Initial" class="px-md py-sm text-xs text-right">{{ $lot->initial_quantity }}</td>
                             <td data-label="Effectif Actuel" class="px-md py-sm text-xs text-right font-bold">{{ $lot->current_quantity }}</td>
-                            <td data-label="Mortalité" class="px-md py-sm text-xs text-right {{ $mortaliteRate > 0 ? 'text-error-deep font-bold' : 'text-outline' }}">{{ $mortaliteRate }}%</td>
+                            <td data-label="Mortalité" class="px-md py-sm text-xs text-right {{ ($mortaliteRate ?? 0) > 0 ? 'text-error-deep font-bold' : 'text-outline' }}">{{ $mortaliteRate === null ? '—' : $mortaliteRate.'%' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($lot->status === 'actif')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
@@ -78,16 +90,22 @@
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap" wire:click.stop>
                                 @can('manage-elevage')
+                                @if($affichage === 'archivees')
+                                <button type="button" wire:click="restoreLot('{{ $lot->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Restaurer"><span class="material-symbols-outlined text-[16px]">restore_from_trash</span></button>
+                                @else
                                 <button type="button" wire:click="editLot('{{ $lot->id }}')" class="text-info-blue hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[16px]">edit</span></button>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-bande-{{ $lot->id }}' })" class="text-error-deep hover:text-error-deep/70 p-1" title="Archiver"><span class="material-symbols-outlined text-[16px]">delete</span></button>
+                                @endif
                                 @else
                                 <span class="text-outline text-[10px] italic">Lecture seule</span>
                                 @endcan
                             </td>
                         </tr>
+                        @if($affichage !== 'archivees')
                         <x-modal-confirm-delete :name="'archive-bande-'.$lot->id" :item-label="$lot->code" :action="'archiveLot(\''.$lot->id.'\')'" />
+                        @endif
                     @empty
-                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.</td></tr>
+                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">{{ $affichage === 'archivees' ? 'Aucune bande archivée.' : 'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -126,7 +144,8 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de Création</label>
-                <input wire:model="created_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                <input wire:model="created_date" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('created_date') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('created_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Quantité Initiale (Effectif) *</label>
@@ -188,7 +207,12 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Effectif Actuel *</label>
+                @if($effectifVerrouille)
+                <input wire:model="quantity" type="number" min="0" disabled data-effectif-verrouille title="{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline cursor-not-allowed">
+                <p class="text-[10px] text-outline mt-xs">{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}</p>
+                @else
                 <input wire:model="quantity" type="number" min="0" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('quantity') ? 'is-invalid' : 'border-outline-variant' }}">
+                @endif
                 @error('quantity') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>

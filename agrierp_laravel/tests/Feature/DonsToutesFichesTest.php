@@ -35,7 +35,7 @@ class DonsToutesFichesTest extends TestCase
         parent::setUp();
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $animalier = User::create([
-            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@olouwachegoun.bj',
+            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $animalier->assignRole('animalier');

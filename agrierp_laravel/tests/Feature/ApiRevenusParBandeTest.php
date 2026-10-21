@@ -37,7 +37,7 @@ class ApiRevenusParBandeTest extends TestCase
 
         Role::findOrCreate('animalier', 'web');
         $user = User::create([
-            'name' => 'Animalier', 'username' => 'animal', 'email' => 'animal@olouwachegoun.bj',
+            'name' => 'Animalier', 'username' => 'animal', 'email' => 'animal@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $user->assignRole('animalier');
