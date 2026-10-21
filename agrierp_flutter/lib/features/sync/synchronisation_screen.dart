@@ -723,6 +723,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'feed_types' => 'Type de provende',
     'elevage_numbering' => 'Numérotation des bandes et sujets',
     'company_settings' => 'Rappel des soins planifiés',
+    // Ticket MOD1 — Paramètres généraux, onglet Modules Actifs.
+    'modules_config' => 'Module actif (espèce)',
     _ => table,
   };
 
