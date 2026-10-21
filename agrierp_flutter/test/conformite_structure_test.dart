@@ -37,7 +37,8 @@ void main() {
     'gestion-stocks.html': 'lib/features/stocks/gestion_stocks_screen.dart',
     'catalogue-view.html': 'lib/features/stocks/catalogue_produits_screen.dart',
     'seuils-alerte.html': 'lib/features/stocks/catalogue_produits_screen.dart',
-    'historique-ventes.html': 'lib/features/ventes/ventes_devis_screen.dart',
+    // Ticket AV2 : le Blade fait foi. `historique-ventes.html` ne se compare plus à la maquette : ses onze colonnes sont
+    // celles de `historique-ventes.blade.php`, vérifiées dans cet ordre par `historique_ventes_blade_test.dart`.
     // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
     // maquette : ses colonnes sont celles de `suivi-reproduction.blade.php` (neuf, puis les
     // ajouts du poste), vérifiées dans cet ordre par `suivi_reproduction_blade_test.dart`.

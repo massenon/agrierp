@@ -102,6 +102,8 @@ import 'features/stocks/catalogue_produits_screen.dart';
 import 'features/stocks/gestion_stocks_screen.dart';
 import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
+import 'features/ventes/avoirs_repository.dart';
+import 'features/ventes/historique_ventes_repository.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
 import 'core/theme/symboles_agri.dart';
@@ -267,6 +269,22 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   late final VentesDevisRepository _ventesDevis = VentesDevisRepository(
     database: _db,
+  );
+
+  /// Ticket AV1 — « Retours et Avoirs » : la demande de retour part, le serveur fait les effets.
+  late final AvoirsRepository _avoirs = AvoirsRepository(
+    database: _db,
+    identifiantPoste: widget.identifiantPoste,
+    gestes: _gestes,
+  );
+
+  /// Ticket AV2 — « Historique des Ventes » : annulation (demande) et ticket PDF. ⚠️ Le MÊME client HTTP : il porte le
+  /// jeton, que le serveur lit pour décider si ce rôle peut exporter le ticket (`export-ventes`).
+  late final HistoriqueVentesRepository _historiqueVentes = HistoriqueVentesRepository(
+    database: _db,
+    client: ClientVentes(_client),
+    // L'annulation passe par l'unique écrivain de `sales` (la caisse, qui signale le geste à la synchronisation).
+    caisse: _caisse,
   );
 
   late final ParametresElevageRepository _parametresElevage =
@@ -456,6 +474,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           soinsVaccins: _soinsVaccins,
           parametresElevage: _parametresElevage,
           ventesDevis: _ventesDevis,
+          avoirs: _avoirs,
+          historiqueVentes: _historiqueVentes,
           stocks: _stocks,
           clients: _clients,
           notifications: _notifications,
@@ -511,6 +531,8 @@ class SocleAccueil extends StatefulWidget {
     required this.soinsVaccins,
     required this.parametresElevage,
     required this.ventesDevis,
+    required this.avoirs,
+    required this.historiqueVentes,
     required this.stocks,
     required this.clients,
     required this.notifications,
@@ -571,6 +593,8 @@ class SocleAccueil extends StatefulWidget {
   final SoinsVaccinsRepository soinsVaccins;
   final ParametresElevageRepository parametresElevage;
   final VentesDevisRepository ventesDevis;
+  final AvoirsRepository avoirs;
+  final HistoriqueVentesRepository historiqueVentes;
   final StocksRepository stocks;
   final ClientsCreancesRepository clients;
   final NotificationsRepository notifications;
@@ -1071,6 +1095,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.ventesEtDevis => VentesDevisScreen(
           depot: widget.ventesDevis,
           caisse: widget.caisse,
+          avoirs: widget.avoirs,
+          historique: widget.historiqueVentes,
+          // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
+          peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
+          peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
         ),
         EcranPoste.caisse => CaisseScreen(depot: widget.caisse),
         EcranPoste.synchronisation => SynchronisationScreen(
