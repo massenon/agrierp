@@ -102,10 +102,15 @@ import 'features/stocks/catalogue_produits_screen.dart';
 import 'features/stocks/gestion_stocks_screen.dart';
 import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
+import 'features/ventes/avoirs_repository.dart';
+import 'features/ventes/historique_ventes_repository.dart';
 import 'features/ventes/devis_repository.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
 import 'core/theme/symboles_agri.dart';
+import 'core/auth/verrou_local.dart';
+import 'features/verrou/changement_pin.dart';
+import 'features/verrou/porte_session.dart';
 
 /// AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
 ///
@@ -270,6 +275,22 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
   );
 
+  /// Ticket AV1 — « Retours et Avoirs » : la demande de retour part, le serveur fait les effets.
+  late final AvoirsRepository _avoirs = AvoirsRepository(
+    database: _db,
+    identifiantPoste: widget.identifiantPoste,
+    gestes: _gestes,
+  );
+
+  /// Ticket AV2 — « Historique des Ventes » : annulation (demande) et ticket PDF. ⚠️ Le MÊME client HTTP : il porte le
+  /// jeton, que le serveur lit pour décider si ce rôle peut exporter le ticket (`export-ventes`).
+  late final HistoriqueVentesRepository _historiqueVentes = HistoriqueVentesRepository(
+    database: _db,
+    client: ClientVentes(_client),
+    // L'annulation passe par l'unique écrivain de `sales` (la caisse, qui signale le geste à la synchronisation).
+    caisse: _caisse,
+  );
+
   /// Ticket DEV — « Devis & Proforma » (onglet « Devis Prestations » du hub Ventes & Devis).
   late final DevisRepository _devis = DevisRepository(
     database: _db,
@@ -356,10 +377,10 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
   );
 
-  /// `null` tant que la reprise de session n'a pas répondu : afficher l'écran
-  /// de connexion avant de savoir ferait clignoter le formulaire devant un
-  /// utilisateur déjà authentifié.
-  bool? _sessionOuverte;
+  /// Ticket VL-1 — le verrou local (code PIN, hors ligne) et la porte qui décide de l'écran montré : chargement,
+  /// connexion, définition du PIN, verrouillage ou application. Elle remplace l'ancien état `_sessionOuverte`
+  /// (null/false/true) : rien n'est montré avant que l'état soit connu.
+  final VerrouLocal _verrou = VerrouLocal();
 
   /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
   /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
@@ -369,29 +390,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// vient de proposer (et le plus souvent de faire) cette synchronisation.
   bool _synchroniserALOuverture = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _reprendre();
-  }
-
-  Future<void> _reprendre() async {
-    final ouverte = await _auth.reprendreSession();
-    final neuf = ouverte && await _demarrage.posteNeuf();
-    if (mounted) {
-      setState(() {
-        _sessionOuverte = ouverte;
-        _premierDemarrage = neuf;
-        _synchroniserALOuverture = true;
-      });
-    }
-  }
-
-  Future<void> _connecte() async {
+  /// Juste avant d'ouvrir l'application (connexion, déverrouillage) : le poste est-il neuf ? (écran F0.98).
+  Future<void> _preparerOuverture() async {
     final neuf = await _demarrage.posteNeuf();
     if (mounted) {
       setState(() {
-        _sessionOuverte = true;
         _premierDemarrage = neuf;
         _synchroniserALOuverture = true;
       });
@@ -416,26 +419,26 @@ class _AgriErpAppState extends State<AgriErpApp> {
       locale: LocalisationPoste.locale,
       supportedLocales: LocalisationPoste.locales,
       localizationsDelegates: LocalisationPoste.delegues,
-      home: switch (_sessionOuverte) {
-        null => const Scaffold(
-          backgroundColor: AgriColors.surfaceBg,
-          body: Center(child: CircularProgressIndicator()),
-        ),
-        false => LoginScreen(
+      home: PorteSession(
+        auth: _auth,
+        verrou: _verrou,
+        avantOuverture: _preparerOuverture,
+        ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
           demarrage: _demarrage,
-          onConnecte: _connecte,
+          onConnecte: onConnecte,
         ),
-        true when _premierDemarrage => PremierDemarrageScreen(
-          depot: _demarrage,
-          engine: _engine,
-          utilisateur: _auth.utilisateur?.nom ?? '—',
-          onTermine: () => setState(() {
-            _premierDemarrage = false;
-            _synchroniserALOuverture = false;
-          }),
-        ),
-        true => SocleAccueil(
+        application: (verrouiller, onDeconnecte) => _premierDemarrage
+            ? PremierDemarrageScreen(
+                depot: _demarrage,
+                engine: _engine,
+                utilisateur: _auth.utilisateur?.nom ?? '—',
+                onTermine: () => setState(() {
+                  _premierDemarrage = false;
+                  _synchroniserALOuverture = false;
+                }),
+              )
+            : SocleAccueil(
           database: _db,
           engine: _engine,
           auth: _auth,
@@ -464,6 +467,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           parametresElevage: _parametresElevage,
           ventesDevis: _ventesDevis,
           devis: _devis,
+          avoirs: _avoirs,
+          historiqueVentes: _historiqueVentes,
           stocks: _stocks,
           clients: _clients,
           notifications: _notifications,
@@ -473,12 +478,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
           sujets: _sujets,
           parametres: widget.parametres,
           identifiantPoste: widget.identifiantPoste,
-          onDeconnecte: () => setState(() => _sessionOuverte = false),
+          onDeconnecte: onDeconnecte,
+          verrou: _verrou,
+          onVerrouiller: verrouiller,
           changementsReseau: Connectivity().onConnectivityChanged,
           gestes: _gestes,
           synchroniserALOuverture: _synchroniserALOuverture,
         ),
-      },
+      ),
     );
   }
 }
@@ -520,6 +527,8 @@ class SocleAccueil extends StatefulWidget {
     required this.parametresElevage,
     required this.ventesDevis,
     required this.devis,
+    required this.avoirs,
+    required this.historiqueVentes,
     required this.stocks,
     required this.clients,
     required this.notifications,
@@ -531,6 +540,8 @@ class SocleAccueil extends StatefulWidget {
     required this.identifiantPoste,
     this.reinitialisation,
     this.onDeconnecte,
+    this.verrou,
+    this.onVerrouiller,
     this.changementsReseau,
     this.gestes,
     this.synchroniserALOuverture = true,
@@ -538,6 +549,12 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
   final VoidCallback? onDeconnecte;
+
+  /// Ticket VL-1 — le verrou local : « Changer le code PIN » de Mon profil ; `null` (tests du châssis) : pas de section.
+  final VerrouLocal? verrou;
+
+  /// Ticket VL-1 — « Verrouiller » du menu du compte : l'application est remplacée par l'écran de verrouillage.
+  final VoidCallback? onVerrouiller;
 
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
@@ -581,6 +598,8 @@ class SocleAccueil extends StatefulWidget {
   final ParametresElevageRepository parametresElevage;
   final VentesDevisRepository ventesDevis;
   final DevisRepository devis;
+  final AvoirsRepository avoirs;
+  final HistoriqueVentesRepository historiqueVentes;
   final StocksRepository stocks;
   final ClientsCreancesRepository clients;
   final NotificationsRepository notifications;
@@ -856,6 +875,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                       role: _role,
                       onNaviguer: (e) => setState(() => _ecran = e),
                     ),
+                    onVerrouiller: widget.onVerrouiller,
                     onDeconnexion: widget.onDeconnecte == null ? null : _deconnecter,
                     // Ticket EX7 (EF8) — « Exercice 2027 ▾ », à gauche de « Synchroniser ».
                     selecteurExercice: const SelecteurExercice(),
@@ -964,6 +984,17 @@ class _SocleAccueilState extends State<SocleAccueil> {
           changer: widget.auth.utilisateur == null
               ? null
               : widget.auth.changerMotDePasse,
+          // Ticket VL-1 — fonction propre au poste : le web n'a pas de verrou.
+          changerPin: widget.verrou == null || widget.auth.utilisateur == null
+              ? null
+              : ({required ancien, required nouveau, required confirmation}) =>
+                    changerPinDepuisProfil(
+                      widget.verrou!,
+                      widget.auth.utilisateur!.id,
+                      ancien: ancien,
+                      nouveau: nouveau,
+                      confirmation: confirmation,
+                    ),
         ),
         EcranPoste.aideEtAPropos => AideAProposScreen(
           onOuvrir: (e) => setState(() => _ecran = e),
@@ -1081,11 +1112,13 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.ventesEtDevis => VentesDevisScreen(
           depot: widget.ventesDevis,
           caisse: widget.caisse,
-          // Ticket DEV — onglet « Devis Prestations » : `manage-ventes` (écrire) et `export-ventes` (« Exporter »).
           devis: widget.devis,
-          peutGererDevis: PermissionsPoste.peut(_role, 'manage-ventes'),
-          peutExporterDevis: PermissionsPoste.peut(_role, 'export-ventes'),
           imprimer: EditeursRapports.imprimer,
+          avoirs: widget.avoirs,
+          historique: widget.historiqueVentes,
+          // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
+          peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
+          peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
         ),
         EcranPoste.caisse => CaisseScreen(depot: widget.caisse),
         EcranPoste.synchronisation => SynchronisationScreen(

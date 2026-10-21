@@ -332,6 +332,29 @@ class CaisseRepository {
     )..where((t) => t.id.equals(venteId))).getSingle());
   }
 
+  /// Ticket AV2 — « Oui, Annuler la Vente » de l'Historique des Ventes : la vente passe à `annulee` et repart (`pending`).
+  ///
+  /// ⚠️⚠️ **UNE DEMANDE, PAS SES EFFETS** : le serveur réintègre le stock des lignes une fois (`AnnulerVenteAction`, celle de
+  /// `HistoriqueVentes::cancelSale()` du web) et passe la vente à `annulee`. Le stock LOCAL ne bouge pas (il se met à jour
+  /// au tirage) : l'annuler ici ferait un double décrément silencieux. La vente n'a qu'UN dépôt écrivain, celui-ci
+  /// (`ecrivain_unique_test.dart`) : l'historique lui délègue.
+  ///
+  /// `false` si la vente est inconnue ou déjà annulée (le web ne fait alors rien non plus : ni stock, ni toast).
+  Future<bool> annulerVente(String venteId) async {
+    final vente = await (_db.select(_db.sales)..where((t) => t.id.equals(venteId))).getSingleOrNull();
+    if (vente == null || vente.status == 'annulee') return false;
+
+    await (_db.update(_db.sales)..where((t) => t.id.equals(venteId))).write(
+      SalesCompanion(
+        status: const Value('annulee'),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.versInstant(maintenant())),
+      ),
+    );
+    _gestes?.signaler();
+    return true;
+  }
+
   /// Répercute la vente sur la fiche du JOUR DE LA VENTE, puis recalcule les fiches suivantes.
   ///
   /// Ticket S-T7 — la fiche n'est écrite QUE par son dépôt (un seul écrivain par table au poste) :

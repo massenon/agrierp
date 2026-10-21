@@ -39,15 +39,15 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-md mb-lg">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Valeur Brute</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->kpis['brut'], 0, ',', ' ') }} F</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Amortissements Cumulés</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs text-error-deep">−{{ number_format($this->kpis['amortissement'], 0, ',', ' ') }} F</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-forest shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-forest shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase block">Valeur Nette Comptable</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs text-brand-forest">{{ number_format($this->kpis['net'], 0, ',', ' ') }} F</span>
         </div>

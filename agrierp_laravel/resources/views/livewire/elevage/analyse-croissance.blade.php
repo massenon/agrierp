@@ -19,7 +19,7 @@
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
         @forelse($this->averages as $moyenne)
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase">GMQ Moyen {{ $moyenne['label'] }}</span>
                 <span class="text-xl font-extrabold block mt-xs">{{ $moyenne['gmq'] }} g/j</span>
                 @if($moyenne['objectif_min'] !== null)
@@ -39,7 +39,7 @@
                 <p class="text-xs text-outline">Aucun lot ne dispose encore de deux pesées : le GMQ ne peut pas être calculé. Saisissez les pesées dans les fiches journalières.</p>
             </div>
         @endforelse
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <span class="text-[10px] text-outline font-bold uppercase">Lots Suivis (Pesées &ge; 2)</span>
             <span class="text-xl font-extrabold block mt-xs">{{ $this->trackedCount }}</span>
         </div>

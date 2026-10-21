@@ -706,6 +706,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     // Ticket BS1 — bande créée, modifiée ou archivée au poste.
     'livestock_lots' => 'Bande',
     'sales' => 'Vente',
+    // Tickets AV1 / AV2 — retour client (demande de retour ou « marquer comme traité »).
+    'credit_notes' => 'Retour client',
     'stock_adjustments' => 'Ajustement de stock',
     'expenses' => 'Dépense',
     // Ticket DEV — devis saisi, avancé ou archivé au poste.

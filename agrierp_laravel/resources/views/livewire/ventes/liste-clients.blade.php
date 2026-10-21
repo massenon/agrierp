@@ -17,15 +17,15 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-md">
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-brand-emerald shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Clients actifs</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">groups</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['clients_actifs'] }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-info-blue shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Nouveaux (mois)</span><span class="material-symbols-outlined text-[18px] text-info-blue">person_add</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['nouveaux_mois'] }}</span>
         </div>
-        <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 border-l-error-red shadow-sm">
+        <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Solde créances</span><span class="material-symbols-outlined text-[18px] text-error-red">payments</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['solde_creances'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>

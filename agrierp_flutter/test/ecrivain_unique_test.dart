@@ -48,6 +48,8 @@ void main() {
     'purchase_returns': 'lib/features/achats/achats_repository.dart',
     'supplier_refunds': 'lib/features/achats/achats_repository.dart',
     'livestock_transfers': 'lib/features/elevage/transferts_repository.dart',
+    // Tickets AV1 / AV2 — « Retours et Avoirs » : la demande de retour et « marquer comme traité » passent par ce dépôt.
+    'credit_notes': 'lib/features/ventes/avoirs_repository.dart',
     // Ticket BS1 — « Bandes & Sujets » : la bande se crée, se modifie et s'archive par ce dépôt.
     'livestock_lots': 'lib/features/elevage/bandes_repository.dart',
     // Ticket BS3 — « Registre des Reproducteurs » : le sujet nominatif s'enregistre, se modifie et se sort par ce dépôt.

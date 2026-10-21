@@ -31,6 +31,8 @@ import 'package:agrierp/features/stocks/stocks_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:agrierp/features/ventes/devis_repository.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
+import 'package:agrierp/features/ventes/avoirs_repository.dart';
+import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 import 'package:agrierp/features/ventes/ventes_devis_repository.dart';
 import 'package:agrierp/main.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -89,6 +91,8 @@ SocleAccueil coqueDeTest(
     parametresElevage: ParametresElevageRepository(database: db),
     ventesDevis: VentesDevisRepository(database: db),
     devis: DevisRepository(database: db, deviceId: poste),
+    avoirs: AvoirsRepository(database: db, identifiantPoste: poste),
+    historiqueVentes: HistoriqueVentesRepository(database: db),
     stocks: StocksRepository(database: db, deviceId: poste),
     clients: ClientsCreancesRepository(database: db, deviceId: 'poste-test'),
     notifications: NotificationsRepository(database: db),

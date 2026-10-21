@@ -768,6 +768,8 @@ class SyncEngine {
       corps['sales'],
       corps['sale_lines'],
     );
+    // Tickets AV1 / AV2 — APRÈS les ventes et les produits : l'avoir d'une vente ou d'un produit inconnu du poste est refusé.
+    recus += await _absorberAvoirs(corps['credit_notes']);
     // Ticket U9 — APRÈS les produits : un mouvement d'un produit inconnu du poste est refusé.
     recus += await _absorberMouvementsStock(corps['stock_movements']);
     recus += await _absorberEmployes(corps['employees']);
@@ -3447,6 +3449,10 @@ class SyncEngine {
         customerId: Value(l['customer_id'] as String?),
         customerName: Value(l['customer_name'] as String?),
         paymentMode: (l['payment_mode'] ?? 'especes') as String,
+        // Ticket AV2 — sous-total et remise servis (colonne « Remise » et détail d'une vente de l'historique). Absents
+        // (serveur antérieur) : la remise reste 0 et le sous-total le total, comme avant.
+        subtotal: Value(_reel(l['subtotal']) ?? _reel(l['total']) ?? 0),
+        discount: Value(_reel(l['discount']) ?? 0),
         total: _reel(l['total']) ?? 0,
         status: Value((l['status'] ?? 'validee') as String),
         mecefStatus: Value(l['mecef_status'] as String?),
@@ -4195,6 +4201,104 @@ class SyncEngine {
     return recues.length;
   }
 
+  /// 🔴→✅ Tickets AV1 / AV2 — LES AVOIRS CLIENTS DESCENDENT AU POSTE (écran « Retours et Avoirs »).
+  ///
+  /// Table MIXTE (comme les dépenses) : le poste y saisit des demandes de retour (`pending`) et y lit les avoirs du web et
+  /// des autres postes. Le serveur attribue le numéro `AV-AAAA-NNN` : une demande acquittée le reçoit ici, au tirage qui
+  /// suit.
+  ///
+  /// ⚠️⚠️ **UNE DEMANDE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (saisie ici, pas encore acquittée, ou refusée
+  /// et en attente de correction) : le tirage précède toujours l'envoi. Un avoir acquitté (`synced`) prend la dernière
+  /// version du serveur (numéro, statut « traité » posé au web) et garde son `device_id` d'origine.
+  ///
+  /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, vente ou produit inconnu du poste, montant absent ou
+  /// négatif, quantité négative, décision ou statut illisible, date illisible → [FormatException], rien n'est écrit, le
+  /// curseur n'avance pas. Clé absente (serveur antérieur, ou table non servie à ce compte) : rien n'est touché.
+  Future<int> _absorberAvoirs(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Avoir client';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final ventes = {for (final v in await _db.select(_db.sales).get()) v.id};
+    final produits = {for (final p in await _db.select(_db.products).get()) p.id};
+    final vus = <String>{};
+    final recus = <CreditNotesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final vente = l['sale_id'];
+      final produit = l['product_id'];
+      final numero = _texteStrict(l['credit_note_number'], '$quoi $id : numéro');
+      final quantite = _nombreStrict(l['qty'], '$quoi $id : quantité');
+      final montant = _nombreStrict(l['amount'], '$quoi $id : montant');
+      final motif = _texteStrict(l['reason'], '$quoi $id : motif');
+      final decision = l['decision'];
+      final notes = _texteStrict(l['inspection_notes'], '$quoi $id : notes d\'inspection');
+      final statut = l['status'];
+      final date = l['created_at'] is String ? HeureBenin.lire(l['created_at']) : null;
+      if (vente is! String || !ventes.contains(vente)) {
+        throw FormatException('$quoi $id refusé : vente inconnue du poste ($vente).');
+      }
+      if (produit is! String || !produits.contains(produit)) {
+        throw FormatException('$quoi $id refusé : produit inconnu du poste ($produit).');
+      }
+      if (montant == null || montant < 0) {
+        throw FormatException('$quoi $id refusé : montant absent ou négatif ($montant).');
+      }
+      if (quantite != null && quantite < 0) {
+        throw FormatException('$quoi $id refusé : quantité négative ($quantite).');
+      }
+      if (decision != null && decision != 'reintegre' && decision != 'reforme') {
+        throw FormatException('$quoi $id refusé : décision illisible ($decision).');
+      }
+      if (statut != 'en_attente' && statut != 'traite') {
+        throw FormatException('$quoi $id refusé : statut illisible ($statut).');
+      }
+      if (date == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['created_at']}).');
+      }
+      recus.add(
+        CreditNotesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          saleId: vente,
+          productId: produit,
+          creditNoteNumber: Value(numero),
+          qty: Value(quantite),
+          amount: montant,
+          reason: Value(motif),
+          decision: Value(decision as String?),
+          inspectionNotes: Value(notes),
+          status: Value(statut as String),
+          // Heure MURALE du serveur, lue telle quelle : le jour du web doit rester le jour.
+          createdAt: date,
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final a in await (_db.select(
+          _db.creditNotes,
+        )..where((t) => t.id.isIn(vus))).get())
+          a.id: a.syncStatus,
+      };
+      for (final a in recus) {
+        final statut = locales[a.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        // Un avoir acquitté de CE poste garde son `device_id` (l'origine de la saisie).
+        await _db
+            .into(_db.creditNotes)
+            .insert(a, onConflict: DoUpdate((_) => a.copyWith(deviceId: const Value.absent())));
+      }
+    });
+
+    return recus.length;
+  }
+
   /// 🔴→✅ Ticket DEV — LES DEVIS DU SERVEUR DESCENDENT AU POSTE (table mixte : saisis ici ET tirés).
   ///
   /// Le serveur sert tout devis créé, modifié, avancé dans son cycle ou archivé au web ou sur un autre poste, au curseur
@@ -4513,6 +4617,11 @@ class SyncEngine {
       _db.supplierRefunds,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Tickets AV1 / AV2 — demandes de retour client et « marquer comme traité » : le serveur fait les effets.
+    final avoirs = await (_db.select(
+      _db.creditNotes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
     final transferts = await (_db.select(
       _db.livestockTransfers,
@@ -4570,6 +4679,7 @@ class SyncEngine {
         documents.isEmpty &&
         retours.isEmpty &&
         remboursements.isEmpty &&
+        avoirs.isEmpty &&
         avances.isEmpty &&
         imputations.isEmpty &&
         produits.isEmpty &&
@@ -4674,6 +4784,9 @@ class SyncEngine {
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
+        // Ticket AV1 — le serveur traite les retours APRÈS les ventes du même envoi. ⚠️ JAMAIS de `stock_adjustments` ni
+        // d'écriture pour un avoir : le serveur réintègre le stock et passe l'écriture inverse (`AvoirClientService`).
+        'credit_notes': avoirs.map(_avoirEnJson).toList(),
         'stock_adjustments': ajustements.map(_ajustementEnJson).toList(),
         'veterinary_records': soins.map(_soinEnJson).toList(),
         'expenses': depenses.map(_depenseEnJson).toList(),
@@ -5032,6 +5145,15 @@ class SyncEngine {
     );
 
     accepte += await _acquitter(
+      'credit_notes',
+      corps['credit_notes'],
+      (ids, statut) => (_db.update(_db.creditNotes)..where((t) => t.id.isIn(ids)))
+          .write(CreditNotesCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    accepte += await _acquitter(
       'expenses',
       corps['expenses'],
       (ids, statut) => (_db.update(_db.expenses)..where((t) => t.id.isIn(ids)))
@@ -5258,6 +5380,8 @@ class SyncEngine {
     'supplier_refunds',
     'attendance_records',
     'sales',
+    // Ticket AV1 — après les ventes (un retour peut viser la vente du même envoi), avant les imputations.
+    'credit_notes',
     'advance_imputations',
     'livestock_reproduction_events',
     'infirmary_records',
@@ -5841,6 +5965,14 @@ class SyncEngine {
               _db.purchases,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const PurchasesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Tickets AV1 / AV2 — sans cette entrée, « Relancer » un retour client refusé ne ferait rien (défaut F0.77).
+      'credit_notes' =>
+        () =>
+            (_db.update(
+              _db.creditNotes,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const CreditNotesCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       'purchase_returns' =>
         () =>
@@ -6513,6 +6645,24 @@ class SyncEngine {
     // `archiveExpense()` du web. Une modification part avec les champs de la ligne (dernier écrivain gagne).
     'is_active': d.isActive,
     'device_id': d.deviceId,
+  };
+
+  /// Tickets AV1 / AV2 — la DEMANDE de retour : ce que le serveur lit dans `pushCreditNotes`. ⚠️ Ni numéro (`AV-AAAA-NNN`,
+  /// attribué par le serveur) ni écriture ni stock. `credit_date` = le jour du FAIT, en heure murale du Bénin sans
+  /// conversion UTC (même règle que `sold_at`) ; `status` = `traite` pour « Marquer comme traité » (une seule fois côté
+  /// serveur).
+  Map<String, dynamic> _avoirEnJson(AvoirClient a) => {
+    'id': a.id,
+    'sale_id': a.saleId,
+    'product_id': a.productId,
+    'qty': a.qty,
+    'amount': a.amount,
+    'reason': a.reason,
+    'decision': a.decision,
+    'inspection_notes': a.inspectionNotes,
+    'status': a.status,
+    'credit_date': _instant(a.createdAt),
+    'device_id': a.deviceId,
   };
 
   /// Ticket DEV — un devis tel qu'il est (le FAIT) : `pushQuotes` le rejoue par `SaisieDevisAction`. ⚠️ Le numéro

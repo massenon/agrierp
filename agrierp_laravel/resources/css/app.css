@@ -168,6 +168,22 @@ body.dark-mode .border-outline-variant {
 }
 
 /* --------------------------------------------------------------------------
+   Carte KPI — TAILLE UNIQUE (demande client : « les tailles des cartes KPI
+   doivent être uniformes partout »). Posée par <x-kpi-card> ET par toute carte
+   KPI écrite à la main : même marge (p-md), même liseré gauche (border-l-4),
+   même hauteur minimale. Dans une grille CSS, la rangée suit sa plus haute
+   carte ; le contenu reste aligné en haut. Le poste porte la même valeur :
+   CarteKpi.hauteurMin = 112 px (lib/core/widgets/carte_kpi.dart).
+   Déclarée APRÈS `@tailwind utilities` : à spécificité égale, elle l'emporte
+   sur `border` (1 px) pour le seul côté gauche.
+   -------------------------------------------------------------------------- */
+.kpi-card {
+  min-height: 112px;
+  padding: 16px;
+  border-left-width: 4px;
+}
+
+/* --------------------------------------------------------------------------
    Accordéon KPI (mobile ET desktop) — classe exacte, jamais de variante locale
    (Document 06 §3 : <x-kpi-accordion> doit utiliser CETTE classe uniquement)
    -------------------------------------------------------------------------- */

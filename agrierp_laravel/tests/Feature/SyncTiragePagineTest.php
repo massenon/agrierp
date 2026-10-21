@@ -208,9 +208,9 @@ class SyncTiragePagineTest extends TestCase
     public function test_tables_servies_a_chacun_des_quatre_roles(): void
     {
         $attendu = [
-            // Ticket DEV — les devis (`view-ventes`) : l'onglet « Devis Prestations » de Ventes & Devis.
+            // Tickets DEV et AV1 — `quotes` (Devis Prestations) et `credit_notes` (Retours et Avoirs) : `view-ventes`.
             'caissier' => [...self::BASE, 'feed_ration_standards', 'veterinary_withdrawal_periods', 'customer_advances',
-                'customer_reminders', 'quotes'],
+                'customer_reminders', 'quotes', 'credit_notes'],
             'animalier' => [...self::BASE, 'livestock_transfers', 'feed_ration_standards', 'growth_standards',
                 'veterinary_withdrawal_periods', 'prophylaxis_schedule_standards', 'veterinary_records', 'infirmary_records',
                 'veterinary_calendar_events', 'feed_types', 'elevage_numbering', 'lot_revenues', 'animals',

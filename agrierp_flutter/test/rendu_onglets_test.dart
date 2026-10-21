@@ -35,6 +35,8 @@ import 'package:agrierp/features/stocks/gestion_stocks_screen.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:agrierp/features/ventes/devis_repository.dart';
+import 'package:agrierp/features/ventes/avoirs_repository.dart';
+import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 import 'package:agrierp/features/ventes/ventes_devis_repository.dart';
 import 'package:agrierp/features/ventes/ventes_devis_screen.dart';
 import 'package:drift/native.dart';
@@ -210,6 +212,8 @@ void main() {
           depot: VentesDevisRepository(database: db),
           caisse: caisse,
           devis: DevisRepository(database: db, deviceId: 'poste-test'),
+          avoirs: AvoirsRepository(database: db, identifiantPoste: 'poste-test'),
+          historique: HistoriqueVentesRepository(database: db),
         ),
       ),
       'parametres-hub': (

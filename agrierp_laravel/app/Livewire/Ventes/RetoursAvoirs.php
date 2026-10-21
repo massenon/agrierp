@@ -2,12 +2,10 @@
 
 namespace App\Livewire\Ventes;
 
-use App\Actions\AdjustStockAction;
-use App\Actions\RecordCreditNoteAccountingEntryAction;
-use App\Models\AuditLog;
+use App\Exceptions\AvoirClientRefuseException;
 use App\Models\CreditNote;
-use App\Models\Product;
 use App\Models\Sale;
+use App\Services\AvoirClientService;
 use Livewire\Component;
 
 /**
@@ -48,6 +46,11 @@ use Livewire\Component;
  *    créer un avoir, réintégrer du stock et solder un retour. Le masquage de
  *    menu n'est pas une autorisation (Document 03 §RBAC) : la garde est posée
  *    sur les deux méthodes qui écrivent.
+ *
+ * 🔴→✅ TICKET AV1 — `saveReturn()` délègue à `AvoirClientService` (voir son docblock) : quantité bornée au vendu moins le
+ * déjà retourné, montant borné à la ligne moins le déjà crédité, exercice clos ou plan incomplet refusés AVANT toute
+ * écriture (le retour n'est plus « enregistré SANS écriture »), une seule transaction. Le même service reçoit les
+ * demandes de retour des postes (`SyncController::pushCreditNotes`).
  *
  * ⚠️ LIMITE ASSUMÉE — LE REMBOURSEMENT N'EST PAS COMPTABILISÉ. L'avoir crédite
  * le compte client (411) : il constate une dette envers le client, pas un
@@ -145,63 +148,42 @@ class RetoursAvoirs extends Component
             'decision' => ['required', 'in:reintegre,reforme'],
         ]);
 
-        $creditNote = CreditNote::create([
-            'credit_note_number' => CreditNote::generateCreditNoteNumber(),
-            'sale_id' => $this->saleId,
-            'product_id' => $this->productId,
-            'qty' => $this->qty,
-            'amount' => $this->amount,
-            'reason' => $this->reason,
-            'decision' => $this->decision,
-            'inspection_notes' => $this->inspectionNotes ?: null,
-            'status' => 'en_attente',
-        ]);
-
-        if ($this->decision === 'reintegre') {
-            $product = Product::find($this->productId);
-            if ($product) {
-                app(AdjustStockAction::class)->execute($product, (float) $this->qty, 'credit_note', $creditNote->id);
-            }
-        }
-
-        // Écriture comptable inverse — la conséquence que le prototype annonce
-        // à l'étape 5 de l'assistant et qui n'était pas produite.
-        $ecriture = null;
-
+        // 🔴→✅ TICKET AV1 — UN SEUL POINT DE PASSAGE (`AvoirClientService`), partagé avec l'envoi d'un poste : mêmes
+        // refus (quantité au-delà du vendu, montant au-delà de la ligne, exercice clos, plan comptable incomplet), mêmes
+        // effets (avoir, stock si réintégré, écriture inverse 701/443/411), une seule transaction — un refus n'écrit rien.
         try {
-            $ecriture = app(RecordCreditNoteAccountingEntryAction::class)
-                ->execute($creditNote->load('product'));
-        } catch (\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException $e) {
-            // Le retour reste enregistré (le produit est physiquement revenu),
-            // mais l'anomalie comptable est DITE, jamais avalée en silence.
-            $this->dispatch('toast', message: 'Retour enregistré SANS écriture comptable : '.$e->getMessage(), type: 'error');
+            app(AvoirClientService::class)->enregistrer([
+                'sale_id' => $this->saleId,
+                'product_id' => $this->productId,
+                'qty' => $this->qty,
+                'amount' => $this->amount,
+                'reason' => $this->reason,
+                'decision' => $this->decision,
+                'inspection_notes' => $this->inspectionNotes,
+            ]);
+        } catch (\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException|AvoirClientRefuseException $e) {
+            // Refus dit, jamais avalé : rien n'a été écrit (ni avoir, ni stock, ni écriture).
+            $this->dispatch('toast', message: 'Retour refusé : '.$e->getMessage(), type: 'error');
             $this->dispatch('close-modal', name: 'modal-nouveau-retour');
 
             return;
         }
 
-        AuditLog::record('credit_note.created', 'ventes');
         $this->dispatch('close-modal', name: 'modal-nouveau-retour');
         $message = $this->decision === 'reintegre'
             ? 'Retour enregistré — produit réintégré au stock.'
             : 'Retour enregistré — produit réformé, aucun impact stock.';
 
-        if (! $ecriture) {
-            $message .= ' Attention : écriture comptable non générée (plan comptable incomplet).';
-            $this->dispatch('toast', message: $message, type: 'error');
-
-            return;
-        }
-
-        $this->dispatch('toast', message: $message.' Avoir comptabilisé (débit 701 / crédit 411).', type: 'success');
+        $this->dispatch('toast', message: $message.((float) $this->amount > 0
+            ? ' Avoir comptabilisé (débit 701 / crédit 411).'
+            : ' Avoir de montant nul : aucune écriture comptable.'), type: 'success');
     }
 
     public function markAsTreated(string $id): void
     {
         $this->authorize('manage-ventes');
 
-        CreditNote::findOrFail($id)->update(['status' => 'traite']);
-        AuditLog::record('credit_note.treated', 'ventes');
+        app(AvoirClientService::class)->marquerTraite(CreditNote::findOrFail($id));
         $this->dispatch('toast', message: 'Avoir marqué comme traité.', type: 'success');
     }
 

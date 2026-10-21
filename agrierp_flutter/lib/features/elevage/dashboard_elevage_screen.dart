@@ -5,6 +5,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import 'suffixe_doublon.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// Dashboard Élevage — le maître est `Livewire\Elevage\DashboardElevage` et sa vue
@@ -248,14 +249,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteKpi(
               libelle: 'Effectif Total Vivant',
               valeur: DashboardElevageRepository.milliers(
@@ -696,14 +690,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         const SizedBox(height: AgriSpacing.md),
         // AJOUTS du poste conservés (décision client du 19/10/2026) : cartes par espèce et courbe
         // de la bande suivie, sur le MÊME GMQ cumulé que le tableau du Blade.
-        GridView.count(
-          crossAxisCount: large ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.0 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 4 : 2, children: [
             _carteGmq(
               'GMQ Moyen Lapins',
               d.gmqParEspece['cuniculture'],
@@ -959,14 +946,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
         ),
         const SizedBox(height: AgriSpacing.md),
         // Les trois cartes du Blade : soins du mois des bandes actives.
-        GridView.count(
-          crossAxisCount: large ? 3 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AgriSpacing.md,
-          crossAxisSpacing: AgriSpacing.md,
-          childAspectRatio: large ? 2.6 : 1.5,
-          children: [
+        GrilleKpi(colonnes: large ? 3 : 2, children: [
             _carteKpi(
               libelle: 'Traitements Administrés (mois)',
               valeur: '${d.traitementsDuMois}',
@@ -1254,14 +1234,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
   ///
   /// ⚠️ Sans bande projetable, la maquette les montre à « — » : une carte que le
   /// poste ne peut pas calculer est un tiret expliqué, jamais omise ni à zéro.
-  Widget _cartesPrevision(Prevision? p, bool large) => GridView.count(
-    crossAxisCount: large ? 3 : 1,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.4 : 3.2,
-    children: [
+  Widget _cartesPrevision(Prevision? p, bool large) => GrilleKpi(colonnes: large ? 3 : 1, children: [
       _carteKpi(
         libelle: 'Poids Projeté',
         valeur: p == null ? '—' : '${_milliers(p.projeter(_horizon))} g',
@@ -1585,13 +1558,4 @@ class _CourbesGmqPainter extends CustomPainter {
       ancien.series != series;
 }
 
-/// Suffixe d'une clé de ligne quand deux bandes portent le même code (`-2`, `-3`…) ; vide pour la première.
-///
-/// 🔴→✅ « Duplicate keys found » : deux bandes de même code (ex. `AVI-2026-01`) donnaient deux lignes de clé
-/// identique, ce qui arrête le dessin de l'écran entier sans aucune erreur de compilation. La première garde sa clé
-/// d'origine (les tests la retrouvent), les suivantes reçoivent un rang.
-String _suffixeDoublon(Iterable<String> codes, int index) {
-  final liste = codes.toList();
-  final rang = liste.sublist(0, index + 1).where((c) => c == liste[index]).length;
-  return rang <= 1 ? '' : '-$rang';
-}
+String _suffixeDoublon(Iterable<String> codes, int index) => suffixeDoublon(codes, index);

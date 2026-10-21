@@ -16,6 +16,7 @@ use App\Actions\RecordSaleOnFicheElevageAction;
 use App\Actions\RecordSaleAccountingEntryAction;
 use App\Actions\CreditTreasuryForSaleAction;
 use App\Http\Controllers\Controller;
+use App\Services\AvoirClientService;
 use App\Exceptions\ClosedFiscalYearException;
 use App\Exceptions\NoOpenFiscalYearException;
 use App\Models\Animal;
@@ -138,6 +139,8 @@ class SyncController extends Controller
         'quotes',
         // Ticket U13 — paie réglée : lecture seule au poste (Recettes et Dépenses).
         'payslips',
+        // Ticket AV1 — retours et avoirs clients saisis au poste (demande ; le serveur fait les effets).
+        'credit_notes',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -240,6 +243,8 @@ class SyncController extends Controller
         // Ticket DEV — DEVIS : aux comptes qui ouvrent « Ventes & Devis » (`view-ventes`, la permission de la route du
         // hub), comme le web leur montre l'onglet « Devis Prestations ». Archivés compris (`is_active`).
         'quotes' => ['view-ventes'],
+        // Ticket AV1 — « Retours et Avoirs » (hub Ventes & Devis, `view-ventes`, comme `customer_advances`).
+        'credit_notes' => ['view-ventes'],
         'stock_movements' => ['view-elevage', 'view-stocks', 'view-rapports'],
         'treasury_accounts' => null,
         'expense_categories' => ['view-achats'],
@@ -1542,6 +1547,10 @@ class SyncController extends Controller
                     'customer_id' => $vente->customer_id,
                     'customer_name' => $vente->customer?->name,
                     'payment_mode' => $vente->payment_mode,
+                    // Ticket AV2 — « Historique des Ventes » du poste = celui du web : colonne « Remise » et détail d'une vente
+                    // (sous-total, remise, total). Sans eux le poste affichait 0 pour la remise d'une vente du web.
+                    'subtotal' => $vente->subtotal,
+                    'discount' => $vente->discount,
                     'total' => $vente->total,
                     'status' => $vente->status,
                     'mecef_status' => $vente->mecef_status,
@@ -1570,6 +1579,35 @@ class SyncController extends Controller
                             'manual_total_amount' => (float) $ligne->manual_total_amount,
                         ],
                     )],
+                ],
+            ],
+            [
+                // 🔴→✅ TICKET AV1 — LES AVOIRS CLIENTS DESCENDENT AU POSTE (« Retours et Avoirs »).
+                //
+                // Une ligne par avoir (un avoir porte UN produit : `credit_notes.product_id`), sans lignes filles : table
+                // d'historique paginée par pièce, au curseur (`updated_at`, `id`). `credit_note_number` (`AV-AAAA-NNN`)
+                // est attribué par le serveur seul : une demande née sur un poste le reçoit ici, au tirage qui suit son
+                // acquittement. `created_at` est le JOUR DU FAIT, servi en HEURE MURALE du serveur ('Y-m-d H:i:s', le web
+                // n'en montre que le jour : `format('d/m/Y')`). `accounting_entry_id` ne descend pas (le poste ne tient
+                // pas la comptabilité d'un avoir : il en lit le résultat au Journal).
+                'cle' => 'credit_notes',
+                'requete' => fn () => \App\Models\CreditNote::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'credit_note_number', 'sale_id', 'product_id', 'qty', 'amount', 'reason', 'decision',
+                        'inspection_notes', 'status', 'created_at', 'updated_at']),
+                'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
+                'enJson' => fn (\App\Models\CreditNote $a) => [
+                    'id' => $a->id,
+                    'credit_note_number' => $a->credit_note_number,
+                    'sale_id' => $a->sale_id,
+                    'product_id' => $a->product_id,
+                    'qty' => $a->qty === null ? null : (float) $a->qty,
+                    'amount' => (float) $a->amount,
+                    'reason' => $a->reason,
+                    'decision' => $a->decision,
+                    'inspection_notes' => $a->inspection_notes,
+                    'status' => $a->status,
+                    'created_at' => $a->created_at?->format('Y-m-d H:i:s'),
                 ],
             ],
             [
@@ -1893,6 +1931,8 @@ class SyncController extends Controller
             // Ticket BS3 — reproducteurs nominatifs du poste, rejoués par `SaisieReproducteurAction` (l'écran web du registre).
             'animals' => ['accepted' => [], 'rejected' => []],
             'sales' => ['accepted' => [], 'rejected' => []],
+            // Ticket AV1 — retours et avoirs clients, rejoués par `AvoirClientService` (le point de passage du web).
+            'credit_notes' => ['accepted' => [], 'rejected' => []],
             'stock_adjustments' => ['accepted' => [], 'rejected' => []],
             'veterinary_records' => ['accepted' => [], 'rejected' => []],
             'expenses' => ['accepted' => [], 'rejected' => []],
@@ -2122,6 +2162,16 @@ class SyncController extends Controller
             );
         }
 
+        // 🔴→✅ TICKET AV1 — APRÈS les ventes : un retour peut viser la vente du même envoi. Le POSTE N'ENVOIE JAMAIS
+        // d'ajustement de stock ni d'écriture pour un retour : le serveur réintègre le stock (décision « réintégré ») et
+        // passe l'écriture inverse, dans `AvoirClientService`, comme `RetoursAvoirs::saveReturn()`.
+        if ($request->has('credit_notes')) {
+            $result['credit_notes'] = $this->pushCreditNotes(
+                $request->input('credit_notes'),
+                $request->user(),
+            );
+        }
+
         // ⚠️ APRÈS les ventes ET les avances (15.19) : une imputation peut viser la créance que la
         // vente à crédit du même envoi vient de créer, avec l'avance du même envoi.
         if ($request->has('advance_imputations')) {
@@ -2245,6 +2295,8 @@ class SyncController extends Controller
         'sales' => 'manage-ventes',
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
+        // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
+        'credit_notes' => 'manage-ventes',
         'stock_adjustments' => 'manage-stocks',
     ];
 
@@ -4101,6 +4153,72 @@ class SyncController extends Controller
     }
 
     /**
+     * 🔴→✅ TICKET AV1 — RETOURS ET AVOIRS CLIENTS SAISIS AU POSTE (écran « Retours et Avoirs »).
+     *
+     * ⚠️⚠️ LE POSTE N'ENVOIE QUE LA DEMANDE : « ce produit, de cette vente, en telle quantité, pour tel motif, tel jour,
+     * à réintégrer ou à réformer, pour tel montant ». La numérotation `AV-AAAA-NNN`, le stock (réintégré), l'écriture
+     * inverse 701 / 443 / 411 et le journal d'audit sont faits ICI par `AvoirClientService`, le point de passage de
+     * `RetoursAvoirs::saveReturn()` — jamais une seconde implémentation.
+     *
+     * ABSORBEUR STRICT (refus MOTIVÉ de CET avoir seul ; la transaction annulée ne laisse ni stock ni écriture) :
+     * vente inconnue ou annulée, produit absent de la vente, quantité au-delà de « vendu − déjà retourné », montant
+     * au-delà de « ligne − déjà crédité », date future ou antérieure à la vente, exercice absent ou clos, plan
+     * comptable incomplet, droit `manage-ventes`.
+     *
+     * ⚠️ IDEMPOTENCE : `id` = UUID de l'avoir né sur le poste ; un `id` déjà reçu est acquitté sans rien rejouer. Un
+     * avoir connu renvoyé au statut `traite` est marqué traité (« Marquer comme traité » du web), une seule fois.
+     */
+    private function pushCreditNotes(array $avoirs, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(AvoirClientService::class);
+
+        foreach ($avoirs as $data) {
+            $id = is_array($data) ? ($data['id'] ?? null) : null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::roleInsuffisant('credit_notes')];
+
+                continue;
+            }
+
+            try {
+                $valides = validator(is_array($data) ? $data : [], [
+                    'id' => ['required', 'uuid'],
+                    'sale_id' => ['required', 'uuid'],
+                    'product_id' => ['required', 'uuid', 'exists:products,id'],
+                    'qty' => ['required', 'numeric', 'gt:0'],
+                    'amount' => ['required', 'numeric', 'min:0'],
+                    'reason' => ['required', 'string', 'max:255'],
+                    'decision' => ['required', 'in:reintegre,reforme'],
+                    'inspection_notes' => ['nullable', 'string', 'max:2000'],
+                    'status' => ['nullable', 'in:en_attente,traite'],
+                    'credit_date' => ['required', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $existant = \App\Models\CreditNote::find($valides['id']);
+
+                if ($existant === null) {
+                    $existant = $service->enregistrer($valides, $valides['id'], Carbon::parse($valides['credit_date']));
+                }
+
+                if (($valides['status'] ?? null) === 'traite') {
+                    $service->marquerTraite($existant);
+                }
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\AvoirClientRefuseException $e) {
+                $rejected[] = ['id' => $id, 'reason' => 'Retour refusé : '.$e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
      * Remboursements fournisseurs saisis au poste (ticket 15.20, D8).
      *
      * ⚠️⚠️ LE POSTE N'ENVOIE QUE LE FAIT : « tant reçu de ce fournisseur, sur ce compte ». Le plafond (créance
@@ -4406,7 +4524,11 @@ class SyncController extends Controller
 
                 $valides = validator($donnees, [
                     'id' => ['required', 'uuid'],
-                    'code' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('livestock_lots', 'code')->ignore($existante?->id)],
+                    // Ticket UNI : unique parmi TOUTES les bandes, casse et espaces ignorés ; le motif dit au poste quoi faire (renommer).
+                    // ⚠️ Un code que la bande PORTE DÉJÀ n'est pas revérifié : un doublon antérieur à la règle ne bloque ni
+                    // l'archivage, ni la restauration, ni le changement de stade de cette bande (le client le renomme).
+                    'code' => array_merge(['required', 'string', 'max:50'], $existante !== null && trim((string) $existante->code) === trim((string) ($donnees['code'] ?? ''))
+                        ? [] : [\App\Rules\UniqueNormalise::bande($existante?->id, depuisPoste: true)]),
                     'species_id' => ['required', 'uuid', 'exists:livestock_species,id'],
                     'stage' => ['required', 'in:'.implode(',', array_keys(LivestockLot::stadesPourEspece($espece?->code)))],
                     'created_date' => ['required', 'date'],
@@ -4423,14 +4545,16 @@ class SyncController extends Controller
                 $archivee = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
                 $restauree = ! $archivee && filter_var($valides['restauree'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-                if ($existante !== null && $existante->code !== $valides['code']) {
+                // Ticket UNI : le code ne change jamais, SAUF pour corriger un doublon (code partagé avec une autre bande).
+                $renomme = $existante !== null && trim((string) $existante->code) !== $valides['code'];
+                if ($renomme && ! $existante->codeEstEnDoublon()) {
                     $rejected[] = ['id' => $id, 'reason' => "Le code d'une bande ne se modifie jamais après sa création."];
 
                     continue;
                 }
 
                 // Une seule transaction par ligne : une création suivie d'un refus n'écrit rien.
-                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree) {
+                DB::transaction(function () use ($saisie, $valides, $existante, $archivee, $restauree, $renomme) {
                     if ($existante === null) {
                         $saisie->creer([
                             'code' => $valides['code'], 'species_id' => $valides['species_id'], 'stage' => $valides['stage'],
@@ -4451,11 +4575,12 @@ class SyncController extends Controller
                     } elseif ($archivee) {
                         // BS-Q3 : la bande doit être vidée AVANT d'être archivée. Une correction d'effectif envoyée avec
                         // l'archivage (bande vidée au poste) se joue d'abord, comme au web (Modifier, puis Archiver).
-                        if (($valides['effectif_corrige'] ?? null) !== null && $existante->is_active) {
+                        if ((($valides['effectif_corrige'] ?? null) !== null || $renomme) && $existante->is_active) {
                             $saisie->modifier($valides['id'], [
                                 'stage' => $valides['stage'],
                                 'status' => $valides['status'] ?? $existante->status,
-                                'current_quantity' => $valides['effectif_corrige'],
+                                'current_quantity' => $valides['effectif_corrige'] ?? null,
+                                'code' => $valides['code'],
                             ]);
                         }
                         $saisie->archiver($valides['id']);
@@ -4468,6 +4593,7 @@ class SyncController extends Controller
                             'stage' => $valides['stage'],
                             'status' => $valides['status'] ?? $existante->status,
                             'current_quantity' => $valides['effectif_corrige'] ?? null,
+                            'code' => $valides['code'],
                         ]);
                     }
                 });
@@ -4636,6 +4762,16 @@ class SyncController extends Controller
             // ⚠️ TICKET 15.38 — `discount` est NOT NULL DEFAULT 0 : `null` = clé absente = aucune remise.
             $saleData = $this->sansNullSurColonnesNotNull($saleData, ['discount']);
 
+            // 🔴→✅ TICKET AV2 — LA DEMANDE D'ANNULATION D'UN POSTE. Le bouton « Annuler » de l'historique des ventes du
+            // poste passe la vente à `annulee` et la renvoie : le serveur fait l'effet (`AnnulerVenteAction`, celle de
+            // `HistoriqueVentes::cancelSale()` : stock réintégré, statut, audit), une seule fois. Une vente CONNUE est
+            // annulée ; une vente INCONNUE (annulée avant son premier envoi) est reçue comme vendue, avec tous ses
+            // effets, PUIS annulée — le même chemin que le web (vendre, puis annuler), jamais un statut posé sans effet.
+            $aAnnuler = is_array($saleData) && ($saleData['status'] ?? null) === 'annulee';
+            if ($aAnnuler) {
+                $saleData['status'] = 'validee';
+            }
+
             try {
                 // ⚠️⚠️ TICKET 14.70 — LE CONTENU DES LIGNES EST ENFIN EXAMINE.
                 // Les lignes etaient creees par assignation de masse
@@ -4692,7 +4828,7 @@ class SyncController extends Controller
                     app(VerifySaleDateAction::class)->execute($validated['sold_at']);
                 }
 
-                DB::transaction(function () use ($validated, $saleData, $fichesRecues) {
+                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler) {
                     // ⚠️ Même contrainte que LivestockDailyEntry ci-dessus :
                     // 'id' n'est pas fillable sur Sale — assignation
                     // explicite pour préserver réellement l'UUID généré
@@ -4801,6 +4937,10 @@ class SyncController extends Controller
                     // l'administrateur, jamais refusée ni passée sous silence.
                     app(\App\Actions\FlagNegativeStockFromSyncAction::class)->execute($sale->fresh('lines'));
 
+                    if ($aAnnuler) {
+                        app(\App\Actions\AnnulerVenteAction::class)->execute($sale->fresh('lines'));
+                    }
+
                     // 🔴→✅ TICKET 14.80 — LA NORMALISATION FISCALE MANQUAIT : une vente encaissée hors ligne arrivait
                     // en base avec `mecef_status` NUL, jamais déclarée à la DGI. ⚠️ TICKET S-T13 : elle est facturée
                     // APRÈS la transaction de l'envoi (`push`, `ventesAFacturer`), jamais dans un essai qui peut être
@@ -4808,13 +4948,26 @@ class SyncController extends Controller
                 });
 
                 $accepted[] = $validated['id'];
-                $this->ventesAFacturer[] = $validated['id'];
+                // Une vente reçue annulée n'a pas à être normalisée auprès de la DGI.
+                if (! $aAnnuler) {
+                    $this->ventesAFacturer[] = $validated['id'];
+                }
             } catch (ValidationException $e) {
                 // 'unique:sales,id' échoue si cette vente a déjà été
                 // synchronisée précédemment — traité comme un succès
                 // silencieux (déjà là), jamais une erreur, pour permettre
                 // un push répété sans risque en cas de coupure réseau.
                 if (isset($saleData['id']) && Sale::where('id', $saleData['id'])->exists()) {
+                    // Ticket AV2 — vente CONNUE renvoyée annulée : la demande d'annulation est rejouée (idempotente).
+                    if ($aAnnuler) {
+                        try {
+                            app(\App\Actions\AnnulerVenteAction::class)->execute(Sale::with('lines')->find($saleData['id']));
+                        } catch (NoOpenFiscalYearException|ClosedFiscalYearException $e) {
+                            $rejected[] = ['id' => $saleData['id'], 'reason' => 'Annulation refusée : '.$e->getMessage()];
+
+                            continue;
+                        }
+                    }
                     $accepted[] = $saleData['id'];
                 } else {
                     $rejected[] = ['id' => $saleData['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];

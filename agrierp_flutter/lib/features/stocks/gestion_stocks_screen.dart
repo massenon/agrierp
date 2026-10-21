@@ -258,32 +258,9 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
     final colonnes = AgriBreakpoints.moyen(context) ? 4 : 2;
     final cartes = _cartesKpi(d);
 
-    // 🔴→✅ LA CARTE PREND LA HAUTEUR DE SON CONTENU, comme au web (grille CSS : la rangée suit sa plus haute carte).
-    // `GridView.count` (rapport 2,6) faisait 76,8 px et la légende sur deux lignes de « Rotation du Stock » débordait
-    // de 8 px (bandeau jaune et noir) ; une hauteur fixe (104 px) débordait encore avec la police agrandie ou aux
-    // largeurs étroites. Chaque rangée est donc une `IntrinsicHeight` : ses cartes s'alignent sur la plus haute.
-    return Column(
-      children: [
-        for (var debut = 0; debut < cartes.length; debut += colonnes) ...[
-          if (debut > 0) const SizedBox(height: AgriSpacing.md),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < colonnes; i++) ...[
-                  if (i > 0) const SizedBox(width: AgriSpacing.md),
-                  Expanded(
-                    child: debut + i < cartes.length
-                        ? cartes[debut + i]
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
+    // La carte prend la hauteur de son contenu (min. `CarteKpi.hauteurMin`), comme au web (grille CSS : la rangée suit
+    // sa plus haute carte) : `GrilleKpi`, jamais un rapport fixe (débordement de « Rotation du Stock », 8 px).
+    return GrilleKpi(colonnes: colonnes, children: cartes);
   }
 
   List<Widget> _cartesKpi(DonneesStocks d) => [

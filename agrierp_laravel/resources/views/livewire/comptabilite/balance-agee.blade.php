@@ -35,7 +35,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-md mb-lg">
         @foreach($this->tranches as $tranche)
-            <div class="bg-white p-md rounded-lg border border-outline-variant border-l-4 {{ $tranche === 'Non échu' ? 'border-l-brand-emerald' : ($tranche === 'Plus de 90 jours' ? 'border-l-error-red' : 'border-l-accent-yellow') }} shadow-sm">
+            <div class="kpi-card bg-white rounded-lg border border-outline-variant {{ $tranche === 'Non échu' ? 'border-l-brand-emerald' : ($tranche === 'Plus de 90 jours' ? 'border-l-error-red' : 'border-l-accent-yellow') }} shadow-sm">
                 <span class="text-[10px] text-outline font-bold uppercase block">{{ $tranche }}</span>
                 <span class="text-base md:text-xl font-extrabold block mt-xs">
                     {{ number_format($this->donnees['totaux'][$tranche], 0, ',', ' ') }} F

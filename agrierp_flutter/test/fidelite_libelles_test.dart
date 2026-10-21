@@ -163,7 +163,9 @@ void main() {
     'seuils-alerte.html': [
       'lib/features/stocks/catalogue_produits_screen.dart',
     ],
-    'historique-ventes.html': ['lib/features/ventes/ventes_devis_screen.dart'],
+    // Ticket AV2 : le Blade fait foi. `historique-ventes.html` ne se compare plus à la maquette (« Détail de la
+    // Vente », « Annuler la Vente », « Désignation », « Exporter »…) : titres, colonnes, filtres, statuts, cartes,
+    // modale, tiroir et messages sont lus dans `historique-ventes.blade.php` par `historique_ventes_blade_test.dart`.
     // Ticket H7 : le Blade fait foi. `suivi-reproduction.html` ne se compare plus à la
     // maquette : titres, colonnes, statuts, KPI, modales et messages sont lus dans
     // `suivi-reproduction.blade.php` par `suivi_reproduction_blade_test.dart`.
@@ -385,9 +387,9 @@ void main() {
     'Confirmer Administration': 'clic sur la case, comme au Blade (H8b)',
 
     // ── Colonnes et libellés du détail d'une vente, non embarqué.
+    // Ticket AV2 : « P.U » et « Désignation » (détail de la vente de la maquette) n'ont plus de page qui les attende :
+    // `historique-ventes.html` est contrôlée contre son Blade ; exemptions globales retirées.
     'Qté': 'module non embarqué au poste',
-    'P.U': 'module non embarqué au poste',
-    'Désignation': 'module non embarqué au poste',
     'Modifier': 'référentiel en lecture seule au poste',
 
     // ── Hub Clients et Créances (ticket F0.43) : les fiches clients s'écrivent
@@ -792,10 +794,6 @@ void main() {
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
-    'historique-ventes.html': {
-      "Exporter": "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Imprimer': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-    },
     'plan-comptable.html': {
       "Confirmer l'archivage":
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
@@ -1160,7 +1158,9 @@ void main() {
   /// avec la page (contrôlée contre le Blade).
   /// U10 (19/10/2026) : 210 → 207 — boutons de modale (« Annuler », « Enregistrer »…) désormais affichés par
   /// Gestion des Stocks (modale « Ajouter Stock » du Blade).
-  const plafondManquesMasques = 207;
+  /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
+  /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
+  const plafondManquesMasques = 197;
 
   for (final entree in portages.entries) {
     final page = entree.key;

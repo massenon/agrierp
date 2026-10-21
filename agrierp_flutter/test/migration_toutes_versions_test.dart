@@ -69,6 +69,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   47: [d.payslips],
   // Ticket DEV — « Devis & Proforma » au poste.
   53: [d.quotes],
+  // Tickets AV1 / AV2 — retours et avoirs clients (table mixte). ⚠️ Le palier 53 est celui de la branche « Devis Prestations ».
+  54: [d.creditNotes],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -226,6 +228,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   52: [],
   // Ticket DEV — table `quotes` créée (aucune colonne ajoutée à une table existante).
   53: [],
+  // Tickets AV1 / AV2 — table `credit_notes` créée (aucune colonne ajoutée à une table existante).
+  54: [],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -318,6 +322,17 @@ void main() {
     try {
       dossier.deleteSync(recursive: true);
     } catch (_) {}
+  });
+
+  test('⚠️ la chaîne 52 → 53 (quotes, ticket DEV) → 54 (credit_notes, tickets AV) est complète, sans trou', () {
+    final d = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(d.close);
+    expect(d.schemaVersion, 54);
+    expect(_tablesCreees(d)[53], [d.quotes]);
+    expect(_tablesCreees(d)[54], [d.creditNotes]);
+    final source = File('lib/core/database/app_database.dart').readAsStringSync();
+    expect(source, contains('if (from < 53) {'));
+    expect(source, contains('if (from < 54) {'));
   });
 
   test('l’historique du test couvre le palier le plus récent du schéma', () {

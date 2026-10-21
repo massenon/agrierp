@@ -225,50 +225,40 @@ class _DevisOngletState extends State<DevisOnglet> {
   /// `grid grid-cols-2 xl:grid-cols-4 gap-md` — les quatre `x-kpi-card` du Blade, dans son ordre et ses couleurs
   /// (émeraude, bleu, maïs, rouge). Rien n'est lu : « — », jamais 0.
   Widget _indicateurs(KpisDevis? k) {
-    return LayoutBuilder(
-      builder: (context, contraintes) {
-        final colonnes = AgriBreakpoints.tresLarge(context) ? 4 : 2;
-        final largeur = (contraintes.maxWidth - (colonnes - 1) * AgriSpacing.md) / colonnes;
-        Widget carte(String libelle, String valeur, Color couleur, IconData icone, {Color? couleurIcone}) => SizedBox(
-          width: largeur,
-          child: CarteKpi(
-            key: Key('kpi-$libelle'),
-            libelle: libelle,
-            valeur: valeur,
-            icone: icone,
-            couleurLisere: couleur,
-            couleurIcone: couleurIcone ?? couleur,
-          ),
-        );
+    Widget carte(String libelle, String valeur, Color couleur, IconData icone, {Color? couleurIcone}) => CarteKpi(
+      key: Key('kpi-$libelle'),
+      libelle: libelle,
+      valeur: valeur,
+      icone: icone,
+      couleurLisere: couleur,
+      couleurIcone: couleurIcone ?? couleur,
+    );
 
-        return Wrap(
-          spacing: AgriSpacing.md,
-          runSpacing: AgriSpacing.md,
-          children: [
-            carte('Devis Actifs', k == null ? '—' : '${k.devisActifs}', AgriColors.brandEmerald, SymbolesAgri.request_quote),
-            carte(
-              'Valeur Totale',
-              // `number_format($kpis['valeur_totale'], 0, ',', ' ').' FCFA'`.
-              k == null ? '—' : '${PmpService.francs(k.valeurTotale)} FCFA',
-              AgriColors.infoBlue,
-              SymbolesAgri.payments,
-            ),
-            carte(
-              'Taux de Conversion',
-              k == null ? '—' : '${k.tauxConversion} %',
-              AgriColors.accentYellow,
-              SymbolesAgri.trending_up,
-              couleurIcone: AgriColors.brandForest,
-            ),
-            carte(
-              'En Attente de Relance',
-              k == null ? '—' : '${k.enAttenteDeRelance}',
-              AgriColors.errorRed,
-              SymbolesAgri.pending_actions,
-            ),
-          ],
-        );
-      },
+    return GrilleKpi(
+      colonnes: AgriBreakpoints.tresLarge(context) ? 4 : 2,
+      children: [
+        carte('Devis Actifs', k == null ? '—' : '${k.devisActifs}', AgriColors.brandEmerald, SymbolesAgri.request_quote),
+        carte(
+          'Valeur Totale',
+          // `number_format($kpis['valeur_totale'], 0, ',', ' ').' FCFA'`.
+          k == null ? '—' : '${PmpService.francs(k.valeurTotale)} FCFA',
+          AgriColors.infoBlue,
+          SymbolesAgri.payments,
+        ),
+        carte(
+          'Taux de Conversion',
+          k == null ? '—' : '${k.tauxConversion} %',
+          AgriColors.accentYellow,
+          SymbolesAgri.trending_up,
+          couleurIcone: AgriColors.brandForest,
+        ),
+        carte(
+          'En Attente de Relance',
+          k == null ? '—' : '${k.enAttenteDeRelance}',
+          AgriColors.errorRed,
+          SymbolesAgri.pending_actions,
+        ),
+      ],
     );
   }
 

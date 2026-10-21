@@ -298,8 +298,12 @@ void main() {
     }
     expect(composant, contains("authorize('export-ventes')"));
     final main = File('lib/main.dart').readAsStringSync();
-    expect(main, contains("peutGererDevis: PermissionsPoste.peut(_role, 'manage-ventes')"));
-    expect(main, contains("peutExporterDevis: PermissionsPoste.peut(_role, 'export-ventes')"));
+    // Le hub passe ses droits `manage-ventes` / `export-ventes` à tous ses onglets, Devis compris.
+    final hub = main.substring(main.indexOf('EcranPoste.ventesEtDevis => VentesDevisScreen('));
+    final appel = hub.substring(0, hub.indexOf('),\n        EcranPoste.caisse'));
+    expect(appel, contains('devis: widget.devis'));
+    expect(appel, contains("peutGerer: PermissionsPoste.peut(_role, 'manage-ventes')"));
+    expect(appel, contains("peutExporter: PermissionsPoste.peut(_role, 'export-ventes')"));
   }, skip: absent);
 
   test('⚠️ le PDF « Exporter » : mêmes colonnes, titre, sous-titre, nom de fichier et état vide que `exports/devis.blade.php`', () {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/temps/heure_benin.dart';
@@ -29,6 +30,7 @@ class MonProfilScreen extends StatefulWidget {
     required this.depot,
     required this.session,
     this.changer,
+    this.changerPin,
   });
 
   final MonProfilRepository depot;
@@ -41,6 +43,17 @@ class MonProfilScreen extends StatefulWidget {
     required String confirmation,
   })?
   changer;
+
+  /// Ticket VL-1 — « Changer le code PIN » (verrou local) : (réussi, message). `null` : la section n'est pas montrée.
+  ///
+  /// ⚠️ **FONCTION PROPRE AU POSTE** : le web n'a pas de verrou ; la section est un ajout assumé (doctrine, art. 5,
+  /// exception), qui ne remplace ni ne déplace rien du Blade.
+  final Future<(bool, String)> Function({
+    required String ancien,
+    required String nouveau,
+    required String confirmation,
+  })?
+  changerPin;
 
   /// Session ouverte, `null` si aucun utilisateur n'est connecté.
   final SessionUtilisateur? session;
@@ -64,6 +77,11 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
   final _ancien = TextEditingController();
   final _nouveau = TextEditingController();
   final _confirmation = TextEditingController();
+  final _pinAncien = TextEditingController();
+  final _pinNouveau = TextEditingController();
+  final _pinConfirmation = TextEditingController();
+  (bool, String)? _resultatPin;
+  bool _pinEnCours = false;
 
   DonneesProfil? _donnees;
   Map<String, String> _erreurs = const {};
@@ -83,6 +101,9 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     _ancien.dispose();
     _nouveau.dispose();
     _confirmation.dispose();
+    _pinAncien.dispose();
+    _pinNouveau.dispose();
+    _pinConfirmation.dispose();
     super.dispose();
   }
 
@@ -90,6 +111,35 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     final donnees = await widget.depot.charger(widget.session);
     if (!mounted) return;
     setState(() => _donnees = donnees);
+  }
+
+  Future<void> _soumettrePin() async {
+    final changer = widget.changerPin;
+    if (_pinEnCours || changer == null) return;
+    setState(() {
+      _pinEnCours = true;
+      _resultatPin = null;
+    });
+    (bool, String) resultat;
+    try {
+      resultat = await changer(
+        ancien: _pinAncien.text,
+        nouveau: _pinNouveau.text,
+        confirmation: _pinConfirmation.text,
+      );
+    } on Object {
+      resultat = (false, 'Changement impossible.');
+    }
+    if (!mounted) return;
+    if (resultat.$1) {
+      _pinAncien.clear();
+      _pinNouveau.clear();
+      _pinConfirmation.clear();
+    }
+    setState(() {
+      _pinEnCours = false;
+      _resultatPin = resultat;
+    });
   }
 
   Future<void> _soumettre() async {
@@ -172,6 +222,10 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
                   children: [
                     _carteMotDePasse(),
                     const SizedBox(height: AgriSpacing.md),
+                    if (widget.changerPin != null) ...[
+                      _cartePin(),
+                      const SizedBox(height: AgriSpacing.md),
+                    ],
                     _carteJournal(d),
                   ],
                 );
@@ -510,12 +564,101 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     ),
   );
 
+  /// Ticket VL-1 — « Changer le code PIN » du verrou local (propre au poste).
+  Widget _cartePin() => Container(
+    key: const Key('carte-pin'),
+    padding: const EdgeInsets.all(AgriSpacing.md),
+    decoration: _carte,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(SymbolesAgri.lock, size: 18, color: AgriColors.brandForest),
+            const SizedBox(width: AgriSpacing.xs),
+            Text(
+              'Changer le code PIN'.toUpperCase(),
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: AgriTypography.gras,
+                color: AgriColors.brandForest,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          "Le code PIN verrouille l'application à chaque lancement, même sans réseau (propre à ce poste).",
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 448),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _champ('Ancien code PIN *', _pinAncien, const Key('pin-ancien'), 'pin-ancien', chiffres: true),
+              const SizedBox(height: AgriSpacing.md),
+              _champ(
+                'Nouveau code PIN *',
+                _pinNouveau,
+                const Key('pin-nouveau'),
+                'pin-nouveau',
+                aide: '4 à 6 chiffres',
+                chiffres: true,
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              _champ(
+                'Confirmer le nouveau code PIN *',
+                _pinConfirmation,
+                const Key('pin-confirmation'),
+                'pin-confirmation',
+                chiffres: true,
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton(
+                  key: const Key('pin-envoyer'),
+                  onPressed: _pinEnCours ? null : _soumettrePin,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AgriColors.brandEmerald,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AgriSpacing.lg,
+                      vertical: AgriSpacing.sm,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AgriRadius.lg),
+                    ),
+                  ),
+                  child: const Text(
+                    'Mettre à jour le code PIN',
+                    style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras),
+                  ),
+                ),
+              ),
+              if (_resultatPin != null) ...[
+                const SizedBox(height: AgriSpacing.md),
+                _bandeauResultat(
+                  _resultatPin!.$1,
+                  _resultatPin!.$2,
+                  cle: _resultatPin!.$1 ? 'pin-reussi' : 'pin-echec',
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _champ(
     String libelle,
     TextEditingController controleur,
     Key cle,
     String champ, {
     String? aide,
+    bool chiffres = false,
   }) {
     final erreur = _erreurs[champ];
 
@@ -537,6 +680,10 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
             key: cle,
             controller: controleur,
             obscureText: true,
+            keyboardType: chiffres ? TextInputType.number : null,
+            inputFormatters: chiffres
+                ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)]
+                : null,
             style: const TextStyle(fontSize: AgriTypography.sm),
             decoration: InputDecoration(
               hintText: aide,
@@ -581,11 +728,11 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
 
   /// Vert si le serveur a confirmé, rouge sinon. ⚠️ JAMAIS de vert sans
   /// réponse du serveur : le prototype affiche son succès sans rien envoyer.
-  Widget _bandeauResultat(bool reussi, String message) {
+  Widget _bandeauResultat(bool reussi, String message, {String? cle}) {
     final couleur = reussi ? AgriColors.brandEmerald : AgriColors.errorRed;
 
     return Container(
-      key: Key(reussi ? 'mdp-reussi' : 'mdp-echec'),
+      key: Key(cle ?? (reussi ? 'mdp-reussi' : 'mdp-echec')),
       padding: const EdgeInsets.all(AgriSpacing.sm),
       decoration: BoxDecoration(
         color: couleur.withValues(alpha: 0.10),

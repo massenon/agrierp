@@ -87,6 +87,8 @@ void main() {
     'attestation_counts': null,
     'sales': 'sales',
     'sale_lines': 'sale_lines',
+    // Tickets AV1 / AV2 — retours et avoirs clients (table mixte : demandes saisies au poste ET avoirs tirés du serveur).
+    'credit_notes': 'credit_notes',
     'stock_movements': 'stock_movements',
     'treasury_accounts': 'treasury_accounts',
     'expense_categories': 'expense_categories',

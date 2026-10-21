@@ -93,6 +93,8 @@ class MotifsRefusPush
             // Ticket DEV — devis : les noms de champ du web (`lang/fr/validation.php`, `attributes`).
             'articles_description' => 'description des articles', 'tva_rate' => 'taux de TVA',
             'validity_days' => 'durée de validité (jours)', 'quote_date' => 'date du devis',
+            'qty' => 'quantité retournée', 'decision' => 'décision', 'inspection_notes' => 'notes d\'inspection',
+            'credit_date' => 'date du retour',
             // Ticket 15.40 — ventilation par catégorie. Emplacements génériques (14.11/14.12), glossaire du 17/10/2026
             // (F0.99) : la 2e catégorie est Sous-mères (lapins) ou Porcelet (porcs), la 3e Jeune ou Porc Marchand.
             'mort_repro' => 'morts reproducteurs', 'mort_sevre' => 'morts sous-mères ou porcelets',
@@ -229,6 +231,7 @@ class MotifsRefusPush
             'attendance_records' => 'enregistrer un pointage',
             'sales' => 'enregistrer une vente',
             'quotes' => 'saisir un devis',
+            'credit_notes' => 'enregistrer un retour ou un avoir client',
             'stock_adjustments' => 'ajuster le stock',
         ][$table] ?? 'écrire ces données';
 

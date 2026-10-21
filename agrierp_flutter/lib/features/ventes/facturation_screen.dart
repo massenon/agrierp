@@ -173,14 +173,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
     ],
   );
 
-  Widget _grilleKpis(bool large, DonneesFacturation d) => GridView.count(
-    crossAxisCount: large ? 4 : 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: AgriSpacing.md,
-    crossAxisSpacing: AgriSpacing.md,
-    childAspectRatio: large ? 2.4 : 1.6,
-    children: [
+  Widget _grilleKpis(bool large, DonneesFacturation d) => GrilleKpi(colonnes: large ? 4 : 2, children: [
       CarteKpi(
         libelle: 'Factures (mois)',
         valeur: '${d.duMois.length}',
