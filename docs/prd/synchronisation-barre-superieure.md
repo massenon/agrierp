@@ -1,6 +1,8 @@
 # PRD — Bouton « Synchroniser » dans la barre supérieure et modale de synchronisation (poste et web)
 **Statut :** brouillon · **Date :** 2026-10-19 · **Ticket(s) :** H2 (absorbe B4), H3, décisions D-SYNC-1 à D-SYNC-5 (`docs/PLAN_FINALISATION.md`)
 
+> ⚠️ **Amendé le 21/10/2026 (§11, correction du client).** L'affirmation « côté web, ce n'est pas un bouton qui synchronise : le serveur EST la base » et la ligne « Aucun bouton Synchroniser : le serveur n'envoie rien » (EF11) étaient **fausses** pour un point : le web doit AUSSI faire revenir les données vers les postes. Le §11 dit ce qui est construit ; les §1 à §10 restent, tels que livrés le 19/10/2026, l'état avant correction.
+
 > **Construit d'abord sur le web** (Doctrine, article 0). Ni le web ni le prototype n'ont cette modale. Côté web, **ce n'est pas un bouton qui synchronise** : le serveur EST la base. La décision du Sprint 0 (`README_SPRINT0.md:107`, `:9667`) a écarté du web un bouton « Synchroniser » « décor sans mécanisme ». Elle reste juste pour un bouton qui ferait semblant d'envoyer. La demande du client du 19/10/2026 lui donne un objet réel au web : **montrer l'état de synchronisation des postes de la ferme**. Les deux surfaces partagent le même bouton, la même modale et la même structure ; seul le contenu propre à chaque surface diffère, et il est dit à l'écran.
 
 ## 1. Problème
@@ -183,3 +185,56 @@ Tous relèvent des décisions D-SYNC-1 à D-SYNC-5 ci-dessous.
 - **Flutter `test/compteur_attente_test.dart`** :
   - La liste des tables de `pendingCount()` est égale à celle de `_envoyer`.
   - **Mutation :** retirer `customers` du compteur doit rougir le test.
+
+---
+
+## 11. Amendement du 21/10/2026 — le web fait aussi revenir les données vers les postes (ticket SW-1)
+**Statut :** construit · **Origine :** correction du client · **Ticket :** SW-1 (`docs/PLAN_FINALISATION.md`)
+
+### 11.1 Ce qui était faux
+J'avais écrit que « sur le web le serveur est la base, donc il n'y a rien à envoyer ». Le client répond **non** : quand le web a été utilisé, les postes doivent recevoir ce qui y a été fait. Exemple : le portable sert au web parce que le poste de bureau est en panne ; le poste de bureau, une fois réparé, doit récupérer tout ce qui a été saisi au web. La modale web répond donc à : **« quels postes n'ont pas encore reçu ce qui a été fait au web, et puis-je forcer l'envoi ? »**
+
+### 11.2 Audit du tirage (`GET /api/sync/pull`), fait avant tout code
+- **Curseur.** Le poste garde `SyncState.lastPulledAt` = le `server_time` rendu à la DERNIÈRE page de son dernier tirage (début du tirage, reculé de 5 s), et le renvoie en `since`. Le serveur ne l'enregistrait pas.
+- **Filtre.** Chaque table servie par `updated_at > since` (curseur converti à l'heure du serveur, S-T12) ; les petits référentiels, les ensembles actifs (fournisseurs, avances, comptes de trésorerie…) et la liste des identifiants d'écritures actives sont servis **sans** filtre et remplacés au poste.
+- **Suppressions.** Aucune table synchronisée n'est supprimée physiquement au web (ni `SoftDeletes`, ni `->delete()`, hors lignes d'écriture remplacées avec `touch()` de la pièce, notifications et rôles servis en entier). L'archivage et l'annulation sont des `is_active = false` / `status = 'annulee'` : ils bougent `updated_at` et redescendent, ou disparaissent d'un ensemble servi en entier, ce que le poste lit pour retirer la ligne.
+- **Dépendance au « dernier contact ».** Aucune : ni `last_used_at` ni l'expiration du jeton n'interviennent dans le tirage.
+- **Scénario éprouvé** (`SyncPosteAbsentTest`) : un poste tire le 01/10, puis 20 jours d'absence pendant lesquels le web ajoute du stock, crée un article et une vente, renomme un client, archive un client, une dépense, un soin, un fournisseur, une avance, désactive une écriture, annule une vente. Le tirage depuis l'ancien curseur rend **tout**, y compris les archivages. **Aucun trou de requête trouvé.**
+- **Trous réels trouvés** (de conception, pas de requête) :
+  1. le serveur **ignorait le curseur de chaque poste** : impossible de dire quels postes sont en retard ;
+  2. **aucun moyen de forcer un tirage complet** (base du poste abîmée, sauvegarde restaurée) sans passer par la machine ;
+  3. la demande de synchronisation S-T6 **expire au bout d'une heure** : un poste réparé une semaine plus tard ne la lit jamais.
+
+### 11.3 Exigences fonctionnelles
+- **EF15** À chaque tirage terminé (dernière page, ou réponse non paginée), le serveur mémorise, par poste, le curseur rendu et l'instant du tirage (table `poste_synchronisations`, serveur seul, clé UUID).
+- **EF16** Pour chaque poste appairé, la modale web affiche : « Modifications du site depuis son dernier tirage : N », le détail par type en une ligne (« 2 ventes, 1 dépense, 1 article, 1 client »), la date du dernier tirage, la date du dernier envoi (colonne existante) et une pastille : **« À jour »** (N = 0), **« En retard de N jours »** (N > 0, dernier tirage d'au moins un jour), **« À recevoir »** (N > 0, tirage du jour), **« Jamais synchronisé »** (curseur inconnu : N affiché « — », jamais 0).
+- **EF17** Bouton **« Renvoyer vers ce poste »** par ligne et **« Renvoyer vers tous les postes »** en pied : lèvent le drapeau `resync_demandee_le`. Un poste inconnu ou au jeton expiré ne reçoit aucun drapeau (toast d'erreur). Réservé à l'administrateur (`manage-users`), comme la modale.
+- **EF18** Le drapeau est lu par le poste dans **la réponse du ping existant** `GET /api/sync/demande` (`resynchronisation`, `resynchronisation_demandee_le`) — le ping de 30 s déclenche aussitôt une synchronisation — et dans **la page 1 du tirage** (`resynchronisation_demandee_le`, clé absente sinon). Il reste levé **jusqu'à l'acquittement**, contrairement à la demande S-T6 : c'est ce qui permet à un poste réparé une semaine plus tard de le lire.
+- **EF19** Le poste honore le drapeau en repartant d'un tirage **complet** (sans `since`), puis acquitte par `POST /api/sync/resynchronisation/acquittement {demandee_le}`. Le serveur abaisse le drapeau **seulement si** `resync_demandee_le <= demandee_le` : une nouvelle demande arrivée pendant le tirage reste levée. Un acquittement perdu laisse le drapeau : le tirage suivant recommence (un tirage complet de trop, jamais une donnée manquante).
+- **EF20** Audit : `sync.renvoi_poste:{poste}` et `sync.renvoi_tous`, avec l'utilisateur et l'instant (onglet Audit Logs).
+- **EF21** La modale du poste affiche **« Resynchronisation demandée par le serveur »** de la lecture du drapeau à son acquittement.
+- **EF22** La réinitialisation des données vide `poste_synchronisations` (ticket 15.50), comme le journal.
+
+### 11.4 Règles et jeu d'exemple (calculé à la main, devenu test)
+Le poste A tire le 10/10 à 12:00. Depuis : 2 ventes (11/10, 15/10), 1 dépense (12/10), 1 article modifié (14/10), 1 client créé (16/10) = **5**. Avant son curseur : 1 vente (09/10), 1 client (10/10 11:59) : **non comptés**. Au 18/10 12:00 : « En retard de 8 jours », résumé « 2 ventes, 1 dépense, 1 article, 1 client ».
+Le compte est `updated_at > curseur` sur les tables de `ResynchronisationPostesService::TYPES` (ventes, achats, dépenses, articles, clients, fournisseurs, bandes, fiches journalières, soins, avances, mouvements de stock, écritures comptables), curseur converti à l'heure du serveur.
+
+### 11.5 Hors ligne et synchronisation
+- Aucune table synchronisable ajoutée ; **aucune migration Drift** (le drapeau vit au serveur, l'état « en cours » en mémoire du moteur).
+- Contrat : voir `agrierp_laravel/README_SPRINT0.md` (ticket SW-1). Ancien poste : il ignore les clés ajoutées, rien ne casse ; il ne sait pas honorer le drapeau, qui reste levé et visible au web.
+- **Ordre de mise en production : serveur d'abord, postes ensuite** (`docs/GUIDE_DEPLOIEMENT.md`).
+
+### 11.6 Interface — libellés exacts
+« Modifications du site depuis son dernier tirage » · « Dernier tirage » · « Renvoyer vers ce poste » · « Renvoyer vers tous les postes » · « À jour » · « En retard de N jours » · « À recevoir » · « Jamais synchronisé » · « Resynchronisation demandée le … » (web) · « Resynchronisation demandée par le serveur » (poste). Les libellés communs (« Synchronisation », « Dernier envoi », « À jour »…) sont ceux des §1 à §7.
+
+### 11.7 Questions ouvertes pour le client
+| Réf. | Question | Recommandation |
+|---|---|---|
+| D-SYNC-8 | Le compte « modifications du site » inclut aussi ce que **les autres postes** ont envoyé (tout passe par le serveur) et, jusqu'à son prochain tirage, ce que **ce poste** vient d'envoyer. Faut-il isoler les seules saisies faites au web ? | **Non** : ce qu'un poste doit recevoir, c'est tout ce que le serveur a de plus que lui. Le libellé dit « du site », pas « du web ». |
+| D-SYNC-9 | « En retard de N jours » compte depuis le dernier tirage du poste. Un seuil d'alerte (rouge) est-il voulu, comme les 3 jours de D-SYNC-6 ? | Pas de seuil : la pastille est rouge dès qu'il y a au moins un jour de retard avec des modifications. |
+| D-SYNC-10 | « Renvoyer vers tous les postes » vise les jetons non expirés. Un poste dont le jeton a expiré (90 jours) doit d'abord se reconnecter. | À garder : le drapeau se lève à la reconnexion si l'administrateur renvoie alors. |
+
+### 11.8 Critères d'acceptation
+- **Laravel `SyncPosteAbsentTest`** : scénario du poste absent (2 tests), aucune perte, aucun archivage manqué.
+- **Laravel `ResynchronisationPostesTest`** (9 tests) : jeu du §11.4 ; « À jour » et « Jamais synchronisé » (« — », pas 0) ; curseur comparé à l'heure du serveur (UTC+1) ; curseur mémorisé à la dernière page seulement ; drapeau posé, lu au ping et au tirage, acquitté, acquittement trop ancien refusé ; jeton et date exigés ; modale Livewire ; droits (comptable : 403) et audit ; poste inconnu sans drapeau. **Mutations :** retirer `where('updated_at', '>', …)` du compte, la condition de l'acquittement ou l'écriture du curseur doit rougir.
+- **Flutter `resynchronisation_serveur_test.dart`** (5 tests) : drapeau → tirage complet puis acquittement ; sans drapeau rien de plus ; ping ; acquittement refusé ou perdu ; modale. **Mutations :** retirer la relance complète ou l'acquittement du moteur doit rougir.
