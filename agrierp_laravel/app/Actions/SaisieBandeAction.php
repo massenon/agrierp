@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
+use App\Rules\UniqueNormalise;
 use App\Services\AccountingEntryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +23,9 @@ use Illuminate\Validation\ValidationException;
  *    le départ de toutes ses fiches) — motif R4, sous « Date de Création ». La bande d'origine (constitution) reste du
  *    ressort du transfert (`TransferBetweenLotsAction`), jamais d'ici : le poste l'envoie comme un transfert à part ;
  *  - modification : stade, statut, et effectif actuel SEULEMENT s'il est fourni (correction explicite de
- *    l'exploitant, comme « Modifier la Bande » du web). Le code, l'espèce, l'effectif initial ne changent jamais.
+ *    l'exploitant, comme « Modifier la Bande » du web). L'espèce et l'effectif initial ne changent jamais ; le code non
+ *    plus, SAUF ticket UNI : une bande dont le code est partagé avec une autre se renomme (vers un code libre),
+ *    c'est le seul moyen, pour le client, de corriger un doublon déjà présent sans qu'on y touche à sa place.
  *    Une bande ARCHIVÉE n'est plus modifiable ; une modification identique n'écrit rien (idempotence des renvois) ;
  *  - archivage : `is_active = false`, la ligne est gardée. Un second archivage n'a aucun effet, ni trace.
  *    ⚠️ BS-Q3 (décision client du 21/10/2026) : une bande qui a un effectif VIVANT (> 0) ne s'archive pas — il faut
@@ -93,13 +96,19 @@ class SaisieBandeAction
             throw ValidationException::withMessages(['created_date' => $refus]);
         }
 
+        // Ticket UNI : le code est unique parmi TOUTES les bandes (casse, accents et espaces ignorés). Garde-fou du
+        // point de passage unique : un appelant qui n'a pas validé (ou qui a perdu une course) ne crée pas de doublon.
+        if (UniqueNormalise::estPris('livestock_lots', 'code', $donnees['code'], $id)) {
+            throw ValidationException::withMessages(['code' => LivestockLot::messageCodePris(trim((string) $donnees['code']))]);
+        }
+
         return DB::transaction(function () use ($donnees, $id, $date) {
             $lot = new LivestockLot();
             if ($id !== null) {
                 $lot->id = $id;
             }
             $lot->fill([
-                'code' => $donnees['code'],
+                'code' => trim((string) $donnees['code']),
                 'species_id' => $donnees['species_id'],
                 // Ticket 14.37 : ce que la bande produit, décidé par l'exploitant.
                 'product_id' => ($donnees['product_id'] ?? null) ?: null,
@@ -145,13 +154,27 @@ class SaisieBandeAction
                 $nouveau['current_quantity'] = $corrige;
             }
 
+            // Ticket UNI : le code est immuable, SAUF pour corriger un doublon déjà en base — la bande dont le code est
+            // partagé avec une autre se renomme (par l'exploitant, jamais automatiquement), vers un code libre.
+            $code = array_key_exists('code', $donnees) ? trim((string) $donnees['code']) : '';
+            if ($code !== '' && $code !== trim((string) $lot->code)) {
+                if (! $lot->codeEstEnDoublon()) {
+                    throw ValidationException::withMessages(['code' => LivestockLot::MESSAGE_CODE_IMMUABLE]);
+                }
+                if (UniqueNormalise::estPris('livestock_lots', 'code', $code, $lot->id)) {
+                    throw ValidationException::withMessages(['code' => LivestockLot::messageCodePris($code)]);
+                }
+                $nouveau['code'] = $code;
+            }
+
             $lot->fill($nouveau);
             if (! $lot->isDirty()) {
                 return $lot;
             }
 
+            $renomme = $lot->isDirty('code');
             $lot->save();
-            AuditLog::record('livestock_lot.updated', 'elevage');
+            AuditLog::record($renomme ? 'livestock_lot.renamed' : 'livestock_lot.updated', 'elevage');
 
             return $lot;
         });
