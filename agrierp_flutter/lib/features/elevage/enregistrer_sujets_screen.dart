@@ -8,6 +8,7 @@ import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
@@ -696,17 +697,23 @@ class _ModaleSujetState extends State<_ModaleSujet> {
               child: ChampTexteModale(controleur: _quantite, nombre: true, enErreur: _erreurs.containsKey('quantite')),
             ),
           ),
-          BlocChampModale(
-            libelle: 'Date *',
-            erreur: _erreurs['entry_date'],
-            cleErreur: const Key('sujet-erreur-entry_date'),
-            enfant: KeyedSubtree(
-              key: const Key('sujet-date'),
-              child: ChampDateModale(
-                date: _date,
-                enErreur: _erreurs.containsKey('entry_date'),
-                surChangement: (d) => setState(() => _date = d),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+            child: ChampDateFormulaire(
+              cle: const Key('sujet-date'),
+              etiquette: 'Date *',
+              valeur: _date,
+              erreur: _erreurs['entry_date'],
+              cleErreur: const Key('sujet-erreur-entry_date'),
+              onTap: () async {
+                final choisie = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (choisie != null) setState(() => _date = choisie);
+              },
             ),
           ),
         ],

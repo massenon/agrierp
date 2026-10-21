@@ -182,37 +182,3 @@ class ChampListeModale extends StatelessWidget {
     );
   }
 }
-
-/// `<input type="date">` : 44 px, `JJ/MM/AAAA`.
-class ChampDateModale extends StatelessWidget {
-  const ChampDateModale({super.key, required this.date, required this.surChangement, this.enErreur = false});
-
-  final DateTime? date;
-  final ValueChanged<DateTime> surChangement;
-  final bool enErreur;
-
-  static String _deux(int n) => n.toString().padLeft(2, '0');
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () async {
-      final choisie = await showDatePicker(
-        context: context,
-        initialDate: date ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
-      );
-      if (choisie != null) surChangement(choisie);
-    },
-    child: Container(
-      height: 44,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
-      decoration: cadreChampModale(enErreur: enErreur),
-      child: Text(
-        date == null ? 'jj/mm/aaaa' : '${_deux(date!.day)}/${_deux(date!.month)}/${date!.year}',
-        style: TextStyle(fontSize: AgriTypography.sm, color: date == null ? AgriColors.outline : null),
-      ),
-    ),
-  );
-}

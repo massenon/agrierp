@@ -85,7 +85,7 @@ void main() {
 
     final ecran = File('lib/features/elevage/gestion_bandes_screen.dart').readAsStringSync();
     final deuxModales = ecran.indexOf('class _ModaleModifierBande');
-    List<String> champsPoste(String bloc) => [for (final m in RegExp(r'''libelle: (['"])(.+?)\1,\s*(?:erreur|aide|enfant)''').allMatches(bloc)) m.group(2)!];
+    List<String> champsPoste(String bloc) => [for (final m in RegExp(r'''(?:libelle|etiquette): (['"])(.+?)\1,\s*(?:erreur|aide|enfant|valeur)''').allMatches(bloc)) m.group(2)!];
 
     expect(champsPoste(ecran.substring(0, deuxModales).substring(ecran.indexOf('class _ModaleNouvelleBande'))), etiquettes(creation));
     expect(champsPoste(ecran.substring(deuxModales, ecran.indexOf('// Tiroir de détail'))), etiquettes(edition));
@@ -104,7 +104,7 @@ void main() {
     final cartes = RegExp(r'<x-kpi-card label="([^"]+)" icon="(\w+)" color="(\w+)"').allMatches(b).toList();
     expect(cartes, hasLength(4));
     for (final m in cartes) {
-      final debut = ecran.indexOf("libelle: '${m.group(1)}'");
+      final debut = ecran.contains("libelle: '${m.group(1)}'") ? ecran.indexOf("libelle: '${m.group(1)}'") : ecran.indexOf("etiquette: '${m.group(1)}'");
       expect(debut, greaterThan(-1), reason: m.group(1));
       final bloc = ecran.substring(debut, debut + 400);
       expect(bloc, contains('SymbolesAgri.${m.group(2)}'), reason: 'icône de ${m.group(1)}');

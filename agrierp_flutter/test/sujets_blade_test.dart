@@ -69,7 +69,7 @@ void main() {
     List<String> etiquettes(String bloc) => [for (final m in RegExp(r'<label[^>]*>([^<]+)</label>').allMatches(bloc)) decoder(m.group(1)!)];
 
     final ecran = File('lib/features/elevage/enregistrer_sujets_screen.dart').readAsStringSync();
-    final champs = [for (final m in RegExp(r'''libelle: (['"])(.+?)\1,\s*(?:erreur|aide|enfant)''').allMatches(ecran)) m.group(2)!];
+    final champs = [for (final m in RegExp(r'''(?:libelle|etiquette): (['"])(.+?)\1,\s*(?:erreur|aide|enfant|valeur)''').allMatches(ecran)) m.group(2)!];
 
     // Une seule modale au poste, deux modes : Espèce et « Bande / Lot de destination » à la création seulement,
     // « Bande / Lot » (non modifiable) en modification seulement, puis Origine, Quantité, Date.
@@ -85,7 +85,7 @@ void main() {
     expect(cartes, hasLength(3));
     for (final m in cartes) {
       expect(m.group(3), 'emerald');
-      final debut = ecran.indexOf("libelle: '${m.group(1)}'");
+      final debut = ecran.contains("libelle: '${m.group(1)}'") ? ecran.indexOf("libelle: '${m.group(1)}'") : ecran.indexOf("etiquette: '${m.group(1)}'");
       expect(debut, greaterThan(-1), reason: m.group(1));
       final bloc = ecran.substring(debut, debut + 350);
       expect(bloc, contains('SymbolesAgri.${m.group(2)}'), reason: 'icône de ${m.group(1)}');
