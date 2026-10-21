@@ -1,5 +1,5 @@
 # PRD — Saisie des Dépenses : une dépense, plusieurs lignes
-**Statut :** brouillon (décisions tranchées sur recommandation, questions client en § 9) · **Date :** 2026-10-21 · **Ticket(s) :** DEP1 à DEP5 (`docs/PLAN_FINALISATION.md`, sprint DEP)
+**Statut :** livré le 21/10/2026 (décisions tranchées sur recommandation, questions client en § 9 à confirmer) · **Date :** 2026-10-21 · **Ticket(s) :** DEP1 à DEP5 (`docs/PLAN_FINALISATION.md`, sprint DEP)
 
 > Demande du client : « faut revoir le mode de fonctionnement actuel de la Saisie des Dépenses ». La fonctionnalité « plusieurs lignes par dépense » n'existe NI sur le web NI au poste NI dans le prototype : elle se construit **d'abord sur le web**, puis se porte au poste (Doctrine, article 0 et § 5). Le web reste le maître.
 
