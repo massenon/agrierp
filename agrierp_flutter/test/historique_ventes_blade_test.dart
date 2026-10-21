@@ -83,14 +83,14 @@ void main() {
       expect(ecran, contains('SymbolesAgri.$icone'), reason: 'icône $icone de « $libelle »');
     }
     // Liserés : `border-l-<couleur>` du Blade → couleur du poste.
-    final listereWeb = [for (final m in RegExp(r'border-l-4 border-l-([a-z-]+)').allMatches(vue)) m.group(1)!];
+    final listereWeb = [for (final m in RegExp(r'(?:border-l-4|kpi-card)[^"]*?border-l-([a-z-]+)').allMatches(vue)) m.group(1)!];
     expect(listereWeb, ['brand-emerald', 'info-blue', 'accent-yellow', 'error-red']);
     for (final couleur in ['brandEmerald', 'infoBlue', 'accentYellow', 'errorRed']) {
       expect(ecran, contains('couleurLisere: AgriColors.$couleur'), reason: couleur);
     }
     // Quatre colonnes dès `md:` (768 px), jamais `lg:` : `GrilleKpi`, partagée.
     expect(vue, contains('grid grid-cols-2 md:grid-cols-4 gap-md'));
-    expect(ecran, contains('GrilleKpi('));
+    expect(ecran, contains('GrilleKpiAdaptative('));
     expect(File('lib/core/widgets/grille_kpi.dart').readAsStringSync(), contains('AgriBreakpoints.moyen(context) ? 4 : 2'));
   }, skip: saut);
 

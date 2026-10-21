@@ -38,8 +38,9 @@ List<String> entetes(String blade) => [
   for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(blade)) m.group(1)!.trim(),
 ];
 
-/// Nombre de cartes KPI : un `border-l-4 border-l-<couleur>` par carte (ni un simple `border-l-4`).
-int cartes(String blade) => RegExp(r'border-l-4 border-l-[a-z-]+').allMatches(blade).length;
+/// Nombre de cartes KPI : un liseré `border-l-<couleur>` par carte, posé avec `border-l-4` ou avec la classe commune
+/// `kpi-card` (qui porte le 4 px, ticket cartes uniformes) — ni un simple `border-l-4`.
+int cartes(String blade) => RegExp(r'(?:border-l-4|kpi-card)[^"]*?border-l-[a-z-]+').allMatches(blade).length;
 
 /// Libellés et icônes des cartes : `<span …uppercase">Libellé</span><span …material-symbols-outlined…>icone</span>`.
 List<(String, String)> libellesDeCartes(String blade) => [
