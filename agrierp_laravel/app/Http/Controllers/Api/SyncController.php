@@ -4306,8 +4306,13 @@ class SyncController extends Controller
                             'created_date' => $valides['created_date'], 'quantity' => $valides['initial_quantity'],
                             'acquisition_cost' => $valides['acquisition_cost'] ?? null, 'product_id' => $valides['product_id'] ?? null,
                         ], $valides['id']);
-                        if (($valides['status'] ?? 'actif') !== 'actif') {
-                            $saisie->modifier($valides['id'], ['stage' => $valides['stage'], 'status' => $valides['status']]);
+                        // Créée puis clôturée ou corrigée avant tout envoi : les deux gestes se rejouent dans l'ordre.
+                        if (($valides['status'] ?? 'actif') !== 'actif' || ($valides['effectif_corrige'] ?? null) !== null) {
+                            $saisie->modifier($valides['id'], [
+                                'stage' => $valides['stage'],
+                                'status' => $valides['status'] ?? 'actif',
+                                'current_quantity' => $valides['effectif_corrige'] ?? null,
+                            ]);
                         }
                         if ($archivee) {
                             $saisie->archiver($valides['id']);

@@ -185,6 +185,18 @@ class LivestockLots extends Table {
   /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
   TextColumn get lotSourceId => text().nullable()();
 
+  /// ⚠️ **UNE BANDE CRÉÉE, MODIFIÉE OU ARCHIVÉE AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT** (ticket BS1, v49). Défaut
+  /// `synced` : tout ce qui descend du serveur l'est, et les bandes d'avant la migration aussi. Le tirage ne touche
+  /// JAMAIS une bande qui ne l'est pas (`_absorberBandes`, strict).
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket BS1 (v49) — CORRECTION MANUELLE DE L'EFFECTIF ACTUEL (« Modifier la Bande » du web), à envoyer. `null` :
+  /// aucune. ⚠️ L'effectif d'une bande est celui de ses fiches (cascade) : la ligne envoyée ne porte `effectif_corrige`
+  /// que si l'exploitant l'a explicitement corrigé, sinon le serveur garderait un effectif périmé du poste. Vidé à
+  /// l'acquittement.
+  IntColumn get effectifCorrige => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1704,7 +1716,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 48;
+  int get schemaVersion => 49;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2200,6 +2212,12 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(m, expenses, expenses.status);
         await _ajouterColonneSiAbsente(m, expenses, expenses.accountingEntryId);
       }
+
+      // v49 — ticket BS1 : bandes créées, modifiées et archivées au poste (statut d'envoi, correction d'effectif).
+      if (from < 49) {
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.syncStatus);
+        await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.effectifCorrige);
+      }
     },
   );
 
@@ -2297,6 +2315,8 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Ticket BS1 — bandes saisies au poste.
+    'livestock_lots',
     // Ticket H8b (D-H8) — infirmerie et calendrier planifié saisis au poste.
     'infirmary_records',
     'veterinary_calendar_events',

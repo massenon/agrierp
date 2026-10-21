@@ -129,6 +129,15 @@ class BandesSujetsPosteTest extends TestCase
         $this->assertSame(33, (int) LivestockLot::findOrFail(self::LOT)->current_quantity);
     }
 
+    public function test_une_bande_creee_puis_corrigee_et_cloturee_avant_tout_envoi_arrive_dans_son_dernier_etat(): void
+    {
+        $this->pousserBandes($this->bande(['status' => 'cloture', 'effectif_corrige' => 31]))
+            ->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+
+        $lot = LivestockLot::findOrFail(self::LOT);
+        $this->assertSame([40, 31, 'cloture'], [(int) $lot->initial_quantity, (int) $lot->current_quantity, $lot->status]);
+    }
+
     public function test_archiver_une_bande_est_logique_idempotent_et_la_bande_n_est_plus_modifiable(): void
     {
         $this->pousserBandes($this->bande())->assertOk();

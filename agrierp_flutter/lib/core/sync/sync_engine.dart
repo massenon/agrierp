@@ -876,35 +876,82 @@ class SyncEngine {
         updatedAt: Value(_instantTechnique(l['updated_at'])),
       );
 
+  /// Bandes du serveur — table MIXTE depuis le ticket BS1 (tirée ET saisie au poste).
+  ///
+  /// ⚠️⚠️ **STRICT, COMME [_absorberDepenses]** : identifiant absent ou servi deux fois, code absent, effectif illisible
+  /// ou négatif, date de création ou `is_active` illisibles → [FormatException] : rien n'est écrit, la page est annulée,
+  /// le curseur n'avance pas. Lisser — un effectif illisible devenu 0 — ferait compter une bande vide.
+  ///
+  /// ⚠️⚠️ **UNE BANDE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (créée, modifiée ou archivée ici, pas
+  /// encore acquittée, ou refusée et en attente de correction) : le tirage précède toujours l'envoi. Une bande acquittée
+  /// (`synced`) prend la dernière version du serveur (cascade des fiches, modification ou archivage au web).
+  ///
+  /// Les clés facultatives absentes (serveur antérieur) laissent la valeur locale.
   Future<int> _absorberBandes(Object? brut) async {
-    final lignes = _lignes(brut);
+    if (brut == null) return 0;
 
-    await _db.batch((b) {
-      for (final l in lignes) {
-        final ligne = LivestockLotsCompanion.insert(
-          id: l['id'] as String,
-          code: (l['code'] ?? '') as String,
-          speciesId: (l['species_id'] ?? '') as String,
-          speciesCode: Value(l['species_code'] as String?),
-          stage: Value(l['stage'] as String?),
-          initialQuantity: Value(_entier(l['initial_quantity']) ?? 0),
-          currentQuantity: Value(_entier(l['current_quantity']) ?? 0),
-          createdDate: Value(_date(l['created_date'])),
-          acquisitionCost: Value(_reel(l['acquisition_cost'])),
-          productId: Value(l['product_id'] as String?),
-          status: Value(l['status'] as String?),
-          isActive: Value(_bool(l['is_active'])),
+    const quoi = 'Bande';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recues = <LivestockLotsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final code = _texteStrict(l['code'], '$quoi $id : code');
+      final espece = _texteStrict(l['species_id'], '$quoi $id : espèce');
+      if (code == null || code.isEmpty || espece == null || espece.isEmpty) {
+        throw FormatException('$quoi $id refusée : code ou espèce absent.');
+      }
+      final initial = _entierPositifStrict(l['initial_quantity'], '$quoi $id : effectif initial');
+      final courant = _entierPositifStrict(l['current_quantity'], '$quoi $id : effectif actuel');
+      final creee = l['created_date'];
+      if (creee != null && _date(creee) == null) {
+        throw FormatException('$quoi $id refusée : date de création illisible ($creee).');
+      }
+      final cout = _nombreStrict(l['acquisition_cost'], '$quoi $id : coût d\'acquisition');
+      final actif = _actifStrict(l, '$quoi $id');
+
+      recues.add(
+        LivestockLotsCompanion.insert(
+          id: id,
+          code: code,
+          speciesId: espece,
+          speciesCode: Value(_texteStrict(l['species_code'], '$quoi $id : code espèce')),
+          stage: Value(_texteStrict(l['stage'], '$quoi $id : stade')),
+          initialQuantity: Value(initial ?? 0),
+          currentQuantity: Value(courant ?? 0),
+          createdDate: Value(_date(creee)),
+          acquisitionCost: Value(cout),
+          productId: Value(_texteStrict(l['product_id'], '$quoi $id : produit')),
+          status: Value(_texteStrict(l['status'], '$quoi $id : statut')),
+          isActive: Value(actif),
           updatedAt: Value(_instantTechnique(l['updated_at'])),
+          syncStatus: const Value(SyncStatus.synced),
           // Ticket 15.46 — bande d'origine ; clé absente (serveur antérieur) = valeur locale gardée.
           lotSourceId: l.containsKey('lot_source_id')
-              ? Value(l['lot_source_id'] as String?)
+              ? Value(_texteStrict(l['lot_source_id'], '$quoi $id : bande d\'origine'))
               : const Value.absent(),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      final locales = {
+        for (final b in await (_db.select(_db.livestockLots)..where((t) => t.id.isIn(vus))).get()) b.id: b.syncStatus,
+      };
+      for (final b in recues) {
+        final statut = locales[b.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        await _db.into(_db.livestockLots).insert(
+          b,
+          // Une bande acquittée garde sa correction d'effectif vide (rien à envoyer) : on ne l'écrit pas.
+          onConflict: DoUpdate((_) => b.copyWith(effectifCorrige: const Value.absent())),
         );
-        b.insert(_db.livestockLots, ligne, onConflict: DoUpdate((_) => ligne));
       }
     });
 
-    return lignes.length;
+    return recues.length;
   }
 
   /// Ticket 15.46 — transferts entre bandes, FUSIONNÉS par identifiant. Un transfert `pending` ou en
@@ -4252,6 +4299,12 @@ class SyncEngine {
               ]))
             .get();
 
+    // Ticket BS1 — bandes créées, modifiées ou archivées au poste : le serveur les rejoue (`SaisieBandeAction`) AVANT
+    // les fiches et les transferts du même envoi (la fiche d'une bande créée à l'instant).
+    final bandes = await (_db.select(
+      _db.livestockLots,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final ventes = await (_db.select(
       _db.sales,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4366,6 +4419,7 @@ class SyncEngine {
     _documentsAcquittes = 0;
 
     if (fiches.isEmpty &&
+        bandes.isEmpty &&
         transferts.isEmpty &&
         infirmerie.isEmpty &&
         interventions.isEmpty &&
@@ -4448,6 +4502,8 @@ class SyncEngine {
         'device_id': _deviceId,
         // Ticket 15.50 — la réinitialisation que ce poste a appliquée (absente : aucune).
         'data_reset_at': ?await _lireReglage(cleReinitialisation),
+        // Ticket BS1 — traitées par le serveur AVANT les fiches (voir `ordreDuServeur`).
+        'livestock_lots': bandes.map(_bandeEnJson).toList(),
         'livestock_daily_entries': [
           for (final (f, identite) in fichesEnvoyees)
             identite
@@ -4545,6 +4601,34 @@ class SyncEngine {
               .write(LivestockDailyEntriesCompanion(syncStatus: Value(statut)));
         }
       },
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket BS1 — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : une bande
+    // corrigée PENDANT l'envoi de sa version précédente reste `pending` et repart. La correction d'effectif partie est
+    // vidée à l'acquittement (sinon elle repartirait avec une bande modifiée plus tard).
+    accepte += await _acquitter(
+      'livestock_lots',
+      corps['livestock_lots'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final b in bandes) (b.id, b.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.livestockLots)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null ? t.updatedAt.isNull() : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(
+                  LivestockLotsCompanion(
+                    syncStatus: Value(statut),
+                    effectifCorrige: statut == SyncStatus.synced ? const Value(null) : const Value.absent(),
+                  ),
+                ),
+      ),
       motifs,
       (n) => rejete += n,
     );
@@ -4972,6 +5056,8 @@ class SyncEngine {
     'administrative_documents',
     'customer_advances',
     'products',
+    // Ticket BS1 — la bande avant ses fiches et ses transferts.
+    'livestock_lots',
     'livestock_daily_entries',
     'livestock_transfers',
     'expenses',
@@ -5443,6 +5529,12 @@ class SyncEngine {
   /// refuserait de nouveau et la boucle reprendrait.
   Future<void> relancer(SyncConflict conflit) async {
     final compagnon = switch (conflit.sourceTable) {
+      // Ticket BS1 — une bande refusée (code déjà pris, exercice clos…) se corrige puis se relance.
+      'livestock_lots' =>
+        () =>
+            (_db.update(_db.livestockLots)..where((t) => t.id.equals(conflit.recordId))).write(
+              const LivestockLotsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       'livestock_daily_entries' =>
         () =>
             (_db.update(
@@ -6002,6 +6094,25 @@ class SyncEngine {
   };
 
   /// Ticket 15.46 — transfert entre bandes tel que le serveur le rejoue (`TransferBetweenLotsAction`).
+  /// Ticket BS1 — bande telle que `SyncController::pushLots` la valide (snake_case). ⚠️ L'EFFECTIF N'Y FIGURE PAS : il
+  /// est celui des fiches (cascade du serveur). Seule une CORRECTION explicite de l'exploitant (« Modifier la Bande »)
+  /// part, sous `effectif_corrige`. Le code, l'espèce, l'effectif initial et la date de création ne se modifient pas :
+  /// ils ne servent qu'à la création.
+  Map<String, dynamic> _bandeEnJson(LivestockLot b) => {
+    'id': b.id,
+    'code': b.code,
+    'species_id': b.speciesId,
+    'stage': b.stage,
+    'created_date': b.createdDate == null ? null : _jour(b.createdDate!),
+    'initial_quantity': b.initialQuantity,
+    'acquisition_cost': b.acquisitionCost,
+    'product_id': b.productId,
+    'status': b.status,
+    'is_active': b.isActive,
+    if (b.effectifCorrige != null) 'effectif_corrige': b.effectifCorrige,
+    'device_id': _deviceId,
+  };
+
   Map<String, dynamic> _transfertEnJson(LivestockTransfer t) => {
     'id': t.id,
     'source_lot_id': t.sourceLotId,

@@ -27,6 +27,8 @@ void main() {
   const fichiers = [
     'lib/features/elevage/fiche_lapins_screen.dart',
     'lib/features/elevage/fiche_categories_vue.dart',
+    // BS1 : le composant d'autonomie est partagé avec le tiroir de « Bandes & Sujets » (un seul composant, comme au web).
+    'lib/features/elevage/autonomie_alimentaire_carte.dart',
     'lib/features/elevage/elements_fiche.dart',
   ];
   final saut = blade.existsSync() ? null : 'SAUT : vue Blade absente';

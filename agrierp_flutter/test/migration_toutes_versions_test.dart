@@ -207,6 +207,11 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.expenses, d.expenses.status),
     (d.expenses, d.expenses.accountingEntryId),
   ],
+  // Ticket BS1 — bandes saisies au poste : statut d'envoi et correction d'effectif.
+  49: [
+    (d.livestockLots, d.livestockLots.syncStatus),
+    (d.livestockLots, d.livestockLots.effectifCorrige),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes

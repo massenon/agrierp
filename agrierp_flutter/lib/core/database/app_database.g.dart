@@ -1419,6 +1419,27 @@ class $LivestockLotsTable extends LivestockLots
     requiredDuringInsert: false,
   );
   @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($LivestockLotsTable.$convertersyncStatus);
+  static const VerificationMeta _effectifCorrigeMeta = const VerificationMeta(
+    'effectifCorrige',
+  );
+  @override
+  late final GeneratedColumn<int> effectifCorrige = GeneratedColumn<int>(
+    'effectif_corrige',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     code,
@@ -1434,6 +1455,8 @@ class $LivestockLotsTable extends LivestockLots
     isActive,
     updatedAt,
     lotSourceId,
+    syncStatus,
+    effectifCorrige,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1552,6 +1575,15 @@ class $LivestockLotsTable extends LivestockLots
         ),
       );
     }
+    if (data.containsKey('effectif_corrige')) {
+      context.handle(
+        _effectifCorrigeMeta,
+        effectifCorrige.isAcceptableOrUnknown(
+          data['effectif_corrige']!,
+          _effectifCorrigeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1617,6 +1649,16 @@ class $LivestockLotsTable extends LivestockLots
         DriftSqlType.string,
         data['${effectivePrefix}lot_source_id'],
       ),
+      syncStatus: $LivestockLotsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      effectifCorrige: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}effectif_corrige'],
+      ),
     );
   }
 
@@ -1624,6 +1666,9 @@ class $LivestockLotsTable extends LivestockLots
   $LivestockLotsTable createAlias(String alias) {
     return $LivestockLotsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class LivestockLot extends DataClass implements Insertable<LivestockLot> {
@@ -1650,6 +1695,17 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
 
   /// Ticket 15.46 (v39) — bande d'origine d'une bande constituée à partir d'une autre (portée, sevrés).
   final String? lotSourceId;
+
+  /// ⚠️ **UNE BANDE CRÉÉE, MODIFIÉE OU ARCHIVÉE AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT** (ticket BS1, v49). Défaut
+  /// `synced` : tout ce qui descend du serveur l'est, et les bandes d'avant la migration aussi. Le tirage ne touche
+  /// JAMAIS une bande qui ne l'est pas (`_absorberBandes`, strict).
+  final SyncStatus syncStatus;
+
+  /// Ticket BS1 (v49) — CORRECTION MANUELLE DE L'EFFECTIF ACTUEL (« Modifier la Bande » du web), à envoyer. `null` :
+  /// aucune. ⚠️ L'effectif d'une bande est celui de ses fiches (cascade) : la ligne envoyée ne porte `effectif_corrige`
+  /// que si l'exploitant l'a explicitement corrigé, sinon le serveur garderait un effectif périmé du poste. Vidé à
+  /// l'acquittement.
+  final int? effectifCorrige;
   const LivestockLot({
     required this.id,
     required this.code,
@@ -1665,6 +1721,8 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     required this.isActive,
     this.updatedAt,
     this.lotSourceId,
+    required this.syncStatus,
+    this.effectifCorrige,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1698,6 +1756,14 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     }
     if (!nullToAbsent || lotSourceId != null) {
       map['lot_source_id'] = Variable<String>(lotSourceId);
+    }
+    {
+      map['sync_status'] = Variable<String>(
+        $LivestockLotsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || effectifCorrige != null) {
+      map['effectif_corrige'] = Variable<int>(effectifCorrige);
     }
     return map;
   }
@@ -1734,6 +1800,10 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       lotSourceId: lotSourceId == null && nullToAbsent
           ? const Value.absent()
           : Value(lotSourceId),
+      syncStatus: Value(syncStatus),
+      effectifCorrige: effectifCorrige == null && nullToAbsent
+          ? const Value.absent()
+          : Value(effectifCorrige),
     );
   }
 
@@ -1757,6 +1827,10 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       isActive: serializer.fromJson<bool>(json['isActive']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       lotSourceId: serializer.fromJson<String?>(json['lotSourceId']),
+      syncStatus: $LivestockLotsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      effectifCorrige: serializer.fromJson<int?>(json['effectifCorrige']),
     );
   }
   @override
@@ -1777,6 +1851,10 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       'isActive': serializer.toJson<bool>(isActive),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'lotSourceId': serializer.toJson<String?>(lotSourceId),
+      'syncStatus': serializer.toJson<String>(
+        $LivestockLotsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'effectifCorrige': serializer.toJson<int?>(effectifCorrige),
     };
   }
 
@@ -1795,6 +1873,8 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     bool? isActive,
     Value<DateTime?> updatedAt = const Value.absent(),
     Value<String?> lotSourceId = const Value.absent(),
+    SyncStatus? syncStatus,
+    Value<int?> effectifCorrige = const Value.absent(),
   }) => LivestockLot(
     id: id ?? this.id,
     code: code ?? this.code,
@@ -1812,6 +1892,10 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     isActive: isActive ?? this.isActive,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     lotSourceId: lotSourceId.present ? lotSourceId.value : this.lotSourceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    effectifCorrige: effectifCorrige.present
+        ? effectifCorrige.value
+        : this.effectifCorrige,
   );
   LivestockLot copyWithCompanion(LivestockLotsCompanion data) {
     return LivestockLot(
@@ -1841,6 +1925,12 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
       lotSourceId: data.lotSourceId.present
           ? data.lotSourceId.value
           : this.lotSourceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      effectifCorrige: data.effectifCorrige.present
+          ? data.effectifCorrige.value
+          : this.effectifCorrige,
     );
   }
 
@@ -1860,7 +1950,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
           ..write('status: $status, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('lotSourceId: $lotSourceId')
+          ..write('lotSourceId: $lotSourceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('effectifCorrige: $effectifCorrige')
           ..write(')'))
         .toString();
   }
@@ -1881,6 +1973,8 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
     isActive,
     updatedAt,
     lotSourceId,
+    syncStatus,
+    effectifCorrige,
   );
   @override
   bool operator ==(Object other) =>
@@ -1899,7 +1993,9 @@ class LivestockLot extends DataClass implements Insertable<LivestockLot> {
           other.status == this.status &&
           other.isActive == this.isActive &&
           other.updatedAt == this.updatedAt &&
-          other.lotSourceId == this.lotSourceId);
+          other.lotSourceId == this.lotSourceId &&
+          other.syncStatus == this.syncStatus &&
+          other.effectifCorrige == this.effectifCorrige);
 }
 
 class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
@@ -1917,6 +2013,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
   final Value<bool> isActive;
   final Value<DateTime?> updatedAt;
   final Value<String?> lotSourceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<int?> effectifCorrige;
   final Value<int> rowid;
   const LivestockLotsCompanion({
     this.id = const Value.absent(),
@@ -1933,6 +2031,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.lotSourceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.effectifCorrige = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LivestockLotsCompanion.insert({
@@ -1950,6 +2050,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.lotSourceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.effectifCorrige = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        code = Value(code),
@@ -1969,6 +2071,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     Expression<bool>? isActive,
     Expression<DateTime>? updatedAt,
     Expression<String>? lotSourceId,
+    Expression<String>? syncStatus,
+    Expression<int>? effectifCorrige,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1986,6 +2090,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
       if (isActive != null) 'is_active': isActive,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (lotSourceId != null) 'lot_source_id': lotSourceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (effectifCorrige != null) 'effectif_corrige': effectifCorrige,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2005,6 +2111,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     Value<bool>? isActive,
     Value<DateTime?>? updatedAt,
     Value<String?>? lotSourceId,
+    Value<SyncStatus>? syncStatus,
+    Value<int?>? effectifCorrige,
     Value<int>? rowid,
   }) {
     return LivestockLotsCompanion(
@@ -2022,6 +2130,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
       lotSourceId: lotSourceId ?? this.lotSourceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      effectifCorrige: effectifCorrige ?? this.effectifCorrige,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2071,6 +2181,14 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
     if (lotSourceId.present) {
       map['lot_source_id'] = Variable<String>(lotSourceId.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $LivestockLotsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (effectifCorrige.present) {
+      map['effectif_corrige'] = Variable<int>(effectifCorrige.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2094,6 +2212,8 @@ class LivestockLotsCompanion extends UpdateCompanion<LivestockLot> {
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('lotSourceId: $lotSourceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('effectifCorrige: $effectifCorrige, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -34753,6 +34873,8 @@ typedef $$LivestockLotsTableCreateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
       Value<String?> lotSourceId,
+      Value<SyncStatus> syncStatus,
+      Value<int?> effectifCorrige,
       Value<int> rowid,
     });
 typedef $$LivestockLotsTableUpdateCompanionBuilder =
@@ -34771,6 +34893,8 @@ typedef $$LivestockLotsTableUpdateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
       Value<String?> lotSourceId,
+      Value<SyncStatus> syncStatus,
+      Value<int?> effectifCorrige,
       Value<int> rowid,
     });
 
@@ -34850,6 +34974,17 @@ class $$LivestockLotsTableFilterComposer
 
   ColumnFilters<String> get lotSourceId => $composableBuilder(
     column: $table.lotSourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<int> get effectifCorrige => $composableBuilder(
+    column: $table.effectifCorrige,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -34932,6 +35067,16 @@ class $$LivestockLotsTableOrderingComposer
     column: $table.lotSourceId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get effectifCorrige => $composableBuilder(
+    column: $table.effectifCorrige,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LivestockLotsTableAnnotationComposer
@@ -34996,6 +35141,17 @@ class $$LivestockLotsTableAnnotationComposer
     column: $table.lotSourceId,
     builder: (column) => column,
   );
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<int> get effectifCorrige => $composableBuilder(
+    column: $table.effectifCorrige,
+    builder: (column) => column,
+  );
 }
 
 class $$LivestockLotsTableTableManager
@@ -35043,6 +35199,8 @@ class $$LivestockLotsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String?> lotSourceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<int?> effectifCorrige = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockLotsCompanion(
                 id: id,
@@ -35059,6 +35217,8 @@ class $$LivestockLotsTableTableManager
                 isActive: isActive,
                 updatedAt: updatedAt,
                 lotSourceId: lotSourceId,
+                syncStatus: syncStatus,
+                effectifCorrige: effectifCorrige,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -35077,6 +35237,8 @@ class $$LivestockLotsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<String?> lotSourceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<int?> effectifCorrige = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockLotsCompanion.insert(
                 id: id,
@@ -35093,6 +35255,8 @@ class $$LivestockLotsTableTableManager
                 isActive: isActive,
                 updatedAt: updatedAt,
                 lotSourceId: lotSourceId,
+                syncStatus: syncStatus,
+                effectifCorrige: effectifCorrige,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
