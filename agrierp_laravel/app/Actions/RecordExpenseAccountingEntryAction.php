@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\DepenseNonComptabilisableException;
 use App\Models\AccountingEntry;
 use App\Models\ChartOfAccount;
 use App\Models\Expense;
@@ -11,35 +12,29 @@ use App\Services\AccountingEntryService;
 /**
  * Ticket 14.33 (Sprint 14) — ÉCRITURE COMPTABLE D'UNE DÉPENSE.
  *
- * 🔴 DÉFAUT TROUVÉ EN SIMULANT L'EXPLOITATION (ticket 14.31) : `SaisieDepenses`
- * décrémentait la trésorerie sans rien porter en charge. Les dépenses de
- * fonctionnement — carburant, électricité, eau, transport, entretien —
- * **n'apparaissaient nulle part au Compte de Résultat**. Sur la simulation :
- * 755 226 FCFA sortis de la caisse sans jamais réduire le résultat, qui était
- * donc surestimé d'autant.
+ * 🔴 DÉFAUT TROUVÉ EN SIMULANT L'EXPLOITATION (ticket 14.31) : `SaisieDepenses` décrémentait la trésorerie sans rien
+ * porter en charge ; 755 226 FCFA sortis de la caisse sans jamais réduire le résultat. Le CDC l'exige mot pour mot, §1.4
+ * [M2] : « `RegisterExpense` → Débit Classe 6 / Crédit Classe 5 ».
  *
- * ⚠️ LE CDC L'EXIGE MOT POUR MOT, §1.4 [M2] :
- *     « **Règle** : `RegisterExpense` → Débit Classe 6 / Crédit Classe 5 »
- * et décrit l'écran comme l'« enregistrement comptable direct des charges de
- * fonctionnement (classe 6 SYSCOHADA) ». La règle n'était pas ambiguë, elle
- * n'était simplement pas implémentée.
+ * Ticket DEP1 — UNE DÉPENSE, PLUSIEURS LIGNES. L'écriture produite :
+ *     Débit  chaque COMPTE de charge distinct des lignes ..... somme des montants des lignes de ce compte
+ *     Crédit compte de trésorerie qui paie ................... le total (somme de toutes les lignes)
+ * Les débits sont REGROUPÉS par compte (deux lignes « 601 » donnent un seul débit 601), dans l'ordre des codes ; le
+ * centre de coût de l'en-tête (facultatif) est porté par chaque ligne d'écriture (Comptabilité analytique). Datée de la
+ * DÉPENSE : une charge appartient à la période où elle est engagée. Elle passe par `AccountingEntryService::record()`
+ * (équilibre, exercice ouvert, numérotation, immuabilité) et l'appelant l'enveloppe dans UNE transaction avec l'en-tête
+ * et les lignes : un refus annule tout.
  *
- * ÉCRITURE PRODUITE (SYSCOHADA) :
- *     Débit  compte de classe 6 choisi ......... montant de la dépense
- *     Crédit compte de trésorerie qui paie ..... même montant
- *
- * ⚠️ LE COMPTE DE CHARGE EST DÉJÀ SAISI, il n'était pas exploité. Le champ
- * `expenses.category` porte le libellé complet de l'écran — « 605 - Énergie »,
- * « 614 - Transports » — soit le code SYSCOHADA suivi de son intitulé. Le code
- * en est extrait ici plutôt que déduit d'une correspondance parallèle : c'est
- * le choix réel du comptable, et une seconde table de correspondance aurait
- * fini par diverger de la liste affichée à l'écran.
+ * 🔴→✅ DEP1 — ÉCHEC = REFUS, JAMAIS SILENCE. Avant, une écriture impossible (compte de trésorerie sans compte du plan)
+ * laissait une dépense sans pièce et un simple toast. Désormais [DepenseNonComptabilisableException] : la dépense n'est
+ * pas enregistrée.
  */
 class RecordExpenseAccountingEntryAction
 {
     /**
-     * @return AccountingEntry|null  null si l'écriture n'a pas pu être générée
-     *                               — l'appelant DOIT alors avertir.
+     * @return AccountingEntry|null  null si la dépense est déjà comptabilisée (jamais de doublon) ou n'a aucune ligne
+     *
+     * @throws DepenseNonComptabilisableException  compte de trésorerie sans compte du plan comptable
      */
     public function execute(Expense $expense): ?AccountingEntry
     {
@@ -47,26 +42,43 @@ class RecordExpenseAccountingEntryAction
             return null;   // déjà comptabilisée — jamais de doublon
         }
 
-        $montant = round((float) $expense->amount, 2);
+        $lignes = $expense->lines()->get();
+        $total = round((float) $lignes->sum('amount'), 2);
 
-        if ($montant <= 0) {
+        if ($lignes->isEmpty() || $total <= 0) {
             return null;
         }
 
-        $charge = $this->compteDeCharge($expense->category);
         $tresorerie = $this->compteDeTresorerie($expense->treasury_account_id);
 
-        if (! $charge || ! $tresorerie) {
-            return null;   // plan comptable incomplet — signalé, jamais deviné
+        if (! $tresorerie) {
+            $compte = TreasuryAccount::find($expense->treasury_account_id);
+
+            throw new DepenseNonComptabilisableException(
+                'La dépense ne peut pas être enregistrée : le compte de trésorerie « '.($compte?->label ?? '—')
+                .' » n\'est relié à aucun compte du plan comptable'.($compte?->account_code ? ' (compte '.$compte->account_code.' absent)' : '')
+                .'. Aucune pièce comptable ne peut être passée.'
+            );
         }
 
+        $centre = $expense->cost_center_id;
+
+        // Débits regroupés par compte de charge, dans l'ordre des codes (écriture stable et lisible).
+        $parCompte = [];
+        foreach ($lignes as $ligne) {
+            $parCompte[$ligne->charge_account_id] = ($parCompte[$ligne->charge_account_id] ?? 0) + (float) $ligne->amount;
+        }
+        $comptes = ChartOfAccount::whereIn('id', array_keys($parCompte))->orderBy('code')->get(['id', 'code']);
+
+        $ecriture = [];
+        foreach ($comptes as $compte) {
+            $ecriture[] = ['account_id' => $compte->id, 'cost_center_id' => $centre, 'debit' => round($parCompte[$compte->id], 2), 'credit' => 0];
+        }
+        $ecriture[] = ['account_id' => $tresorerie->id, 'cost_center_id' => $centre, 'debit' => 0, 'credit' => $total];
+
         $entry = app(AccountingEntryService::class)->record(
-            lines: [
-                ['account_id' => $charge->id, 'debit' => $montant, 'credit' => 0],
-                ['account_id' => $tresorerie->id, 'debit' => 0, 'credit' => $montant],
-            ],
-            // Datée de la DÉPENSE elle-même : une charge appartient à la
-            // période où elle est engagée, pas à celle de sa saisie.
+            lines: $ecriture,
+            // Datée de la DÉPENSE elle-même : une charge appartient à la période où elle est engagée, pas à celle de sa saisie.
             entryDate: $expense->expense_date?->format('Y-m-d') ?? now()->format('Y-m-d'),
             reference: AccountingEntry::generateReference().' — Dépense '.$expense->label,
             sourceType: 'expense',
@@ -79,19 +91,18 @@ class RecordExpenseAccountingEntryAction
     }
 
     /**
-     * CONTRE-PASSATION d'une dépense archivée : une écriture d'annulation, de
-     * sens inverse, jamais la suppression de l'originale.
+     * CONTRE-PASSATION d'une dépense archivée : une écriture d'annulation, de sens inverse, jamais la suppression de
+     * l'originale (le grand livre est immuable).
      *
-     * ⚠️ LE GRAND LIVRE EST IMMUABLE. `archiveExpense()` réintègre la
-     * trésorerie ; sans contre-passation, la charge resterait au Compte de
-     * Résultat alors que l'argent est revenu — l'écart exact que le
-     * rapprochement bancaire mettrait au jour, sans que rien n'explique
-     * pourquoi. Effacer l'écriture d'origine serait pire : elle a été
-     * justifiée, elle doit rester consultable, et c'est aussi la discipline
-     * appliquée aux avoirs (14.27) et aux amortissements (14.26).
+     * Ticket DEP1 — l'écriture est l'INVERSE EXACTE de l'écriture d'origine, relue ligne à ligne (comptes, montants,
+     * centre de coût) : quelles que soient les lignes de la dépense, la charge extournée est exactement celle qui avait
+     * été passée, même si la dépense est une ancienne dépense convertie.
      *
      *     Débit  compte de trésorerie ..... montant réintégré
-     *     Crédit compte de classe 6 ....... même montant
+     *     Crédit chaque compte de charge .. son montant
+     *
+     * Datée du JOUR DE L'ANNULATION, jamais de la dépense d'origine : antidater modifierait un résultat déjà arrêté, et
+     * l'écriture serait refusée si la période d'origine est clôturée.
      */
     public function reverse(Expense $expense): ?AccountingEntry
     {
@@ -99,54 +110,26 @@ class RecordExpenseAccountingEntryAction
             return null;   // jamais comptabilisée : rien à annuler
         }
 
-        $montant = round((float) $expense->amount, 2);
-        $charge = $this->compteDeCharge($expense->category);
-        $tresorerie = $this->compteDeTresorerie($expense->treasury_account_id);
+        $origine = AccountingEntry::with('lines')->find($expense->accounting_entry_id);
 
-        if ($montant <= 0 || ! $charge || ! $tresorerie) {
+        if ($origine === null || $origine->lines->isEmpty()) {
             return null;
         }
 
+        $inverse = $origine->lines->map(fn ($l) => [
+            'account_id' => $l->account_id,
+            'cost_center_id' => $l->cost_center_id,
+            'debit' => (float) $l->credit,
+            'credit' => (float) $l->debit,
+        ])->all();
+
         return app(AccountingEntryService::class)->record(
-            lines: [
-                ['account_id' => $tresorerie->id, 'debit' => $montant, 'credit' => 0],
-                ['account_id' => $charge->id, 'debit' => 0, 'credit' => $montant],
-            ],
-            // Datée du JOUR DE L'ANNULATION, jamais de la dépense d'origine :
-            // antidater modifierait un résultat déjà arrêté, et l'écriture
-            // serait refusée si la période d'origine est clôturée.
+            lines: $inverse,
             entryDate: now()->format('Y-m-d'),
             reference: AccountingEntry::generateReference().' — Annulation dépense '.$expense->label,
             sourceType: 'expense_reversal',
             sourceId: $expense->id,
         );
-    }
-
-    /**
-     * Compte de charge extrait du libellé choisi à l'écran.
-     *
-     * ⚠️ DEUX INCOHÉRENCES DU PROTOTYPE, SIGNALÉES ET NON RÉSOLUES ICI :
-     *   - la liste propose « 621 - Salaires », alors que la paie est
-     *     comptabilisée en 661 Charges de personnel (ticket 14.25) : deux
-     *     comptes différents pour la même nature de charge ;
-     *   - « 614 - Transports » et « 624 - Transports » y figurent tous deux,
-     *     avec le même intitulé.
-     * Les deux comptes sont créés au plan comptable pour que l'écran reste
-     * fonctionnel, mais trancher lequel retenir relève du client — arbitrer
-     * seul reviendrait à réécrire silencieusement son plan comptable.
-     */
-    private function compteDeCharge(?string $categorie): ?ChartOfAccount
-    {
-        if (! $categorie) {
-            return null;
-        }
-
-        // « 605 - Énergie » → « 605 ». Le format vient de l'écran lui-même.
-        if (! preg_match('/^\s*(\d{2,4})/', $categorie, $trouve)) {
-            return null;
-        }
-
-        return ChartOfAccount::where('code', $trouve[1])->where('class', 6)->first();
     }
 
     private function compteDeTresorerie(?string $treasuryAccountId): ?ChartOfAccount

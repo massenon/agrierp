@@ -438,9 +438,9 @@ class SelecteurExerciceTest extends TestCase
         $this->assertSame(1, \App\Models\AccountingEntry::count());
     }
 
-    // ── EX-Q5 : la date d'une dépense comptabilisée est grisée ───────────────────────────────────────────────
+    // ── EX-Q5 (remplacée par DEP1) : une dépense comptabilisée est immuable, sa date comprise ─────────────────
 
-    public function test_la_date_d_une_depense_comptabilisee_est_grisee_avec_son_motif(): void
+    public function test_une_depense_comptabilisee_ne_s_ouvre_plus_en_modification_sa_date_comprise(): void
     {
         $this->ouvrirExercices();
         $this->planDeLExemple();
@@ -448,21 +448,19 @@ class SelecteurExerciceTest extends TestCase
         $caisse = TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse', 'account_code' => '531', 'balance' => 100_000, 'is_active' => true]);
 
         $saisie = Livewire::test(SaisieDepenses::class)
+            ->call('nouvelleDepense')
             ->set('expenseDate', '2027-02-05')
-            ->set('label', 'Carburant')
-            ->set('category', '605 - Énergie')
-            ->set('amount', 5000)
             ->set('treasuryAccountId', $caisse->id)
+            ->set('lines.0.label', 'Carburant')
+            ->set('lines.0.chargeAccountId', \App\Models\ChartOfAccount::where('code', '605')->value('id'))
+            ->set('lines.0.amount', '5000')
             ->call('submitExpense');
         $depense = Expense::firstOrFail();
-
-        // Nouvelle dépense : la date est libre.
-        $saisie->assertDontSeeHtml('data-date-verrouillee');
 
         $this->assertNotNull($depense->accounting_entry_id, 'le décor comptabilise la dépense (605 / 531 au plan)');
 
         $saisie->call('editExpense', $depense->id)
-            ->assertSeeHtml('data-date-verrouillee')
-            ->assertSeeHtml('title="'.e(\App\Actions\SaisieDepenseAction::MOTIF_DATE_VERROUILLEE).'"');
+            ->assertNotDispatched('open-modal')
+            ->assertDispatched('toast', message: \App\Actions\SaisieDepenseAction::MESSAGE_DEJA_COMPTABILISEE, type: 'error');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AccountingEntry extends Model
 {
@@ -31,6 +32,15 @@ class AccountingEntry extends Model
     public function lines()
     {
         return $this->hasMany(AccountingEntryLine::class, 'entry_id');
+    }
+
+    /**
+     * Ticket DEP2 — le NUMÉRO de pièce (« OD-2026-0012 »), RELU de la référence de l'écriture : le début, avant le
+     * libellé (« OD-2026-0012 — Dépense Provende »). Une dépense ne le recopie jamais.
+     */
+    public function getNumeroAttribute(): string
+    {
+        return trim(Str::before((string) $this->reference, ' — '));
     }
 
     public function getTotalDebitAttribute(): float

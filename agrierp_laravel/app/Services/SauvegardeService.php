@@ -58,7 +58,7 @@ class SauvegardeService
                 // Ticket 15.20 : enfants de `suppliers` (et de `treasury_accounts`), donc AVANT `suppliers`.
                 // `supplier_payments` (15.16) avait été oublié : un remplacement du module le laissait orphelin.
                 'supplier_payments', 'supplier_refunds',
-                'payables', 'purchases', 'purchase_orders', 'expenses',
+                'payables', 'purchases', 'purchase_orders', 'expense_lines', 'expenses',
                 'suppliers',
             ]],
             'stocks' => ['libelle' => 'Stocks', 'tables' => [

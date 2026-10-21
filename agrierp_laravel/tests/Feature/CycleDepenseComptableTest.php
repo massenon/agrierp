@@ -68,14 +68,16 @@ class CycleDepenseComptableTest extends TestCase
         ]);
     }
 
+    /** Saisit une dépense à UNE ligne par la modale ; [$categorie] = « code - intitulé » : seul le code compte. */
     private function saisir(string $categorie = '605 - Énergie', float $montant = 35_000): void
     {
         Livewire::test(SaisieDepenses::class)
+            ->call('nouvelleDepense')
             ->set('expenseDate', now()->format('Y-m-d'))
-            ->set('label', 'Carburant groupe électrogène')
-            ->set('category', $categorie)
-            ->set('amount', $montant)
             ->set('treasuryAccountId', $this->caisse->id)
+            ->set('lines.0.label', 'Carburant groupe électrogène')
+            ->set('lines.0.chargeAccountId', ChartOfAccount::where('code', substr($categorie, 0, 3))->value('id'))
+            ->set('lines.0.amount', (string) (int) $montant)
             ->call('submitExpense')
             ->assertHasNoErrors();
     }
@@ -159,8 +161,8 @@ class CycleDepenseComptableTest extends TestCase
         $this->assertFalse((bool) $depense->fresh()->is_active);
     }
 
-    /** Une dépense déjà comptabilisée ne se réécrit pas en silence. */
-    public function test_a_posted_expense_cannot_have_its_amount_rewritten(): void
+    /** Une dépense déjà comptabilisée ne se réécrit pas en silence (DEP1 : elle ne s'ouvre même plus en modification). */
+    public function test_a_posted_expense_cannot_be_rewritten(): void
     {
         $this->saisir('605 - Énergie', 35_000);
 
@@ -168,9 +170,8 @@ class CycleDepenseComptableTest extends TestCase
 
         Livewire::test(SaisieDepenses::class)
             ->call('editExpense', $depense->id)
-            ->set('amount', 99_000)
-            ->call('submitExpense')
-            ->assertHasErrors(['amount']);
+            ->assertNotDispatched('open-modal')
+            ->assertDispatched('toast', type: 'error');
 
         $this->assertEquals(35_000, (float) $depense->fresh()->amount);
     }
@@ -185,25 +186,25 @@ class CycleDepenseComptableTest extends TestCase
     }
 
     /**
-     * Compte de charge absent du plan comptable : la dépense est enregistrée
-     * malgré tout — l'argent est réellement sorti — mais l'anomalie est DITE.
+     * 🔴→✅ DEP1 — LA PIÈCE IMPOSSIBLE REFUSE LA DÉPENSE. Avant : une dépense sans écriture possible était enregistrée
+     * quand même, l'anomalie dite par un toast. Désormais : ni dépense, ni lignes, la caisse intacte.
      */
-    public function test_a_missing_charge_account_is_reported_never_swallowed(): void
+    public function test_an_impossible_entry_refuses_the_whole_expense(): void
     {
-        Livewire::test(SaisieDepenses::class)
-            ->set('expenseDate', now()->format('Y-m-d'))
-            ->set('label', 'Charge sans compte')
-            ->set('category', '699 - Compte inexistant')
-            ->set('amount', 10_000)
-            ->set('treasuryAccountId', $this->caisse->id)
-            ->call('submitExpense')
-            ->assertDispatched('toast', function (string $nom, array $params) {
-                return str_contains($params['message'], 'écriture comptable non générée')
-                    && $params['type'] === 'warning';
-            });
+        $orphelin = TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse sans compte', 'account_code' => '999', 'balance' => 100_000, 'is_active' => true]);
 
-        $this->assertEquals(1, Expense::count());
-        $this->assertNull(Expense::firstOrFail()->accounting_entry_id);
-        $this->assertEquals(490_000, (float) $this->caisse->fresh()->balance, "L'argent est bien sorti.");
+        Livewire::test(SaisieDepenses::class)
+            ->call('nouvelleDepense')
+            ->set('expenseDate', now()->format('Y-m-d'))
+            ->set('treasuryAccountId', $orphelin->id)
+            ->set('lines.0.label', 'Charge sans pièce possible')
+            ->set('lines.0.chargeAccountId', ChartOfAccount::where('code', '605')->value('id'))
+            ->set('lines.0.amount', '10000')
+            ->call('submitExpense')
+            ->assertHasErrors(['treasuryAccountId']);
+
+        $this->assertEquals(0, Expense::count());
+        $this->assertEquals(0, \App\Models\ExpenseLine::count());
+        $this->assertEquals(100_000, (float) $orphelin->fresh()->balance);
     }
 }
