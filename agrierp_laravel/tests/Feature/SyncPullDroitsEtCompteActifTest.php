@@ -35,7 +35,7 @@ class SyncPullDroitsEtCompteActifTest extends TestCase
     {
         $u = User::create([
             'name' => ucfirst($role), 'username' => $role,
-            'email' => $role.'@olouwachegoun.bj',
+            'email' => $role.'@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => $actif,
         ]);
         $u->assignRole($role);

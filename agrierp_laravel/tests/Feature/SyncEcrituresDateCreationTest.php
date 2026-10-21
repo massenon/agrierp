@@ -50,7 +50,7 @@ class SyncEcrituresDateCreationTest extends TestCase
         $this->ventes = ChartOfAccount::create(['code' => '701', 'label' => 'Ventes', 'class' => 7, 'is_active' => true]);
 
         $this->utilisateur = User::create([
-            'name' => 'Poste', 'username' => 'poste', 'email' => 'poste@olouwachegoun.bj',
+            'name' => 'Poste', 'username' => 'poste', 'email' => 'poste@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
     }

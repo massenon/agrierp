@@ -40,7 +40,7 @@ class FiscalYearClosureTest extends DuskTestCase
     public function test_closure_ui_completes_and_locks_year(): void
     {
         $this->seed();
-        $comptable = User::where('email', 'compta@olouwachegoun.bj')->firstOrFail();
+        $comptable = User::where('email', 'compta@fermeolouwachegoun.com')->firstOrFail();
 
         $year = FiscalYear::firstOrCreate(
             ['year' => now()->year],

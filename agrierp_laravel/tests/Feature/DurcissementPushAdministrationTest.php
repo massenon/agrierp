@@ -37,7 +37,7 @@ class DurcissementPushAdministrationTest extends TestCase
         Permission::findOrCreate('manage-administration', 'web');
         Role::findOrCreate('secretaire', 'web')->givePermissionTo('manage-administration');
         $this->secretaire = User::create([
-            'name' => 'Secretaire', 'username' => 'secretaire', 'email' => 'secretaire@olouwachegoun.bj',
+            'name' => 'Secretaire', 'username' => 'secretaire', 'email' => 'secretaire@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->secretaire->assignRole('secretaire');

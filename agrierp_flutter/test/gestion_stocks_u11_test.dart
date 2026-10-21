@@ -670,7 +670,7 @@ foreach (['view-stocks', 'manage-stocks'] as $nom) {
 }
 $role = App\Models\Role::findOrCreate('admin', 'web');
 $role->givePermissionTo(['view-stocks', 'manage-stocks']);
-$admin = App\Models\User::create(['name' => 'DG', 'email' => 'dg@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+$admin = App\Models\User::create(['name' => 'DG', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
 $admin->assignRole($role);
 App\Models\FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);
 $categorie = App\Models\ProductCategory::create(['label' => 'Aliments', 'is_active' => true]);

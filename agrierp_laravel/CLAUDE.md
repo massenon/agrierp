@@ -244,7 +244,7 @@ One ticket = one session. Never batch-convert screens without intermediate verif
 
 **`README_SPRINT0.md` exists in two places and must stay byte-identical**: here and at `C:\Projects\agrierp_laravel\README_SPRINT0.md`. Append every ticket to **both**. They had drifted by ~2400 lines, and that gap hid six unbuilt tickets and swallowed ticket 14.25 entirely. Compare hashes of both files before appending, not by eye.
 
-Seeded demo accounts, password `AgriERP@2026` — login accepts the **short username or the e-mail** (ticket 14.50): `admin` (dg@), `compta`, `caisse`, `elevage`, all `@olouwachegoun.bj`. The e-mail column stays: it carries password reset.
+Seeded demo accounts, password `AgriERP@2026` — login accepts the **short username or the e-mail** (ticket 14.50): `admin` (contact@), `compta`, `caisse`, `elevage`, all `@fermeolouwachegoun.com`. The e-mail column stays: it carries password reset.
 
 Root-level `*.md` files are project artifacts, not generic Laravel docs: `RUNBOOK_DEPLOIEMENT_CPANEL.md` (exact deployment commands for this repo), `CHECKLIST_PRE_DEPLOIEMENT.md`, `STRATEGIE_BASCULE_PAPIER_NUMERIQUE.md` (paper → digital cutover, with the data-entry gaps it exposed), `SETUP_API_SANCTUM.md`, `ADDENDUM_FULL_MIGRATIONS_DATABASE_FLUTTER.md` (Drift tables the Flutter side still lacks).
 

@@ -178,7 +178,7 @@ class BalanceAgeeTest extends TestCase
 
         $comptable = \App\Models\User::create([
             'name' => 'Comptable', 'username' => 'compta',
-            'email' => 'compta@olouwachegoun.bj',
+            'email' => 'compta@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');

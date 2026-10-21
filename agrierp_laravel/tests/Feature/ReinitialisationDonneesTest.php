@@ -42,7 +42,7 @@ class ReinitialisationDonneesTest extends TestCase
         Role::findOrCreate('caissier', 'web');
 
         $this->admin = User::create([
-            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
@@ -204,7 +204,7 @@ class ReinitialisationDonneesTest extends TestCase
     public function test_a_non_admin_can_neither_toggle_nor_reset(): void
     {
         $caissier = User::create([
-            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

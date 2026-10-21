@@ -87,10 +87,10 @@ php artisan db:seed --force --class=Database\\Seeders\\DatabaseSeeder
 
 | Rôle | Email | Mot de passe démo |
 |---|---|---|
-| admin | dg@olouwachegoun.bj | AgriERP@2026 |
-| comptable | compta@olouwachegoun.bj | AgriERP@2026 |
-| caissier | caisse@olouwachegoun.bj | AgriERP@2026 |
-| animalier | elevage@olouwachegoun.bj | AgriERP@2026 |
+| admin | dg@fermeolouwachegoun.com | AgriERP@2026 |
+| comptable | compta@fermeolouwachegoun.com | AgriERP@2026 |
+| caissier | caisse@fermeolouwachegoun.com | AgriERP@2026 |
+| animalier | elevage@fermeolouwachegoun.com | AgriERP@2026 |
 
 **Dès la mise en donnée réelle** : changer ces 4 mots de passe depuis
 l'écran Mon Profil de chaque compte, ou via `php artisan tinker` en SSH

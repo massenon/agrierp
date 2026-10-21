@@ -153,7 +153,7 @@ class ClotureGardeeTest extends TestCase
     public function test_l_etape_2_exige_le_droit_de_cloturer(): void
     {
         $caissier = User::create([
-            'name' => 'Caisse', 'username' => 'caisse-cl', 'email' => 'caisse-cl@olouwachegoun.bj',
+            'name' => 'Caisse', 'username' => 'caisse-cl', 'email' => 'caisse-cl@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

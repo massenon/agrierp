@@ -71,7 +71,7 @@ class SyncVenteDateeSocleTest extends TestCase
 
         $caissier = User::create([
             'name' => 'Caissière POS', 'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier', 'animalier');

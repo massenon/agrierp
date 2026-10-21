@@ -48,7 +48,7 @@ class CorrectifsWebU13Test extends TestCase
         }
         $role = Role::findOrCreate('role-u13', 'web');
         $role->givePermissionTo($permissions);
-        $u = User::create(['name' => 'Compte U13', 'email' => 'u13@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => 'Compte U13', 'email' => 'u13@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $u->assignRole($role);
         $this->actingAs($u);
     }

@@ -30,7 +30,7 @@ class ClotureExerciceTest extends TestCase
         // Ticket S2 : les étapes de clôture exigent désormais `close-fiscal-year`.
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $comptable = \App\Models\User::create([
-            'name' => 'Comptable', 'username' => 'compta-cloture', 'email' => 'compta-cloture@olouwachegoun.bj',
+            'name' => 'Comptable', 'username' => 'compta-cloture', 'email' => 'compta-cloture@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');

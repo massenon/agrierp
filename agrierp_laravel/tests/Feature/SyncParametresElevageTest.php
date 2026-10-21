@@ -44,7 +44,7 @@ class SyncParametresElevageTest extends TestCase
 
         $this->utilisateur = User::create([
             'name' => "Chef d'Élevage", 'username' => 'elevage',
-            'email' => 'elevage@olouwachegoun.bj',
+            'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 

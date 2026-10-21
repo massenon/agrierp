@@ -58,7 +58,7 @@ class ClotturePeriodiqueTest extends TestCase
 
         $user = User::create([
             'name' => 'Test '.$role,
-            'email' => $role.'.test@olouwachegoun.bj',
+            'email' => $role.'.test@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($r);

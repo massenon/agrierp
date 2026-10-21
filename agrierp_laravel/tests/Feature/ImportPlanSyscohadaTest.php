@@ -338,7 +338,7 @@ class ImportPlanSyscohadaTest extends TestCase
     {
         $this->seed(ChartOfAccountsSeeder::class);
         Role::findOrCreate('caissier', 'web');
-        $u = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+        $u = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
         $u->assignRole('caissier');
 
@@ -425,7 +425,7 @@ class ImportPlanSyscohadaTest extends TestCase
         }
         $role = Role::findOrCreate('comptable', 'web');
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
-        $u = User::create(['name' => 'Comptable', 'email' => 'plan@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => 'Comptable', 'email' => 'plan@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $u->assignRole($role);
         $this->actingAs($u);
 
@@ -689,7 +689,7 @@ class ImportPlanSyscohadaTest extends TestCase
         // Ticket S2 : l'enregistrement d'un mode de paiement exige `manage-comptabilite`.
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $comptable = User::create([
-            'name' => 'Comptable', 'username' => 'compta-a2', 'email' => 'compta-a2@olouwachegoun.bj',
+            'name' => 'Comptable', 'username' => 'compta-a2', 'email' => 'compta-a2@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');

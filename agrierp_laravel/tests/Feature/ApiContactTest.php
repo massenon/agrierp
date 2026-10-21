@@ -28,7 +28,7 @@ class ApiContactTest extends TestCase
         $this->user = User::create([
             'name' => 'Caissier Ferme',
             'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP),
             'is_active' => true,
         ]);
@@ -62,7 +62,7 @@ class ApiContactTest extends TestCase
         Mail::assertSent(ContactEditorMail::class, function (ContactEditorMail $m) {
             return $m->payload['type'] === 'message'
                 && $m->payload['subject'] === 'Question'
-                && $m->senderEmail === 'caisse@olouwachegoun.bj'
+                && $m->senderEmail === 'caisse@fermeolouwachegoun.com'
                 && $m->hasTo(config('mail.support_address', 'contact@massenonrhodes.com'));
         });
         $this->assertDatabaseHas('audit_logs', [

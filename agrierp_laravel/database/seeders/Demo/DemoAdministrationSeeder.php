@@ -50,7 +50,7 @@ class DemoAdministrationSeeder extends Seeder
             'company_name' => 'FERME ÉCOLE OLOUWACHEGOUN',
             'promoter_name' => 'Cabinet FAGUEZ SARL',
             'address' => 'Ikpinlè, Commune d\'Adja-Ouèrè, Département du Plateau, Bénin',
-            'phone' => '+229 97 00 00 00',
+            'phone' => '+2290197840285',
             'email' => 'contact@fermeolouwachegoun.com',
             'ifu' => '3202512345678',
             'rccm' => 'RB/PTN/26 B 1234',

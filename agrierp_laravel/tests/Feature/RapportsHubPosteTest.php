@@ -47,7 +47,7 @@ class RapportsHubPosteTest extends TestCase
         $role = Role::findOrCreate('essai-'.count($permissions), 'web');
         $role->syncPermissions($permissions);
         $utilisateur = User::create([
-            'name' => 'Comptable', 'email' => 'rapports'.count($permissions).'@olouwachegoun.bj',
+            'name' => 'Comptable', 'email' => 'rapports'.count($permissions).'@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $utilisateur->assignRole($role);

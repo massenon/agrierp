@@ -50,7 +50,7 @@ class EncaissementVenteTest extends TestCase
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
         $user = User::create([
-            'name' => 'Caissière', 'email' => 'encaissement@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Caissière', 'email' => 'encaissement@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

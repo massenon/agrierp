@@ -36,7 +36,7 @@ trait JeuBasculeExercice
     {
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $comptable = User::create([
-            'name' => 'Comptable', 'username' => 'compta-bascule', 'email' => 'compta-bascule@olouwachegoun.bj',
+            'name' => 'Comptable', 'username' => 'compta-bascule', 'email' => 'compta-bascule@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');

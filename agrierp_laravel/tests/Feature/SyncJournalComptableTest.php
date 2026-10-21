@@ -62,7 +62,7 @@ class SyncJournalComptableTest extends TestCase
         $this->banque = ChartOfAccount::create(['code' => '521', 'label' => 'Banque', 'class' => 5, 'is_active' => true]);
 
         $this->utilisateur = User::create([
-            'name' => 'Poste', 'username' => 'poste', 'email' => 'poste@olouwachegoun.bj',
+            'name' => 'Poste', 'username' => 'poste', 'email' => 'poste@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
     }
@@ -94,7 +94,7 @@ class SyncJournalComptableTest extends TestCase
         $role = Role::findOrCreate('comptable', 'web');
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
         $compta = User::create([
-            'name' => 'Compta', 'username' => 'compta', 'email' => 'compta@olouwachegoun.bj',
+            'name' => 'Compta', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $compta->assignRole($role);

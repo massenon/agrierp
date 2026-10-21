@@ -123,7 +123,7 @@ $s['passe'] = [
 // compte qui a `view-elevage` (`exportFichePdf` l'exige).
 if (! App\Models\User::where('username', 'animalier-ex8')->exists()) {
     Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => Database\Seeders\RolesAndPermissionsSeeder::class, '--force' => true]);
-    $animalier = App\Models\User::create(['name' => 'Animalier', 'username' => 'animalier-ex8', 'email' => 'animalier-ex8@olouwachegoun.bj',
+    $animalier = App\Models\User::create(['name' => 'Animalier', 'username' => 'animalier-ex8', 'email' => 'animalier-ex8@fermeolouwachegoun.com',
         'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
     $animalier->assignRole('animalier');
     Illuminate\Support\Facades\Auth::login($animalier);

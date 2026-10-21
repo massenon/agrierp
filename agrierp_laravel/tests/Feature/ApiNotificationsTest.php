@@ -38,7 +38,7 @@ class ApiNotificationsTest extends TestCase
         $u = User::create([
             'name' => ucfirst($username),
             'username' => $username,
-            'email' => $username.'@olouwachegoun.bj',
+            'email' => $username.'@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP),
             'is_active' => true,
         ]);

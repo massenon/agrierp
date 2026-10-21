@@ -60,7 +60,7 @@ class SyncMotifsRefusFrancaisTest extends TestCase
         Role::findOrCreate('gestionnaire', 'web')->givePermissionTo($permissions);
 
         $this->admin = User::create([
-            'name' => 'Gestionnaire', 'username' => 'gest', 'email' => 'gest@olouwachegoun.bj',
+            'name' => 'Gestionnaire', 'username' => 'gest', 'email' => 'gest@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('gestionnaire');

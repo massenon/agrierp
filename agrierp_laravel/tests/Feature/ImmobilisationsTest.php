@@ -43,7 +43,7 @@ class ImmobilisationsTest extends TestCase
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
 
         $this->comptable = User::create([
-            'name' => 'Comptable', 'email' => 'immo@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Comptable', 'email' => 'immo@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $this->comptable->assignRole($role);
         $this->actingAs($this->comptable);
@@ -548,7 +548,7 @@ class ImmobilisationsTest extends TestCase
     public function test_a_read_only_user_cannot_write_even_by_forcing_the_form_open(): void
     {
         $lecteur = User::create([
-            'name' => 'Lecteur', 'email' => 'lecture@olouwachegoun.bj', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Lecteur', 'email' => 'lecture@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
         ]);
         $lectureSeule = Role::findOrCreate('observateur', 'web');
         $lectureSeule->givePermissionTo('view-comptabilite');

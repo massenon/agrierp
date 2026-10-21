@@ -38,7 +38,7 @@ class SyncEcartInventaireTest extends TestCase
 
         $this->utilisateur = User::create([
             'name' => 'Animalier', 'username' => 'elevage',
-            'email' => 'elevage@olouwachegoun.bj',
+            'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 

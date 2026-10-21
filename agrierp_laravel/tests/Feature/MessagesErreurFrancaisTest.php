@@ -58,7 +58,7 @@ class MessagesErreurFrancaisTest extends TestCase
         $role->givePermissionTo(['view-elevage', 'manage-elevage']);
 
         $user = User::create([
-            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@olouwachegoun.bj',
+            'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);
@@ -232,7 +232,7 @@ class MessagesErreurFrancaisTest extends TestCase
         // Une route protégée par `can:` : l'exception du framework (« This action is unauthorized. »)
         // passe par `lang/fr.json`.
         $sansDroit = User::create([
-            'name' => 'Sans droit', 'username' => 'sansdroit', 'email' => 'sansdroit@olouwachegoun.bj',
+            'name' => 'Sans droit', 'username' => 'sansdroit', 'email' => 'sansdroit@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         Permission::findOrCreate('view-elevage', 'web');

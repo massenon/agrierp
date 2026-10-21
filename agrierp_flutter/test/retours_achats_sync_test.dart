@@ -610,7 +610,7 @@ Carbon\Carbon::setTestNow('2026-10-19 08:00:00');
 $entree = json_decode(file_get_contents($argv[1]), true);
 Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolesAndPermissionsSeeder', '--force' => true]);
 $utilisateur = App\Models\User::create([
-    'name' => 'Administrateur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+    'name' => 'Administrateur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
     'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
 ]);
 $utilisateur->assignRole('admin');

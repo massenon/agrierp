@@ -47,7 +47,7 @@ class SyncClientsCreancesTest extends TestCase
 
         $this->utilisateur = User::create([
             'name' => 'Caissier', 'username' => 'caisse',
-            'email' => 'caisse@olouwachegoun.bj',
+            'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
 

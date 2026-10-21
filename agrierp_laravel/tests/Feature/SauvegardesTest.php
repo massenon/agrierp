@@ -42,7 +42,7 @@ class SauvegardesTest extends TestCase
         Role::findOrCreate('caissier', 'web');
 
         $this->admin = User::create([
-            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
@@ -207,7 +207,7 @@ class SauvegardesTest extends TestCase
         $fichier = app(SauvegardeService::class)->genererModule('stocks');
 
         $caissier = User::create([
-            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

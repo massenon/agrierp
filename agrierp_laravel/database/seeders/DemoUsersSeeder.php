@@ -22,9 +22,9 @@ class DemoUsersSeeder extends Seeder
         $accounts = [
             // Décision client du 17/10/2026 : « M. Olouchègoun », adresse de contact du domaine de la ferme.
             ['name' => 'M. Olouchègoun', 'username' => 'admin', 'email' => 'contact@fermeolouwachegoun.com', 'role' => 'admin'],
-            ['name' => 'Comptable Ferme École', 'username' => 'compta', 'email' => 'compta@olouwachegoun.bj', 'role' => 'comptable'],
-            ['name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj', 'role' => 'caissier'],
-            ['name' => 'Chef d\'Élevage', 'username' => 'elevage', 'email' => 'elevage@olouwachegoun.bj', 'role' => 'animalier'],
+            ['name' => 'Comptable Ferme École', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com', 'role' => 'comptable'],
+            ['name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'role' => 'caissier'],
+            ['name' => 'Chef d\'Élevage', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com', 'role' => 'animalier'],
         ];
 
         foreach ($accounts as $account) {

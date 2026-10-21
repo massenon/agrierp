@@ -140,7 +140,7 @@ class BandesSaisieWebTest extends TestCase
     public function test_sans_manage_elevage_aucune_action_n_est_permise(): void
     {
         $caissier = User::create([
-            'name' => 'Caisse', 'username' => 'caisse-bs', 'email' => 'caisse-bs@olouwachegoun.bj',
+            'name' => 'Caisse', 'username' => 'caisse-bs', 'email' => 'caisse-bs@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

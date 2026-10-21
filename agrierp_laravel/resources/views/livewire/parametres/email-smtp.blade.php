@@ -33,7 +33,7 @@
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Utilisateur SMTP</label>
-                    <input wire:model="smtpUser" type="text" placeholder="ex : notifications@olouwachegoun.bj" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="smtpUser" type="text" placeholder="ex : notifications@fermeolouwachegoun.com" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                     @error('smtpUser') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
                 <div>
@@ -52,7 +52,7 @@
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Adresse d'Expédition</label>
-                    <input wire:model="fromAddress" type="email" placeholder="{{ $this->contactEmail ?? 'ex : contact@olouwachegoun.bj' }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('fromAddress') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <input wire:model="fromAddress" type="email" placeholder="{{ $this->contactEmail ?? 'ex : contact@fermeolouwachegoun.com' }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('fromAddress') ? 'is-invalid' : 'border-outline-variant' }}">
                     @error('fromAddress') <p class="invalid-feedback">{{ $message }}</p> @enderror
                     <p class="text-[10px] text-outline mt-xs">Vide : l'e-mail de contact (Données de l'Entreprise) sert d'expéditeur.</p>
                 </div>

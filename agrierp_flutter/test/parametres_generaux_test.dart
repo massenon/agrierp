@@ -80,7 +80,7 @@ void main() {
         UtilisateursCompanion.insert(
           id: uuid(cle),
           name: nom,
-          email: Value('$cle@olouwachegoun.bj'),
+          email: Value('$cle@fermeolouwachegoun.com'),
           role: Value(role),
           isActive: Value(actif),
         ),

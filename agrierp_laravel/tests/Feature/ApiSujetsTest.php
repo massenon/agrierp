@@ -35,7 +35,7 @@ class ApiSujetsTest extends TestCase
 
         foreach ([['animal', 'animalier'], ['caisse', 'caissier']] as [$u, $r]) {
             User::create([
-                'name' => ucfirst($u), 'username' => $u, 'email' => $u.'@olouwachegoun.bj',
+                'name' => ucfirst($u), 'username' => $u, 'email' => $u.'@fermeolouwachegoun.com',
                 'password' => bcrypt(self::MDP), 'is_active' => true,
             ])->assignRole($r);
         }

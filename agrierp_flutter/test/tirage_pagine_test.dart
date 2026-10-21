@@ -647,7 +647,7 @@ Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'Database\\See
 $comptes = [];
 foreach (['admin', 'caissier'] as $role) {
     $compte = App\Models\User::create([
-        'name' => 'Compte '.$role, 'username' => $role, 'email' => $role.'@olouwachegoun.bj',
+        'name' => 'Compte '.$role, 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
         'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
     ]);
     $compte->assignRole($role);

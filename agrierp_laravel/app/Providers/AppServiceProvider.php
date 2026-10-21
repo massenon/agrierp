@@ -28,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Un champ numérique vidé au clavier vaut 0 au lieu de casser l'écran (voir la classe).
+        \App\Support\ChampNumeriqueVide::enregistrer();
+
         // ⚠️⚠️ TICKET 14.65 — POLITIQUE DE MOT DE PASSE CENTRALISEE. Les deux
         // seuls endroits qui posent un mot de passe (`ResetPassword` et
         // `GestionUtilisateurs`) exigeaient `min:8` et rien d'autre :

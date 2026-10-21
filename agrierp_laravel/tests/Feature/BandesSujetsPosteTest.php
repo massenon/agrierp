@@ -66,7 +66,7 @@ class BandesSujetsPosteTest extends TestCase
     private function jeton(string $role): void
     {
         $utilisateur = User::create([
-            'name' => $role, 'username' => $role.'-bs', 'email' => $role.'-bs@olouwachegoun.bj',
+            'name' => $role, 'username' => $role.'-bs', 'email' => $role.'-bs@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);

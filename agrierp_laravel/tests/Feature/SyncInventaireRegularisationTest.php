@@ -59,7 +59,7 @@ class SyncInventaireRegularisationTest extends TestCase
 
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->admin = User::create([
-            'name' => 'Administrateur', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Administrateur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');

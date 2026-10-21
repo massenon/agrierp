@@ -50,7 +50,7 @@ class SyncReproductionTest extends TestCase
 
         $user = User::create([
             'name' => 'Chef d\'Élevage', 'username' => 'elevage',
-            'email' => 'elevage@olouwachegoun.bj',
+            'email' => 'elevage@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $user->assignRole('animalier');

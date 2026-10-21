@@ -108,7 +108,7 @@
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'forgot-password' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <p class="text-xs text-outline mb-4">Saisissez votre adresse e-mail professionnelle. Un lien de réinitialisation sécurisé vous sera envoyé.</p>
-        <input wire:model="forgotEmail" type="email" placeholder="votre.email@olouwachegoun.bj" class="w-full h-11 px-4 border border-outline-variant rounded-lg text-xs mb-1 focus:ring-2 focus:ring-brand-emerald outline-none">
+        <input wire:model="forgotEmail" type="email" placeholder="votre.email@fermeolouwachegoun.com" class="w-full h-11 px-4 border border-outline-variant rounded-lg text-xs mb-1 focus:ring-2 focus:ring-brand-emerald outline-none">
         @error('forgotEmail') <p class="invalid-feedback mb-3">{{ $message }}</p> @enderror
         <button type="button" wire:click="sendResetLink" class="w-full bg-brand-emerald hover:bg-brand-forest text-white font-bold h-11 rounded-lg text-xs uppercase tracking-wider mt-3">Envoyer le lien de réinitialisation</button>
     </x-modal>

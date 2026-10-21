@@ -44,7 +44,7 @@ class EchecMecefEnvoiAuditTest extends TestCase
         }
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes', 'manage-ventes']);
         $caissier = User::create([
-            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@olouwachegoun.bj',
+            'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
             'password' => bcrypt(self::MDP), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');

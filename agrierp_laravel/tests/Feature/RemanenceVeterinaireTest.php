@@ -52,7 +52,7 @@ class RemanenceVeterinaireTest extends TestCase
 
         $user = User::create([
             'name' => 'Caissière',
-            'email' => 'caisse.remanence@olouwachegoun.bj',
+            'email' => 'caisse.remanence@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'),
         ]);
         $user->assignRole($role);

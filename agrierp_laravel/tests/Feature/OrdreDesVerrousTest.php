@@ -61,7 +61,7 @@ class OrdreDesVerrousTest extends TestCase
         Carbon::setTestNow('2026-10-14 12:00:00');
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->admin = User::create([
-            'name' => 'Direction', 'username' => 'admin', 'email' => 'dg@olouwachegoun.bj',
+            'name' => 'Direction', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
