@@ -9,7 +9,7 @@
             ['key' => 'postes', 'label' => 'Postes & Appairage', 'icon' => 'lan'],
             ['key' => 'paiement', 'label' => 'Modes de Paiement', 'icon' => 'payments'],
             ['key' => 'audit', 'label' => 'Audit Logs', 'icon' => 'history'],
-            ['key' => 'restauration', 'label' => 'Restauration', 'icon' => 'restore_from_trash'],
+            ['key' => 'corbeille', 'label' => 'Corbeille', 'icon' => 'restore_from_trash'],
             ['key' => 'reinitialisation', 'label' => 'Réinitialisation', 'icon' => 'restart_alt'],
             ['key' => 'sauvegardes', 'label' => 'Sauvegardes', 'icon' => 'database'],
         ]"
@@ -47,8 +47,8 @@
             <livewire:parametres.audit-logs />
         @endif
 
-        @if($tab === 'restauration')
-            <livewire:parametres.restauration />
+        @if($tab === 'corbeille')
+            <livewire:parametres.corbeille />
         @endif
 
         @if($tab === 'reinitialisation')

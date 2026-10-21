@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Parametres\Restauration;
+use App\Livewire\Parametres\Corbeille;
 use App\Models\AccountingEntry;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
@@ -57,6 +57,9 @@ class CorbeilleRestaurationTest extends TestCase
         $this->fournisseur = Supplier::create([
             'name' => 'Provenderie du Plateau', 'phone' => '+22997000000', 'is_active' => true,
         ]);
+
+        // Ticket ARC1 — le service refuse un acteur sans le droit (l'écran n'est pas la garantie) : l'administrateur agit.
+        $this->actingAs($this->admin);
     }
 
     /** Un enregistrement actif n'est pas dans la corbeille. */
@@ -194,7 +197,7 @@ class CorbeilleRestaurationTest extends TestCase
             'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
-        $this->actingAs($caissier);
+        $this->actingAs($caissier);   // ARC1 : remplace l'administrateur du setUp
 
         $this->fournisseur->update(['is_active' => false]);
 
@@ -205,7 +208,7 @@ class CorbeilleRestaurationTest extends TestCase
         $refuse = false;
 
         try {
-            Livewire::test(Restauration::class)
+            Livewire::test(Corbeille::class)
                 ->call('restaurer', 'fournisseurs', $this->fournisseur->id);
         } catch (\Throwable $e) {
             $refuse = true;
@@ -226,7 +229,7 @@ class CorbeilleRestaurationTest extends TestCase
         $this->actingAs($this->admin);
         $this->fournisseur->update(['is_active' => false]);
 
-        Livewire::test(Restauration::class)
+        Livewire::test(Corbeille::class)
             ->call('restaurer', 'fournisseurs', $this->fournisseur->id)
             ->assertDispatched('toast');
 

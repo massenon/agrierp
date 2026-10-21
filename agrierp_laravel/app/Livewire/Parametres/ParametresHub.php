@@ -36,6 +36,11 @@ class ParametresHub extends Component
 
     public function render()
     {
+        // Ticket ARC1 — l'onglet « Restauration » est devenu « Corbeille » : l'ancienne clé (signets, liens) y mène encore.
+        if ($this->tab === 'restauration') {
+            $this->tab = 'corbeille';
+        }
+
         return view('livewire.parametres.parametres-hub', ['title' => 'Paramètres']);
     }
 }

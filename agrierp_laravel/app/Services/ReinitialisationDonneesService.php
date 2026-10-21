@@ -190,6 +190,9 @@ class ReinitialisationDonneesService
             // de numérotation de l'élevage).
             'growth_standards', 'attestation_templates', 'elevage_numbering_settings',
             'audit_logs',
+            // Ticket ARC1 — journal de la Corbeille (qui a restauré ou supprimé définitivement quoi) : une trace d'administration
+            // comme `audit_logs`, utile précisément après une suppression irréversible. Ses éléments, eux, sont partis.
+            'corbeille_operations',
         ];
     }
 

@@ -116,6 +116,9 @@ class AuditLog extends Model
         'quote.accepted' => 'Devis accepté',
         'quote.refused' => 'Devis refusé',
         'quote.archived' => 'Devis archivé',
+        // Ticket ARC1 — Corbeille : restauration et suppression définitive (jamais une clé affichée brute).
+        'corbeille.restored' => 'Élément restauré de la corbeille',
+        'corbeille.deleted' => 'Élément supprimé définitivement',
         'customer.created' => 'Client créé',
         'customer.updated' => 'Client modifié',
         'customer.archived' => 'Client archivé',

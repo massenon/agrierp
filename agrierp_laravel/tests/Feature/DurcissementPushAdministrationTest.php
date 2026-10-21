@@ -218,7 +218,15 @@ class DurcissementPushAdministrationTest extends TestCase
         $this->pousser(['administrative_documents' => [['id' => $d['id'], 'is_active' => false]]])->assertOk();
 
         Carbon::setTestNow('2026-10-09 16:30:00');
-        $this->assertTrue(app(CorbeilleService::class)->restaurer('documents', $d['id']));
+        // Ticket ARC1 — le service refuse un acteur sans le droit (l'écran n'est pas la garantie) : l'administrateur restaure.
+        Permission::findOrCreate('manage-parametres', 'web');
+        Role::findOrCreate('directeur', 'web')->givePermissionTo('manage-parametres');
+        $directeur = User::create([
+            'name' => 'Directeur', 'username' => 'directeur', 'email' => 'directeur@fermeolouwachegoun.com',
+            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+        ]);
+        $directeur->assignRole('directeur');
+        $this->assertTrue(app(CorbeilleService::class)->tenterRestauration('documents', $d['id'], null, $directeur)['ok']);
 
         $modele = AdministrativeDocument::find($d['id']);
         $this->assertTrue((bool) $modele->is_active);
