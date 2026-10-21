@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../config/domaine_email.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -1716,7 +1717,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 49;
+  int get schemaVersion => 50;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2218,8 +2219,61 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.syncStatus);
         await _ajouterColonneSiAbsente(m, livestockLots, livestockLots.effectifCorrige);
       }
+
+      // v50 — ticket MAIL1 (décision du client du 21/10/2026) : les anciennes adresses `@olouwachegoun.bj` déjà
+      // enregistrées au poste passent à `@fermeolouwachegoun.com`. AUCUN changement de table : `app_database.g.dart` ne
+      // bouge pas. Voir [_convertirAdressesEmail].
+      if (from < 50) {
+        await _convertirAdressesEmail();
+      }
     },
   );
+
+  /// Palier v50 (ticket MAIL1) — remplace `@olouwachegoun.bj` par `@fermeolouwachegoun.com` (insensible à la casse, en
+  /// SQL) dans TOUTES les colonnes locales susceptibles de porter une adresse : l'e-mail des clients, des fournisseurs,
+  /// de l'identité de la ferme et des utilisateurs, le titre et le message des notifications, et les valeurs de
+  /// `app_settings` (réglages non secrets de l'onglet « Email (SMTP) » : utilisateur, expéditeur).
+  ///
+  /// ⚠️ **UNE LIGNE RESTE CE QU'ELLE ÉTAIT** : seule la colonne d'adresse est écrite. NI `sync_status` NI `updated_at` ne
+  /// bougent — une fiche `pending` reste `pending`, une `synced` reste `synced` ; le serveur, migré lui aussi, fait converger
+  /// les postes au tirage. Les adresses d'un autre domaine sont intactes.
+  ///
+  /// ⚠️ Aucune contrainte d'unicité locale sur ces colonnes (la clé primaire est l'UUID), donc aucun conflit à arbitrer
+  /// (le web, lui, journalise un `users.email` déjà pris). Le journal d'audit local n'est pas réécrit (historique).
+  ///
+  /// ⚠️ **AUCUN SECRET N'EST LU** : le mot de passe SMTP et le jeton vivent au coffre du système (`flutter_secure_storage`),
+  /// jamais dans ces tables ; la base n'ouvre pas le coffre. L'e-mail de la session mise en cache (au coffre) est converti
+  /// à la lecture, par `convertirDomaineEmail` (`SessionUtilisateur.depuisJson`).
+  ///
+  /// Une valeur qui porterait l'adresse DEUX fois est reprise à la passe suivante (au plus dix) ; un nom de serveur
+  /// (`smtp.olouwachegoun.bj`, sans « @ ») n'est pas une adresse et n'est pas touché.
+  Future<void> _convertirAdressesEmail() async {
+    final cibles = <(String, String)>[
+      (customers.actualTableName, customers.email.name),
+      (suppliers.actualTableName, suppliers.email.name),
+      (companySettings.actualTableName, companySettings.email.name),
+      (utilisateurs.actualTableName, utilisateurs.email.name),
+      (notifications.actualTableName, notifications.title.name),
+      (notifications.actualTableName, notifications.message.name),
+      (appSettings.actualTableName, appSettings.value.name),
+    ];
+    const ancien = '@$ancienDomaineEmail';
+    const nouveau = '@$nouveauDomaineEmail';
+    const longueur = ancien.length;
+
+    for (final (table, colonne) in cibles) {
+      final c = '"$colonne"';
+      final position = "instr(lower($c), '$ancien')";
+      for (var passe = 0; passe < 10; passe++) {
+        final modifiees = await customUpdate(
+          'UPDATE "$table" SET $c = substr($c, 1, $position - 1) || \'$nouveau\' || substr($c, $position + $longueur) '
+          "WHERE $c IS NOT NULL AND $position > 0 "
+          "AND NOT (substr(lower($c), $position + $longueur, 1) GLOB '[a-z0-9-]')",
+        );
+        if (modifiees == 0) break;
+      }
+    }
+  }
 
   /// Vrai si [table] existe déjà (un `createTable` d'un palier antérieur pose le schéma COURANT).
   Future<bool> _tableExiste(Migrator m, TableInfo table) async {
