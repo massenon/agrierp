@@ -79,6 +79,7 @@ abstract final class SymbolesAgri {
   static const IconData expand_more = IconData(0xe5cf, fontFamily: famille);
   static const IconData fact_check = IconData(0xf0c5, fontFamily: famille);
   static const IconData favorite = IconData(0xe87d, fontFamily: famille);
+  static const IconData female = IconData(0xe590, fontFamily: famille);
   static const IconData filter_none = IconData(0xe3e0, fontFamily: famille);
   static const IconData flag = IconData(0xe153, fontFamily: famille);
   static const IconData folder = IconData(0xe2c7, fontFamily: famille);
@@ -108,6 +109,7 @@ abstract final class SymbolesAgri {
   static const IconData lock_outline = IconData(0xe88d, fontFamily: famille);
   static const IconData logout = IconData(0xe9ba, fontFamily: famille);
   static const IconData mail = IconData(0xe0be, fontFamily: famille);
+  static const IconData male = IconData(0xe58e, fontFamily: famille);
   static const IconData manage_accounts = IconData(0xf02e, fontFamily: famille);
   static const IconData mark_email_read = IconData(0xe9fd, fontFamily: famille);
   static const IconData mark_email_unread = IconData(0xf18a, fontFamily: famille);
@@ -143,6 +145,7 @@ abstract final class SymbolesAgri {
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restart_alt = IconData(0xf053, fontFamily: famille);
   static const IconData restaurant = IconData(0xe56c, fontFamily: famille);
+  static const IconData restore_from_trash = IconData(0xe938, fontFamily: famille);
   static const IconData rule = IconData(0xf1c2, fontFamily: famille);
   static const IconData save = IconData(0xe161, fontFamily: famille);
   static const IconData savings = IconData(0xe2eb, fontFamily: famille);

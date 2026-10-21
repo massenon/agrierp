@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\AuditLog;
+use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Services\AccountingEntryService;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,13 @@ use Illuminate\Validation\ValidationException;
  *    l'exploitant, comme « Modifier la Bande » du web). Le code, l'espèce, l'effectif initial ne changent jamais.
  *    Une bande ARCHIVÉE n'est plus modifiable ; une modification identique n'écrit rien (idempotence des renvois) ;
  *  - archivage : `is_active = false`, la ligne est gardée. Un second archivage n'a aucun effet, ni trace.
+ *    ⚠️ BS-Q3 (décision client du 21/10/2026) : une bande qui a un effectif VIVANT (> 0) ne s'archive pas — il faut
+ *    d'abord sortir ou transférer les sujets restants (fiche : mort, vente, don ; transfert vers une autre bande ;
+ *    correction d'effectif d'une bande sans fiche). Rien n'est perdu, aucun flux n'est fermé : le vidage existe déjà ;
+ *  - BS-Q4 : dès qu'une bande a des fiches journalières, son effectif n'est plus modifiable par « Modifier la
+ *    Bande » (la cascade des fiches en est l'UNIQUE écrivain) ; une bande sans fiche garde l'édition libre ;
+ *  - BS-Q7 : une bande archivée se RESTAURE (`is_active = true`), sauf si son code est déjà porté par une bande en
+ *    cours (jamais deux bandes en cours sous le même code) ;
  *
  * ⚠️ LA CASCADE DES EFFECTIFS N'EST PAS CONTOURNÉE ICI : la création ne pose aucune fiche, et la correction d'effectif
  * est celle que le web offre déjà (la prochaine fiche réécrit l'effectif de la bande par `recalculerEnCascade`).
@@ -32,7 +40,38 @@ class SaisieBandeAction
 {
     public const MESSAGE_ARCHIVEE = 'Cette bande est archivée : elle ne peut plus être modifiée.';
 
+    /** BS-Q4 : « Modifier la Bande » n'écrit plus l'effectif d'une bande qui a des fiches. */
+    public const MESSAGE_EFFECTIF_PAR_LES_FICHES = "L'effectif de cette bande est tenu par ses fiches journalières : corrigez-le depuis la fiche, la bande suit automatiquement.";
+
+    /** Info-bulle du champ « Effectif Actuel » grisé (web et poste). */
+    public const INFOBULLE_EFFECTIF_PAR_LES_FICHES = 'Cette bande a des fiches journalières : son effectif se corrige depuis la fiche (la bande suit automatiquement).';
+
     public const ARCHIVEE = 'archivee';
+
+    /** Sortie de [restaurer] : la bande était déjà en cours, rien n'est écrit. */
+    public const DEJA_EN_COURS = 'deja_en_cours';
+
+    /** Sortie de [restaurer] : la bande vient d'être restaurée. */
+    public const RESTAUREE_MAINTENANT = 'restauree_maintenant';
+
+    /** BS-Q3 : « Cette bande compte encore 200 sujets vivants : … » (singulier à 1). */
+    public static function messageEffectifVivant(int $effectif): string
+    {
+        return 'Cette bande compte encore '.$effectif.($effectif === 1 ? ' sujet vivant' : ' sujets vivants')
+            .' : archivez-la après avoir sorti ou transféré les sujets restants.';
+    }
+
+    /** BS-Q7 : le code est pris par une autre bande en cours. */
+    public static function messageCodePris(string $code): string
+    {
+        return 'Le code « '.$code.' » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.';
+    }
+
+    /** Une bande a-t-elle au moins une fiche journalière ? (BS-Q4 : alors la cascade tient son effectif.) */
+    public static function aDesFiches(string $lotId): bool
+    {
+        return LivestockDailyEntry::where('lot_id', $lotId)->exists();
+    }
 
     /** Sortie de [archiver] : la bande l'était déjà, rien n'est écrit. */
     public const DEJA_ARCHIVEE = 'deja_archivee';
@@ -97,7 +136,13 @@ class SaisieBandeAction
 
             $nouveau = ['stage' => $donnees['stage'], 'status' => $donnees['status']];
             if (array_key_exists('current_quantity', $donnees) && $donnees['current_quantity'] !== null) {
-                $nouveau['current_quantity'] = (int) $donnees['current_quantity'];
+                $corrige = (int) $donnees['current_quantity'];
+                // BS-Q4 : une valeur identique à l'effectif de la bande n'est pas une correction ; une vraie correction
+                // sur une bande qui a des fiches passe par la fiche (cascade unique).
+                if ($corrige !== (int) $lot->current_quantity && self::aDesFiches($lot->id)) {
+                    throw ValidationException::withMessages(['quantity' => self::MESSAGE_EFFECTIF_PAR_LES_FICHES]);
+                }
+                $nouveau['current_quantity'] = $corrige;
             }
 
             $lot->fill($nouveau);
@@ -122,10 +167,48 @@ class SaisieBandeAction
                 return self::DEJA_ARCHIVEE;
             }
 
+            // BS-Q3 : une bande qui a encore des sujets vivants ne s'archive pas (rien n'est écrit, rien n'est perdu).
+            if ((int) $lot->current_quantity > 0) {
+                throw ValidationException::withMessages(['bande' => self::messageEffectifVivant((int) $lot->current_quantity)]);
+            }
+
             $lot->update(['is_active' => false]);
             AuditLog::record('livestock_lot.archived', 'elevage');
 
             return self::ARCHIVEE_MAINTENANT;
+        });
+    }
+
+    /**
+     * BS-Q7 — restaure une bande archivée (Bandes & Sujets, et le poste à l'envoi). Une bande déjà en cours : aucun
+     * effet, aucune trace. Refusée si une AUTRE bande en cours porte déjà ce code (comparaison sans casse, comme la
+     * collation du serveur) : deux bandes en cours ne partagent jamais un code.
+     *
+     * @return string  [RESTAUREE_MAINTENANT] ou [DEJA_EN_COURS]
+     *
+     * @throws ValidationException  code déjà porté par une bande en cours
+     */
+    public function restaurer(string $id): string
+    {
+        return DB::transaction(function () use ($id) {
+            $lot = LivestockLot::lockForUpdate()->findOrFail($id);
+
+            if ($lot->is_active) {
+                return self::DEJA_EN_COURS;
+            }
+
+            $pris = LivestockLot::where('is_active', true)
+                ->where('id', '!=', $lot->id)
+                ->whereRaw('lower(code) = ?', [mb_strtolower($lot->code)])
+                ->exists();
+            if ($pris) {
+                throw ValidationException::withMessages(['bande' => self::messageCodePris($lot->code)]);
+            }
+
+            $lot->update(['is_active' => true]);
+            AuditLog::record('livestock_lot.restored', 'elevage');
+
+            return self::RESTAUREE_MAINTENANT;
         });
     }
 }

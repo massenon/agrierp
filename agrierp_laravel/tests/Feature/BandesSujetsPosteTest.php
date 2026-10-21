@@ -138,13 +138,14 @@ class BandesSujetsPosteTest extends TestCase
         $this->assertSame([40, 31, 'cloture'], [(int) $lot->initial_quantity, (int) $lot->current_quantity, $lot->status]);
     }
 
-    public function test_archiver_une_bande_est_logique_idempotent_et_la_bande_n_est_plus_modifiable(): void
+    public function test_archiver_une_bande_videe_est_logique_idempotent_et_la_bande_n_est_plus_modifiable(): void
     {
         $this->pousserBandes($this->bande())->assertOk();
+        // BS-Q3 : la bande doit être vidée (ici par une correction envoyée avec l'archivage).
 
-        $this->pousserBandes($this->bande(['is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+        $this->pousserBandes($this->bande(['is_active' => false, 'effectif_corrige' => 0]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
         $lot = LivestockLot::findOrFail(self::LOT);
-        $this->assertSame([false, 'actif', 40], [(bool) $lot->is_active, $lot->status, (int) $lot->current_quantity]);
+        $this->assertSame([false, 'actif', 0, 40], [(bool) $lot->is_active, $lot->status, (int) $lot->current_quantity, (int) $lot->initial_quantity]);
 
         $this->pousserBandes($this->bande(['is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
         $this->assertSame(1, AuditLog::where('action', 'livestock_lot.archived')->count(), 'second envoi : aucune seconde trace');
@@ -155,9 +156,136 @@ class BandesSujetsPosteTest extends TestCase
         $this->assertSame('croissance', LivestockLot::findOrFail(self::LOT)->stage);
     }
 
-    public function test_une_bande_creee_puis_archivee_avant_tout_envoi_est_creee_archivee(): void
+    public function test_archiver_une_bande_qui_a_un_effectif_vivant_est_rejete_avec_le_motif_du_web_et_la_bande_reste_en_cours(): void
     {
+        $this->pousserBandes($this->bande())->assertOk();
+
+        $reponse = $this->pousserBandes($this->bande(['is_active' => false]));
+
+        $reponse->assertJsonPath('livestock_lots.accepted', []);
+        $reponse->assertJsonPath('livestock_lots.rejected.0.id', self::LOT);
+        $reponse->assertJsonPath('livestock_lots.rejected.0.reason', 'Cette bande compte encore 40 sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants.');
+        $this->assertTrue((bool) LivestockLot::findOrFail(self::LOT)->is_active);
+        $this->assertSame(0, AuditLog::where('action', 'livestock_lot.archived')->count());
+    }
+
+    public function test_une_bande_videe_par_une_fiche_du_poste_peut_ensuite_etre_archivee(): void
+    {
+        $this->pousserBandes($this->bande())->assertOk();
+        $this->envoyer(['livestock_daily_entries' => [[
+            'id' => self::FICHE, 'lot_id' => self::LOT, 'entry_date' => '2026-10-20',
+            'achat' => 0, 'ne' => 0, 'mort' => 10, 'vente' => 20, 'don' => 10, 'effectif_final' => 0,
+        ]]])->assertJsonPath('livestock_daily_entries.accepted', [self::FICHE]);
+        $this->assertSame(0, (int) LivestockLot::findOrFail(self::LOT)->current_quantity);
+
         $this->pousserBandes($this->bande(['is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+
+        $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
+    }
+
+    public function test_une_bande_creee_puis_archivee_avant_tout_envoi_est_creee_archivee_si_elle_est_videe(): void
+    {
+        $this->pousserBandes($this->bande(['is_active' => false, 'effectif_corrige' => 0]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+
+        $lot = LivestockLot::findOrFail(self::LOT);
+        $this->assertSame([false, 0], [(bool) $lot->is_active, (int) $lot->current_quantity]);
+    }
+
+    public function test_une_bande_creee_puis_archivee_avec_son_effectif_est_rejetee_et_n_est_pas_creee(): void
+    {
+        $reponse = $this->pousserBandes($this->bande(['is_active' => false]));
+
+        $reponse->assertJsonPath('livestock_lots.accepted', []);
+        $this->assertSame(
+            'Cette bande compte encore 40 sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants.',
+            $reponse->json('livestock_lots.rejected.0.reason'),
+        );
+        $this->assertSame(0, LivestockLot::where('id', self::LOT)->count(), 'la transaction de la ligne est annulée');
+    }
+
+    // ── BS-Q4 : correction d'effectif refusée sur une bande qui a des fiches ───────────────────────────────────────
+
+    public function test_une_correction_d_effectif_sur_une_bande_qui_a_des_fiches_est_rejetee_avec_le_motif_du_web(): void
+    {
+        $this->envoyer(['livestock_daily_entries' => [$this->fiche()]])->assertOk();
+        $lot = $this->pondeuses->id;
+
+        $reponse = $this->pousserBandes($this->bande(['id' => $lot, 'code' => 'PON-2026-01', 'species_id' => $this->pondeuses->species_id, 'stage' => 'ponte', 'created_date' => '2026-06-01', 'initial_quantity' => 200, 'effectif_corrige' => 120]));
+
+        $reponse->assertJsonPath('livestock_lots.accepted', []);
+        $reponse->assertJsonPath('livestock_lots.rejected.0.reason', "L'effectif de cette bande est tenu par ses fiches journalières : corrigez-le depuis la fiche, la bande suit automatiquement.");
+        $this->assertSame(210, (int) $this->pondeuses->fresh()->current_quantity, "l'effectif reste celui de la cascade");
+    }
+
+    public function test_le_stade_d_une_bande_qui_a_des_fiches_se_modifie_sans_correction_d_effectif(): void
+    {
+        $this->envoyer(['livestock_daily_entries' => [$this->fiche()]])->assertOk();
+
+        $this->pousserBandes($this->bande(['id' => $this->pondeuses->id, 'code' => 'PON-2026-01', 'species_id' => $this->pondeuses->species_id, 'stage' => 'engraissement', 'created_date' => '2026-06-01', 'initial_quantity' => 200]))
+            ->assertJsonPath('livestock_lots.accepted', [$this->pondeuses->id]);
+
+        $this->assertSame(['engraissement', 210], [$this->pondeuses->fresh()->stage, (int) $this->pondeuses->fresh()->current_quantity]);
+    }
+
+    // ── BS-Q7 : restauration d'une bande archivée ──────────────────────────────────────────────────────────────────
+
+    private function bandeArchivee(): void
+    {
+        $this->pousserBandes($this->bande(['is_active' => false, 'effectif_corrige' => 0]))->assertOk();
+    }
+
+    public function test_une_restauration_du_poste_remet_la_bande_en_cours_avec_audit(): void
+    {
+        $this->bandeArchivee();
+
+        $this->pousserBandes($this->bande(['is_active' => true, 'restauree' => true]))
+            ->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+
+        $this->assertTrue((bool) LivestockLot::findOrFail(self::LOT)->is_active);
+        $this->assertSame(1, AuditLog::where('action', 'livestock_lot.restored')->count());
+
+        // Renvoi : bande déjà en cours, rien de plus.
+        $this->pousserBandes($this->bande(['is_active' => true, 'restauree' => true]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+        $this->assertSame(1, AuditLog::where('action', 'livestock_lot.restored')->count());
+    }
+
+    public function test_un_poste_qui_ne_sait_pas_la_bande_archivee_ne_la_restaure_jamais_par_hasard(): void
+    {
+        $this->bandeArchivee();
+
+        // Sans le geste explicite « restauree », `is_active: true` d'une copie périmée reste refusé comme avant.
+        $this->pousserBandes($this->bande(['stage' => 'ponte', 'is_active' => true]))
+            ->assertJsonPath('livestock_lots.rejected.0.reason', 'Cette bande est archivée : elle ne peut plus être modifiée.');
+        $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
+    }
+
+    public function test_une_restauration_est_refusee_si_le_code_est_pris_par_une_bande_en_cours(): void
+    {
+        $this->bandeArchivee();
+        LivestockLot::create([
+            'code' => 'lot-vol-9', 'species_id' => $this->pondeuses->species_id, 'stage' => 'ponte', 'initial_quantity' => 5, 'current_quantity' => 5,
+            'created_date' => '2026-10-01', 'status' => 'actif', 'is_active' => true,
+        ]);
+
+        $reponse = $this->pousserBandes($this->bande(['is_active' => true, 'restauree' => true]));
+
+        $reponse->assertJsonPath('livestock_lots.accepted', []);
+        $reponse->assertJsonPath('livestock_lots.rejected.0.reason', 'Le code « LOT-VOL-9 » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.');
+        $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
+    }
+
+    public function test_un_compte_sans_manage_elevage_ne_restaure_pas(): void
+    {
+        // Bande archivée posée directement : le jeton du caissier doit parler seul (aucune session de l'administrateur).
+        $lot = new LivestockLot();
+        $lot->id = self::LOT;
+        $lot->fill([
+            'code' => 'LOT-VOL-9', 'species_id' => $this->pondeuses->species_id, 'stage' => 'croissance', 'initial_quantity' => 40,
+            'current_quantity' => 0, 'created_date' => '2026-10-20', 'status' => 'actif', 'is_active' => false,
+        ])->save();
+        $this->jeton('caissier');
+
+        $this->pousserBandes($this->bande(['is_active' => true, 'restauree' => true]))->assertJsonPath('livestock_lots.accepted', []);
 
         $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
     }

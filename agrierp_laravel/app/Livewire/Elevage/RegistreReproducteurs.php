@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\SaisieReproducteurAction;
 use App\Models\Animal;
-use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -179,17 +180,11 @@ class RegistreReproducteurs extends Component
             'entry_date' => "date d'entrée",
         ]);
 
-        if ($this->birth_date !== '' && $this->birth_date > $this->entry_date) {
-            $this->addError('birth_date', "La date de naissance ne peut pas être postérieure à la date d'entrée.");
-
-            return;
-        }
-
+        // Ticket BS3 — le point de passage unique du registre (le poste envoie les siens par le même).
         $donnees = [
             'identifier' => $this->identifier,
             'species_id' => $this->species_id,
             'lot_id' => $this->lot_id ?: null,
-            'category' => 'reproducteur',
             'sex' => $this->sex,
             'breed' => $this->breed ?: null,
             'birth_date' => $this->birth_date ?: null,
@@ -198,14 +193,19 @@ class RegistreReproducteurs extends Component
             'cage' => $this->cage ?: null,
         ];
 
-        if ($this->editingId) {
-            Animal::findOrFail($this->editingId)->update($donnees);
-            $message = 'Reproducteur mis à jour.';
-            AuditLog::record('animal.updated', 'elevage');
-        } else {
-            Animal::create($donnees + ['status' => 'actif', 'is_active' => true]);
-            $message = 'Reproducteur enregistré — l\'effectif de la bande est inchangé, ce sujet y était déjà compté.';
-            AuditLog::record('animal.registered', 'elevage');
+        try {
+            if ($this->editingId) {
+                app(SaisieReproducteurAction::class)->modifier($this->editingId, $donnees);
+                $message = 'Reproducteur mis à jour.';
+            } else {
+                app(SaisieReproducteurAction::class)->enregistrer($donnees);
+                $message = 'Reproducteur enregistré — l\'effectif de la bande est inchangé, ce sujet y était déjà compté.';
+            }
+        } catch (ValidationException $e) {
+            // La naissance postérieure à l'entrée : sous « Date de Naissance ».
+            $this->addError('birth_date', collect($e->errors())->flatten()->first());
+
+            return;
         }
 
         $this->dispatch('close-modal', name: 'modal-reproducteur');
@@ -233,24 +233,22 @@ class RegistreReproducteurs extends Component
             'exit_reason' => ['nullable', 'string', 'max:150'],
         ], [], ['exit_date' => 'date de sortie', 'exit_reason' => 'motif']);
 
-        $animal = Animal::findOrFail($this->exitingId);
-
-        if ($this->exit_date < $animal->entry_date->format('Y-m-d')) {
-            $this->addError('exit_date', "La date de sortie ne peut pas précéder la date d'entrée du sujet.");
+        try {
+            app(SaisieReproducteurAction::class)->sortir($this->exitingId, [
+                'status' => $this->exitStatus,
+                'exit_date' => $this->exit_date,
+                'exit_reason' => $this->exit_reason ?: null,
+            ]);
+        } catch (ValidationException $e) {
+            // La sortie avant l'entrée : sous « Date de sortie » ; un sujet déjà sorti : sous « Motif de sortie ».
+            $erreurs = $e->errors();
+            isset($erreurs['exit_date'])
+                ? $this->addError('exit_date', $erreurs['exit_date'][0])
+                : $this->addError('exitStatus', $erreurs['status'][0]);
 
             return;
         }
 
-        // Archivage LOGIQUE : le sujet change de statut, sa fiche et son
-        // historique restent consultables. Aucune suppression physique d'un
-        // historique zootechnique (Document 00 §7).
-        $animal->update([
-            'status' => $this->exitStatus,
-            'exit_date' => $this->exit_date,
-            'exit_reason' => $this->exit_reason ?: null,
-        ]);
-
-        AuditLog::record('animal.exited', 'elevage');
         $this->dispatch('close-modal', name: 'modal-sortie-reproducteur');
         $this->dispatch('toast', message: "Sortie enregistrée. L'effectif de la bande doit être ajusté depuis la fiche journalière — c'est elle qui fait foi sur les quantités.", type: 'warning');
     }

@@ -2854,43 +2854,64 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Sujets suivis individuellement — l'ENSEMBLE est remplacé à chaque tirage
-  /// (ticket F0.65).
+  /// Sujets suivis individuellement — l'ENSEMBLE est remplacé à chaque tirage (ticket F0.65).
   ///
-  /// ⚠️ Un tirage sans ce bloc ne vide rien (serveur plus ancien). Absorbeur
-  /// STRICT : un sujet sans identifiant lisible est refusé — il ne se retrouverait
-  /// ni par son QR ni par la référence d'une saillie.
+  /// ⚠️ Un tirage sans ce bloc ne vide rien (serveur plus ancien). Absorbeur STRICT (ticket BS3, comme
+  /// [_absorberBandes]) : identifiant absent ou servi deux fois, identifiant lisible vide, `is_active` illisible →
+  /// [FormatException] : rien n'est écrit, la page est annulée, le curseur n'avance pas. Un sujet sans identifiant lisible
+  /// ne se retrouverait ni par son QR ni par la référence d'une saillie.
+  ///
+  /// ⚠️⚠️ **UN SUJET LOCAL `pending` OU `conflict` N'EST JAMAIS ÉCRASÉ NI SUPPRIMÉ** (enregistré, modifié ou sorti ici, pas
+  /// encore acquitté, ou refusé et en attente de correction) : le tirage précède toujours l'envoi. Les sujets acquittés
+  /// (`synced`) sont remplacés par l'ensemble servi : un sujet absent du tirage disparaît, un sujet servi prend la dernière
+  /// version du serveur.
   Future<int> _absorberSujets(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Sujet';
+    final lignes = _lignesStrictes(brut, quoi);
+
+    final vus = <String>{};
+    final recues = <AnimalsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final identifiant = _texteStrict(l['identifier'], '$quoi $id : identifiant');
+      if (identifiant == null || identifiant.isEmpty) {
+        throw FormatException('$quoi $id refusé : identifiant lisible absent.');
+      }
+      recues.add(
+        AnimalsCompanion.insert(
+          id: id,
+          identifier: identifiant,
+          speciesId: Value(_texteStrict(l['species_id'], '$quoi $id : espèce')),
+          speciesLabel: Value(_texteStrict(l['species_label'], '$quoi $id : libellé d\'espèce')),
+          lotId: Value(_texteStrict(l['lot_id'], '$quoi $id : bande')),
+          lotCode: Value(_texteStrict(l['lot_code'], '$quoi $id : code de bande')),
+          category: Value(_texteStrict(l['category'], '$quoi $id : catégorie') ?? 'reproducteur'),
+          sex: Value(_texteStrict(l['sex'], '$quoi $id : sexe') ?? 'F'),
+          breed: Value(_texteStrict(l['breed'], '$quoi $id : race')),
+          birthDate: Value(_date(l['birth_date'])),
+          entryDate: Value(_date(l['entry_date'])),
+          origin: Value(_texteStrict(l['origin'], '$quoi $id : origine')),
+          cage: Value(_texteStrict(l['cage'], '$quoi $id : cage')),
+          status: Value(_texteStrict(l['status'], '$quoi $id : statut') ?? 'actif'),
+          exitDate: Value(_date(l['exit_date'])),
+          exitReason: Value(_texteStrict(l['exit_reason'], '$quoi $id : motif de sortie')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+          syncStatus: const Value(SyncStatus.synced),
+        ),
+      );
+    }
 
     await _db.transaction(() async {
-      await _db.delete(_db.animals).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.animals)
-            .insert(
-              AnimalsCompanion.insert(
-                id: l['id'] as String,
-                identifier: l['identifier'] as String,
-                speciesLabel: Value(l['species_label'] as String?),
-                lotId: Value(l['lot_id'] as String?),
-                lotCode: Value(l['lot_code'] as String?),
-                category: Value((l['category'] ?? 'reproducteur') as String),
-                sex: Value((l['sex'] ?? 'F') as String),
-                breed: Value(l['breed'] as String?),
-                birthDate: Value(_date(l['birth_date'])),
-                entryDate: Value(_date(l['entry_date'])),
-                origin: Value(l['origin'] as String?),
-                cage: Value(l['cage'] as String?),
-                status: Value((l['status'] ?? 'actif') as String),
-                exitDate: Value(_date(l['exit_date'])),
-                exitReason: Value(l['exit_reason'] as String?),
-                isActive: Value(_bool(l['is_active'])),
-              ),
-            );
+      // Les acquittés sont remplacés par l'ensemble servi ; les `pending` / `conflict` restent tels quels.
+      await (_db.delete(_db.animals)..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
+      final gardes = {
+        for (final a in await _db.select(_db.animals).get()) a.id,
+      };
+      for (final a in recues) {
+        if (gardes.contains(a.id.value)) continue;
+        await _db.into(_db.animals).insert(a);
       }
     });
 
@@ -4305,6 +4326,11 @@ class SyncEngine {
       _db.livestockLots,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket BS3 — reproducteurs nominatifs enregistrés, modifiés ou sortis au poste (`SaisieReproducteurAction`).
+    final sujets = await (_db.select(
+      _db.animals,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final ventes = await (_db.select(
       _db.sales,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4420,6 +4446,7 @@ class SyncEngine {
 
     if (fiches.isEmpty &&
         bandes.isEmpty &&
+        sujets.isEmpty &&
         transferts.isEmpty &&
         infirmerie.isEmpty &&
         interventions.isEmpty &&
@@ -4504,6 +4531,8 @@ class SyncEngine {
         'data_reset_at': ?await _lireReglage(cleReinitialisation),
         // Ticket BS1 — traitées par le serveur AVANT les fiches (voir `ordreDuServeur`).
         'livestock_lots': bandes.map(_bandeEnJson).toList(),
+        // Ticket BS3 — traités par le serveur APRÈS leurs bandes (le sujet d'une bande créée à l'instant).
+        'animals': sujets.map(_sujetEnJson).toList(),
         'livestock_daily_entries': [
           for (final (f, identite) in fichesEnvoyees)
             identite
@@ -4626,8 +4655,31 @@ class SyncEngine {
                   LivestockLotsCompanion(
                     syncStatus: Value(statut),
                     effectifCorrige: statut == SyncStatus.synced ? const Value(null) : const Value.absent(),
+                    restauree: statut == SyncStatus.synced ? const Value(false) : const Value.absent(),
                   ),
                 ),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket BS3 — n'acquitte que la VERSION partie (instant de saisie inchangé) : un sujet corrigé PENDANT l'envoi de sa
+    // version précédente reste `pending` et repart.
+    accepte += await _acquitter(
+      'animals',
+      corps['animals'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final a in sujets) (a.id, a.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.animals)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null ? t.updatedAt.isNull() : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(AnimalsCompanion(syncStatus: Value(statut))),
       ),
       motifs,
       (n) => rejete += n,
@@ -5058,6 +5110,8 @@ class SyncEngine {
     'products',
     // Ticket BS1 — la bande avant ses fiches et ses transferts.
     'livestock_lots',
+    // Ticket BS3 — les reproducteurs après leur bande (celle créée à l'instant dans le même envoi).
+    'animals',
     'livestock_daily_entries',
     'livestock_transfers',
     'expenses',
@@ -5534,6 +5588,12 @@ class SyncEngine {
         () =>
             (_db.update(_db.livestockLots)..where((t) => t.id.equals(conflit.recordId))).write(
               const LivestockLotsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket BS3 — un reproducteur refusé (identifiant déjà pris, date…) se corrige puis se relance.
+      'animals' =>
+        () =>
+            (_db.update(_db.animals)..where((t) => t.id.equals(conflit.recordId))).write(
+              const AnimalsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       'livestock_daily_entries' =>
         () =>
@@ -6110,6 +6170,29 @@ class SyncEngine {
     'status': b.status,
     'is_active': b.isActive,
     if (b.effectifCorrige != null) 'effectif_corrige': b.effectifCorrige,
+    // BS-Q7 : le geste explicite de restauration (le serveur ne restaure JAMAIS sur le seul `is_active: true`).
+    if (b.restauree) 'restauree': true,
+    'device_id': _deviceId,
+  };
+
+  /// Ticket BS3 — reproducteur tel que `SyncController::pushAnimals` le valide (snake_case). La catégorie reste
+  /// « reproducteur » (seul suivi nominatif) ; l'effectif d'une bande n'y figure JAMAIS (aucune cascade).
+  Map<String, dynamic> _sujetEnJson(Sujet a) => {
+    'id': a.id,
+    'identifier': a.identifier,
+    'species_id': a.speciesId,
+    'lot_id': a.lotId,
+    'category': a.category,
+    'sex': a.sex,
+    'breed': a.breed,
+    'birth_date': a.birthDate == null ? null : _jour(a.birthDate!),
+    'entry_date': a.entryDate == null ? null : _jour(a.entryDate!),
+    'origin': a.origin,
+    'cage': a.cage,
+    'status': a.status,
+    'exit_date': a.exitDate == null ? null : _jour(a.exitDate!),
+    'exit_reason': a.exitReason,
+    'is_active': a.isActive,
     'device_id': _deviceId,
   };
 

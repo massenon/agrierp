@@ -31,7 +31,7 @@
                 <span class="material-symbols-outlined text-brand-emerald">edit_note</span>
                 <h3 class="font-bold text-base text-brand-forest">Saisie Journalière Couvoir &amp; Suivi Chair</h3>
             </div>
-            <div class="flex items-center gap-xs">
+            <div class="flex items-center gap-xs flex-wrap">
                 <span class="text-xs text-outline font-semibold">Date :</span>
                 <input type="date" wire:model.live="selectedDate" class="h-9 px-md border border-outline-variant rounded-lg text-xs font-bold text-brand-forest bg-surface-zebra cursor-pointer">
                 {{-- Ticket EX8 (EF12) : consulter un mois passé. --}}

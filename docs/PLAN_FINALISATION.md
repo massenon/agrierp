@@ -428,13 +428,13 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - Le prototype HTML est absent (A8) : les garde-fous lisent le Blade.
 
 **Questions au client (non tranchées) :**
-- **BS-Q1** : « Sujets » = le journal des entrées (Enregistrer des Sujets, fait ici) ou aussi le registre nominatif des reproducteurs (`Animal`, à porter en écriture) ?
+- **BS-Q1** ✅ *tranché 21/10/2026* : « Sujets » inclut le registre nominatif des reproducteurs (`Animal`) : porté en écriture au poste (ticket BS3 ci-dessous).
 - **BS-Q2** : « Archiver un sujet » = retirer l'entrée du journal (quantité remise à 0, tracé à l'audit) : confirmé ? Sinon, quelle trace garder ?
-- **BS-Q3** : le web archive une bande quel que soit son effectif ou ses fiches. Faut-il refuser l'archivage d'une bande qui a un effectif vivant ou des fiches ? (Le poste reprend le web.)
-- **BS-Q4** : « Modifier la Bande » écrit l'effectif actuel directement, sans passer par une fiche ; la prochaine fiche le réécrit (cascade). Interdire cette saisie dès qu'une bande a des fiches ?
+- **BS-Q3** ✅ *tranché 21/10/2026* : une bande qui a un effectif vivant (> 0) ne s'archive pas (« Cette bande compte encore N sujets vivants : archivez-la après avoir sorti ou transféré les sujets restants. ») ; une bande à effectif 0 s'archive. Web (`SaisieBandeAction` + `GestionBandes`), poste et envoi du poste (rejet motivé, `conflict`). Le vidage reste possible : fiche (mort, vente, don), transfert, correction d'effectif d'une bande sans fiche.
+- **BS-Q4** ✅ *tranché 21/10/2026* : « Effectif Actuel » de « Modifier la Bande » n'est plus modifiable dès que la bande a des fiches (champ grisé, info-bulle explicative, refus du serveur aussi) ; la correction passe par la fiche (cascade unique). Une bande sans fiche garde l'édition libre.
 - **BS-Q5** : l'archivage d'une bande utilise `manage-elevage` au web (le droit `archive-elevage` existe mais n'est lu nulle part). Passer à `archive-elevage` ?
-- **BS-Q6** : une bande datée dans un exercice clos est maintenant refusée (règle nouvelle, web puis poste). Confirmé ?
-- **BS-Q7** : restaurer une bande au poste (Corbeille absente du poste) ?
+- **BS-Q6** ✅ *tranché 21/10/2026* : une bande datée dans un exercice clos est refusée (déjà livré en BS1) ; tests de non-régression au web, à l'envoi et au poste.
+- **BS-Q7** ✅ *tranché 21/10/2026* : restauration d'une bande archivée au poste. Web d'abord : filtre « Bandes archivées » et bouton « Restaurer » (`manage-elevage`, audit `livestock_lot.restored`, refusée si une autre bande en cours porte le même code) dans « Bandes & Sujets » ; puis poste (Drift v50) et envoi (`restauree`, geste explicite).
 - **BS-Q8** : deux postes créant la même bande hors ligne (même code) : le second envoi est refusé « La valeur du champ code est déjà utilisée » et reste en conflit à corriger. Suffisant ?
 
 **Livré (21/10/2026)** : voir `agrierp_laravel/README_SPRINT0.md`, entrée « BS1 + BS2 ». Écart au plan : « Enregistrer des Sujets » n'était relié à aucun écran du web ; un bouton « Enregistrer des Sujets » a été ajouté à « Bandes & Sujets » (web puis poste), sinon l'écran du poste était inatteignable. Questions **BS-Q9** : ce bouton est-il voulu (ou un emplacement dans la barre latérale) ? **BS-Q10** : au web, `ucfirst('cloture')` donne « Cloture » (sans accent) dans le PDF des bandes, « Clôturé » à l'écran — à corriger ?
@@ -451,10 +451,17 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **NON vérifié** : tout le comportement Windows (voir `agrierp_laravel/README_SPRINT0.md`, ENV1).
 
+### BS3 ✅ (21/10/2026) Registre nominatif des reproducteurs au poste (BS-Q1 tranché)
+
+**Objectif :** « Sujets » inclut le registre nominatif (`Animal`, `RegistreReproducteurs`, `AnimalDetails`) : le poste l'ÉCRIT (enregistrer, modifier, sortir), à l'identique du web.
+**Vérifié d'abord au web :** Créer, Modifier et Sortir existent déjà (`manage-elevage`, audit, aucune cascade d'effectif : identifier n'est pas faire entrer) ; construit au web : point de passage `SaisieReproducteurAction`, bouton « Registre des Reproducteurs » dans « Bandes & Sujets » (l'écran n'était relié à rien), seconde sortie refusée.
+**Poste / serveur :** `animals` table mixte (`pushAnimals`), Drift v51, `ReproducteursRepository`, `RegistreReproducteursScreen`, absorbeur strict qui protège `pending` / `conflict`. Détail et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Décisions du client du 21/10/2026 ».
+**Questions au client (non tranchées) :** **BS-Q11** « Reforme » sans accent au registre (`ucfirst`), à corriger ? · **BS-Q12** espèces du registre : `is_enabled` au web contre modules actifs au tirage · **BS-Q13** changer l'identifiant d'un sujet laisse orphelines les références de saillie : l'interdire après enregistrement ?
+
 ## Sprint MP — Mise en page du poste (demandes du client)
 
 | Ticket | Contenu | État |
 |---|---|---|
 | MP1 | Libellés et champs « Date » et « Mois » : marges, espacements, alignements et proportions repris des classes Tailwind du Blade ; un champ partagé par gabarit (`lib/core/widgets/champs_date_agri.dart`, constantes `AgriChamps`) ; 20 écarts corrigés sur 20 écrans (`docs/AUDIT_FIDELITE_ECRANS.md` § 9) ; mesures à 640 / 1024 / 1440 px et garde-fou qui lit les classes du Blade | ✅ 21/10/2026 (`README_SPRINT0.md` ; rendu réel Windows / navigateur NON vérifié) |
 | MP2 | Mêmes contrôles pour les libellés et champs VOISINS d'une date dans les modales (texte, liste, nombre : `h-11 px-md text-sm`, libellés `text-[10px] uppercase`), `labelText` flottant de Transferts, « Compte : » du Grand Livre ; construire les champs Date que le poste n'a pas (Historique des ventes, Liste d'Achats, Bilan…) relève de tickets de fonctionnalité | 🔧 proposé |
-| MP1-Q1 | ❓ Fiche Reproducteurs : le Blade ne replie pas sa barre « Bande / Date / Mois » (`flex items-center gap-xs` sans `flex-wrap`). Le poste la replie. Ajouter `flex-wrap` au Blade (retouche web) ou garder l'écart ? | ❓ client |
+| MP1-Q1 | ✅ *tranché 21/10/2026* : `flex-wrap` ajouté à la barre « Bande / Date / Mois » du Blade de la fiche Reproducteurs (retouche web) ; l'écart disparaît, garde-fou `champs_date_mise_en_page_test.dart` et `docs/AUDIT_FIDELITE_ECRANS.md` § 9 mis à jour | ✅ 21/10/2026 |

@@ -46,6 +46,7 @@ class GestionBandesScreen extends StatefulWidget {
     this.imprimer,
     this.onCommanderStock,
     this.onOuvrirSujets,
+    this.onOuvrirRegistre,
     this.horloge,
   });
 
@@ -63,6 +64,9 @@ class GestionBandesScreen extends StatefulWidget {
   /// Bouton « Enregistrer des Sujets » de l'en-tête (`route('elevage.enregistrer-sujets')` au web).
   final VoidCallback? onOuvrirSujets;
 
+  /// BS3 — bouton « Registre des Reproducteurs » de l'en-tête (`route('elevage.reproducteurs')` au web).
+  final VoidCallback? onOuvrirRegistre;
+
   final DateTime Function()? horloge;
 
   /// `wire:model.live.debounce.300ms` du champ « Rechercher un code de bande... ».
@@ -77,6 +81,12 @@ class GestionBandesScreen extends StatefulWidget {
     ('helico', 'Héliciculture'),
   ];
 
+  /// BS-Q7 — `<option>` du filtre d'affichage du Blade : bandes en cours (par défaut) ou archivées (restaurables).
+  static const affichages = <(String, String)>[
+    ('', 'Bandes en cours'),
+    ('archivees', 'Bandes archivées'),
+  ];
+
   @override
   State<GestionBandesScreen> createState() => _GestionBandesScreenState();
 }
@@ -87,6 +97,9 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
   final _recherche = TextEditingController();
   String _rechercheAppliquee = '';
   String _filiere = '';
+
+  /// BS-Q7 : `''` = bandes en cours, `archivees` = bandes archivées (`GestionBandes::$affichage`).
+  String _affichage = '';
   Timer? _attente;
 
   DateTime _maintenant() => (widget.horloge ?? HeureBenin.maintenant)();
@@ -106,7 +119,7 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
 
   Future<void> _charger() async {
     final kpis = await widget.depot.indicateurs();
-    final lignes = await widget.depot.bandes(recherche: _rechercheAppliquee, filiere: _filiere);
+    final lignes = await widget.depot.bandes(recherche: _rechercheAppliquee, filiere: _filiere, archivees: _affichage == 'archivees');
     if (!mounted) return;
     setState(() {
       _kpis = kpis;
@@ -187,6 +200,19 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
           onPressed: widget.onOuvrirSujets,
           icon: const Icon(SymbolesAgri.pets, size: 18),
           label: const Text('Enregistrer des Sujets'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AgriColors.brandForest,
+            side: const BorderSide(color: AgriColors.outlineVariant),
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+            textStyle: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AgriRadius.full)),
+          ),
+        ),
+        OutlinedButton.icon(
+          key: const Key('bandes-registre-reproducteurs'),
+          onPressed: widget.onOuvrirRegistre,
+          icon: const Icon(SymbolesAgri.badge, size: 18),
+          label: const Text('Registre des Reproducteurs'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AgriColors.brandForest,
             side: const BorderSide(color: AgriColors.outlineVariant),
@@ -412,6 +438,31 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
               ),
             ),
           ),
+          // BS-Q7 : « Bandes en cours » / « Bandes archivées » (restaurables).
+          Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+            decoration: BoxDecoration(
+              color: AgriColors.surfaceCard,
+              border: Border.all(color: AgriColors.outlineVariant),
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                key: const Key('bandes-filtre-affichage'),
+                value: _affichage,
+                style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+                items: [
+                  for (final (valeur, libelle) in GestionBandesScreen.affichages)
+                    DropdownMenuItem(value: valeur, child: Text(libelle)),
+                ],
+                onChanged: (v) {
+                  _affichage = v ?? '';
+                  _charger();
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -453,13 +504,15 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
             ),
           ),
           if (_lignes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(AgriSpacing.xl),
+            Padding(
+              padding: const EdgeInsets.all(AgriSpacing.xl),
               child: Text(
-                'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.',
-                key: Key('bandes-vide'),
+                _affichage == 'archivees'
+                    ? 'Aucune bande archivée.'
+                    : 'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.',
+                key: const Key('bandes-vide'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: AgriTypography.base, color: AgriColors.outline),
+                style: const TextStyle(fontSize: AgriTypography.base, color: AgriColors.outline),
               ),
             ),
           for (final (i, l) in _lignes.indexed) _ligne(l, i),
@@ -549,8 +602,13 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        _action('bande-modifier-${b.id}', 'Modifier', SymbolesAgri.edit, AgriColors.infoBlue, () => _modifier(b)),
-                        _action('bande-archiver-${b.id}', 'Archiver', SymbolesAgri.delete, AgriColors.errorDeep, () => _archiver(b)),
+                        if (_affichage == 'archivees')
+                          // BS-Q7 : une bande archivée ne se modifie pas, elle se restaure.
+                          _action('bande-restaurer-${b.id}', 'Restaurer', SymbolesAgri.restore_from_trash, AgriColors.brandEmerald, () => _restaurer(b))
+                        else ...[
+                          _action('bande-modifier-${b.id}', 'Modifier', SymbolesAgri.edit, AgriColors.infoBlue, () => _modifier(b)),
+                          _action('bande-archiver-${b.id}', 'Archiver', SymbolesAgri.delete, AgriColors.errorDeep, () => _archiver(b)),
+                        ],
                       ],
                     )
                   : const Text(
@@ -630,9 +688,12 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
 
   /// `editLot($id)` → `modal-edit-bande`.
   Future<void> _modifier(LivestockLot b) async {
+    // BS-Q4 : `editLot` lit si la bande a des fiches (`effectifVerrouille`) AVANT d'ouvrir la modale.
+    final verrouille = await widget.depot.aDesFiches(b.id);
+    if (!mounted) return;
     final resultat = await afficherModale<String>(
       context: context,
-      constructeur: (_) => _ModaleModifierBande(depot: widget.depot, bande: b),
+      constructeur: (_) => _ModaleModifierBande(depot: widget.depot, bande: b, effectifVerrouille: verrouille),
     );
     if (resultat == null || !mounted) return;
     await _charger();
@@ -671,10 +732,31 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
     );
     if (confirme != true) return;
 
-    await widget.depot.archiver(b.id);
+    try {
+      await widget.depot.archiver(b.id);
+    } on BandeRefusee catch (e) {
+      // BS-Q3 : une bande qui a des sujets vivants ne s'archive pas — le message du web, en toast d'erreur.
+      await _charger();
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.erreurs.values.first, type: TypeToast.erreur);
+      return;
+    }
     await _charger();
     if (!mounted) return;
     ToastAgri.afficher(context, BandesRepository.toastArchivee, type: TypeToast.avertissement);
+  }
+
+  /// BS-Q7 — `restoreLot($id)` : pas de confirmation (rien de destructif), toast de succès ou message du refus.
+  Future<void> _restaurer(LivestockLot b) async {
+    try {
+      final restauree = await widget.depot.restaurer(b.id);
+      await _charger();
+      if (!mounted) return;
+      if (restauree) ToastAgri.afficher(context, BandesRepository.toastRestauree);
+    } on BandeRefusee catch (e) {
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.erreurs.values.first, type: TypeToast.erreur);
+    }
   }
 
   /// `view($id)` : le tiroir de détail, à droite (`sm:w-96`), sous un voile `bg-black/40`.
@@ -931,10 +1013,13 @@ class _ModaleNouvelleBandeState extends State<_ModaleNouvelleBande> {
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 class _ModaleModifierBande extends StatefulWidget {
-  const _ModaleModifierBande({required this.depot, required this.bande});
+  const _ModaleModifierBande({required this.depot, required this.bande, this.effectifVerrouille = false});
 
   final BandesRepository depot;
   final LivestockLot bande;
+
+  /// BS-Q4 : la bande a des fiches — « Effectif Actuel » grisé (`disabled`), info-bulle explicative.
+  final bool effectifVerrouille;
 
   @override
   State<_ModaleModifierBande> createState() => _ModaleModifierBandeState();
@@ -1001,9 +1086,16 @@ class _ModaleModifierBandeState extends State<_ModaleModifierBande> {
             libelle: 'Effectif Actuel *',
             erreur: _erreurs['quantity'],
             cleErreur: const Key('bande-erreur-quantity'),
+            aide: widget.effectifVerrouille ? BandesRepository.infobulleEffectifParLesFiches : null,
             enfant: KeyedSubtree(
               key: const Key('bande-edit-quantite'),
-              child: ChampTexteModale(controleur: _quantite, nombre: true, enErreur: _erreurs.containsKey('quantity')),
+              child: widget.effectifVerrouille
+                  // `<input disabled data-effectif-verrouille title="…">` : valeur grisée, info-bulle.
+                  ? Tooltip(
+                      message: BandesRepository.infobulleEffectifParLesFiches,
+                      child: ChampLectureModale(valeur: _quantite.text),
+                    )
+                  : ChampTexteModale(controleur: _quantite, nombre: true, enErreur: _erreurs.containsKey('quantity')),
             ),
           ),
           BlocChampModale(

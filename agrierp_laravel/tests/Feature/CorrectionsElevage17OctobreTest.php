@@ -261,7 +261,8 @@ class CorrectionsElevage17OctobreTest extends TestCase
         $kpis = Livewire::test(GestionBandes::class)->instance()->kpis;
         $this->assertSame([2, 1, 100, 1], [$kpis['bandes_actives'], $kpis['en_reproduction'], $kpis['effectif_total'], $kpis['alertes_sanitaires']]);
 
-        Livewire::test(GestionBandes::class)->call('archiveLot', $archivee->id);
+        // BS-Q3 : une bande vivante ne s'archive plus par l'écran ; l'archivage est posé directement (le test porte sur les indicateurs).
+        $archivee->update(['is_active' => false]);
 
         $this->assertSame(60, Livewire::test(GestionElevage::class)->instance()->effectifTotal);
         $this->assertSame(1, Livewire::test(GestionElevage::class)->instance()->bandesActives);

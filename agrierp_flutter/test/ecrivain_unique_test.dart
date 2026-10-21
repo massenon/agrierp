@@ -48,6 +48,8 @@ void main() {
     'livestock_transfers': 'lib/features/elevage/transferts_repository.dart',
     // Ticket BS1 — « Bandes & Sujets » : la bande se crée, se modifie et s'archive par ce dépôt.
     'livestock_lots': 'lib/features/elevage/bandes_repository.dart',
+    // Ticket BS3 — « Registre des Reproducteurs » : le sujet nominatif s'enregistre, se modifie et se sort par ce dépôt.
+    'animals': 'lib/features/elevage/reproducteurs_repository.dart',
     'infirmary_records': 'lib/features/elevage/soins_vaccins_repository.dart',
     'veterinary_calendar_events': 'lib/features/elevage/soins_vaccins_repository.dart',
     'feed_ration_standards': 'lib/features/elevage/parametres_elevage_repository.dart',

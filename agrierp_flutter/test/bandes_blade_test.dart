@@ -51,7 +51,9 @@ void main() {
       // Tableau : vide, lecture seule, infobulles d'actions.
       'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.',
       for (final m in RegExp(r'italic">([^<]+)</span>').allMatches(b)) m.group(1)!,
-      for (final m in RegExp(r'title="(Modifier|Archiver)"').allMatches(b)) m.group(1)!,
+      for (final m in RegExp(r'title="(Modifier|Archiver|Restaurer)"').allMatches(b)) m.group(1)!,
+      // BS-Q7 : l'état vide du filtre des archivées.
+      'Aucune bande archivée.',
       // Tiroir.
       for (final m in RegExp(r'<span class="text-outline block">([^<]+)</span>').allMatches(b)) m.group(1)!,
       for (final m in RegExp(r'<p class="text-xs font-bold text-brand-forest uppercase mb-xs">([^<]+)</p>').allMatches(b)) m.group(1)!,
@@ -120,7 +122,8 @@ void main() {
       expect(litteraux, contains(norme(m.group(1)!)), reason: 'toast « ${m.group(1)} »');
     }
     // Les cinq méthodes mutantes du web exigent `manage-elevage` en première ligne.
-    for (final methode in ['newLot', 'saveLot', 'editLot', 'updateLot', 'archiveLot']) {
+    // BS-Q7 : `restoreLot` (Restaurer) exige le même droit.
+    for (final methode in ['newLot', 'saveLot', 'editLot', 'updateLot', 'archiveLot', 'restoreLot']) {
       expect(
         RegExp('function $methode\\([^)]*\\)[^{]*\\{\\s*\\\$this->authorize\\(\'manage-elevage\'\\)').hasMatch(php),
         isTrue,
@@ -141,5 +144,40 @@ void main() {
       expect(litteraux, contains('${m.group(1)}'), reason: m.group(1));
       expect(litteraux, contains(norme(m.group(2)!)), reason: 'libellé de stade « ${m.group(2)} »');
     }
+  }, skip: saut);
+
+  test('⚠️ BS-Q3 / BS-Q4 / BS-Q7 — les messages et l info-bulle de SaisieBandeAction (constantes, gabarits) sont des littéraux du poste', () {
+    final action = File('$dossierLaravel/app/Actions/SaisieBandeAction.php');
+    if (!action.existsSync()) return;
+    final php = action.readAsStringSync();
+    final litteraux = litterauxDe(['lib/features/elevage/bandes_repository.dart']);
+
+    final constantes = [
+      for (final m in RegExp(r'''const (?:MESSAGE_EFFECTIF_PAR_LES_FICHES|INFOBULLE_EFFECTIF_PAR_LES_FICHES) = (?:"([^"]+)"|'([^']+)');''').allMatches(php))
+        m.group(1) ?? m.group(2)!,
+    ];
+    expect(constantes, hasLength(2));
+    for (final c in constantes) {
+      expect(litteraux, contains(norme(c)), reason: 'constante « $c »');
+    }
+    // Les deux gabarits (le nombre est inséré) : leurs morceaux fixes sont au poste.
+    for (final morceau in [
+      'Cette bande compte encore ',
+      ' : archivez-la après avoir sorti ou transféré les sujets restants.',
+      'Le code « ',
+      ' » est déjà utilisé par une bande en cours : cette bande ne peut pas être restaurée.',
+    ]) {
+      expect(php, contains(morceau), reason: 'gabarit du web « $morceau »');
+      expect(litteraux, contains(norme(morceau)), reason: 'gabarit du poste « $morceau »');
+    }
+  }, skip: saut);
+
+  test('⚠️ BS-Q4 — le Blade grise le champ Effectif Actuel (disabled, info-bulle) quand la bande a des fiches, et le poste le dit', () {
+    final b = sansCommentairesBlade(blade.readAsStringSync());
+    expect(b, contains('@if(\$effectifVerrouille)'));
+    expect(b, contains('data-effectif-verrouille'));
+    expect(b, contains('INFOBULLE_EFFECTIF_PAR_LES_FICHES'));
+    final ecran = File('lib/features/elevage/gestion_bandes_screen.dart').readAsStringSync();
+    expect(ecran, contains('BandesRepository.infobulleEffectifParLesFiches'));
   }, skip: saut);
 }

@@ -211,6 +211,7 @@ class MotifsRefusPush
             'livestock_daily_entries' => 'saisir une fiche d\'élevage',
             'livestock_transfers' => 'transférer des sujets entre bandes',
             'livestock_lots' => 'créer, modifier ou archiver une bande',
+            'animals' => 'créer, modifier ou sortir un reproducteur',
             'livestock_reproduction_events' => 'enregistrer un événement de reproduction',
             'veterinary_records' => 'enregistrer un soin vétérinaire',
             'infirmary_records' => 'enregistrer une entrée d\'infirmerie',

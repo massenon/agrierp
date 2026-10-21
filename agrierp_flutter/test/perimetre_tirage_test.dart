@@ -143,6 +143,7 @@ void main() {
     EcranPoste.transfertsBandes: 'elevage/transferts_bandes_screen.dart',
     EcranPoste.gestionBandes: 'elevage/gestion_bandes_screen.dart',
     EcranPoste.enregistrerSujets: 'elevage/enregistrer_sujets_screen.dart',
+    EcranPoste.registreReproducteurs: 'elevage/registre_reproducteurs_screen.dart',
   };
 
   /// Recherche globale de la barre supérieure (tous rôles) : tables lues PAR DOMAINE, sous la permission du web

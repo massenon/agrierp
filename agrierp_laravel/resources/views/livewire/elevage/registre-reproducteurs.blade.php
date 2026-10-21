@@ -176,6 +176,7 @@
                     <option value="vendu">Vente</option>
                     <option value="mort">Mortalité</option>
                 </select>
+                @error('exitStatus') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de sortie *</label>
