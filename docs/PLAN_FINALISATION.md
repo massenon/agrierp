@@ -500,3 +500,26 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - Une déconnexion normale (menu du compte) conserve le PIN de l'utilisateur ; « PIN oublié » et les dix échecs l'effacent.
 - Tests : `verrou_local_test.dart` (18) et `verrou_ecrans_test.dart` (21), écrits rouges d'abord, 7 mutations tuées. **Non vérifié :** coffre Windows réel (Credential Manager), durée de PBKDF2 sur le poste le plus lent de la ferme.
 
+
+## Sprint DEP — Saisie des Dépenses à plusieurs lignes (demande du client du 21/10/2026, PRD `docs/prd/depenses-multilignes.md`)
+
+> « Faut revoir le mode de fonctionnement actuel de la Saisie des Dépenses. » Une dépense = un en-tête + N lignes (libellé, compte de charge, montant). Web d'abord, poste ensuite. Questions client DEP-Q1 à DEP-Q8 : voir le PRD § 9 (décisions déjà prises sur recommandation).
+
+### DEP1 🔧 Web : schéma, modèle, Action (point de passage unique)
+**Objectif :** `expense_lines`, colonnes d'en-tête, conversion des anciennes dépenses, création atomique (en-tête + lignes + écriture + trésorerie), immuabilité, contre-passation par lecture de l'écriture d'origine.
+**Web :** migrations (`expense_lines` ; colonnes `payment_mode`, `cost_center_id`, `supplier_id`, `beneficiary`, `created_by`, `category` nullable) puis conversion 1 en-tête = 1 ligne (UUID v5, 628 en repli, journalisée) · `ExpenseLine`, `Expense::lines()` · `SaisieDepenseAction` · `RecordExpenseAccountingEntryAction` (débit par compte, crédit trésorerie).
+**Tests (rouges d'abord) :** `DepensesMultilignesTest`, `MigrationDepensesEnLignesTest`. **Mutation :** retirer l'écriture de la transaction ; retirer le regroupement par compte ; retirer l'immuabilité.
+
+### DEP2 🔧 Web : modale à lignes dynamiques
+`SaisieDepenses` + `saisie-depenses.blade.php` : modale, lignes, total en direct, tableau à détail déplié, filtre « Pièce ». Test `DepensesMultilignesLivewireTest`.
+
+### DEP3 🔧 Contrat `/api/sync`
+Tirage : `lines`, nouvelles colonnes, `cost_centers`, `chart_of_accounts` pour `view-achats`. Poussoir : absorbeur strict, ancien payload plat converti en 1 ligne, idempotence. Test `SyncDepensesMultilignesTest` ; adaptation des tests de synchronisation existants. **Le serveur est déployé AVANT les postes.**
+
+### DEP4 🔧 Poste : Drift v56, dépôt, moteur de synchronisation
+Tables `ExpenseLines` et `CostCenters`, colonnes de `Expenses` (dont `ecriture_refus`), palier `from < 56` (transformation locale), `DepensesRepository` (transaction unique, mêmes validations), `SyncEngine` (envoi/absorption des lignes, refus affiché). **Numéro de schéma 56 sur cette branche ; la fusion renumérotera si l'un des paliers 53 (devis), 54 (avoirs) ou 55 (unicité) manque.** Tests `depenses_multilignes_test`, migration v56, cohérence de schéma Laravel ↔ Drift.
+
+### DEP5 🔧 Poste : écran et parité
+`saisie_depenses_screen.dart` : modale à lignes dynamiques, tableau à détail, mêmes libellés ; garde-fou de parité Blade ↔ Dart. Tests `depenses_multilignes_ecran_test`, `depenses_multilignes_parite_test`.
+
+**Vérification finale :** `php artisan test --testsuite=Feature`, `flutter analyze`, `flutter test --concurrency=3`. Consigner dans `agrierp_laravel/README_SPRINT0.md` ce qui n'a pas été vérifié (base MySQL réelle peuplée, poste Windows réel).
