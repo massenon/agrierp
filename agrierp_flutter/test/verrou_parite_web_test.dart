@@ -70,7 +70,7 @@ void main() {
         markTestSkipped(raison);
         return;
       }
-      final r = executerPhp(r'''
+      final r = executerPhp(r'''<?php
 require 'vendor/autoload.php';
 use App\Services\VerrouSessionService as V;
 echo json_encode(['essais' => V::MAX_TENTATIVES, 'echecs' => V::ECHECS_MAX, 'blocage' => V::DUREE_BLOCAGE]);
@@ -116,7 +116,7 @@ echo json_encode(['essais' => V::MAX_TENTATIVES, 'echecs' => V::ECHECS_MAX, 'blo
         markTestSkipped(raison);
         return;
       }
-      final r = executerPhp(r'''
+      final r = executerPhp(r'''<?php
 require 'vendor/autoload.php';
 use App\Services\VerrouSessionService as V;
 echo json_encode([
