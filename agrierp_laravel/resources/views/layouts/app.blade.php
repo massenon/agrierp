@@ -44,6 +44,7 @@
         sidebarDesktopHidden: localStorage.getItem('agrierp_sidebar_hidden') === '1',
         quickNavOpen: false,
     }"
+    id="app-racine"
     class="flex h-screen w-full overflow-hidden">
 
     <aside id="sidebar"
@@ -190,6 +191,8 @@
                         <a href="/aide-a-propos" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">help</span>Aide &amp; À Propos</a>
                         <a href="/contact-editeur" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">support_agent</span>Contactez l'Éditeur</a>
                         <a href="/parametres-hub" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">settings</span>Paramètres</a>
+                        {{-- Sprint VW : « Verrouiller » (même libellé, même icône et même place que le menu du poste). --}}
+                        <button type="button" dusk="verrouiller" @click="open = false; window.agrierpVerrou && window.agrierpVerrou.verrouiller()" class="w-full flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">lock</span>Verrouiller</button>
                         <div class="border-t border-outline-variant"></div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
@@ -264,5 +267,7 @@
     <x-toast-container />
     <x-flash-toast />
 </div>
+{{-- Sprint VW : écran de verrouillage + minuterie d'inactivité. HORS de `#app-racine` (qu'il rend inerte) ; absent de `guest`. --}}
+<x-verrou-session minutes="{{ auth()->user()->delaiVerrouillage() }}" />
 </body>
 </html>

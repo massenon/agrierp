@@ -1,4 +1,5 @@
 import collapse from '@alpinejs/collapse';
+import './verrou';
 
 /**
  * AgriERP — resources/js/app.js
