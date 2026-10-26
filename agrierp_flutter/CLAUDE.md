@@ -155,6 +155,16 @@ Known weaknesses, deliberately deferred rather than patched in passing (they tou
 - Les tests emploient `CoffreMemoire` (`test/coffre_memoire.dart`) et `VerrouLocal(iterations: …)` réduit pour la vitesse ; un test fixe le réglage de production.
 - ⚠️ Le mot de passe, lui, n'est toujours JAMAIS conservé (`AuthService`) : le PIN ne le remplace pas, il ne sert qu'à rouvrir une session déjà ouverte.
 
+## Fenêtre « Rappels du jour » (tickets POP1 à POP4, 26/10/2026)
+
+Demande du client : « Quand on ouvre le poste ou le web, la notification popup doit afficher les rappels VMS, soins et vaccinations. » Web maître (`App\Services\RappelsDuJourService`, règle **R-RAPPELS-01**, PRD `docs/prd/popup-rappels.md`), poste identique.
+
+- **Calcul LOCAL** (hors ligne) : `lib/features/elevage/rappels_du_jour_repository.dart` — soins planifiés (R-SOINS-01), traitements du barème dus et non administrés (le cycle vient de `SoinsRepository.protocoleDuJour`, jamais recopié), fins de délai d'attente, sur l'horizon N = `company_settings.rappel_soins_jours` (3 si jamais tiré). Bandes vivantes, espèces actives (Modules Actifs), droit `view-elevage` (`pourRole`) : le caissier ne la reçoit pas. Parité EXÉCUTÉE contre le PHP du serveur : `test/rappels_du_jour_parite_php_test.dart`.
+- **Quand** : `PorteSession.surOuverture` est appelé UNE fois par session — au lancement (après le PIN) et à chaque connexion — **jamais à un déverrouillage** (manuel ou par inactivité ; question POP-Q3). L'erreur de la fenêtre est avalée (`debugPrint`), elle ne bloque ni l'ouverture ni la synchronisation. `main.dart` : `_ouvrirRappelsDuJour`, lien « Ouvrir Soins et vaccins » par `SocleAccueil.demandeEcran`.
+- **« Ne plus afficher aujourd'hui »** : `ReglageRappels` (coffre du système, `agrierp.rappels.masque.<id utilisateur>` = jour `AAAA-MM-JJ`) — propre au poste, **aucune migration Drift** (le palier 62 reste libre). `OuvertureRappels.aMontrer` rend `null` (pas de fenêtre) si masqué, sans droit, **sans rappel (jamais une fenêtre vide)** ou en erreur.
+- Fenêtre : `rappels_du_jour_modale.dart` (`ModaleAgri`), libellés lus dans `rappels-du-jour.blade.php` par `test/rappels_du_jour_blade_test.dart`.
+- ⚠️ Le calendrier vétérinaire ne porte aucun produit : la colonne « Produit » vaut « — » pour un soin (web aussi). L'infirmerie n'a pas de date prévue : aucun rappel (POP-Q1).
+
 ## Sync Engine — the server half already exists
 
 ```

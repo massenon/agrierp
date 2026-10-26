@@ -274,3 +274,8 @@ A full narrative of every session since `/init` — what was asked, what was fou
 - Livewire needs a moment to hydrate before a scripted login works. A `sendKeys` fired too early submits empty credentials and silently stays on `/login` — wait, then assert the URL actually changed.
 - Web login is rate-limited to **5 attempts / 15 min per identifier+IP** (`RateLimiter` in `Livewire\Auth\Login`). Repeated scripted logins can lock you out.
 - When driving the UI by clicking on a **text label**, exclude `aside` and `header` first: a tab named "Créances" or "Commandes" also exists in the sidebar, and the click silently navigates elsewhere.
+
+## Fenêtre « Rappels du jour » (tickets POP1 à POP4, 26/10/2026)
+
+`App\Services\RappelsDuJourService` est le **point de passage unique** de la règle R-RAPPELS-01 (PRD `docs/prd/popup-rappels.md`) : il APPELLE `AlertesElevageService::soinsAVenir()` / `joursRappelSoins()` (R-SOINS-01) et `ProtocoleDuJourService::pourBande()` — ne rien recopier. Le poste le reprend en local (`rappels_du_jour_repository.dart`, parité exécutée). `Livewire\Shared\RappelsDuJour` (monté dans `layouts/app.blade.php` sous `@can('view-elevage')`) décide côté serveur : `ouvrir($dejaVuSession, $masqueLe)` ; le navigateur ne fait que transmettre `sessionStorage` (une fois par session de navigateur) et `localStorage` (« Ne plus afficher aujourd'hui », par utilisateur). Un événement `Login` pose `rappels_forcer` (réouverture à chaque connexion). Aucune fenêtre vide, erreur journalisée et silencieuse. Tests : `RappelsDuJourTest`.
+

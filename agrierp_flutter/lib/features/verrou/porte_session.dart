@@ -35,6 +35,7 @@ class PorteSession extends StatefulWidget {
     this.avantOuverture,
     this.inactivite,
     this.surFinDeSession,
+    this.surOuverture,
   });
 
   final AuthService auth;
@@ -57,6 +58,12 @@ class PorteSession extends StatefulWidget {
   /// pour survivre à un verrouillage (brouillons), afin qu'un autre utilisateur ne le retrouve pas.
   final VoidCallback? surFinDeSession;
 
+  /// Ticket POP3 — appelé UNE fois à chaque OUVERTURE DE SESSION : au lancement (après le PIN) et à chaque connexion.
+  /// Jamais à un déverrouillage (verrouillage manuel ou par inactivité) : le poste reste ouvert dans la même session.
+  /// C'est là que s'ouvre la fenêtre « Rappels du jour ». Toute erreur levée ici est avalée (journalisée par
+  /// l'appelant) : elle ne bloque jamais l'ouverture de l'application.
+  final Future<void> Function(BuildContext context)? surOuverture;
+
   @override
   State<PorteSession> createState() => _PorteSessionState();
 }
@@ -65,6 +72,11 @@ enum _Phase { chargement, connexion, definition, verrouille, ouverte }
 
 class _PorteSessionState extends State<PorteSession> {
   _Phase _phase = _Phase.chargement;
+
+  /// POP3 — une nouvelle SESSION vient de commencer (lancement avec session restaurée, ou connexion) : la prochaine
+  /// ouverture de l'application déclenche [PorteSession.surOuverture], puis le drapeau retombe. Un déverrouillage ne
+  /// le relève pas.
+  bool _sessionNeuve = false;
 
   String get _id => widget.auth.utilisateur?.id ?? '';
 
@@ -78,11 +90,13 @@ class _PorteSessionState extends State<PorteSession> {
     final ouverte = await widget.auth.reprendreSession();
     if (!mounted) return;
     if (!ouverte) return _aller(_Phase.connexion);
+    _sessionNeuve = true;
     final defini = await widget.verrou.estDefini(_id);
     if (mounted) _aller(defini ? _Phase.verrouille : _Phase.definition);
   }
 
   Future<void> _connecte() async {
+    _sessionNeuve = true;
     final defini = await widget.verrou.estDefini(_id);
     if (defini) return _ouvrir();
     if (mounted) _aller(_Phase.definition);
@@ -93,6 +107,22 @@ class _PorteSessionState extends State<PorteSession> {
     if (!mounted) return;
     setState(() => _phase = _Phase.ouverte);
     _armerInactivite();
+    if (_sessionNeuve) {
+      _sessionNeuve = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _annoncerOuverture());
+    }
+  }
+
+  /// POP3 — après le premier affichage de l'application : la fenêtre « Rappels du jour ». Silencieux sur erreur.
+  Future<void> _annoncerOuverture() async {
+    final surOuverture = widget.surOuverture;
+    if (surOuverture == null || !mounted || _phase != _Phase.ouverte) return;
+    try {
+      await surOuverture(context);
+    } on Object catch (e) {
+      debugPrint('Rappels du jour : ouverture impossible.');
+      debugPrint('$e');
+    }
   }
 
   /// VL-2 — arme le minuteur d'inactivité pour l'utilisateur de la session.
