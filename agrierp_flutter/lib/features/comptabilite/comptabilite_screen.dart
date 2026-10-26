@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/comptabilite/exercice_choisi.dart';
@@ -1800,13 +1802,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         border: Border.all(color: AgriColors.outlineVariant),
         borderRadius: BorderRadius.circular(AgriRadius.lg),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: largeur,
-          child: Column(
-            children: [
-              // Premier niveau : les groupes.
+      child: LayoutBuilder(
+        builder: (_, contraintes) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: max(largeur, contraintes.maxWidth),
+            child: Column(
+              children: [
+                // Premier niveau : les groupes.
               Container(
                 color: AgriColors.surfaceZebra,
                 padding: const EdgeInsets.symmetric(
@@ -1879,6 +1882,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -1906,20 +1910,21 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
                   for (final (libelle, flex) in colonnes)
                     Expanded(
                       flex: flex,
@@ -1944,6 +1949,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

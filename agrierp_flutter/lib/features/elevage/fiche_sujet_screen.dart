@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -723,10 +725,11 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
     key: Key('sujet-tableau-$cle'),
     decoration: _carte(),
     clipBehavior: Clip.antiAlias,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 880,
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(880, contraintes.maxWidth),
         child: Column(
           children: [
             Container(
@@ -793,6 +796,7 @@ class _FicheSujetScreenState extends State<FicheSujetScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

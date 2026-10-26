@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/permissions_poste.dart';
@@ -1012,26 +1014,27 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       titre: 'Top 5 Produits du Mois',
       enfant: top.isEmpty
           ? _messageVide('Aucune vente ce mois-ci.', centre: true)
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: 420,
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AgriColors.outlineVariant),
+          : LayoutBuilder(
+              builder: (_, contraintes) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: max(420, contraintes.maxWidth),
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: AgriColors.outlineVariant),
+                          ),
                         ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AgriSpacing.xs,
-                      ),
-                      child: const Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Text('Produit', style: _enteteTop),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AgriSpacing.xs,
+                        ),
+                        child: const Row(
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: Text('Produit', style: _enteteTop),
                           ),
                           Expanded(
                             child: Text(
@@ -1128,6 +1131,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
                   ],
                 ),
               ),
+            ),
             ),
     );
 

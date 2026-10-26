@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -1426,37 +1428,38 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
     clipBehavior: Clip.antiAlias,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              decoration: const BoxDecoration(
-                color: AgriColors.surfaceZebra,
-                border: Border(
-                  bottom: BorderSide(color: AgriColors.outlineVariant),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                decoration: const BoxDecoration(
+                  color: AgriColors.surfaceZebra,
+                  border: Border(
+                    bottom: BorderSide(color: AgriColors.outlineVariant),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex, droite) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(
+                          libelle.toUpperCase(),
+                          textAlign: droite ? TextAlign.right : TextAlign.left,
+                          style: _enteteColonne,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex, droite) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(
-                        libelle.toUpperCase(),
-                        textAlign: droite ? TextAlign.right : TextAlign.left,
-                        style: _enteteColonne,
-                      ),
-                    ),
-                ],
-              ),
-            ),
             if (lignes.isEmpty && vide != null)
               Padding(
                 padding: const EdgeInsets.all(AgriSpacing.lg),
@@ -1477,6 +1480,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

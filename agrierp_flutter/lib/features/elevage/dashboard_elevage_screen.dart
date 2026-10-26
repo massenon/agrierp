@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
@@ -883,12 +885,13 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
     return Container(
       decoration: _cadreTableau(),
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: 980,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: LayoutBuilder(
+        builder: (_, contraintes) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: max(980, contraintes.maxWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _enteteTableau(c, aGauche: 2),
               if (lignes.isEmpty) _videTableau('Aucune bande active pour le moment.'),
@@ -919,6 +922,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

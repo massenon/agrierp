@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
@@ -520,10 +522,11 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
             border: Border.all(color: AgriColors.outlineVariant),
             borderRadius: BorderRadius.circular(AgriRadius.lg),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: 1140,
+          child: LayoutBuilder(
+            builder: (_, contraintes) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: max(1140, contraintes.maxWidth),
               child: Column(
                 children: [
                   Container(
@@ -607,6 +610,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ],
@@ -806,10 +810,11 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
           border: Border.all(color: AgriColors.outlineVariant),
           borderRadius: BorderRadius.circular(AgriRadius.lg),
         ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: 1040,
+        child: LayoutBuilder(
+          builder: (_, contraintes) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: max(1040, contraintes.maxWidth),
             child: Column(
               children: [
                 Container(
@@ -880,6 +885,7 @@ class _GestionStocksScreenState extends State<GestionStocksScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
       // Ticket EX7 (EF9) — `<x-pagination>` du web, sous le tableau.

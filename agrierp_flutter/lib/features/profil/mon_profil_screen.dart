@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -899,10 +901,11 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
       ('IP', 3),
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 640,
+    return LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(640, contraintes.maxWidth),
         child: Column(
           children: [
             Container(
@@ -981,6 +984,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

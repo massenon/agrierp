@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart' show Customer;
@@ -1399,22 +1401,23 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  if (teteSelection != null)
-                    SizedBox(width: 32, child: teteSelection),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    if (teteSelection != null)
+                      SizedBox(width: 32, child: teteSelection),
                   for (final (libelle, flex) in colonnes)
                     Expanded(
                       flex: flex,
@@ -1439,6 +1442,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

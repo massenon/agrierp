@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
@@ -426,10 +428,11 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 940,
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(940, contraintes.maxWidth),
         child: Column(
           children: [
             Container(
@@ -544,6 +547,7 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

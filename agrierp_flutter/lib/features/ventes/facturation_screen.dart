@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/comptabilite/exercice_choisi.dart';
@@ -263,10 +265,11 @@ class _FacturationScreenState extends State<FacturationScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 1000,
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(1000, contraintes.maxWidth),
         child: Column(
           children: [
             Container(
@@ -362,6 +365,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 
