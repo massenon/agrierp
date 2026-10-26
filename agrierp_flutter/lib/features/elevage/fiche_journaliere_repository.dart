@@ -959,6 +959,39 @@ class FicheJournaliereRepository {
     return (mort / effectifPrecedent) * 100;
   }
 
+  /// Estimation du poids moyen par animal (g) pour la bande [lotId] à la date [jour], par GMQ.
+  ///
+  /// Retourne `null` si aucune pesée antérieure n'est disponible.
+  /// Logique identique à `getPoidsMoyenEstimeProperty()` du web (FicheLapins, FicheEscargots, FicheReproducteurs).
+  Future<double?> poidsMoyenEstime({
+    required String lotId,
+    required DateTime jour,
+  }) async {
+    final pesees = await (_db.select(_db.livestockDailyEntries)
+          ..where(
+            (t) =>
+                t.lotId.equals(lotId) &
+                t.entryDate.isSmallerThanValue(jour) &
+                t.weightSampleAvgG.isNotNull(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.entryDate)]))
+        .get();
+    if (pesees.isEmpty) return null;
+    final derniere = pesees.last;
+    final joursEcoules = _minuit(jour).difference(_minuit(derniere.entryDate)).inDays;
+    if (joursEcoules <= 0) return derniere.weightSampleAvgG;
+    double gmq = 0.0;
+    if (pesees.length >= 2) {
+      final premiere = pesees.first;
+      final joursGmq =
+          _minuit(derniere.entryDate).difference(_minuit(premiere.entryDate)).inDays;
+      if (joursGmq > 0) {
+        gmq = (derniere.weightSampleAvgG! - premiere.weightSampleAvgG!) / joursGmq;
+      }
+    }
+    return derniere.weightSampleAvgG! + gmq * joursEcoules;
+  }
+
   /// Les dates sont des JOURS : toute heure résiduelle fausserait à la fois
   /// l'unicité (bande, date) et la recherche de la veille.
   static DateTime _minuit(DateTime d) => DateTime(d.year, d.month, d.day);

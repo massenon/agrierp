@@ -513,6 +513,55 @@ class FichePorcs extends Component
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
 
+    /**
+     * Ticket #46 — Poids moyen estimé (en Kg) pour le jour affiché, depuis le dernier poids
+     * enregistré et le GMQ. Nul si moins d'une pesée connue ou si un poids a déjà été saisi.
+     */
+    public function getPoidsMoyenEstimeKgProperty(): ?float
+    {
+        if ($this->peseeTotalKg !== null) {
+            return null;
+        }
+
+        $lot = $this->bande;
+
+        if (! $lot || ! $this->dateValide($this->selectedDate)) {
+            return null;
+        }
+
+        $pesees = LivestockDailyEntry::where('lot_id', $lot->id)
+            ->whereNotNull('weight_sample_avg_g')
+            ->where('entry_date', '<', $this->selectedDate)
+            ->orderBy('entry_date')
+            ->get(['entry_date', 'weight_sample_avg_g']);
+
+        if ($pesees->isEmpty()) {
+            return null;
+        }
+
+        $derniere = $pesees->last();
+        $jourTarget = \Carbon\Carbon::parse($this->selectedDate)->startOfDay();
+        $joursEcoules = (int) $derniere->entry_date->startOfDay()->diffInDays($jourTarget);
+
+        if ($joursEcoules <= 0) {
+            return round($derniere->weight_sample_avg_g / 1000, 2);
+        }
+
+        if ($pesees->count() >= 2) {
+            $premiere = $pesees->first();
+            $joursGmq = (int) $premiere->entry_date->startOfDay()->diffInDays($derniere->entry_date->startOfDay());
+            $gmq = $joursGmq > 0
+                ? ($derniere->weight_sample_avg_g - $premiere->weight_sample_avg_g) / $joursGmq
+                : 0.0;
+        } else {
+            $gmq = 0.0;
+        }
+
+        $estimG = $derniere->weight_sample_avg_g + $gmq * $joursEcoules;
+
+        return round($estimG / 1000, 2);
+    }
+
     public function loadDay(string $date): void
     {
         // Ticket 15.42 : une date vide ou invalide (champ date vidé) ne casse pas la fiche — retour au jour courant.

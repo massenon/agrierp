@@ -285,7 +285,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-md border-t border-outline-variant pt-md">
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (Kg)</label>
-                        <input wire:model.live="peseeTotalKg" type="number" min="0" step="0.1" placeholder="ex : 85" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                        <input wire:model.live="peseeTotalKg" type="number" min="0" step="0.1"
+                            placeholder="{{ $this->poidsMoyenEstimeKg !== null && $this->effectifFinalCalc > 0 ? '~'.number_format($this->poidsMoyenEstimeKg * $this->effectifFinalCalc, 1).' Kg (estimé)' : 'ex : 85' }}"
+                            class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
                     </div>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Effectif Final <span class="text-outline normal-case font-normal">(diviseur)</span></label>
@@ -299,6 +301,12 @@
                         </div>
                     </div>
                 </div>
+                @if($this->poidsMoyenEstimeKg !== null)
+                    <p class="text-xs text-outline italic flex items-center gap-xs mt-xs">
+                        <span class="material-symbols-outlined text-[14px]">trending_up</span>
+                        Poids moyen estimé (GMQ) : <span class="font-bold text-brand-forest not-italic">{{ number_format($this->poidsMoyenEstimeKg, 2) }} Kg / animal</span>
+                    </p>
+                @endif
 
                 <div class="border-t border-outline-variant pt-md">
                     <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">vaccines</span>Suivi Clinique &amp; Prophylaxie</p>
