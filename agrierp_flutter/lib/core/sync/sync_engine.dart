@@ -243,6 +243,10 @@ class SyncEngine {
   /// curseur, et deux envois simultanés acquitteraient deux fois les mêmes lignes.
   Future<SyncOutcome>? _tentativeEnCours;
 
+  /// Ticket VL-2 — une synchronisation (tirage ou envoi) est-elle en cours ? Le verrouillage automatique par
+  /// inactivité attend sa fin au lieu de l'interrompre.
+  bool get enCours => _tentativeEnCours != null;
+
   Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
       _synchroniserUneFois().whenComplete(() => _tentativeEnCours = null);
 

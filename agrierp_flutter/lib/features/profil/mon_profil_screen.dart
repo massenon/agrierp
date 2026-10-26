@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/verrou_inactivite.dart' show ReglageInactivite;
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'mon_profil_repository.dart';
@@ -31,6 +32,8 @@ class MonProfilScreen extends StatefulWidget {
     required this.session,
     this.changer,
     this.changerPin,
+    this.delaiInactivite,
+    this.changerDelaiInactivite,
   });
 
   final MonProfilRepository depot;
@@ -54,6 +57,16 @@ class MonProfilScreen extends StatefulWidget {
     required String confirmation,
   })?
   changerPin;
+
+  /// Ticket VL-2 — verrouillage automatique : durée d'inactivité actuelle de l'utilisateur, en minutes (`0` :
+  /// jamais). `null` (ou [changerDelaiInactivite] `null`) : la rubrique n'est pas montrée.
+  ///
+  /// ⚠️ **FONCTION PROPRE AU POSTE** (comme [changerPin]) : le web n'a ni verrou ni inactivité ; réglage local, jamais
+  /// synchronisé.
+  final Future<int> Function()? delaiInactivite;
+
+  /// Ticket VL-2 — enregistre la durée choisie (minutes, `0` : jamais) ; s'applique aussitôt.
+  final Future<void> Function(int minutes)? changerDelaiInactivite;
 
   /// Session ouverte, `null` si aucun utilisateur n'est connecté.
   final SessionUtilisateur? session;
@@ -83,6 +96,9 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
   (bool, String)? _resultatPin;
   bool _pinEnCours = false;
 
+  /// VL-2 — durée d'inactivité choisie (`null` : pas encore lue).
+  int? _delai;
+
   DonneesProfil? _donnees;
   Map<String, String> _erreurs = const {};
 
@@ -94,6 +110,21 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
   void initState() {
     super.initState();
     _charger();
+    _chargerDelai();
+  }
+
+  Future<void> _chargerDelai() async {
+    final lire = widget.delaiInactivite;
+    if (lire == null) return;
+    final minutes = await lire();
+    if (mounted) setState(() => _delai = minutes);
+  }
+
+  Future<void> _choisirDelai(int? minutes) async {
+    final changer = widget.changerDelaiInactivite;
+    if (minutes == null || changer == null) return;
+    setState(() => _delai = minutes);
+    await changer(minutes);
   }
 
   @override
@@ -225,6 +256,10 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
                     if (widget.changerPin != null) ...[
                       _cartePin(),
                       const SizedBox(height: AgriSpacing.md),
+                      if (widget.delaiInactivite != null && widget.changerDelaiInactivite != null) ...[
+                        _carteInactivite(),
+                        const SizedBox(height: AgriSpacing.md),
+                      ],
                     ],
                     _carteJournal(d),
                   ],
@@ -646,6 +681,55 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
                 ),
               ],
             ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// Ticket VL-2 — « Verrouillage automatique » : durée d'inactivité avant le verrouillage (propre au poste).
+  Widget _carteInactivite() => Container(
+    key: const Key('carte-inactivite'),
+    padding: const EdgeInsets.all(AgriSpacing.md),
+    decoration: _carte,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(SymbolesAgri.lock, size: 18, color: AgriColors.brandForest),
+            const SizedBox(width: AgriSpacing.xs),
+            Text(
+              'Verrouillage automatique'.toUpperCase(),
+              style: const TextStyle(
+                fontSize: AgriTypography.xs,
+                fontWeight: AgriTypography.gras,
+                color: AgriColors.brandForest,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          "Après ce délai sans toucher à la souris ni au clavier, l'application se verrouille : le code PIN est "
+          'demandé, sans réseau (propre à ce poste).',
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 448),
+          child: DropdownButtonFormField<int>(
+            key: const Key('delai-inactivite'),
+            initialValue: _delai,
+            isDense: true,
+            isExpanded: true,
+            decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+            style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+            items: [
+              for (final m in ReglageInactivite.choix)
+                DropdownMenuItem(value: m, child: Text(ReglageInactivite.libelle(m))),
+            ],
+            onChanged: _delai == null ? null : _choisirDelai,
           ),
         ),
       ],
