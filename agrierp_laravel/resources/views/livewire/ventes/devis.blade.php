@@ -76,6 +76,9 @@
                                     $statusLabels = ['brouillon' => 'Brouillon', 'envoye' => 'Envoyé', 'accepte' => 'Accepté', 'refuse' => 'Refusé', 'facture' => 'Facturé'];
                                 @endphp
                                 <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border {{ $statusStyles[$quote->status] }}">{{ $statusLabels[$quote->status] }}</span>
+                                @if($quote->status === 'facture' && $quote->sale)
+                                    <span class="block text-[10px] font-mono text-outline mt-[2px]">{{ $quote->numero_facture }}</span>
+                                @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 @if($quote->status === 'brouillon')
@@ -85,8 +88,11 @@
                                     <button type="button" wire:click="markAsAccepted('{{ $quote->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Marquer comme accepté"><span class="material-symbols-outlined text-[18px]">check_circle</span></button>
                                     <button type="button" wire:click="markAsRefused('{{ $quote->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Marquer comme refusé"><span class="material-symbols-outlined text-[18px]">cancel</span></button>
                                 @endif
-                                @if($quote->status === 'accepte')
+                                @if($quote->status === 'accepte' && auth()->user()?->can('manage-ventes') && auth()->user()?->can('manage-facturation'))
                                     <button type="button" wire:click="convertToInvoice('{{ $quote->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Convertir en Facture"><span class="material-symbols-outlined text-[18px]">receipt_long</span></button>
+                                @endif
+                                @if($quote->status === 'facture' && $quote->sale && auth()->user()?->can('view-facturation'))
+                                    <a href="{{ route('facturation.index', ['search' => $quote->sale->id]) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Voir la facture"><span class="material-symbols-outlined text-[18px]">visibility</span></a>
                                 @endif
                                 <button type="button" wire:click="editQuote('{{ $quote->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-devis-{{ $quote->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>

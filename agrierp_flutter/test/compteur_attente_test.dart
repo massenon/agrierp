@@ -32,7 +32,9 @@ void main() {
     // Ticket H9b (19/10/2026) : + les cinq tables des Paramètres Élevage (rations, prophylaxie, provendes,
     // numérotation, entreprise pour le délai du rappel des soins), modifiables au poste (D-H9).
     // Tickets AV1 / AV2 (21/10/2026) : + `credit_notes` et `quotes` (ticket DEV), demandes de retour client et « marquer comme traité ».
-    expect(lues, hasLength(31), reason: 'trente et une tables envoyées (BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis) : $lues');
+    // Ticket ARC3 : + `corbeille_demandes`, restaurer / supprimer définitivement (demandes).
+    // Ticket MOD1 (21/10/2026) : + `modules_config`, les bascules des Modules Actifs faites au poste.
+    expect(lues, hasLength(33), reason: 'trente-trois tables envoyées (ARC3 : les demandes de la corbeille ; BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis ; MOD1 : les modules) : $lues');
     expect(AppDatabase.tablesEnvoyees.toSet(), lues);
   });
 }

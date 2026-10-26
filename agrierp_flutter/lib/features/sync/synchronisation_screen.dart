@@ -713,6 +713,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'expenses' => 'Dépense',
     // Ticket DEV — devis saisi, avancé ou archivé au poste.
     'quotes' => 'Devis',
+    // Ticket DEV3 — demande de conversion d'un devis accepté en facture.
+    'quote_conversions' => 'Conversion de devis en facture',
     'purchases' => 'Achat',
     'livestock_reproduction_events' => 'Saillie',
     'mails' => 'Courrier',

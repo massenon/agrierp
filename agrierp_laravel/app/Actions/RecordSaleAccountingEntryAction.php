@@ -144,6 +144,17 @@ class RecordSaleAccountingEntryAction
     {
         $service = app(VatDeclarationService::class);
 
+        // Ticket DEV3 — la facture d'un devis est une prestation libre : AUCUNE ligne, donc aucun produit qui porte un
+        // taux. La TVA est celle du devis (neutralisée si l'exploitation n'est pas assujettie, comme pour un produit) ;
+        // le total de la vente est TTC, comme `manual_total_amount`.
+        if ($sale->lines->isEmpty() && $sale->devis) {
+            $taux = app(TvaSettingService::class)->tauxPour((float) $sale->devis->tva_rate) / 100;
+            $total = round((float) $sale->total, 2);
+            $tva = $service->tva($total, $taux);
+
+            return [round($total - $tva, 2), $tva];
+        }
+
         $ht = 0.0;
         $tva = 0.0;
         $ttcLignes = 0.0;

@@ -119,6 +119,7 @@ class AuditLog extends Model
         // Ticket ARC1 — Corbeille : restauration et suppression définitive (jamais une clé affichée brute).
         'corbeille.restored' => 'Élément restauré de la corbeille',
         'corbeille.deleted' => 'Élément supprimé définitivement',
+        'quote.invoiced' => 'Devis converti en facture',
         'customer.created' => 'Client créé',
         'customer.updated' => 'Client modifié',
         'customer.archived' => 'Client archivé',

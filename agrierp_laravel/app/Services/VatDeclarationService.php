@@ -58,7 +58,7 @@ class VatDeclarationService
      */
     public function tvaCollectee(string $startDate, string $endDate): array
     {
-        $sales = Sale::with(['customer', 'lines.product'])
+        $sales = Sale::with(['customer', 'lines.product', 'devis'])
             ->where('status', 'validee')
             ->where('mecef_status', 'transmise')
             ->soldBetween($startDate, $endDate)
@@ -80,6 +80,15 @@ class VatDeclarationService
                 $ttc += $lineTtc;
                 $ht += $this->ht($lineTtc, $rate);
                 $tva += $this->tva($lineTtc, $rate);
+            }
+
+            // Ticket DEV3 — facture d'un devis : aucune ligne, la TVA est celle du devis (total TTC de la vente).
+            if ($sale->lines->isEmpty() && $sale->devis) {
+                $rate = app(TvaSettingService::class)->tauxPour((float) $sale->devis->tva_rate) / 100;
+                $ttc = (float) $sale->total;
+                $ht = $this->ht($ttc, $rate);
+                $tva = $this->tva($ttc, $rate);
+                $rates[] = $rate;
             }
 
             return [

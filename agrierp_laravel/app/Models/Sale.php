@@ -121,6 +121,21 @@ class Sale extends Model
         return $this->hasMany(SaleLine::class, 'sale_id');
     }
 
+    /** Le devis dont cette vente est la facture (DEV3 : « Convertir en Facture »), `null` pour toute autre vente. */
+    public function devis()
+    {
+        return $this->hasOne(Quote::class, 'converted_sale_id');
+    }
+
+    /**
+     * Numéro de la facture, `FV-AAAA-XXXXXX` : l'année de la date effective et les six premiers caractères de
+     * l'identifiant. UN SEUL point de vérité (l'écran Facturation, « Devis & Proforma » et le tirage des devis).
+     */
+    protected function numeroFacture(): Attribute
+    {
+        return Attribute::get(fn (): string => 'FV-'.$this->date_effective->format('Y').'-'.strtoupper(substr($this->id, 0, 6)));
+    }
+
     public function receivable()
     {
         return $this->hasOne(Receivable::class, 'sale_id');

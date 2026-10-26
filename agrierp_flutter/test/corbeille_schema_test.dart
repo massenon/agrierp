@@ -19,11 +19,10 @@ void main() {
   setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
   tearDown(() => db.close());
 
-  test('⚠️ le palier 58 crée les deux tables ; 57, 59 et 60 sont réservés à d\'autres branches', () {
+  test('⚠️ le palier 58 crée les deux tables ; 57 (devis) et 60 (modules) viennent d\'autres branches, 59 est réservé', () {
     expect(db.schemaVersion, greaterThanOrEqualTo(58));
     final source = File('lib/core/database/app_database.dart').readAsStringSync();
     expect(source, contains('if (from < 58) {'));
-    expect(source, isNot(contains('if (from < 57) {')));
     expect({for (final c in db.corbeilleElements.$columns) c.name}, {
       'id', 'type', 'element_id', 'titre', 'detail', 'module', 'archive_le', 'restaurable', 'motif_restauration', 'supprimable', 'motif_suppression',
     });

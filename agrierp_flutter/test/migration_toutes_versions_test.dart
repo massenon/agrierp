@@ -245,6 +245,12 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.expenses, d.expenses.createdBy),
     (d.expenses, d.expenses.ecritureRefus),
   ],
+  // Ticket DEV3 — « Convertir en Facture » : la demande de conversion de ce poste, le lien vers la facture et son numéro.
+  57: [
+    (d.quotes, d.quotes.conversionRequestedAt),
+    (d.quotes, d.quotes.convertedSaleId),
+    (d.quotes, d.quotes.invoiceNumber),
+  ],
   // Ticket ARC3 — deux tables créées (aucune colonne ajoutée à une table existante).
   58: [],
   // Ticket MOD1 — les modules actifs se basculent au poste. ⚠️ 57, 58 et 59 sont réservés à d'autres branches.
@@ -346,7 +352,7 @@ void main() {
     } catch (_) {}
   });
 
-  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) est complète ; le 55 est inutilisé', () {
+  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) est complète ; le 55 est inutilisé', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
     expect(d.schemaVersion, 60, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés');
@@ -359,6 +365,7 @@ void main() {
     expect(source, contains('if (from < 53) {'));
     expect(source, contains('if (from < 54) {'));
     expect(source, contains('if (from < 56) {'));
+    expect(source, contains('if (from < 57) {'));
     expect(source, contains('if (from < 58) {'));
     expect(source, isNot(contains('if (from < 55) {')));
   });
