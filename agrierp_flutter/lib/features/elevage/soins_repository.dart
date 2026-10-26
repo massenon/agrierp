@@ -188,8 +188,35 @@ class SoinsRepository {
     }
 
     if (jourDeCycle == null) {
+      // Ticket #45 — bande indéterminée : tous les traitements du barème avec
+      // bornes sont exposés avec l'état « déjà administré » du jour.
+      final lendemainIndet = DateTime(jour.year, jour.month, jour.day + 1);
+      final soinsDuJourIndet =
+          await (_db.select(_db.veterinaryRecords)..where(
+                (t) => Expression.and([
+                  t.lotId.equals(bande.id),
+                  t.isActive.equals(true),
+                  t.recordDate.isBiggerOrEqualValue(jour),
+                  t.recordDate.isSmallerThanValue(lendemainIndet),
+                ]),
+              ))
+              .get();
+      final libellesIndet =
+          soinsDuJourIndet.map((s) => s.actionType).toSet();
+      final avecBornes = standards.where((s) => s.cycleDayStart != null).toList()
+        ..sort((a, b) {
+          final parDebut = a.cycleDayStart!.compareTo(b.cycleDayStart!);
+          return parDebut != 0 ? parDebut : a.treatment.compareTo(b.treatment);
+        });
       return ProtocoleDuJour(
-        traitements: const [],
+        traitements: avecBornes
+            .map(
+              (s) => TraitementPrevu(
+                standard: s,
+                dejaAdministre: libellesIndet.contains(s.treatment),
+              ),
+            )
+            .toList(),
         jourDeCycle: null,
         motifIndetermine: motif,
         calendairesNonEvalues: calendaires,

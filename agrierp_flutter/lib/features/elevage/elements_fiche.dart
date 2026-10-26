@@ -1406,8 +1406,8 @@ class ProphylaxieDuJourFiche extends StatelessWidget {
                         ),
                       ),
                     ],
-                  )
-                else if (p.traitements.isEmpty)
+                  ),
+                if (p.traitements.isEmpty && p.determinable)
                   const Text(
                     '— Aucun traitement récurrent programmé pour ce jour —',
                     style: TextStyle(
@@ -1415,9 +1415,8 @@ class ProphylaxieDuJourFiche extends StatelessWidget {
                       fontStyle: FontStyle.italic,
                       color: AgriColors.outline,
                     ),
-                  )
-                else
-                  for (final t in p.traitements) _ligne(t),
+                  ),
+                for (final t in p.traitements) _ligne(t),
               ],
             ),
           ),
@@ -1429,7 +1428,7 @@ class ProphylaxieDuJourFiche extends StatelessWidget {
               style: const TextStyle(fontSize: 10, color: AgriColors.outline),
             ),
           ],
-          if (p.determinable && p.enAttente > 0) ...[
+          if (p.enAttente > 0) ...[
             const SizedBox(height: AgriSpacing.sm),
             const Text(
               "Valider un traitement rémanent bloque la vente de cette bande jusqu'à la fin du délai d'attente.",
@@ -1453,7 +1452,7 @@ class ProphylaxieDuJourFiche extends StatelessWidget {
               ),
             ),
           ],
-          if (p.determinable && p.traitements.isNotEmpty) ...[
+          if (p.traitements.isNotEmpty) ...[
             const SizedBox(height: AgriSpacing.sm),
             Align(
               alignment: Alignment.centerLeft,

@@ -24,9 +24,10 @@ use Illuminate\Support\Facades\DB;
  * croyait), sous verrou de la bande : deux onglets ou un double clic ne peuvent
  * pas créer deux soins — ni deux périodes de rémanence — pour le même traitement.
  *
- * ⚠️ SEULS LES TRAITEMENTS DUS CE JOUR-LÀ SE VALIDENT : un identifiant forgé, ou
- * issu d'un autre jour de cycle, est ignoré. Une bande indéterminée (reproduction
- * sans saillie) ne valide rien.
+ * ⚠️ SEULS LES TRAITEMENTS DU BARÈME SE VALIDENT : un identifiant forgé ou inconnu
+ * est ignoré. Depuis le ticket #45, une bande indéterminée (reproduction sans
+ * saillie) expose aussi ses traitements — le cycle est inconnu mais l'administration
+ * reste possible ; les identifiants doivent tout de même exister dans le barème.
  */
 class ValidateProphylaxisTreatmentsAction
 {

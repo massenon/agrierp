@@ -160,11 +160,12 @@ class FichesProphylaxieTest extends TestCase
     {
         $this->bande($this->lapins, 'LOT-LAP-R', 'reproduction', '2026-10-10');
 
+        // Ticket #45 : les traitements du barème avec bornes sont visibles même sans saillie.
         Livewire::test(FicheLapins::class)
             ->assertSee('Indéterminé')
             ->assertSee('saillie')
             ->assertDontSee('Libre')
-            ->assertDontSee('Anti-coccidien');
+            ->assertSee('Anti-coccidien');
     }
 
     public function test_une_bande_en_reproduction_se_compte_depuis_la_derniere_saillie(): void
@@ -295,7 +296,8 @@ class FichesProphylaxieTest extends TestCase
         $this->assertSame(0, VeterinaryWithdrawalPeriod::count());
     }
 
-    public function test_une_bande_indeterminee_ne_se_valide_pas(): void
+    /** Ticket #45 : une bande indéterminée (sans saillie) PEUT valider ses traitements. */
+    public function test_une_bande_indeterminee_peut_valider_ses_traitements(): void
     {
         $this->bande($this->lapins, 'LOT-LAP-R', 'reproduction', '2026-10-10');
 
@@ -303,7 +305,7 @@ class FichesProphylaxieTest extends TestCase
             ->set('traitementsCoches', [$this->idDe('Anti-coccidien')])
             ->call('validerTraitements');
 
-        $this->assertSame(0, VeterinaryRecord::count());
+        $this->assertSame(1, VeterinaryRecord::count());
     }
 
     /** Rapprochement : un soin d'un AUTRE jour ou d'une AUTRE bande ne vaut pas validation. */

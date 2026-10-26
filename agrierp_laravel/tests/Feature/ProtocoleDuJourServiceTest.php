@@ -121,7 +121,9 @@ class ProtocoleDuJourServiceTest extends TestCase
 
         $protocole = $service->pourBande($bande);
         $this->assertFalse($protocole->determinable());
-        $this->assertCount(0, $protocole->traitements);
+        // Ticket #45 : tous les traitements du barème avec bornes (Anti-stress + Anti-coccidien)
+        // sont exposés même sans saillie connue — le cycle est inconnu mais l'administration reste possible.
+        $this->assertCount(2, $protocole->traitements);
         $this->assertStringContainsString('saillie', (string) $protocole->motifIndetermine);
         $this->assertSame('Indéterminé', $protocole->etat());
     }

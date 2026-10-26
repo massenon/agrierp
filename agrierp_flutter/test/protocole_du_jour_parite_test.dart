@@ -188,7 +188,10 @@ void main() {
           reason: 'jamais de repli sur la mise en lot',
         );
         expect(p.determinable, isFalse);
-        expect(p.traitements, isEmpty);
+        // Ticket #45 : Anti-stress J2-J4 + Anti-coccidien J5 sont exposés même
+        // sans saillie — le cycle est inconnu mais l'administration reste possible.
+        expect(p.traitements, hasLength(2));
+        expect(noms(p), containsAll(['Anti-stress', 'Anti-coccidien']));
         expect(p.motifIndetermine, contains('saillie'));
       },
     );
@@ -208,7 +211,9 @@ void main() {
         final p = await protocole(lot);
 
         expect(p.determinable, isFalse);
-        expect(p.traitements, isEmpty);
+        // Ticket #45 : Anti-stress + Anti-coccidien + Large (1-999) exposés.
+        expect(p.traitements, hasLength(3));
+        expect(noms(p), containsAll(['Anti-stress', 'Anti-coccidien', 'Large']));
       },
     );
 
