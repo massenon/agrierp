@@ -591,7 +591,19 @@ Tables `ExpenseLines` et `CostCenters`, colonnes de `Expenses` (dont `ecriture_r
 ### DEP5 ✅ (21/10/2026) Poste : écran et parité
 `saisie_depenses_screen.dart` : modale à lignes dynamiques, tableau à détail, mêmes libellés ; garde-fou de parité Blade ↔ Dart. Tests `depenses_multilignes_ecran_test`, `depenses_multilignes_parite_test`.
 
-**Livré le 21/10/2026** (détail, mutations et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Ticket DEP1 à DEP5 ») : suite Laravel 2 250 verts, poste 3 191 verts / 17 sautés, `flutter analyze` propre. **Questions client DEP-Q1 à DEP-Q8 : à confirmer** (PRD § 9). **Numéro de schéma Drift 56 propre à la branche `t-depenses`** : la fusion renumérotera si l'un des paliers 53 (devis), 54 (avoirs) ou 55 (unicité) manque. Non vérifié : base MySQL peuplée, poste Windows réel, Dusk, essai à cinq postes contre le serveur réel.
+**Livré le 21/10/2026** (détail, mutations et mesures : `agrierp_laravel/README_SPRINT0.md`, entrée « Ticket DEP1 à DEP5 ») : suite Laravel 2 250 verts, poste 3 191 verts / 17 sautés, `flutter analyze` propre. **Questions client DEP-Q2, Q4 à DEP-Q8 : à confirmer** (PRD § 9) ; DEP-Q1 et DEP-Q3 closes (OUI, § 11). **Numéro de schéma Drift 56 propre à la branche `t-depenses`** : la fusion renumérotera si l'un des paliers 53 (devis), 54 (avoirs) ou 55 (unicité) manque. Non vérifié : base MySQL peuplée, poste Windows réel, Dusk, essai à cinq postes contre le serveur réel.
+### DEP6 ✅ (26/10/2026) Centre de coût obligatoire (DEP-Q1 : OUI du client)
+Web (modale « Centre de Coût * », message sous le champ), absorbeur strict, poste ancien accepté au centre « Général » (créé par migration et semoir), existant rangé sous « Général » sans réécrire une pièce. Tests `DepenseCentreCoutObligatoireTest`. PRD § 11.1.
+
+### DEP7 ✅ (26/10/2026) Dépense à crédit = dette fournisseur (DEP-Q3 : OUI du client)
+`DetteFournisseurService` partagé avec les achats à crédit ; « Règlement * » (Payée comptant / À crédit) ; D charges / C 401 ; `payables.expense_id` ; règlement ⇒ `payee` ; archivage sans règlement ⇒ contre-passation de la charge et de la dette, refusé après règlement (DEP-Q9). Tests `DepenseFournisseurCreditTest`, `…LivewireTest`, `SyncDepenseFournisseurCreditTest`. PRD § 11.2.
+
+### DEP8 ✅ (26/10/2026) Poste : Drift v59, dépôt, modale, absorbeur
+`on_credit`, trésorerie nullable (table reconstruite), centre « Général » local ; dépôt et modale identiques au web ; envoi avec `on_credit`. Tests `depenses_a_credit_test`, migration toutes versions. **Numéro 59** (57 devis, 58 archives, 60 modules actifs ailleurs).
+
+### DEP9 ✅ (26/10/2026) Parité Blade ↔ Dart et cohérence de schéma
+`depenses_a_credit_parite_test` (libellés, ordre, messages, `libelleReglement` exécuté contre PHP), `SchemaDepensesPosteTest`. **Questions client DEP-Q9 à DEP-Q11 : à confirmer** (PRD § 11.3). Risque : migrer les postes avant d'ouvrir « À crédit ».
+
 ## Sprint UNI — Unicité des codes et libellés (demande du client du 21/10/2026 : « que faire pour éviter cela à la longue ? »)
 
 ### UNI ✅ (21/10/2026) Codes de bande et libellés de catégorie uniques à la source, sans toucher à l'existant
