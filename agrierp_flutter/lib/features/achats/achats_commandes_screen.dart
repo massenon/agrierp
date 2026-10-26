@@ -126,6 +126,11 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// Filtre de date de la Liste d'Achats (onglet 2) ; `null` : aucun filtre.
   DateTime? _dateFiltreAchats;
 
+  // #41 — barre de recherche et filtre de règlement (fidèles au `search`/`statusFilter` du Blade).
+  String _rechercheAchat = '';
+  String _filtreStatutAchat = '';
+  final _ctrlRechercheAchat = TextEditingController();
+
   /// Fournisseur dont le profil est ouvert depuis le détail d'un achat ;
   /// `null` : le hub.
   String? _profilFournisseur;
@@ -144,6 +149,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     _quantite.dispose();
     _prixUnitaire.dispose();
     _montantPaye.dispose();
+    _ctrlRechercheAchat.dispose();
     super.dispose();
   }
 
@@ -284,6 +290,44 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   bool _memeJour(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  // #41 — correspondance recherche : 8 premiers chars de l'UUID (référence affichée) ou nom fournisseur.
+  bool _matchRecherche(LigneAchat l, String q) {
+    final r = q.toLowerCase();
+    return l.achat.id.substring(0, l.achat.id.length.clamp(0, 8)).toLowerCase().contains(r) ||
+        (l.achat.supplierName ?? '').toLowerCase().contains(r);
+  }
+
+  // #42 — reste dû d'un achat d'après les dettes servies (null = inconnu).
+  double? _detteAchat(DonneesAchats d, LigneAchat l) {
+    if (!l.achat.hasDebt || !l.envoye) return 0;
+    final payables = d.dettes.where((p) => p.purchaseId == l.achat.id).toList();
+    if (payables.isEmpty) return null;
+    return payables.fold<double>(0, (t, p) => t + (p.amount - p.amountPaid).clamp(0, double.infinity));
+  }
+
+  Widget _montantPayeCell(DonneesAchats d, LigneAchat l, String cle) {
+    final dette = _detteAchat(d, l);
+    final paye = dette == null ? null : l.achat.total - dette;
+    return Text(
+      paye == null ? '—' : _montant(paye),
+      key: Key(cle),
+      style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+    );
+  }
+
+  Widget _detteCell(DonneesAchats d, LigneAchat l, String cle) {
+    final dette = _detteAchat(d, l);
+    return Text(
+      dette == null ? '—' : (dette > 0 ? _montant(dette) : '0'),
+      key: Key(cle),
+      style: TextStyle(
+        fontSize: AgriTypography.xs,
+        fontWeight: AgriTypography.gras,
+        color: dette != null && dette > 0 ? AgriColors.errorDeep : null,
+      ),
+    );
+  }
 
   // ── Liste d'Achats : détail, impression ───────────────────────────────────
 
@@ -933,7 +977,17 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     final achats = _dateFiltreAchats == null
         ? achatsExercice
         : [for (final a in achatsExercice) if (_memeJour(a.achat.purchaseDate, _dateFiltreAchats!)) a];
-    final page = etat == null ? achats : PaginationAgri.tranche(achats, _pageAchats);
+    // #41 — filtre texte : 8 premiers caractères de la référence ou nom fournisseur.
+    final achatsRecherche = _rechercheAchat.isEmpty
+        ? achats
+        : [for (final a in achats) if (_matchRecherche(a, _rechercheAchat)) a];
+    // #41 — filtre statut de règlement (fidèle au `statusFilter` 'paye'/'dette' du Blade).
+    final achatsFiltres = _filtreStatutAchat == 'paye'
+        ? [for (final a in achatsRecherche) if (a.envoye && !a.achat.hasDebt && !a.retourne) a]
+        : _filtreStatutAchat == 'dette'
+            ? [for (final a in achatsRecherche) if (a.achat.hasDebt) a]
+            : achatsRecherche;
+    final page = etat == null ? achatsFiltres : PaginationAgri.tranche(achatsFiltres, _pageAchats);
     final verrou = LectureSeule.motif(context);
     return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1082,14 +1136,63 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      // #41 — barre de recherche + filtre de règlement (fidèles au bloc `bg-white border...p-md` du Blade).
+      Container(
+        padding: const EdgeInsets.all(AgriSpacing.md),
+        decoration: BoxDecoration(
+          color: AgriColors.surfaceCard,
+          border: Border.all(color: AgriColors.outlineVariant),
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
+        ),
+        child: Wrap(
+          spacing: AgriSpacing.sm,
+          runSpacing: AgriSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 180),
+              child: TextField(
+                key: const Key('recherche-achats'),
+                controller: _ctrlRechercheAchat,
+                style: const TextStyle(fontSize: AgriTypography.xs),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher par référence ou fournisseur...',
+                  hintStyle: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                  prefixIcon: const Icon(SymbolesAgri.search, size: 18, color: AgriColors.outline),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AgriRadius.lg)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AgriRadius.lg), borderSide: const BorderSide(color: AgriColors.outlineVariant)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: AgriSpacing.sm),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() { _rechercheAchat = v.trim(); _pageAchats = 1; }),
+              ),
+            ),
+            DropdownButton<String>(
+              key: const Key('filtre-statut-achats'),
+              value: _filtreStatutAchat,
+              underline: const SizedBox.shrink(),
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+              items: const [
+                DropdownMenuItem(value: '', child: Text('Tous les règlements')),
+                DropdownMenuItem(value: 'paye', child: Text('Payé entièrement')),
+                DropdownMenuItem(value: 'dette', child: Text('Dette fournisseur')),
+              ],
+              onChanged: (v) => setState(() { _filtreStatutAchat = v ?? ''; _pageAchats = 1; }),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.md),
       _tableau(
-        largeur: 1050,
+        largeur: 1250,
         colonnes: const [
           ('Référence Achat', 3),
           ('Date', 3),
           ('Fournisseur', 4),
           ('Catégorie', 3),
-          ('Montant Total', 3),
+          ('Montant Payé', 2),
+          ('Montant Total', 2),
+          ('Dette', 2),
           ('Statut', 4),
           ('Actions', 3),
         ],
@@ -1118,16 +1221,20 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
                 3,
               ),
+              // #42 — Montant Payé / Montant Total / Dette (fidèles au tiroir du Blade : `$purchase->payable->balance`).
+              (_montantPayeCell(d, page[i], 'paye-$i'), 2),
               (
                 Text(
                   _montant(page[i].achat.total),
+                  key: Key('total-achat-$i'),
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
                     fontWeight: AgriTypography.gras,
                   ),
                 ),
-                3,
+                2,
               ),
+              (_detteCell(d, page[i], 'dette-$i'), 2),
               (_statut(page[i], 'liste-$i'), 4),
               (_actionsAchat(page[i], i), 3),
             ]),
@@ -1136,7 +1243,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       if (etat != null)
         PaginationAgri(
           nom: 'achats',
-          total: achats.length,
+          total: achatsFiltres.length,
           page: _pageAchats,
           annee: etat.annee,
           onPage: (p) => setState(() => _pageAchats = p),
