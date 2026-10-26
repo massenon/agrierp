@@ -1,7 +1,14 @@
 <div class="mt-md">
-    <div class="border-b border-outline-variant pb-md mb-lg">
-        <h2 class="text-xl lg:text-2xl font-bold text-on-surface">Enregistrer un Achat</h2>
-        <p class="text-xs text-outline mt-xs">Réception de marchandises auprès d'un fournisseur.</p>
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
+        <div>
+            <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">add_shopping_cart</span>Enregistrer un Achat
+            </h2>
+            <p class="text-xs text-outline mt-xs">Réception de marchandises auprès d'un fournisseur.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-xs">
+            <input wire:model.live="purchaseDate" type="date" min="{{ \App\Support\ExerciceChoisi::bornes()[0] }}" max="{{ \App\Support\ExerciceChoisi::bornes()[1] }}" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-md items-start">

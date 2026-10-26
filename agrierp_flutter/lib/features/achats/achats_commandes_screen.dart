@@ -16,6 +16,7 @@ import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 
 /// `prototype_html/achats-commandes.html` → Achats & Commandes.
@@ -117,6 +118,12 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   String? _message;
   bool _messageEstUneErreur = false;
 
+  /// Date de l'achat en cours de saisie (onglet 1) — par défaut : aujourd'hui.
+  DateTime? _dateAchat;
+
+  /// Filtre de date de la Liste d'Achats (onglet 2) ; `null` : aucun filtre.
+  DateTime? _dateFiltreAchats;
+
   /// Fournisseur dont le profil est ouvert depuis le détail d'un achat ;
   /// `null` : le hub.
   String? _profilFournisseur;
@@ -126,6 +133,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   @override
   void initState() {
     super.initState();
+    _dateAchat = _maintenant;
     _charger();
   }
 
@@ -206,6 +214,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         modePaiement: _modePaiement,
         compteId: _compteId!,
         montantPaye: paye,
+        date: _dateAchat,
       );
     } on RefusExercice catch (e) {
       // 🔴→✅ Ticket EX6 (EF7) — `EnregistrerAchat::save()` : « Achat refusé : » + le motif R4 en toast d'erreur, le
@@ -225,6 +234,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     setState(() {
       _panier.clear();
       _montantPaye.clear();
+      _dateAchat = _maintenant;
       _message =
           'Achat enregistré sur ce poste — il partira à la prochaine '
           'synchronisation.';
@@ -233,6 +243,45 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
     await _charger();
   }
+
+  // ── Sélecteurs de date ────────────────────────────────────────────────────
+
+  /// Ticket #40 — calendrier borné à l'exercice ouvert (fidèle à `min`/`max` du Blade).
+  Future<void> _choisirDateAchat() async {
+    final premier = await widget.depot.premierJourSaisissable();
+    if (!mounted) return;
+    final dernier = _maintenant;
+    final bornes = ExerciceDeSaisie.calendrier(
+      premier: premier,
+      repli: DateTime(2020),
+      dernier: dernier,
+      initial: _dateAchat ?? dernier,
+    );
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: bornes.initial,
+      firstDate: bornes.premier,
+      lastDate: dernier,
+      locale: const Locale('fr'),
+    );
+    if (choisie != null && mounted) setState(() => _dateAchat = choisie);
+  }
+
+  /// Ticket #40 — filtre de date de la Liste d'Achats, borné à l'exercice affiché.
+  Future<void> _choisirDateFiltreAchats() async {
+    final etat = PorteeExerciceChoisi.lire(context);
+    final valeurCourante = _dateFiltreAchats ?? _maintenant;
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: etat?.borner(valeurCourante) ?? valeurCourante,
+      firstDate: etat?.bornes.debut ?? DateTime(2020),
+      lastDate: etat?.bornes.fin ?? _maintenant,
+      locale: const Locale('fr'),
+    );
+    if (choisie != null && mounted) setState(() => _dateFiltreAchats = choisie);
+  }
+
+  bool _memeJour(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
   // ── Liste d'Achats : détail, impression ───────────────────────────────────
 
@@ -585,7 +634,19 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   Widget _ongletSaisie(DonneesAchats d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _titre('Enregistrer un Achat', large),
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: AgriSpacing.sm,
+        children: [
+          _titre('Enregistrer un Achat', large, icone: SymbolesAgri.add_shopping_cart),
+          ChampDateFiltre(
+            cle: const Key('date-achat'),
+            valeur: _dateAchat ?? _maintenant,
+            onTap: _choisirDateAchat,
+          ),
+        ],
+      ),
       const SizedBox(height: AgriSpacing.md),
       if (large)
         IntrinsicHeight(
@@ -865,7 +926,11 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     // Ticket EX7 (EF9) — les achats de l'exercice AFFICHÉ, 25 par page (web : `achatsDeLExercice()` puis la page) ;
     // l'export reprend tout l'exercice. Les indicateurs restent ceux du web (toute la ferme).
     final etat = PorteeExerciceChoisi.lire(context);
-    final achats = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
+    // Ticket #40 — filtre de date en plus du filtre exercice (fidèle au `dateFilter` du Blade).
+    final achatsExercice = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
+    final achats = _dateFiltreAchats == null
+        ? achatsExercice
+        : [for (final a in achatsExercice) if (_memeJour(a.achat.purchaseDate, _dateFiltreAchats!)) a];
     final page = etat == null ? achats : PaginationAgri.tranche(achats, _pageAchats);
     final verrou = LectureSeule.motif(context);
     return Column(
@@ -876,11 +941,46 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         crossAxisAlignment: WrapCrossAlignment.center,
         runSpacing: AgriSpacing.sm,
         children: [
-          _titre("Liste d'Achats", large),
+          _titre("Liste d'Achats", large, icone: SymbolesAgri.list_alt),
           Wrap(
             spacing: AgriSpacing.xs,
             runSpacing: AgriSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              // Filtre date (fidèle au `<input type="date" wire:model.live="dateFilter">` du Blade).
+              if (_dateFiltreAchats != null) ...[
+                ChampDateFiltre(
+                  cle: const Key('filtre-date-achats'),
+                  valeur: _dateFiltreAchats!,
+                  onTap: _choisirDateFiltreAchats,
+                ),
+                InkWell(
+                  key: const Key('effacer-filtre-date-achats'),
+                  onTap: () => setState(() => _dateFiltreAchats = null),
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  child: const Tooltip(
+                    message: 'Effacer le filtre de date',
+                    child: Icon(SymbolesAgri.close, size: 18, color: AgriColors.outline),
+                  ),
+                ),
+              ] else
+                OutlinedButton.icon(
+                  key: const Key('ouvrir-filtre-date-achats'),
+                  onPressed: _choisirDateFiltreAchats,
+                  icon: const Icon(SymbolesAgri.calendar_today, size: 16),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AgriColors.outline,
+                    side: const BorderSide(color: AgriColors.outlineVariant),
+                    shape: const StadiumBorder(),
+                  ),
+                  label: const Text(
+                    'Filtrer par date',
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontWeight: AgriTypography.gras,
+                    ),
+                  ),
+                ),
               FilledButton.icon(
                 key: const Key('exporter-pdf-achats'),
                 onPressed: () => _exporterListe(d),
@@ -1285,14 +1385,25 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   Widget _grilleKpis(bool large, List<Widget> cartes) => GrilleKpi(colonnes: large ? cartes.length : 2, children: cartes,
   );
 
-  Widget _titre(String texte, bool large) => Text(
-    texte,
-    style: TextStyle(
-      fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
-      fontWeight: AgriTypography.gras,
-      color: AgriColors.onSurface,
-    ),
-  );
+  Widget _titre(String texte, bool large, {IconData? icone}) {
+    final texteWidget = Text(
+      texte,
+      style: TextStyle(
+        fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
+        fontWeight: AgriTypography.gras,
+        color: AgriColors.onSurface,
+      ),
+    );
+    if (icone == null) return texteWidget;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icone, size: large ? 28.0 : 24.0, color: AgriColors.brandEmerald),
+        const SizedBox(width: AgriSpacing.xs),
+        texteWidget,
+      ],
+    );
+  }
 
   Widget _carte(Widget contenu) => Container(
     padding: const EdgeInsets.all(AgriSpacing.md),

@@ -76,6 +76,8 @@ class EnregistrerAchat extends Component
 
     public $receiptFile = null;
 
+    public string $purchaseDate = '';
+
     public string $newSupplierName = '';
 
     public string $newSupplierPhone = '';
@@ -89,6 +91,7 @@ class EnregistrerAchat extends Component
     public function mount(): void
     {
         $this->treasuryAccountId = (string) (TreasuryAccount::where('is_active', true)->first()?->id ?? '');
+        $this->purchaseDate = now()->format('Y-m-d');
     }
 
     public function getSuppliersProperty()
@@ -238,6 +241,7 @@ class EnregistrerAchat extends Component
 
         $this->validate([
             'supplierId' => ['required', 'exists:suppliers,id'],
+            'purchaseDate' => ['required', 'date', 'date_format:Y-m-d'],
             'treasuryAccountId' => ['required', 'exists:treasury_accounts,id'],
             'amountPaid' => ['nullable', 'numeric', 'min:0'],
             'receiptFile' => ['nullable', 'image', 'max:5120'],
@@ -265,6 +269,7 @@ class EnregistrerAchat extends Component
                 paymentMode: $this->paymentMode,
                 treasuryAccountId: $this->treasuryAccountId,
                 montantRegle: (float) $paid,
+                purchaseDate: $this->purchaseDate,
             );
         } catch (NoOpenFiscalYearException|ClosedFiscalYearException|AchatNonComptabilisableException $e) {
             $this->dispatch('toast', message: 'Achat refusé : '.$e->getMessage(), type: 'error');
