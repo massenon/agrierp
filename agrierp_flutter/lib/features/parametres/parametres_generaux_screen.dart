@@ -15,8 +15,12 @@ import 'appairage_poste.dart';
 import 'corbeille_repository.dart';
 import 'onglet_appairage.dart';
 import 'onglet_corbeille.dart';
+import 'onglet_donnees_entreprise.dart';
 import 'onglet_email_smtp.dart';
+import 'onglet_gestion_utilisateurs.dart';
 import 'onglet_reinitialisation.dart';
+import 'onglet_roles_permissions.dart';
+import 'onglet_sauvegardes.dart';
 import 'parametres_generaux_repository.dart';
 import 'reinitialisation_poste.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -93,6 +97,11 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
   /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
   /// « Réinitialisation » (R-1) après « Audit Logs », avec l'icône du web (`restart_alt`).
+  static const ongletSauvegardes = 'Sauvegardes';
+
+  /// Les dix onglets du hub, dans son ordre : les six de la maquette, plus
+  /// « Email (SMTP) » et « Appairage » (CFG-2), « Corbeille » (ARC4),
+  /// « Réinitialisation » (R-1) et « Sauvegardes ».
   static const onglets = <(String, IconData)>[
     ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
     ("Données de l'Entreprise", SymbolesAgri.domain),
@@ -104,6 +113,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     ('Audit Logs', SymbolesAgri.security),
     (ongletCorbeille, SymbolesAgri.restore_from_trash),
     (ongletReinitialisation, SymbolesAgri.restart_alt),
+    (ongletSauvegardes, SymbolesAgri.backup),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -206,23 +216,26 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
-                        "Données de l'Entreprise" => _ongletEntreprise(
-                          d,
-                          large,
-                        ),
+                        'Rôles & Permissions' =>
+                          OngletRolesPermissions(donnees: d),
+                        "Données de l'Entreprise" =>
+                          OngletDonneesEntreprise(donnees: d, repository: widget.depot),
                         ParametresGenerauxScreen.ongletEmailSmtp =>
                           _ongletEmailSmtp(),
                         'Modules Actifs' => _ongletModules(d, large),
                         ParametresGenerauxScreen.ongletAppairage =>
                           _ongletAppairage(),
-                        'Gestion Utilisateurs' => _ongletUtilisateurs(d, large),
+                        'Gestion Utilisateurs' =>
+                          OngletGestionUtilisateurs(donnees: d, repository: widget.depot),
                         'Modes de Paiement' => _ongletPaiement(d, large),
                         'Audit Logs' => _ongletAudit(d, large),
                         ParametresGenerauxScreen.ongletCorbeille =>
                           _ongletCorbeille(),
                         ParametresGenerauxScreen.ongletReinitialisation =>
                           _ongletReinitialisation(),
-                        _ => _ongletRoles(d, large),
+                        ParametresGenerauxScreen.ongletSauvegardes =>
+                          OngletSauvegardes(repository: widget.depot),
+                        _ => OngletRolesPermissions(donnees: d),
                       },
                     ],
                   ),
