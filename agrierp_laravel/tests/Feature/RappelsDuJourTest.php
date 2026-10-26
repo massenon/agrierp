@@ -119,6 +119,7 @@ class RappelsDuJourTest extends TestCase
         $this->assertSame('2026-10-12', $lignes[0]['date']);
         $this->assertSame('12/10/2026', $lignes[0]['date_texte']);
         $this->assertSame('soin', $lignes[0]['type']);
+        $this->assertSame('—', $lignes[0]['produit'], 'le calendrier ne porte aucun produit : jamais un libellé répété ni 0');
     }
 
     public function test_le_delai_est_celui_du_reglage_rappel_soins_jours(): void

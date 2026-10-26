@@ -43,6 +43,9 @@ import 'features/achats/fournisseurs_screen.dart';
 import 'features/achats/depenses_repository.dart';
 import 'features/achats/saisie_depenses_screen.dart';
 import 'features/elevage/dashboard_elevage_repository.dart';
+import 'features/elevage/rappels_du_jour_modale.dart';
+import 'features/elevage/rappels_du_jour_ouverture.dart';
+import 'features/elevage/rappels_du_jour_repository.dart';
 import 'features/elevage/bandes_repository.dart';
 import 'features/elevage/enregistrer_sujets_screen.dart';
 import 'features/elevage/gestion_bandes_screen.dart';
@@ -389,6 +392,28 @@ class _AgriErpAppState extends State<AgriErpApp> {
     auteurId: () => _auth.utilisateur?.id,
   );
 
+  /// Ticket POP3 — la fenêtre « Rappels du jour » : calcul LOCAL (tables déjà tirées), préférence « Ne plus afficher
+  /// aujourd'hui » au coffre du système. Déclenchée par `PorteSession.surOuverture` (lancement et connexion).
+  late final OuvertureRappels _rappelsDuJour = OuvertureRappels(
+    depot: RappelsDuJourRepository(database: _db, soins: _soins),
+    reglage: ReglageRappels(),
+  );
+
+  /// Ticket POP3 — « Ouvrir Soins et vaccins » de la fenêtre : demande d'écran lue par le socle de l'application.
+  final ValueNotifier<EcranPoste?> _demandeEcran = ValueNotifier<EcranPoste?>(null);
+
+  Future<void> _ouvrirRappelsDuJour(BuildContext context) async {
+    final utilisateur = _auth.utilisateur;
+    final rappels = await _rappelsDuJour.aMontrer(idUtilisateur: utilisateur?.id, role: utilisateur?.role);
+    if (rappels == null || !context.mounted) return;
+    await montrerRappelsDuJour(
+      context,
+      donnees: rappels,
+      surMasquer: () => _rappelsDuJour.masquerAujourdhui(utilisateur!.id),
+      surOuvrirSoins: () => _demandeEcran.value = EcranPoste.soinsEtVaccins,
+    );
+  }
+
   /// Ticket VL-1 — le verrou local (code PIN, hors ligne) et la porte qui décide de l'écran montré : chargement,
   /// connexion, définition du PIN, verrouillage ou application. Elle remplace l'ancien état `_sessionOuverte`
   /// (null/false/true) : rien n'est montré avant que l'état soit connu.
@@ -429,6 +454,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
     _gestes.dispose();
     _inactivite.desarmer();
     _brouillonContact.dispose();
+    _demandeEcran.dispose();
     _db.close();
     super.dispose();
   }
@@ -457,6 +483,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
         auth: _auth,
         verrou: _verrou,
         avantOuverture: _preparerOuverture,
+        surOuverture: _ouvrirRappelsDuJour,
         ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
           demarrage: _demarrage,
@@ -517,6 +544,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           verrou: _verrou,
           inactivite: _inactivite,
           brouillonContact: _brouillonContact,
+          demandeEcran: _demandeEcran,
           onVerrouiller: verrouiller,
           changementsReseau: Connectivity().onConnectivityChanged,
           gestes: _gestes,
@@ -579,6 +607,7 @@ class SocleAccueil extends StatefulWidget {
     this.reinitialisation,
     this.onDeconnecte,
     this.verrou,
+    this.demandeEcran,
     this.onVerrouiller,
     this.inactivite,
     this.brouillonContact,
@@ -594,6 +623,10 @@ class SocleAccueil extends StatefulWidget {
   final VerrouLocal? verrou;
 
   /// Ticket VL-1 — « Verrouiller » du menu du compte : l'application est remplacée par l'écran de verrouillage.
+  /// Ticket POP3 — écran demandé de l'extérieur (le lien « Ouvrir Soins et vaccins » de la fenêtre « Rappels du
+  /// jour ») ; ignoré si le rôle n'y a pas droit.
+  final ValueNotifier<EcranPoste?>? demandeEcran;
+
   final VoidCallback? onVerrouiller;
 
   /// Ticket VL-2 — minuteur d'inactivité (réglage de Mon profil) ; `null` : pas de rubrique « Verrouillage automatique ».
@@ -775,7 +808,16 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ? EcranPoste.synchronisation
         : accessibles.first;
 
+    widget.demandeEcran?.addListener(_ecranDemande);
     _demarrerSynchronisationAutomatique();
+  }
+
+  /// Ticket POP3 — ouvre l'écran demandé par la fenêtre « Rappels du jour », sauf s'il est interdit à ce rôle.
+  void _ecranDemande() {
+    final demande = widget.demandeEcran?.value;
+    if (demande == null) return;
+    widget.demandeEcran!.value = null;
+    if (mounted && PermissionsPoste.autorise(_role, demande)) setState(() => _ecran = demande);
   }
 
   /// Ticket H13 (B2) — synchronisation automatique de la session : retour du réseau, intervalle réglé dans
@@ -828,6 +870,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
   @override
   void dispose() {
     _automatique?.arreter();
+    widget.demandeEcran?.removeListener(_ecranDemande);
     _cycleDeVie?.dispose();
     _exercice
       ..removeListener(_exerciceChange)

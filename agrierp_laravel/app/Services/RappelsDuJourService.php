@@ -14,7 +14,8 @@ use Carbon\Carbon;
  * ═══ RÈGLE R-RAPPELS-01 (rédigée le 26/10/2026, PRD `docs/prd/popup-rappels.md` § 5) ═══
  * Horizon N = délai de rappel des soins déjà réglé (`AlertesElevageService::joursRappelSoins`, R-SOINS-01).
  * Aucun seuil nouveau : trois sources, chacune déjà calculée ailleurs.
- *  1. SOIN PLANIFIÉ (`AlertesElevageService::soinsAVenir`, la règle R-SOINS-01 telle quelle) : date dépassée =
+ *  1. SOIN PLANIFIÉ (`AlertesElevageService::soinsAVenir`, la règle R-SOINS-01 telle quelle ; le calendrier ne porte aucun
+ *     produit : « — ») : date dépassée =
  *     « En retard », date du jour = « Aujourd'hui », jusqu'à aujourd'hui + N = « À venir ».
  *  2. TRAITEMENT DU BARÈME PROPHYLACTIQUE dû et non encore administré (moteur UNIQUE `ProtocoleDuJourService`, comme le
  *     Dashboard Élevage), pour chacun des jours J à J+N : « Aujourd'hui » ou « À venir ». Jamais « En retard » : le
@@ -69,7 +70,7 @@ class RappelsDuJourService
             if (! $bande || ! in_array($bande->species?->code, $codesActifs, true)) {
                 continue;
             }
-            $lignes[] = $this->ligne('soin', $bande, $soin->task_type, $soin->task_type, $soin->scheduled_date, $aujourdhui);
+            $lignes[] = $this->ligne('soin', $bande, $soin->task_type, null, $soin->scheduled_date, $aujourdhui);
         }
 
         $bandes = LivestockLot::vivantes()->with('species')->orderBy('code')->get()
