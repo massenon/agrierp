@@ -3,9 +3,11 @@
 namespace App\Livewire\Profil;
 
 use App\Models\AuditLog;
+use App\Services\VerrouSessionService;
 use App\Support\PolitiqueMotDePasse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -44,6 +46,34 @@ class MonProfil extends Component
     public string $new_password = '';
 
     public string $new_password_confirmation = '';
+
+    /**
+     * Sprint VW — durée d'inactivité avant le verrouillage automatique de la session web (minutes ; 0 = « Jamais »).
+     * Réglage PROPRE À L'UTILISATEUR, tenu sur le serveur (`users.verrouillage_minutes`) : il suit la personne d'un
+     * navigateur à l'autre. Mêmes choix et même défaut (5 min) que le poste.
+     */
+    public int $verrouillage_minutes = VerrouSessionService::DUREE_PAR_DEFAUT;
+
+    public function mount(): void
+    {
+        $this->verrouillage_minutes = Auth::user()->delaiVerrouillage();
+    }
+
+    /** Enregistre le choix dès qu'il change (liste déroulante `wire:model.live`) ; une valeur hors liste est refusée. */
+    public function updatedVerrouillageMinutes(): void
+    {
+        $this->validate([
+            'verrouillage_minutes' => ['required', 'integer', Rule::in(VerrouSessionService::DUREES)],
+        ], [
+            'verrouillage_minutes.*' => 'Choisissez une durée dans la liste.',
+        ]);
+
+        Auth::user()->forceFill(['verrouillage_minutes' => $this->verrouillage_minutes])->save();
+
+        // Le navigateur applique la nouvelle durée aussitôt (minuterie de `components/verrou-session`).
+        $this->dispatch('verrou-delai-modifie', minutes: $this->verrouillage_minutes);
+        $this->dispatch('toast', message: 'Verrouillage automatique : '.VerrouSessionService::libelleDuree($this->verrouillage_minutes).'.', type: 'success');
+    }
 
     public function getLastLoginProperty(): ?AuditLog
     {

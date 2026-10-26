@@ -57,6 +57,20 @@
                 </form>
             </div>
 
+            {{-- Sprint VW : verrou de session — même carte, mêmes durées et même défaut que Mon Profil du poste. --}}
+            <div class="bg-white border border-outline-variant rounded-lg p-md" dusk="carte-inactivite">
+                <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">lock</span>Verrouillage automatique</p>
+                <p class="text-xs text-outline mb-md">Après ce délai sans toucher à la souris ni au clavier, l'application se verrouille : le mot de passe de votre compte est demandé.</p>
+                <div class="max-w-md">
+                    <select wire:model.live="verrouillage_minutes" id="delai-inactivite" dusk="delai-inactivite" aria-label="Verrouillage automatique" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('verrouillage_minutes') ? 'is-invalid' : 'border-outline-variant' }}">
+                        @foreach(\App\Services\VerrouSessionService::DUREES as $duree)
+                            <option value="{{ $duree }}">{{ \App\Services\VerrouSessionService::libelleDuree($duree) }}</option>
+                        @endforeach
+                    </select>
+                    @error('verrouillage_minutes') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
             <div class="bg-white border border-outline-variant rounded-lg overflow-hidden">
                 <div class="px-md py-sm border-b border-outline-variant"><h3 class="text-sm font-bold text-brand-forest">Journal d'Audit — 10 Dernières Actions</h3></div>
                 @if($this->recentActions->isEmpty())
