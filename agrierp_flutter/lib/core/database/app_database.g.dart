@@ -10140,6 +10140,40 @@ class $InternshipsTable extends Internships
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _birthDateMeta = const VerificationMeta(
+    'birthDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> birthDate = GeneratedColumn<DateTime>(
+    'birth_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _birthPlaceMeta = const VerificationMeta(
+    'birthPlace',
+  );
+  @override
+  late final GeneratedColumn<String> birthPlace = GeneratedColumn<String>(
+    'birth_place',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _civiliteMeta = const VerificationMeta(
+    'civilite',
+  );
+  @override
+  late final GeneratedColumn<String> civilite = GeneratedColumn<String>(
+    'civilite',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('M.'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -10150,6 +10184,9 @@ class $InternshipsTable extends Internships
     endDate,
     monthlyFee,
     feePaid,
+    birthDate,
+    birthPlace,
+    civilite,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -10214,6 +10251,24 @@ class $InternshipsTable extends Internships
         feePaid.isAcceptableOrUnknown(data['fee_paid']!, _feePaidMeta),
       );
     }
+    if (data.containsKey('birth_date')) {
+      context.handle(
+        _birthDateMeta,
+        birthDate.isAcceptableOrUnknown(data['birth_date']!, _birthDateMeta),
+      );
+    }
+    if (data.containsKey('birth_place')) {
+      context.handle(
+        _birthPlaceMeta,
+        birthPlace.isAcceptableOrUnknown(data['birth_place']!, _birthPlaceMeta),
+      );
+    }
+    if (data.containsKey('civilite')) {
+      context.handle(
+        _civiliteMeta,
+        civilite.isAcceptableOrUnknown(data['civilite']!, _civiliteMeta),
+      );
+    }
     return context;
   }
 
@@ -10255,6 +10310,18 @@ class $InternshipsTable extends Internships
         DriftSqlType.bool,
         data['${effectivePrefix}fee_paid'],
       )!,
+      birthDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}birth_date'],
+      ),
+      birthPlace: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}birth_place'],
+      ),
+      civilite: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}civilite'],
+      )!,
     );
   }
 
@@ -10273,6 +10340,9 @@ class Internship extends DataClass implements Insertable<Internship> {
   final DateTime? endDate;
   final double? monthlyFee;
   final bool feePaid;
+  final DateTime? birthDate;
+  final String? birthPlace;
+  final String civilite;
   const Internship({
     required this.id,
     required this.firstName,
@@ -10282,6 +10352,9 @@ class Internship extends DataClass implements Insertable<Internship> {
     this.endDate,
     this.monthlyFee,
     required this.feePaid,
+    this.birthDate,
+    this.birthPlace,
+    required this.civilite,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -10302,6 +10375,13 @@ class Internship extends DataClass implements Insertable<Internship> {
       map['monthly_fee'] = Variable<double>(monthlyFee);
     }
     map['fee_paid'] = Variable<bool>(feePaid);
+    if (!nullToAbsent || birthDate != null) {
+      map['birth_date'] = Variable<DateTime>(birthDate);
+    }
+    if (!nullToAbsent || birthPlace != null) {
+      map['birth_place'] = Variable<String>(birthPlace);
+    }
+    map['civilite'] = Variable<String>(civilite);
     return map;
   }
 
@@ -10323,6 +10403,13 @@ class Internship extends DataClass implements Insertable<Internship> {
           ? const Value.absent()
           : Value(monthlyFee),
       feePaid: Value(feePaid),
+      birthDate: birthDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(birthDate),
+      birthPlace: birthPlace == null && nullToAbsent
+          ? const Value.absent()
+          : Value(birthPlace),
+      civilite: Value(civilite),
     );
   }
 
@@ -10340,6 +10427,9 @@ class Internship extends DataClass implements Insertable<Internship> {
       endDate: serializer.fromJson<DateTime?>(json['endDate']),
       monthlyFee: serializer.fromJson<double?>(json['monthlyFee']),
       feePaid: serializer.fromJson<bool>(json['feePaid']),
+      birthDate: serializer.fromJson<DateTime?>(json['birthDate']),
+      birthPlace: serializer.fromJson<String?>(json['birthPlace']),
+      civilite: serializer.fromJson<String>(json['civilite']),
     );
   }
   @override
@@ -10354,6 +10444,9 @@ class Internship extends DataClass implements Insertable<Internship> {
       'endDate': serializer.toJson<DateTime?>(endDate),
       'monthlyFee': serializer.toJson<double?>(monthlyFee),
       'feePaid': serializer.toJson<bool>(feePaid),
+      'birthDate': serializer.toJson<DateTime?>(birthDate),
+      'birthPlace': serializer.toJson<String?>(birthPlace),
+      'civilite': serializer.toJson<String>(civilite),
     };
   }
 
@@ -10366,6 +10459,9 @@ class Internship extends DataClass implements Insertable<Internship> {
     Value<DateTime?> endDate = const Value.absent(),
     Value<double?> monthlyFee = const Value.absent(),
     bool? feePaid,
+    Value<DateTime?> birthDate = const Value.absent(),
+    Value<String?> birthPlace = const Value.absent(),
+    String? civilite,
   }) => Internship(
     id: id ?? this.id,
     firstName: firstName ?? this.firstName,
@@ -10375,6 +10471,9 @@ class Internship extends DataClass implements Insertable<Internship> {
     endDate: endDate.present ? endDate.value : this.endDate,
     monthlyFee: monthlyFee.present ? monthlyFee.value : this.monthlyFee,
     feePaid: feePaid ?? this.feePaid,
+    birthDate: birthDate.present ? birthDate.value : this.birthDate,
+    birthPlace: birthPlace.present ? birthPlace.value : this.birthPlace,
+    civilite: civilite ?? this.civilite,
   );
   Internship copyWithCompanion(InternshipsCompanion data) {
     return Internship(
@@ -10388,6 +10487,11 @@ class Internship extends DataClass implements Insertable<Internship> {
           ? data.monthlyFee.value
           : this.monthlyFee,
       feePaid: data.feePaid.present ? data.feePaid.value : this.feePaid,
+      birthDate: data.birthDate.present ? data.birthDate.value : this.birthDate,
+      birthPlace: data.birthPlace.present
+          ? data.birthPlace.value
+          : this.birthPlace,
+      civilite: data.civilite.present ? data.civilite.value : this.civilite,
     );
   }
 
@@ -10401,7 +10505,10 @@ class Internship extends DataClass implements Insertable<Internship> {
           ..write('startDate: $startDate, ')
           ..write('endDate: $endDate, ')
           ..write('monthlyFee: $monthlyFee, ')
-          ..write('feePaid: $feePaid')
+          ..write('feePaid: $feePaid, ')
+          ..write('birthDate: $birthDate, ')
+          ..write('birthPlace: $birthPlace, ')
+          ..write('civilite: $civilite')
           ..write(')'))
         .toString();
   }
@@ -10416,6 +10523,9 @@ class Internship extends DataClass implements Insertable<Internship> {
     endDate,
     monthlyFee,
     feePaid,
+    birthDate,
+    birthPlace,
+    civilite,
   );
   @override
   bool operator ==(Object other) =>
@@ -10428,7 +10538,10 @@ class Internship extends DataClass implements Insertable<Internship> {
           other.startDate == this.startDate &&
           other.endDate == this.endDate &&
           other.monthlyFee == this.monthlyFee &&
-          other.feePaid == this.feePaid);
+          other.feePaid == this.feePaid &&
+          other.birthDate == this.birthDate &&
+          other.birthPlace == this.birthPlace &&
+          other.civilite == this.civilite);
 }
 
 class InternshipsCompanion extends UpdateCompanion<Internship> {
@@ -10440,6 +10553,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   final Value<DateTime?> endDate;
   final Value<double?> monthlyFee;
   final Value<bool> feePaid;
+  final Value<DateTime?> birthDate;
+  final Value<String?> birthPlace;
+  final Value<String> civilite;
   final Value<int> rowid;
   const InternshipsCompanion({
     this.id = const Value.absent(),
@@ -10450,6 +10566,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     this.endDate = const Value.absent(),
     this.monthlyFee = const Value.absent(),
     this.feePaid = const Value.absent(),
+    this.birthDate = const Value.absent(),
+    this.birthPlace = const Value.absent(),
+    this.civilite = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InternshipsCompanion.insert({
@@ -10461,6 +10580,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     this.endDate = const Value.absent(),
     this.monthlyFee = const Value.absent(),
     this.feePaid = const Value.absent(),
+    this.birthDate = const Value.absent(),
+    this.birthPlace = const Value.absent(),
+    this.civilite = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        firstName = Value(firstName),
@@ -10474,6 +10596,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     Expression<DateTime>? endDate,
     Expression<double>? monthlyFee,
     Expression<bool>? feePaid,
+    Expression<DateTime>? birthDate,
+    Expression<String>? birthPlace,
+    Expression<String>? civilite,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -10485,6 +10610,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
       if (endDate != null) 'end_date': endDate,
       if (monthlyFee != null) 'monthly_fee': monthlyFee,
       if (feePaid != null) 'fee_paid': feePaid,
+      if (birthDate != null) 'birth_date': birthDate,
+      if (birthPlace != null) 'birth_place': birthPlace,
+      if (civilite != null) 'civilite': civilite,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -10498,6 +10626,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     Value<DateTime?>? endDate,
     Value<double?>? monthlyFee,
     Value<bool>? feePaid,
+    Value<DateTime?>? birthDate,
+    Value<String?>? birthPlace,
+    Value<String>? civilite,
     Value<int>? rowid,
   }) {
     return InternshipsCompanion(
@@ -10509,6 +10640,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
       endDate: endDate ?? this.endDate,
       monthlyFee: monthlyFee ?? this.monthlyFee,
       feePaid: feePaid ?? this.feePaid,
+      birthDate: birthDate ?? this.birthDate,
+      birthPlace: birthPlace ?? this.birthPlace,
+      civilite: civilite ?? this.civilite,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -10540,6 +10674,15 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     if (feePaid.present) {
       map['fee_paid'] = Variable<bool>(feePaid.value);
     }
+    if (birthDate.present) {
+      map['birth_date'] = Variable<DateTime>(birthDate.value);
+    }
+    if (birthPlace.present) {
+      map['birth_place'] = Variable<String>(birthPlace.value);
+    }
+    if (civilite.present) {
+      map['civilite'] = Variable<String>(civilite.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -10557,6 +10700,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
           ..write('endDate: $endDate, ')
           ..write('monthlyFee: $monthlyFee, ')
           ..write('feePaid: $feePaid, ')
+          ..write('birthDate: $birthDate, ')
+          ..write('birthPlace: $birthPlace, ')
+          ..write('civilite: $civilite, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -17686,8 +17832,97 @@ class $AttestationTemplatesTable extends AttestationTemplates
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _numeroSequenceMeta = const VerificationMeta(
+    'numeroSequence',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, type, bodyText];
+  late final GeneratedColumn<int> numeroSequence = GeneratedColumn<int>(
+    'numero_sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _sig1TitreMeta = const VerificationMeta(
+    'sig1Titre',
+  );
+  @override
+  late final GeneratedColumn<String> sig1Titre = GeneratedColumn<String>(
+    'sig1_titre',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig1NomMeta = const VerificationMeta(
+    'sig1Nom',
+  );
+  @override
+  late final GeneratedColumn<String> sig1Nom = GeneratedColumn<String>(
+    'sig1_nom',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig2TitreMeta = const VerificationMeta(
+    'sig2Titre',
+  );
+  @override
+  late final GeneratedColumn<String> sig2Titre = GeneratedColumn<String>(
+    'sig2_titre',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig2NomMeta = const VerificationMeta(
+    'sig2Nom',
+  );
+  @override
+  late final GeneratedColumn<String> sig2Nom = GeneratedColumn<String>(
+    'sig2_nom',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig3TitreMeta = const VerificationMeta(
+    'sig3Titre',
+  );
+  @override
+  late final GeneratedColumn<String> sig3Titre = GeneratedColumn<String>(
+    'sig3_titre',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig3NomMeta = const VerificationMeta(
+    'sig3Nom',
+  );
+  @override
+  late final GeneratedColumn<String> sig3Nom = GeneratedColumn<String>(
+    'sig3_nom',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    bodyText,
+    numeroSequence,
+    sig1Titre,
+    sig1Nom,
+    sig2Titre,
+    sig2Nom,
+    sig3Titre,
+    sig3Nom,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -17721,6 +17956,51 @@ class $AttestationTemplatesTable extends AttestationTemplates
     } else if (isInserting) {
       context.missing(_bodyTextMeta);
     }
+    if (data.containsKey('numero_sequence')) {
+      context.handle(
+        _numeroSequenceMeta,
+        numeroSequence.isAcceptableOrUnknown(
+          data['numero_sequence']!,
+          _numeroSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sig1_titre')) {
+      context.handle(
+        _sig1TitreMeta,
+        sig1Titre.isAcceptableOrUnknown(data['sig1_titre']!, _sig1TitreMeta),
+      );
+    }
+    if (data.containsKey('sig1_nom')) {
+      context.handle(
+        _sig1NomMeta,
+        sig1Nom.isAcceptableOrUnknown(data['sig1_nom']!, _sig1NomMeta),
+      );
+    }
+    if (data.containsKey('sig2_titre')) {
+      context.handle(
+        _sig2TitreMeta,
+        sig2Titre.isAcceptableOrUnknown(data['sig2_titre']!, _sig2TitreMeta),
+      );
+    }
+    if (data.containsKey('sig2_nom')) {
+      context.handle(
+        _sig2NomMeta,
+        sig2Nom.isAcceptableOrUnknown(data['sig2_nom']!, _sig2NomMeta),
+      );
+    }
+    if (data.containsKey('sig3_titre')) {
+      context.handle(
+        _sig3TitreMeta,
+        sig3Titre.isAcceptableOrUnknown(data['sig3_titre']!, _sig3TitreMeta),
+      );
+    }
+    if (data.containsKey('sig3_nom')) {
+      context.handle(
+        _sig3NomMeta,
+        sig3Nom.isAcceptableOrUnknown(data['sig3_nom']!, _sig3NomMeta),
+      );
+    }
     return context;
   }
 
@@ -17742,6 +18022,34 @@ class $AttestationTemplatesTable extends AttestationTemplates
         DriftSqlType.string,
         data['${effectivePrefix}body_text'],
       )!,
+      numeroSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}numero_sequence'],
+      )!,
+      sig1Titre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig1_titre'],
+      ),
+      sig1Nom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig1_nom'],
+      ),
+      sig2Titre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig2_titre'],
+      ),
+      sig2Nom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig2_nom'],
+      ),
+      sig3Titre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig3_titre'],
+      ),
+      sig3Nom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig3_nom'],
+      ),
     );
   }
 
@@ -17756,10 +18064,24 @@ class AttestationTemplate extends DataClass
   final String id;
   final String type;
   final String bodyText;
+  final int numeroSequence;
+  final String? sig1Titre;
+  final String? sig1Nom;
+  final String? sig2Titre;
+  final String? sig2Nom;
+  final String? sig3Titre;
+  final String? sig3Nom;
   const AttestationTemplate({
     required this.id,
     required this.type,
     required this.bodyText,
+    required this.numeroSequence,
+    this.sig1Titre,
+    this.sig1Nom,
+    this.sig2Titre,
+    this.sig2Nom,
+    this.sig3Titre,
+    this.sig3Nom,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -17767,6 +18089,25 @@ class AttestationTemplate extends DataClass
     map['id'] = Variable<String>(id);
     map['type'] = Variable<String>(type);
     map['body_text'] = Variable<String>(bodyText);
+    map['numero_sequence'] = Variable<int>(numeroSequence);
+    if (!nullToAbsent || sig1Titre != null) {
+      map['sig1_titre'] = Variable<String>(sig1Titre);
+    }
+    if (!nullToAbsent || sig1Nom != null) {
+      map['sig1_nom'] = Variable<String>(sig1Nom);
+    }
+    if (!nullToAbsent || sig2Titre != null) {
+      map['sig2_titre'] = Variable<String>(sig2Titre);
+    }
+    if (!nullToAbsent || sig2Nom != null) {
+      map['sig2_nom'] = Variable<String>(sig2Nom);
+    }
+    if (!nullToAbsent || sig3Titre != null) {
+      map['sig3_titre'] = Variable<String>(sig3Titre);
+    }
+    if (!nullToAbsent || sig3Nom != null) {
+      map['sig3_nom'] = Variable<String>(sig3Nom);
+    }
     return map;
   }
 
@@ -17775,6 +18116,25 @@ class AttestationTemplate extends DataClass
       id: Value(id),
       type: Value(type),
       bodyText: Value(bodyText),
+      numeroSequence: Value(numeroSequence),
+      sig1Titre: sig1Titre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig1Titre),
+      sig1Nom: sig1Nom == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig1Nom),
+      sig2Titre: sig2Titre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig2Titre),
+      sig2Nom: sig2Nom == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig2Nom),
+      sig3Titre: sig3Titre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig3Titre),
+      sig3Nom: sig3Nom == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig3Nom),
     );
   }
 
@@ -17787,6 +18147,13 @@ class AttestationTemplate extends DataClass
       id: serializer.fromJson<String>(json['id']),
       type: serializer.fromJson<String>(json['type']),
       bodyText: serializer.fromJson<String>(json['bodyText']),
+      numeroSequence: serializer.fromJson<int>(json['numeroSequence']),
+      sig1Titre: serializer.fromJson<String?>(json['sig1Titre']),
+      sig1Nom: serializer.fromJson<String?>(json['sig1Nom']),
+      sig2Titre: serializer.fromJson<String?>(json['sig2Titre']),
+      sig2Nom: serializer.fromJson<String?>(json['sig2Nom']),
+      sig3Titre: serializer.fromJson<String?>(json['sig3Titre']),
+      sig3Nom: serializer.fromJson<String?>(json['sig3Nom']),
     );
   }
   @override
@@ -17796,20 +18163,53 @@ class AttestationTemplate extends DataClass
       'id': serializer.toJson<String>(id),
       'type': serializer.toJson<String>(type),
       'bodyText': serializer.toJson<String>(bodyText),
+      'numeroSequence': serializer.toJson<int>(numeroSequence),
+      'sig1Titre': serializer.toJson<String?>(sig1Titre),
+      'sig1Nom': serializer.toJson<String?>(sig1Nom),
+      'sig2Titre': serializer.toJson<String?>(sig2Titre),
+      'sig2Nom': serializer.toJson<String?>(sig2Nom),
+      'sig3Titre': serializer.toJson<String?>(sig3Titre),
+      'sig3Nom': serializer.toJson<String?>(sig3Nom),
     };
   }
 
-  AttestationTemplate copyWith({String? id, String? type, String? bodyText}) =>
-      AttestationTemplate(
-        id: id ?? this.id,
-        type: type ?? this.type,
-        bodyText: bodyText ?? this.bodyText,
-      );
+  AttestationTemplate copyWith({
+    String? id,
+    String? type,
+    String? bodyText,
+    int? numeroSequence,
+    Value<String?> sig1Titre = const Value.absent(),
+    Value<String?> sig1Nom = const Value.absent(),
+    Value<String?> sig2Titre = const Value.absent(),
+    Value<String?> sig2Nom = const Value.absent(),
+    Value<String?> sig3Titre = const Value.absent(),
+    Value<String?> sig3Nom = const Value.absent(),
+  }) => AttestationTemplate(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    bodyText: bodyText ?? this.bodyText,
+    numeroSequence: numeroSequence ?? this.numeroSequence,
+    sig1Titre: sig1Titre.present ? sig1Titre.value : this.sig1Titre,
+    sig1Nom: sig1Nom.present ? sig1Nom.value : this.sig1Nom,
+    sig2Titre: sig2Titre.present ? sig2Titre.value : this.sig2Titre,
+    sig2Nom: sig2Nom.present ? sig2Nom.value : this.sig2Nom,
+    sig3Titre: sig3Titre.present ? sig3Titre.value : this.sig3Titre,
+    sig3Nom: sig3Nom.present ? sig3Nom.value : this.sig3Nom,
+  );
   AttestationTemplate copyWithCompanion(AttestationTemplatesCompanion data) {
     return AttestationTemplate(
       id: data.id.present ? data.id.value : this.id,
       type: data.type.present ? data.type.value : this.type,
       bodyText: data.bodyText.present ? data.bodyText.value : this.bodyText,
+      numeroSequence: data.numeroSequence.present
+          ? data.numeroSequence.value
+          : this.numeroSequence,
+      sig1Titre: data.sig1Titre.present ? data.sig1Titre.value : this.sig1Titre,
+      sig1Nom: data.sig1Nom.present ? data.sig1Nom.value : this.sig1Nom,
+      sig2Titre: data.sig2Titre.present ? data.sig2Titre.value : this.sig2Titre,
+      sig2Nom: data.sig2Nom.present ? data.sig2Nom.value : this.sig2Nom,
+      sig3Titre: data.sig3Titre.present ? data.sig3Titre.value : this.sig3Titre,
+      sig3Nom: data.sig3Nom.present ? data.sig3Nom.value : this.sig3Nom,
     );
   }
 
@@ -17818,20 +18218,45 @@ class AttestationTemplate extends DataClass
     return (StringBuffer('AttestationTemplate(')
           ..write('id: $id, ')
           ..write('type: $type, ')
-          ..write('bodyText: $bodyText')
+          ..write('bodyText: $bodyText, ')
+          ..write('numeroSequence: $numeroSequence, ')
+          ..write('sig1Titre: $sig1Titre, ')
+          ..write('sig1Nom: $sig1Nom, ')
+          ..write('sig2Titre: $sig2Titre, ')
+          ..write('sig2Nom: $sig2Nom, ')
+          ..write('sig3Titre: $sig3Titre, ')
+          ..write('sig3Nom: $sig3Nom')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, type, bodyText);
+  int get hashCode => Object.hash(
+    id,
+    type,
+    bodyText,
+    numeroSequence,
+    sig1Titre,
+    sig1Nom,
+    sig2Titre,
+    sig2Nom,
+    sig3Titre,
+    sig3Nom,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is AttestationTemplate &&
           other.id == this.id &&
           other.type == this.type &&
-          other.bodyText == this.bodyText);
+          other.bodyText == this.bodyText &&
+          other.numeroSequence == this.numeroSequence &&
+          other.sig1Titre == this.sig1Titre &&
+          other.sig1Nom == this.sig1Nom &&
+          other.sig2Titre == this.sig2Titre &&
+          other.sig2Nom == this.sig2Nom &&
+          other.sig3Titre == this.sig3Titre &&
+          other.sig3Nom == this.sig3Nom);
 }
 
 class AttestationTemplatesCompanion
@@ -17839,17 +18264,38 @@ class AttestationTemplatesCompanion
   final Value<String> id;
   final Value<String> type;
   final Value<String> bodyText;
+  final Value<int> numeroSequence;
+  final Value<String?> sig1Titre;
+  final Value<String?> sig1Nom;
+  final Value<String?> sig2Titre;
+  final Value<String?> sig2Nom;
+  final Value<String?> sig3Titre;
+  final Value<String?> sig3Nom;
   final Value<int> rowid;
   const AttestationTemplatesCompanion({
     this.id = const Value.absent(),
     this.type = const Value.absent(),
     this.bodyText = const Value.absent(),
+    this.numeroSequence = const Value.absent(),
+    this.sig1Titre = const Value.absent(),
+    this.sig1Nom = const Value.absent(),
+    this.sig2Titre = const Value.absent(),
+    this.sig2Nom = const Value.absent(),
+    this.sig3Titre = const Value.absent(),
+    this.sig3Nom = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttestationTemplatesCompanion.insert({
     required String id,
     required String type,
     required String bodyText,
+    this.numeroSequence = const Value.absent(),
+    this.sig1Titre = const Value.absent(),
+    this.sig1Nom = const Value.absent(),
+    this.sig2Titre = const Value.absent(),
+    this.sig2Nom = const Value.absent(),
+    this.sig3Titre = const Value.absent(),
+    this.sig3Nom = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        type = Value(type),
@@ -17858,12 +18304,26 @@ class AttestationTemplatesCompanion
     Expression<String>? id,
     Expression<String>? type,
     Expression<String>? bodyText,
+    Expression<int>? numeroSequence,
+    Expression<String>? sig1Titre,
+    Expression<String>? sig1Nom,
+    Expression<String>? sig2Titre,
+    Expression<String>? sig2Nom,
+    Expression<String>? sig3Titre,
+    Expression<String>? sig3Nom,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (type != null) 'type': type,
       if (bodyText != null) 'body_text': bodyText,
+      if (numeroSequence != null) 'numero_sequence': numeroSequence,
+      if (sig1Titre != null) 'sig1_titre': sig1Titre,
+      if (sig1Nom != null) 'sig1_nom': sig1Nom,
+      if (sig2Titre != null) 'sig2_titre': sig2Titre,
+      if (sig2Nom != null) 'sig2_nom': sig2Nom,
+      if (sig3Titre != null) 'sig3_titre': sig3Titre,
+      if (sig3Nom != null) 'sig3_nom': sig3Nom,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -17872,12 +18332,26 @@ class AttestationTemplatesCompanion
     Value<String>? id,
     Value<String>? type,
     Value<String>? bodyText,
+    Value<int>? numeroSequence,
+    Value<String?>? sig1Titre,
+    Value<String?>? sig1Nom,
+    Value<String?>? sig2Titre,
+    Value<String?>? sig2Nom,
+    Value<String?>? sig3Titre,
+    Value<String?>? sig3Nom,
     Value<int>? rowid,
   }) {
     return AttestationTemplatesCompanion(
       id: id ?? this.id,
       type: type ?? this.type,
       bodyText: bodyText ?? this.bodyText,
+      numeroSequence: numeroSequence ?? this.numeroSequence,
+      sig1Titre: sig1Titre ?? this.sig1Titre,
+      sig1Nom: sig1Nom ?? this.sig1Nom,
+      sig2Titre: sig2Titre ?? this.sig2Titre,
+      sig2Nom: sig2Nom ?? this.sig2Nom,
+      sig3Titre: sig3Titre ?? this.sig3Titre,
+      sig3Nom: sig3Nom ?? this.sig3Nom,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -17894,6 +18368,27 @@ class AttestationTemplatesCompanion
     if (bodyText.present) {
       map['body_text'] = Variable<String>(bodyText.value);
     }
+    if (numeroSequence.present) {
+      map['numero_sequence'] = Variable<int>(numeroSequence.value);
+    }
+    if (sig1Titre.present) {
+      map['sig1_titre'] = Variable<String>(sig1Titre.value);
+    }
+    if (sig1Nom.present) {
+      map['sig1_nom'] = Variable<String>(sig1Nom.value);
+    }
+    if (sig2Titre.present) {
+      map['sig2_titre'] = Variable<String>(sig2Titre.value);
+    }
+    if (sig2Nom.present) {
+      map['sig2_nom'] = Variable<String>(sig2Nom.value);
+    }
+    if (sig3Titre.present) {
+      map['sig3_titre'] = Variable<String>(sig3Titre.value);
+    }
+    if (sig3Nom.present) {
+      map['sig3_nom'] = Variable<String>(sig3Nom.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -17906,6 +18401,13 @@ class AttestationTemplatesCompanion
           ..write('id: $id, ')
           ..write('type: $type, ')
           ..write('bodyText: $bodyText, ')
+          ..write('numeroSequence: $numeroSequence, ')
+          ..write('sig1Titre: $sig1Titre, ')
+          ..write('sig1Nom: $sig1Nom, ')
+          ..write('sig2Titre: $sig2Titre, ')
+          ..write('sig2Nom: $sig2Nom, ')
+          ..write('sig3Titre: $sig3Titre, ')
+          ..write('sig3Nom: $sig3Nom, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -43986,6 +44488,9 @@ typedef $$InternshipsTableCreateCompanionBuilder =
       Value<DateTime?> endDate,
       Value<double?> monthlyFee,
       Value<bool> feePaid,
+      Value<DateTime?> birthDate,
+      Value<String?> birthPlace,
+      Value<String> civilite,
       Value<int> rowid,
     });
 typedef $$InternshipsTableUpdateCompanionBuilder =
@@ -43998,6 +44503,9 @@ typedef $$InternshipsTableUpdateCompanionBuilder =
       Value<DateTime?> endDate,
       Value<double?> monthlyFee,
       Value<bool> feePaid,
+      Value<DateTime?> birthDate,
+      Value<String?> birthPlace,
+      Value<String> civilite,
       Value<int> rowid,
     });
 
@@ -44047,6 +44555,21 @@ class $$InternshipsTableFilterComposer
 
   ColumnFilters<bool> get feePaid => $composableBuilder(
     column: $table.feePaid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get birthDate => $composableBuilder(
+    column: $table.birthDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get birthPlace => $composableBuilder(
+    column: $table.birthPlace,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get civilite => $composableBuilder(
+    column: $table.civilite,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -44099,6 +44622,21 @@ class $$InternshipsTableOrderingComposer
     column: $table.feePaid,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get birthDate => $composableBuilder(
+    column: $table.birthDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get birthPlace => $composableBuilder(
+    column: $table.birthPlace,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get civilite => $composableBuilder(
+    column: $table.civilite,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$InternshipsTableAnnotationComposer
@@ -44135,6 +44673,17 @@ class $$InternshipsTableAnnotationComposer
 
   GeneratedColumn<bool> get feePaid =>
       $composableBuilder(column: $table.feePaid, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get birthDate =>
+      $composableBuilder(column: $table.birthDate, builder: (column) => column);
+
+  GeneratedColumn<String> get birthPlace => $composableBuilder(
+    column: $table.birthPlace,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get civilite =>
+      $composableBuilder(column: $table.civilite, builder: (column) => column);
 }
 
 class $$InternshipsTableTableManager
@@ -44176,6 +44725,9 @@ class $$InternshipsTableTableManager
                 Value<DateTime?> endDate = const Value.absent(),
                 Value<double?> monthlyFee = const Value.absent(),
                 Value<bool> feePaid = const Value.absent(),
+                Value<DateTime?> birthDate = const Value.absent(),
+                Value<String?> birthPlace = const Value.absent(),
+                Value<String> civilite = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternshipsCompanion(
                 id: id,
@@ -44186,6 +44738,9 @@ class $$InternshipsTableTableManager
                 endDate: endDate,
                 monthlyFee: monthlyFee,
                 feePaid: feePaid,
+                birthDate: birthDate,
+                birthPlace: birthPlace,
+                civilite: civilite,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -44198,6 +44753,9 @@ class $$InternshipsTableTableManager
                 Value<DateTime?> endDate = const Value.absent(),
                 Value<double?> monthlyFee = const Value.absent(),
                 Value<bool> feePaid = const Value.absent(),
+                Value<DateTime?> birthDate = const Value.absent(),
+                Value<String?> birthPlace = const Value.absent(),
+                Value<String> civilite = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternshipsCompanion.insert(
                 id: id,
@@ -44208,6 +44766,9 @@ class $$InternshipsTableTableManager
                 endDate: endDate,
                 monthlyFee: monthlyFee,
                 feePaid: feePaid,
+                birthDate: birthDate,
+                birthPlace: birthPlace,
+                civilite: civilite,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -47917,6 +48478,13 @@ typedef $$AttestationTemplatesTableCreateCompanionBuilder =
       required String id,
       required String type,
       required String bodyText,
+      Value<int> numeroSequence,
+      Value<String?> sig1Titre,
+      Value<String?> sig1Nom,
+      Value<String?> sig2Titre,
+      Value<String?> sig2Nom,
+      Value<String?> sig3Titre,
+      Value<String?> sig3Nom,
       Value<int> rowid,
     });
 typedef $$AttestationTemplatesTableUpdateCompanionBuilder =
@@ -47924,6 +48492,13 @@ typedef $$AttestationTemplatesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> type,
       Value<String> bodyText,
+      Value<int> numeroSequence,
+      Value<String?> sig1Titre,
+      Value<String?> sig1Nom,
+      Value<String?> sig2Titre,
+      Value<String?> sig2Nom,
+      Value<String?> sig3Titre,
+      Value<String?> sig3Nom,
       Value<int> rowid,
     });
 
@@ -47948,6 +48523,41 @@ class $$AttestationTemplatesTableFilterComposer
 
   ColumnFilters<String> get bodyText => $composableBuilder(
     column: $table.bodyText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get numeroSequence => $composableBuilder(
+    column: $table.numeroSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig1Titre => $composableBuilder(
+    column: $table.sig1Titre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig1Nom => $composableBuilder(
+    column: $table.sig1Nom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig2Titre => $composableBuilder(
+    column: $table.sig2Titre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig2Nom => $composableBuilder(
+    column: $table.sig2Nom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig3Titre => $composableBuilder(
+    column: $table.sig3Titre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig3Nom => $composableBuilder(
+    column: $table.sig3Nom,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -47975,6 +48585,41 @@ class $$AttestationTemplatesTableOrderingComposer
     column: $table.bodyText,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get numeroSequence => $composableBuilder(
+    column: $table.numeroSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig1Titre => $composableBuilder(
+    column: $table.sig1Titre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig1Nom => $composableBuilder(
+    column: $table.sig1Nom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig2Titre => $composableBuilder(
+    column: $table.sig2Titre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig2Nom => $composableBuilder(
+    column: $table.sig2Nom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig3Titre => $composableBuilder(
+    column: $table.sig3Titre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig3Nom => $composableBuilder(
+    column: $table.sig3Nom,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AttestationTemplatesTableAnnotationComposer
@@ -47994,6 +48639,29 @@ class $$AttestationTemplatesTableAnnotationComposer
 
   GeneratedColumn<String> get bodyText =>
       $composableBuilder(column: $table.bodyText, builder: (column) => column);
+
+  GeneratedColumn<int> get numeroSequence => $composableBuilder(
+    column: $table.numeroSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sig1Titre =>
+      $composableBuilder(column: $table.sig1Titre, builder: (column) => column);
+
+  GeneratedColumn<String> get sig1Nom =>
+      $composableBuilder(column: $table.sig1Nom, builder: (column) => column);
+
+  GeneratedColumn<String> get sig2Titre =>
+      $composableBuilder(column: $table.sig2Titre, builder: (column) => column);
+
+  GeneratedColumn<String> get sig2Nom =>
+      $composableBuilder(column: $table.sig2Nom, builder: (column) => column);
+
+  GeneratedColumn<String> get sig3Titre =>
+      $composableBuilder(column: $table.sig3Titre, builder: (column) => column);
+
+  GeneratedColumn<String> get sig3Nom =>
+      $composableBuilder(column: $table.sig3Nom, builder: (column) => column);
 }
 
 class $$AttestationTemplatesTableTableManager
@@ -48042,11 +48710,25 @@ class $$AttestationTemplatesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> bodyText = const Value.absent(),
+                Value<int> numeroSequence = const Value.absent(),
+                Value<String?> sig1Titre = const Value.absent(),
+                Value<String?> sig1Nom = const Value.absent(),
+                Value<String?> sig2Titre = const Value.absent(),
+                Value<String?> sig2Nom = const Value.absent(),
+                Value<String?> sig3Titre = const Value.absent(),
+                Value<String?> sig3Nom = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttestationTemplatesCompanion(
                 id: id,
                 type: type,
                 bodyText: bodyText,
+                numeroSequence: numeroSequence,
+                sig1Titre: sig1Titre,
+                sig1Nom: sig1Nom,
+                sig2Titre: sig2Titre,
+                sig2Nom: sig2Nom,
+                sig3Titre: sig3Titre,
+                sig3Nom: sig3Nom,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -48054,11 +48736,25 @@ class $$AttestationTemplatesTableTableManager
                 required String id,
                 required String type,
                 required String bodyText,
+                Value<int> numeroSequence = const Value.absent(),
+                Value<String?> sig1Titre = const Value.absent(),
+                Value<String?> sig1Nom = const Value.absent(),
+                Value<String?> sig2Titre = const Value.absent(),
+                Value<String?> sig2Nom = const Value.absent(),
+                Value<String?> sig3Titre = const Value.absent(),
+                Value<String?> sig3Nom = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttestationTemplatesCompanion.insert(
                 id: id,
                 type: type,
                 bodyText: bodyText,
+                numeroSequence: numeroSequence,
+                sig1Titre: sig1Titre,
+                sig1Nom: sig1Nom,
+                sig2Titre: sig2Titre,
+                sig2Nom: sig2Nom,
+                sig3Titre: sig3Titre,
+                sig3Nom: sig3Nom,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

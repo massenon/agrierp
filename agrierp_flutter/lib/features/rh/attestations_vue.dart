@@ -631,6 +631,35 @@ class _AttestationsVueState extends State<AttestationsVue> {
               ),
             ],
           ),
+          // ATT-1 — civilité (M. / Mme).
+          const SizedBox(height: AgriSpacing.md),
+          Text('Civilité'.toUpperCase(), style: _etiquette),
+          const SizedBox(height: AgriSpacing.xs),
+          RadioGroup<String>(
+            groupValue: _civilite,
+            onChanged: (v) => setState(() => _civilite = v ?? 'M.'),
+            child: Row(
+              children: [
+                for (final (val, lib) in [('M.', 'M. (Monsieur)'), ('Mme', 'Mme (Madame)')])
+                  Flexible(
+                    child: InkWell(
+                      key: Key('att-civilite-$val'),
+                      onTap: () => setState(() => _civilite = val),
+                      child: Row(
+                        children: [
+                          Radio<String>(
+                            value: val,
+                            activeColor: AgriColors.brandEmerald,
+                          ),
+                          Text(lib, style: const TextStyle(fontSize: AgriTypography.xs)),
+                          const SizedBox(width: AgriSpacing.md),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           // ATT-1 — champs naissance + domaines + appréciation (stagiaire seulement).
           if (!employe) ...[
             const SizedBox(height: AgriSpacing.md),
@@ -751,6 +780,81 @@ class _AttestationsVueState extends State<AttestationsVue> {
             onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: AgriTypography.sm),
             decoration: _decor('Assiduité, rigueur, compétences acquises...'),
+          ),
+          // ATT-1 — signataires éditables par attestation.
+          const SizedBox(height: AgriSpacing.md),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: const Key('att-signataires'),
+              tilePadding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: AgriColors.outlineVariant),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              collapsedShape: RoundedRectangleBorder(
+                side: const BorderSide(color: AgriColors.outlineVariant),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              title: Text(
+                'Signataires (modifiables)'.toUpperCase(),
+                style: _etiquette,
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AgriSpacing.sm, 0, AgriSpacing.sm, AgriSpacing.sm,
+                  ),
+                  child: Column(
+                    children: [
+                      for (final (titreCtrl, nomCtrl, label) in [
+                        (_sig2TitreCtrl, _sig2NomCtrl, "Signataire 1 (Examinateur)"),
+                        (_sig3TitreCtrl, _sig3NomCtrl, "Signataire 2 (Président du Jury)"),
+                        (_sig1TitreCtrl, _sig1NomCtrl, "Signataire 3 (Directeur Général)"),
+                      ]) ...[
+                        const SizedBox(height: AgriSpacing.xs),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('$label — Titre'.toUpperCase(), style: _etiquette),
+                                  const SizedBox(height: AgriSpacing.xs),
+                                  TextField(
+                                    controller: titreCtrl,
+                                    onChanged: (_) => setState(() {}),
+                                    style: StylesChampsAgri.valeurFormulaire,
+                                    decoration: _decor('', hauteurFixe: AgriChamps.hauteurFormulaire),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: AgriSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('$label — Nom'.toUpperCase(), style: _etiquette),
+                                  const SizedBox(height: AgriSpacing.xs),
+                                  TextField(
+                                    controller: nomCtrl,
+                                    onChanged: (_) => setState(() {}),
+                                    style: StylesChampsAgri.valeurFormulaire,
+                                    decoration: _decor('', hauteurFixe: AgriChamps.hauteurFormulaire),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AgriSpacing.md),
           FilledButton.icon(
@@ -1128,7 +1232,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   x != null) ...[
                 const SizedBox(height: AgriSpacing.sm),
                 Text(
-                  "Au cours de sa formation, ${x.libelle} s'est distingué(e) "
+                  "Au cours de sa formation, ${x.libelle} s'est distingué${_civilite == 'Mme' ? 'e' : ''} "
                   'par ${_appreciation.text}.',
                   key: const Key('att-apercu-appreciation'),
                   style: const TextStyle(
@@ -1161,11 +1265,29 @@ class _AttestationsVueState extends State<AttestationsVue> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _blocSignature(_sig1Titre, _sig1Nom, _sig1Sous)),
+                  Expanded(
+                    child: _blocSignature(
+                      _sig2TitreCtrl.text.isEmpty ? _sig2Titre : _sig2TitreCtrl.text,
+                      _sig2NomCtrl.text.isEmpty ? _sig2Nom : _sig2NomCtrl.text,
+                      _sig2Sous,
+                    ),
+                  ),
                   const SizedBox(width: AgriSpacing.sm),
-                  Expanded(child: _blocSignature(_sig2Titre, _sig2Nom, _sig2Sous)),
+                  Expanded(
+                    child: _blocSignature(
+                      _sig3TitreCtrl.text.isEmpty ? _sig3Titre : _sig3TitreCtrl.text,
+                      _sig3NomCtrl.text.isEmpty ? _sig3Nom : _sig3NomCtrl.text,
+                      _sig3Sous,
+                    ),
+                  ),
                   const SizedBox(width: AgriSpacing.sm),
-                  Expanded(child: _blocSignature(_sig3Titre, _sig3Nom, _sig3Sous)),
+                  Expanded(
+                    child: _blocSignature(
+                      _sig1TitreCtrl.text.isEmpty ? _sig1Titre : _sig1TitreCtrl.text,
+                      _sig1NomCtrl.text.isEmpty ? _sig1Nom : _sig1NomCtrl.text,
+                      _sig1Sous,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1255,14 +1377,14 @@ class _AttestationsVueState extends State<AttestationsVue> {
       'employe',
       SymbolesAgri.badge,
       'Modèle - Attestation de Travail (Employé)',
-      'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]',
+      'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN], [DUREE], [CIVILITE], [TITRE_NOM], [ACCORD_E]',
     );
     final stagiaire = _carteModele(
       'stagiaire',
       SymbolesAgri.school,
       'Modèle - Attestation de Stage (Stagiaire)',
-      'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_NAISSANCE], [LIEU_NAISSANCE], '
-          '[DATE_DEBUT], [DATE_FIN]',
+      'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN], [DUREE], '
+          '[DATE_NAISSANCE], [LIEU_NAISSANCE], [CIVILITE], [TITRE_NOM], [ACCORD_E]',
     );
 
     return Column(
