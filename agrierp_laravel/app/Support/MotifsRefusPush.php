@@ -117,6 +117,23 @@ class MotifsRefusPush
     }
 
     /**
+     * Ticket VTE-1 — une vente reçue porte un client que le serveur ne connaît pas (client créé au poste mais pas encore
+     * envoyé, ou refusé par le serveur). Le refus est celui de CETTE vente seule, lisible, et RELANÇABLE : le client
+     * part avant ses ventes dans un même envoi, donc une relance après l'envoi du client passe.
+     */
+    public static function clientInconnu(): string
+    {
+        return 'Client inconnu du serveur : cette vente porte un client qui n\'a pas encore été envoyé (ou qu\'il a refusé). '
+            .'Envoyez d\'abord le client, puis relancez la vente.';
+    }
+
+    /** Ticket VTE-1 — crédit ou avance sans client : la créance (ou l'avance) n'aurait aucun propriétaire. */
+    public static function venteSansClient(string $mode): string
+    {
+        return $mode === 'avance' ? 'Une vente sur avance exige un client.' : 'Une vente à crédit exige un client.';
+    }
+
+    /**
      * Ticket 15.34 — motif de refus d'une fiche élevage « réduite » (`id`, `lot_id`, `entry_date`
      * seulement) dont l'`id` est inconnu du serveur. Le poste renvoie cette forme réduite pour ne
      * pas écraser les corrections faites sur le web ; si la fiche a disparu côté serveur, l'écrire

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
+import '../../core/erreurs/message_erreur.dart';
+import '../clients/clients_creances_repository.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -21,14 +24,15 @@ import '../../core/theme/symboles_agri.dart';
 /// exigerait une heuristique.
 ///
 /// ÉCARTS ASSUMÉS PAR RAPPORT À LA MAQUETTE :
-/// 1. **Client : « Client Anonyme » uniquement.** La table `customers` ne fait
-///    pas partie du contrat de synchronisation — le poste n'a donc aucun
-///    fichier client à proposer. Afficher une liste vide ou inventer des noms
-///    serait pire ; le champ est présent, expliqué, et désactivé.
-/// 2. **« Crédit / À terme » et « Déduire de l'avance » retirés de la liste
-///    des règlements.** Tous deux supposent un client identifié et un suivi de
-///    créance ou d'avance que le poste ne porte pas. Les laisser produirait des
-///    ventes à crédit sans débiteur — une créance envers personne.
+/// 1. 🔴→✅ **Client : le sélecteur du web, ACTIF (ticket VTE-1).** Ce champ était désactivé (« Client Anonyme uniquement,
+///    fichier client non synchronisé ») depuis le Sprint 0, quand la table `customers` ne faisait pas partie du contrat.
+///    Elle en fait partie depuis F0.55 (le poste crée et envoie ses clients) : le champ propose « Client Anonyme » puis
+///    les clients de ce poste, et « + » en crée un À LA VOLÉE (nom, téléphone — `saveNewClient()` du web). Un client
+///    créé ici, ou pas encore tiré, n'empêche aucune vente : il part AVANT elle dans l'envoi.
+/// 2. 🔴→✅ **« Crédit / À terme » est de retour (ticket VTE-1)** : il exige un client connu de ce poste (refus motivé,
+///    sous le champ et en bandeau, sinon : la créance n'aurait aucun propriétaire). Le serveur crée la créance à la
+///    synchronisation. **« Déduire de l'avance » reste retiré** : le web ne passe aucune écriture pour ce mode (écriture
+///    « non générée » signalée au Journal) et l'imputation d'une avance est un geste à part (F0.73, écran Clients).
 /// 3. « Ajouter Produit Ferme » et « Livraison concernée » non repris : le
 ///    premier crée un référentiel (le serveur fait autorité), le second dépend
 ///    d'un module de livraison absent du contrat.
@@ -63,6 +67,13 @@ class _CaisseScreenState extends State<CaisseScreen> {
   /// `null` = « Tous », le premier filtre de la maquette.
   String? _categorieChoisie;
   String _modePaiement = 'especes';
+
+  /// Ticket VTE-1 — clients de CE poste (tirés ou créés ici) et client choisi au panier (`null` = « Client Anonyme »).
+  List<Customer> _clients = const [];
+  String? _clientId;
+
+  /// Refus de la vente tenant au client (crédit sans client) : affiché SOUS le champ, comme `@error('customerId')`.
+  String? _erreurClient;
   double _remise = 0;
   double? _especesRecues;
   bool _enCours = false;
@@ -78,6 +89,8 @@ class _CaisseScreenState extends State<CaisseScreen> {
     'especes': 'Espèces',
     'mobile_money': 'Mobile Money',
     'virement': 'Virement bancaire',
+    // Ticket VTE-1 — exige un client (voir l'écart n° 2 du docblock).
+    'credit': 'Crédit / À terme',
   };
 
   double get _sousTotal => _panier.fold(0, (s, l) => s + l.montant);
@@ -94,10 +107,14 @@ class _CaisseScreenState extends State<CaisseScreen> {
   Future<void> _charger() async {
     final produits = await widget.depot.catalogue();
     final categories = await widget.depot.categories();
+    final clients = await widget.depot.clients();
     if (mounted) {
       setState(() {
         _catalogue = produits;
         _categories = categories;
+        _clients = clients;
+        // Un client archivé ou disparu depuis le choix ne reste pas sélectionné.
+        if (_clientId != null && !clients.any((c) => c.id == _clientId)) _clientId = null;
       });
     }
   }
@@ -236,12 +253,16 @@ class _CaisseScreenState extends State<CaisseScreen> {
   Future<void> _valider() async {
     if (_panier.isEmpty || _enCours) return;
 
-    setState(() => _enCours = true);
+    setState(() {
+      _enCours = true;
+      _erreurClient = null;
+    });
 
     try {
       final vente = await widget.depot.enregistrerVente(
         panier: List.of(_panier),
         modePaiement: _modePaiement,
+        clientId: _clientId,
         remise: _remise,
         especesRecues: _especesRecues,
         dateVente: _dateVente,
@@ -253,6 +274,8 @@ class _CaisseScreenState extends State<CaisseScreen> {
         _panier.clear();
         _remise = 0;
         _especesRecues = null;
+        // Comme le web (`validateSale`) : la vente suivante repart « Client Anonyme », au comptant.
+        _clientId = null;
         // Après une vente, le champ revient à aujourd'hui (comme le POS web) : une date
         // antérieure ne doit jamais « coller » à la vente suivante.
         _dateVente = widget.depot.aujourdhui();
@@ -269,9 +292,18 @@ class _CaisseScreenState extends State<CaisseScreen> {
         // F0.89 — un refus de DATE se relit aussi sous le champ.
         final refusDate = await widget.depot.refusDeDate(_dateVente);
         if (!mounted) return;
-        setState(() => _refusDate = refusDate);
+        setState(() {
+          _refusDate = refusDate;
+          // VTE-1 — un refus tenant au client se relit aussi sous le champ client.
+          _erreurClient = (e.message == motifCreditSansClient || e.message == motifCreditClientIntrouvable) ? e.message : null;
+        });
         _dire(e.message, erreur: true);
       }
+    } catch (e) {
+      // 🔴→✅ TICKET VTE-1 — AUCUN BLOCAGE SILENCIEUX. Seul `VenteRefusee` était rattrapé : toute autre erreur (base
+      // verrouillée, disque plein, donnée inattendue) remontait à Flutter sans un mot à l'écran — « le bouton ne fait rien ».
+      // Le panier est conservé, le bouton se libère (`finally`), le caissier lit pourquoi.
+      if (mounted) _dire('Vente NON enregistrée : ${messageErreur(e)} Le panier est conservé : validez à nouveau, ou prévenez le responsable.', erreur: true);
     } finally {
       if (mounted) setState(() => _enCours = false);
     }
@@ -532,17 +564,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                   ),
                 ),
                 const SizedBox(height: AgriSpacing.xs),
-                // ⚠️ Le fichier client ne fait pas partie du contrat de
-                // synchronisation : le champ est présent mais désactivé,
-                // plutôt qu'une liste vide ou des noms inventés.
-                const TextField(
-                  enabled: false,
-                  decoration: InputDecoration(
-                    hintText: 'Client Anonyme',
-                    helperText: 'Fichier client non synchronisé sur ce poste',
-                    helperStyle: TextStyle(fontSize: 9),
-                  ),
-                ),
+                _champClient(),
                 const SizedBox(height: AgriSpacing.sm),
                 _champDateVente(),
               ],
@@ -555,6 +577,99 @@ class _CaisseScreenState extends State<CaisseScreen> {
         ],
       ),
     );
+  }
+
+  /// 🔴→✅ TICKET VTE-1 — « Client » du panier : `<select wire:model="customerId">` + « + » (`openAddClientModal`) du web.
+  /// « Client Anonyme » est le premier choix et la valeur par défaut : le comptant ne l'exige jamais.
+  Widget _champClient() {
+    final choisi = _clients.where((c) => c.id == _clientId).firstOrNull;
+    final enAttente = choisi != null && choisi.syncStatus != SyncStatus.synced;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              // ⚠️ `DropdownButton` à valeur CONTRÔLÉE (et non `DropdownButtonFormField`, dont `initialValue` n'est lu qu'une
+              // fois) : le client choisi change par programme — création à la volée, remise à « Client Anonyme » après la vente.
+              child: InputDecorator(
+                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    key: const Key('client-vente'),
+                    value: _clientId,
+                    isExpanded: true,
+                    style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('Client Anonyme')),
+                      for (final c in _clients) DropdownMenuItem<String?>(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _clientId = v;
+                      _erreurClient = null;
+                    }),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: FilledButton(
+                key: const Key('ajouter-client'),
+                onPressed: _enCours ? null : _ajouterClient,
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: AgriColors.brandEmerald,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AgriRadius.lg)),
+                ),
+                child: const Icon(SymbolesAgri.person_add, size: 18),
+              ),
+            ),
+          ],
+        ),
+        if (_erreurClient != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              _erreurClient!,
+              key: const Key('client-vente-erreur'),
+              style: const TextStyle(fontSize: 10.5, color: AgriColors.errorDeep),
+            ),
+          ),
+        if (enAttente)
+          const Padding(
+            key: Key('client-vente-note'),
+            padding: EdgeInsets.only(top: 2),
+            child: Text(
+              'Client créé sur ce poste : il partira avec la vente à la prochaine synchronisation.',
+              style: TextStyle(fontSize: 9, color: AgriColors.outline),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// « + » — modale « Nouveau Client » (`modal-add-client` du web : Nom complet *, Téléphone). Le client est créé EN
+  /// ATTENTE d'envoi par l'unique écrivain du fichier client, puis choisi pour la vente.
+  Future<void> _ajouterClient() async {
+    final nouveau = await afficherModale<Customer>(
+      context: context,
+      constructeur: (_) => _DialogueClient(depot: widget.depot),
+    );
+    if (nouveau == null || !mounted) return;
+
+    final clients = await widget.depot.clients();
+    if (!mounted) return;
+    setState(() {
+      _clients = clients;
+      _clientId = nouveau.id;
+      _erreurClient = null;
+    });
   }
 
   /// 🔴→✅ TICKET F0.89 — « Date de la vente » (écart ASSUMÉ n° 4 du docblock).
@@ -870,6 +985,72 @@ class _CaisseScreenState extends State<CaisseScreen> {
     }
 
     return '${v.round() < 0 ? '-' : ''}${morceaux.join(' ')}';
+  }
+}
+
+/// Ticket VTE-1 — « Nouveau Client » (`modal-add-client` du web) : Nom complet *, Téléphone ; Annuler / Enregistrer.
+class _DialogueClient extends StatefulWidget {
+  const _DialogueClient({required this.depot});
+
+  final CaisseRepository depot;
+
+  @override
+  State<_DialogueClient> createState() => _DialogueClientState();
+}
+
+class _DialogueClientState extends State<_DialogueClient> {
+  final _nom = TextEditingController();
+  final _telephone = TextEditingController();
+  Map<String, String> _erreurs = const {};
+  bool _enCours = false;
+
+  @override
+  void dispose() {
+    _nom.dispose();
+    _telephone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enregistrer() async {
+    final fiche = FormulaireClient(nom: _nom.text, telephone: _telephone.text);
+    final erreurs = ClientsCreancesRepository.validerFiche(fiche);
+    if (erreurs.isNotEmpty) {
+      setState(() => _erreurs = erreurs);
+      return;
+    }
+
+    setState(() => _enCours = true);
+    final client = await widget.depot.creerClient(nom: _nom.text, telephone: _telephone.text);
+    if (mounted) Navigator.of(context).pop(client);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ModaleAgri(
+      titre: 'Nouveau Client',
+      largeur: LargeurModale.sm,
+      contenu: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: const Key('client-nom'),
+            controller: _nom,
+            decoration: InputDecoration(labelText: 'Nom complet *', errorText: _erreurs['nom']),
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          TextField(
+            key: const Key('client-telephone'),
+            controller: _telephone,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(labelText: 'Téléphone', errorText: _erreurs['telephone']),
+          ),
+        ],
+      ),
+      actions: [
+        BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+        BoutonModalePrimaire(key: const Key('enregistrer-client'), libelle: 'Enregistrer', onPressed: _enCours ? null : _enregistrer),
+      ],
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
+import '../clients/clients_creances_repository.dart';
 import '../elevage/fiche_journaliere_repository.dart';
 
 /// Ligne du panier de caisse.
@@ -41,6 +42,15 @@ class VenteRefusee implements Exception {
   @override
   String toString() => message;
 }
+
+/// Ticket VTE-1 — mêmes textes que `PosInterface::validateSale` (web) : un caissier lit le même refus des deux côtés.
+const motifCreditSansClient =
+    'Une vente à crédit exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».';
+
+/// Ticket VTE-1 — le client choisi n'existe pas dans ce poste (fiche archivée entre-temps, base restaurée).
+const motifCreditClientIntrouvable =
+    'Une vente à crédit exige un client connu de ce poste : le client choisi est introuvable. '
+    'Lancez une synchronisation ou créez-le avec le bouton « + ».';
 
 /// Caisse hors ligne — enregistrement local d'une vente et de ses effets.
 ///
@@ -136,6 +146,25 @@ class CaisseRepository {
   Future<({DateTime? premier, DateTime dernier})> bornesDateVente() async =>
       (premier: await _exercice.premierJour(), dernier: aujourdhui());
 
+  /// Ticket VTE-1 — les clients ACTIFS de ce poste, par nom : ceux du dernier tirage ET ceux créés ici (en attente
+  /// d'envoi). C'est la liste du sélecteur « Client » du panier (`PosInterface::getCustomersProperty`).
+  Future<List<Customer>> clients() {
+    return (_db.select(_db.customers)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+        .get();
+  }
+
+  /// Ticket VTE-1 — « + » du panier (`saveNewClient()` du web : nom, téléphone) : le client est créé À LA VOLÉE, EN ATTENTE
+  /// d'envoi. ⚠️ Le fichier client n'a qu'UN écrivain au poste ([ClientsCreancesRepository]) : la caisse lui délègue.
+  /// Le client part AVANT ses ventes dans l'envoi (`SyncEngine.ordreDuServeur` : `customers` précède `sales`).
+  Future<Customer> creerClient({required String nom, String telephone = ''}) async {
+    final client = await ClientsCreancesRepository(database: _db, deviceId: _deviceId, uuid: _uuid)
+        .creerClient(FormulaireClient(nom: nom, telephone: telephone));
+    _gestes?.signaler();
+    return client;
+  }
+
   Future<List<Product>> catalogue() {
     return (_db.select(_db.products)
           ..where((t) => t.isActive.equals(true))
@@ -201,6 +230,18 @@ class CaisseRepository {
       throw const VenteRefusee('Le panier est vide.');
     }
 
+    // 🔴→✅ TICKET VTE-1 — LE CLIENT. Au COMPTANT, jamais obligatoire : la vente s'enregistre « Client Anonyme », ou avec un
+    // client choisi même s'il n'est pas encore au serveur (créé ici, ou pas encore tiré) — il partira AVANT la vente.
+    // À CRÉDIT, un client CONNU de ce poste est exigé (comme `PosInterface::validateSale`) : sans lui la créance n'aurait
+    // aucun propriétaire. Refus motivé, avant tout effet.
+    final client = clientId == null || clientId.isEmpty
+        ? null
+        : await (_db.select(_db.customers)..where((t) => t.id.equals(clientId))).getSingleOrNull();
+    if (modePaiement == 'credit') {
+      if (clientId == null || clientId.isEmpty) throw const VenteRefusee(motifCreditSansClient);
+      if (client == null) throw const VenteRefusee(motifCreditClientIntrouvable);
+    }
+
     final saisie = maintenant();
     final jourVente = dateVente == null ? aujourdhui() : _minuit(dateVente);
     final anterieure = jourVente.isBefore(aujourdhui());
@@ -262,7 +303,9 @@ class CaisseRepository {
               syncStatus: const Value(SyncStatus.pending),
               // S-T11 : `saisie` est l'heure murale du Bénin ; `updatedAt` reste un INSTANT.
               updatedAt: HeureBenin.versInstant(saisie),
-              customerId: Value(clientId),
+              customerId: Value(clientId == null || clientId.isEmpty ? null : clientId),
+              // La vente reste nommée dans l'historique avant même son premier envoi (le tirage la renomme ensuite).
+              customerName: Value(client?.name),
               paymentMode: modePaiement,
               subtotal: Value(sousTotal),
               discount: Value(remise),

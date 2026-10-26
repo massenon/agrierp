@@ -61,6 +61,8 @@
                 </select>
                 <button type="button" wire:click="openAddClientModal" class="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-emerald text-white flex-shrink-0"><span class="material-symbols-outlined text-[18px]">person_add</span></button>
             </div>
+            {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
+            @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
             {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
                  décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
             <div>

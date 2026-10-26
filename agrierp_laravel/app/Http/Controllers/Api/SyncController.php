@@ -5101,7 +5101,16 @@ class SyncController extends Controller
                     // colonne NOT NULL : l'omettre levait une violation de
                     // contrainte, donc un 500 global.
                     'lines.*.manual_total_amount' => ['required', 'numeric', 'min:0'],
-                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                    // 🔴→✅ TICKET VTE-1 — un client inconnu du serveur est un refus LISIBLE de cette vente (relançable), pas le
+                    // « ne correspond à aucun enregistrement » générique.
+                ], array_merge(MotifsRefusPush::messages(), ['customer_id.exists' => MotifsRefusPush::clientInconnu()]), MotifsRefusPush::attributs())->validate();
+
+                // 🔴→✅ TICKET VTE-1 — CRÉDIT OU AVANCE SANS CLIENT : la créance (ou l'avance) n'aurait aucun propriétaire. Le
+                // web et le poste le refusent avant d'écrire ; un poste ancien ou un envoi fabriqué est refusé ici, vente par
+                // vente. Le comptant, lui, n'a JAMAIS besoin de client.
+                if (in_array($validated['payment_mode'], ['credit', 'avance'], true) && empty($validated['customer_id'])) {
+                    throw ValidationException::withMessages(['customer_id' => MotifsRefusPush::venteSansClient($validated['payment_mode'])]);
+                }
 
                 $this->verifierCoherenceDuTotal($saleData);
 
