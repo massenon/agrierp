@@ -348,7 +348,7 @@ void main() {
         label: 'Carburant groupe électrogène',
         category: 'Carburant',
         amount: 999999,
-        treasuryAccountId: uuid('caisse'),
+        treasuryAccountId: Value(uuid('caisse')),
       ),
     );
 
@@ -777,7 +777,7 @@ void main() {
           label: 'Charge refusée',
           category: 'Carburant',
           amount: 1234,
-          treasuryAccountId: uuid('caisse'),
+          treasuryAccountId: Value(uuid('caisse')),
         ),
       );
 

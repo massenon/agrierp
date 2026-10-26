@@ -525,7 +525,8 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: AgriSpacing.md),
                   child: Text(
-                    DepensesRepository.modesDePaiement[d.paymentMode] ?? '—',
+                    // Ticket DEP7 — `$expense->on_credit ? 'À crédit' : modes[...] ?? '—'` du Blade.
+                    d.onCredit ? 'À crédit' : (DepensesRepository.modesDePaiement[d.paymentMode] ?? '—'),
                     key: Key('depense-mode-$index'),
                     style: corps,
                   ),
@@ -623,6 +624,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
             ' · Centre de coût : ${ou(l.centreCout)}'
             ' · Fournisseur : ${ou(l.fournisseur)}'
             ' · Bénéficiaire : ${ou(l.depense.beneficiary)}'
+            ' · Règlement : ${DepensesRepository.libelleReglement(aCredit: l.depense.onCredit, statut: l.depense.status)}'
             ' · Saisie par : ${ou(l.auteur)}',
             key: Key('depense-detail-resume-$index'),
             style: const TextStyle(fontSize: 11, color: AgriColors.outline),
@@ -789,7 +791,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
     if (!mounted) return;
     ToastAgri.afficher(
       context,
-      DepensesRepository.toastArchivee,
+      d.onCredit ? DepensesRepository.toastArchiveeACredit : DepensesRepository.toastArchivee,
       type: TypeToast.avertissement,
     );
   }

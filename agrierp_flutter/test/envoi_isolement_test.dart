@@ -4,6 +4,7 @@ import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/sync/synchronisation_automatique.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -195,7 +196,7 @@ void main() {
                 label: i == fautive ? 'FAUTIVE' : 'Dépense $i',
                 category: 'Carburant',
                 amount: 1000,
-                treasuryAccountId: 'caisse',
+                treasuryAccountId: Value('caisse'),
               ),
             );
       }

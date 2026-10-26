@@ -211,7 +211,7 @@ void main() {
       expect(await db.select(db.costCenters).get(), isEmpty);
       final d = (await db.select(db.expenses).get()).single;
       expect((d.paymentMode, d.costCenterId, d.supplierId, d.beneficiary, d.createdBy, d.ecritureRefus), ('caisse', null, null, null, null, null));
-      expect(db.schemaVersion, 56, reason: 'palier DEP4 ; la fusion renumérotera si un palier manque');
+      expect(db.schemaVersion, 59, reason: 'palier DEP4 (56) puis DEP6/DEP7 (59) ; 57, 58 et 60 réservés à d\'autres chantiers');
     });
   });
 
@@ -270,6 +270,7 @@ void main() {
       date: DateTime(2026, 10, 12),
       modePaiement: 'caisse',
       compteTresorerieId: _caisse,
+      centreCoutId: centreGeneral,
       lignes: const [
         LigneSaisie(libelle: 'Provende ponte', compteChargeId: compte601, montant: '45000'),
         LigneSaisie(libelle: 'Vermifuge', compteChargeId: compte602, montant: '10000'),
@@ -338,7 +339,7 @@ void main() {
           label: 'Gasoil',
           category: '605 - Énergie',
           amount: 5000,
-          treasuryAccountId: _caisse,
+          treasuryAccountId: Value(_caisse),
         ),
       );
 
@@ -369,6 +370,7 @@ void main() {
         date: DateTime(2026, 10, 13),
         modePaiement: 'caisse',
         compteTresorerieId: _caisse,
+        centreCoutId: centreGeneral,
         idEnModification: d.id,
         lignes: const [LigneSaisie(libelle: 'Provende ponte', compteChargeId: compte601, montant: '45000')],
       );
@@ -392,7 +394,7 @@ void main() {
           label: 'Ancienne',
           category: '601 - Aliments',
           amount: 100,
-          treasuryAccountId: _caisse,
+          treasuryAccountId: Value(_caisse),
         ),
       );
       await db.into(db.expenseLines).insert(

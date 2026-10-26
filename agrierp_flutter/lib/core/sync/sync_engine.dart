@@ -4197,6 +4197,12 @@ class SyncEngine {
         l['treasury_account_id'],
         '$quoi $id : compte de trésorerie',
       );
+      // Ticket DEP7 — `on_credit` : présent, booléen (sinon refus) ; absent : serveur antérieur (payée comptant).
+      final creditBrut = l['on_credit'];
+      if (l.containsKey('on_credit') && creditBrut is! bool) {
+        throw FormatException('$quoi $id refusée : règlement illisible ($creditBrut).');
+      }
+      final aCredit = creditBrut == true;
       final actif = _actifStrict(l, '$quoi $id');
       // Ticket U14 — `status` (`payee` / `en_attente`) et `accounting_entry_id` (nul ou un identifiant). Absent : serveur
       // antérieur à U14 (défauts du schéma, resynchronisation unique quand il les servira). Présent et illisible : refus.
@@ -4215,7 +4221,8 @@ class SyncEngine {
           '$quoi $id refusée : date illisible (${l['expense_date']}).',
         );
       }
-      if (libelle == null || compte == null || compte.isEmpty) {
+      // Une dépense À CRÉDIT n'a AUCUN compte de trésorerie (elle crédite le 401) ; payée comptant, il est obligatoire.
+      if (libelle == null || (!aCredit && (compte == null || compte.isEmpty))) {
         throw FormatException(
           '$quoi $id refusée : libellé ou compte de trésorerie absent.',
         );
@@ -4250,7 +4257,8 @@ class SyncEngine {
           label: libelle,
           category: categorie ?? '',
           amount: montant,
-          treasuryAccountId: compte,
+          treasuryAccountId: Value(aCredit || compte == null || compte.isEmpty ? null : compte),
+          onCredit: l.containsKey('on_credit') ? Value(aCredit) : const Value.absent(),
           isActive: Value(actif),
           status: statut is String ? Value(statut) : const Value.absent(),
           accountingEntryId: l.containsKey('accounting_entry_id')
@@ -6838,7 +6846,8 @@ class SyncEngine {
   Map<String, dynamic> _depenseEnJson(Expense d, List<ExpenseLine> lignes) => {
     'id': d.id,
     'expense_date': _jour(d.expenseDate),
-    'treasury_account_id': d.treasuryAccountId,
+    // Ticket DEP7 — à crédit : AUCUNE trésorerie (nulle), le serveur crédite le 401 et ouvre la dette.
+    'treasury_account_id': d.onCredit ? null : d.treasuryAccountId,
     if (lignes.isEmpty) ...{
       'label': d.label,
       'category': d.category,
@@ -6848,6 +6857,9 @@ class SyncEngine {
       'cost_center_id': d.costCenterId,
       'supplier_id': d.supplierId,
       'beneficiary': d.beneficiary,
+      // Tickets DEP6 et DEP7 — la présence de `on_credit` dit au serveur que ce poste connaît le centre de coût obligatoire
+      // (un poste ancien, qui ne l'envoie pas, est accepté au centre « Général »).
+      'on_credit': d.onCredit,
       'amount': d.amount,
       'lines': [
         for (final l in lignes)

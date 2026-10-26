@@ -484,7 +484,7 @@ echo json_encode($sortie);
               label: 'Carburant',
               category: '605 - Énergie',
               amount: 5000,
-              treasuryAccountId: _uuid('t1'),
+              treasuryAccountId: Value(_uuid('t1')),
               accountingEntryId: Value(_uuid('e1')),
               syncStatus: const Value(SyncStatus.synced),
             ),

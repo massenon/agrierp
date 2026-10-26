@@ -95,11 +95,13 @@ void main() {
             label: libelle ?? 'Dépense $id',
             category: '601 - Aliments',
             amount: montant,
-            treasuryAccountId: compteId,
+            treasuryAccountId: Value(compteId),
             isActive: Value(actif),
             status: Value(statutWeb),
             accountingEntryId: Value(ecriture),
             paymentMode: Value(modePaiement),
+            // Ticket DEP6 — après la migration du serveur, toute dépense a un centre de coût (« Général » à défaut).
+            costCenterId: const Value(centreGeneral),
           ),
         );
     if (sansLigne) return;
@@ -146,6 +148,7 @@ void main() {
         libelle: 'Sac de provende ponte',
         montant: 25000,
         compteTresorerieId: compteId,
+        centreCoutId: centreGeneral,
       );
 
       expect(depense.syncStatus, SyncStatus.pending);
@@ -170,11 +173,17 @@ void main() {
         String? compte = compteId,
         String beneficiaire = '',
         List<LigneSaisie>? lignes,
+        String? centre = centreGeneral,
+        String? fournisseur,
+        bool aCredit = false,
       }) => refus(
         () => depot.enregistrer(
           date: sansDate ? null : (date ?? DateTime(2026, 8, 19)),
           modePaiement: mode,
           compteTresorerieId: compte,
+          centreCoutId: centre,
+          fournisseurId: fournisseur,
+          aCredit: aCredit,
           beneficiaire: beneficiaire,
           lignes: lignes ?? const [LigneSaisie(libelle: 'Carburant', compteChargeId: compte605, montant: '25000')],
         ),
@@ -189,6 +198,20 @@ void main() {
         'ligne.0.compte': 'Le champ compte de charge de la ligne est obligatoire.',
         'ligne.0.montant': 'Le champ montant de la ligne est obligatoire.',
       });
+      // Ticket DEP6 (DEP-Q1) — le centre de coût est OBLIGATOIRE ; un centre inconnu est refusé comme au web (`exists`).
+      expect(await saisie(centre: null), {'centre': DepensesRepository.messageCentreObligatoire});
+      expect(await saisie(centre: ''), {'centre': DepensesRepository.messageCentreObligatoire});
+      expect(await saisie(centre: 'dddddddd-0000-4000-8000-000000000000'), {
+        'centre': "La valeur sélectionnée pour le champ centre de coût n'existe pas.",
+      });
+      // Ticket DEP7 (DEP-Q3) — À CRÉDIT : un fournisseur, et ni mode ni compte de trésorerie.
+      expect(await saisie(aCredit: true, mode: null, compte: null), {
+        'fournisseur': DepensesRepository.messageCreditSansFournisseur,
+      }, reason: 'à crédit sans fournisseur : aucune dette à créer');
+      expect(await saisie(aCredit: true, fournisseur: 'ffffffff-0000-4000-8000-000000000001', mode: null, compte: null), isEmpty,
+          reason: 'à crédit : la trésorerie n est PAS demandée');
+      await db.delete(db.expenses).go();
+      await db.delete(db.expenseLines).go();
       expect(await saisie(lignes: const []), {'lignes': 'Ajoutez au moins une ligne à la dépense.'});
       expect(await saisie(lignes: [ligne(libelle: 'x' * 256)]), {
         'ligne.0.libelle': 'Le champ libellé de la ligne ne doit pas dépasser 255 caractères.',
@@ -235,7 +258,7 @@ void main() {
         date: DateTime(2026, 6, 15),
         modePaiement: 'caisse',
         compteTresorerieId: compteId,
-        centreCoutId: null,
+        centreCoutId: centreGeneral,
         beneficiaire: '  M. Dossou  ',
         lignes: const [
           LigneSaisie(libelle: 'Provende ponte', compteChargeId: compte601, montant: '45000'),
@@ -272,6 +295,7 @@ void main() {
           date: DateTime(2026, 6, 15),
           modePaiement: 'caisse',
           compteTresorerieId: compteId,
+          centreCoutId: centreGeneral,
           lignes: const [
             LigneSaisie(id: idDouble, libelle: 'A', compteChargeId: compte601, montant: '1000'),
             // Même identifiant : la clé primaire refuse la seconde ligne, APRÈS l'en-tête et la première.
@@ -291,6 +315,7 @@ void main() {
         date: DateTime(2026, 6, 15),
         modePaiement: 'caisse',
         compteTresorerieId: compteId,
+        centreCoutId: centreGeneral,
         lignes: const [
           LigneSaisie(libelle: 'A', compteChargeId: compte601, montant: '1000'),
           LigneSaisie(libelle: 'B', compteChargeId: compte605, montant: '2000'),
@@ -309,6 +334,7 @@ void main() {
           libelle: 'Sac de provende',
           montant: 25000,
           compteTresorerieId: compteId,
+          centreCoutId: centreGeneral,
         );
 
         final compte = await (db.select(
@@ -326,6 +352,7 @@ void main() {
           libelle: 'Depense $jour',
           montant: montant,
           compteTresorerieId: compteId,
+          centreCoutId: centreGeneral,
         );
       }
       await depot.enregistrerUneLigne(
@@ -333,6 +360,7 @@ void main() {
         libelle: 'Mois precedent',
         montant: 99000,
         compteTresorerieId: compteId,
+        centreCoutId: centreGeneral,
       );
 
       expect(await depot.totalDuMois(DateTime(2026, 8, 19)), 35000);
@@ -448,6 +476,7 @@ void main() {
           libelle: libelle,
           montant: montant,
           compteTresorerieId: compte,
+          centreCoutId: centreGeneral,
           modePaiement: mode,
           idEnModification: id,
         ),
@@ -476,6 +505,7 @@ void main() {
         date: DateTime(2026, 8, 3),
         modePaiement: 'banque',
         compteTresorerieId: banqueId,
+        centreCoutId: centreGeneral,
         idEnModification: id,
         lignes: [
           LigneSaisie(id: avant.id, libelle: 'Provende', compteChargeId: compte605, montant: '20000'),
@@ -510,6 +540,7 @@ void main() {
             libelle: 'X',
             montant: 25000,
             compteTresorerieId: compteId,
+            centreCoutId: centreGeneral,
             idEnModification: id,
           ),
         ),
@@ -556,6 +587,7 @@ void main() {
           libelle: 'Corrigée',
           montant: 4000,
           compteTresorerieId: compteId,
+          centreCoutId: centreGeneral,
           idEnModification: id,
         );
         final d = await lire(id);
@@ -632,8 +664,9 @@ void main() {
           'Date de la Transaction *',
           'Mode de Paiement *',
           'Compte de Trésorerie Débité *',
-          'Centre de Coût',
+          'Centre de Coût *',
           'Fournisseur',
+          'Règlement *',
           'Bénéficiaire',
           'Reçu / Facture (Photo)',
           'Lignes de la Dépense *',
@@ -741,8 +774,9 @@ void main() {
         'Date de la Transaction *',
         'Mode de Paiement *',
         'Compte de Trésorerie Débité *',
-        'Centre de Coût',
+        'Centre de Coût *',
         'Fournisseur',
+        'Règlement *',
         'Bénéficiaire',
         'Reçu / Facture (Photo)',
         'Lignes de la Dépense *',
@@ -765,7 +799,7 @@ void main() {
       final modale = File('lib/features/achats/modale_depense.dart').readAsStringSync();
       final ordrePoste = [
         for (final t in ["'Date de la Transaction *'", "'Mode de Paiement *'", "'Compte de Trésorerie Débité *'",
-          "'Centre de Coût'", "'Fournisseur'", "'Bénéficiaire'", "'Reçu / Facture (Photo)'", "'LIGNES DE LA DÉPENSE *'",
+          "'Centre de Coût *'", "'Fournisseur'", "'Règlement *'", "'Bénéficiaire'", "'Reçu / Facture (Photo)'", "'LIGNES DE LA DÉPENSE *'",
           "'Ajouter une ligne'", "'Total : ", "'Enregistrer la Dépense'"])
           modale.indexOf(t),
       ];
@@ -928,7 +962,7 @@ void main() {
       expect(positions, equals([...positions]..sort()));
       // `md:grid-cols-2` : Date et Mode côte à côte, Compte et Centre de Coût, Fournisseur et Bénéficiaire.
       expect(y(tester, 'DATE DE LA TRANSACTION *'), y(tester, 'MODE DE PAIEMENT *'));
-      expect(y(tester, 'COMPTE DE TRÉSORERIE DÉBITÉ *'), y(tester, 'CENTRE DE COÛT'));
+      expect(y(tester, 'COMPTE DE TRÉSORERIE DÉBITÉ *'), y(tester, 'CENTRE DE COÛT *'));
       expect(y(tester, 'FOURNISSEUR'), y(tester, 'BÉNÉFICIAIRE'));
     });
 
@@ -992,6 +1026,13 @@ void main() {
 
       expect(find.text('Le champ mode de paiement est obligatoire.'), findsOneWidget);
       expect(find.text('Le champ compte de trésorerie est obligatoire.'), findsOneWidget);
+      // Ticket DEP6 (DEP-Q1) — le centre de coût est obligatoire : son message sous le champ, comme `@error('costCenterId')`.
+      expect(find.text(DepensesRepository.messageCentreObligatoire), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('erreur-centre'))).dy,
+        greaterThan(tester.getTopLeft(find.byKey(const Key('liste-centre'))).dy),
+        reason: 'sous le champ',
+      );
       expect(find.text('Le champ libellé de la ligne est obligatoire.'), findsOneWidget);
       expect(find.text('Le champ compte de charge de la ligne est obligatoire.'), findsOneWidget);
       expect(find.text('Le champ montant de la ligne est obligatoire.'), findsOneWidget);
@@ -1011,6 +1052,7 @@ void main() {
       await ouvrirModale(tester);
 
       await choisir(tester, 'liste-compte', 'Caisse Physique (500 000 FCFA)');
+      await choisir(tester, 'liste-centre', 'Général');
       await tester.tap(find.byKey(const Key('bouton-ajouter-ligne')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('bouton-ajouter-ligne')));
@@ -1044,7 +1086,7 @@ void main() {
       expect(find.text('10 000 FCFA'), findsOneWidget);
       expect(
         tester.widget<Text>(find.byKey(const Key('depense-detail-resume-0'))).data,
-        'Trésorerie : Caisse Physique · Centre de coût : — · Fournisseur : — · Bénéficiaire : — · Saisie par : —',
+        'Trésorerie : Caisse Physique · Centre de coût : Général · Fournisseur : — · Bénéficiaire : — · Règlement : Payée comptant · Saisie par : —',
       );
       await tester.tap(find.byKey(const Key('depense-deplier-0')));
       await tester.pumpAndSettle();

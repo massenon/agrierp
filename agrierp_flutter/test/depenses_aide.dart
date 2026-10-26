@@ -14,8 +14,17 @@ const compte614 = '61400000-0000-4000-8000-000000000614';
 const compte628 = '62800000-0000-4000-8000-000000000628';
 const compte531 = '53100000-0000-4000-8000-000000000531';
 
-/// Insère le plan de charge du décor (idempotent).
+/// Ticket DEP6 — le CENTRE DE COÛT est obligatoire à la saisie : le centre « Général » du décor (id fixe), semé avec le plan.
+const centreGeneral = 'ce000000-0000-4000-8000-000000000001';
+
+/// Insère le plan de charge du décor et le centre de coût « Général » (idempotent).
 Future<void> semerPlanDeCharge(AppDatabase db) async {
+  await db
+      .into(db.costCenters)
+      .insert(
+        CostCentersCompanion.insert(id: centreGeneral, label: 'Général', type: 'filiere'),
+        mode: InsertMode.insertOrIgnore,
+      );
   for (final (id, code, libelle, classe) in [
     (compte601, '601', 'Achats de marchandises', 6),
     (compte602, '602', 'Produits vétérinaires', 6),
@@ -40,14 +49,16 @@ extension DepenseAUneLigne on DepensesRepository {
     required DateTime date,
     required String libelle,
     required num montant,
-    required String compteTresorerieId,
+    required String? compteTresorerieId,
     String compteChargeId = compte601,
     String modePaiement = 'caisse',
+    String? centreCoutId = centreGeneral,
     String? idEnModification,
   }) => enregistrer(
     date: date,
     modePaiement: modePaiement,
     compteTresorerieId: compteTresorerieId,
+    centreCoutId: centreCoutId,
     lignes: [LigneSaisie(libelle: libelle, compteChargeId: compteChargeId, montant: montant.round().toString())],
     idEnModification: idEnModification,
   );

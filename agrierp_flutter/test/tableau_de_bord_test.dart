@@ -193,7 +193,7 @@ void main() {
             label: libelle,
             category: 'Carburant',
             amount: montant,
-            treasuryAccountId: uuid('caisse'),
+            treasuryAccountId: Value(uuid('caisse')),
           ),
         );
   }

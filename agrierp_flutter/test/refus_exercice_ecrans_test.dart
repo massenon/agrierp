@@ -179,7 +179,7 @@ void main() {
               label: 'Facture SBEE',
               category: '601 - Aliments',
               amount: 25000,
-              treasuryAccountId: _uuid('t1'),
+              treasuryAccountId: Value(_uuid('t1')),
             ),
           );
       await afficher(tester);

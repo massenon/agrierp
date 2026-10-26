@@ -604,7 +604,7 @@ void main() {
                 label: 'Saisie du poste',
                 category: '628 - Autres charges',
                 amount: montantLocal,
-                treasuryAccountId: 'caisse-0000000000000000000000000000',
+                treasuryAccountId: Value('caisse-0000000000000000000000000000'),
               ),
             );
       }

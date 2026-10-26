@@ -159,7 +159,7 @@ Future<void> _depenseExistante(AppDatabase db, DateTime jour) => db
         label: 'Facture SBEE',
         category: 'Énergie',
         amount: 25000,
-        treasuryAccountId: _uuid('t1'),
+        treasuryAccountId: Value(_uuid('t1')),
       ),
     );
 

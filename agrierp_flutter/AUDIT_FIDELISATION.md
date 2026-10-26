@@ -1030,3 +1030,6 @@ Production (volumes, comptages `comptabilite:doublons-references` et `comptabili
 
 ### E. Reste à faire (ordre proposé)
 T2 (valider et clore) → audit T2 → T3 balance (période, ouverture/mouvements/final, carte Écart) → T4 exports PDF des 4 pages → T5/T6 selon Q1–Q3 → T7 requalification des exemptions → phase B du plan (après cabinet) → item 10 (pages sous 60 %) → ticket Laravel sur les 7 tables à 500 → mise à jour de `CLAUDE.md` « Working state » (1 552+ tests, schéma v37, Laravel 1 087+) à la clôture de T2.
+
+**DEP6–DEP9 (26/10/2026) — saisie-depenses.html : centre de coût obligatoire et dépense à crédit.** Modale du poste = Blade : « Centre de Coût * » (« -- Sélectionner -- », message sous le champ), « Règlement * » (Payée comptant / À crédit (dette fournisseur)) après « Fournisseur », ni mode ni compte à crédit, aide `data-aide-credit`, colonne Mode « À crédit », détail « Règlement : … ». Garde-fou : `depenses_a_credit_parite_test.dart` (libellés, ordre, messages, `libelleReglement` exécuté contre PHP). Drift v59. Écrans « Dettes Fournisseurs » inchangés.
+
