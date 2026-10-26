@@ -112,7 +112,7 @@ class BarreSuperieure extends StatelessWidget {
   /// Ticket H1 — « Paramètres » du menu du compte (`/parametres-hub` au web). `null` : entrée non proposée.
   final VoidCallback? onParametres;
 
-  /// Ticket VL-1 — « Verrouiller » : fonction propre au poste (le web n'a pas de verrou), avant « Déconnexion ».
+  /// Tickets VL-1 / VW — « Verrouiller » (icône `lock`), comme le menu du compte du web : avant « Déconnexion ».
   /// `null` : non proposée.
   final VoidCallback? onVerrouiller;
 

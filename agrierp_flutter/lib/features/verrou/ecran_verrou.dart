@@ -153,7 +153,8 @@ class _EcranVerrouState extends State<EcranVerrou> {
     return CadreConnexion(
       titre: 'Application verrouillée',
       sousTitre:
-          'Session de ${widget.nomUtilisateur}. Saisissez votre code PIN : aucune connexion au serveur n\'est nécessaire.',
+          'Session de ${widget.nomUtilisateur}. Saisissez votre code PIN pour reprendre votre travail. '
+          'Aucune connexion au serveur n\'est nécessaire.',
       enfants: [
         if (message != null) ...[
           KeyedSubtree(

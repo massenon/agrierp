@@ -49,8 +49,8 @@ class MonProfilScreen extends StatefulWidget {
 
   /// Ticket VL-1 — « Changer le code PIN » (verrou local) : (réussi, message). `null` : la section n'est pas montrée.
   ///
-  /// ⚠️ **FONCTION PROPRE AU POSTE** : le web n'a pas de verrou ; la section est un ajout assumé (doctrine, art. 5,
-  /// exception), qui ne remplace ni ne déplace rien du Blade.
+  /// ⚠️ **MÉCANISME PROPRE AU POSTE** : le verrou existe aussi au web (ticket VW, mot de passe du compte) ; le PIN local
+  /// est ce qui le rend possible SANS réseau, donc cette section n'a pas d'équivalent au web (doctrine § 5.6).
   final Future<(bool, String)> Function({
     required String ancien,
     required String nouveau,
@@ -61,8 +61,9 @@ class MonProfilScreen extends StatefulWidget {
   /// Ticket VL-2 — verrouillage automatique : durée d'inactivité actuelle de l'utilisateur, en minutes (`0` :
   /// jamais). `null` (ou [changerDelaiInactivite] `null`) : la rubrique n'est pas montrée.
   ///
-  /// ⚠️ **FONCTION PROPRE AU POSTE** (comme [changerPin]) : le web n'a ni verrou ni inactivité ; réglage local, jamais
-  /// synchronisé.
+  /// ⚠️ **MÊMES LIBELLÉS ET MÊMES DURÉES QUE LE WEB** (ticket VW, carte « Verrouillage automatique » de Mon Profil :
+  /// `VerrouSessionService::DUREES`, garde-fou `verrou_parite_web_test.dart`). Seul le réglage est local : jamais
+  /// synchronisé avec celui du web.
   final Future<int> Function()? delaiInactivite;
 
   /// Ticket VL-2 — enregistre la durée choisie (minutes, `0` : jamais) ; s'applique aussitôt.
@@ -687,7 +688,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
     ),
   );
 
-  /// Ticket VL-2 — « Verrouillage automatique » : durée d'inactivité avant le verrouillage (propre au poste).
+  /// Ticket VL-2 / VW — « Verrouillage automatique » : durée d'inactivité avant le verrouillage (carte du web).
   Widget _carteInactivite() => Container(
     key: const Key('carte-inactivite'),
     padding: const EdgeInsets.all(AgriSpacing.md),
@@ -712,7 +713,7 @@ class _MonProfilScreenState extends State<MonProfilScreen> {
         const SizedBox(height: AgriSpacing.xs),
         const Text(
           "Après ce délai sans toucher à la souris ni au clavier, l'application se verrouille : le code PIN est "
-          'demandé, sans réseau (propre à ce poste).',
+          'demandé, sans réseau.',
           style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
         ),
         const SizedBox(height: AgriSpacing.md),

@@ -26,7 +26,8 @@ void main() {
         .allMatches(menu)
         .map((m) => m.group(1)!.replaceAll('&amp;', '&').trim())
         .toList();
-    expect(libelles, ['Mon Profil', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Déconnexion']);
+    // Ticket VW : « Verrouiller » (verrou de session web) entre Paramètres et le séparateur de Déconnexion.
+    expect(libelles, ['Mon Profil', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Verrouiller', 'Déconnexion']);
   }, skip: sansLaravel);
 
   testWidgets('menu du compte : Paramètres puis, sous un séparateur, Déconnexion qui prévient le socle', (t) async {

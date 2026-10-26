@@ -8,9 +8,10 @@ import 'verrou_local.dart';
 
 /// Ticket VL-2 — durée d'inactivité avant le verrouillage automatique, CHOISIE PAR CHAQUE UTILISATEUR de ce poste.
 ///
-/// ⚠️ **FONCTION PROPRE AU POSTE** (exception de la doctrine § 5.6, comme le verrou VL-1) : le web n'a ni verrou
-/// ni inactivité. Le réglage reste ICI : aucune synchronisation, aucune table (pas de migration Drift) ; il est
-/// rangé au coffre du système sous `agrierp.inactivite.<id utilisateur>`, à côté du PIN qu'il accompagne.
+/// ⚠️ **VERROU PRÉSENT DES DEUX CÔTÉS** (ticket VW, 26/10/2026 : le web a le sien, réglé dans son Mon Profil par
+/// `users.verrouillage_minutes`). Mêmes choix, même défaut, mêmes libellés (garde-fou `verrou_parite_web_test.dart`).
+/// Le réglage reste ICI : aucune synchronisation, aucune table (pas de migration Drift) ; il est rangé au coffre du
+/// système sous `agrierp.inactivite.<id utilisateur>`, à côté du PIN qu'il accompagne.
 ///
 /// Valeur en minutes ; `0` = « Jamais ». Défaut : **5 minutes** (décision consignée, plan VL-2).
 class ReglageInactivite {

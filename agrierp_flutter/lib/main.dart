@@ -394,7 +394,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// (null/false/true) : rien n'est montré avant que l'état soit connu.
   final VerrouLocal _verrou = VerrouLocal();
 
-  /// Ticket VL-2 — verrouillage automatique après inactivité (propre au poste). Une synchronisation en cours n'est
+  /// Ticket VL-2 — verrouillage automatique après inactivité (le web a le même, ticket VW ; ici par PIN local). Une synchronisation en cours n'est
   /// pas interrompue : le verrou attend sa fin.
   late final VerrouInactivite _inactivite = VerrouInactivite(
     reglage: ReglageInactivite(),
@@ -1036,7 +1036,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
           changer: widget.auth.utilisateur == null
               ? null
               : widget.auth.changerMotDePasse,
-          // Ticket VL-1 — fonction propre au poste : le web n'a pas de verrou.
+          // Tickets VL-1 / VW — verrou présent des DEUX côtés (web : mot de passe ; poste : PIN local), mêmes libellés.
           delaiInactivite: widget.inactivite == null || widget.auth.utilisateur == null
               ? null
               : () => widget.inactivite!.reglage.lire(widget.auth.utilisateur!.id),

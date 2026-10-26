@@ -30,9 +30,9 @@ class TentativeVerrou {
 
 /// Ticket VL-1 — verrou local : code PIN de 4 à 6 chiffres vérifié SANS réseau, à chaque lancement.
 ///
-/// ⚠️ **FONCTION PROPRE AU POSTE** (exception justifiée à la fidélité web ↔ poste, doctrine art. 5) : le web n'a pas
-/// de verrou, il s'appuie sur la session du serveur ; le poste, lui, reprend sa session hors ligne et doit donc se
-/// protéger d'un tiers devant la machine.
+/// ⚠️ **MÉCANISME PROPRE AU POSTE** : depuis le ticket VW (26/10/2026) le web a aussi un verrou de session, dont le secret
+/// est le mot de passe du compte, vérifié par le serveur. Le poste reprend sa session HORS LIGNE : il ne peut pas
+/// interroger le serveur, d'où ce PIN local. Textes communs aux deux côtés : `verrou_parite_web_test.dart`.
 ///
 /// ⚠️ **LE PIN N'EST JAMAIS STOCKÉ.** On range, par utilisateur, un sel aléatoire de 16 octets et l'empreinte
 /// PBKDF2-HMAC-SHA256 (au moins 100 000 itérations) ; la comparaison se fait à temps constant. Le tout dans le

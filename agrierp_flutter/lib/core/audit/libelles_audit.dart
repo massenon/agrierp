@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 139 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 148 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -22,6 +22,10 @@ class LibellesAudit {
     'login.failed': 'Tentative de connexion échouée',
     'login.locked': 'Compte verrouillé (trop de tentatives)',
     'logout': 'Déconnexion',
+    'session.verrouillee': 'Session verrouillée',
+    'session.deverrouillee': 'Session déverrouillée',
+    'session.deverrouillage_echec': 'Échec de déverrouillage de la session',
+    'session.deconnexion_apres_echecs': 'Déconnexion après trop d\'échecs de déverrouillage',
     'password.updated': 'Mot de passe modifié',
     'user.created': 'Utilisateur créé',
     'user.updated': 'Utilisateur modifié',
@@ -51,6 +55,9 @@ class LibellesAudit {
     'quote.accepted': 'Devis accepté',
     'quote.refused': 'Devis refusé',
     'quote.archived': 'Devis archivé',
+    'corbeille.restored': 'Élément restauré de la corbeille',
+    'corbeille.deleted': 'Élément supprimé définitivement',
+    'quote.invoiced': 'Devis converti en facture',
     'customer.created': 'Client créé',
     'customer.updated': 'Client modifié',
     'customer.archived': 'Client archivé',
@@ -90,6 +97,8 @@ class LibellesAudit {
     'livestock_lot.updated': 'Lot modifié',
     'livestock_lot.archived': 'Lot archivé',
     'livestock_entry.recorded': 'Sujet enregistré',
+    'livestock_entry.updated': 'Sujet modifié',
+    'livestock_entry.archived': 'Sujet archivé',
     'livestock_daily_entry.saved': 'Saisie quotidienne enregistrée',
     'reproduction_event.created': 'Événement de reproduction créé',
     'reproduction_event.palpation_recorded': 'Palpation enregistrée',
