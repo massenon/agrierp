@@ -455,6 +455,22 @@ class PosInterface extends Component
             return;
         }
 
+        // 🔴→✅ TICKET VTE-1 — CRÉDIT OU AVANCE SANS CLIENT : REFUS MOTIVÉ, AVANT TOUT EFFET. Sans client, la créance (ou
+        // l'avance à déduire) n'aurait aucun propriétaire : la vente passait, l'écriture débitait 411, mais aucune ligne
+        // `receivables` n'existait (`$sale->customer_id` nul, plus bas) — une créance envers personne. Le comptant, lui,
+        // s'enregistre TOUJOURS sans client (« Client Anonyme »). Le poste applique la même règle, avec le même message.
+        if (in_array($this->paymentMode, ['credit', 'avance'], true) && $this->customerId === '') {
+            $message = $this->paymentMode === 'avance'
+                ? 'Une vente sur avance exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».'
+                : 'Une vente à crédit exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».';
+            $this->addError('customerId', $message);
+            $this->dispatch('toast', message: $message, type: 'error');
+
+            return;
+        }
+
+        $this->resetErrorBag('customerId');
+
         // 🔴→✅ TICKET 15.30 — UNE DATE PASSÉE EST JUGÉE AVANT TOUT EFFET (futur, mois clôturé,
         // exercice absent ou clos) par le MÊME point de passage que la synchronisation.
         [$soldAt, $refus] = $this->evaluerDateVente();
