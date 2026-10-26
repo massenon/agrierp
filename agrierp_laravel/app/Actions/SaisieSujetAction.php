@@ -99,7 +99,7 @@ class SaisieSujetAction
             $this->enregistrerLaFiche($fiche);
 
             $this->terminer($lot, [$date]);
-            AuditLog::record('livestock_entry.archived', 'elevage');
+            AuditLog::record('livestock_entry.archived', 'elevage', null, $fiche);
         });
     }
 

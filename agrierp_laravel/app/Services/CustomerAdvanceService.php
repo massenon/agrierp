@@ -295,6 +295,6 @@ class CustomerAdvanceService
         }
 
         $avance->update(['is_active' => false]);
-        AuditLog::record('customer_advance.archived', 'ventes');
+        AuditLog::record('customer_advance.archived', 'ventes', null, $avance);
     }
 }

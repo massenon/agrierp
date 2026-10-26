@@ -85,7 +85,7 @@ class CustomerCatalogService
         AuditLog::record('customer.updated', 'ventes');
 
         if ($etaitActif && ! $client->is_active) {
-            AuditLog::record('customer.archived', 'ventes');
+            AuditLog::record('customer.archived', 'ventes', null, $client);
         }
 
         return $client->fresh();
@@ -95,7 +95,7 @@ class CustomerCatalogService
     {
         $client->update(['is_active' => false]);
 
-        AuditLog::record('customer.archived', 'ventes');
+        AuditLog::record('customer.archived', 'ventes', null, $client);
     }
 
     /**
@@ -106,10 +106,15 @@ class CustomerCatalogService
      */
     public function archiverPlusieurs(array $ids): int
     {
-        $nombre = Customer::whereIn('id', $ids)->where('is_active', true)->count();
+        $aArchiver = Customer::whereIn('id', $ids)->where('is_active', true)->get();
+        $nombre = $aArchiver->count();
         Customer::whereIn('id', $ids)->update(['is_active' => false]);
 
         AuditLog::record('customer.bulk_archived', 'ventes');
+        // Ticket ARC-Q2 — la Corbeille doit savoir qui a archivé CHAQUE client : une ligne d'audit par client réellement archivé.
+        foreach ($aArchiver as $client) {
+            AuditLog::record('customer.archived', 'ventes', null, $client);
+        }
 
         return $nombre;
     }

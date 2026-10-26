@@ -119,7 +119,7 @@ class CourrierService
 
         $courrier->update(['is_active' => false]);
 
-        AuditLog::record('mail.archived', 'administration');
+        AuditLog::record('mail.archived', 'administration', null, $courrier);
 
         return true;
     }

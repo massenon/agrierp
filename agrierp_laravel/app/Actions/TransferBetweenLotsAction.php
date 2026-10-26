@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockTransfer;
@@ -103,6 +104,7 @@ class TransferBetweenLotsAction
 
             $transfert->is_active = false;
             $transfert->save();
+            AuditLog::record('livestock_transfer.cancelled', 'elevage', null, $transfert);
 
             if ($transfert->constitution && $cible->lot_source_id === $source->id
                 && ! LivestockTransfer::actifs()->where('target_lot_id', $cible->id)->where('constitution', true)->exists()) {

@@ -229,6 +229,7 @@ class TransfertsBandes extends Component
         $this->authorize('manage-elevage');
 
         try {
+            // L'audit `livestock_transfer.cancelled` (avec le transfert visé) est écrit par l'action : le poste la rejoue aussi.
             app(TransferBetweenLotsAction::class)->annuler(LivestockTransfer::findOrFail($id));
         } catch (ValidationException $e) {
             $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
@@ -236,7 +237,6 @@ class TransfertsBandes extends Component
             return;
         }
 
-        AuditLog::record('livestock_transfer.cancelled', 'elevage');
         $this->dispatch('toast', message: 'Transfert annulé : les deux bandes sont recalculées.', type: 'warning');
     }
 

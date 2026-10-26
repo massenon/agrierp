@@ -96,7 +96,7 @@ class ArchiveDocumentService
 
         $document->update(['is_active' => false]);
 
-        AuditLog::record('archived_document.deleted', 'administration');
+        AuditLog::record('archived_document.deleted', 'administration', null, $document);
 
         return true;
     }

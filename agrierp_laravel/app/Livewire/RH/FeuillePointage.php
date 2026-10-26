@@ -153,8 +153,9 @@ class FeuillePointage extends Component
     public function archiveRecord(string $id): void
     {
         $this->authorize('manage-rh');
-        AttendanceRecord::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('attendance.archived', 'rh');
+        $pointage = AttendanceRecord::findOrFail($id);
+        $pointage->update(['is_active' => false]);
+        AuditLog::record('attendance.archived', 'rh', null, $pointage);
         $this->dispatch('toast', message: 'Pointage archivé avec succès.', type: 'warning');
     }
 

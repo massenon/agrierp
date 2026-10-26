@@ -241,7 +241,7 @@ class CorbeilleService
     /**
      * Tout ce qui est archivé, du plus récemment archivé au plus ancien, avec ce que chaque ligne permet.
      *
-     * @return array<int, array{type: string, libelle_type: string, module: string, id: string, titre: string, detail: string, archive_le: ?CarbonInterface, restaurable: bool, motif_restauration: ?string, supprimable: bool, motif_suppression: ?string}>
+     * @return array<int, array{type: string, libelle_type: string, module: string, id: string, titre: string, detail: string, archive_le: ?CarbonInterface, archive_par: ?string, restaurable: bool, motif_restauration: ?string, supprimable: bool, motif_suppression: ?string}>
      */
     public function elements(?string $typeFiltre = null, ?string $recherche = null, ?string $du = null, ?string $au = null): array
     {
@@ -254,6 +254,7 @@ class CorbeilleService
 
             $lignes = $this->archives($definition)->orderByDesc('updated_at')->get();
             $motifsSuppression = $this->motifsDeSuppression($type, $definition, $lignes);
+            $auteurs = $this->auteursDArchivage($definition, $lignes);
 
             foreach ($lignes as $ligne) {
                 $motifRestauration = $this->motifDeRestauration($type, $definition, $ligne);
@@ -268,6 +269,8 @@ class CorbeilleService
                     'titre' => $this->titre($definition, $ligne),
                     'detail' => isset($definition['detail']) ? (string) $definition['detail']($ligne) : '',
                     'archive_le' => $ligne->updated_at,
+                    // Ticket ARC-Q2 — QUI a archivé ; `null` quand on ne le sait pas (archivage d'avant l'audit de l'entité).
+                    'archive_par' => $auteurs[(string) $ligne->getKey()] ?? null,
                     'restaurable' => $motifRestauration === null,
                     'motif_restauration' => $motifRestauration,
                     'supprimable' => $motifSuppression === null,
@@ -580,6 +583,45 @@ class CorbeilleService
         }
 
         return $this->pointsDeReference[$memo] = array_values($points);
+    }
+
+    /**
+     * Ticket ARC-Q2 — « Archivé par » : le nom de l'utilisateur du DERNIER audit d'archivage de chaque ligne
+     * (`audit_logs.entity_type` / `entity_id`, famille `AuditLog::ACTIONS_ARCHIVAGE`). Une ligne sans audit d'entité
+     * (archivée avant cette migration), ou dont l'auteur n'existe plus, est ABSENTE du résultat : l'écran affiche
+     * « — », jamais un nom deviné.
+     *
+     * @param  Collection<int, Model>  $lignes
+     * @return array<string, string>  id de l'élément => nom de l'auteur
+     */
+    private function auteursDArchivage(array $definition, Collection $lignes): array
+    {
+        if ($lignes->isEmpty()) {
+            return [];
+        }
+
+        $type = $lignes->first()->getMorphClass();
+        $ids = $lignes->map(fn ($l) => (string) $l->getKey())->all();
+        $auteurs = [];
+
+        foreach (array_chunk($ids, 500) as $paquet) {
+            $audits = AuditLog::query()
+                ->where('entity_type', $type)
+                ->whereIn('entity_id', $paquet)
+                ->whereIn('action', AuditLog::ACTIONS_ARCHIVAGE)
+                ->with('user:id,name')
+                ->orderByDesc('created_at')
+                ->get();
+
+            foreach ($audits as $audit) {
+                // Le premier audit rencontré est le plus récent : on ne le remplace pas (même s'il n'a plus d'auteur).
+                if (! array_key_exists($audit->entity_id, $auteurs)) {
+                    $auteurs[$audit->entity_id] = $audit->user?->name;
+                }
+            }
+        }
+
+        return array_filter($auteurs, fn ($nom) => $nom !== null && trim($nom) !== '');
     }
 
     /** La requête des lignes ARCHIVÉES d'un type. */

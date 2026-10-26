@@ -208,8 +208,9 @@ class PlanComptable extends Component
             return;
         }
 
-        ChartOfAccount::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('chart_of_account.archived', 'comptabilite');
+        $compte = ChartOfAccount::findOrFail($id);
+        $compte->update(['is_active' => false]);
+        AuditLog::record('chart_of_account.archived', 'comptabilite', null, $compte);
         $this->dispatch('toast', message: 'Compte archivé avec succès.', type: 'warning');
     }
 

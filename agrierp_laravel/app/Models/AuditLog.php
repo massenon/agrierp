@@ -35,6 +35,8 @@ class AuditLog extends Model
         'user_id',
         'action',
         'module',
+        'entity_type',
+        'entity_id',
         'ip_address',
     ];
 
@@ -50,12 +52,33 @@ class AuditLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    public static function record(string $action, ?string $module = null, ?string $userId = null): self
+    /**
+     * Les actions qui ARCHIVENT un enregistrement (ou l'annulent : une vente, un transfert). La Corbeille lit le
+     * dernier audit de cette famille pour dire « Archivé par » (ticket ARC-Q2). Toute NOUVELLE clé d'archivage doit
+     * être ajoutée ici ET passer l'enregistrement visé à `record()` — `CorbeilleArchiveParTest` le prouve par type.
+     */
+    public const ACTIONS_ARCHIVAGE = [
+        'customer.archived', 'supplier.archived', 'product.archived', 'expense.archived', 'livestock_lot.archived',
+        'livestock_entry.archived', 'veterinary_record.archived', 'feed_ration_standard.archived', 'feed_type.archived',
+        'prophylaxis_schedule.archived', 'internship_absence.archived', 'administrative_document.archived',
+        'archived_document.deleted', 'mail.archived', 'chart_of_account.archived', 'accounting_entry.archived',
+        'quote.archived', 'customer_advance.archived', 'employee.archived', 'attendance.archived', 'sale.cancelled',
+        'livestock_transfer.cancelled',
+    ];
+
+    /**
+     * Journalise une action. `$entite` (ticket ARC-Q2) : l'enregistrement VISÉ — son type et sa clé sont retenus pour
+     * que l'on sache, plus tard, qui a fait quoi SUR CET enregistrement. Facultatif : les appels existants, qui n'ont
+     * pas d'enregistrement à désigner, ne changent pas.
+     */
+    public static function record(string $action, ?string $module = null, ?string $userId = null, ?Model $entite = null): self
     {
         return static::create([
             'user_id' => $userId ?? auth()->id(),
             'action' => $action,
             'module' => $module,
+            'entity_type' => $entite?->getMorphClass(),
+            'entity_id' => $entite !== null ? (string) $entite->getKey() : null,
             'ip_address' => request()?->ip(),
         ]);
     }

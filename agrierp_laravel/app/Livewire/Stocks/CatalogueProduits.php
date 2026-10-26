@@ -79,7 +79,7 @@ class CatalogueProduits extends Component
         $product = Product::findOrFail($id);
         $product->update(['is_active' => false]);
 
-        AuditLog::record('product.archived', 'stocks');
+        AuditLog::record('product.archived', 'stocks', null, $product);
 
         $this->dispatch('toast', message: "{$product->name} archivé avec succès.", type: 'warning');
     }

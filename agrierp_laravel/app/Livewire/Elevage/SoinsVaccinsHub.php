@@ -227,8 +227,9 @@ class SoinsVaccinsHub extends Component
     {
         $this->authorize('manage-elevage');
 
-        VeterinaryRecord::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('veterinary_record.archived', 'elevage');
+        $soin = VeterinaryRecord::findOrFail($id);
+        $soin->update(['is_active' => false]);
+        AuditLog::record('veterinary_record.archived', 'elevage', null, $soin);
         $this->dispatch('toast', message: 'Fiche archivée avec succès.', type: 'warning');
     }
 

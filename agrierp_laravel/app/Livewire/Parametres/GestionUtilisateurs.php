@@ -205,7 +205,7 @@ class GestionUtilisateurs extends Component
         $utilisateur->update(['is_active' => false]);
         // Ticket S3 — les jetons de ses postes sont révoqués : la désactivation vaut aussi hors du web.
         $utilisateur->tokens()->delete();
-        AuditLog::record('user.archived', 'parametres');
+        AuditLog::record('user.archived', 'parametres', null, $utilisateur);
         $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
     }
 

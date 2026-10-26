@@ -1405,6 +1405,8 @@ class SyncController extends Controller
                     'module' => $e['module'],
                     // Heure murale du serveur (le jour d'archivage du web), jamais convertie.
                     'archive_le' => $e['archive_le']?->format('Y-m-d H:i:s'),
+                    // Ticket ARC-Q2 — le nom de qui a archivé ; `null` si inconnu (archivage antérieur à l'audit de l'entité).
+                    'archive_par' => $e['archive_par'],
                     'restaurable' => $e['restaurable'],
                     'motif_restauration' => $e['motif_restauration'],
                     'supprimable' => $e['supprimable'],
@@ -5354,7 +5356,7 @@ class SyncController extends Controller
 
                     if (array_key_exists('is_active', $v) && ! filter_var($v['is_active'], FILTER_VALIDATE_BOOLEAN) && $existant->is_active) {
                         $existant->update(['is_active' => false]);
-                        AuditLog::record('veterinary_record.archived', 'elevage');
+                        AuditLog::record('veterinary_record.archived', 'elevage', null, $existant);
                     }
                     $accepted[] = $v['id'];
 
@@ -5388,7 +5390,7 @@ class SyncController extends Controller
                 );
                 if ($archive) {
                     $cree->update(['is_active' => false]);
-                    AuditLog::record('veterinary_record.archived', 'elevage');
+                    AuditLog::record('veterinary_record.archived', 'elevage', null, $cree);
                 }
 
                 $accepted[] = $validated['id'];

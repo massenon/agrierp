@@ -174,8 +174,9 @@ class ParametresElevage extends Component
         // référentiel y est REMPLACÉ), et la provende cessait d'être calculée
         // pour cette catégorie sans que rien ne l'explique. Restaurable depuis
         // Paramètres > Restauration.
-        FeedRationStandard::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('feed_ration_standard.archived', 'elevage');
+        $ration = FeedRationStandard::findOrFail($id);
+        $ration->update(['is_active' => false]);
+        AuditLog::record('feed_ration_standard.archived', 'elevage', null, $ration);
         $this->dispatch('toast', message: 'Paramètre archivé — restaurable depuis Paramètres > Restauration.', type: 'warning');
     }
 
@@ -242,8 +243,9 @@ class ParametresElevage extends Component
 
         // 🔴→✅ TICKET 14.55 — un protocole sanitaire effacé ne se
         // retrouve pas : archivé, il reste restaurable.
-        ProphylaxisScheduleStandard::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('prophylaxis_schedule.archived', 'elevage');
+        $protocole = ProphylaxisScheduleStandard::findOrFail($id);
+        $protocole->update(['is_active' => false]);
+        AuditLog::record('prophylaxis_schedule.archived', 'elevage', null, $protocole);
         $this->dispatch('toast', message: 'Paramètre archivé — restaurable depuis Paramètres > Restauration.', type: 'warning');
     }
 
@@ -310,8 +312,9 @@ class ParametresElevage extends Component
         $this->authorize('manage-elevage');
 
         // 🔴→✅ TICKET 14.55 — archivage logique, comme partout ailleurs.
-        FeedType::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('feed_type.archived', 'elevage');
+        $provende = FeedType::findOrFail($id);
+        $provende->update(['is_active' => false]);
+        AuditLog::record('feed_type.archived', 'elevage', null, $provende);
         $this->dispatch('toast', message: 'Paramètre archivé — restaurable depuis Paramètres > Restauration.', type: 'warning');
     }
 
