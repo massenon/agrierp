@@ -679,3 +679,14 @@ Le web, lui, n'avait pas de défaut (`ModulesActifs::toggleModule()` écrit `mod
 
 **Décision à confirmer par le client.** Seul l'administrateur (`manage-modules`) peut basculer un module, au poste comme au web ; un autre compte voit sa bascule refusée avec son motif (jamais perdue).
 **Non vérifié :** poste Windows réel ; essai à plusieurs postes (`outils/essai_multipostes.sh`, MariaDB).
+
+## Sprint POP — « Rappels du jour » : fenêtre à l'ouverture du web et du poste (demande du client du 26/10/2026, PRD `docs/prd/popup-rappels.md`)
+
+> « Quand on ouvre chaque fois le poste ou le web, la notification popup doit se déclencher pour afficher les rappels VMS, soins et vaccinations. » Web maître, poste identique. **Aucune migration Drift** (le palier 62 reste libre).
+
+### POP1 🔧 Web : `RappelsDuJourService` (règle R-RAPPELS-01), composant `Shared\RappelsDuJour`, ouverture à la connexion et une fois par session de navigateur, « Ne plus afficher aujourd'hui »
+### POP2 🔧 Poste : `RappelsDuJourRepository` (calcul local, mêmes sources et même tri), préférence du jour au coffre, fenêtre
+### POP3 🔧 Poste : déclenchement par `PorteSession` (lancement et connexion, pas les déverrouillages), droits, silence sur erreur
+### POP4 🔧 Parité Blade ↔ Dart des libellés, parité exécutée contre le PHP du serveur, docs (AUDIT, CLAUDE.md)
+
+**Questions au client (non tranchées) :** POP-Q1 infirmerie sans date prévue (recommandé : pas de rappel) · POP-Q2 « vaccin à renouveler » = barème prophylactique · POP-Q3 fenêtre à chaque déverrouillage (recommandé : non) · POP-Q4 rémanences hors horizon N.
