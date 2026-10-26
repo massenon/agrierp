@@ -261,6 +261,10 @@
     </button>
 
     <x-pwa-install />
+    {{-- Ticket POP1 — fenêtre « Rappels du jour » à l'ouverture, pour qui voit Soins et vaccins (view-elevage). --}}
+    @can('view-elevage')
+        <livewire:shared.rappels-du-jour />
+    @endcan
     <x-toast-container />
     <x-flash-toast />
 </div>

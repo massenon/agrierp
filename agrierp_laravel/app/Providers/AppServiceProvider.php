@@ -48,6 +48,10 @@ class AppServiceProvider extends ServiceProvider
         // : les phrases viennent de `lang/fr/validation.php`, mais Laravel y collait « today ».
         DatesValidationFr::enregistrer();
 
+        // Ticket POP1 — chaque CONNEXION (mot de passe ou jeton « se souvenir de moi ») redemande la fenêtre « Rappels du
+        // jour » : le drapeau est consommé par sa première ouverture (`Livewire\Shared\RappelsDuJour::ouvrir`).
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, fn () => session()->put('rappels_forcer', true));
+
         // Ticket EX7 (EF10) — `@lectureSeule`, juste après `<button` d'un bouton de saisie (Nouveau, Modifier, Archiver,
         // Enregistrer) : grisé, désactivé, motif « Exercice 2026 clôturé — lecture seule » en info-bulle quand
         // l'exercice affiché est clos. Le motif est lu UNE fois par rendu de vue (`$__motifExercice`), pas à chaque
