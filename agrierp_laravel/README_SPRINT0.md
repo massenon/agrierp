@@ -22472,3 +22472,10 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 
 
 **Mesures finales (après fusion de la branche principale, Drift 60)** : suite Laravel **2 446 verts** (25 722 assertions) ; poste `flutter analyze` propre, **3 512 verts, 17 sautés, 0 rouge** (`flutter test --concurrency=3`).
+
+
+### Ticket VTE-1 — le client à la caisse (26/10/2026) : crédit exige un client, client inconnu = refus motivé relançable
+
+**Contrat modifié.** `POST /api/sync/push`, clé `sales` : (1) `payment_mode` `credit` ou `avance` SANS `customer_id` est refusé pour cette vente seule (`rejected[].reason` = « Une vente à crédit exige un client. » / « Une vente sur avance exige un client. ») — avant, la vente passait avec une écriture D 411 et aucune créance ; (2) un `customer_id` inconnu du serveur est refusé avec « Client inconnu du serveur : cette vente porte un client qui n'a pas encore été envoyé (ou qu'il a refusé). Envoyez d'abord le client, puis relancez la vente. » au lieu du texte générique (`MotifsRefusPush::clientInconnu()`). Aucune clé ajoutée ; l'ordre de traitement (clients avant ventes) est inchangé. Le comptant sans client est et reste accepté.
+**Web.** `PosInterface::validateSale` : crédit ou avance sans client → erreur `customerId` (sous le champ) et toast, rien d'écrit. **Poste.** Champ « Client » actif, « Crédit / À terme » rétabli, « + » (client créé à la volée), erreurs inattendues dites à l'écran — voir `docs/PLAN_FINALISATION.md`, VTE-1.
+**Tests.** `VenteSansClientTest` (8). Poste : `vente_client_poste_test`, `ventes_sans_client_parite_php_test` (VRAI `SyncController`).
