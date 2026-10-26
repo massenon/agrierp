@@ -460,6 +460,8 @@ class DepensesRepository {
     String beneficiaire = '',
     String? idEnModification,
     bool aCredit = false,
+    /// Ticket #48 — chemin absolu local du justificatif copié. Jamais synchronisé.
+    String? receiptLocalPath,
   }) async {
     final existante = idEnModification == null
         ? null
@@ -566,6 +568,7 @@ class DepensesRepository {
             isActive: const Value(true),
             syncStatus: const Value(SyncStatus.pending),
             updatedAt: Value(maintenant),
+            receiptLocalPath: Value(receiptLocalPath),
           ),
         );
         await ecrireLesLignes(existante.id);
@@ -604,6 +607,7 @@ class DepensesRepository {
               onCredit: Value(credit),
               status: Value(credit ? 'en_attente' : 'payee'),
               createdBy: Value(_auteurId?.call()),
+              receiptLocalPath: Value(receiptLocalPath),
             ),
           );
       await ecrireLesLignes(id);

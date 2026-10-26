@@ -1339,6 +1339,10 @@ class Purchases extends Table with SyncColumns {
   /// Part déjà payée devenue créance sur le fournisseur (`supplier_credit`, compte 409).
   /// Nulle tant que le serveur ne l'a pas servie : le poste ne la calcule pas.
   RealColumn get supplierCredit => real().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  TextColumn get receiptLocalPath => text().nullable()();
 }
 
 /// Pointage d'un employé, saisi au poste ou reçu du serveur.
@@ -1745,6 +1749,10 @@ class Expenses extends Table with SyncColumns {
   /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
   /// Effacé quand la saisie est acquittée ou corrigée. Le web n'a pas de file d'envoi : il dit le refus tout de suite.
   TextColumn get ecritureRefus => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  TextColumn get receiptLocalPath => text().nullable()();
 }
 
 /// Ticket DEP4 — une LIGNE de dépense : libellé, COMPTE DE CHARGE du plan (classe 6) et montant. Elle suit son en-tête :
@@ -1956,7 +1964,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 63;
+  int get schemaVersion => 64;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2542,6 +2550,10 @@ class AppDatabase extends _$AppDatabase {
       // enjambe sans les supposer.
       if (from < 63) {
         await _ajouterColonneSiAbsente(m, corbeilleElements, corbeilleElements.archivePar);
+      }
+      if (from < 64) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.receiptLocalPath);
+        await _ajouterColonneSiAbsente(m, purchases, purchases.receiptLocalPath);
       }
     },
   );

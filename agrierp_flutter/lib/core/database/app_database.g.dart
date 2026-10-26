@@ -21888,6 +21888,17 @@ class $PurchasesTable extends Purchases
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receiptLocalPathMeta = const VerificationMeta(
+    'receiptLocalPath',
+  );
+  @override
+  late final GeneratedColumn<String> receiptLocalPath = GeneratedColumn<String>(
+    'receipt_local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -21905,6 +21916,7 @@ class $PurchasesTable extends Purchases
     purchaseDate,
     returnedAt,
     supplierCredit,
+    receiptLocalPath,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -22031,6 +22043,15 @@ class $PurchasesTable extends Purchases
         ),
       );
     }
+    if (data.containsKey('receipt_local_path')) {
+      context.handle(
+        _receiptLocalPathMeta,
+        receiptLocalPath.isAcceptableOrUnknown(
+          data['receipt_local_path']!,
+          _receiptLocalPathMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -22102,6 +22123,10 @@ class $PurchasesTable extends Purchases
         DriftSqlType.double,
         data['${effectivePrefix}supplier_credit'],
       ),
+      receiptLocalPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_local_path'],
+      ),
     );
   }
 
@@ -22143,6 +22168,10 @@ class Purchase extends DataClass implements Insertable<Purchase> {
   /// Part déjà payée devenue créance sur le fournisseur (`supplier_credit`, compte 409).
   /// Nulle tant que le serveur ne l'a pas servie : le poste ne la calcule pas.
   final double? supplierCredit;
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  final String? receiptLocalPath;
   const Purchase({
     required this.id,
     required this.deviceId,
@@ -22159,6 +22188,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     required this.purchaseDate,
     this.returnedAt,
     this.supplierCredit,
+    this.receiptLocalPath,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -22192,6 +22222,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     if (!nullToAbsent || supplierCredit != null) {
       map['supplier_credit'] = Variable<double>(supplierCredit);
     }
+    if (!nullToAbsent || receiptLocalPath != null) {
+      map['receipt_local_path'] = Variable<String>(receiptLocalPath);
+    }
     return map;
   }
 
@@ -22222,6 +22255,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       supplierCredit: supplierCredit == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierCredit),
+      receiptLocalPath: receiptLocalPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptLocalPath),
     );
   }
 
@@ -22250,6 +22286,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       purchaseDate: serializer.fromJson<DateTime>(json['purchaseDate']),
       returnedAt: serializer.fromJson<DateTime?>(json['returnedAt']),
       supplierCredit: serializer.fromJson<double?>(json['supplierCredit']),
+      receiptLocalPath: serializer.fromJson<String?>(json['receiptLocalPath']),
     );
   }
   @override
@@ -22273,6 +22310,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       'purchaseDate': serializer.toJson<DateTime>(purchaseDate),
       'returnedAt': serializer.toJson<DateTime?>(returnedAt),
       'supplierCredit': serializer.toJson<double?>(supplierCredit),
+      'receiptLocalPath': serializer.toJson<String?>(receiptLocalPath),
     };
   }
 
@@ -22292,6 +22330,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     DateTime? purchaseDate,
     Value<DateTime?> returnedAt = const Value.absent(),
     Value<double?> supplierCredit = const Value.absent(),
+    Value<String?> receiptLocalPath = const Value.absent(),
   }) => Purchase(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -22314,6 +22353,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     supplierCredit: supplierCredit.present
         ? supplierCredit.value
         : this.supplierCredit,
+    receiptLocalPath: receiptLocalPath.present
+        ? receiptLocalPath.value
+        : this.receiptLocalPath,
   );
   Purchase copyWithCompanion(PurchasesCompanion data) {
     return Purchase(
@@ -22352,6 +22394,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       supplierCredit: data.supplierCredit.present
           ? data.supplierCredit.value
           : this.supplierCredit,
+      receiptLocalPath: data.receiptLocalPath.present
+          ? data.receiptLocalPath.value
+          : this.receiptLocalPath,
     );
   }
 
@@ -22372,7 +22417,8 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           ..write('hasDebt: $hasDebt, ')
           ..write('purchaseDate: $purchaseDate, ')
           ..write('returnedAt: $returnedAt, ')
-          ..write('supplierCredit: $supplierCredit')
+          ..write('supplierCredit: $supplierCredit, ')
+          ..write('receiptLocalPath: $receiptLocalPath')
           ..write(')'))
         .toString();
   }
@@ -22394,6 +22440,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     purchaseDate,
     returnedAt,
     supplierCredit,
+    receiptLocalPath,
   );
   @override
   bool operator ==(Object other) =>
@@ -22413,7 +22460,8 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           other.hasDebt == this.hasDebt &&
           other.purchaseDate == this.purchaseDate &&
           other.returnedAt == this.returnedAt &&
-          other.supplierCredit == this.supplierCredit);
+          other.supplierCredit == this.supplierCredit &&
+          other.receiptLocalPath == this.receiptLocalPath);
 }
 
 class PurchasesCompanion extends UpdateCompanion<Purchase> {
@@ -22432,6 +22480,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
   final Value<DateTime> purchaseDate;
   final Value<DateTime?> returnedAt;
   final Value<double?> supplierCredit;
+  final Value<String?> receiptLocalPath;
   final Value<int> rowid;
   const PurchasesCompanion({
     this.id = const Value.absent(),
@@ -22449,6 +22498,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     this.purchaseDate = const Value.absent(),
     this.returnedAt = const Value.absent(),
     this.supplierCredit = const Value.absent(),
+    this.receiptLocalPath = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PurchasesCompanion.insert({
@@ -22467,6 +22517,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     required DateTime purchaseDate,
     this.returnedAt = const Value.absent(),
     this.supplierCredit = const Value.absent(),
+    this.receiptLocalPath = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -22491,6 +22542,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Expression<DateTime>? purchaseDate,
     Expression<DateTime>? returnedAt,
     Expression<double>? supplierCredit,
+    Expression<String>? receiptLocalPath,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -22509,6 +22561,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       if (purchaseDate != null) 'purchase_date': purchaseDate,
       if (returnedAt != null) 'returned_at': returnedAt,
       if (supplierCredit != null) 'supplier_credit': supplierCredit,
+      if (receiptLocalPath != null) 'receipt_local_path': receiptLocalPath,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -22529,6 +22582,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Value<DateTime>? purchaseDate,
     Value<DateTime?>? returnedAt,
     Value<double?>? supplierCredit,
+    Value<String?>? receiptLocalPath,
     Value<int>? rowid,
   }) {
     return PurchasesCompanion(
@@ -22547,6 +22601,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       purchaseDate: purchaseDate ?? this.purchaseDate,
       returnedAt: returnedAt ?? this.returnedAt,
       supplierCredit: supplierCredit ?? this.supplierCredit,
+      receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -22601,6 +22656,9 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     if (supplierCredit.present) {
       map['supplier_credit'] = Variable<double>(supplierCredit.value);
     }
+    if (receiptLocalPath.present) {
+      map['receipt_local_path'] = Variable<String>(receiptLocalPath.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -22625,6 +22683,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
           ..write('purchaseDate: $purchaseDate, ')
           ..write('returnedAt: $returnedAt, ')
           ..write('supplierCredit: $supplierCredit, ')
+          ..write('receiptLocalPath: $receiptLocalPath, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -35183,6 +35242,17 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receiptLocalPathMeta = const VerificationMeta(
+    'receiptLocalPath',
+  );
+  @override
+  late final GeneratedColumn<String> receiptLocalPath = GeneratedColumn<String>(
+    'receipt_local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -35204,6 +35274,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     createdBy,
     onCredit,
     ecritureRefus,
+    receiptLocalPath,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -35357,6 +35428,15 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         ),
       );
     }
+    if (data.containsKey('receipt_local_path')) {
+      context.handle(
+        _receiptLocalPathMeta,
+        receiptLocalPath.isAcceptableOrUnknown(
+          data['receipt_local_path']!,
+          _receiptLocalPathMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -35444,6 +35524,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}ecriture_refus'],
       ),
+      receiptLocalPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_local_path'],
+      ),
     );
   }
 
@@ -35509,6 +35593,10 @@ class Expense extends DataClass implements Insertable<Expense> {
   /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
   /// Effacé quand la saisie est acquittée ou corrigée. Le web n'a pas de file d'envoi : il dit le refus tout de suite.
   final String? ecritureRefus;
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  final String? receiptLocalPath;
   const Expense({
     required this.id,
     required this.deviceId,
@@ -35529,6 +35617,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     this.createdBy,
     required this.onCredit,
     this.ecritureRefus,
+    this.receiptLocalPath,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -35572,6 +35661,9 @@ class Expense extends DataClass implements Insertable<Expense> {
     if (!nullToAbsent || ecritureRefus != null) {
       map['ecriture_refus'] = Variable<String>(ecritureRefus);
     }
+    if (!nullToAbsent || receiptLocalPath != null) {
+      map['receipt_local_path'] = Variable<String>(receiptLocalPath);
+    }
     return map;
   }
 
@@ -35612,6 +35704,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       ecritureRefus: ecritureRefus == null && nullToAbsent
           ? const Value.absent()
           : Value(ecritureRefus),
+      receiptLocalPath: receiptLocalPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptLocalPath),
     );
   }
 
@@ -35646,6 +35741,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       createdBy: serializer.fromJson<String?>(json['createdBy']),
       onCredit: serializer.fromJson<bool>(json['onCredit']),
       ecritureRefus: serializer.fromJson<String?>(json['ecritureRefus']),
+      receiptLocalPath: serializer.fromJson<String?>(json['receiptLocalPath']),
     );
   }
   @override
@@ -35673,6 +35769,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       'createdBy': serializer.toJson<String?>(createdBy),
       'onCredit': serializer.toJson<bool>(onCredit),
       'ecritureRefus': serializer.toJson<String?>(ecritureRefus),
+      'receiptLocalPath': serializer.toJson<String?>(receiptLocalPath),
     };
   }
 
@@ -35696,6 +35793,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     Value<String?> createdBy = const Value.absent(),
     bool? onCredit,
     Value<String?> ecritureRefus = const Value.absent(),
+    Value<String?> receiptLocalPath = const Value.absent(),
   }) => Expense(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -35722,6 +35820,9 @@ class Expense extends DataClass implements Insertable<Expense> {
     ecritureRefus: ecritureRefus.present
         ? ecritureRefus.value
         : this.ecritureRefus,
+    receiptLocalPath: receiptLocalPath.present
+        ? receiptLocalPath.value
+        : this.receiptLocalPath,
   );
   Expense copyWithCompanion(ExpensesCompanion data) {
     return Expense(
@@ -35762,6 +35863,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       ecritureRefus: data.ecritureRefus.present
           ? data.ecritureRefus.value
           : this.ecritureRefus,
+      receiptLocalPath: data.receiptLocalPath.present
+          ? data.receiptLocalPath.value
+          : this.receiptLocalPath,
     );
   }
 
@@ -35786,7 +35890,8 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('beneficiary: $beneficiary, ')
           ..write('createdBy: $createdBy, ')
           ..write('onCredit: $onCredit, ')
-          ..write('ecritureRefus: $ecritureRefus')
+          ..write('ecritureRefus: $ecritureRefus, ')
+          ..write('receiptLocalPath: $receiptLocalPath')
           ..write(')'))
         .toString();
   }
@@ -35812,6 +35917,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     createdBy,
     onCredit,
     ecritureRefus,
+    receiptLocalPath,
   );
   @override
   bool operator ==(Object other) =>
@@ -35835,7 +35941,8 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.beneficiary == this.beneficiary &&
           other.createdBy == this.createdBy &&
           other.onCredit == this.onCredit &&
-          other.ecritureRefus == this.ecritureRefus);
+          other.ecritureRefus == this.ecritureRefus &&
+          other.receiptLocalPath == this.receiptLocalPath);
 }
 
 class ExpensesCompanion extends UpdateCompanion<Expense> {
@@ -35858,6 +35965,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<String?> createdBy;
   final Value<bool> onCredit;
   final Value<String?> ecritureRefus;
+  final Value<String?> receiptLocalPath;
   final Value<int> rowid;
   const ExpensesCompanion({
     this.id = const Value.absent(),
@@ -35879,6 +35987,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.createdBy = const Value.absent(),
     this.onCredit = const Value.absent(),
     this.ecritureRefus = const Value.absent(),
+    this.receiptLocalPath = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ExpensesCompanion.insert({
@@ -35901,6 +36010,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.createdBy = const Value.absent(),
     this.onCredit = const Value.absent(),
     this.ecritureRefus = const Value.absent(),
+    this.receiptLocalPath = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -35929,6 +36039,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<String>? createdBy,
     Expression<bool>? onCredit,
     Expression<String>? ecritureRefus,
+    Expression<String>? receiptLocalPath,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -35951,6 +36062,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (createdBy != null) 'created_by': createdBy,
       if (onCredit != null) 'on_credit': onCredit,
       if (ecritureRefus != null) 'ecriture_refus': ecritureRefus,
+      if (receiptLocalPath != null) 'receipt_local_path': receiptLocalPath,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -35975,6 +36087,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<String?>? createdBy,
     Value<bool>? onCredit,
     Value<String?>? ecritureRefus,
+    Value<String?>? receiptLocalPath,
     Value<int>? rowid,
   }) {
     return ExpensesCompanion(
@@ -35997,6 +36110,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       createdBy: createdBy ?? this.createdBy,
       onCredit: onCredit ?? this.onCredit,
       ecritureRefus: ecritureRefus ?? this.ecritureRefus,
+      receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -36063,6 +36177,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (ecritureRefus.present) {
       map['ecriture_refus'] = Variable<String>(ecritureRefus.value);
     }
+    if (receiptLocalPath.present) {
+      map['receipt_local_path'] = Variable<String>(receiptLocalPath.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -36091,6 +36208,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('createdBy: $createdBy, ')
           ..write('onCredit: $onCredit, ')
           ..write('ecritureRefus: $ecritureRefus, ')
+          ..write('receiptLocalPath: $receiptLocalPath, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -49910,6 +50028,7 @@ typedef $$PurchasesTableCreateCompanionBuilder =
       required DateTime purchaseDate,
       Value<DateTime?> returnedAt,
       Value<double?> supplierCredit,
+      Value<String?> receiptLocalPath,
       Value<int> rowid,
     });
 typedef $$PurchasesTableUpdateCompanionBuilder =
@@ -49929,6 +50048,7 @@ typedef $$PurchasesTableUpdateCompanionBuilder =
       Value<DateTime> purchaseDate,
       Value<DateTime?> returnedAt,
       Value<double?> supplierCredit,
+      Value<String?> receiptLocalPath,
       Value<int> rowid,
     });
 
@@ -50016,6 +50136,11 @@ class $$PurchasesTableFilterComposer
     column: $table.supplierCredit,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$PurchasesTableOrderingComposer
@@ -50101,6 +50226,11 @@ class $$PurchasesTableOrderingComposer
     column: $table.supplierCredit,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PurchasesTableAnnotationComposer
@@ -50177,6 +50307,11 @@ class $$PurchasesTableAnnotationComposer
     column: $table.supplierCredit,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => column,
+  );
 }
 
 class $$PurchasesTableTableManager
@@ -50222,6 +50357,7 @@ class $$PurchasesTableTableManager
                 Value<DateTime> purchaseDate = const Value.absent(),
                 Value<DateTime?> returnedAt = const Value.absent(),
                 Value<double?> supplierCredit = const Value.absent(),
+                Value<String?> receiptLocalPath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchasesCompanion(
                 id: id,
@@ -50239,6 +50375,7 @@ class $$PurchasesTableTableManager
                 purchaseDate: purchaseDate,
                 returnedAt: returnedAt,
                 supplierCredit: supplierCredit,
+                receiptLocalPath: receiptLocalPath,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -50258,6 +50395,7 @@ class $$PurchasesTableTableManager
                 required DateTime purchaseDate,
                 Value<DateTime?> returnedAt = const Value.absent(),
                 Value<double?> supplierCredit = const Value.absent(),
+                Value<String?> receiptLocalPath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchasesCompanion.insert(
                 id: id,
@@ -50275,6 +50413,7 @@ class $$PurchasesTableTableManager
                 purchaseDate: purchaseDate,
                 returnedAt: returnedAt,
                 supplierCredit: supplierCredit,
+                receiptLocalPath: receiptLocalPath,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -56159,6 +56298,7 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       Value<String?> createdBy,
       Value<bool> onCredit,
       Value<String?> ecritureRefus,
+      Value<String?> receiptLocalPath,
       Value<int> rowid,
     });
 typedef $$ExpensesTableUpdateCompanionBuilder =
@@ -56182,6 +56322,7 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<String?> createdBy,
       Value<bool> onCredit,
       Value<String?> ecritureRefus,
+      Value<String?> receiptLocalPath,
       Value<int> rowid,
     });
 
@@ -56289,6 +56430,11 @@ class $$ExpensesTableFilterComposer
     column: $table.ecritureRefus,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$ExpensesTableOrderingComposer
@@ -56394,6 +56540,11 @@ class $$ExpensesTableOrderingComposer
     column: $table.ecritureRefus,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ExpensesTableAnnotationComposer
@@ -56480,6 +56631,11 @@ class $$ExpensesTableAnnotationComposer
     column: $table.ecritureRefus,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get receiptLocalPath => $composableBuilder(
+    column: $table.receiptLocalPath,
+    builder: (column) => column,
+  );
 }
 
 class $$ExpensesTableTableManager
@@ -56529,6 +56685,7 @@ class $$ExpensesTableTableManager
                 Value<String?> createdBy = const Value.absent(),
                 Value<bool> onCredit = const Value.absent(),
                 Value<String?> ecritureRefus = const Value.absent(),
+                Value<String?> receiptLocalPath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion(
                 id: id,
@@ -56550,6 +56707,7 @@ class $$ExpensesTableTableManager
                 createdBy: createdBy,
                 onCredit: onCredit,
                 ecritureRefus: ecritureRefus,
+                receiptLocalPath: receiptLocalPath,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -56573,6 +56731,7 @@ class $$ExpensesTableTableManager
                 Value<String?> createdBy = const Value.absent(),
                 Value<bool> onCredit = const Value.absent(),
                 Value<String?> ecritureRefus = const Value.absent(),
+                Value<String?> receiptLocalPath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion.insert(
                 id: id,
@@ -56594,6 +56753,7 @@ class $$ExpensesTableTableManager
                 createdBy: createdBy,
                 onCredit: onCredit,
                 ecritureRefus: ecritureRefus,
+                receiptLocalPath: receiptLocalPath,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

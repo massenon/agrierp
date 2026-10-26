@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
@@ -95,6 +100,9 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   bool _enregistrement = false;
   Map<String, String> _erreurs = const {};
 
+  /// Ticket #48 — chemin absolu du justificatif copié localement (jamais synchronisé).
+  String? _receiptLocalPath;
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +117,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
       _centreId = e.costCenterId;
       _fournisseurId = e.supplierId;
       _beneficiaire.text = e.beneficiary ?? '';
+      _receiptLocalPath = e.receiptLocalPath;
       for (final l in d.lignes) {
         _lignes.add(
           _LigneEdition(
@@ -418,32 +427,99 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   );
 
   /// « Reçu / Facture (Photo) » — cadre pointillé du Blade (`border-2 border-dashed … h-11`).
-  Widget _recu() => _champ(
-    'Reçu / Facture (Photo)',
-    Container(
-      constraints: const BoxConstraints(minHeight: 44),
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
-      decoration: BoxDecoration(
-        border: Border.all(color: AgriColors.outlineVariant, width: 2),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(SymbolesAgri.add_a_photo, size: 18, color: AgriColors.outlineVariant),
-          SizedBox(width: AgriSpacing.xs),
-          Flexible(
-            child: Text(
-              'Le justificatif ne peut pas encore être transmis depuis le poste : la synchronisation ne '
-              "transporte aucun fichier. Joignez-le depuis l'application web.",
-              key: Key('depense-recu-limite'),
-              style: TextStyle(fontSize: 10, color: AgriColors.outline),
+  /// Ticket #48 : le fichier est copié localement (jamais synchronisé) ; ouvrez-le depuis la visionneuse Windows.
+  Widget _recu() {
+    final chemin = _receiptLocalPath;
+    return _champ(
+      'Reçu / Facture (Photo)',
+      chemin == null
+          ? InkWell(
+              key: const Key('depense-recu-choisir'),
+              onTap: _choisirJustificatif,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AgriColors.outlineVariant, width: 2),
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(SymbolesAgri.add_a_photo, size: 18, color: AgriColors.outlineVariant),
+                    SizedBox(width: AgriSpacing.xs),
+                    Flexible(
+                      child: Text(
+                        'Joindre un justificatif (JPG, PNG, PDF) — copié localement, non synchronisé',
+                        key: Key('depense-recu-limite'),
+                        style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AgriSpacing.md,
+                vertical: AgriSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                border: Border.all(color: AgriColors.brandEmerald, width: 1),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+                color: AgriColors.brandEmerald.withValues(alpha: 0.05),
+              ),
+              child: Row(
+                children: [
+                  const Icon(SymbolesAgri.description, size: 18, color: AgriColors.brandEmerald),
+                  const SizedBox(width: AgriSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      p.basename(chemin),
+                      key: const Key('depense-recu-nom'),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AgriColors.brandForest,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('depense-recu-retirer'),
+                    icon: const Icon(SymbolesAgri.close, size: 16, color: AgriColors.outline),
+                    onPressed: () => setState(() => _receiptLocalPath = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Retirer le justificatif',
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
+    );
+  }
+
+  /// Ouvre le sélecteur de fichier et copie le fichier choisi dans le dossier local de l'application.
+  Future<void> _choisirJustificatif() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      dialogTitle: 'Joindre un justificatif',
+    );
+    if (result == null || result.files.isEmpty) return;
+    final source = File(result.files.first.path!);
+    final dir = await getApplicationDocumentsDirectory();
+    final nomFichier = '${DateTime.now().millisecondsSinceEpoch}_${result.files.first.name}';
+    final destination = File('${dir.path}/agrierp_justificatifs/$nomFichier');
+    await destination.parent.create(recursive: true);
+    final copie = await source.copy(destination.path);
+    if (!mounted) return;
+    setState(() => _receiptLocalPath = copie.path);
+  }
 
   // ── Lignes ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -581,6 +657,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
         lignes: [for (final l in _lignes) l.enSaisie()],
         idEnModification: widget.enModification?.depense.id,
         aCredit: _aCredit,
+        receiptLocalPath: _receiptLocalPath,
       );
     } on DepenseRefusee catch (e) {
       if (!mounted) return;
