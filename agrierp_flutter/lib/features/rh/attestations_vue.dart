@@ -109,6 +109,8 @@ class _AttestationsVueState extends State<AttestationsVue> {
   List<PersonneAttestation> _personnes = const [];
   String _personneId = '';
   String _contrat = AttestationsRepository.contrats.first;
+  // ATT-1 — civilité (M. / Mme), conditionne l'accord grammatical.
+  String _civilite = 'M.';
 
   final _debut = TextEditingController();
   final _fin = TextEditingController();
@@ -118,6 +120,14 @@ class _AttestationsVueState extends State<AttestationsVue> {
   final _naissance = TextEditingController();
   final _lieuNaissance = TextEditingController();
   final Set<String> _domaines = {};
+
+  // ATT-1 — signataires éditables par attestation (pré-remplis depuis le modèle).
+  final _sig1TitreCtrl = TextEditingController(text: _sig1Titre);
+  final _sig1NomCtrl = TextEditingController(text: _sig1Nom);
+  final _sig2TitreCtrl = TextEditingController(text: _sig2Titre);
+  final _sig2NomCtrl = TextEditingController(text: _sig2Nom);
+  final _sig3TitreCtrl = TextEditingController(text: _sig3Titre);
+  final _sig3NomCtrl = TextEditingController(text: _sig3Nom);
 
   final _modeles = <String, TextEditingController>{
     'employe': TextEditingController(),
@@ -149,6 +159,12 @@ class _AttestationsVueState extends State<AttestationsVue> {
     _appreciation.dispose();
     _naissance.dispose();
     _lieuNaissance.dispose();
+    _sig1TitreCtrl.dispose();
+    _sig1NomCtrl.dispose();
+    _sig2TitreCtrl.dispose();
+    _sig2NomCtrl.dispose();
+    _sig3TitreCtrl.dispose();
+    _sig3NomCtrl.dispose();
     for (final c in _modeles.values) {
       c.dispose();
     }
@@ -218,10 +234,11 @@ class _AttestationsVueState extends State<AttestationsVue> {
       // Comme la page web : la personne préremplit les dates.
       _debut.text = _ecrire(x.debut);
       _fin.text = _ecrire(x.fin);
-      // ATT-1 : pré-remplissage de la naissance pour un stagiaire.
+      // ATT-1 : pré-remplissage de la naissance et civilité pour un stagiaire.
       if (_type == 'stagiaire') {
         _naissance.text = _ecrire(x.birthDate);
         _lieuNaissance.text = x.birthPlace ?? '';
+        _civilite = x.civilite;
       }
     });
   }
@@ -272,6 +289,13 @@ class _AttestationsVueState extends State<AttestationsVue> {
         appreciation: _appreciation.text,
         birthDate: _lire(_naissance.text),
         birthPlace: _lieuNaissance.text,
+        civilite: _civilite,
+        sig1Titre: _sig1TitreCtrl.text.trim().isEmpty ? null : _sig1TitreCtrl.text,
+        sig1Nom: _sig1NomCtrl.text.trim().isEmpty ? null : _sig1NomCtrl.text,
+        sig2Titre: _sig2TitreCtrl.text.trim().isEmpty ? null : _sig2TitreCtrl.text,
+        sig2Nom: _sig2NomCtrl.text.trim().isEmpty ? null : _sig2NomCtrl.text,
+        sig3Titre: _sig3TitreCtrl.text.trim().isEmpty ? null : _sig3TitreCtrl.text,
+        sig3Nom: _sig3NomCtrl.text.trim().isEmpty ? null : _sig3NomCtrl.text,
       );
       final chemin = await widget.enregistrer(pdf);
       if (!mounted) return;
@@ -941,6 +965,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
         fin: _lire(_fin.text),
         birthDate: _lire(_naissance.text),
         birthPlace: _lieuNaissance.text,
+        civilite: _civilite,
       );
     }
 

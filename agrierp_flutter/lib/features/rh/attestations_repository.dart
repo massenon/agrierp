@@ -51,6 +51,13 @@ class ClientAttestations {
     String appreciation = '',
     DateTime? birthDate,
     String birthPlace = '',
+    String civilite = 'M.',
+    String? sig1Titre,
+    String? sig1Nom,
+    String? sig2Titre,
+    String? sig2Nom,
+    String? sig3Titre,
+    String? sig3Nom,
   }) async {
     try {
       final reponse = await _client.post<List<int>>(
@@ -62,12 +69,17 @@ class ClientAttestations {
           'start_date': ?_jour(debut),
           'end_date': ?_jour(fin),
           if (note.trim().isNotEmpty) 'note': note,
-          if (type == 'stagiaire' && domaines.isNotEmpty) 'domaines': domaines,
-          if (type == 'stagiaire' && appreciation.trim().isNotEmpty)
-            'appreciation': appreciation,
-          if (type == 'stagiaire' && birthDate != null) 'birth_date': _jour(birthDate),
-          if (type == 'stagiaire' && birthPlace.trim().isNotEmpty)
-            'birth_place': birthPlace,
+          if (domaines.isNotEmpty) 'domaines': domaines,
+          if (appreciation.trim().isNotEmpty) 'appreciation': appreciation,
+          if (birthDate != null) 'birth_date': _jour(birthDate),
+          if (birthPlace.trim().isNotEmpty) 'birth_place': birthPlace,
+          'civilite': civilite,
+          if (sig1Titre != null) 'sig1_titre': sig1Titre,
+          if (sig1Nom != null) 'sig1_nom': sig1Nom,
+          if (sig2Titre != null) 'sig2_titre': sig2Titre,
+          if (sig2Nom != null) 'sig2_nom': sig2Nom,
+          if (sig3Titre != null) 'sig3_titre': sig3Titre,
+          if (sig3Nom != null) 'sig3_nom': sig3Nom,
         },
         options: Options(responseType: ResponseType.bytes),
       );
@@ -179,6 +191,7 @@ class PersonneAttestation {
     required this.fin,
     this.birthDate,
     this.birthPlace,
+    this.civilite = 'M.',
   });
 
   final String id;
@@ -202,6 +215,9 @@ class PersonneAttestation {
 
   /// Lieu de naissance du stagiaire (ATT-1).
   final String? birthPlace;
+
+  /// Civilité (M. / Mme) — conditionne l'accord grammatical dans l'attestation.
+  final String civilite;
 
   /// « AGOSSOU Jean » — l'ordre de la page web (`last_name first_name`).
   String get libelle => '$nom $prenom';
@@ -261,6 +277,7 @@ class AttestationsRepository {
           fin: s.endDate,
           birthDate: s.birthDate,
           birthPlace: s.birthPlace,
+          civilite: s.civilite,
         ),
     ];
   }
@@ -298,7 +315,12 @@ class AttestationsRepository {
     DateTime? fin,
     DateTime? birthDate,
     String birthPlace = '',
+    String civilite = 'M.',
   }) {
+    final accordE = civilite == 'Mme' ? 'e' : '';
+    final titreNom = civilite == 'Mme'
+        ? 'Madame ${personne.libelle}'
+        : 'Monsieur ${personne.libelle}';
     final remplacements = type == 'employe'
         ? {
             '[NOM]': personne.libelle,
@@ -306,6 +328,9 @@ class AttestationsRepository {
             '[CONTRAT]': contrat,
             '[DATE_DEBUT]': _date(debut) ?? '',
             '[DATE_FIN]': _date(fin) ?? 'ce jour',
+            '[CIVILITE]': civilite,
+            '[TITRE_NOM]': titreNom,
+            '[ACCORD_E]': accordE,
           }
         : {
             '[NOM]': personne.libelle,
@@ -315,6 +340,9 @@ class AttestationsRepository {
             '[DATE_FIN]': _date(fin) ?? 'ce jour',
             '[DATE_NAISSANCE]': _date(birthDate) ?? '',
             '[LIEU_NAISSANCE]': birthPlace,
+            '[CIVILITE]': civilite,
+            '[TITRE_NOM]': titreNom,
+            '[ACCORD_E]': accordE,
           };
 
     var texte = modele;
@@ -340,6 +368,13 @@ class AttestationsRepository {
     String appreciation = '',
     DateTime? birthDate,
     String birthPlace = '',
+    String civilite = 'M.',
+    String? sig1Titre,
+    String? sig1Nom,
+    String? sig2Titre,
+    String? sig2Nom,
+    String? sig3Titre,
+    String? sig3Nom,
   }) async => _client().generer(
     type: type,
     personneId: personne.id,
@@ -351,6 +386,13 @@ class AttestationsRepository {
     appreciation: appreciation,
     birthDate: birthDate,
     birthPlace: birthPlace,
+    civilite: civilite,
+    sig1Titre: sig1Titre,
+    sig1Nom: sig1Nom,
+    sig2Titre: sig2Titre,
+    sig2Nom: sig2Nom,
+    sig3Titre: sig3Titre,
+    sig3Nom: sig3Nom,
   );
 
   /// Enregistre un modèle : le serveur d'abord, la base locale ensuite.
