@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 
@@ -371,40 +372,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
             ),
           )
-        : SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 960,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in _colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(
-                        libelle.toUpperCase(),
-                        textAlign: libelle == 'Actions'
-                            ? TextAlign.end
-                            : TextAlign.start,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: AgriTypography.gras,
-                          color: AgriColors.outline,
+        : LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(960, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in _colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(
+                          libelle.toUpperCase(),
+                          textAlign: libelle == 'Actions'
+                              ? TextAlign.end
+                              : TextAlign.start,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: AgriTypography.gras,
+                            color: AgriColors.outline,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            for (var i = 0; i < lignes.length; i++) _ligne(i, lignes[i]),
-          ],
+              for (var i = 0; i < lignes.length; i++) _ligne(i, lignes[i]),
+            ],
+          ),
         ),
       ),
     ),

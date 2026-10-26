@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
@@ -659,42 +661,44 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(libelle.toUpperCase(), style: _enteteColonne),
-                    ),
-                ],
-              ),
-            ),
-            if (lignes.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(AgriSpacing.lg),
-                child: Text(
-                  vide,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontStyle: FontStyle.italic,
-                    color: AgriColors.outline,
-                  ),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(libelle.toUpperCase(), style: _enteteColonne),
+                      ),
+                  ],
                 ),
               ),
-            ...lignes,
-          ],
+              if (lignes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AgriSpacing.lg),
+                  child: Text(
+                    vide,
+                    style: const TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontStyle: FontStyle.italic,
+                      color: AgriColors.outline,
+                    ),
+                  ),
+                ),
+              ...lignes,
+            ],
+          ),
         ),
       ),
     ),
