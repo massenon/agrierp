@@ -1429,6 +1429,58 @@ class CreditNotes extends Table with SyncColumns {
   DateTimeColumn get createdAt => dateTime()();
 }
 
+/// La Corbeille servie par le serveur (`corbeille`) — INSTANTANÉ en lecture seule (ticket ARC3, PRD `docs/prd/archives.md`).
+///
+/// Une ligne par élément archivé de `CorbeilleService::registre()` (tous modules), AVEC ce que le serveur en permet :
+/// `restaurable` / `supprimable` et le motif du refus. ⚠️ **Le poste ne recalcule JAMAIS ces règles** (dépense
+/// contre-passée, exercice clos, code déjà pris, références dans une vingtaine de tables qu'il ne possède pas toutes) :
+/// deux implémentations finiraient par diverger. La table est REMPLACÉE EN ENTIER à chaque tirage (clé absente : rien
+/// n'est touché ; liste vide : tout est effacé) et seul l'administrateur la reçoit (`manage-parametres`).
+///
+/// `id` = UUID v5 de (type, id de l'élément), calculé par le serveur : stable d'un tirage à l'autre, jamais celui de la
+/// ligne métier. `archiveLe` est l'heure MURALE du serveur (le jour d'archivage du web), lue telle quelle.
+@DataClassName('ElementCorbeille')
+class CorbeilleElements extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// Clé du registre (`clients`, `depenses`, `bandes`…).
+  TextColumn get type => text()();
+  TextColumn get elementId => text().withLength(min: 36, max: 36)();
+  TextColumn get titre => text()();
+  TextColumn get detail => text().withDefault(const Constant(''))();
+  TextColumn get module => text()();
+  DateTimeColumn get archiveLe => dateTime().nullable()();
+  BoolColumn get restaurable => boolean()();
+  TextColumn get motifRestauration => text().nullable()();
+  BoolColumn get supprimable => boolean()();
+  TextColumn get motifSuppression => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Une DEMANDE de la Corbeille saisie au poste : « restaurer » ou « supprimer définitivement » (ticket ARC3).
+///
+/// ⚠️⚠️ **LE POSTE N'ENREGISTRE QUE LA DEMANDE, PAS SES EFFETS** (même motif que le retour client AV1, [CreditNotes]) : il
+/// n'écrit JAMAIS `is_active` ni ne supprime une ligne métier. Le serveur fait les effets par `CorbeilleService` (le
+/// point de passage de la page web) et peut REFUSER : dépense contre-passée, exercice clos, code déjà pris, élément
+/// référencé, mot de confirmation faux, droit insuffisant. Son motif est gardé tel quel (`sync_conflicts`).
+///
+/// TABLE MIXTE : `pending` (en attente d'envoi) → `synced` (le serveur a fait l'effet ; la ligne s'efface au tirage
+/// suivant, qui remplace l'instantané) ou `conflict` (refus ; une nouvelle demande pour le même élément remplace la
+/// ligne refusée). `confirmation` : le mot `SUPPRIMER` saisi, que le serveur revérifie. `titre` : de quoi parle la
+/// demande, pour l'afficher sans l'instantané.
+@DataClassName('DemandeCorbeille')
+class CorbeilleDemandes extends Table with SyncColumns {
+  TextColumn get type => text()();
+  TextColumn get elementId => text().withLength(min: 36, max: 36)();
+
+  /// `restaurer` · `supprimer`.
+  TextColumn get action => text()();
+  TextColumn get titre => text().withDefault(const Constant(''))();
+  TextColumn get confirmation => text().nullable()();
+}
+
 /// Soin vétérinaire administré, saisi au poste ou reçu du serveur.
 ///
 /// ⚠️ `withdrawalDays` N'EST PAS UNE COLONNE DU REGISTRE CÔTÉ SERVEUR : c'est
@@ -1833,6 +1885,8 @@ class SyncState extends Table {
     Sales,
     SaleLines,
     CreditNotes,
+    CorbeilleElements,
+    CorbeilleDemandes,
     StockAdjustments,
     StockMovements,
     SyncConflicts,
@@ -1852,6 +1906,8 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
+  /// ⚠️ **ARC3 : 56 → 58 (Corbeille).** Les numéros 57, 59 et 60 sont réservés (conversion des devis, dépenses, modules).
+  ///
   /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4).** Le numéro
   /// 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide, `from < 56` et
   /// `schemaVersion = 56` l'enjambent sans trou.
@@ -1863,7 +1919,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 56;
+  int get schemaVersion => 58;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2414,6 +2470,14 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(m, expenses, expenses.ecritureRefus);
         await _convertirDepensesEnLignes();
       }
+
+      // v58 — ticket ARC3 : la Corbeille au poste (`corbeille_elements`, instantané servi ; `corbeille_demandes`, table
+      // mixte des demandes). Les numéros 57 (conversion des devis), 59 (dépenses) et 60 (modules) sont réservés à d'autres
+      // branches : la fusion renumérotera si un palier manque. Une base en v56 ou en v58 passe ici sans trou.
+      if (from < 58) {
+        if (!await _tableExiste(m, corbeilleElements)) await m.createTable(corbeilleElements);
+        if (!await _tableExiste(m, corbeilleDemandes)) await m.createTable(corbeilleDemandes);
+      }
     },
   );
 
@@ -2620,6 +2684,8 @@ class AppDatabase extends _$AppDatabase {
     'livestock_transfers',
     // Tickets AV1 / AV2 — retours et avoirs clients (demandes de retour, « marquer comme traité »).
     'credit_notes',
+    // Ticket ARC3 — demandes de la Corbeille (restaurer, supprimer définitivement) : le serveur fait les effets.
+    'corbeille_demandes',
     // Ticket BS1 — bandes saisies au poste.
     'livestock_lots',
     // Ticket BS3 — reproducteurs nominatifs saisis au poste.
@@ -2678,6 +2744,7 @@ class AppDatabase extends _$AppDatabase {
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
     'advance_imputations', 'sales', 'sale_lines', 'credit_notes', // AV1
+    'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expense_lines', 'expenses', 'stock_adjustments', 'stock_movements', // U9, DEP4

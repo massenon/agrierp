@@ -74,6 +74,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   // Ticket DEP4 — lignes de dépense et centres de coût. ⚠️ Chaîne 52 → 53 (devis) → 54 (avoirs) → 56 (dépenses) : le palier
   // 55 est inutilisé (aucune table ni colonne), la migration passe de 54 à 56 sans trou.
   56: [d.expenseLines, d.costCenters],
+  // Ticket ARC3 — la Corbeille : instantané du serveur et demandes. ⚠️ 57, 59 et 60 sont réservés à d'autres branches.
+  58: [d.corbeilleElements, d.corbeilleDemandes],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -243,6 +245,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.expenses, d.expenses.createdBy),
     (d.expenses, d.expenses.ecritureRefus),
   ],
+  // Ticket ARC3 — deux tables créées (aucune colonne ajoutée à une table existante).
+  58: [],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -340,7 +344,8 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) est complète ; le 55 est inutilisé', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 56, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou');
+    expect(d.schemaVersion, 58, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; ARC3 : 56 → 58');
+    expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
     expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);
     expect(_tablesCreees(d)[53], [d.quotes]);
@@ -349,6 +354,7 @@ void main() {
     expect(source, contains('if (from < 53) {'));
     expect(source, contains('if (from < 54) {'));
     expect(source, contains('if (from < 56) {'));
+    expect(source, contains('if (from < 58) {'));
     expect(source, isNot(contains('if (from < 55) {')));
   });
 

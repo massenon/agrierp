@@ -84,6 +84,7 @@ import 'features/rh/personnel_stages_screen.dart';
 import 'features/ventes/facturation_repository.dart';
 import 'features/ventes/facturation_screen.dart';
 import 'features/parametres/appairage_poste.dart';
+import 'features/parametres/corbeille_repository.dart';
 import 'features/parametres/reinitialisation_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
@@ -282,6 +283,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
     gestes: _gestes,
   );
 
+  /// Ticket ARC3 — onglet « Corbeille » de Paramètres : la liste vient du serveur (instantané), restaurer et supprimer
+  /// définitivement sont des DEMANDES (le serveur fait les effets). Le geste est signalé à la synchronisation automatique.
+  late final CorbeilleRepository _corbeille = CorbeilleRepository(
+    database: _db,
+    identifiantPoste: widget.identifiantPoste,
+    gestes: _gestes,
+  );
+
   /// Ticket AV2 — « Historique des Ventes » : annulation (demande) et ticket PDF. ⚠️ Le MÊME client HTTP : il porte le
   /// jeton, que le serveur lit pour décider si ce rôle peut exporter le ticket (`export-ventes`).
   late final HistoriqueVentesRepository _historiqueVentes = HistoriqueVentesRepository(
@@ -470,6 +479,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           ventesDevis: _ventesDevis,
           devis: _devis,
           avoirs: _avoirs,
+          corbeille: _corbeille,
           historiqueVentes: _historiqueVentes,
           stocks: _stocks,
           clients: _clients,
@@ -530,6 +540,7 @@ class SocleAccueil extends StatefulWidget {
     required this.ventesDevis,
     required this.devis,
     required this.avoirs,
+    this.corbeille,
     required this.historiqueVentes,
     required this.stocks,
     required this.clients,
@@ -601,6 +612,9 @@ class SocleAccueil extends StatefulWidget {
   final VentesDevisRepository ventesDevis;
   final DevisRepository devis;
   final AvoirsRepository avoirs;
+
+  /// Ticket ARC3 — onglet « Corbeille » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
+  final CorbeilleRepository? corbeille;
   final HistoriqueVentesRepository historiqueVentes;
   final StocksRepository stocks;
   final ClientsCreancesRepository clients;
@@ -692,6 +706,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     envoiEmail: _envoiEmail,
     appairage: _appairage,
     reinitialisation: widget.reinitialisation,
+    corbeille: widget.corbeille,
     ongletInitial: ongletInitial,
   );
 

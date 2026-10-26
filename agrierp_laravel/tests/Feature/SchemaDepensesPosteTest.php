@@ -128,7 +128,11 @@ class SchemaDepensesPosteTest extends TestCase
     public function test_le_palier_drift_est_declare_et_ses_tables_servies_au_tirage(): void
     {
         $source = file_get_contents(base_path('../agrierp_flutter/lib/core/database/app_database.dart'));
-        $this->assertMatchesRegularExpression('/int get schemaVersion => 56;/', $source, 'schéma Drift 56 sur cette branche (53 devis, 54 avoirs, 55 unicité sont réservés)');
+        // ARC3 : la Corbeille porte le schéma à 58 (57 devis, 59 dépenses, 60 modules sont réservés) ; le palier 56 des
+        // dépenses reste dans la chaîne (`from < 56`) : le numéro courant ne peut que croître.
+        preg_match('/int get schemaVersion => (\d+);/', $source, $version);
+        $this->assertGreaterThanOrEqual(56, (int) ($version[1] ?? 0), 'schéma Drift 56 au moins (le palier des dépenses est dans la chaîne)');
+        $this->assertStringContainsString('if (from < 56)', $source);
         foreach (['expense_lines', 'cost_centers'] as $table) {
             $this->assertArrayHasKey($table, \App\Http\Controllers\Api\SyncController::PERMISSIONS_DE_TIRAGE, "{$table} doit être servie au tirage");
         }

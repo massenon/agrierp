@@ -148,6 +148,7 @@ abstract final class SymbolesAgri {
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restart_alt = IconData(0xf053, fontFamily: famille);
   static const IconData restaurant = IconData(0xe56c, fontFamily: famille);
+  static const IconData restore = IconData(0xe28e, fontFamily: famille);
   static const IconData restore_from_trash = IconData(0xe938, fontFamily: famille);
   static const IconData rule = IconData(0xf1c2, fontFamily: famille);
   static const IconData save = IconData(0xe161, fontFamily: famille);

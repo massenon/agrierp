@@ -873,6 +873,7 @@ class SyncEngine {
     recus += await _absorberCentresDeCout(corps['cost_centers']);
     recus += await _absorberDepenses(corps['expenses'], corps['expense_lines']);
     recus += await _absorberPaie(corps['payslips']);
+    recus += await _absorberCorbeille(corps['corbeille']);
 
     return recus;
   }
@@ -4468,6 +4469,91 @@ class SyncEngine {
     return recus.length;
   }
 
+  /// 🔴→✅ Ticket ARC3 — LA CORBEILLE DESCEND AU POSTE, EN INSTANTANÉ (`corbeille`, page 1, `manage-parametres`).
+  ///
+  /// Une ligne par élément archivé du serveur, AVEC ce qu'il en permet (`restaurable` / `supprimable` et le motif du
+  /// refus) : le poste n'a pas à recalculer les règles (dépense contre-passée, exercice clos, code déjà pris, références
+  /// dans des tables qu'il ne possède pas toutes). La table est REMPLACÉE EN ENTIER : clé absente (compte sans le droit,
+  /// serveur ancien) → rien n'est touché ; liste vide → tout est effacé (plus rien n'est archivé).
+  ///
+  /// ⚠️⚠️ **STRICT**, comme [_absorberAvoirs] : élément illisible, identifiant ou élément invalide, servi deux fois,
+  /// type, titre, module, drapeau (`restaurable`, `supprimable`) ou date illisible, refus sans motif sur un élément
+  /// annoncé non restaurable / non supprimable → [FormatException] : RIEN n'est écrit (l'ancien instantané reste), la
+  /// page est annulée, le curseur n'avance pas. Lisser — un drapeau illisible devenu « oui » — offrirait un bouton que
+  /// le serveur refusera, ou pire, en cacherait un.
+  ///
+  /// Les demandes ACQUITTÉES (`synced`) s'effacent avec l'ancien instantané : le nouveau dit ce qui reste archivé. Une
+  /// demande `pending` ou `conflict` n'est jamais touchée.
+  Future<int> _absorberCorbeille(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Corbeille';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final cles = <String>{};
+    final recus = <CorbeilleElementsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final type = l['type'];
+      final element = l['element_id'];
+      final titre = l['titre'];
+      final module = l['module'];
+      final detail = _texteStrict(l['detail'], '$quoi $id : détail') ?? '';
+      final motifRestauration = _texteStrict(l['motif_restauration'], '$quoi $id : motif de restauration');
+      final motifSuppression = _texteStrict(l['motif_suppression'], '$quoi $id : motif de suppression');
+      final restaurable = l['restaurable'];
+      final supprimable = l['supprimable'];
+      final archiveLe = l['archive_le'];
+      if (type is! String || type.isEmpty) throw FormatException('$quoi $id refusé : type illisible ($type).');
+      if (element is! String || element.length != 36) {
+        throw FormatException('$quoi $id refusé : élément invalide ($element).');
+      }
+      if (!cles.add('$type:$element')) throw FormatException('$quoi $id refusé : élément servi deux fois.');
+      if (titre is! String || titre.isEmpty) throw FormatException('$quoi $id refusé : titre illisible ($titre).');
+      if (module is! String || module.isEmpty) throw FormatException('$quoi $id refusé : module illisible ($module).');
+      if (restaurable is! bool) throw FormatException('$quoi $id refusé : « restaurable » illisible ($restaurable).');
+      if (supprimable is! bool) throw FormatException('$quoi $id refusé : « supprimable » illisible ($supprimable).');
+      if (!restaurable && (motifRestauration == null || motifRestauration.isEmpty)) {
+        throw FormatException('$quoi $id refusé : élément non restaurable sans motif.');
+      }
+      if (!supprimable && (motifSuppression == null || motifSuppression.isEmpty)) {
+        throw FormatException('$quoi $id refusé : élément non supprimable sans motif.');
+      }
+      DateTime? date;
+      if (archiveLe != null) {
+        date = archiveLe is String ? HeureBenin.lire(archiveLe) : null;
+        if (date == null) throw FormatException('$quoi $id refusé : date d\'archivage illisible ($archiveLe).');
+      }
+      recus.add(
+        CorbeilleElementsCompanion.insert(
+          id: id,
+          type: type,
+          elementId: element,
+          titre: titre,
+          detail: Value(detail),
+          module: module,
+          // Heure MURALE du serveur, lue telle quelle : le jour d'archivage du web doit rester le jour.
+          archiveLe: Value(date),
+          restaurable: restaurable,
+          motifRestauration: Value(restaurable ? null : motifRestauration),
+          supprimable: supprimable,
+          motifSuppression: Value(supprimable ? null : motifSuppression),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.corbeilleElements).go();
+      for (final e in recus) {
+        await _db.into(_db.corbeilleElements).insert(e);
+      }
+      // Ce que le serveur a traité est dans le nouvel instantané (ou n'y est plus) : la demande a fait son travail.
+      await (_db.delete(_db.corbeilleDemandes)..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
+    });
+
+    return recus.length;
+  }
+
   /// 🔴→✅ Ticket DEV — LES DEVIS DU SERVEUR DESCENDENT AU POSTE (table mixte : saisis ici ET tirés).
   ///
   /// Le serveur sert tout devis créé, modifié, avancé dans son cycle ou archivé au web ou sur un autre poste, au curseur
@@ -4791,6 +4877,11 @@ class SyncEngine {
       _db.creditNotes,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket ARC3 — demandes de la Corbeille : le serveur fait les effets (jamais d'`is_active` ni de DELETE du poste).
+    final demandesCorbeille = await (_db.select(
+      _db.corbeilleDemandes,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
     final transferts = await (_db.select(
       _db.livestockTransfers,
@@ -4849,6 +4940,7 @@ class SyncEngine {
         retours.isEmpty &&
         remboursements.isEmpty &&
         avoirs.isEmpty &&
+        demandesCorbeille.isEmpty &&
         avances.isEmpty &&
         imputations.isEmpty &&
         produits.isEmpty &&
@@ -4966,6 +5058,10 @@ class SyncEngine {
         // Ticket AV1 — le serveur traite les retours APRÈS les ventes du même envoi. ⚠️ JAMAIS de `stock_adjustments` ni
         // d'écriture pour un avoir : le serveur réintègre le stock et passe l'écriture inverse (`AvoirClientService`).
         'credit_notes': avoirs.map(_avoirEnJson).toList(),
+        // Ticket ARC3 — traitée par le serveur EN DERNIER (l'archivage du même envoi lui est connu). Une clé VIDE n'est pas
+        // envoyée : le serveur répondrait par une liste vide, sans objet.
+        if (demandesCorbeille.isNotEmpty)
+          'corbeille_demandes': demandesCorbeille.map(_demandeCorbeilleEnJson).toList(),
         'stock_adjustments': ajustements.map(_ajustementEnJson).toList(),
         'veterinary_records': soins.map(_soinEnJson).toList(),
         'expenses': depenses.map((d) => _depenseEnJson(d, lignesDeDepense[d.id] ?? const [])).toList(),
@@ -5332,6 +5428,16 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket ARC3 — une demande de la Corbeille : `synced` (effet fait) ou `conflict` (refus, motif du serveur gardé).
+    accepte += await _acquitter(
+      'corbeille_demandes',
+      corps['corbeille_demandes'],
+      (ids, statut) => (_db.update(_db.corbeilleDemandes)..where((t) => t.id.isIn(ids)))
+          .write(CorbeilleDemandesCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     accepte += await _acquitter(
       'expenses',
       corps['expenses'],
@@ -5586,6 +5692,8 @@ class SyncEngine {
     'veterinary_calendar_events',
     'stock_adjustments',
     'veterinary_records',
+    // Ticket ARC3 — EN DERNIER, comme au serveur : une demande vise ce que le même envoi vient d'archiver.
+    'corbeille_demandes',
   ];
 
   /// ⚠️⚠️ **TABLES COUPLÉES DANS UN MÊME ENVOI, JAMAIS SÉPARÉES PAR JOUR.** Le serveur passe aux ventes les
@@ -6171,6 +6279,14 @@ class SyncEngine {
               _db.creditNotes,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const CreditNotesCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket ARC3 — « Relancer » une demande refusée de la Corbeille (le serveur la rejuge : la cause a pu disparaître).
+      'corbeille_demandes' =>
+        () =>
+            (_db.update(
+              _db.corbeilleDemandes,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const CorbeilleDemandesCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       'purchase_returns' =>
         () =>
@@ -6881,6 +6997,18 @@ class SyncEngine {
     'status': a.status,
     'credit_date': _instant(a.createdAt),
     'device_id': a.deviceId,
+  };
+
+  /// Ticket ARC3 — la DEMANDE de la Corbeille : ce que le serveur lit dans `pushCorbeilleDemandes`. ⚠️ Ni `is_active` ni
+  /// suppression : le serveur fait les effets par `CorbeilleService`. `confirmation` : le mot saisi (supprimer seulement),
+  /// que le serveur revérifie.
+  Map<String, dynamic> _demandeCorbeilleEnJson(DemandeCorbeille d) => {
+    'id': d.id,
+    'type': d.type,
+    'element_id': d.elementId,
+    'action': d.action,
+    'confirmation': d.confirmation,
+    'device_id': d.deviceId,
   };
 
   /// Ticket DEV — un devis tel qu'il est (le FAIT) : `pushQuotes` le rejoue par `SaisieDevisAction`. ⚠️ Le numéro

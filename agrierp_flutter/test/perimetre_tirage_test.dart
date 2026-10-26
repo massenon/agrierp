@@ -98,6 +98,8 @@ void main() {
     'expense_lines': 'expense_lines',
     'cost_centers': 'cost_centers',
     'payslips': 'payslips',
+    // Ticket ARC3 — l'instantané de la Corbeille (administrateur), lu par l'onglet « Corbeille » de Paramètres.
+    'corbeille': 'corbeille_elements',
   };
 
   /// Tables Drift propres au poste : saisies envoyées mais jamais tirées, file, réglages.
@@ -106,6 +108,7 @@ void main() {
     'advance_imputations',
     'supplier_payments',
     'supplier_refunds',
+    'corbeille_demandes',
     'sync_conflicts',
     'app_settings',
     'sync_state',

@@ -31380,6 +31380,1279 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
   }
 }
 
+class $CorbeilleElementsTable extends CorbeilleElements
+    with TableInfo<$CorbeilleElementsTable, ElementCorbeille> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CorbeilleElementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _elementIdMeta = const VerificationMeta(
+    'elementId',
+  );
+  @override
+  late final GeneratedColumn<String> elementId = GeneratedColumn<String>(
+    'element_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titreMeta = const VerificationMeta('titre');
+  @override
+  late final GeneratedColumn<String> titre = GeneratedColumn<String>(
+    'titre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _detailMeta = const VerificationMeta('detail');
+  @override
+  late final GeneratedColumn<String> detail = GeneratedColumn<String>(
+    'detail',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _moduleMeta = const VerificationMeta('module');
+  @override
+  late final GeneratedColumn<String> module = GeneratedColumn<String>(
+    'module',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _archiveLeMeta = const VerificationMeta(
+    'archiveLe',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archiveLe = GeneratedColumn<DateTime>(
+    'archive_le',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _restaurableMeta = const VerificationMeta(
+    'restaurable',
+  );
+  @override
+  late final GeneratedColumn<bool> restaurable = GeneratedColumn<bool>(
+    'restaurable',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("restaurable" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _motifRestaurationMeta = const VerificationMeta(
+    'motifRestauration',
+  );
+  @override
+  late final GeneratedColumn<String> motifRestauration =
+      GeneratedColumn<String>(
+        'motif_restauration',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _supprimableMeta = const VerificationMeta(
+    'supprimable',
+  );
+  @override
+  late final GeneratedColumn<bool> supprimable = GeneratedColumn<bool>(
+    'supprimable',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("supprimable" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _motifSuppressionMeta = const VerificationMeta(
+    'motifSuppression',
+  );
+  @override
+  late final GeneratedColumn<String> motifSuppression = GeneratedColumn<String>(
+    'motif_suppression',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    elementId,
+    titre,
+    detail,
+    module,
+    archiveLe,
+    restaurable,
+    motifRestauration,
+    supprimable,
+    motifSuppression,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'corbeille_elements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ElementCorbeille> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('element_id')) {
+      context.handle(
+        _elementIdMeta,
+        elementId.isAcceptableOrUnknown(data['element_id']!, _elementIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_elementIdMeta);
+    }
+    if (data.containsKey('titre')) {
+      context.handle(
+        _titreMeta,
+        titre.isAcceptableOrUnknown(data['titre']!, _titreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titreMeta);
+    }
+    if (data.containsKey('detail')) {
+      context.handle(
+        _detailMeta,
+        detail.isAcceptableOrUnknown(data['detail']!, _detailMeta),
+      );
+    }
+    if (data.containsKey('module')) {
+      context.handle(
+        _moduleMeta,
+        module.isAcceptableOrUnknown(data['module']!, _moduleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_moduleMeta);
+    }
+    if (data.containsKey('archive_le')) {
+      context.handle(
+        _archiveLeMeta,
+        archiveLe.isAcceptableOrUnknown(data['archive_le']!, _archiveLeMeta),
+      );
+    }
+    if (data.containsKey('restaurable')) {
+      context.handle(
+        _restaurableMeta,
+        restaurable.isAcceptableOrUnknown(
+          data['restaurable']!,
+          _restaurableMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_restaurableMeta);
+    }
+    if (data.containsKey('motif_restauration')) {
+      context.handle(
+        _motifRestaurationMeta,
+        motifRestauration.isAcceptableOrUnknown(
+          data['motif_restauration']!,
+          _motifRestaurationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('supprimable')) {
+      context.handle(
+        _supprimableMeta,
+        supprimable.isAcceptableOrUnknown(
+          data['supprimable']!,
+          _supprimableMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_supprimableMeta);
+    }
+    if (data.containsKey('motif_suppression')) {
+      context.handle(
+        _motifSuppressionMeta,
+        motifSuppression.isAcceptableOrUnknown(
+          data['motif_suppression']!,
+          _motifSuppressionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ElementCorbeille map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ElementCorbeille(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      elementId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}element_id'],
+      )!,
+      titre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}titre'],
+      )!,
+      detail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}detail'],
+      )!,
+      module: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}module'],
+      )!,
+      archiveLe: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archive_le'],
+      ),
+      restaurable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}restaurable'],
+      )!,
+      motifRestauration: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}motif_restauration'],
+      ),
+      supprimable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}supprimable'],
+      )!,
+      motifSuppression: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}motif_suppression'],
+      ),
+    );
+  }
+
+  @override
+  $CorbeilleElementsTable createAlias(String alias) {
+    return $CorbeilleElementsTable(attachedDatabase, alias);
+  }
+}
+
+class ElementCorbeille extends DataClass
+    implements Insertable<ElementCorbeille> {
+  final String id;
+
+  /// Clé du registre (`clients`, `depenses`, `bandes`…).
+  final String type;
+  final String elementId;
+  final String titre;
+  final String detail;
+  final String module;
+  final DateTime? archiveLe;
+  final bool restaurable;
+  final String? motifRestauration;
+  final bool supprimable;
+  final String? motifSuppression;
+  const ElementCorbeille({
+    required this.id,
+    required this.type,
+    required this.elementId,
+    required this.titre,
+    required this.detail,
+    required this.module,
+    this.archiveLe,
+    required this.restaurable,
+    this.motifRestauration,
+    required this.supprimable,
+    this.motifSuppression,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['element_id'] = Variable<String>(elementId);
+    map['titre'] = Variable<String>(titre);
+    map['detail'] = Variable<String>(detail);
+    map['module'] = Variable<String>(module);
+    if (!nullToAbsent || archiveLe != null) {
+      map['archive_le'] = Variable<DateTime>(archiveLe);
+    }
+    map['restaurable'] = Variable<bool>(restaurable);
+    if (!nullToAbsent || motifRestauration != null) {
+      map['motif_restauration'] = Variable<String>(motifRestauration);
+    }
+    map['supprimable'] = Variable<bool>(supprimable);
+    if (!nullToAbsent || motifSuppression != null) {
+      map['motif_suppression'] = Variable<String>(motifSuppression);
+    }
+    return map;
+  }
+
+  CorbeilleElementsCompanion toCompanion(bool nullToAbsent) {
+    return CorbeilleElementsCompanion(
+      id: Value(id),
+      type: Value(type),
+      elementId: Value(elementId),
+      titre: Value(titre),
+      detail: Value(detail),
+      module: Value(module),
+      archiveLe: archiveLe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archiveLe),
+      restaurable: Value(restaurable),
+      motifRestauration: motifRestauration == null && nullToAbsent
+          ? const Value.absent()
+          : Value(motifRestauration),
+      supprimable: Value(supprimable),
+      motifSuppression: motifSuppression == null && nullToAbsent
+          ? const Value.absent()
+          : Value(motifSuppression),
+    );
+  }
+
+  factory ElementCorbeille.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ElementCorbeille(
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      elementId: serializer.fromJson<String>(json['elementId']),
+      titre: serializer.fromJson<String>(json['titre']),
+      detail: serializer.fromJson<String>(json['detail']),
+      module: serializer.fromJson<String>(json['module']),
+      archiveLe: serializer.fromJson<DateTime?>(json['archiveLe']),
+      restaurable: serializer.fromJson<bool>(json['restaurable']),
+      motifRestauration: serializer.fromJson<String?>(
+        json['motifRestauration'],
+      ),
+      supprimable: serializer.fromJson<bool>(json['supprimable']),
+      motifSuppression: serializer.fromJson<String?>(json['motifSuppression']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'elementId': serializer.toJson<String>(elementId),
+      'titre': serializer.toJson<String>(titre),
+      'detail': serializer.toJson<String>(detail),
+      'module': serializer.toJson<String>(module),
+      'archiveLe': serializer.toJson<DateTime?>(archiveLe),
+      'restaurable': serializer.toJson<bool>(restaurable),
+      'motifRestauration': serializer.toJson<String?>(motifRestauration),
+      'supprimable': serializer.toJson<bool>(supprimable),
+      'motifSuppression': serializer.toJson<String?>(motifSuppression),
+    };
+  }
+
+  ElementCorbeille copyWith({
+    String? id,
+    String? type,
+    String? elementId,
+    String? titre,
+    String? detail,
+    String? module,
+    Value<DateTime?> archiveLe = const Value.absent(),
+    bool? restaurable,
+    Value<String?> motifRestauration = const Value.absent(),
+    bool? supprimable,
+    Value<String?> motifSuppression = const Value.absent(),
+  }) => ElementCorbeille(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    elementId: elementId ?? this.elementId,
+    titre: titre ?? this.titre,
+    detail: detail ?? this.detail,
+    module: module ?? this.module,
+    archiveLe: archiveLe.present ? archiveLe.value : this.archiveLe,
+    restaurable: restaurable ?? this.restaurable,
+    motifRestauration: motifRestauration.present
+        ? motifRestauration.value
+        : this.motifRestauration,
+    supprimable: supprimable ?? this.supprimable,
+    motifSuppression: motifSuppression.present
+        ? motifSuppression.value
+        : this.motifSuppression,
+  );
+  ElementCorbeille copyWithCompanion(CorbeilleElementsCompanion data) {
+    return ElementCorbeille(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      elementId: data.elementId.present ? data.elementId.value : this.elementId,
+      titre: data.titre.present ? data.titre.value : this.titre,
+      detail: data.detail.present ? data.detail.value : this.detail,
+      module: data.module.present ? data.module.value : this.module,
+      archiveLe: data.archiveLe.present ? data.archiveLe.value : this.archiveLe,
+      restaurable: data.restaurable.present
+          ? data.restaurable.value
+          : this.restaurable,
+      motifRestauration: data.motifRestauration.present
+          ? data.motifRestauration.value
+          : this.motifRestauration,
+      supprimable: data.supprimable.present
+          ? data.supprimable.value
+          : this.supprimable,
+      motifSuppression: data.motifSuppression.present
+          ? data.motifSuppression.value
+          : this.motifSuppression,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ElementCorbeille(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('elementId: $elementId, ')
+          ..write('titre: $titre, ')
+          ..write('detail: $detail, ')
+          ..write('module: $module, ')
+          ..write('archiveLe: $archiveLe, ')
+          ..write('restaurable: $restaurable, ')
+          ..write('motifRestauration: $motifRestauration, ')
+          ..write('supprimable: $supprimable, ')
+          ..write('motifSuppression: $motifSuppression')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    type,
+    elementId,
+    titre,
+    detail,
+    module,
+    archiveLe,
+    restaurable,
+    motifRestauration,
+    supprimable,
+    motifSuppression,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ElementCorbeille &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.elementId == this.elementId &&
+          other.titre == this.titre &&
+          other.detail == this.detail &&
+          other.module == this.module &&
+          other.archiveLe == this.archiveLe &&
+          other.restaurable == this.restaurable &&
+          other.motifRestauration == this.motifRestauration &&
+          other.supprimable == this.supprimable &&
+          other.motifSuppression == this.motifSuppression);
+}
+
+class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
+  final Value<String> id;
+  final Value<String> type;
+  final Value<String> elementId;
+  final Value<String> titre;
+  final Value<String> detail;
+  final Value<String> module;
+  final Value<DateTime?> archiveLe;
+  final Value<bool> restaurable;
+  final Value<String?> motifRestauration;
+  final Value<bool> supprimable;
+  final Value<String?> motifSuppression;
+  final Value<int> rowid;
+  const CorbeilleElementsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.elementId = const Value.absent(),
+    this.titre = const Value.absent(),
+    this.detail = const Value.absent(),
+    this.module = const Value.absent(),
+    this.archiveLe = const Value.absent(),
+    this.restaurable = const Value.absent(),
+    this.motifRestauration = const Value.absent(),
+    this.supprimable = const Value.absent(),
+    this.motifSuppression = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CorbeilleElementsCompanion.insert({
+    required String id,
+    required String type,
+    required String elementId,
+    required String titre,
+    this.detail = const Value.absent(),
+    required String module,
+    this.archiveLe = const Value.absent(),
+    required bool restaurable,
+    this.motifRestauration = const Value.absent(),
+    required bool supprimable,
+    this.motifSuppression = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       elementId = Value(elementId),
+       titre = Value(titre),
+       module = Value(module),
+       restaurable = Value(restaurable),
+       supprimable = Value(supprimable);
+  static Insertable<ElementCorbeille> custom({
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<String>? elementId,
+    Expression<String>? titre,
+    Expression<String>? detail,
+    Expression<String>? module,
+    Expression<DateTime>? archiveLe,
+    Expression<bool>? restaurable,
+    Expression<String>? motifRestauration,
+    Expression<bool>? supprimable,
+    Expression<String>? motifSuppression,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (elementId != null) 'element_id': elementId,
+      if (titre != null) 'titre': titre,
+      if (detail != null) 'detail': detail,
+      if (module != null) 'module': module,
+      if (archiveLe != null) 'archive_le': archiveLe,
+      if (restaurable != null) 'restaurable': restaurable,
+      if (motifRestauration != null) 'motif_restauration': motifRestauration,
+      if (supprimable != null) 'supprimable': supprimable,
+      if (motifSuppression != null) 'motif_suppression': motifSuppression,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CorbeilleElementsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? type,
+    Value<String>? elementId,
+    Value<String>? titre,
+    Value<String>? detail,
+    Value<String>? module,
+    Value<DateTime?>? archiveLe,
+    Value<bool>? restaurable,
+    Value<String?>? motifRestauration,
+    Value<bool>? supprimable,
+    Value<String?>? motifSuppression,
+    Value<int>? rowid,
+  }) {
+    return CorbeilleElementsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      elementId: elementId ?? this.elementId,
+      titre: titre ?? this.titre,
+      detail: detail ?? this.detail,
+      module: module ?? this.module,
+      archiveLe: archiveLe ?? this.archiveLe,
+      restaurable: restaurable ?? this.restaurable,
+      motifRestauration: motifRestauration ?? this.motifRestauration,
+      supprimable: supprimable ?? this.supprimable,
+      motifSuppression: motifSuppression ?? this.motifSuppression,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (elementId.present) {
+      map['element_id'] = Variable<String>(elementId.value);
+    }
+    if (titre.present) {
+      map['titre'] = Variable<String>(titre.value);
+    }
+    if (detail.present) {
+      map['detail'] = Variable<String>(detail.value);
+    }
+    if (module.present) {
+      map['module'] = Variable<String>(module.value);
+    }
+    if (archiveLe.present) {
+      map['archive_le'] = Variable<DateTime>(archiveLe.value);
+    }
+    if (restaurable.present) {
+      map['restaurable'] = Variable<bool>(restaurable.value);
+    }
+    if (motifRestauration.present) {
+      map['motif_restauration'] = Variable<String>(motifRestauration.value);
+    }
+    if (supprimable.present) {
+      map['supprimable'] = Variable<bool>(supprimable.value);
+    }
+    if (motifSuppression.present) {
+      map['motif_suppression'] = Variable<String>(motifSuppression.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CorbeilleElementsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('elementId: $elementId, ')
+          ..write('titre: $titre, ')
+          ..write('detail: $detail, ')
+          ..write('module: $module, ')
+          ..write('archiveLe: $archiveLe, ')
+          ..write('restaurable: $restaurable, ')
+          ..write('motifRestauration: $motifRestauration, ')
+          ..write('supprimable: $supprimable, ')
+          ..write('motifSuppression: $motifSuppression, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CorbeilleDemandesTable extends CorbeilleDemandes
+    with TableInfo<$CorbeilleDemandesTable, DemandeCorbeille> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CorbeilleDemandesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($CorbeilleDemandesTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _elementIdMeta = const VerificationMeta(
+    'elementId',
+  );
+  @override
+  late final GeneratedColumn<String> elementId = GeneratedColumn<String>(
+    'element_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actionMeta = const VerificationMeta('action');
+  @override
+  late final GeneratedColumn<String> action = GeneratedColumn<String>(
+    'action',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titreMeta = const VerificationMeta('titre');
+  @override
+  late final GeneratedColumn<String> titre = GeneratedColumn<String>(
+    'titre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _confirmationMeta = const VerificationMeta(
+    'confirmation',
+  );
+  @override
+  late final GeneratedColumn<String> confirmation = GeneratedColumn<String>(
+    'confirmation',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    type,
+    elementId,
+    action,
+    titre,
+    confirmation,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'corbeille_demandes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DemandeCorbeille> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('element_id')) {
+      context.handle(
+        _elementIdMeta,
+        elementId.isAcceptableOrUnknown(data['element_id']!, _elementIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_elementIdMeta);
+    }
+    if (data.containsKey('action')) {
+      context.handle(
+        _actionMeta,
+        action.isAcceptableOrUnknown(data['action']!, _actionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_actionMeta);
+    }
+    if (data.containsKey('titre')) {
+      context.handle(
+        _titreMeta,
+        titre.isAcceptableOrUnknown(data['titre']!, _titreMeta),
+      );
+    }
+    if (data.containsKey('confirmation')) {
+      context.handle(
+        _confirmationMeta,
+        confirmation.isAcceptableOrUnknown(
+          data['confirmation']!,
+          _confirmationMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DemandeCorbeille map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DemandeCorbeille(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $CorbeilleDemandesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      elementId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}element_id'],
+      )!,
+      action: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action'],
+      )!,
+      titre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}titre'],
+      )!,
+      confirmation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}confirmation'],
+      ),
+    );
+  }
+
+  @override
+  $CorbeilleDemandesTable createAlias(String alias) {
+    return $CorbeilleDemandesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class DemandeCorbeille extends DataClass
+    implements Insertable<DemandeCorbeille> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String type;
+  final String elementId;
+
+  /// `restaurer` · `supprimer`.
+  final String action;
+  final String titre;
+  final String? confirmation;
+  const DemandeCorbeille({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.type,
+    required this.elementId,
+    required this.action,
+    required this.titre,
+    this.confirmation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $CorbeilleDemandesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['type'] = Variable<String>(type);
+    map['element_id'] = Variable<String>(elementId);
+    map['action'] = Variable<String>(action);
+    map['titre'] = Variable<String>(titre);
+    if (!nullToAbsent || confirmation != null) {
+      map['confirmation'] = Variable<String>(confirmation);
+    }
+    return map;
+  }
+
+  CorbeilleDemandesCompanion toCompanion(bool nullToAbsent) {
+    return CorbeilleDemandesCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      type: Value(type),
+      elementId: Value(elementId),
+      action: Value(action),
+      titre: Value(titre),
+      confirmation: confirmation == null && nullToAbsent
+          ? const Value.absent()
+          : Value(confirmation),
+    );
+  }
+
+  factory DemandeCorbeille.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DemandeCorbeille(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $CorbeilleDemandesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      type: serializer.fromJson<String>(json['type']),
+      elementId: serializer.fromJson<String>(json['elementId']),
+      action: serializer.fromJson<String>(json['action']),
+      titre: serializer.fromJson<String>(json['titre']),
+      confirmation: serializer.fromJson<String?>(json['confirmation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $CorbeilleDemandesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'type': serializer.toJson<String>(type),
+      'elementId': serializer.toJson<String>(elementId),
+      'action': serializer.toJson<String>(action),
+      'titre': serializer.toJson<String>(titre),
+      'confirmation': serializer.toJson<String?>(confirmation),
+    };
+  }
+
+  DemandeCorbeille copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? type,
+    String? elementId,
+    String? action,
+    String? titre,
+    Value<String?> confirmation = const Value.absent(),
+  }) => DemandeCorbeille(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    type: type ?? this.type,
+    elementId: elementId ?? this.elementId,
+    action: action ?? this.action,
+    titre: titre ?? this.titre,
+    confirmation: confirmation.present ? confirmation.value : this.confirmation,
+  );
+  DemandeCorbeille copyWithCompanion(CorbeilleDemandesCompanion data) {
+    return DemandeCorbeille(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      type: data.type.present ? data.type.value : this.type,
+      elementId: data.elementId.present ? data.elementId.value : this.elementId,
+      action: data.action.present ? data.action.value : this.action,
+      titre: data.titre.present ? data.titre.value : this.titre,
+      confirmation: data.confirmation.present
+          ? data.confirmation.value
+          : this.confirmation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DemandeCorbeille(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('type: $type, ')
+          ..write('elementId: $elementId, ')
+          ..write('action: $action, ')
+          ..write('titre: $titre, ')
+          ..write('confirmation: $confirmation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    type,
+    elementId,
+    action,
+    titre,
+    confirmation,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DemandeCorbeille &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.type == this.type &&
+          other.elementId == this.elementId &&
+          other.action == this.action &&
+          other.titre == this.titre &&
+          other.confirmation == this.confirmation);
+}
+
+class CorbeilleDemandesCompanion extends UpdateCompanion<DemandeCorbeille> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> type;
+  final Value<String> elementId;
+  final Value<String> action;
+  final Value<String> titre;
+  final Value<String?> confirmation;
+  final Value<int> rowid;
+  const CorbeilleDemandesCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.type = const Value.absent(),
+    this.elementId = const Value.absent(),
+    this.action = const Value.absent(),
+    this.titre = const Value.absent(),
+    this.confirmation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CorbeilleDemandesCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String type,
+    required String elementId,
+    required String action,
+    this.titre = const Value.absent(),
+    this.confirmation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       type = Value(type),
+       elementId = Value(elementId),
+       action = Value(action);
+  static Insertable<DemandeCorbeille> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? type,
+    Expression<String>? elementId,
+    Expression<String>? action,
+    Expression<String>? titre,
+    Expression<String>? confirmation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (type != null) 'type': type,
+      if (elementId != null) 'element_id': elementId,
+      if (action != null) 'action': action,
+      if (titre != null) 'titre': titre,
+      if (confirmation != null) 'confirmation': confirmation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CorbeilleDemandesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? type,
+    Value<String>? elementId,
+    Value<String>? action,
+    Value<String>? titre,
+    Value<String?>? confirmation,
+    Value<int>? rowid,
+  }) {
+    return CorbeilleDemandesCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      type: type ?? this.type,
+      elementId: elementId ?? this.elementId,
+      action: action ?? this.action,
+      titre: titre ?? this.titre,
+      confirmation: confirmation ?? this.confirmation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $CorbeilleDemandesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (elementId.present) {
+      map['element_id'] = Variable<String>(elementId.value);
+    }
+    if (action.present) {
+      map['action'] = Variable<String>(action.value);
+    }
+    if (titre.present) {
+      map['titre'] = Variable<String>(titre.value);
+    }
+    if (confirmation.present) {
+      map['confirmation'] = Variable<String>(confirmation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CorbeilleDemandesCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('type: $type, ')
+          ..write('elementId: $elementId, ')
+          ..write('action: $action, ')
+          ..write('titre: $titre, ')
+          ..write('confirmation: $confirmation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StockAdjustmentsTable extends StockAdjustments
     with TableInfo<$StockAdjustmentsTable, StockAdjustment> {
   @override
@@ -37172,6 +38445,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $CreditNotesTable creditNotes = $CreditNotesTable(this);
+  late final $CorbeilleElementsTable corbeilleElements =
+      $CorbeilleElementsTable(this);
+  late final $CorbeilleDemandesTable corbeilleDemandes =
+      $CorbeilleDemandesTable(this);
   late final $StockAdjustmentsTable stockAdjustments = $StockAdjustmentsTable(
     this,
   );
@@ -37246,6 +38523,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     sales,
     saleLines,
     creditNotes,
+    corbeilleElements,
+    corbeilleDemandes,
     stockAdjustments,
     stockMovements,
     syncConflicts,
@@ -52611,6 +53890,636 @@ typedef $$CreditNotesTableProcessedTableManager =
       AvoirClient,
       PrefetchHooks Function()
     >;
+typedef $$CorbeilleElementsTableCreateCompanionBuilder =
+    CorbeilleElementsCompanion Function({
+      required String id,
+      required String type,
+      required String elementId,
+      required String titre,
+      Value<String> detail,
+      required String module,
+      Value<DateTime?> archiveLe,
+      required bool restaurable,
+      Value<String?> motifRestauration,
+      required bool supprimable,
+      Value<String?> motifSuppression,
+      Value<int> rowid,
+    });
+typedef $$CorbeilleElementsTableUpdateCompanionBuilder =
+    CorbeilleElementsCompanion Function({
+      Value<String> id,
+      Value<String> type,
+      Value<String> elementId,
+      Value<String> titre,
+      Value<String> detail,
+      Value<String> module,
+      Value<DateTime?> archiveLe,
+      Value<bool> restaurable,
+      Value<String?> motifRestauration,
+      Value<bool> supprimable,
+      Value<String?> motifSuppression,
+      Value<int> rowid,
+    });
+
+class $$CorbeilleElementsTableFilterComposer
+    extends Composer<_$AppDatabase, $CorbeilleElementsTable> {
+  $$CorbeilleElementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get elementId => $composableBuilder(
+    column: $table.elementId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titre => $composableBuilder(
+    column: $table.titre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get detail => $composableBuilder(
+    column: $table.detail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get module => $composableBuilder(
+    column: $table.module,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get archiveLe => $composableBuilder(
+    column: $table.archiveLe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get restaurable => $composableBuilder(
+    column: $table.restaurable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get motifRestauration => $composableBuilder(
+    column: $table.motifRestauration,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get supprimable => $composableBuilder(
+    column: $table.supprimable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get motifSuppression => $composableBuilder(
+    column: $table.motifSuppression,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CorbeilleElementsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CorbeilleElementsTable> {
+  $$CorbeilleElementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get elementId => $composableBuilder(
+    column: $table.elementId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titre => $composableBuilder(
+    column: $table.titre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get detail => $composableBuilder(
+    column: $table.detail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get module => $composableBuilder(
+    column: $table.module,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get archiveLe => $composableBuilder(
+    column: $table.archiveLe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get restaurable => $composableBuilder(
+    column: $table.restaurable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get motifRestauration => $composableBuilder(
+    column: $table.motifRestauration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get supprimable => $composableBuilder(
+    column: $table.supprimable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get motifSuppression => $composableBuilder(
+    column: $table.motifSuppression,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CorbeilleElementsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CorbeilleElementsTable> {
+  $$CorbeilleElementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get elementId =>
+      $composableBuilder(column: $table.elementId, builder: (column) => column);
+
+  GeneratedColumn<String> get titre =>
+      $composableBuilder(column: $table.titre, builder: (column) => column);
+
+  GeneratedColumn<String> get detail =>
+      $composableBuilder(column: $table.detail, builder: (column) => column);
+
+  GeneratedColumn<String> get module =>
+      $composableBuilder(column: $table.module, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get archiveLe =>
+      $composableBuilder(column: $table.archiveLe, builder: (column) => column);
+
+  GeneratedColumn<bool> get restaurable => $composableBuilder(
+    column: $table.restaurable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get motifRestauration => $composableBuilder(
+    column: $table.motifRestauration,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get supprimable => $composableBuilder(
+    column: $table.supprimable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get motifSuppression => $composableBuilder(
+    column: $table.motifSuppression,
+    builder: (column) => column,
+  );
+}
+
+class $$CorbeilleElementsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CorbeilleElementsTable,
+          ElementCorbeille,
+          $$CorbeilleElementsTableFilterComposer,
+          $$CorbeilleElementsTableOrderingComposer,
+          $$CorbeilleElementsTableAnnotationComposer,
+          $$CorbeilleElementsTableCreateCompanionBuilder,
+          $$CorbeilleElementsTableUpdateCompanionBuilder,
+          (
+            ElementCorbeille,
+            BaseReferences<
+              _$AppDatabase,
+              $CorbeilleElementsTable,
+              ElementCorbeille
+            >,
+          ),
+          ElementCorbeille,
+          PrefetchHooks Function()
+        > {
+  $$CorbeilleElementsTableTableManager(
+    _$AppDatabase db,
+    $CorbeilleElementsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CorbeilleElementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CorbeilleElementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CorbeilleElementsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> elementId = const Value.absent(),
+                Value<String> titre = const Value.absent(),
+                Value<String> detail = const Value.absent(),
+                Value<String> module = const Value.absent(),
+                Value<DateTime?> archiveLe = const Value.absent(),
+                Value<bool> restaurable = const Value.absent(),
+                Value<String?> motifRestauration = const Value.absent(),
+                Value<bool> supprimable = const Value.absent(),
+                Value<String?> motifSuppression = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CorbeilleElementsCompanion(
+                id: id,
+                type: type,
+                elementId: elementId,
+                titre: titre,
+                detail: detail,
+                module: module,
+                archiveLe: archiveLe,
+                restaurable: restaurable,
+                motifRestauration: motifRestauration,
+                supprimable: supprimable,
+                motifSuppression: motifSuppression,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String type,
+                required String elementId,
+                required String titre,
+                Value<String> detail = const Value.absent(),
+                required String module,
+                Value<DateTime?> archiveLe = const Value.absent(),
+                required bool restaurable,
+                Value<String?> motifRestauration = const Value.absent(),
+                required bool supprimable,
+                Value<String?> motifSuppression = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CorbeilleElementsCompanion.insert(
+                id: id,
+                type: type,
+                elementId: elementId,
+                titre: titre,
+                detail: detail,
+                module: module,
+                archiveLe: archiveLe,
+                restaurable: restaurable,
+                motifRestauration: motifRestauration,
+                supprimable: supprimable,
+                motifSuppression: motifSuppression,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CorbeilleElementsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CorbeilleElementsTable,
+      ElementCorbeille,
+      $$CorbeilleElementsTableFilterComposer,
+      $$CorbeilleElementsTableOrderingComposer,
+      $$CorbeilleElementsTableAnnotationComposer,
+      $$CorbeilleElementsTableCreateCompanionBuilder,
+      $$CorbeilleElementsTableUpdateCompanionBuilder,
+      (
+        ElementCorbeille,
+        BaseReferences<
+          _$AppDatabase,
+          $CorbeilleElementsTable,
+          ElementCorbeille
+        >,
+      ),
+      ElementCorbeille,
+      PrefetchHooks Function()
+    >;
+typedef $$CorbeilleDemandesTableCreateCompanionBuilder =
+    CorbeilleDemandesCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String type,
+      required String elementId,
+      required String action,
+      Value<String> titre,
+      Value<String?> confirmation,
+      Value<int> rowid,
+    });
+typedef $$CorbeilleDemandesTableUpdateCompanionBuilder =
+    CorbeilleDemandesCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> type,
+      Value<String> elementId,
+      Value<String> action,
+      Value<String> titre,
+      Value<String?> confirmation,
+      Value<int> rowid,
+    });
+
+class $$CorbeilleDemandesTableFilterComposer
+    extends Composer<_$AppDatabase, $CorbeilleDemandesTable> {
+  $$CorbeilleDemandesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get elementId => $composableBuilder(
+    column: $table.elementId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titre => $composableBuilder(
+    column: $table.titre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get confirmation => $composableBuilder(
+    column: $table.confirmation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CorbeilleDemandesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CorbeilleDemandesTable> {
+  $$CorbeilleDemandesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get elementId => $composableBuilder(
+    column: $table.elementId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titre => $composableBuilder(
+    column: $table.titre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get confirmation => $composableBuilder(
+    column: $table.confirmation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CorbeilleDemandesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CorbeilleDemandesTable> {
+  $$CorbeilleDemandesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get elementId =>
+      $composableBuilder(column: $table.elementId, builder: (column) => column);
+
+  GeneratedColumn<String> get action =>
+      $composableBuilder(column: $table.action, builder: (column) => column);
+
+  GeneratedColumn<String> get titre =>
+      $composableBuilder(column: $table.titre, builder: (column) => column);
+
+  GeneratedColumn<String> get confirmation => $composableBuilder(
+    column: $table.confirmation,
+    builder: (column) => column,
+  );
+}
+
+class $$CorbeilleDemandesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CorbeilleDemandesTable,
+          DemandeCorbeille,
+          $$CorbeilleDemandesTableFilterComposer,
+          $$CorbeilleDemandesTableOrderingComposer,
+          $$CorbeilleDemandesTableAnnotationComposer,
+          $$CorbeilleDemandesTableCreateCompanionBuilder,
+          $$CorbeilleDemandesTableUpdateCompanionBuilder,
+          (
+            DemandeCorbeille,
+            BaseReferences<
+              _$AppDatabase,
+              $CorbeilleDemandesTable,
+              DemandeCorbeille
+            >,
+          ),
+          DemandeCorbeille,
+          PrefetchHooks Function()
+        > {
+  $$CorbeilleDemandesTableTableManager(
+    _$AppDatabase db,
+    $CorbeilleDemandesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CorbeilleDemandesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CorbeilleDemandesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CorbeilleDemandesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> elementId = const Value.absent(),
+                Value<String> action = const Value.absent(),
+                Value<String> titre = const Value.absent(),
+                Value<String?> confirmation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CorbeilleDemandesCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                type: type,
+                elementId: elementId,
+                action: action,
+                titre: titre,
+                confirmation: confirmation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String type,
+                required String elementId,
+                required String action,
+                Value<String> titre = const Value.absent(),
+                Value<String?> confirmation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CorbeilleDemandesCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                type: type,
+                elementId: elementId,
+                action: action,
+                titre: titre,
+                confirmation: confirmation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CorbeilleDemandesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CorbeilleDemandesTable,
+      DemandeCorbeille,
+      $$CorbeilleDemandesTableFilterComposer,
+      $$CorbeilleDemandesTableOrderingComposer,
+      $$CorbeilleDemandesTableAnnotationComposer,
+      $$CorbeilleDemandesTableCreateCompanionBuilder,
+      $$CorbeilleDemandesTableUpdateCompanionBuilder,
+      (
+        DemandeCorbeille,
+        BaseReferences<
+          _$AppDatabase,
+          $CorbeilleDemandesTable,
+          DemandeCorbeille
+        >,
+      ),
+      DemandeCorbeille,
+      PrefetchHooks Function()
+    >;
 typedef $$StockAdjustmentsTableCreateCompanionBuilder =
     StockAdjustmentsCompanion Function({
       required String id,
@@ -55633,6 +57542,10 @@ class $AppDatabaseManager {
       $$SaleLinesTableTableManager(_db, _db.saleLines);
   $$CreditNotesTableTableManager get creditNotes =>
       $$CreditNotesTableTableManager(_db, _db.creditNotes);
+  $$CorbeilleElementsTableTableManager get corbeilleElements =>
+      $$CorbeilleElementsTableTableManager(_db, _db.corbeilleElements);
+  $$CorbeilleDemandesTableTableManager get corbeilleDemandes =>
+      $$CorbeilleDemandesTableTableManager(_db, _db.corbeilleDemandes);
   $$StockAdjustmentsTableTableManager get stockAdjustments =>
       $$StockAdjustmentsTableTableManager(_db, _db.stockAdjustments);
   $$StockMovementsTableTableManager get stockMovements =>

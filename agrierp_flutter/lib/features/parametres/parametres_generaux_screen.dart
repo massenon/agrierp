@@ -11,7 +11,9 @@ import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import 'appairage_poste.dart';
+import 'corbeille_repository.dart';
 import 'onglet_appairage.dart';
+import 'onglet_corbeille.dart';
 import 'onglet_email_smtp.dart';
 import 'onglet_reinitialisation.dart';
 import 'parametres_generaux_repository.dart';
@@ -32,6 +34,10 @@ import '../../core/theme/symboles_agri.dart';
 /// [OngletAppairage]). L'onglet « Appairage » remplace l'écran isolé
 /// « Paramètres du poste » : l'entrée de la barre latérale ouvre ce hub sur lui
 /// ([ongletInitial]).
+///
+/// 🔁 Ticket ARC4 (demande du client : « une page pour afficher les enregistrements archivés et les restaurer ou les
+/// supprimer définitivement, web et poste ») — DIX ONGLETS. « Corbeille » (ex-« Restauration » du web, absente du poste
+/// jusqu'ici) s'insère entre « Audit Logs » et « Réinitialisation », comme au web ([OngletCorbeille]).
 ///
 /// 🔁 Ticket R-1 (demande du client : « sur le web et le poste ») — NEUF ONGLETS.
 /// « Réinitialisation » suit « Audit Logs », comme au web (où « Restauration »,
@@ -56,6 +62,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.envoiEmail,
     this.appairage,
     this.reinitialisation,
+    this.corbeille,
     this.ongletInitial,
   });
 
@@ -71,11 +78,15 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Ticket R-1 — réinitialisation des données par le serveur, puis purge de ce poste ; `null` : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
 
+  /// Ticket ARC4 — la Corbeille (demandes de restauration / de suppression définitive) ; `null` : l'onglet le dit.
+  final CorbeilleRepository? corbeille;
+
   /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
   final String? ongletInitial;
 
   static const ongletEmailSmtp = 'Email (SMTP)';
   static const ongletAppairage = 'Appairage';
+  static const ongletCorbeille = 'Corbeille';
   static const ongletReinitialisation = 'Réinitialisation';
 
   /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
@@ -90,6 +101,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     (ongletAppairage, SymbolesAgri.settings_applications),
     ('Modes de Paiement', SymbolesAgri.account_balance_wallet),
     ('Audit Logs', SymbolesAgri.security),
+    (ongletCorbeille, SymbolesAgri.restore_from_trash),
     (ongletReinitialisation, SymbolesAgri.restart_alt),
   ];
 
@@ -205,6 +217,8 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                         'Gestion Utilisateurs' => _ongletUtilisateurs(d, large),
                         'Modes de Paiement' => _ongletPaiement(d, large),
                         'Audit Logs' => _ongletAudit(d, large),
+                        ParametresGenerauxScreen.ongletCorbeille =>
+                          _ongletCorbeille(),
                         ParametresGenerauxScreen.ongletReinitialisation =>
                           _ongletReinitialisation(),
                         _ => _ongletRoles(d, large),
@@ -543,6 +557,21 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
     }
     return OngletAppairage(appairage: appairage);
+  }
+
+  // ── Onglet « Corbeille » — ticket ARC4 ────────────────────────────────────
+
+  Widget _ongletCorbeille() {
+    final corbeille = widget.corbeille;
+    if (corbeille == null) {
+      return _mentionPoste(
+        'La Corbeille est indisponible dans cette vue : elle s\'ouvre depuis '
+        'Paramètres, une fois la session ouverte.',
+        cle: 'corbeille-indisponible',
+      );
+    }
+    // Pas de défilement imbriqué : l'onglet est lui-même une page (la vue du hub défile déjà).
+    return OngletCorbeille(depot: corbeille);
   }
 
   // ── Onglet 9 : Réinitialisation — ticket R-1 ──────────────────────────────
