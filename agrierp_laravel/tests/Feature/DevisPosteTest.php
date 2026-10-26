@@ -344,7 +344,7 @@ class DevisPosteTest extends TestCase
         $this->assertCount(2, $lignes);
         $this->assertEqualsCanonicalizing(
             ['id', 'quote_number', 'customer_id', 'articles_description', 'amount', 'tva_rate', 'validity_days', 'quote_date',
-                'note', 'status', 'is_active', 'updated_at'],
+                'note', 'status', 'is_active', 'converted_sale_id', 'invoice_number', 'updated_at'],
             array_keys($lignes[self::DEVIS]),
         );
         $this->assertSame(['DEV-2026-001', '2026-10-20', 150000.0, 18.0, 15, 'brouillon', true, 'Remise accordée'], [
@@ -353,6 +353,8 @@ class DevisPosteTest extends TestCase
             $lignes[self::DEVIS]['is_active'], $lignes[self::DEVIS]['note'],
         ]);
         $this->assertFalse($lignes[self::DEVIS_2]['is_active']);
+        // DEV3 : un devis non converti n'a ni lien ni numéro de facture.
+        $this->assertSame([null, null], [$lignes[self::DEVIS]['converted_sale_id'], $lignes[self::DEVIS]['invoice_number']]);
     }
 
     public function test_le_tirage_incremental_ne_sert_que_ce_qui_a_change_depuis_since(): void

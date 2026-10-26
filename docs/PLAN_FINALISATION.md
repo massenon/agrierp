@@ -565,10 +565,25 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 **Limites et décisions :**
 - **Horloge** : la temporisation se mesure à l'horloge de Windows. Reculer l'horloge ne la raccourcit pas (comptée depuis le dernier essai) ; l'avancer ne fait gagner que des minutes. Le plafond de 10 échecs, lui, ne dépend d'aucune horloge. Un PIN de 4 à 6 chiffres protège d'un passant, pas d'un attaquant maître de la session Windows.
 - Verrouiller **démonte** l'application (l'écran de verrouillage la remplace, il ne la recouvre pas) : une saisie en cours est perdue, la synchronisation automatique de l'accueil s'arrête pendant le verrou et repart au déverrouillage.
-- **Verrouillage automatique après inactivité : NON fait** (facultatif et non trivial : il faudrait écouter toute la saisie et arbitrer les saisies en cours) ; à décider par le client si besoin (❓ VL-Q1).
+- **Verrouillage automatique après inactivité : non fait dans VL-1** ; décidé OUI par le client le 21/10/2026 (VL-Q1 ✅ close) et livré par VL-2 ci-dessous.
 - Une déconnexion normale (menu du compte) conserve le PIN de l'utilisateur ; « PIN oublié » et les dix échecs l'effacent.
 - Tests : `verrou_local_test.dart` (18) et `verrou_ecrans_test.dart` (21), écrits rouges d'abord, 7 mutations tuées. **Non vérifié :** coffre Windows réel (Credential Manager), durée de PBKDF2 sur le poste le plus lent de la ferme.
 
+
+### VL-2 ✅ (21/10/2026) Verrouillage automatique après inactivité (VL-Q1 close : OUI)
+
+**Décision du client (VL-Q1) :** OUI, poste uniquement. **Exception de fidélité** (doctrine § 5.6, même ligne que VL-1) : le web n'a ni verrou ni inactivité. Aucune migration Drift, aucune synchronisation.
+
+**Livré :**
+- `lib/core/auth/verrou_inactivite.dart` : `ReglageInactivite` (durée en minutes par utilisateur, au coffre sous `agrierp.inactivite.<id>` ; choix **Jamais / 1 / 5 / 15 / 30 min ; défaut 5 min — décision consignée** ; valeur illisible ou coffre inaccessible = 5 min), `VerrouInactivite` (minuteur, `Timer` donc pilotable par `FakeAsync`, fabrique injectable), `SurveillanceInactivite` (un `Listener` — clic, déplacement, survol, molette/défilement — et un `HardwareKeyboard` globaux).
+- Posé UNE fois, dans `MaterialApp.builder` de `main.dart` (au-dessus du navigateur : une interaction dans une fenêtre modale compte). Armé par `PorteSession` à l'ouverture de l'application, désarmé dès qu'elle la quitte : **jamais pendant la connexion, la définition du PIN ni l'écran de verrouillage** (il ne se re-verrouille donc pas). À l'échéance le PIN est relu : **sans PIN, pas de verrou**.
+- À l'échéance : fenêtres modales fermées (elles recouvriraient l'écran de verrouillage), application démontée, écran de verrouillage ; PIN requis, sans réseau (même chemin que « Verrouiller »).
+- Mon Profil : rubrique « Verrouillage automatique » (liste déroulante) sous « Changer le code PIN » ; le choix s'applique aussitôt.
+
+**Décisions :**
+- **Synchronisation en cours** (`SyncEngine.enCours`) : le verrou n'interrompt JAMAIS un tirage ou un envoi ; il attend sa fin (revérification toutes les 10 s). ⚠️ **Limite :** une fois verrouillé, l'application est démontée (comme décidé pour VL-1) et la synchronisation AUTOMATIQUE (minuterie, réseau, gestes) s'arrête avec le socle d'accueil ; elle repart au déverrouillage. La laisser tourner exigerait de sortir `SynchronisationAutomatique` du socle (son `onTermine` rafraîchit l'écran) : non fait, à décider (ticket éventuel).
+- **Saisie non enregistrée** : le projet n'a qu'un brouillon persistant, celui de « Contactez l'Éditeur » ; il est désormais possédé par la coque (`_AgriErpAppState`), donc **il survit au verrouillage** (et est vidé à la déconnexion et à « PIN oublié », pour qu'un autre utilisateur ne le retrouve pas). Les formulaires modaux n'ont pas de brouillon : s'il y en a un d'ouvert à l'échéance, le verrou est **reporté d'une minute, une seule fois** (toute interaction rend son report), puis la fenêtre est fermée et la saisie non enregistrée est perdue — choix : un poste laissé seul ne reste pas ouvert indéfiniment pour un formulaire oublié.
+- Tests : `verrou_inactivite_test.dart` (15) et `verrou_inactivite_ecrans_test.dart` (8), écrits rouges d'abord ; 8 mutations tuées (défaut, interaction sans effet, PIN non relu, minuteur non désarmé, report, durée, « Jamais », synchro en cours). **Non vérifié :** comportement sur Windows réel (événements souris sous RDP/écran tactile), reprise d'une saisie non enregistrée de modale (perdue).
 
 ## Sprint DEP — Saisie des Dépenses à plusieurs lignes (demande du client du 21/10/2026, PRD `docs/prd/depenses-multilignes.md`)
 

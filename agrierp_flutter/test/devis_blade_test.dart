@@ -79,10 +79,13 @@ void main() {
     final colonnesPoste = {for (final c in db.quotes.$columns) c.name};
 
     // Écarts, chacun justifié : `device_id` et `sync_status` sont les métadonnées de toute table synchronisable (CDC §292) ;
-    // `converted_sale_id` n'est lu ni écrit nulle part au web (la conversion en facture n'existe pas : DEV-Q1) ;
-    // `created_at` : le poste ne garde que l'instant de dernière saisie (`updated_at`).
-    expect(colonnesPoste.difference(colonnesServeur), {'device_id', 'sync_status'});
-    expect(colonnesServeur.difference(colonnesPoste), {'converted_sale_id', 'created_at'});
+    // `created_at` : le poste ne garde que l'instant de dernière saisie (`updated_at`) ; ticket DEV3 — `converted_sale_id`
+    // est désormais écrit par la conversion en facture (le poste le reçoit au tirage : il EST dans le schéma du poste) ;
+    // `conversion_requested_at` (la DEMANDE de conversion, fonction propre au poste hors ligne : le web convertit sur place)
+    // et `invoice_number` (le numéro `FV-AAAA-XXXXXX` que le serveur calcule : `Quote::getNumeroFactureAttribute`, pas une
+    // colonne) n'ont pas de colonne au web.
+    expect(colonnesPoste.difference(colonnesServeur), {'device_id', 'sync_status', 'conversion_requested_at', 'invoice_number'});
+    expect(colonnesServeur.difference(colonnesPoste), {'created_at'});
     expect(db.quotes.id.type, DriftSqlType.string, reason: 'clé UUID, jamais un entier auto-incrémenté');
     // Les statuts de l'énumération de la migration sont ceux du poste.
     final enumeration = RegExp(r"enum\('status', \[([^\]]*)\]\)").firstMatch(_migration!)!.group(1)!;
@@ -182,7 +185,13 @@ void main() {
     }.toList();
     expect(messages, containsAll(['Devis marqué comme envoyé.', 'Devis marqué comme accepté.', 'Devis marqué comme refusé.']));
     final poste = litterauxDe(_fichiers);
+    // ⚠️ ÉCART ASSUMÉ (ticket DEV3, fonction propre au poste hors ligne, doctrine § 5.6) : le toast de succès de la conversion
+    // porte le numéro de la facture, que le SERVEUR crée à l'instant du geste ; le poste, sans réseau, écrit une DEMANDE
+    // (`toastConversionDemandee`) et le numéro apparaît dans le tableau à l'acquittement. Les autres toasts de la conversion
+    // (« déjà facturé », avertissement MeCeF) existent au poste ou n'ont pas d'objet hors ligne.
+    const ecartsHorsLigne = {'Devis converti en facture '};
     for (final message in messages) {
+      if (ecartsHorsLigne.contains(message)) continue;
       expect(poste, contains(_norme(message.replaceAll(r"\'", "'"))), reason: 'message du web : « $message »');
     }
     // Les trois messages de succès de `saveQuote()` / `archiveQuote()`.
@@ -193,7 +202,47 @@ void main() {
     expect(DevisRepository.toastCree, 'Devis créé avec succès.');
     expect(DevisRepository.toastModifie, 'Devis modifié avec succès.');
     expect(DevisRepository.toastArchive, 'Devis archivé avec succès.');
-    expect(DevisRepository.toastConversion, contains('La conversion en facture réelle arrive avec le module Facturation'));
+  }, skip: absent);
+
+  test('⚠️⚠️ « Convertir en Facture » (DEV3) : les messages du web — refus de l action, toast « déjà facturé » — sont ceux du poste, mot pour mot', () {
+    final action = _lire('app/Actions/ConvertirDevisEnFactureAction.php');
+    expect(action, isNotNull);
+    final a = action!;
+
+    // Les refus de `ConvertirDevisEnFactureAction`, tels que le poste les juge AVANT d'écrire sa demande.
+    expect(a, contains("'Ce devis est archivé : il ne peut pas être converti en facture.'"));
+    expect(DevisRepository.messageConversionArchive, 'Ce devis est archivé : il ne peut pas être converti en facture.');
+    expect(a, contains("'Ce devis n\\'a pas de client : une facture à crédit en exige un.'"));
+    expect(DevisRepository.messageConversionSansClient, "Ce devis n'a pas de client : une facture à crédit en exige un.");
+    expect(a, contains("'Seul un devis accepté peut être converti en facture : celui-ci est « '"));
+    expect(DevisRepository.messageConversionStatut('envoye'), 'Seul un devis accepté peut être converti en facture : celui-ci est « Envoyé ».');
+    expect(a, contains('"Le client « {\$client->name} » est archivé : réactivez-le avant de facturer ce devis."'));
+    expect(DevisRepository.messageConversionClientArchive('AMOUSSOU Régis'), 'Le client « AMOUSSOU Régis » est archivé : réactivez-le avant de facturer ce devis.');
+    expect(a, contains('"Plan comptable incomplet : le compte {\$code} ({\$libelle}) est introuvable. "'));
+    expect(a, contains("'Complétez le plan comptable puis relancez la conversion.'"));
+    expect(
+      DevisRepository.messageConversionPlanIncomplet('701', 'Ventes de produits'),
+      'Plan comptable incomplet : le compte 701 (Ventes de produits) est introuvable. Complétez le plan comptable puis relancez la conversion.',
+    );
+    // Les trois comptes de l'écriture de la facture, avec leurs libellés.
+    final comptes = {
+      for (final m in RegExp(r"'(\d+)' => '([^']+)'").allMatches(RegExp(r'COMPTES = \[(.*?)\];', dotAll: true).firstMatch(a)!.group(1)!))
+        m.group(1)!: m.group(2)!,
+    };
+    expect(DevisRepository.comptesDeLaFacture, comptes);
+    // La date de la facture est jugée comme celle d'une vente, préfixe « Facture refusée ».
+    expect(a, contains("str_replace('Vente refusée', 'Facture refusée'"));
+
+    // Le composant : toast « déjà facturé » (mot pour mot), et les deux droits.
+    final c = _composant!;
+    expect(c, contains("'Ce devis est déjà facturé : facture '"));
+    expect(DevisRepository.toastDejaFacture('FV-2026-ABC123'), 'Ce devis est déjà facturé : facture FV-2026-ABC123.');
+    expect(c, contains("authorize('manage-ventes');"));
+    expect(c, contains("authorize('manage-facturation');"));
+    expect(c, contains("'Devis converti en facture '"), reason: 'le toast de succès du web (avec le numéro) : le poste, hors ligne, écrit une demande');
+    expect(c, isNot(contains('arrive avec le module Facturation')), reason: 'le toast d attente a disparu');
+    // ⚠️ ÉCART ASSUMÉ (hors ligne) : le poste dit « demandée », le serveur crée la facture à la synchronisation.
+    expect(DevisRepository.toastConversionDemandee, contains('Conversion en facture demandée'));
   }, skip: absent);
 
   test('⚠️⚠️ les règles et les messages de validation sont ceux du web (`saveQuote()` et `lang/fr/validation.php`)', () {
@@ -271,10 +320,16 @@ void main() {
     // Les conditions : `@if($quote->status === '…')` autour de chaque action, comme le poste (`d.status == '…'`).
     expect(b, contains("@if(\$quote->status === 'brouillon')"));
     expect(b, contains("@if(\$quote->status === 'envoye')"));
-    expect(b, contains("@if(\$quote->status === 'accepte')"));
+    // Ticket DEV3 : « Convertir en Facture » exige en plus les deux droits (le web masque le bouton sans eux).
+    expect(b, contains("@if(\$quote->status === 'accepte' && auth()->user()?->can('manage-ventes') && auth()->user()?->can('manage-facturation'))"));
+    expect(b, contains("@if(\$quote->status === 'facture' && \$quote->sale && auth()->user()?->can('view-facturation'))"));
     expect(ecran, contains("d.status == 'brouillon'"));
     expect(ecran, contains("d.status == 'envoye'"));
-    expect(ecran, contains("d.status == 'accepte'"));
+    expect(ecran, contains("d.status == 'accepte' && widget.peutGerer && widget.peutConvertir"));
+    expect(ecran, contains("d.status == 'facture' && d.convertedSaleId != null && widget.peutVoirFacturation"));
+    // « Voir la facture » : même infobulle et même icône que le lien du Blade.
+    expect(b, contains('title="Voir la facture"><span class="material-symbols-outlined text-[18px]">visibility</span>'));
+    expect(RegExp(r"infobulle: 'Voir la facture',\s*icone: SymbolesAgri\.visibility,").hasMatch(ecran), isTrue);
   }, skip: absent);
 
   test('⚠️ le hub place « Devis Prestations » en deuxième onglet, avec son icône', () {
@@ -304,6 +359,10 @@ void main() {
     expect(appel, contains('devis: widget.devis'));
     expect(appel, contains("peutGerer: PermissionsPoste.peut(_role, 'manage-ventes')"));
     expect(appel, contains("peutExporter: PermissionsPoste.peut(_role, 'export-ventes')"));
+    // Ticket DEV3 : la conversion exige `manage-facturation` EN PLUS ; « Voir la facture » : `view-facturation`.
+    expect(appel, contains("peutConvertir: PermissionsPoste.peut(_role, 'manage-facturation')"));
+    expect(appel, contains("peutVoirFacturation: PermissionsPoste.peut(_role, 'view-facturation')"));
+    expect(appel, contains('surVoirFacturation: () => setState(() => _ecran = EcranPoste.facturation)'));
   }, skip: absent);
 
   test('⚠️ le PDF « Exporter » : mêmes colonnes, titre, sous-titre, nom de fichier et état vide que `exports/devis.blade.php`', () {

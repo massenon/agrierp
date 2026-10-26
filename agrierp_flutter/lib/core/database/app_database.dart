@@ -1748,6 +1748,21 @@ class Quotes extends Table with SyncColumns {
 
   /// Archivage logique (`false` : archivé, rien n'est supprimé).
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// 🔴→✅ Ticket DEV3 — « CONVERTIR EN FACTURE » : l'instant (heure du Bénin) où ce poste a DEMANDÉ la conversion du devis
+  /// accepté en facture ; `NULL` : aucune demande. Le poste n'envoie que la DEMANDE (`quote_conversions`), le serveur crée
+  /// la facture, la numérote et en rend le lien ([convertedSaleId], [invoiceNumber]). Tant que la demande est ouverte, le
+  /// devis est figé (ni modification, ni archivage) ; elle se ferme à l'acquittement (`NULL`, statut `facture`).
+  /// Fonction propre au poste hors ligne : le web convertit sur place, sans file.
+  DateTimeColumn get conversionRequestedAt => dateTime().nullable()();
+
+  /// Ticket DEV3 — la facture issue du devis (`quotes.converted_sale_id` du serveur : une facture EST une vente), `NULL`
+  /// tant que le devis n'est pas converti. Servie au tirage, ou rendue à l'acquittement de la demande.
+  TextColumn get convertedSaleId => text().nullable()();
+
+  /// Ticket DEV3 — `FV-AAAA-XXXXXX`, le numéro de cette facture tel que le SERVEUR le calcule (`Sale::numero_facture`) :
+  /// le poste ne l'invente jamais (même principe que `DEV-AAAA-NNN`).
+  TextColumn get invoiceNumber => text().nullable()();
 }
 
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
@@ -1871,10 +1886,10 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
-  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 59 (dépense à
-  /// crédit et centre de coût obligatoire, DEP6/DEP7) → 60 (modules actifs envoyés au serveur, MOD1).** Le numéro 55 (unicité
-  /// des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide, `from < 56` l'enjambe sans trou.
-  /// Les numéros 57 (conversion des devis) et 58 (corbeille) sont réservés à d'autres branches : `from < 59` les enjambe de même.
+  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 57 (conversion des
+  /// devis, DEV3) → 59 (dépense à crédit et centre de coût obligatoire, DEP6/DEP7) → 60 (modules actifs envoyés au serveur, MOD1).**
+  /// Le numéro 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide. Le 58 (corbeille)
+  /// est réservé à une autre branche : `from < 59` l'enjambe de même.
   ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
@@ -2435,8 +2450,17 @@ class AppDatabase extends _$AppDatabase {
         await _convertirDepensesEnLignes();
       }
 
+      // v57 — ticket DEV3 : « Convertir en Facture » (devis → facture). Trois colonnes sur `quotes` : la demande de
+      // conversion de ce poste et le lien vers la facture que le serveur crée. Aucune donnée à transformer (les devis
+      // existants n'ont ni demande ni facture) ; `sync_status` et `updated_at` ne bougent pas.
+      if (from < 57) {
+        await _ajouterColonneSiAbsente(m, quotes, quotes.conversionRequestedAt);
+        await _ajouterColonneSiAbsente(m, quotes, quotes.convertedSaleId);
+        await _ajouterColonneSiAbsente(m, quotes, quotes.invoiceNumber);
+      }
+
       // v59 — tickets DEP6 et DEP7 : la dépense À CRÉDIT (`on_credit`, trésorerie facultative) et le centre de coût
-      // obligatoire. Voir [_depensesACreditEtCentreObligatoire]. ⚠️ Les numéros 57 et 58 appartiennent à d'autres chantiers.
+      // obligatoire. Voir [_depensesACreditEtCentreObligatoire]. ⚠️ Le numéro 58 (corbeille) appartient à une autre branche.
       if (from < 59) {
         await _depensesACreditEtCentreObligatoire(m);
       }

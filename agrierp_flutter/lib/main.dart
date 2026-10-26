@@ -108,6 +108,7 @@ import 'features/ventes/devis_repository.dart';
 import 'features/ventes/ventes_devis_repository.dart';
 import 'features/ventes/ventes_devis_screen.dart';
 import 'core/theme/symboles_agri.dart';
+import 'core/auth/verrou_inactivite.dart';
 import 'core/auth/verrou_local.dart';
 import 'features/verrou/changement_pin.dart';
 import 'features/verrou/porte_session.dart';
@@ -384,6 +385,17 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// (null/false/true) : rien n'est montré avant que l'état soit connu.
   final VerrouLocal _verrou = VerrouLocal();
 
+  /// Ticket VL-2 — verrouillage automatique après inactivité (propre au poste). Une synchronisation en cours n'est
+  /// pas interrompue : le verrou attend sa fin.
+  late final VerrouInactivite _inactivite = VerrouInactivite(
+    reglage: ReglageInactivite(),
+    verrou: _verrou,
+  )..synchroEnCours = () => _engine.enCours;
+
+  /// Brouillon de « Contactez l'Éditeur », possédé par la COQUE de l'application (et non par le socle) : le
+  /// verrouillage démonte le socle, pas ce brouillon. Vidé à la fin de la session (déconnexion, « PIN oublié »).
+  final _brouillonContact = BrouillonContact();
+
   /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
   /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
   bool _premierDemarrage = false;
@@ -406,6 +418,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   @override
   void dispose() {
     _gestes.dispose();
+    _inactivite.desarmer();
+    _brouillonContact.dispose();
     _db.close();
     super.dispose();
   }
@@ -421,7 +435,16 @@ class _AgriErpAppState extends State<AgriErpApp> {
       locale: LocalisationPoste.locale,
       supportedLocales: LocalisationPoste.locales,
       localizationsDelegates: LocalisationPoste.delegues,
+      // Ticket VL-2 — l'oreille d'inactivité est posée UNE fois, au-dessus du navigateur : les fenêtres modales
+      // comptent aussi comme des interactions.
+      builder: (context, child) =>
+          SurveillanceInactivite(controleur: _inactivite, child: child ?? const SizedBox.shrink()),
       home: PorteSession(
+        inactivite: _inactivite,
+        surFinDeSession: () {
+          _brouillonContact.viderMessage();
+          _brouillonContact.viderBug();
+        },
         auth: _auth,
         verrou: _verrou,
         avantOuverture: _preparerOuverture,
@@ -482,6 +505,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           identifiantPoste: widget.identifiantPoste,
           onDeconnecte: onDeconnecte,
           verrou: _verrou,
+          inactivite: _inactivite,
+          brouillonContact: _brouillonContact,
           onVerrouiller: verrouiller,
           changementsReseau: Connectivity().onConnectivityChanged,
           gestes: _gestes,
@@ -544,6 +569,8 @@ class SocleAccueil extends StatefulWidget {
     this.onDeconnecte,
     this.verrou,
     this.onVerrouiller,
+    this.inactivite,
+    this.brouillonContact,
     this.changementsReseau,
     this.gestes,
     this.synchroniserALOuverture = true,
@@ -557,6 +584,13 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket VL-1 — « Verrouiller » du menu du compte : l'application est remplacée par l'écran de verrouillage.
   final VoidCallback? onVerrouiller;
+
+  /// Ticket VL-2 — minuteur d'inactivité (réglage de Mon profil) ; `null` : pas de rubrique « Verrouillage automatique ».
+  final VerrouInactivite? inactivite;
+
+  /// Ticket VL-2 — brouillon de « Contactez l'Éditeur » possédé par la coque (survit au verrouillage) ; `null` : le
+  /// socle en possède un.
+  final BrouillonContact? brouillonContact;
 
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
@@ -660,10 +694,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
     });
   }
 
-  /// Brouillon de « Contactez l'Éditeur », possédé ICI pour survivre aux
-  /// changements d'écran : un texte rédigé hors ligne ne doit pas disparaître
-  /// parce qu'on est allé vérifier une information ailleurs.
-  final _brouillonContact = BrouillonContact();
+  /// Brouillon de « Contactez l'Éditeur » : possédé par la coque (`_AgriErpAppState`) pour survivre aux
+  /// changements d'écran ET au verrouillage (ticket VL-2).
+  /// Sans brouillon fourni (tests du socle), le socle en possède un et le libère lui-même.
+  late final BrouillonContact _brouillonContact = widget.brouillonContact ?? (_brouillonPropre = BrouillonContact());
+  BrouillonContact? _brouillonPropre;
 
   String get _role => widget.auth.utilisateur?.role ?? '';
 
@@ -782,7 +817,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     _exercice
       ..removeListener(_exerciceChange)
       ..dispose();
-    _brouillonContact.dispose();
+    _brouillonPropre?.dispose();
     super.dispose();
   }
 
@@ -987,6 +1022,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
               ? null
               : widget.auth.changerMotDePasse,
           // Ticket VL-1 — fonction propre au poste : le web n'a pas de verrou.
+          delaiInactivite: widget.inactivite == null || widget.auth.utilisateur == null
+              ? null
+              : () => widget.inactivite!.reglage.lire(widget.auth.utilisateur!.id),
+          changerDelaiInactivite: widget.inactivite?.regler,
           changerPin: widget.verrou == null || widget.auth.utilisateur == null
               ? null
               : ({required ancien, required nouveau, required confirmation}) =>
@@ -1121,6 +1160,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
           peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
           peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
+          // Ticket DEV3 — « Convertir en Facture » : `manage-facturation` EN PLUS de `manage-ventes` (admin seul aujourd'hui) ;
+          // « Voir la facture » : `view-facturation`, vers l'écran Facturation & MeCeF.
+          peutConvertir: PermissionsPoste.peut(_role, 'manage-facturation'),
+          peutVoirFacturation: PermissionsPoste.peut(_role, 'view-facturation'),
+          surVoirFacturation: () => setState(() => _ecran = EcranPoste.facturation),
         ),
         EcranPoste.caisse => CaisseScreen(depot: widget.caisse),
         EcranPoste.synchronisation => SynchronisationScreen(

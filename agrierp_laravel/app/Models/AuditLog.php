@@ -116,6 +116,7 @@ class AuditLog extends Model
         'quote.accepted' => 'Devis accepté',
         'quote.refused' => 'Devis refusé',
         'quote.archived' => 'Devis archivé',
+        'quote.invoiced' => 'Devis converti en facture',
         'customer.created' => 'Client créé',
         'customer.updated' => 'Client modifié',
         'customer.archived' => 'Client archivé',

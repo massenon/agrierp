@@ -397,6 +397,8 @@ void main() {
     const exemptions = <String, String>{
       'parametres_generaux_screen.dart|module-':
           'liste fixe des modules du logiciel (un code par module, posée dans le code, pas lue en base)',
+      'parametres_generaux_screen.dart|bascule-module-':
+          'un interrupteur par espèce : `modules_config.module_code` est unique (liste fixe des espèces du logiciel)',
       'dashboard_elevage_screen.dart|carte-espece-':
           'une carte par espèce ; deux espèces de même code passent sans exception (cles_uniques_test.dart)',
       'elements_fiche.dart|kpi-':
