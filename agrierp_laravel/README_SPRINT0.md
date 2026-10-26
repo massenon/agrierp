@@ -22472,3 +22472,7 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 
 
 **Mesures finales (après fusion de la branche principale, Drift 60)** : suite Laravel **2 446 verts** (25 722 assertions) ; poste `flutter analyze` propre, **3 512 verts, 17 sautés, 0 rouge** (`flutter test --concurrency=3`).
+
+### Sprint POP (26/10/2026) — Fenêtre « Rappels du jour » à l'ouverture (web puis poste)
+**Livré** : `RappelsDuJourService` (R-RAPPELS-01 : soins planifiés, barème prophylactique non administré, fins de délai d'attente, horizon = `rappel_soins_jours`), composant `Shared\RappelsDuJour` dans la mise en page (`view-elevage`), ouverture à la connexion et une fois par session de navigateur, « Ne plus afficher aujourd'hui » local, jamais de fenêtre vide ; poste : calcul local, `PorteSession.surOuverture` (lancement et connexion, pas les déverrouillages), parité Blade ↔ Dart et PHP exécutée. **Aucune migration** (Drift reste en 60). **Non vérifié** : rendu dans un vrai navigateur (Alpine/`sessionStorage`) et sur un poste Windows réel. **Questions client** : POP-Q1 à POP-Q4 (`docs/prd/popup-rappels.md` § 9).
+

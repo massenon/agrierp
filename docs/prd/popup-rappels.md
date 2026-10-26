@@ -48,6 +48,7 @@ Notifications du système d'exploitation (hors application), e-mail, son. Stock 
 - **POP-Q2** Il n'existe pas de « vaccin à renouveler » distinct : le renouvellement est porté par le barème prophylactique (source 2). Confirmer.
 - **POP-Q3** Réafficher la fenêtre à chaque déverrouillage du poste ? (recommandé : non, seulement lancement et connexion).
 - **POP-Q4** Une rémanence qui finit hors de l'horizon N n'est pas listée (le Dashboard liste toutes les rémanences en cours). Confirmer.
+- **POP-Q5** La cloche (`AlertesElevageService::soinsAVenir`) ne filtre pas les espèces désactivées, la fenêtre si. Aligner la cloche ? (recommandé : oui).
 
 ## 10. Critères d'acceptation
 Tests nommés : `agrierp_laravel/tests/Feature/RappelsDuJourTest.php` (règle, tri, droits, module désactivé, fenêtre vide, une fois par session, masquage du jour, connexion), `agrierp_flutter/test/rappels_du_jour_test.dart` (calcul local, modale, porte de session, masquage), `rappels_du_jour_parite_php_test.dart` (même résultat que le serveur), `rappels_du_jour_blade_test.dart` (libellés). Épreuve de mutation : retirer un contrôle de droit, la borne « > N », le filtre de module, le tri, le test « liste vide » ou la comparaison de date du masquage doit faire rougir au moins un test.

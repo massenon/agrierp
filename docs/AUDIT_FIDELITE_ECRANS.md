@@ -414,3 +414,27 @@ Maître : `corbeille.blade.php` + `Livewire\Parametres\Corbeille` ; poste : `ong
 
 ### 12.2 Défauts du WEB trouvés et corrigés d'abord
 Dépense restaurée sans contre-passation rejouée ni trésorerie ; titres vides (provendes, absences) ; pas de contrôle d'exercice clos ni de code pris ; devis, avances, employés, pointages, ventes et transferts annulés absents.
+
+## 13. Fenêtre « Rappels du jour » (tickets POP1 à POP4, 26/10/2026)
+
+Maître : `resources/views/livewire/shared/rappels-du-jour.blade.php` (composant `Shared\RappelsDuJour`, service `RappelsDuJourService`). Poste : `rappels_du_jour_modale.dart`, `rappels_du_jour_repository.dart`.
+
+| Élément | Web | Poste | Garde-fou |
+|---|---|---|---|
+| Titre « Rappels du jour », intitulé, 5 colonnes (Bande, Rappel, Produit, Date prévue, Échéance) | ✅ | ✅ | `rappels_du_jour_blade_test` |
+| Groupes « En retard » / « Aujourd'hui » / « À venir (sous N jours) » + effectif | ✅ | ✅ | idem |
+| Libellés de type et formules d'échéance | ✅ (service) | ✅ | idem, lus dans le service |
+| Pied : « Ouvrir Soins et vaccins », « Ne plus afficher aujourd'hui », « Plus tard » | ✅ | ✅ | idem |
+| Mêmes lignes, même ordre (3 délais : 3, 5, 0 jours) | ✅ | ✅ | `rappels_du_jour_parite_php_test` (PHP exécuté) |
+| Droit `view-elevage`, caissier exclu ; espèce désactivée ; bande non vivante ; jamais vide | ✅ | ✅ | `RappelsDuJourTest`, `rappels_du_jour_test` |
+
+### 13.1 ÉCARTS ASSUMÉS
+| Écart | Raison | Garde-fou |
+|---|---|---|
+| Déclenchement : web = connexion + premier chargement de la session de navigateur (`sessionStorage`) ; poste = lancement + connexion, pas les déverrouillages | deux cycles de vie différents | `RappelsDuJourTest` (une fois par session, connexion), `rappels_du_jour_test` (porte de session) |
+| « Ne plus afficher aujourd'hui » : `localStorage` (web) / coffre du système (poste), par utilisateur et par jour | stockage local de chaque plateforme | idem |
+| Modules Actifs vides : web = aucune espèce active, poste = toutes (convention du Dashboard Élevage du poste) | table jamais tirée | — |
+
+### 13.2 Défaut de fond relevé (web, non corrigé ici)
+`AlertesElevageService::soinsAVenir()` (cloche) ne filtre pas les espèces désactivées : la cloche peut encore signaler un soin d'une espèce éteinte, alors que la fenêtre ne le fait pas. À arbitrer (POP-Q5) : le filtre se mettrait dans `soinsAVenir`.
+
