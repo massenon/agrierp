@@ -22437,3 +22437,7 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 **Épreuve de mutation.** Laravel : 11/11 tuées. Poste : 8/8 tuées (plafonds quantité et montant, exercice clos, statut « traité », protection des demandes pending/conflict au tirage, sortie anticipée de `_pousser`, accusé de réception, remise de la vente).
 
 **NON vérifié.** Parité exécutée seulement avec PHP local (SQLite) ; aucune recette sur poste Windows ni sur MySQL de production ; ticket PDF non essayé hors ligne réelle. Questions client AV-Q1 à AV-Q5 : `docs/PLAN_FINALISATION.md`.
+
+### MOD1 — Modules Actifs basculables au poste (21/10/2026)
+
+**Contrat modifié.** `POST /api/sync/push` accepte `modules_config` : liste de `{id, species_code, is_enabled}` (l'`id` est le code de l'espèce, sous lequel le serveur acquitte ou refuse). Droit `manage-modules` (sinon refus par ligne : « votre rôle ne permet pas d'activer ou désactiver un module »). Valeur explicite, jamais une bascule ; espèce inconnue ou valeur non booléenne refusées ; journal `module.toggled`, `updated_by` tracé ; `ModuleConfig::definir()` est le point d'écriture commun avec `Livewire\Parametres\ModulesActifs`. Ne touche jamais la comptabilité. La clé n'est plus comptée dans `referentiels_ignored`. Tirage inchangé. Poste : Drift v60, absorbeur qui ne remplace pas une bascule non acquittée. Détail et tests : `docs/PLAN_FINALISATION.md`, Sprint MOD.

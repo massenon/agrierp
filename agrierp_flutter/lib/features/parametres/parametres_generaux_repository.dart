@@ -1,4 +1,9 @@
+import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import '../stocks/pmp_service.dart';
 
 /// Les quatre modules d'espèce, tels que la maquette les nomme.
@@ -132,9 +137,57 @@ class DonneesParametresGeneraux {
 /// la maquette, elle, masque les blocs `data-module="helico"`. Le poste lit
 /// désormais cette table.
 class ParametresGenerauxRepository {
-  ParametresGenerauxRepository({required this.database});
+  ParametresGenerauxRepository({
+    required this.database,
+    DateTime Function()? maintenant,
+    Uuid? uuid,
+  }) : _maintenant = maintenant ?? HeureBenin.maintenant,
+       _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
+  final DateTime Function() _maintenant;
+  final Uuid _uuid;
+
+  /// `ModulesActifs::toggleModule()` — active ou désactive UNE espèce, indépendamment des autres.
+  ///
+  /// 🔴 Avant le ticket MOD1, le poste n'avait AUCUN interrupteur (le réglage « se faisait sur le web ») : le client ne
+  /// pouvait ni activer ni désactiver un module. La valeur choisie est écrite localement (`pending`, effet immédiat sur
+  /// les écrans d'élevage, qui relisent cette table à l'ouverture) puis envoyée au serveur (`modules_config`, droit
+  /// `manage-modules`) ; le tirage ne l'écrase pas tant qu'elle n'est pas acquittée (`_absorberModules`).
+  ///
+  /// ⚠️ Ne touche QUE `modules_config` : ni les données déjà saisies de l'espèce, ni la comptabilité. Aucun « au moins un
+  /// module » : le web n'impose rien, le poste non plus.
+  Future<void> definirModule(ModuleEspece module, {required bool actif}) async {
+    final instant = HeureBenin.versInstant(_maintenant());
+    final existante = await (database.select(
+      database.modulesConfig,
+    )..where((t) => t.speciesCode.equals(module.code))).getSingleOrNull();
+
+    if (existante == null) {
+      await database
+          .into(database.modulesConfig)
+          .insert(
+            ModulesConfigCompanion.insert(
+              id: _uuid.v4(),
+              speciesCode: module.code,
+              isEnabled: Value(actif),
+              syncStatus: const Value(SyncStatus.pending),
+              updatedAt: Value(instant),
+            ),
+          );
+      return;
+    }
+
+    await (database.update(
+      database.modulesConfig,
+    )..where((t) => t.id.equals(existante.id))).write(
+      ModulesConfigCompanion(
+        isEnabled: Value(actif),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(instant),
+      ),
+    );
+  }
 
   Future<DonneesParametresGeneraux> charger() async {
     final entreprise = await database

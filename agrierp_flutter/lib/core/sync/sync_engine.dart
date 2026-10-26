@@ -2713,18 +2713,41 @@ class SyncEngine {
     final lignes = _lignes(brut);
 
     await _db.transaction(() async {
+      // ⚠️⚠️ TICKET MOD1 — UNE BASCULE FAITE SUR CE POSTE ET PAS ENCORE ACQUITTÉE N'EST JAMAIS ÉCRASÉE. Le référentiel
+      // était remplacé en bloc à chaque tirage : le serveur, qui n'avait pas encore reçu la bascule, renvoyait
+      // l'ancienne valeur et le module « revenait » tout seul à son état d'avant. Les lignes `pending` / `conflict`
+      // sont mises de côté, gardent leur valeur locale et leur statut ; les autres sont remplacées comme avant.
+      final locales = await _db.select(_db.modulesConfig).get();
+      final enAttente = {
+        for (final m in locales)
+          if (m.syncStatus != SyncStatus.synced) m.speciesCode: m,
+      };
+
       await _db.delete(_db.modulesConfig).go();
 
+      final vus = <String>{};
       for (final l in lignes) {
+        final code = (l['species_code'] ?? '') as String;
+        final locale = enAttente[code];
+        vus.add(code);
         await _db
             .into(_db.modulesConfig)
             .insert(
               ModulesConfigCompanion.insert(
                 id: l['id'] as String,
-                speciesCode: (l['species_code'] ?? '') as String,
-                isEnabled: Value(_bool(l['is_enabled'])),
+                speciesCode: code,
+                isEnabled: Value(locale != null ? locale.isEnabled : _bool(l['is_enabled'])),
+                syncStatus: Value(locale?.syncStatus ?? SyncStatus.synced),
+                updatedAt: Value(locale?.updatedAt),
               ),
             );
+      }
+
+      // Une bascule en attente pour une espèce que le serveur ne liste pas (poste qui n'a jamais tiré cette ligne) reste.
+      for (final locale in enAttente.values) {
+        if (!vus.contains(locale.speciesCode)) {
+          await _db.into(_db.modulesConfig).insert(locale);
+        }
       }
     });
 
@@ -4830,6 +4853,11 @@ class SyncEngine {
       _db.companySettings,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket MOD1 — modules actifs basculés au poste (`RecordModulesConfigFromDeviceAction`, droit `manage-modules`).
+    final modules = await (_db.select(
+      _db.modulesConfig,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     _financiersAcquittes = 0;
     _ventesDeBetailAcquittees = 0;
     _courriersAcquittes = 0;
@@ -4847,6 +4875,7 @@ class SyncEngine {
         provendes.isEmpty &&
         numerotations.isEmpty &&
         entreprise.isEmpty &&
+        modules.isEmpty &&
         courriers.isEmpty &&
         archives.isEmpty &&
         documents.isEmpty &&
@@ -4964,6 +4993,9 @@ class SyncEngine {
           'elevage_numbering': numerotations.map(_numerotationEnJson).toList(),
         if (entreprise.isNotEmpty)
           'company_settings': entreprise.map(_rappelSoinsEnJson).toList(),
+        // Ticket MOD1 — UNE LIGNE PAR ESPÈCE, valeur explicite (jamais une bascule) ; acquittée sous le code de l'espèce.
+        if (modules.isNotEmpty)
+          'modules_config': modules.map(_moduleEnJson).toList(),
         'sales': ventes
             .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
             .toList(),
@@ -5269,6 +5301,29 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket MOD1 — l'identifiant d'une ligne est le CODE de l'espèce, comme au serveur.
+    accepte += await _acquitter(
+      'modules_config',
+      corps['modules_config'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final m in modules) (m.speciesCode, m.updatedAt)],
+        ids,
+        (code, saisie) =>
+            (_db.update(_db.modulesConfig)..where(
+                  (t) => Expression.and([
+                    t.speciesCode.equals(code),
+                    saisie == null
+                        ? t.updatedAt.isNull()
+                        : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(ModulesConfigCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
     accepte += await _acquitter(
       'sales',
       corps['sales'],
@@ -5560,6 +5615,8 @@ class SyncEngine {
     'feed_types',
     'elevage_numbering',
     'company_settings',
+    // Ticket MOD1 — modules actifs (`modules_config`), juste après les paramètres d'élevage, comme au serveur.
+    'modules_config',
     'suppliers',
     'customers',
     // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
@@ -6277,6 +6334,17 @@ class SyncEngine {
                     syncStatus: Value(SyncStatus.pending),
                   ),
                 ),
+      // Ticket MOD1 — le refus porte le code de l'espèce : la ligne locale en conflit repart en file.
+      'modules_config' =>
+        () =>
+            (_db.update(_db.modulesConfig)..where(
+                  (t) => t.syncStatus.equalsValue(SyncStatus.conflict),
+                ))
+                .write(
+                  const ModulesConfigCompanion(
+                    syncStatus: Value(SyncStatus.pending),
+                  ),
+                ),
       _ => null,
     };
 
@@ -6768,6 +6836,13 @@ class SyncEngine {
   static Map<String, dynamic> _rappelSoinsEnJson(CompanySetting e) => {
     'id': ParametresElevageCles.rappelSoins,
     'rappel_soins_jours': e.rappelSoinsJours,
+  };
+
+  /// Ticket MOD1 — `{id, species_code, is_enabled}` : la VALEUR choisie, pas une bascule (`RecordModulesConfigFromDeviceAction`).
+  static Map<String, dynamic> _moduleEnJson(ModulesConfigData m) => {
+    'id': m.speciesCode,
+    'species_code': m.speciesCode,
+    'is_enabled': m.isEnabled,
   };
 
   Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {

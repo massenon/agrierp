@@ -15334,7 +15334,34 @@ class $ModulesConfigTable extends ModulesConfig
     defaultValue: const Constant(true),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, speciesCode, isEnabled];
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($ModulesConfigTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    speciesCode,
+    isEnabled,
+    syncStatus,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -15369,6 +15396,12 @@ class $ModulesConfigTable extends ModulesConfig
         isEnabled.isAcceptableOrUnknown(data['is_enabled']!, _isEnabledMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -15390,6 +15423,16 @@ class $ModulesConfigTable extends ModulesConfig
         DriftSqlType.bool,
         data['${effectivePrefix}is_enabled'],
       )!,
+      syncStatus: $ModulesConfigTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
     );
   }
 
@@ -15397,6 +15440,9 @@ class $ModulesConfigTable extends ModulesConfig
   $ModulesConfigTable createAlias(String alias) {
     return $ModulesConfigTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class ModulesConfigData extends DataClass
@@ -15406,10 +15452,21 @@ class ModulesConfigData extends DataClass
   /// `cuniculture` · `aviculture` · `porciculture` · `helico`.
   final String speciesCode;
   final bool isEnabled;
+
+  /// Ticket MOD1 — `pending` dès qu'un module est basculé sur CE poste, `synced` une fois le serveur acquitté (ou pour
+  /// une ligne tirée), `conflict` si le serveur refuse (droit `manage-modules`, espèce inconnue). ⚠️ Tant qu'elle n'est
+  /// pas `synced`, le tirage NE LA REMPLACE PAS : sans cela, le serveur renvoyait l'ancienne valeur et la bascule
+  /// « revenait » toute seule au cycle suivant.
+  final SyncStatus syncStatus;
+
+  /// Ticket MOD1 — instant de la bascule au poste (nul pour une ligne tirée).
+  final DateTime? updatedAt;
   const ModulesConfigData({
     required this.id,
     required this.speciesCode,
     required this.isEnabled,
+    required this.syncStatus,
+    this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -15417,6 +15474,14 @@ class ModulesConfigData extends DataClass
     map['id'] = Variable<String>(id);
     map['species_code'] = Variable<String>(speciesCode);
     map['is_enabled'] = Variable<bool>(isEnabled);
+    {
+      map['sync_status'] = Variable<String>(
+        $ModulesConfigTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     return map;
   }
 
@@ -15425,6 +15490,10 @@ class ModulesConfigData extends DataClass
       id: Value(id),
       speciesCode: Value(speciesCode),
       isEnabled: Value(isEnabled),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
     );
   }
 
@@ -15437,6 +15506,10 @@ class ModulesConfigData extends DataClass
       id: serializer.fromJson<String>(json['id']),
       speciesCode: serializer.fromJson<String>(json['speciesCode']),
       isEnabled: serializer.fromJson<bool>(json['isEnabled']),
+      syncStatus: $ModulesConfigTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
     );
   }
   @override
@@ -15446,6 +15519,10 @@ class ModulesConfigData extends DataClass
       'id': serializer.toJson<String>(id),
       'speciesCode': serializer.toJson<String>(speciesCode),
       'isEnabled': serializer.toJson<bool>(isEnabled),
+      'syncStatus': serializer.toJson<String>(
+        $ModulesConfigTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
     };
   }
 
@@ -15453,10 +15530,14 @@ class ModulesConfigData extends DataClass
     String? id,
     String? speciesCode,
     bool? isEnabled,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
   }) => ModulesConfigData(
     id: id ?? this.id,
     speciesCode: speciesCode ?? this.speciesCode,
     isEnabled: isEnabled ?? this.isEnabled,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
   ModulesConfigData copyWithCompanion(ModulesConfigCompanion data) {
     return ModulesConfigData(
@@ -15465,6 +15546,10 @@ class ModulesConfigData extends DataClass
           ? data.speciesCode.value
           : this.speciesCode,
       isEnabled: data.isEnabled.present ? data.isEnabled.value : this.isEnabled,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -15473,37 +15558,48 @@ class ModulesConfigData extends DataClass
     return (StringBuffer('ModulesConfigData(')
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
-          ..write('isEnabled: $isEnabled')
+          ..write('isEnabled: $isEnabled, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, speciesCode, isEnabled);
+  int get hashCode =>
+      Object.hash(id, speciesCode, isEnabled, syncStatus, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ModulesConfigData &&
           other.id == this.id &&
           other.speciesCode == this.speciesCode &&
-          other.isEnabled == this.isEnabled);
+          other.isEnabled == this.isEnabled &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt);
 }
 
 class ModulesConfigCompanion extends UpdateCompanion<ModulesConfigData> {
   final Value<String> id;
   final Value<String> speciesCode;
   final Value<bool> isEnabled;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
   final Value<int> rowid;
   const ModulesConfigCompanion({
     this.id = const Value.absent(),
     this.speciesCode = const Value.absent(),
     this.isEnabled = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ModulesConfigCompanion.insert({
     required String id,
     required String speciesCode,
     this.isEnabled = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        speciesCode = Value(speciesCode);
@@ -15511,12 +15607,16 @@ class ModulesConfigCompanion extends UpdateCompanion<ModulesConfigData> {
     Expression<String>? id,
     Expression<String>? speciesCode,
     Expression<bool>? isEnabled,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (speciesCode != null) 'species_code': speciesCode,
       if (isEnabled != null) 'is_enabled': isEnabled,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -15525,12 +15625,16 @@ class ModulesConfigCompanion extends UpdateCompanion<ModulesConfigData> {
     Value<String>? id,
     Value<String>? speciesCode,
     Value<bool>? isEnabled,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
     Value<int>? rowid,
   }) {
     return ModulesConfigCompanion(
       id: id ?? this.id,
       speciesCode: speciesCode ?? this.speciesCode,
       isEnabled: isEnabled ?? this.isEnabled,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15547,6 +15651,14 @@ class ModulesConfigCompanion extends UpdateCompanion<ModulesConfigData> {
     if (isEnabled.present) {
       map['is_enabled'] = Variable<bool>(isEnabled.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $ModulesConfigTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -15559,6 +15671,8 @@ class ModulesConfigCompanion extends UpdateCompanion<ModulesConfigData> {
           ..write('id: $id, ')
           ..write('speciesCode: $speciesCode, ')
           ..write('isEnabled: $isEnabled, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -44827,6 +44941,8 @@ typedef $$ModulesConfigTableCreateCompanionBuilder =
       required String id,
       required String speciesCode,
       Value<bool> isEnabled,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 typedef $$ModulesConfigTableUpdateCompanionBuilder =
@@ -44834,6 +44950,8 @@ typedef $$ModulesConfigTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> speciesCode,
       Value<bool> isEnabled,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 
@@ -44858,6 +44976,17 @@ class $$ModulesConfigTableFilterComposer
 
   ColumnFilters<bool> get isEnabled => $composableBuilder(
     column: $table.isEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -44885,6 +45014,16 @@ class $$ModulesConfigTableOrderingComposer
     column: $table.isEnabled,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ModulesConfigTableAnnotationComposer
@@ -44906,6 +45045,15 @@ class $$ModulesConfigTableAnnotationComposer
 
   GeneratedColumn<bool> get isEnabled =>
       $composableBuilder(column: $table.isEnabled, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
 class $$ModulesConfigTableTableManager
@@ -44946,11 +45094,15 @@ class $$ModulesConfigTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> speciesCode = const Value.absent(),
                 Value<bool> isEnabled = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ModulesConfigCompanion(
                 id: id,
                 speciesCode: speciesCode,
                 isEnabled: isEnabled,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -44958,11 +45110,15 @@ class $$ModulesConfigTableTableManager
                 required String id,
                 required String speciesCode,
                 Value<bool> isEnabled = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ModulesConfigCompanion.insert(
                 id: id,
                 speciesCode: speciesCode,
                 isEnabled: isEnabled,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

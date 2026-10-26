@@ -31,4 +31,20 @@ class ModuleConfig extends Model
     {
         return (bool) static::where('species_code', $speciesCode)->value('is_enabled');
     }
+
+    /**
+     * UN SEUL POINT D'ÉCRITURE de l'activation d'un module (ticket MOD1) : l'écran web
+     * (`ModulesActifs::toggleModule()`) et l'envoi du poste (`RecordModulesConfigFromDeviceAction`) passent ici,
+     * avec le même journal d'audit. La valeur est EXPLICITE : rejouer un envoi ne rebascule jamais le module.
+     * Ne touche que `modules_config` — jamais la comptabilité ni les données déjà saisies de l'espèce.
+     */
+    public static function definir(string $speciesCode, bool $actif, ?string $userId): self
+    {
+        $config = static::firstOrCreate(['species_code' => $speciesCode], ['is_enabled' => false]);
+        $config->update(['is_enabled' => $actif, 'updated_by' => $userId]);
+
+        AuditLog::record('module.toggled', 'parametres', $userId);
+
+        return $config;
+    }
 }
