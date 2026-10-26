@@ -36,6 +36,14 @@ class ProductsSeeder extends Seeder
         $categoryLabels = ['Cuniculture', 'Aviculture', 'Porciculture', 'Maraîchage', 'Transformation', 'Équipements', 'Aliments', 'Médicaments', 'Autre'];
         $categoryIds = [];
         foreach ($categoryLabels as $label) {
+            // « Autre » peut déjà exister (insérée par la migration
+            // 2026_10_26_000002_ajouter_categorie_autre_aux_produits) — on
+            // récupère son id plutôt que d'en créer un doublon.
+            $existing = DB::table('product_categories')->where('label', $label)->first();
+            if ($existing) {
+                $categoryIds[$label] = $existing->id;
+                continue;
+            }
             $id = (string) Str::uuid();
             DB::table('product_categories')->insert([
                 'id' => $id,
