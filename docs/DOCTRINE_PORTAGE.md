@@ -129,6 +129,7 @@ La fidélité à la vue Blade a une limite : une fonction qui n'a de sens que pa
 | Exception | Décision | Pourquoi elle n'existe pas au web | Garde-fou |
 | --- | --- | --- | --- |
 | **Verrou local (VL-1)** : code PIN de 4 à 6 chiffres, écran de verrouillage à chaque lancement, entrée « Verrouiller » du menu du compte, carte « Changer le code PIN » de Mon Profil | Client, 21/10/2026 : « verrou local, écran de verrouillage à chaque lancement, sans réseau requis » | Le web s'appuie sur la session du serveur (connexion en ligne, expiration). Le poste reprend sa session SANS réseau (`reprendreSession`) : sans verrou, quiconque ouvre la machine lit les données de la ferme | `test/verrou_local_test.dart`, `test/verrou_ecrans_test.dart` (dont l'épreuve : aucun texte de l'application tant que verrouillé) |
+| **Verrouillage automatique après inactivité (VL-2)** : minuteur global (pointeur, défilement, clavier), durée Jamais / 1 / 5 / 15 / 30 min (défaut 5) réglée dans Mon Profil, local à l'utilisateur | Client, 21/10/2026 (VL-Q1) : « oui au verrouillage automatique après inactivité », poste uniquement | Le web n'a pas de verrou ; l'expiration de session est l'affaire du serveur. Le poste reste ouvert hors ligne tant que personne ne le ferme | `test/verrou_inactivite_test.dart`, `test/verrou_inactivite_ecrans_test.dart` |
 
 Règle : toute future exception de ce tableau se justifie par le hors-ligne, jamais par une préférence d'interface.
 
