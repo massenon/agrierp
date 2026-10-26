@@ -50,6 +50,7 @@ void main() {
     'livestock_transfers': 'lib/features/elevage/transferts_repository.dart',
     // Tickets AV1 / AV2 — « Retours et Avoirs » : la demande de retour et « marquer comme traité » passent par ce dépôt.
     'credit_notes': 'lib/features/ventes/avoirs_repository.dart',
+    'corbeille_demandes': 'lib/features/parametres/corbeille_repository.dart',
     // Ticket BS1 — « Bandes & Sujets » : la bande se crée, se modifie et s'archive par ce dépôt.
     'livestock_lots': 'lib/features/elevage/bandes_repository.dart',
     // Ticket BS3 — « Registre des Reproducteurs » : le sujet nominatif s'enregistre, se modifie et se sort par ce dépôt.
@@ -61,6 +62,8 @@ void main() {
     'feed_types': 'lib/features/elevage/parametres_elevage_repository.dart',
     'elevage_numbering_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
     'company_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
+    // Ticket MOD1 — « Modules Actifs » : la bascule d'une espèce s'écrit par ce dépôt (le moteur ne fait qu'absorber / acquitter).
+    'modules_config': 'lib/features/parametres/parametres_generaux_repository.dart',
   };
 
   /// EXCEPTIONS LÉGITIMES, chacune justifiée. Clé : `table <- fichier`. Une exception devenue inutile fait échouer le

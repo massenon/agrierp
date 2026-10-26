@@ -708,6 +708,7 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'sales' => 'Vente',
     // Tickets AV1 / AV2 — retour client (demande de retour ou « marquer comme traité »).
     'credit_notes' => 'Retour client',
+    'corbeille_demandes' => 'Demande de la corbeille',
     'stock_adjustments' => 'Ajustement de stock',
     'expenses' => 'Dépense',
     // Ticket DEV — devis saisi, avancé ou archivé au poste.
@@ -723,6 +724,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     'feed_types' => 'Type de provende',
     'elevage_numbering' => 'Numérotation des bandes et sujets',
     'company_settings' => 'Rappel des soins planifiés',
+    // Ticket MOD1 — Paramètres généraux, onglet Modules Actifs.
+    'modules_config' => 'Module actif (espèce)',
     _ => table,
   };
 

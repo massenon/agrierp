@@ -649,6 +649,16 @@ class ModulesConfig extends Table {
   TextColumn get speciesCode => text()();
   BoolColumn get isEnabled => boolean().withDefault(const Constant(true))();
 
+  /// Ticket MOD1 — `pending` dès qu'un module est basculé sur CE poste, `synced` une fois le serveur acquitté (ou pour
+  /// une ligne tirée), `conflict` si le serveur refuse (droit `manage-modules`, espèce inconnue). ⚠️ Tant qu'elle n'est
+  /// pas `synced`, le tirage NE LA REMPLACE PAS : sans cela, le serveur renvoyait l'ancienne valeur et la bascule
+  /// « revenait » toute seule au cycle suivant.
+  TextColumn get syncStatus =>
+      textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  /// Ticket MOD1 — instant de la bascule au poste (nul pour une ligne tirée).
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1906,11 +1916,10 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
-  /// ⚠️ **ARC3 : 56 → 58 (Corbeille).** Les numéros 57, 59 et 60 sont réservés (conversion des devis, dépenses, modules).
-  ///
-  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4).** Le numéro
-  /// 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide, `from < 56` et
-  /// `schemaVersion = 56` l'enjambent sans trou.
+  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 60
+  /// (modules actifs envoyés au serveur, MOD1).** Le numéro 55 (unicité des codes, finalement sans palier Drift) n'est PAS
+  /// utilisé : il reste simplement vide, `from < 56` et `schemaVersion = 56` l'enjambent sans trou. Les numéros 57 à 59
+  /// sont réservés à d'autres branches (conversion des devis, dépenses ; 58 : corbeille, ARC3) : `from < 60` les enjambe de même.
   ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
@@ -1919,7 +1928,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 58;
+  int get schemaVersion => 60;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2478,6 +2487,13 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, corbeilleElements)) await m.createTable(corbeilleElements);
         if (!await _tableExiste(m, corbeilleDemandes)) await m.createTable(corbeilleDemandes);
       }
+
+      // v60 — ticket MOD1 : les modules actifs se basculent au poste et partent au serveur (`syncStatus`, `updatedAt`).
+      // ⚠️ Une ligne déjà là reste `synced` (défaut) : rien n'est renvoyé à la mise à jour.
+      if (from < 60) {
+        await _ajouterColonneSiAbsente(m, modulesConfig, modulesConfig.syncStatus);
+        await _ajouterColonneSiAbsente(m, modulesConfig, modulesConfig.updatedAt);
+      }
     },
   );
 
@@ -2700,6 +2716,8 @@ class AppDatabase extends _$AppDatabase {
     'feed_types',
     'elevage_numbering_settings',
     'company_settings',
+    // Ticket MOD1 — modules actifs basculés au poste (conservés par la purge, comme les autres réglages).
+    'modules_config',
   ];
 
   /// Nombre d'enregistrements en attente d'envoi, toutes tables confondues.

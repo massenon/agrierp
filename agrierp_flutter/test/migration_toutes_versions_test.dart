@@ -247,6 +247,11 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket ARC3 — deux tables créées (aucune colonne ajoutée à une table existante).
   58: [],
+  // Ticket MOD1 — les modules actifs se basculent au poste. ⚠️ 57, 58 et 59 sont réservés à d'autres branches.
+  60: [
+    (d.modulesConfig, d.modulesConfig.syncStatus),
+    (d.modulesConfig, d.modulesConfig.updatedAt),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -344,7 +349,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) est complète ; le 55 est inutilisé', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 58, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; ARC3 : 56 → 58');
+    expect(d.schemaVersion, 60, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés');
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
     expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);

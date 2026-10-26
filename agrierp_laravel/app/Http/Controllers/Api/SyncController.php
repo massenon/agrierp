@@ -2077,7 +2077,6 @@ class SyncController extends Controller
             'fiscal_years',
             'accounting_entries',
             'accounting_entry_lines',
-            'modules_config',
             'roles',
             'users',
             'audit_logs',
@@ -2117,6 +2116,17 @@ class SyncController extends Controller
                 continue;
             }
             $result[$table] = $parametresElevage->execute($table, $request->input($table));
+        }
+
+        // Ticket MOD1 — MODULES ACTIFS BASCULABLES AU POSTE (« je n'arrive pas à activer / désactiver les modules »).
+        // Droit `manage-modules` (celui de l'écran web `ModulesActifs`), valeur explicite, dernier écrivain gagne.
+        if ($request->has('modules_config')) {
+            $result['modules_config'] = $request->user()?->can('manage-modules')
+                ? app(\App\Actions\RecordModulesConfigFromDeviceAction::class)->execute($request->input('modules_config'), $request->user())
+                : ['accepted' => [], 'rejected' => array_map(
+                    fn ($e) => ['id' => is_array($e) ? ($e['id'] ?? null) : null, 'reason' => MotifsRefusPush::roleInsuffisant('modules_config')],
+                    $request->input('modules_config'),
+                )];
         }
 
         // ⚠️ LES FOURNISSEURS ET LES PRODUITS D'ABORD (15.15, 15.17) : un achat ou un

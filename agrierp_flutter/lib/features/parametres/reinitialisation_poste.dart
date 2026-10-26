@@ -175,6 +175,7 @@ class ReinitialisationPoste {
     'purchase_returns': 'Retours fournisseurs',
     'supplier_refunds': 'Remboursements fournisseurs',
     'credit_notes': 'Retours et avoirs clients',
+    'corbeille_demandes': 'Demandes de la corbeille',
     'livestock_transfers': 'Transferts entre bandes',
     'livestock_lots': 'Bandes',
     'animals': 'Reproducteurs (registre nominatif)',

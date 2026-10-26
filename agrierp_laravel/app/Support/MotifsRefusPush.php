@@ -226,6 +226,7 @@ class MotifsRefusPush
             'feed_types' => 'modifier les types de provende',
             'elevage_numbering' => 'modifier la numérotation des bandes et sujets',
             'company_settings' => 'modifier le délai de rappel des soins',
+            'modules_config' => 'activer ou désactiver un module',
             'expenses' => 'enregistrer une dépense',
             'purchases' => 'enregistrer un achat',
             'attendance_records' => 'enregistrer un pointage',

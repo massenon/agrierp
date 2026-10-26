@@ -156,13 +156,13 @@ void main() {
       SymbolesAgri.restart_alt,
     );
     expect(web.icone, 'restart_alt');
-    // Au web : … Audit Logs, Restauration (absent du poste), Réinitialisation, Sauvegardes (absent du poste).
+    // Au web : … Audit Logs, Corbeille (ARC4 : présente au poste), Réinitialisation, Sauvegardes (absente du poste).
     final libellesWeb = onglets.map((o) => o.libelle).toList();
     final precedentWeb = libellesWeb
         .sublist(0, libellesWeb.indexOf(web.libelle))
         .lastWhere(poste.contains);
     expect(poste.indexOf(web.libelle) - poste.indexOf(precedentWeb), 1);
-    expect(precedentWeb, 'Audit Logs');
+    expect(precedentWeb, 'Corbeille');
   }, skip: absent ?? false);
 
   test('⚠️ les routes appelées par le poste existent au serveur', () {
