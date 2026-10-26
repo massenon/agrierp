@@ -585,6 +585,35 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **Saisie non enregistrée** : le projet n'a qu'un brouillon persistant, celui de « Contactez l'Éditeur » ; il est désormais possédé par la coque (`_AgriErpAppState`), donc **il survit au verrouillage** (et est vidé à la déconnexion et à « PIN oublié », pour qu'un autre utilisateur ne le retrouve pas). Les formulaires modaux n'ont pas de brouillon : s'il y en a un d'ouvert à l'échéance, le verrou est **reporté d'une minute, une seule fois** (toute interaction rend son report), puis la fenêtre est fermée et la saisie non enregistrée est perdue — choix : un poste laissé seul ne reste pas ouvert indéfiniment pour un formulaire oublié.
 - Tests : `verrou_inactivite_test.dart` (15) et `verrou_inactivite_ecrans_test.dart` (8), écrits rouges d'abord ; 8 mutations tuées (défaut, interaction sans effet, PIN non relu, minuteur non désarmé, report, durée, « Jamais », synchro en cours). **Non vérifié :** comportement sur Windows réel (événements souris sous RDP/écran tactile), reprise d'une saisie non enregistrée de modale (perdue).
 
+## Sprint VW — Verrou de session sur le web (demande du client du 26/10/2026, PRD `docs/prd/verrou-web.md`)
+
+> « Il faut appliquer aussi le module de verrou session sur le web. » **Cette décision lève l'exception de la doctrine § 5.6** : le verrou est désormais présent des DEUX côtés, avec un mécanisme propre à chacun (web : mot de passe du compte vérifié par le serveur ; poste : PIN local, sans réseau). Le web est construit d'abord (maître) ; le poste ne change que ses libellés communs.
+
+**Décisions client requises :** aucune bloquante. VW-Q1 (défaut 5 min pour tous), VW-Q2 (plafond imposé), VW-Q3 (réglage partagé web/poste), VW-Q4 : voir le PRD § 9, propositions retenues en attendant.
+
+### Ticket VW1 — Web, serveur : état, middleware, déverrouillage
+**Objectif :** un verrou effectif côté serveur, valable même si le navigateur est manipulé.
+**Web :** migration `users.verrouillage_minutes` (smallint, défaut 5) · `VerrouSessionService` (durées, libellés, verrouiller, déverrouiller, limiteur de la connexion, 10 échecs = déconnexion, cookie de rappel) · middleware `SessionVerrouillee` (groupe `web`) · routes `POST /verrouiller`, `POST /deverrouiller`, `GET /verrouillage`.
+**Tests (rouges d'abord) :** `VerrouSessionMiddlewareTest`, `VerrouSessionDeverrouillageTest`, `VerrouSessionAuditTest`. **Mutation :** retirer le test de l'état ; seuil 10 → 11 ; ne pas vérifier le hash.
+
+### Ticket VW2 — Web, navigateur : surcouche, minuterie, menu
+**Web :** composant `x-verrou-session` (surcouche plein écran à la présentation de la connexion), `resources/js/verrou.js` + `verrou-logique.js` (minuterie partagée entre onglets par `localStorage`, requêtes Livewire en vol, 423 → surcouche), entrée « Verrouiller » du menu du compte, page `/verrouillage` (composant `Auth\EcranVerrouillage`).
+**Tests :** `VerrouSessionBladeTest`, `tests/Js/verrou-logique.test.mjs`.
+
+### Ticket VW3 — Web : réglage dans Mon Profil
+**Web :** carte « Verrouillage automatique » (liste Jamais / 1 / 5 / 15 / 30 minutes), `MonProfil::updatedVerrouillageMinutes`. **Tests :** `VerrouSessionReglageTest`, `VerrouSessionLivewireTest`.
+
+### Ticket VW4 — Journal d'audit
+**Web :** libellés `session.*` dans `AuditLog` ; **poste :** `libelles_audit.dart` régénéré par `outils/libelles_audit.py`.
+
+### Ticket VW5 — Poste : un seul jeu de textes
+**Poste :** libellé de la phrase d'aide de « Verrouillage automatique » et sous-titre de l'écran alignés sur le Blade ; `chassis_web_test.dart` attend « Verrouiller » dans le menu web ; garde-fou `verrou_parite_web_test.dart` (libellés lus dans le Blade, durées lues dans `VerrouSessionService`). Aucune migration Drift.
+
+### Ticket VW6 — Documentation
+PRD, doctrine § 5.6 (exception levée), `CLAUDE.md` Laravel et Flutter, `README_SPRINT0.md`.
+
+**Statut :** VW1 à VW6 🔧 en cours (branche `t-verrouweb`).
+
 ## Sprint DEP — Saisie des Dépenses à plusieurs lignes (demande du client du 21/10/2026, PRD `docs/prd/depenses-multilignes.md`)
 
 > « Faut revoir le mode de fonctionnement actuel de la Saisie des Dépenses. » Une dépense = un en-tête + N lignes (libellé, compte de charge, montant). Web d'abord, poste ensuite. Questions client DEP-Q1 à DEP-Q8 : voir le PRD § 9 (décisions déjà prises sur recommandation).
