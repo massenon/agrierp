@@ -65,7 +65,19 @@ Object? executerPhp(
       [fichierScript.path, fichierEntree.path],
       workingDirectory: dossierLaravel,
       environment: application
-          ? const {
+          ? {
+              // ⚠️ WINDOWS / POSTE DE PRODUCTION (retour du client, 26/10/2026) : le dépôt Laravel d'un poste de
+              // production a souvent `php artisan config:cache` — l'environnement ci-dessous est alors IGNORÉ et le
+              // garde-fou « base SQLite en mémoire » refuse (« Refus : la base n est pas une base SQLite en memoire »,
+              // 100 tests de parité en échec). On pointe donc les caches de configuration, de routes et d'événements
+              // vers des fichiers INEXISTANTS : le test ne lit jamais le cache de production, et ne le modifie pas.
+              'APP_CONFIG_CACHE': '${Directory.systemTemp.path}${Platform.pathSeparator}agrierp_pas_de_cache_config.php',
+              'APP_ROUTES_CACHE': '${Directory.systemTemp.path}${Platform.pathSeparator}agrierp_pas_de_cache_routes.php',
+              'APP_EVENTS_CACHE': '${Directory.systemTemp.path}${Platform.pathSeparator}agrierp_pas_de_cache_events.php',
+              // ⚠️ Vues Blade compilées dans un dossier PROPRE À CE PROCESSUS : `flutter test` lance plusieurs processus
+              // en parallèle ; sous Windows, deux PHP qui compilent la même vue dans `storage/framework/views` se
+              // disputent le fichier (« rename(…tmp…): Access is denied », constaté chez le client).
+              'VIEW_COMPILED_PATH': dossierVuesCompilees(),
               'APP_ENV': 'testing',
               'DB_CONNECTION': 'sqlite',
               'DB_DATABASE': ':memory:',
@@ -89,6 +101,13 @@ Object? executerPhp(
     fichierScript.deleteSync();
     fichierEntree.deleteSync();
   }
+}
+
+/// Dossier des vues compilées de CE processus de test (créé à la demande, jamais `storage/framework/views`).
+String dossierVuesCompilees() {
+  final d = Directory('${Directory.systemTemp.path}${Platform.pathSeparator}agrierp_vues_$pid')..createSync(recursive: true);
+
+  return d.path;
 }
 
 /// Démarre Laravel sur SQLite EN MÉMOIRE et migre. Refuse de continuer sur une autre base.
