@@ -10,6 +10,7 @@ import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/toast_agri.dart';
 import 'appairage_poste.dart';
 import 'onglet_appairage.dart';
 import 'onglet_email_smtp.dart';
@@ -562,12 +563,33 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   // ── Onglet 4 : Modules Actifs ─────────────────────────────────────────────
 
   /// Le sous-titre de chaque module, mot pour mot comme la maquette.
+  ///
+  /// ⚠️ LE BLADE DU WEB EST LE MAÎTRE (`livewire/parametres/modules-actifs.blade.php`) : « Fiches, VMS, catalogue POS liés
+  /// à cette filière » pour une espèce exploitée, « Module en préparation — désactivé par défaut » (pastille FUTUR) pour
+  /// l'héliciculture. Les sous-titres propres à chaque espèce de l'ancienne maquette étaient périmés.
   static const _descriptionsModules = <ModuleEspece, String>{
-    ModuleEspece.cuniculture: 'Fiches, VMS, catalogue POS liés aux lapins',
-    ModuleEspece.aviculture: 'Fiches, VMS, catalogue POS liés aux volailles',
-    ModuleEspece.porciculture: 'Fiches, VMS, catalogue POS liés aux porcs',
+    ModuleEspece.cuniculture: 'Fiches, VMS, catalogue POS liés à cette filière',
+    ModuleEspece.aviculture: 'Fiches, VMS, catalogue POS liés à cette filière',
+    ModuleEspece.porciculture: 'Fiches, VMS, catalogue POS liés à cette filière',
     ModuleEspece.helico: 'Module en préparation — désactivé par défaut',
   };
+
+  /// Toast du web (`$this->dispatch('toast', message: …, type: 'success')`).
+  static const messageModuleBascule = 'Modification appliquée avec succès.';
+
+  final _basculesEnCours = <ModuleEspece>{};
+
+  /// `wire:click="toggleModule('…')"` — écrit, relit (les icônes et la couleur suivent), annonce comme le web.
+  Future<void> _basculer(ModuleEspece module, bool actif) async {
+    if (!_basculesEnCours.add(module)) return;
+    try {
+      await widget.depot.definirModule(module, actif: actif);
+      await _charger();
+      if (mounted) ToastAgri.afficher(context, messageModuleBascule);
+    } finally {
+      _basculesEnCours.remove(module);
+    }
+  }
 
   static const _iconesModules = <ModuleEspece, IconData>{
     ModuleEspece.cuniculture: SymbolesAgri.cruelty_free,
@@ -626,16 +648,15 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                               ),
                             ),
                           ),
-                          // ⚠️ « FUTUR » est le mot de la maquette, porté tel
+                          // ⚠️ « FUTUR » est le mot du web, porté tel
                           // quel : l'héliciculture n'est pas éteinte par
                           // accident, elle n'est pas encore exploitée.
                           if (module == ModuleEspece.helico) ...[
                             const SizedBox(width: AgriSpacing.sm),
-                            // ⚠️ EN GRIS, PAS EN JAUNE. Le jaune d'accent sur
-                            // blanc est précisément le défaut de contraste
-                            // corrigé sur la surface web au ticket 14.79 : le
-                            // reproduire ici rendrait la pastille illisible.
-                            _pastille('FUTUR', couleur: AgriColors.outline),
+                            // ⚠️ EN BLEU « info », comme le Blade du web (`text-info-blue`,
+                            // fond `info-blue/10`) — jamais en jaune d'accent : sur blanc,
+                            // c'est le défaut de contraste corrigé au web au ticket 14.79.
+                            _pastille('FUTUR', couleur: AgriColors.infoBlue),
                           ],
                         ],
                       ),
@@ -651,12 +672,22 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                   ),
                 ),
                 const SizedBox(width: AgriSpacing.sm),
-                Icon(
-                  d.moduleActif(module) ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
-                  size: 28,
-                  color: d.moduleActif(module)
-                      ? AgriColors.brandEmerald
-                      : AgriColors.outline,
+                // ⚠️ L'INTERRUPTEUR EST UN BOUTON (ticket MOD1) : c'était une simple icône, qui ne répondait à aucun clic.
+                InkWell(
+                  key: Key('bascule-module-${module.code}'),
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () => _basculer(module, !d.moduleActif(module)),
+                  child: Semantics(
+                    toggled: d.moduleActif(module),
+                    label: 'Activer ou désactiver ${module.libelle}',
+                    child: Icon(
+                      d.moduleActif(module) ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
+                      size: 28,
+                      color: d.moduleActif(module)
+                          ? AgriColors.brandEmerald
+                          : AgriColors.outline,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -668,13 +699,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       // Reproduction », comme la maquette masque ses blocs `data-module`. Le
       // poste l'ignorait : il proposait la fiche Escargots d'une ferme qui
       // n'élève pas d'escargots.
+      // Texte et couleur du Blade du web (`bg-info-blue/10 border-info-blue/30`), mot pour mot.
       _mentionPoste(
         'Ces réglages sont appliqués immédiatement sur tous les onglets de '
         'Gestion Élevage et du Dashboard Élevage. Les données déjà '
         "enregistrées d'une espèce désactivée restent conservées et "
-        'réapparaissent dès la réactivation du module. Le réglage lui-même se '
-        'fait sur la surface web.',
+        'réapparaissent dès la réactivation du module.',
         cle: 'modules',
+        couleur: AgriColors.infoBlue,
       ),
     ],
   );
@@ -1226,13 +1258,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
   /// DEUX quand aucun tirage n'a eu lieu, et deux clés identiques dans une
   /// même colonne lèvent « Duplicate keys found » — l'écran cesse alors de se
   /// peindre, sans que l'analyseur n'ait rien vu.
-  Widget _mentionPoste(String texte, {required String cle}) => Container(
+  Widget _mentionPoste(
+    String texte, {
+    required String cle,
+    Color couleur = AgriColors.accentYellow,
+  }) => Container(
     key: Key('mention-$cle'),
     padding: const EdgeInsets.all(AgriSpacing.sm),
     decoration: BoxDecoration(
-      color: AgriColors.accentYellow.withValues(alpha: 0.10),
+      color: couleur.withValues(alpha: 0.10),
       border: Border.all(
-        color: AgriColors.accentYellow.withValues(alpha: 0.30),
+        color: couleur.withValues(alpha: 0.30),
       ),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),

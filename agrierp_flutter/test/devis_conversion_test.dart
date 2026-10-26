@@ -146,10 +146,6 @@ void main() {
     return null;
   }
 
-  Future<void> compte(String code, String libelle) => db
-      .into(db.chartOfAccounts)
-      .insert(ChartOfAccountsCompanion.insert(id: _uuid('compte$code'), code: code, label: libelle));
-
   setUp(() async {
     HeureBenin.horloge = () => DateTime.utc(2026, 10, 21, 9);
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -238,30 +234,6 @@ void main() {
         "Facture refusée : l'exercice 2025 est clôturé : aucune saisie ne peut être datée du 20/12/2025.",
       );
       expect((await lire('d')).conversionRequestedAt, isNull);
-    });
-
-    test('⚠️ plan comptable incomplet : 701 absent refusé ; 443 exigé seulement avec une TVA assujettie ; plan inconnu du poste : le serveur juge', () async {
-      await devis('a');
-      // Plan inconnu de ce poste (jamais tiré) : aucun refus local.
-      expect((await depot.demanderConversion(_uuid('a'))).deja, isFalse);
-
-      await compte('411', 'Clients');
-      await devis('b', numero: 'DEV-2026-002');
-      expect(
-        await motif(() => depot.demanderConversion(_uuid('b'))),
-        'Plan comptable incomplet : le compte 701 (Ventes de produits) est introuvable. Complétez le plan comptable puis relancez la conversion.',
-      );
-
-      await compte('701', 'Ventes de produits');
-      expect(
-        await motif(() => depot.demanderConversion(_uuid('b'))),
-        'Plan comptable incomplet : le compte 443 (TVA facturée) est introuvable. Complétez le plan comptable puis relancez la conversion.',
-      );
-      // Un devis à 0 % n'exige pas 443 ; une exploitation non assujettie non plus.
-      await devis('z', tva: 0, numero: 'DEV-2026-003');
-      expect((await depot.demanderConversion(_uuid('z'))).deja, isFalse);
-      await db.into(db.companySettings).insert(CompanySettingsCompanion(tvaEnabled: const Value(false)));
-      expect((await depot.demanderConversion(_uuid('b'))).deja, isFalse);
     });
   });
 

@@ -61,6 +61,8 @@ void main() {
     'feed_types': 'lib/features/elevage/parametres_elevage_repository.dart',
     'elevage_numbering_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
     'company_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
+    // Ticket MOD1 — « Modules Actifs » : la bascule d'une espèce s'écrit par ce dépôt (le moteur ne fait qu'absorber / acquitter).
+    'modules_config': 'lib/features/parametres/parametres_generaux_repository.dart',
   };
 
   /// EXCEPTIONS LÉGITIMES, chacune justifiée. Clé : `table <- fichier`. Une exception devenue inutile fait échouer le

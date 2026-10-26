@@ -548,8 +548,7 @@ class DevisRepository {
   /// l'action sont jugés ICI avant d'écrire (même ordre, mêmes motifs, mot pour mot) : devis inconnu ; déjà converti
   /// (`deja`, aucune seconde demande) ; demande déjà ouverte ; archivé ; statut autre qu'`accepte` ; client absent ou
   /// archivé ; devis d'un exercice clos (lecture seule) ; date de la facture (aujourd'hui) future, ou d'un exercice absent
-  /// ou clos (« Facture refusée : … ») ; plan comptable incomplet (juge seulement si le plan est connu de ce poste : un
-  /// poste qui ne l'a pas tiré laisse le serveur trancher). Droits : `manage-ventes` ET `manage-facturation`, jugés par
+  /// ou clos (« Facture refusée : … »). Le plan comptable incomplet n'est jugé que par le serveur. Droits : `manage-ventes` ET `manage-facturation`, jugés par
   /// l'écran (bouton) et par le serveur (refus motivé).
   ///
   /// Écrit : `conversion_requested_at` = l'instant du clic (heure du Bénin ; le serveur date la facture de ce jour-là), le
@@ -582,7 +581,8 @@ class DevisRepository {
           'devis': ExerciceDeSaisie.prefixeVente(refusDate).replaceFirst('Vente refusée', 'Facture refusée'),
         });
       }
-      await _exigerLePlanComptable(d);
+      // Plan comptable incomplet : jugé par le SEUL serveur (le plan n'est pas servi au tirage du caissier) ; son motif revient
+      // mot pour mot en « Conversion refusée » (`messageConversionPlanIncomplet`).
 
       await _db.update(_db.quotes).replace(
         d.copyWith(
@@ -594,21 +594,6 @@ class DevisRepository {
       await _effacerRefus(id);
       return (devis: await _lire(id), deja: false);
     });
-  }
-
-  /// Plan comptable incomplet : 411, 701 et — si le devis porte une TVA ET que l'exploitation y est assujettie
-  /// (`TvaSettingService` : sans réglage connu, assujettie, comme le serveur) — 443. Un plan inconnu de ce poste (jamais
-  /// tiré) ne juge rien : le serveur le fera.
-  Future<void> _exigerLePlanComptable(Quote d) async {
-    final comptes = await _db.select(_db.chartOfAccounts).get();
-    if (comptes.isEmpty) return;
-    final reglage = await _db.select(_db.companySettings).getSingleOrNull();
-    final avecTva = (reglage?.tvaEnabled ?? true) && d.tvaRate > 0;
-    final codes = {for (final c in comptes) c.code};
-    for (final MapEntry(key: code, value: libelle) in comptesDeLaFacture.entries) {
-      if (code == '443' && !avecTva) continue;
-      if (!codes.contains(code)) throw DevisRefuse({'devis': messageConversionPlanIncomplet(code, libelle)});
-    }
   }
 
   /// ➕ Ticket DEV3 (poste seul) — « Annuler la demande » : la demande de conversion REFUSÉE par le serveur est retirée et le
