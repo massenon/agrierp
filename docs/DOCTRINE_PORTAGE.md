@@ -124,12 +124,24 @@ Objectif : **parité de 100 %** entre la vue Blade (maître) et l'écran Flutter
 
 ### 5.6 Exceptions justifiées : les fonctions propres au poste hors ligne
 
-La fidélité à la vue Blade a une limite : une fonction qui n'a de sens que parce que le poste **travaille sans réseau** n'a pas d'équivalent web, et le web n'a pas à l'inventer (article 0 : on ne porte que ce qui existe). Chacune est une **exception nommée**, décidée par le client, signalée dans le code (« fonction propre au poste ») et couverte par un garde-fou. Elle n'ajoute rien aux écrans du Blade et ne déplace rien : elle s'insère dans le châssis du poste (menu du compte, une carte de plus de Mon Profil, un écran avant l'application).
+La fidélité à la vue Blade a une limite : une fonction qui n'a de sens que parce que le poste **travaille sans réseau** n'a pas d'équivalent web, et le web n'a pas à l'inventer (article 0 : on ne porte que ce qui existe). *(Le verrou de session en était une ; depuis le 26/10/2026 il existe aussi au web : voir la note sous le tableau.)* Chacune est une **exception nommée**, décidée par le client, signalée dans le code (« fonction propre au poste ») et couverte par un garde-fou. Elle n'ajoute rien aux écrans du Blade et ne déplace rien : elle s'insère dans le châssis du poste (menu du compte, une carte de plus de Mon Profil, un écran avant l'application).
 
 | Exception | Décision | Pourquoi elle n'existe pas au web | Garde-fou |
 | --- | --- | --- | --- |
-| **Verrou local (VL-1)** : code PIN de 4 à 6 chiffres, écran de verrouillage à chaque lancement, entrée « Verrouiller » du menu du compte, carte « Changer le code PIN » de Mon Profil | Client, 21/10/2026 : « verrou local, écran de verrouillage à chaque lancement, sans réseau requis » | Le web s'appuie sur la session du serveur (connexion en ligne, expiration). Le poste reprend sa session SANS réseau (`reprendreSession`) : sans verrou, quiconque ouvre la machine lit les données de la ferme | `test/verrou_local_test.dart`, `test/verrou_ecrans_test.dart` (dont l'épreuve : aucun texte de l'application tant que verrouillé) |
-| **Verrouillage automatique après inactivité (VL-2)** : minuteur global (pointeur, défilement, clavier), durée Jamais / 1 / 5 / 15 / 30 min (défaut 5) réglée dans Mon Profil, local à l'utilisateur | Client, 21/10/2026 (VL-Q1) : « oui au verrouillage automatique après inactivité », poste uniquement | Le web n'a pas de verrou ; l'expiration de session est l'affaire du serveur. Le poste reste ouvert hors ligne tant que personne ne le ferme | `test/verrou_inactivite_test.dart`, `test/verrou_inactivite_ecrans_test.dart` |
+| **Code PIN local (VL-1)** : code PIN de 4 à 6 chiffres, écran de verrouillage à chaque lancement, carte « Changer le code PIN » de Mon Profil | Client, 21/10/2026 : « verrou local, écran de verrouillage à chaque lancement, sans réseau requis » | Le **mécanisme** (un PIN vérifié localement) n'a pas d'équivalent web : le poste reprend sa session SANS réseau (`reprendreSession`) et ne peut pas interroger le serveur ; le web, en ligne, vérifie le mot de passe du compte (ticket VW, ci-dessous) | `test/verrou_local_test.dart`, `test/verrou_ecrans_test.dart` (dont l'épreuve : aucun texte de l'application tant que verrouillé) |
+| **Mécanisme du verrou d'inactivité (VL-2)** : minuteur global du poste, réglage local au coffre | Client, 21/10/2026 (VL-Q1) | Idem : le réglage du poste reste local (coffre, non synchronisé) ; **le principe, les durées, le défaut et les libellés sont ceux du web** | `test/verrou_inactivite_test.dart`, `test/verrou_inactivite_ecrans_test.dart` |
+
+> ✅ **Exception levée le 26/10/2026 (ticket VW).** Le client a demandé : « Il faut appliquer aussi le module de verrou session sur le web. » Le verrou n'est donc plus « propre au poste » : il est **présent des DEUX côtés, avec un mécanisme propre à chacun**. Le web est le maître (article 0) et a été construit d'abord ; le poste s'aligne sur lui pour tout ce qui est commun. Ce qui reste propre à chaque côté est justifié par le réseau, pas par une préférence :
+>
+> | | Web (maître) | Poste |
+> |---|---|---|
+> | Secret de déverrouillage | mot de passe du compte, vérifié par le serveur | code PIN local, vérifié sans réseau |
+> | État du verrou | session Laravel (`session_locked`), refus des requêtes par `SessionVerrouillee` | l'application est démontée, remplacée par l'écran de verrouillage |
+> | Échecs | limiteur de la connexion (5 essais / 15 min) ; 10 échecs = déconnexion | temporisation dès le 5e échec ; 10 échecs = reconnexion en ligne |
+> | Réglage d'inactivité | `users.verrouillage_minutes` (serveur, suit l'utilisateur), carte « Verrouillage automatique » de Mon Profil | coffre du poste, même carte, même liste |
+> | **Commun (un seul jeu de textes)** | « Verrouiller » (icône `lock`), « Application verrouillée », « NOM D'UTILISATEUR », « DÉVERROUILLER », « Verrouillage automatique », Jamais / 1 minute / 5 / 15 / 30 minutes, défaut 5 minutes, « Trop d'essais. Réessayez dans … », « Trop d'échecs : … » | idem |
+>
+> Garde-fous : `tests/Feature/VerrouSession*Test.php` et `tests/Js/verrou-logique.test.mjs` (web) ; `test/verrou_parite_web_test.dart` (poste : libellés lus dans le Blade, durées et seuils lus dans le vrai PHP). Un texte commun modifié d'un seul côté fait rougir l'un des deux.
 
 Règle : toute future exception de ce tableau se justifie par le hors-ligne, jamais par une préférence d'interface.
 

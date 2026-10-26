@@ -22472,3 +22472,21 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 
 
 **Mesures finales (après fusion de la branche principale, Drift 60)** : suite Laravel **2 446 verts** (25 722 assertions) ; poste `flutter analyze` propre, **3 512 verts, 17 sautés, 0 rouge** (`flutter test --concurrency=3`).
+
+### Sprint VW (26/10/2026) — Verrou de session sur le web (PRD `docs/prd/verrou-web.md`)
+
+**Demande du client :** « Il faut appliquer aussi le module de verrou session sur le web. » Le poste avait un verrou (VL-1 : PIN à chaque lancement et « Verrouiller » ; VL-2 : verrouillage après inactivité). **L'exception « propre au poste » de la doctrine § 5.6 est levée** : le verrou est présent des deux côtés, mécanisme propre à chacun (web : mot de passe du compte vérifié par le serveur ; poste : PIN local sans réseau). Le web est le maître ; le poste s'aligne sur ses textes.
+
+**Livré (web) :**
+- `users.verrouillage_minutes` (migration `2026_10_26_000001`, `NOT NULL DEFAULT 5`, sûre sur base peuplée, non synchronisée) ; `User::delaiVerrouillage()` (valeur inconnue = 5).
+- `VerrouSessionService` (durées 0/1/5/15/30, défaut 5, `verrouiller()`, `deverrouiller()`), `SessionVerrouillee` (middleware du groupe `web` : redirection vers `/verrouillage` pour une page, 423 pour Livewire/JSON), `VerrouSessionController` (`POST /verrouiller`, `POST /deverrouiller`), `Livewire\Auth\EcranVerrouillage` (`GET /verrouillage`).
+- Limiteur de la connexion réutilisé (`Login::MAX_TENTATIVES` 5, `Login::DUREE_BLOCAGE` 900 s, désormais des constantes) ; 10 échecs cumulés dans la session = déconnexion complète ; cookie « se souvenir de moi » retiré au verrouillage et rétabli au déverrouillage (sans quoi supprimer le cookie de session contournait le verrou).
+- Navigateur : `components/verrou-session.blade.php` (surcouche à la présentation de la connexion, hors `#app-racine`, absente de `guest`), `resources/js/verrou.js` + `verrou-logique.js` (minuterie partagée entre onglets, pas de verrouillage pendant une requête Livewire en vol, un 423 de Livewire affiche la surcouche), entrée « Verrouiller » du menu du compte, carte « Verrouillage automatique » de Mon Profil. La surcouche ne démonte pas la page : la saisie Livewire non enregistrée survit au déverrouillage.
+- Audit : `session.verrouillee`, `session.deverrouillee`, `session.deverrouillage_echec`, `session.deconnexion_apres_echecs` (jamais le mot de passe).
+
+**Livré (poste, libellés seulement, aucune migration Drift) :** phrase d'aide de « Verrouillage automatique » (sans « (propre à ce poste) »), sous-titre de l'écran de verrouillage (« Session de … Saisissez votre code PIN pour reprendre votre travail. »), libellés d'audit régénérés (`outils/libelles_audit.py` : 148 actions, dont les quatre `session.*` et neuf clés du serveur qui manquaient), `chassis_web_test.dart` attend « Verrouiller » dans le menu web, nouveau garde-fou `test/verrou_parite_web_test.dart`.
+
+**Tests (rouges d'abord) :** `VerrouSessionMiddlewareTest` (15), `VerrouSessionDeverrouillageTest` (13), `VerrouSessionAuditTest` (6), `VerrouSessionReglageTest` (10), `VerrouSessionBladeTest` (10), `VerrouSessionLivewireTest` (2) ; `tests/Js/verrou-logique.test.mjs` (11, `node --test`). 13 mutations tuées (middleware neutralisé, exemption `logout` retirée, seuil 10 → 11, mot de passe non vérifié, limiteur neutralisé, limiteur non remis à zéro, audit d'échec retiré, état non effacé au succès, défaut 5 → 10, validation de la liste retirée, middleware retiré du groupe, surcouche retirée du gabarit, durée JavaScript modifiée).
+
+**NON vérifié :** navigateur réel (aucun Chrome ni Dusk ici : minuterie, événements d'activité, `storage` entre onglets, hook Livewire 423, `inert`, focus) ; `flutter analyze` et `flutter test` (Flutter absent de cet environnement : les modifications du poste sont des libellés, un test de menu et un garde-fou, relus mais non exécutés) ; MySQL réel pour la migration.
+**Questions client :** VW-Q1 à VW-Q4 (PRD § 9). **Limites :** un rechargement de page perd la saisie non enregistrée ; ce qui était déjà affiché reste dans la mémoire du navigateur ; la cloche interroge le serveur toutes les 30 s, ce qui renouvelle la session (comportement préexistant).

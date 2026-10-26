@@ -591,28 +591,30 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 
 **Décisions client requises :** aucune bloquante. VW-Q1 (défaut 5 min pour tous), VW-Q2 (plafond imposé), VW-Q3 (réglage partagé web/poste), VW-Q4 : voir le PRD § 9, propositions retenues en attendant.
 
-### Ticket VW1 — Web, serveur : état, middleware, déverrouillage
+### VW1 ✅ (26/10/2026) — Web, serveur : état, middleware, déverrouillage
 **Objectif :** un verrou effectif côté serveur, valable même si le navigateur est manipulé.
 **Web :** migration `users.verrouillage_minutes` (smallint, défaut 5) · `VerrouSessionService` (durées, libellés, verrouiller, déverrouiller, limiteur de la connexion, 10 échecs = déconnexion, cookie de rappel) · middleware `SessionVerrouillee` (groupe `web`) · routes `POST /verrouiller`, `POST /deverrouiller`, `GET /verrouillage`.
 **Tests (rouges d'abord) :** `VerrouSessionMiddlewareTest`, `VerrouSessionDeverrouillageTest`, `VerrouSessionAuditTest`. **Mutation :** retirer le test de l'état ; seuil 10 → 11 ; ne pas vérifier le hash.
 
-### Ticket VW2 — Web, navigateur : surcouche, minuterie, menu
+### VW2 ✅ (26/10/2026) — Web, navigateur : surcouche, minuterie, menu
 **Web :** composant `x-verrou-session` (surcouche plein écran à la présentation de la connexion), `resources/js/verrou.js` + `verrou-logique.js` (minuterie partagée entre onglets par `localStorage`, requêtes Livewire en vol, 423 → surcouche), entrée « Verrouiller » du menu du compte, page `/verrouillage` (composant `Auth\EcranVerrouillage`).
 **Tests :** `VerrouSessionBladeTest`, `tests/Js/verrou-logique.test.mjs`.
 
-### Ticket VW3 — Web : réglage dans Mon Profil
+### VW3 ✅ (26/10/2026) — Web : réglage dans Mon Profil
 **Web :** carte « Verrouillage automatique » (liste Jamais / 1 / 5 / 15 / 30 minutes), `MonProfil::updatedVerrouillageMinutes`. **Tests :** `VerrouSessionReglageTest`, `VerrouSessionLivewireTest`.
 
-### Ticket VW4 — Journal d'audit
+### VW4 ✅ (26/10/2026) — Journal d'audit
 **Web :** libellés `session.*` dans `AuditLog` ; **poste :** `libelles_audit.dart` régénéré par `outils/libelles_audit.py`.
 
-### Ticket VW5 — Poste : un seul jeu de textes
+### VW5 ✅ (26/10/2026) — Poste : un seul jeu de textes
 **Poste :** libellé de la phrase d'aide de « Verrouillage automatique » et sous-titre de l'écran alignés sur le Blade ; `chassis_web_test.dart` attend « Verrouiller » dans le menu web ; garde-fou `verrou_parite_web_test.dart` (libellés lus dans le Blade, durées lues dans `VerrouSessionService`). Aucune migration Drift.
 
-### Ticket VW6 — Documentation
+### VW6 ✅ (26/10/2026) — Documentation
 PRD, doctrine § 5.6 (exception levée), `CLAUDE.md` Laravel et Flutter, `README_SPRINT0.md`.
 
-**Statut :** VW1 à VW6 🔧 en cours (branche `t-verrouweb`).
+**Statut :** VW1 à VW6 ✅ (26/10/2026, branche `t-verrouweb`). **Non vérifié :** navigateur réel (minuterie, `storage` entre onglets, hook Livewire 423) ; `flutter analyze` / `flutter test` (Flutter absent de l'environnement de la session). Questions VW-Q1 à VW-Q4 : ❓ client (propositions appliquées).
+
+**Doctrine :** § 5.6 reformulée (voir `docs/DOCTRINE_PORTAGE.md`) ; les lignes VL-1 et VL-2 ci-dessus restent vraies pour le *mécanisme* du poste, mais leur mention « le web n'a ni verrou ni inactivité » est périmée depuis le ticket VW.
 
 ## Sprint DEP — Saisie des Dépenses à plusieurs lignes (demande du client du 21/10/2026, PRD `docs/prd/depenses-multilignes.md`)
 

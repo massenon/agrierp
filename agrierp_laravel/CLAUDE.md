@@ -102,7 +102,7 @@ Route::get('/gestion-elevage', \App\Livewire\Elevage\GestionElevage::class)
 
 …and `$this->authorize('manage-elevage');` as the **first line of every mutating method** (166 call sites today). Menu hiding via `@hasanyrole` in `layouts/app.blade.php` is cosmetic, not authorization — ticket 13.1 found 41 of 42 routes protected by `auth` alone, reachable by direct URL from any logged-in account.
 
-Only 5 routes are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-a-propos`, `/contact-editeur`, `/notifications`. There is no `Gate::before` admin bypass — a permission that isn't seeded is inaccessible to everyone, including admin.
+Only 5 screens are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-a-propos`, `/contact-editeur`, `/notifications` (plus, since sprint VW, the three session-lock routes `POST /verrouiller`, `POST /deverrouiller`, `GET /verrouillage`). There is no `Gate::before` admin bypass — a permission that isn't seeded is inaccessible to everyone, including admin.
 
 ### Livewire / Blade conventions
 
@@ -136,6 +136,19 @@ Only 5 routes are legitimately `auth`-only: `/dashboard`, `/mon-profil`, `/aide-
 | Fiscal year closure | Never synced — the API refuses it in any form |
 
 The controller demonstrates each rule on a representative subset of tables, not all ~60. Extending to a new table follows the same block pattern.
+
+### Verrou de session web (sprint VW, 26/10/2026)
+
+Demande du client : « appliquer aussi le module de verrou session sur le web ». PRD : `docs/prd/verrou-web.md`. Le verrou est présent **des deux côtés** (le poste a le sien depuis VL-1/VL-2) ; le web est le maître, le poste s'aligne sur ses textes.
+
+- **Effectif côté serveur, pas une surcouche.** L'état `session_locked` vit dans la session Laravel. Le middleware `App\Http\Middleware\SessionVerrouillee` (groupe `web`, ajouté dans `bootstrap/app.php`) refuse toute requête tant qu'il est posé : page → redirection vers `/verrouillage` (la page demandée est mémorisée pour le retour), requête JavaScript / Livewire (`POST /livewire/update`) / JSON → **423** `{verrouille: true}`. Exempts : `session.verrou`, `session.deverrouiller`, `session.verrouiller`, `logout`, pages publiques, `/up`, fichiers JavaScript de Livewire. L'API du poste (Sanctum) n'a pas de session : jamais concernée. **Ne jamais retirer le middleware du groupe `web`** : `VerrouSessionMiddlewareTest::test_le_middleware_est_dans_le_groupe_web` le garde.
+- **Un seul point de passage : `App\Services\VerrouSessionService`** (durées `DUREES = [0, 1, 5, 15, 30]`, défaut 5, libellés, `verrouiller()`, `deverrouiller()`). Le secret est le **mot de passe du compte**, vérifié ici (`Hash::check`), avec le limiteur de la connexion (`Login::MAX_TENTATIVES` = 5, `Login::DUREE_BLOCAGE` = 900 s, clé `deverrouillage|<id>|<ip>`), puis **10 échecs cumulés dans la session = déconnexion complète** (compteur `session_lock_failures`, remis à zéro par un succès seulement). Cookie « se souvenir de moi » : retiré au verrouillage, rétabli au déverrouillage (sinon supprimer le cookie de session rouvrirait une session déverrouillée).
+- **Routes** (`auth` seul, comme `/mon-profil`) : `POST /verrouiller`, `POST /deverrouiller` (JSON : 200 / 422 / 429 / 401 `deconnecte`), `GET /verrouillage` (`Livewire\Auth\EcranVerrouillage`). Audit : `session.verrouillee`, `session.deverrouillee`, `session.deverrouillage_echec`, `session.deconnexion_apres_echecs` ; jamais le mot de passe.
+- **Navigateur** : `components/verrou-session.blade.php` (surcouche plein écran à la présentation de la connexion, posée dans `layouts/app.blade.php` HORS de `#app-racine`, absente de `guest`) + `resources/js/verrou.js` (minuterie d'inactivité partagée entre onglets par `localStorage`, vérifiée sur l'horloge toutes les 5 s) + `verrou-logique.js` (logique pure, testée par `node --test tests/Js`). La surcouche **ne démonte pas la page** : une saisie Livewire non enregistrée survit au déverrouillage ; un 423 reçu par Livewire fait apparaître la surcouche au lieu d'une fenêtre d'erreur. Pas de verrouillage pendant une requête Livewire en vol (exports et PDF passent par Livewire) ni 60 s après un clic sur `a[download]` / `[data-verrou-suspendre]`. Limites assumées : un rechargement perd la saisie non enregistrée ; ce qui était déjà affiché reste dans la mémoire du navigateur (le serveur, lui, refuse tout ce qui est nouveau).
+- **Réglage** : `users.verrouillage_minutes` (défaut 5, 0 = Jamais), carte « Verrouillage automatique » de Mon Profil (`MonProfil::updatedVerrouillageMinutes`), lue par `User::delaiVerrouillage()` (valeur inconnue = 5). Hors `$fillable`, **jamais** dans les colonnes de `users` que `SyncController` donne au poste.
+- **`SESSION_LIFETIME` reste indépendante** (glissante, renouvelée à chaque requête, dont le déverrouillage). Session verrouillée qui expire : le déverrouillage répond 401/419 et la page renvoie à la connexion.
+- **Textes communs avec le poste** (ne jamais en changer un seul côté ; `test/verrou_parite_web_test.dart` lit ce Blade) : « Verrouiller » (icône `lock`), « Application verrouillée », « NOM D'UTILISATEUR », « DÉVERROUILLER », « Verrouillage automatique », Jamais / 1 minute / N minutes, « Trop d'essais. Réessayez dans … », « Trop d'échecs : … ».
+- **Environnement de test** : `phpunit` lancé depuis un worktree dont `vendor` est un lien global charge le code du dépôt principal ; copier `vendor/composer` et lier le reste, et lancer `php vendor/phpunit/phpunit/phpunit` ne suffit pas non plus (il charge l'autoload du dépôt principal) : un lanceur de deux lignes (`require vendor/autoload.php; (new PHPUnit\TextUI\Application)->run($argv)`) règle le cas.
 
 ### Scheduling
 
