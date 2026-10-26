@@ -121,10 +121,10 @@ class VerrouSessionBladeTest extends VerrouSessionBase
     {
         $node = trim((string) shell_exec('command -v node 2>/dev/null'));
         if ($node === '') {
-            $this->markTestSkipped('Node absent : tests/Js/verrou-logique.test.mjs non exécuté.');
+            $this->markTestSkipped('Node absent : tests/Js/*.test.mjs non exécutés.');
         }
 
-        exec(escapeshellarg($node).' --test '.escapeshellarg(base_path('tests/Js/verrou-logique.test.mjs')).' 2>&1', $sortie, $code);
+        exec(escapeshellarg($node).' --test '.escapeshellarg(base_path('tests/Js/verrou-logique.test.mjs')).' '.escapeshellarg(base_path('tests/Js/verrou-composant.test.mjs')).' 2>&1', $sortie, $code);
 
         $this->assertSame(0, $code, implode("\n", $sortie));
     }

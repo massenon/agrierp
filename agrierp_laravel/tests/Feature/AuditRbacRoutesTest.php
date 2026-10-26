@@ -181,6 +181,8 @@ class AuditRbacRoutesTest extends TestCase
         $universelles = [
             'dashboard.index', 'profil.index', 'aide.index', 'contact.index',
             'notifications.index', 'public.welcome', 'public.presentation',
+            // Sprint VW : l'écran de verrouillage protège la session de tout compte connecté, sans permission dédiée.
+            'session.verrou',
         ];
 
         $sansPermission = [];

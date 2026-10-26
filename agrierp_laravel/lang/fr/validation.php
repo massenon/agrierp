@@ -291,6 +291,7 @@ return [
         'nesMorts' => 'nés morts',
         'nesVivants' => 'nés vivants',
         'new_password' => 'nouveau mot de passe',
+        'verrouillage_minutes' => 'durée de verrouillage automatique',
         'new_password_confirmation' => 'confirmation du nouveau mot de passe',
         'newClientName' => 'nom du client',
         'newClientPhone' => 'téléphone du client',
