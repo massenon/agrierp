@@ -396,3 +396,21 @@ Neuf colonnes, quatre cartes (`border-l-info-blue` / `accent-yellow` / `brand-em
 
 Quantité retournée > vendue (50 sur 10), montant > ligne, retour d'une vente annulée, produit hors vente, exercice clos (« enregistré SANS écriture » ou stock bougé puis 500), plan comptable incomplet : tous refusés avant d'écrire, une transaction. **Non corrigés, signalés au client** (ne se décident pas à sa place) : l'avoir ne diminue pas la créance de la vente ; annuler une vente ne contre-passe ni l'écriture ni la créance (AV-Q1, AV-Q2 dans `docs/PLAN_FINALISATION.md`).
 
+
+
+## 12. Corbeille (tickets ARC1 à ARC4, 21/10/2026)
+
+Maître : `corbeille.blade.php` + `Livewire\Parametres\Corbeille` ; poste : `onglet_corbeille.dart`. Parité LUE par `test/corbeille_blade_test.dart` (registre du serveur : clés, libellés, modules, ordre, règles ; refus et motifs mot pour mot ; libellés, six colonnes, icônes, encadré, pagination).
+
+### 12.1 ÉCARTS ASSUMÉS (hors ligne : le poste enregistre la demande, le serveur fait les effets)
+
+| Écart | Raison | Garde-fou |
+|---|---|---|
+| Toasts « Restauration demandée : … » / « Suppression définitive demandée : … à la prochaine synchronisation » | le web agit à l'instant | `corbeille_poste_test` |
+| État de la demande sous la ligne : « Demande en attente d'envoi », « Demande traitée par le serveur », « Refusée par le serveur : <motif> » | la demande n'existe pas au web | idem |
+| « Archivé sur ce poste — pas encore synchronisé » (surcouche locale, règles du type) | l'instantané du serveur ne connaît pas encore l'archivage | idem |
+| Boutons grisés pendant une demande en attente | une seule demande par élément | idem |
+| Calendrier Flutter au lieu de `<input type="date">` ; mot SUPPRIMER dans `ModaleConfirmation` | plateforme | — |
+
+### 12.2 Défauts du WEB trouvés et corrigés d'abord
+Dépense restaurée sans contre-passation rejouée ni trésorerie ; titres vides (provendes, absences) ; pas de contrôle d'exercice clos ni de code pris ; devis, avances, employés, pointages, ventes et transferts annulés absents.

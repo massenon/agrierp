@@ -616,3 +616,17 @@ Tables `ExpenseLines` et `CostCenters`, colonnes de `Expenses` (dont `ecriture_r
 **Schéma Drift : inchangé** (v52 ; ni 53 ni 54 ni 55 pris).
 **Non vérifié :** migration sur une base MySQL réelle peuplée (collation, doublons réels) ; poste Windows réel ; rendu navigateur (Dusk) du bandeau et du champ code.
 
+
+
+## Sprint ARC — Corbeille : voir, restaurer, supprimer définitivement (demande du client du 21/10/2026, PRD `docs/prd/archives.md`)
+
+> Demande : « page/screen (web et poste) pour afficher les enregistrements archivés (supprimés) et permettre de les RESTAURER et/ou de les SUPPRIMER DÉFINITIVEMENT ». Le nom du projet est conservé : « Corbeille » (ex-onglet « Restauration » de Paramètres).
+
+### ARC1 ✅ Web : liste de 20 types, recherche/type/période, restauration sous règles, suppression en deux temps
+`CorbeilleService` (point de passage UNIQUE page + envoi), `Livewire\Parametres\Corbeille`, journal `corbeille_operations`, `AuditLog corbeille.restored|deleted`. **Défauts trouvés** : une dépense archivée se « restaurait » sans rejouer la contre-passation ni la trésorerie (désormais INTERDIT) ; titres « — » des provendes et absences ; aucun contrôle d'exercice clos ni de code pris ; quatre types absents.
+### ARC2 ✅ Contrat `/api/sync` : clé de tirage `corbeille` (page 1, `manage-parametres`), clé d'envoi `corbeille_demandes` (traitée en dernier, idempotente par UUID).
+### ARC3 ✅ Poste : Drift **v58** (`corbeille_elements` instantané, `corbeille_demandes` mixte), absorbeur strict, envoi, relance. Bug trouvé par les tests : la garde « rien à envoyer » ignorait la nouvelle table.
+### ARC4 ✅ Poste : onglet « Corbeille » de Paramètres Général (même place qu'au web), parité lue par `corbeille_blade_test.dart`.
+### ARC5 ✅ Docs (PRD, plan, audit § 12, README_SPRINT0, CLAUDE.md).
+
+**Questions au client (non tranchées) :** ARC-Q1 restauration d'une dépense avec re-comptabilisation (recommandé : NON pour l'instant) · ARC-Q2 savoir QUI a archivé (recommandé : OUI, `entity_id` dans `audit_logs`) · ARC-Q3 suppression d'un devis/courrier (NON : trou de numérotation) · ARC-Q4 délai avant suppression définitive (NON) · ARC-Q5 écritures contre-passées en consultation (NON) · ARC-Q6 ligne supprimée restée archivée sur les postes tiers (OUI, acceptable).

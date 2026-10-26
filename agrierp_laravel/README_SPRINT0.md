@@ -22437,3 +22437,14 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 **Épreuve de mutation.** Laravel : 11/11 tuées. Poste : 8/8 tuées (plafonds quantité et montant, exercice clos, statut « traité », protection des demandes pending/conflict au tirage, sortie anticipée de `_pousser`, accusé de réception, remise de la vente).
 
 **NON vérifié.** Parité exécutée seulement avec PHP local (SQLite) ; aucune recette sur poste Windows ni sur MySQL de production ; ticket PDF non essayé hors ligne réelle. Questions client AV-Q1 à AV-Q5 : `docs/PLAN_FINALISATION.md`.
+
+
+## Tickets ARC1 à ARC5 — Corbeille : voir, restaurer, supprimer définitivement, web et poste (21/10/2026)
+
+**Décisions (PRD `docs/prd/archives.md`).** Nom « Corbeille », onglet de Paramètres Généraux entre « Audit Logs » et « Réinitialisation » (web et poste), administrateur seul (`manage-parametres`). 20 types listés ; écritures comptables et comptes utilisateurs exclus (14.55 conservé). Restauration : dépense, vente annulée et transfert annulé INTERDITS (la contre-passation / le stock / le mouvement ne se rejouent pas), exercice clos refusé (devis, avances, soins, pointages), code déjà pris refusé (bande par `SaisieBandeAction`, produit, compte). Suppression définitive : types admis produit, fournisseur, client, employé (aucune référence : FK + colonnes `<entité>_id`), ration, provende, protocole, absence, document, pièce ; mot `SUPPRIMER` exact ; jamais un fait comptable, zootechnique ou numéroté.
+
+**Contrat de synchronisation.** Tirage : `corbeille` (page 1, remplacée en entier, `manage-parametres`, vide pour les postes anciens sans le droit). Envoi : `corbeille_demandes` (`manage-parametres`, traitée EN DERNIER) = `{id, type, element_id, action restaurer|supprimer, confirmation, device_id}`, jouée par `CorbeilleService`, idempotente par UUID (journal `corbeille_operations`), refus rejugé à la relance. Poste : Drift v58 (`corbeille_elements`, `corbeille_demandes`).
+
+**Tests.** Laravel `CorbeilleArchivesTest` (26), `CorbeilleSyncTest` (13), `CorbeilleRestaurationTest` (12, adapté). Poste `corbeille_poste_test`, `corbeille_sync_poste_test`, `corbeille_blade_test`, `corbeille_schema_test`, `migration_toutes_versions_test`. Mutations tuées (serveur) : mot de confirmation, références, restauration interdite, exercice clos, code pris, droit.
+
+**NON vérifié.** Poste Windows réel ; MySQL réel (scan des clés étrangères `Schema::getForeignKeys`, coût avec de gros volumes d'archives à chaque tirage administrateur) ; navigateur (Dusk) pour la modale ; suppression sur les postes tiers (ligne archivée résiduelle, ARC-Q6). Questions ARC-Q1 à ARC-Q6 : `docs/PLAN_FINALISATION.md`.
