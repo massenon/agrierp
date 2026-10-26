@@ -35,6 +35,7 @@ class DepensesMultilignesLivewireTest extends TestCase
             ->set('expenseDate', '2026-06-15')
             ->set('paymentMode', 'caisse')
             ->set('treasuryAccountId', $this->caisse->id)
+            ->set('costCenterId', $this->filiere->id)
             ->call('addLine')->call('addLine');
 
         foreach ([['Provende ponte', '601', 45_000], ['Vermifuge', '602', 10_000], ['Sac d\'aliment bis', '601', 5_000]] as $i => [$libelle, $code, $montant]) {
@@ -211,7 +212,8 @@ class DepensesMultilignesLivewireTest extends TestCase
     {
         $depense = new Expense();
         $depense->fill(['expense_date' => '2026-06-10', 'label' => 'Ancienne', 'category' => '605 - Énergie', 'amount' => 25_000,
-            'treasury_account_id' => $this->caisse->id, 'payment_mode' => 'caisse', 'status' => 'payee', 'is_active' => true]);
+            'treasury_account_id' => $this->caisse->id, 'payment_mode' => 'caisse', 'status' => 'payee', 'is_active' => true,
+            'cost_center_id' => $this->filiere->id]);
         $depense->save();
         $ligne = new ExpenseLine();
         $ligne->id = ExpenseLine::idDeConversion($depense->id);

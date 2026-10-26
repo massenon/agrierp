@@ -239,7 +239,12 @@ class SyncDepensesMultilignesTest extends TestCase
         $this->assertContains('chart_of_accounts', $corps['tables_servies']);
         $this->assertContains('cost_centers', $corps['tables_servies']);
         $this->assertContains('601', collect($corps['chart_of_accounts'])->pluck('code')->all());
-        $this->assertSame([['id' => $this->filiere->id, 'label' => 'Cuniculture', 'type' => 'filiere', 'parent_species_id' => null, 'is_active' => true]], $corps['cost_centers']);
+        // Ticket DEP6 — le centre « Général » (créé par la migration DEP6) descend avec les filières : le poste l'offre au choix.
+        $this->assertEqualsCanonicalizing(
+            [['id' => $this->filiere->id, 'label' => 'Cuniculture', 'type' => 'filiere', 'parent_species_id' => null, 'is_active' => true],
+             ['id' => \App\Models\CostCenter::general()->id, 'label' => 'Général', 'type' => 'filiere', 'parent_species_id' => null, 'is_active' => true]],
+            $corps['cost_centers'],
+        );
         $this->assertSame(Expense::CATEGORIES, $corps['expense_categories'], 'conservée pour les postes non migrés');
     }
 }

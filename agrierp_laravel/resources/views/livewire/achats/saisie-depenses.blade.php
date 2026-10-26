@@ -51,7 +51,7 @@
                                 </button>
                             </td>
                             <td data-label="Total" class="px-md py-sm text-xs text-right font-bold">{{ number_format($expense->amount, 0, ',', ' ') }} FCFA</td>
-                            <td data-label="Mode" class="px-md py-sm text-xs">{{ \App\Models\Expense::MODES_DE_PAIEMENT[$expense->payment_mode] ?? '—' }}</td>
+                            <td data-label="Mode" class="px-md py-sm text-xs">{{ $expense->on_credit ? 'À crédit' : (\App\Models\Expense::MODES_DE_PAIEMENT[$expense->payment_mode] ?? '—') }}</td>
                             <td data-label="Pièce" class="px-md py-sm">
                                 @if($comptabilisee)
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ $expense->accountingEntry?->numero ?: 'Comptabilisée' }}</span>
@@ -93,6 +93,7 @@
                                     · Centre de coût : {{ $expense->costCenter?->label ?? '—' }}
                                     · Fournisseur : {{ $expense->supplier?->name ?? '—' }}
                                     · Bénéficiaire : {{ $expense->beneficiary ?: '—' }}
+                                    · Règlement : {{ \App\Models\Expense::libelleReglement((bool) $expense->on_credit, $expense->status) }}
                                     · Saisie par : {{ $expense->creator?->name ?? '—' }}
                                 </p>
                             </td>
@@ -121,6 +122,7 @@
                 <input wire:model="expenseDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('expenseDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
+            @unless($this->aCredit)
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Paiement *</label>
                 <select wire:model.live="paymentMode" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('paymentMode') ? 'is-invalid' : 'border-outline-variant' }}">
@@ -141,10 +143,11 @@
                 </select>
                 @error('treasuryAccountId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
+            @endunless
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Centre de Coût</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Centre de Coût *</label>
                 <select wire:model="costCenterId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('costCenterId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Aucun --</option>
+                    <option value="">-- Sélectionner --</option>
                     @foreach($this->costCenters as $centre)
                         <option value="{{ $centre->id }}">{{ $centre->label }}</option>
                     @endforeach
@@ -153,7 +156,7 @@
             </div>
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Fournisseur</label>
-                <select wire:model="supplierId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('supplierId') ? 'is-invalid' : 'border-outline-variant' }}">
+                <select wire:model.live="supplierId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('supplierId') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Aucun --</option>
                     @foreach($this->suppliers as $fournisseur)
                         <option value="{{ $fournisseur->id }}">{{ $fournisseur->name }}</option>
@@ -161,6 +164,20 @@
                 </select>
                 @error('supplierId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
+            @if($supplierId !== '')
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Règlement *</label>
+                    <select wire:model.live="reglement" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('reglement') ? 'is-invalid' : 'border-outline-variant' }}">
+                        @foreach(\App\Models\Expense::REGLEMENTS as $cle => $libelle)
+                            <option value="{{ $cle }}">{{ $libelle }}</option>
+                        @endforeach
+                    </select>
+                    @error('reglement') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                    @if($this->aCredit)
+                        <p class="text-[10px] text-outline mt-xs" data-aide-credit>Aucune trésorerie n'est touchée : la dette est créée au nom du fournisseur et se règle dans « Dettes Fournisseurs ».</p>
+                    @endif
+                </div>
+            @endif
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bénéficiaire</label>
                 <input wire:model="beneficiary" type="text" placeholder="ex : M. Dossou (si ce n'est pas un fournisseur)" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('beneficiary') ? 'is-invalid' : 'border-outline-variant' }}">

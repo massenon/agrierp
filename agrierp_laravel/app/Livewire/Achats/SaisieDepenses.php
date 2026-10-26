@@ -80,6 +80,9 @@ class SaisieDepenses extends Component
 
     public string $supplierId = '';
 
+    /** Ticket DEP7 (DEP-Q3) — « Règlement » (proposé quand un fournisseur est choisi) : `comptant` ou `credit` (`Expense::REGLEMENTS`). */
+    public string $reglement = 'comptant';
+
     public string $beneficiary = '';
 
     public $receiptFile = null;
@@ -99,7 +102,7 @@ class SaisieDepenses extends Component
 
     private function reinitialiserLeFormulaire(): void
     {
-        $this->reset(['editingExpenseId', 'paymentMode', 'treasuryAccountId', 'costCenterId', 'supplierId', 'beneficiary', 'receiptFile']);
+        $this->reset(['editingExpenseId', 'paymentMode', 'treasuryAccountId', 'costCenterId', 'supplierId', 'reglement', 'beneficiary', 'receiptFile']);
         $this->resetErrorBag();
         $this->expenseDate = now()->format('Y-m-d');
         $this->lines = [self::ligneVide()];
@@ -193,6 +196,20 @@ class SaisieDepenses extends Component
         }
     }
 
+    /** Ticket DEP7 — sans fournisseur, pas de crédit : la dépense est payée comptant (trésorerie obligatoire, comme avant). */
+    public function updatedSupplierId(): void
+    {
+        if ($this->supplierId === '') {
+            $this->reglement = 'comptant';
+        }
+    }
+
+    /** Ticket DEP7 — la dépense est-elle saisie À CRÉDIT (fournisseur choisi ET règlement « À crédit ») ? */
+    public function getACreditProperty(): bool
+    {
+        return $this->supplierId !== '' && $this->reglement === 'credit';
+    }
+
     /** Choisir un compte de trésorerie fixe le mode (son type) : les deux champs ne se contredisent jamais. */
     public function updatedTreasuryAccountId(): void
     {
@@ -229,8 +246,10 @@ class SaisieDepenses extends Component
     {
         return [
             'expense_date' => $this->expenseDate,
-            'treasury_account_id' => $this->treasuryAccountId,
-            'payment_mode' => $this->paymentMode,
+            // Ticket DEP7 — à crédit : aucune trésorerie ni mode (la dette crédite le 401, la caisse ne bouge pas).
+            'treasury_account_id' => $this->aCredit ? null : $this->treasuryAccountId,
+            'payment_mode' => $this->aCredit ? null : $this->paymentMode,
+            'on_credit' => $this->aCredit,
             'cost_center_id' => $this->costCenterId !== '' ? $this->costCenterId : null,
             'supplier_id' => $this->supplierId !== '' ? $this->supplierId : null,
             'beneficiary' => $this->beneficiary,
@@ -249,7 +268,7 @@ class SaisieDepenses extends Component
         $carte = [
             'expense_date' => 'expenseDate', 'treasury_account_id' => 'treasuryAccountId', 'payment_mode' => 'paymentMode',
             'cost_center_id' => 'costCenterId', 'supplier_id' => 'supplierId', 'beneficiary' => 'beneficiary',
-            'amount' => 'total', 'category' => 'formulaire',
+            'amount' => 'total', 'category' => 'formulaire', 'on_credit' => 'reglement',
         ];
 
         foreach ($e->errors() as $cle => $messages) {
@@ -288,7 +307,7 @@ class SaisieDepenses extends Component
         } catch (ValidationException $e) {
             $this->afficherLesErreurs($e);
             // Choisir un compte de trésorerie fixe le mode : un mode vide dit qu'aucun compte n'est choisi.
-            if ($this->paymentMode === '') {
+            if (! $this->aCredit && $this->paymentMode === '') {
                 $this->addError('paymentMode', 'Le champ mode de paiement est obligatoire.');
             }
 
@@ -348,6 +367,7 @@ class SaisieDepenses extends Component
         $this->treasuryAccountId = $expense->treasury_account_id;
         $this->costCenterId = (string) ($expense->cost_center_id ?? '');
         $this->supplierId = (string) ($expense->supplier_id ?? '');
+        $this->reglement = 'comptant';   // une dépense modifiable est une reprise SANS pièce : jamais à crédit (DEP7)
         $this->beneficiary = (string) ($expense->beneficiary ?? '');
         $this->receiptFile = null;
         $this->lines = $expense->lines->map(fn ($l) => [
@@ -363,10 +383,18 @@ class SaisieDepenses extends Component
         // Archiver une depense la retire des etats : meme niveau d'exigence.
         $this->authorize('manage-achats');
 
+        // Ticket DEP7 — une dépense À CRÉDIT s'archive en annulant sa dette (aucune trésorerie n'avait bougé) : le toast le dit.
+        $aCredit = (bool) Expense::whereKey($id)->value('on_credit');
+
         // 🔴→✅ TICKET 14.33 — CONTRE-PASSATION (écriture d'annulation de sens inverse, jamais suppression de
         // l'originale) et trésorerie réintégrée : `SaisieDepenseAction::archiver()` (U14, partagé avec les postes).
         try {
             $resultat = app(SaisieDepenseAction::class)->archiver($id);
+        } catch (DepenseNonModifiableException $e) {
+            // Ticket DEP7 — dépense à crédit déjà réglée en tout ou partie : rien n'est archivé, le motif est dit.
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
         } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
             // 🔴→✅ Ticket EX5 — dépense d'un exercice clos, ou contre-passation du jour sans exercice : motif R4.
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
@@ -381,7 +409,7 @@ class SaisieDepenses extends Component
 
         $message = $resultat === SaisieDepenseAction::ARCHIVEE_SANS_ANNULATION
             ? 'Dépense archivée — ATTENTION : écriture d\'annulation non générée. À régulariser au Journal Comptable.'
-            : 'Dépense archivée — trésorerie réintégrée et charge annulée.';
+            : ($aCredit ? 'Dépense archivée — dette fournisseur annulée et charge annulée.' : 'Dépense archivée — trésorerie réintégrée et charge annulée.');
 
         $this->dispatch('toast', message: $message, type: 'warning');
     }

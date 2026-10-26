@@ -67,6 +67,8 @@ class SupplierSettlementService
                 $dette->amount_paid += $applique;
                 $dette->status = $dette->balance <= 0 ? 'soldee' : 'en_cours';
                 $dette->save();
+                // Ticket DEP7 — une dette de dépense soldée passe sa dépense de `en_attente` à `payee`.
+                app(DetteFournisseurService::class)->apresImputation($dette);
 
                 $reste -= $applique;
             }

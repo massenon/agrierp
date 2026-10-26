@@ -12,7 +12,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 
 /**
- * Ticket DEP1 à DEP3 — décor commun des tests de « Saisie des Dépenses » à plusieurs lignes : un administrateur, un
+ * Ticket DEP1 à DEP3 (DEP6 : + 401 Fournisseurs, centre de coût obligatoire) — décor commun des tests de « Saisie des Dépenses » à plusieurs lignes : un administrateur, un
  * exercice 2026 ouvert, le plan (531 caisse, 521 banque, 601, 602, 605, 614, 628 en classe 6, 411 en classe 4),
  * une caisse de 500 000 F et une banque de 800 000 F, un centre de coût, un fournisseur.
  *
@@ -48,7 +48,7 @@ trait DecorDepenses
         FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);
 
         foreach ([
-            ['531', 'Caisse', 5], ['521', 'Banque', 5], ['411', 'Clients', 4],
+            ['531', 'Caisse', 5], ['521', 'Banque', 5], ['411', 'Clients', 4], ['401', 'Fournisseurs', 4],
             ['601', 'Achats de marchandises', 6], ['602', 'Produits vétérinaires', 6], ['605', 'Énergie', 6],
             ['614', 'Transports', 6], ['628', 'Autres charges', 6],
         ] as [$code, $libelle, $classe]) {
@@ -73,6 +73,8 @@ trait DecorDepenses
             'expense_date' => '2026-06-15',
             'treasury_account_id' => $this->caisse->id,
             'payment_mode' => 'caisse',
+            // Ticket DEP6 (DEP-Q1) — le centre de coût est OBLIGATOIRE à la saisie.
+            'cost_center_id' => $this->filiere->id,
             'lines' => [
                 ['label' => 'Provende ponte', 'charge_account_id' => $this->plan['601']->id, 'amount' => 45_000],
                 ['label' => 'Vermifuge', 'charge_account_id' => $this->plan['602']->id, 'amount' => 10_000],

@@ -48,6 +48,8 @@ class Expense extends Model
         'receipt_path', 'status', 'is_active', 'accounting_entry_id',
         // Ticket DEP1 — l'en-tête d'une dépense à plusieurs lignes.
         'payment_mode', 'cost_center_id', 'supplier_id', 'beneficiary', 'created_by',
+        // Ticket DEP7 — non payée comptant : crédite le 401 du fournisseur et ouvre une dette (aucune trésorerie).
+        'on_credit',
     ];
 
     /**
@@ -61,6 +63,30 @@ class Expense extends Model
         'banque' => 'Banque',
         'mobile_money' => 'Mobile Money',
     ];
+
+    /**
+     * Ticket DEP7 (DEP-Q3) — le CHOIX de règlement, proposé quand un fournisseur est choisi : clé = valeur du champ
+     * (`on_credit` faux / vrai), valeur = libellé affiché (web et poste, mot pour mot).
+     *
+     * @var array<string, string>
+     */
+    public const REGLEMENTS = [
+        'comptant' => 'Payée comptant',
+        'credit' => 'À crédit (dette fournisseur)',
+    ];
+
+    /**
+     * Ticket DEP7 — le règlement tel que le détail déplié le dit (web et poste, mot pour mot) : « Payée comptant »,
+     * « À crédit — en attente » (dette ouverte), « À crédit — réglée » (dette soldée).
+     */
+    public static function libelleReglement(bool $aCredit, ?string $statut): string
+    {
+        if (! $aCredit) {
+            return 'Payée comptant';
+        }
+
+        return $statut === 'payee' ? 'À crédit — réglée' : 'À crédit — en attente';
+    }
 
     /**
      * Ticket DEP1 — le LIBELLÉ-RÉSUMÉ de l'en-tête (`expenses.label`, lu par les rapports et le Tableau de bord) : le
@@ -82,6 +108,7 @@ class Expense extends Model
             'expense_date' => 'date',
             'amount' => 'decimal:2',
             'is_active' => 'boolean',
+            'on_credit' => 'boolean',
         ];
     }
 
