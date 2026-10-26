@@ -903,6 +903,19 @@ class SyncEngine {
       }
     });
 
+    // Ticket #44 — un migrate:fresh --seed sur le serveur recrée chaque catégorie
+    // avec un UUID différent. Le DoUpdate ci-dessus traite les conflits de PRIMARY KEY
+    // (même UUID) mais ne supprime pas les anciennes lignes d'UUID différent portant
+    // le même libellé. On conserve pour chaque libellé la ligne avec l'updatedAt le
+    // plus récent, et on supprime les doublons obsolètes.
+    if (lignes.isNotEmpty) {
+      await _db.customStatement(
+        'DELETE FROM product_categories WHERE id NOT IN ('
+        '  SELECT id FROM (SELECT id FROM product_categories GROUP BY label HAVING MAX(updated_at))'
+        ')',
+      );
+    }
+
     return lignes.length;
   }
 
