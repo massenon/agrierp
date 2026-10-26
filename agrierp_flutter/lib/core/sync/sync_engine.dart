@@ -4536,6 +4536,8 @@ class SyncEngine {
       final detail = _texteStrict(l['detail'], '$quoi $id : détail') ?? '';
       final motifRestauration = _texteStrict(l['motif_restauration'], '$quoi $id : motif de restauration');
       final motifSuppression = _texteStrict(l['motif_suppression'], '$quoi $id : motif de suppression');
+      // Ticket ARC-Q2 — absent (serveur ancien) ou null : auteur inconnu ; autre chose qu'un texte : le lot est refusé.
+      final archivePar = _texteStrict(l['archive_par'], '$quoi $id : archivé par');
       final restaurable = l['restaurable'];
       final supprimable = l['supprimable'];
       final archiveLe = l['archive_le'];
@@ -4569,6 +4571,7 @@ class SyncEngine {
           module: module,
           // Heure MURALE du serveur, lue telle quelle : le jour d'archivage du web doit rester le jour.
           archiveLe: Value(date),
+          archivePar: Value(archivePar == null || archivePar.trim().isEmpty ? null : archivePar),
           restaurable: restaurable,
           motifRestauration: Value(restaurable ? null : motifRestauration),
           supprimable: supprimable,

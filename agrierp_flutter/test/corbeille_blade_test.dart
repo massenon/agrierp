@@ -112,11 +112,14 @@ void main() {
     expect(onglet, contains("etiquette: 'Au'"));
   }, skip: saut);
 
-  test('⚠️ les six colonnes du Blade, dans l\'ordre', () {
-    final blade6 = [for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(vue)) m.group(1)!.trim()];
-    expect(blade6, ['Type', 'Élément', 'Détail', 'Module', 'Archivé le', 'Actions']);
+  test('⚠️ les sept colonnes du Blade, dans l\'ordre (dont « Archivé par », ARC-Q2)', () {
+    final blade7 = [for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(vue)) m.group(1)!.trim()];
+    expect(blade7, ['Type', 'Élément', 'Détail', 'Module', 'Archivé le', 'Archivé par', 'Actions']);
     final dart = [for (final m in RegExp(r"ColonneTableau\('([^']+)'").allMatches(onglet)) m.group(1)!];
-    expect(dart, blade6);
+    expect(dart, blade7);
+    // L'auteur inconnu s'écrit « — » aux deux endroits.
+    expect(vue, contains("\$element['archive_par'] ?? '—'"));
+    expect(onglet, contains("l.archivePar ?? '—'"));
   }, skip: saut);
 
   test('les icônes du Blade sont celles du Dart', () {
