@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Parametres;
 
-use App\Models\AuditLog;
 use App\Models\LivestockSpecies;
 use App\Models\ModuleConfig;
 use Illuminate\Support\Facades\Auth;
@@ -51,13 +50,7 @@ class ModulesActifs extends Component
     {
         $this->authorize('manage-modules');
 
-        $config = ModuleConfig::firstOrCreate(['species_code' => $speciesCode], ['is_enabled' => false]);
-        $config->update([
-            'is_enabled' => ! $config->is_enabled,
-            'updated_by' => Auth::id(),
-        ]);
-
-        AuditLog::record('module.toggled', 'parametres');
+        ModuleConfig::definir($speciesCode, ! ModuleConfig::isEnabled($speciesCode), Auth::id());
         $this->dispatch('toast', message: 'Modification appliquée avec succès.', type: 'success');
     }
 

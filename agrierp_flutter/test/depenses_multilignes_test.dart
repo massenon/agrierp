@@ -211,7 +211,7 @@ void main() {
       expect(await db.select(db.costCenters).get(), isEmpty);
       final d = (await db.select(db.expenses).get()).single;
       expect((d.paymentMode, d.costCenterId, d.supplierId, d.beneficiary, d.createdBy, d.ecritureRefus), ('caisse', null, null, null, null, null));
-      expect(db.schemaVersion, 59, reason: 'palier DEP4 (56) puis DEP6/DEP7 (59) ; 57, 58 et 60 réservés à d\'autres chantiers');
+      expect(db.schemaVersion, greaterThanOrEqualTo(56), reason: 'palier DEP4 (56) au moins ; les paliers suivants l\'enjambent');
     });
   });
 

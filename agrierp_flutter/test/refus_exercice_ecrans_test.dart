@@ -158,6 +158,7 @@ void main() {
       await choisir(tester, 'liste-ligne-0-compte', '601 - Achats de marchandises');
       await choisir(tester, 'liste-mode', 'Espèces');
       await choisir(tester, 'liste-compte', 'Caisse Physique (500 000 FCFA)');
+      await choisir(tester, 'liste-centre', 'Général');   // DEP6 : le centre de coût est obligatoire
       await tester.tap(find.byKey(const Key('bouton-enregistrer-depense')));
       await tester.pumpAndSettle();
 

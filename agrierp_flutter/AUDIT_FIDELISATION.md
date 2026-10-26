@@ -564,6 +564,7 @@ Format : `page — retrouvés/total (%) — écran associé`, puis les élément
 - **etiquettes** 2/9 — absents: Titulaire du Compte · RIB * · IBAN * · Sous-compte Auxiliaire · Numero de Telephone * · Titulaire de la Ligne · Numero de Serie SIM
 
 ## modules-actifs.html — 1/1 (100 %) — écran: lib/features/parametres/parametres_generaux_screen.dart
+- **MOD1 (21/10/2026)** : l'interrupteur n'était qu'une icône (aucune bascule possible au poste) ; désormais actif, envoyé au serveur et protégé du tirage — voir `docs/PLAN_FINALISATION.md`, Sprint MOD.
 
 ## mon-profil.html — 5/11 (45 %) — écran: AUCUN
 - **titres** 0/2 — absents: Mon Profil · Journal d'Audit — 10 Dernières Actions

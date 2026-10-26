@@ -628,3 +628,25 @@ Web (modale « Centre de Coût * », message sous le champ), absorbeur strict, p
 **Schéma Drift : inchangé** (v52 ; ni 53 ni 54 ni 55 pris).
 **Non vérifié :** migration sur une base MySQL réelle peuplée (collation, doublons réels) ; poste Windows réel ; rendu navigateur (Dusk) du bandeau et du champ code.
 
+
+## Sprint MOD — « Modules Actifs » : activer / désactiver au poste (bug rapporté par le client, 21/10/2026)
+
+### MOD1 ✅ (21/10/2026) Interrupteurs des espèces au poste, envoyés au serveur, jamais écrasés par le tirage
+
+**Bug rapporté.** « En poste, je n'arrive pas à activer / désactiver les Modules Actifs. »
+
+**Cause racine (trois défauts cumulés, aucun ne levait d'erreur).**
+1. **Écran** : l'interrupteur du poste n'était qu'une `Icon` (`toggle_on` / `toggle_off`) sans gestionnaire de clic ; la carte disait même « le réglage lui-même se fait sur la surface web ». Aucune condition (droits, hors ligne, exercice) ne le désactivait : il n'existait simplement pas.
+2. **Écriture et envoi** : `modules_config` n'était qu'un référentiel descendant, sans `sync_status` ni clé d'envoi ; le serveur comptait tout envoi dans `referentiels_ignored`.
+3. **Tirage** : `_absorberModules` supprimait puis réinsérait toute la table à chaque tirage. Même corrigés (1) et (2), une bascule non encore acquittée serait « revenue » toute seule à l'ancienne valeur au cycle suivant.
+Le web, lui, n'avait pas de défaut (`ModulesActifs::toggleModule()` écrit `modules_config.is_enabled`, `updated_by`, journal `module.toggled`, toast « Modification appliquée avec succès. ») ; il ne contrôlait ni « au moins un module » ni la comptabilité, et le poste non plus.
+
+**Correction.**
+- **Web** : `ModuleConfig::definir()` devient le point d'écriture unique (web et poste, même audit) ; `RecordModulesConfigFromDeviceAction` + clé d'envoi `modules_config` dans `SyncController::push` (droit `manage-modules`, refus par ligne avec motif, espèce inconnue ou valeur illisible refusées, valeur EXPLICITE et non bascule : un envoi rejoué ne rebascule pas), retirée des référentiels ignorés.
+- **Poste** : Drift **v60** (`modules_config.sync_status`, `updated_at` ; 57 à 59 réservés, `from < 60` les enjambe) ; interrupteur cliquable (`bascule-module-<code>`), écriture `pending` immédiate, toast du web, icônes rafraîchies ; envoi, acquittement sous le code de l'espèce, refus → conflit avec motif, relance ; absorbeur protecteur (une ligne `pending` / `conflict` n'est jamais écrasée, même pour une espèce absente du tirage) ; compteur « en attente » de la synchronisation. Les écrans d'élevage (cartes de Gestion Élevage, onglets de Suivi Reproduction, Dashboard Élevage, sélecteurs de bande, Registre) relisent `modules_config` à l'ouverture : l'effet est immédiat.
+- **Fidélité au Blade (maître)** : sous-titres « Fiches, VMS, catalogue POS liés à cette filière », pastille FUTUR et carte d'information en bleu `info-blue`, mention sans renvoi au web.
+
+**Tests (rouges d'abord, mutations tuées).** `agrierp_laravel/tests/Feature/SyncModulesActifsPosteTest.php` (7) ; `agrierp_flutter/test/modules_actifs_poste_test.dart` : écran (clic, icônes, toast, première bascule sans ligne), dépôt (actives, aucun « au moins un », comptabilité intacte), moteur (envoi, acquittement, refus, bascule refaite pendant l'envoi, tirage périmé, tirage web → poste), parité Blade ↔ Dart (textes, descriptions, espèces, icônes, message), **aller-retour contre le vrai `SyncController` PHP** (poste → serveur → bascule web par le vrai composant Livewire → tirage → poste, et refus du rôle sans `manage-modules`). Mutations : absorbeur sans protection (5 rouges), bascule non marquée `pending` (8 rouges).
+
+**Décision à confirmer par le client.** Seul l'administrateur (`manage-modules`) peut basculer un module, au poste comme au web ; un autre compte voit sa bascule refusée avec son motif (jamais perdue).
+**Non vérifié :** poste Windows réel ; essai à plusieurs postes (`outils/essai_multipostes.sh`, MariaDB).

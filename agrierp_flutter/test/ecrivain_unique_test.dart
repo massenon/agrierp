@@ -61,6 +61,8 @@ void main() {
     'feed_types': 'lib/features/elevage/parametres_elevage_repository.dart',
     'elevage_numbering_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
     'company_settings': 'lib/features/elevage/parametres_elevage_repository.dart',
+    // Ticket MOD1 — « Modules Actifs » : la bascule d'une espèce s'écrit par ce dépôt (le moteur ne fait qu'absorber / acquitter).
+    'modules_config': 'lib/features/parametres/parametres_generaux_repository.dart',
   };
 
   /// EXCEPTIONS LÉGITIMES, chacune justifiée. Clé : `table <- fichier`. Une exception devenue inutile fait échouer le
@@ -190,7 +192,9 @@ void main() {
           ..removeAll(colonnesPermises[table] ?? const <String>{});
         // SQL brut : `SET stock_qty = 0` et rien d'autre (aucune seconde colonne après une virgule).
         final sqlPermis = RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait) ||
-            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait));
+            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait)) ||
+            // Ticket DEP6 — palier v59 : le centre « Général » posé aux dépenses locales qui n'en avaient pas (colonne dérivée).
+            (table == 'expenses' && RegExp(r'SET\s+cost_center_id\s*=\s*\(SELECT\s+id\s+FROM\s+cost_centers').hasMatch(extrait));
         final sqlHors = extrait.contains('SET') && !sqlPermis;
         if (hors.isNotEmpty || sqlHors || extrait.contains('syncStatus') || extrait.contains('sync_status')) {
           parasites.add('$cle écrit au-delà de ses colonnes dérivées : $extrait');

@@ -391,7 +391,7 @@ void main() {
       expect(lignes[c]!.syncStatus, SyncStatus.conflict);
       expect(lignes[a]!.updatedAt, lignes[b]!.updatedAt, reason: '`updated_at` ne bouge pas');
       expect(lignes[a]!.treasuryAccountId, _caisse);
-      expect(base.schemaVersion, 59);
+      expect(base.schemaVersion, greaterThanOrEqualTo(59));
 
       final tresorerie = (await base.customSelect('PRAGMA table_info("expenses")').get())
           .firstWhere((l) => l.read<String>('name') == 'treasury_account_id');

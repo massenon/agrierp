@@ -247,6 +247,11 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   // RÉSERVÉS à d'autres chantiers ; le palier 56 → 59 les enjambe. Le passage de `treasury_account_id` à NULLABLE (table
   // reconstruite depuis une base dont la colonne est encore obligatoire) est vérifié par `depenses_a_credit_test.dart`.
   59: [(d.expenses, d.expenses.onCredit)],
+  // Ticket MOD1 — les modules actifs se basculent au poste. ⚠️ 57, 58 et 59 sont réservés à d'autres branches.
+  60: [
+    (d.modulesConfig, d.modulesConfig.syncStatus),
+    (d.modulesConfig, d.modulesConfig.updatedAt),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -344,7 +349,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 59 (à crédit, DEP7) est complète ; 55, 57, 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 59, reason: '55 (unicité) sans palier Drift ; 57, 58 et 60 réservés à d\'autres chantiers : 56 → 59');
+    expect(d.schemaVersion, 60, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés');
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
     expect(_colonnesAjoutees(d)[59], [(d.expenses, d.expenses.onCredit)]);
     expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);

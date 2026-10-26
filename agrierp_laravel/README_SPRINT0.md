@@ -22438,6 +22438,10 @@ Constat transversal : la plupart des écrans du poste ont été portés depuis l
 
 **NON vérifié.** Parité exécutée seulement avec PHP local (SQLite) ; aucune recette sur poste Windows ni sur MySQL de production ; ticket PDF non essayé hors ligne réelle. Questions client AV-Q1 à AV-Q5 : `docs/PLAN_FINALISATION.md`.
 
+### MOD1 — Modules Actifs basculables au poste (21/10/2026)
+
+**Contrat modifié.** `POST /api/sync/push` accepte `modules_config` : liste de `{id, species_code, is_enabled}` (l'`id` est le code de l'espèce, sous lequel le serveur acquitte ou refuse). Droit `manage-modules` (sinon refus par ligne : « votre rôle ne permet pas d'activer ou désactiver un module »). Valeur explicite, jamais une bascule ; espèce inconnue ou valeur non booléenne refusées ; journal `module.toggled`, `updated_by` tracé ; `ModuleConfig::definir()` est le point d'écriture commun avec `Livewire\Parametres\ModulesActifs`. Ne touche jamais la comptabilité. La clé n'est plus comptée dans `referentiels_ignored`. Tirage inchangé. Poste : Drift v60, absorbeur qui ne remplace pas une bascule non acquittée. Détail et tests : `docs/PLAN_FINALISATION.md`, Sprint MOD.
+
 ### Ticket DEP6 à DEP9 (26/10/2026) — « Saisie des Dépenses » : centre de coût OBLIGATOIRE et dépense À CRÉDIT = dette fournisseur (PRD `docs/prd/depenses-multilignes.md` § 11)
 
 **Décisions du client (21/10/2026) :** DEP-Q1 « le centre de coût doit devenir obligatoire » → OUI ; DEP-Q3 « une dépense à un fournisseur doit créer une dette » → OUI.
