@@ -33,8 +33,16 @@ import 'devis_repository.dart';
 ///      derrière `x-modal-confirm-delete`.
 ///
 /// Toasts du web : « Devis créé avec succès. », « Devis modifié avec succès. », « Devis marqué comme envoyé / accepté /
-/// refusé. », « Devis archivé avec succès. » (avertissement), « La conversion en facture réelle arrive avec le module
-/// Facturation (Sprint 7). » (avertissement : la conversion n'existe pas encore au web).
+/// refusé. », « Devis archivé avec succès. » (avertissement).
+///
+/// 🔴→✅ Ticket DEV3 — « CONVERTIR EN FACTURE » est construit (DEV-Q1 close) : un devis ACCEPTÉ devient une facture (vente à
+/// crédit sans ligne, créée par le SERVEUR). Visible aux mêmes conditions que le web : devis `accepte` ET droits
+/// `manage-ventes` + `manage-facturation`. Un devis `facture` montre son numéro `FV-AAAA-XXXXXX` sous le badge et l'icône
+/// « Voir la facture » (`view-facturation`) vers l'écran Facturation.
+///
+/// ⚠️ ÉCART ASSUMÉ (fonction propre au poste hors ligne, doctrine § 5.6) : le web convertit sur place ; le poste écrit la
+/// DEMANDE (badge « Conversion demandée », devis figé), le serveur crée la facture à la synchronisation et rend son numéro.
+/// « Conversion refusée » + motif du serveur mot pour mot, avec « Annuler la demande ».
 ///
 /// ➕ Ajouts du poste, gardés : sous le numéro, l'état d'envoi d'une saisie de ce poste (« À envoyer » ; « Refusé » ou
 /// « Archivage refusé » suivi du motif du serveur mot pour mot) — le web n'a pas de file d'envoi ; et « — » en N° Devis
@@ -45,6 +53,9 @@ class DevisOnglet extends StatefulWidget {
     required this.depot,
     this.peutGerer = true,
     this.peutExporter = true,
+    this.peutConvertir = false,
+    this.peutVoirFacturation = false,
+    this.surVoirFacturation,
     this.imprimer,
   });
 
@@ -56,6 +67,16 @@ class DevisOnglet extends StatefulWidget {
 
   /// `export-ventes` : « Exporter » (`exportDevisPdf()` : `$this->authorize('export-ventes')`).
   final bool peutExporter;
+
+  /// Ticket DEV3 — `manage-facturation` (EN PLUS de `manage-ventes`, [peutGerer]) : « Convertir en Facture »
+  /// (`convertToInvoice()` : `authorize('manage-ventes')` puis `authorize('manage-facturation')`).
+  final bool peutConvertir;
+
+  /// Ticket DEV3 — `view-facturation` : l'icône « Voir la facture » d'un devis facturé (`@can('view-facturation')`).
+  final bool peutVoirFacturation;
+
+  /// Ticket DEV3 — ouvre l'écran « Facturation & MeCeF » (`route('facturation.index')` du web).
+  final VoidCallback? surVoirFacturation;
 
   /// Éditeur injecté — `EditeursRapports.imprimer` en production, un espion en test. `null` : « Exporter » inerte.
   final Editeur? imprimer;
@@ -475,10 +496,22 @@ class _DevisOngletState extends State<DevisOnglet> {
             flex: 2,
             child: Padding(
               padding: const EdgeInsets.only(left: AgriSpacing.md),
-              child: Align(alignment: Alignment.centerLeft, child: _badgeStatut(d)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _badgeStatut(d),
+                  // `@if($quote->status === 'facture' && $quote->sale)` : le numéro de la facture, sous le badge.
+                  if (d.status == 'facture' && d.convertedSaleId != null)
+                    Text(
+                      d.invoiceNumber ?? '—',
+                      key: Key('devis-facture-${d.id}'),
+                      style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AgriColors.outline),
+                    ),
+                ],
+              ),
             ),
           ),
-          Expanded(flex: 3, child: _actions(d)),
+          Expanded(flex: 3, child: _actions(l)),
         ],
       ),
     );
@@ -535,7 +568,9 @@ class _DevisOngletState extends State<DevisOnglet> {
           borderRadius: BorderRadius.circular(AgriRadius.full),
         ),
         child: Text(
-          !refuse
+          l.conversionDemandee
+              ? (refuse ? 'Conversion refusée' : 'Conversion demandée')
+              : !refuse
               ? 'À envoyer'
               : d.isActive
               ? 'Refusé'
@@ -559,7 +594,8 @@ class _DevisOngletState extends State<DevisOnglet> {
   /// Les icônes d'action du Blade, dans son ordre et aux mêmes conditions : brouillon → « Marquer comme envoyé » ;
   /// envoyé → « Marquer comme accepté » et « Marquer comme refusé » ; accepté → « Convertir en Facture » ; puis
   /// « Modifier » et « Archiver ».
-  Widget _actions(Quote d) {
+  Widget _actions(LigneDevis l) {
+    final d = l.devis;
     Widget action({
       required String cle,
       required String infobulle,
@@ -603,14 +639,33 @@ class _DevisOngletState extends State<DevisOnglet> {
             surAppui: () => _changerStatut(d, 'refuse', DevisRepository.toastRefuse, TypeToast.avertissement),
           ),
         ],
-        // `convertToInvoice()` n'a pas d'`authorize()` au web : le bouton est montré à tous.
-        if (d.status == 'accepte')
+        // `@if($quote->status === 'accepte' && can('manage-ventes') && can('manage-facturation'))` : le bouton n'est montré
+        // qu'à qui peut convertir. Une demande déjà ouverte (poste) le remplace par son état.
+        if (d.status == 'accepte' && widget.peutGerer && widget.peutConvertir && !l.conversionDemandee)
           action(
             cle: 'devis-convertir-${d.id}',
             infobulle: 'Convertir en Facture',
             icone: SymbolesAgri.receipt_long,
             couleur: AgriColors.brandEmerald,
-            surAppui: () => ToastAgri.afficher(context, DevisRepository.toastConversion, type: TypeToast.avertissement),
+            surAppui: () => _convertir(d),
+          ),
+        // ➕ Poste : une demande REFUSÉE par le serveur s'annule (le devis redevient libre) ou se relance depuis Synchronisation.
+        if (widget.peutGerer && l.conversionRefusee)
+          action(
+            cle: 'devis-annuler-conversion-${d.id}',
+            infobulle: 'Annuler la demande de conversion',
+            icone: SymbolesAgri.close,
+            couleur: AgriColors.errorDeep,
+            surAppui: () => _annulerConversion(d),
+          ),
+        // `@if($quote->status === 'facture' && $quote->sale && can('view-facturation'))` : « Voir la facture ».
+        if (d.status == 'facture' && d.convertedSaleId != null && widget.peutVoirFacturation)
+          action(
+            cle: 'devis-voir-facture-${d.id}',
+            infobulle: 'Voir la facture',
+            icone: SymbolesAgri.visibility,
+            couleur: AgriColors.brandEmerald,
+            surAppui: () => widget.surVoirFacturation?.call(),
           ),
         if (widget.peutGerer) ...[
           action(
@@ -630,6 +685,39 @@ class _DevisOngletState extends State<DevisOnglet> {
         ],
       ],
     );
+  }
+
+  /// `convertToInvoice($id)` — « Convertir en Facture » : au poste, la DEMANDE est écrite ([DevisRepository.demanderConversion])
+  /// et part à la prochaine synchronisation. Un refus est un toast d'erreur (motif du serveur), un devis déjà facturé un
+  /// avertissement avec son numéro, comme au web.
+  Future<void> _convertir(Quote d) async {
+    final ConversionDemandee resultat;
+    try {
+      resultat = await widget.depot.demanderConversion(d.id);
+    } on DevisRefuse catch (e) {
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
+    await _charger();
+    if (!mounted) return;
+    if (resultat.deja) {
+      ToastAgri.afficher(
+        context,
+        DevisRepository.toastDejaFacture(resultat.devis.invoiceNumber ?? '—'),
+        type: TypeToast.avertissement,
+      );
+      return;
+    }
+    ToastAgri.afficher(context, DevisRepository.toastConversionDemandee, type: TypeToast.succes);
+  }
+
+  /// ➕ Poste seul — « Annuler la demande de conversion » d'une demande refusée.
+  Future<void> _annulerConversion(Quote d) async {
+    final annulee = await widget.depot.annulerConversion(d.id);
+    await _charger();
+    if (!mounted || !annulee) return;
+    ToastAgri.afficher(context, DevisRepository.toastConversionAnnulee, type: TypeToast.avertissement);
   }
 
   /// `markAsSent` / `markAsAccepted` / `markAsRefused` : toast du web en cas de succès ; un refus (pas interdit,

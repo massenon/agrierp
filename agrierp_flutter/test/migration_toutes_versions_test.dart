@@ -243,6 +243,12 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.expenses, d.expenses.createdBy),
     (d.expenses, d.expenses.ecritureRefus),
   ],
+  // Ticket DEV3 — « Convertir en Facture » : la demande de conversion de ce poste, le lien vers la facture et son numéro.
+  57: [
+    (d.quotes, d.quotes.conversionRequestedAt),
+    (d.quotes, d.quotes.convertedSaleId),
+    (d.quotes, d.quotes.invoiceNumber),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -337,10 +343,10 @@ void main() {
     } catch (_) {}
   });
 
-  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) est complète ; le 55 est inutilisé', () {
+  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) est complète ; le 55 est inutilisé', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 56, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou');
+    expect(d.schemaVersion, 57, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou, puis 57 (DEV3)');
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
     expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);
     expect(_tablesCreees(d)[53], [d.quotes]);
@@ -349,6 +355,7 @@ void main() {
     expect(source, contains('if (from < 53) {'));
     expect(source, contains('if (from < 54) {'));
     expect(source, contains('if (from < 56) {'));
+    expect(source, contains('if (from < 57) {'));
     expect(source, isNot(contains('if (from < 55) {')));
   });
 

@@ -1121,6 +1121,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
           peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
           peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
+          // Ticket DEV3 — « Convertir en Facture » : `manage-facturation` EN PLUS de `manage-ventes` (admin seul aujourd'hui) ;
+          // « Voir la facture » : `view-facturation`, vers l'écran Facturation & MeCeF.
+          peutConvertir: PermissionsPoste.peut(_role, 'manage-facturation'),
+          peutVoirFacturation: PermissionsPoste.peut(_role, 'view-facturation'),
+          surVoirFacturation: () => setState(() => _ecran = EcranPoste.facturation),
         ),
         EcranPoste.caisse => CaisseScreen(depot: widget.caisse),
         EcranPoste.synchronisation => SynchronisationScreen(

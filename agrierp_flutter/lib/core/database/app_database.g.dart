@@ -35547,6 +35547,39 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _conversionRequestedAtMeta =
+      const VerificationMeta('conversionRequestedAt');
+  @override
+  late final GeneratedColumn<DateTime> conversionRequestedAt =
+      GeneratedColumn<DateTime>(
+        'conversion_requested_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _convertedSaleIdMeta = const VerificationMeta(
+    'convertedSaleId',
+  );
+  @override
+  late final GeneratedColumn<String> convertedSaleId = GeneratedColumn<String>(
+    'converted_sale_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _invoiceNumberMeta = const VerificationMeta(
+    'invoiceNumber',
+  );
+  @override
+  late final GeneratedColumn<String> invoiceNumber = GeneratedColumn<String>(
+    'invoice_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -35563,6 +35596,9 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
     note,
     status,
     isActive,
+    conversionRequestedAt,
+    convertedSaleId,
+    invoiceNumber,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -35674,6 +35710,33 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('conversion_requested_at')) {
+      context.handle(
+        _conversionRequestedAtMeta,
+        conversionRequestedAt.isAcceptableOrUnknown(
+          data['conversion_requested_at']!,
+          _conversionRequestedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('converted_sale_id')) {
+      context.handle(
+        _convertedSaleIdMeta,
+        convertedSaleId.isAcceptableOrUnknown(
+          data['converted_sale_id']!,
+          _convertedSaleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('invoice_number')) {
+      context.handle(
+        _invoiceNumberMeta,
+        invoiceNumber.isAcceptableOrUnknown(
+          data['invoice_number']!,
+          _invoiceNumberMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -35741,6 +35804,18 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      conversionRequestedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}conversion_requested_at'],
+      ),
+      convertedSaleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_sale_id'],
+      ),
+      invoiceNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invoice_number'],
+      ),
     );
   }
 
@@ -35774,6 +35849,21 @@ class Quote extends DataClass implements Insertable<Quote> {
 
   /// Archivage logique (`false` : archivé, rien n'est supprimé).
   final bool isActive;
+
+  /// 🔴→✅ Ticket DEV3 — « CONVERTIR EN FACTURE » : l'instant (heure du Bénin) où ce poste a DEMANDÉ la conversion du devis
+  /// accepté en facture ; `NULL` : aucune demande. Le poste n'envoie que la DEMANDE (`quote_conversions`), le serveur crée
+  /// la facture, la numérote et en rend le lien ([convertedSaleId], [invoiceNumber]). Tant que la demande est ouverte, le
+  /// devis est figé (ni modification, ni archivage) ; elle se ferme à l'acquittement (`NULL`, statut `facture`).
+  /// Fonction propre au poste hors ligne : le web convertit sur place, sans file.
+  final DateTime? conversionRequestedAt;
+
+  /// Ticket DEV3 — la facture issue du devis (`quotes.converted_sale_id` du serveur : une facture EST une vente), `NULL`
+  /// tant que le devis n'est pas converti. Servie au tirage, ou rendue à l'acquittement de la demande.
+  final String? convertedSaleId;
+
+  /// Ticket DEV3 — `FV-AAAA-XXXXXX`, le numéro de cette facture tel que le SERVEUR le calcule (`Sale::numero_facture`) :
+  /// le poste ne l'invente jamais (même principe que `DEV-AAAA-NNN`).
+  final String? invoiceNumber;
   const Quote({
     required this.id,
     required this.deviceId,
@@ -35789,6 +35879,9 @@ class Quote extends DataClass implements Insertable<Quote> {
     this.note,
     required this.status,
     required this.isActive,
+    this.conversionRequestedAt,
+    this.convertedSaleId,
+    this.invoiceNumber,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -35815,6 +35908,17 @@ class Quote extends DataClass implements Insertable<Quote> {
     }
     map['status'] = Variable<String>(status);
     map['is_active'] = Variable<bool>(isActive);
+    if (!nullToAbsent || conversionRequestedAt != null) {
+      map['conversion_requested_at'] = Variable<DateTime>(
+        conversionRequestedAt,
+      );
+    }
+    if (!nullToAbsent || convertedSaleId != null) {
+      map['converted_sale_id'] = Variable<String>(convertedSaleId);
+    }
+    if (!nullToAbsent || invoiceNumber != null) {
+      map['invoice_number'] = Variable<String>(invoiceNumber);
+    }
     return map;
   }
 
@@ -35836,6 +35940,15 @@ class Quote extends DataClass implements Insertable<Quote> {
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       status: Value(status),
       isActive: Value(isActive),
+      conversionRequestedAt: conversionRequestedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conversionRequestedAt),
+      convertedSaleId: convertedSaleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedSaleId),
+      invoiceNumber: invoiceNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invoiceNumber),
     );
   }
 
@@ -35863,6 +35976,11 @@ class Quote extends DataClass implements Insertable<Quote> {
       note: serializer.fromJson<String?>(json['note']),
       status: serializer.fromJson<String>(json['status']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      conversionRequestedAt: serializer.fromJson<DateTime?>(
+        json['conversionRequestedAt'],
+      ),
+      convertedSaleId: serializer.fromJson<String?>(json['convertedSaleId']),
+      invoiceNumber: serializer.fromJson<String?>(json['invoiceNumber']),
     );
   }
   @override
@@ -35885,6 +36003,11 @@ class Quote extends DataClass implements Insertable<Quote> {
       'note': serializer.toJson<String?>(note),
       'status': serializer.toJson<String>(status),
       'isActive': serializer.toJson<bool>(isActive),
+      'conversionRequestedAt': serializer.toJson<DateTime?>(
+        conversionRequestedAt,
+      ),
+      'convertedSaleId': serializer.toJson<String?>(convertedSaleId),
+      'invoiceNumber': serializer.toJson<String?>(invoiceNumber),
     };
   }
 
@@ -35903,6 +36026,9 @@ class Quote extends DataClass implements Insertable<Quote> {
     Value<String?> note = const Value.absent(),
     String? status,
     bool? isActive,
+    Value<DateTime?> conversionRequestedAt = const Value.absent(),
+    Value<String?> convertedSaleId = const Value.absent(),
+    Value<String?> invoiceNumber = const Value.absent(),
   }) => Quote(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -35918,6 +36044,15 @@ class Quote extends DataClass implements Insertable<Quote> {
     note: note.present ? note.value : this.note,
     status: status ?? this.status,
     isActive: isActive ?? this.isActive,
+    conversionRequestedAt: conversionRequestedAt.present
+        ? conversionRequestedAt.value
+        : this.conversionRequestedAt,
+    convertedSaleId: convertedSaleId.present
+        ? convertedSaleId.value
+        : this.convertedSaleId,
+    invoiceNumber: invoiceNumber.present
+        ? invoiceNumber.value
+        : this.invoiceNumber,
   );
   Quote copyWithCompanion(QuotesCompanion data) {
     return Quote(
@@ -35945,6 +36080,15 @@ class Quote extends DataClass implements Insertable<Quote> {
       note: data.note.present ? data.note.value : this.note,
       status: data.status.present ? data.status.value : this.status,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      conversionRequestedAt: data.conversionRequestedAt.present
+          ? data.conversionRequestedAt.value
+          : this.conversionRequestedAt,
+      convertedSaleId: data.convertedSaleId.present
+          ? data.convertedSaleId.value
+          : this.convertedSaleId,
+      invoiceNumber: data.invoiceNumber.present
+          ? data.invoiceNumber.value
+          : this.invoiceNumber,
     );
   }
 
@@ -35964,7 +36108,10 @@ class Quote extends DataClass implements Insertable<Quote> {
           ..write('quoteDate: $quoteDate, ')
           ..write('note: $note, ')
           ..write('status: $status, ')
-          ..write('isActive: $isActive')
+          ..write('isActive: $isActive, ')
+          ..write('conversionRequestedAt: $conversionRequestedAt, ')
+          ..write('convertedSaleId: $convertedSaleId, ')
+          ..write('invoiceNumber: $invoiceNumber')
           ..write(')'))
         .toString();
   }
@@ -35985,6 +36132,9 @@ class Quote extends DataClass implements Insertable<Quote> {
     note,
     status,
     isActive,
+    conversionRequestedAt,
+    convertedSaleId,
+    invoiceNumber,
   );
   @override
   bool operator ==(Object other) =>
@@ -36003,7 +36153,10 @@ class Quote extends DataClass implements Insertable<Quote> {
           other.quoteDate == this.quoteDate &&
           other.note == this.note &&
           other.status == this.status &&
-          other.isActive == this.isActive);
+          other.isActive == this.isActive &&
+          other.conversionRequestedAt == this.conversionRequestedAt &&
+          other.convertedSaleId == this.convertedSaleId &&
+          other.invoiceNumber == this.invoiceNumber);
 }
 
 class QuotesCompanion extends UpdateCompanion<Quote> {
@@ -36021,6 +36174,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
   final Value<String?> note;
   final Value<String> status;
   final Value<bool> isActive;
+  final Value<DateTime?> conversionRequestedAt;
+  final Value<String?> convertedSaleId;
+  final Value<String?> invoiceNumber;
   final Value<int> rowid;
   const QuotesCompanion({
     this.id = const Value.absent(),
@@ -36037,6 +36193,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     this.note = const Value.absent(),
     this.status = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.conversionRequestedAt = const Value.absent(),
+    this.convertedSaleId = const Value.absent(),
+    this.invoiceNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   QuotesCompanion.insert({
@@ -36054,6 +36213,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     this.note = const Value.absent(),
     this.status = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.conversionRequestedAt = const Value.absent(),
+    this.convertedSaleId = const Value.absent(),
+    this.invoiceNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -36077,6 +36239,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     Expression<String>? note,
     Expression<String>? status,
     Expression<bool>? isActive,
+    Expression<DateTime>? conversionRequestedAt,
+    Expression<String>? convertedSaleId,
+    Expression<String>? invoiceNumber,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -36095,6 +36260,10 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
       if (note != null) 'note': note,
       if (status != null) 'status': status,
       if (isActive != null) 'is_active': isActive,
+      if (conversionRequestedAt != null)
+        'conversion_requested_at': conversionRequestedAt,
+      if (convertedSaleId != null) 'converted_sale_id': convertedSaleId,
+      if (invoiceNumber != null) 'invoice_number': invoiceNumber,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -36114,6 +36283,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     Value<String?>? note,
     Value<String>? status,
     Value<bool>? isActive,
+    Value<DateTime?>? conversionRequestedAt,
+    Value<String?>? convertedSaleId,
+    Value<String?>? invoiceNumber,
     Value<int>? rowid,
   }) {
     return QuotesCompanion(
@@ -36131,6 +36303,10 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
       note: note ?? this.note,
       status: status ?? this.status,
       isActive: isActive ?? this.isActive,
+      conversionRequestedAt:
+          conversionRequestedAt ?? this.conversionRequestedAt,
+      convertedSaleId: convertedSaleId ?? this.convertedSaleId,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -36182,6 +36358,17 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (conversionRequestedAt.present) {
+      map['conversion_requested_at'] = Variable<DateTime>(
+        conversionRequestedAt.value,
+      );
+    }
+    if (convertedSaleId.present) {
+      map['converted_sale_id'] = Variable<String>(convertedSaleId.value);
+    }
+    if (invoiceNumber.present) {
+      map['invoice_number'] = Variable<String>(invoiceNumber.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -36205,6 +36392,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
           ..write('note: $note, ')
           ..write('status: $status, ')
           ..write('isActive: $isActive, ')
+          ..write('conversionRequestedAt: $conversionRequestedAt, ')
+          ..write('convertedSaleId: $convertedSaleId, ')
+          ..write('invoiceNumber: $invoiceNumber, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -54646,6 +54836,9 @@ typedef $$QuotesTableCreateCompanionBuilder =
       Value<String?> note,
       Value<String> status,
       Value<bool> isActive,
+      Value<DateTime?> conversionRequestedAt,
+      Value<String?> convertedSaleId,
+      Value<String?> invoiceNumber,
       Value<int> rowid,
     });
 typedef $$QuotesTableUpdateCompanionBuilder =
@@ -54664,6 +54857,9 @@ typedef $$QuotesTableUpdateCompanionBuilder =
       Value<String?> note,
       Value<String> status,
       Value<bool> isActive,
+      Value<DateTime?> conversionRequestedAt,
+      Value<String?> convertedSaleId,
+      Value<String?> invoiceNumber,
       Value<int> rowid,
     });
 
@@ -54746,6 +54942,21 @@ class $$QuotesTableFilterComposer
     column: $table.isActive,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get conversionRequestedAt => $composableBuilder(
+    column: $table.conversionRequestedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get convertedSaleId => $composableBuilder(
+    column: $table.convertedSaleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get invoiceNumber => $composableBuilder(
+    column: $table.invoiceNumber,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$QuotesTableOrderingComposer
@@ -54826,6 +55037,21 @@ class $$QuotesTableOrderingComposer
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get conversionRequestedAt => $composableBuilder(
+    column: $table.conversionRequestedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get convertedSaleId => $composableBuilder(
+    column: $table.convertedSaleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get invoiceNumber => $composableBuilder(
+    column: $table.invoiceNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$QuotesTableAnnotationComposer
@@ -54889,6 +55115,21 @@ class $$QuotesTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get conversionRequestedAt => $composableBuilder(
+    column: $table.conversionRequestedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get convertedSaleId => $composableBuilder(
+    column: $table.convertedSaleId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get invoiceNumber => $composableBuilder(
+    column: $table.invoiceNumber,
+    builder: (column) => column,
+  );
 }
 
 class $$QuotesTableTableManager
@@ -54933,6 +55174,9 @@ class $$QuotesTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<DateTime?> conversionRequestedAt = const Value.absent(),
+                Value<String?> convertedSaleId = const Value.absent(),
+                Value<String?> invoiceNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotesCompanion(
                 id: id,
@@ -54949,6 +55193,9 @@ class $$QuotesTableTableManager
                 note: note,
                 status: status,
                 isActive: isActive,
+                conversionRequestedAt: conversionRequestedAt,
+                convertedSaleId: convertedSaleId,
+                invoiceNumber: invoiceNumber,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -54967,6 +55214,9 @@ class $$QuotesTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<DateTime?> conversionRequestedAt = const Value.absent(),
+                Value<String?> convertedSaleId = const Value.absent(),
+                Value<String?> invoiceNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotesCompanion.insert(
                 id: id,
@@ -54983,6 +55233,9 @@ class $$QuotesTableTableManager
                 note: note,
                 status: status,
                 isActive: isActive,
+                conversionRequestedAt: conversionRequestedAt,
+                convertedSaleId: convertedSaleId,
+                invoiceNumber: invoiceNumber,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

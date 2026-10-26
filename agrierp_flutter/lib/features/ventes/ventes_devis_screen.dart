@@ -37,6 +37,9 @@ class VentesDevisScreen extends StatefulWidget {
     this.imprimer,
     this.peutGerer = true,
     this.peutExporter = true,
+    this.peutConvertir = false,
+    this.peutVoirFacturation = false,
+    this.surVoirFacturation,
     this.enregistrerPdf,
   });
 
@@ -61,6 +64,15 @@ class VentesDevisScreen extends StatefulWidget {
 
   /// `export-ventes` : « Télécharger PDF » du détail d'une vente.
   final bool peutExporter;
+
+  /// Ticket DEV3 — `manage-facturation` (en plus de `manage-ventes`) : « Convertir en Facture » de l'onglet Devis.
+  final bool peutConvertir;
+
+  /// Ticket DEV3 — `view-facturation` : « Voir la facture » d'un devis facturé, qui ouvre [surVoirFacturation].
+  final bool peutVoirFacturation;
+
+  /// Ticket DEV3 — ouvre l'écran « Facturation & MeCeF » (`route('facturation.index')` au web).
+  final VoidCallback? surVoirFacturation;
 
   /// Écrit le PDF du ticket (`LivraisonPdf.enregistrer` par défaut, un espion en test).
   final Future<String> Function(PdfRecu pdf)? enregistrerPdf;
@@ -95,6 +107,9 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
                 depot: widget.devis,
                 peutGerer: widget.peutGerer,
                 peutExporter: widget.peutExporter,
+                peutConvertir: widget.peutConvertir,
+                peutVoirFacturation: widget.peutVoirFacturation,
+                surVoirFacturation: widget.surVoirFacturation,
                 imprimer: widget.imprimer,
               ),
               // Ticket AV2 — l'historique de la ferme, identique au Blade (`historique_ventes_onglet.dart`).

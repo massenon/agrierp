@@ -40,7 +40,18 @@ class LigneDevis {
 
   /// `getValidUntilAttribute()` du web : date du devis + validité en jours.
   DateTime get valideJusqua => HeureBenin.plusJours(devis.quoteDate, devis.validityDays);
+
+  /// ➕ Ticket DEV3 — la DEMANDE de conversion en facture de ce poste est ouverte : écrite hors ligne, pas encore
+  /// acquittée par le serveur (en attente d'envoi, ou refusée). Le devis est alors figé.
+  bool get conversionDemandee => devis.conversionRequestedAt != null && devis.convertedSaleId == null;
+
+  /// ➕ Ticket DEV3 — la demande a été REFUSÉE par le serveur ([motifRefus] en donne la raison, mot pour mot).
+  bool get conversionRefusee => conversionDemandee && devis.syncStatus == SyncStatus.conflict;
 }
+
+/// Ticket DEV3 — le résultat d'une demande de conversion : le devis, et `deja` quand il était déjà facturé (le web
+/// répond alors par un avertissement, jamais par une seconde facture).
+typedef ConversionDemandee = ({Quote devis, bool deja});
 
 /// Les quatre cartes de `Devis::getKpisProperty()`.
 class KpisDevis {
@@ -126,7 +137,33 @@ class DevisRepository {
   static const toastAccepte = 'Devis marqué comme accepté.';
   static const toastRefuse = 'Devis marqué comme refusé.';
   static const toastArchive = 'Devis archivé avec succès.';
-  static const toastConversion = 'La conversion en facture réelle arrive avec le module Facturation (Sprint 7).';
+
+  /// 🔴→✅ Ticket DEV3 — « Convertir en Facture » est construit : les motifs de refus sont ceux de
+  /// `ConvertirDevisEnFactureAction` (mot pour mot, lus par `devis_blade_test.dart`), jugés AVANT d'écrire la demande.
+  static const messageConversionArchive = 'Ce devis est archivé : il ne peut pas être converti en facture.';
+  static const messageConversionSansClient = "Ce devis n'a pas de client : une facture à crédit en exige un.";
+  static String messageConversionStatut(String statut) =>
+      'Seul un devis accepté peut être converti en facture : celui-ci est « ${statuts[statut] ?? statut} ».';
+  static String messageConversionClientArchive(String nom) =>
+      'Le client « $nom » est archivé : réactivez-le avant de facturer ce devis.';
+  static String messageConversionPlanIncomplet(String code, String libelle) =>
+      'Plan comptable incomplet : le compte $code ($libelle) est introuvable. '
+      'Complétez le plan comptable puis relancez la conversion.';
+
+  /// Toast du web quand le devis est déjà converti (`convertToInvoice()`).
+  static String toastDejaFacture(String numero) => 'Ce devis est déjà facturé : facture $numero.';
+
+  /// ⚠️ ÉCART ASSUMÉ (fonction propre au poste hors ligne, doctrine § 5.6) : le web convertit sur place et annonce « Devis
+  /// converti en facture FV-… avec succès. » ; le poste, sans réseau, écrit la DEMANDE — le numéro de la facture
+  /// n'existe qu'au serveur, il apparaît dans le tableau à l'acquittement. Le devis est figé entre-temps.
+  static const toastConversionDemandee =
+      'Conversion en facture demandée : la facture sera créée à la prochaine synchronisation.';
+  static const toastConversionAnnulee = 'Demande de conversion annulée.';
+  static const messageConversionDemandee =
+      'Une conversion en facture est demandée pour ce devis : il ne peut plus être modifié.';
+
+  /// Comptes de l'écriture de la facture et leur libellé (`ConvertirDevisEnFactureAction::COMPTES`).
+  static const comptesDeLaFacture = <String, String>{'411': 'Clients', '701': 'Ventes de produits', '443': 'TVA facturée'};
 
   /// Valeur par défaut de « Validité (jours) » et de « TVA (%) » du formulaire (`newQuote()` du web).
   static const validiteParDefaut = 15;
@@ -162,10 +199,15 @@ class DevisRepository {
     final tous = await _db.select(_db.customers).get();
     final nomDe = {for (final c in tous) c.id: c.name};
 
-    final refus = {
-      for (final c in await (_db.select(_db.syncConflicts)..where((c) => c.sourceTable.equals('quotes'))).get())
-        c.recordId: c.reason,
-    };
+    // Un devis refusé : le motif de sa saisie (`quotes`) ou, plus récent, celui de sa DEMANDE de conversion
+    // (`quote_conversions`, ticket DEV3) — ce dernier prime, la saisie ayant été acceptée avant lui.
+    final refus = <String, String>{};
+    for (final c in await (_db.select(_db.syncConflicts)
+          ..where((c) => c.sourceTable.isIn(const ['quotes', 'quote_conversions']))
+          ..orderBy([(c) => OrderingTerm(expression: c.sourceTable)]))
+        .get()) {
+      refus[c.recordId] = c.reason;
+    }
     final lignes =
         await (_db.select(_db.quotes)..where(
               (t) => t.isActive.equals(true) | t.syncStatus.equalsValue(SyncStatus.conflict),
@@ -362,6 +404,10 @@ class DevisRepository {
       if (existant.status == 'facture') {
         throw DevisRefuse({'devis': messageFacture});
       }
+      // Ticket DEV3 — une demande de conversion ouverte fige le devis (le serveur le facturerait tel qu'il est).
+      if (existant.conversionRequestedAt != null) {
+        throw DevisRefuse({'devis': messageConversionDemandee});
+      }
       final identique =
           existant.customerId == clientId &&
           existant.articlesDescription == articles &&
@@ -446,6 +492,9 @@ class DevisRepository {
       if (!d.isActive && d.syncStatus != SyncStatus.conflict) {
         throw DevisRefuse({'devis': messageArchive});
       }
+      if (d.conversionRequestedAt != null && d.convertedSaleId == null) {
+        throw DevisRefuse({'devis': messageConversionDemandee});
+      }
       if (!(transitions[d.status] ?? const []).contains(statut)) {
         throw DevisRefuse({'devis': messageStatutInterdit(d.status, statut)});
       }
@@ -472,6 +521,9 @@ class DevisRepository {
     return _db.transaction(() async {
       final d = await (_db.select(_db.quotes)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (d == null || (!d.isActive && d.syncStatus != SyncStatus.conflict)) return false;
+      if (d.conversionRequestedAt != null && d.convertedSaleId == null) {
+        throw DevisRefuse({'devis': messageConversionDemandee});
+      }
       try {
         await _exercice.refuser(d.quoteDate, regle: RegleExercice.closSeulement);
       } on RefusExercice catch (e) {
@@ -489,8 +541,98 @@ class DevisRepository {
     });
   }
 
+  /// 🔴→✅ Ticket DEV3 — « CONVERTIR EN FACTURE » (`convertToInvoice()` du web, `ConvertirDevisEnFactureAction`).
+  ///
+  /// ⚠️⚠️ **LE POSTE N'ÉCRIT QUE LA DEMANDE.** La facture est une vente à crédit sans ligne que le SERVEUR crée, numérote
+  /// (`FV-AAAA-XXXXXX`), comptabilise et lie au devis ; elle revient à l'acquittement (`SyncEngine`). Les refus de
+  /// l'action sont jugés ICI avant d'écrire (même ordre, mêmes motifs, mot pour mot) : devis inconnu ; déjà converti
+  /// (`deja`, aucune seconde demande) ; demande déjà ouverte ; archivé ; statut autre qu'`accepte` ; client absent ou
+  /// archivé ; devis d'un exercice clos (lecture seule) ; date de la facture (aujourd'hui) future, ou d'un exercice absent
+  /// ou clos (« Facture refusée : … ») ; plan comptable incomplet (juge seulement si le plan est connu de ce poste : un
+  /// poste qui ne l'a pas tiré laisse le serveur trancher). Droits : `manage-ventes` ET `manage-facturation`, jugés par
+  /// l'écran (bouton) et par le serveur (refus motivé).
+  ///
+  /// Écrit : `conversion_requested_at` = l'instant du clic (heure du Bénin ; le serveur date la facture de ce jour-là), le
+  /// devis repart en `pending`. Il est figé jusqu'à l'acquittement.
+  Future<ConversionDemandee> demanderConversion(String id, {DateTime? maintenant}) async {
+    final instant = maintenant ?? HeureBenin.maintenant();
+    return _db.transaction(() async {
+      final d = await (_db.select(_db.quotes)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (d == null) throw DevisRefuse({'devis': 'Devis introuvable sur ce poste.'});
+      if (d.status == 'facture' && d.convertedSaleId != null) return (devis: d, deja: true);
+      if (d.conversionRequestedAt != null) throw DevisRefuse({'devis': messageConversionDemandee});
+      if (!d.isActive) throw DevisRefuse({'devis': messageConversionArchive});
+      if (d.status != 'accepte') throw DevisRefuse({'devis': messageConversionStatut(d.status)});
+
+      final client = await (_db.select(_db.customers)..where((t) => t.id.equals(d.customerId))).getSingleOrNull();
+      if (client == null) throw DevisRefuse({'devis': messageConversionSansClient});
+      if (!client.isActive) throw DevisRefuse({'devis': messageConversionClientArchive(client.name)});
+
+      // Le devis d'un exercice clos est en lecture seule (EF6) : le passer à « facturé » le modifierait.
+      try {
+        await _exercice.refuser(d.quoteDate, regle: RegleExercice.closSeulement);
+      } on RefusExercice catch (e) {
+        throw DevisRefuse({'devis': e.motif});
+      }
+      // `VerifySaleDateAction` : la date de la facture est jugée comme celle de toute vente (futur : jamais, c'est
+      // aujourd'hui ; exercice absent ou clos), préfixée « Facture refusée : ».
+      final refusDate = await _exercice.refus(HeureBenin.jour(instant));
+      if (refusDate != null) {
+        throw DevisRefuse({
+          'devis': ExerciceDeSaisie.prefixeVente(refusDate).replaceFirst('Vente refusée', 'Facture refusée'),
+        });
+      }
+      await _exigerLePlanComptable(d);
+
+      await _db.update(_db.quotes).replace(
+        d.copyWith(
+          conversionRequestedAt: Value(instant),
+          syncStatus: SyncStatus.pending,
+          updatedAt: HeureBenin.versInstant(instant),
+        ),
+      );
+      await _effacerRefus(id);
+      return (devis: await _lire(id), deja: false);
+    });
+  }
+
+  /// Plan comptable incomplet : 411, 701 et — si le devis porte une TVA ET que l'exploitation y est assujettie
+  /// (`TvaSettingService` : sans réglage connu, assujettie, comme le serveur) — 443. Un plan inconnu de ce poste (jamais
+  /// tiré) ne juge rien : le serveur le fera.
+  Future<void> _exigerLePlanComptable(Quote d) async {
+    final comptes = await _db.select(_db.chartOfAccounts).get();
+    if (comptes.isEmpty) return;
+    final reglage = await _db.select(_db.companySettings).getSingleOrNull();
+    final avecTva = (reglage?.tvaEnabled ?? true) && d.tvaRate > 0;
+    final codes = {for (final c in comptes) c.code};
+    for (final MapEntry(key: code, value: libelle) in comptesDeLaFacture.entries) {
+      if (code == '443' && !avecTva) continue;
+      if (!codes.contains(code)) throw DevisRefuse({'devis': messageConversionPlanIncomplet(code, libelle)});
+    }
+  }
+
+  /// ➕ Ticket DEV3 (poste seul) — « Annuler la demande » : la demande de conversion REFUSÉE par le serveur est retirée et le
+  /// devis redevient libre (`accepte`, modifiable). Seule une demande REFUSÉE s'annule ici : une demande en attente
+  /// d'envoi part à la prochaine synchronisation. Rend `false` quand il n'y avait rien à annuler.
+  Future<bool> annulerConversion(String id) async {
+    return _db.transaction(() async {
+      final d = await (_db.select(_db.quotes)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (d == null || d.conversionRequestedAt == null || d.convertedSaleId != null) return false;
+      if (d.syncStatus != SyncStatus.conflict) return false;
+      await (_db.update(_db.quotes)..where((t) => t.id.equals(id))).write(
+        QuotesCompanion(
+          conversionRequestedAt: const Value(null),
+          syncStatus: const Value(SyncStatus.pending),
+          updatedAt: Value(HeureBenin.versInstant(HeureBenin.maintenant())),
+        ),
+      );
+      await _effacerRefus(id);
+      return true;
+    });
+  }
+
   Future<void> _effacerRefus(String id) =>
-      (_db.delete(_db.syncConflicts)..where((c) => c.id.equals('quotes:$id'))).go();
+      (_db.delete(_db.syncConflicts)..where((c) => c.id.isIn(['quotes:$id', 'quote_conversions:$id']))).go();
 
   Future<Quote> _lire(String id) => (_db.select(_db.quotes)..where((t) => t.id.equals(id))).getSingle();
 

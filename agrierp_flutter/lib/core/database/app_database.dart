@@ -1729,6 +1729,21 @@ class Quotes extends Table with SyncColumns {
 
   /// Archivage logique (`false` : archivé, rien n'est supprimé).
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// 🔴→✅ Ticket DEV3 — « CONVERTIR EN FACTURE » : l'instant (heure du Bénin) où ce poste a DEMANDÉ la conversion du devis
+  /// accepté en facture ; `NULL` : aucune demande. Le poste n'envoie que la DEMANDE (`quote_conversions`), le serveur crée
+  /// la facture, la numérote et en rend le lien ([convertedSaleId], [invoiceNumber]). Tant que la demande est ouverte, le
+  /// devis est figé (ni modification, ni archivage) ; elle se ferme à l'acquittement (`NULL`, statut `facture`).
+  /// Fonction propre au poste hors ligne : le web convertit sur place, sans file.
+  DateTimeColumn get conversionRequestedAt => dateTime().nullable()();
+
+  /// Ticket DEV3 — la facture issue du devis (`quotes.converted_sale_id` du serveur : une facture EST une vente), `NULL`
+  /// tant que le devis n'est pas converti. Servie au tirage, ou rendue à l'acquittement de la demande.
+  TextColumn get convertedSaleId => text().nullable()();
+
+  /// Ticket DEV3 — `FV-AAAA-XXXXXX`, le numéro de cette facture tel que le SERVEUR le calcule (`Sale::numero_facture`) :
+  /// le poste ne l'invente jamais (même principe que `DEV-AAAA-NNN`).
+  TextColumn get invoiceNumber => text().nullable()();
 }
 
 /// Ticket U13 — PAIE RÉGLÉE (`payslips` du serveur), en LECTURE SEULE : seules les colonnes que le rapport « Recettes
@@ -1852,9 +1867,10 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
-  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4).** Le numéro
-  /// 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste simplement vide, `from < 56` et
-  /// `schemaVersion = 56` l'enjambent sans trou.
+  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 57
+  /// (conversion devis → facture, DEV3).** Le numéro 55 (unicité des codes, finalement sans palier Drift) n'est PAS
+  /// utilisé : il reste simplement vide, `from < 56` et `from < 57` l'enjambent sans trou. Réservés (autres tickets) :
+  /// 58 corbeille, 59 dépenses, 60 modules.
   ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
@@ -1863,7 +1879,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 56;
+  int get schemaVersion => 57;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2413,6 +2429,15 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(m, expenses, expenses.createdBy);
         await _ajouterColonneSiAbsente(m, expenses, expenses.ecritureRefus);
         await _convertirDepensesEnLignes();
+      }
+
+      // v57 — ticket DEV3 : « Convertir en Facture » (devis → facture). Trois colonnes sur `quotes` : la demande de
+      // conversion de ce poste et le lien vers la facture que le serveur crée. Aucune donnée à transformer (les devis
+      // existants n'ont ni demande ni facture) ; `sync_status` et `updated_at` ne bougent pas.
+      if (from < 57) {
+        await _ajouterColonneSiAbsente(m, quotes, quotes.conversionRequestedAt);
+        await _ajouterColonneSiAbsente(m, quotes, quotes.convertedSaleId);
+        await _ajouterColonneSiAbsente(m, quotes, quotes.invoiceNumber);
       }
     },
   );

@@ -4505,6 +4505,10 @@ class SyncEngine {
       final validite = _nombreStrict(l['validity_days'], '$quoi $id : validité');
       final date = l['quote_date'] is String ? HeureBenin.lire(l['quote_date']) : null;
       final remarque = _texteStrict(l['note'], '$quoi $id : note');
+      // Ticket DEV3 — le lien vers la facture et son numéro : `null` (ou clés absentes d'un serveur antérieur) tant que le
+      // devis n'est pas converti ; un texte sinon, jamais autre chose.
+      final factureId = _texteStrict(l['converted_sale_id'], '$quoi $id : facture');
+      final factureNumero = _texteStrict(l['invoice_number'], '$quoi $id : numéro de facture');
       final statut = l['status'];
       final actif = _actifStrict(l, '$quoi $id');
       if (date == null) {
@@ -4542,6 +4546,8 @@ class SyncEngine {
           note: Value(remarque),
           status: Value(statut),
           isActive: Value(actif),
+          convertedSaleId: Value(factureId),
+          invoiceNumber: Value(factureNumero),
         ),
       );
     }
@@ -4971,6 +4977,14 @@ class SyncEngine {
         'expenses': depenses.map((d) => _depenseEnJson(d, lignesDeDepense[d.id] ?? const [])).toList(),
         // Ticket DEV — `pushQuotes` (manage-ventes) : le numéro `DEV-AAAA-NNN` ne part JAMAIS, le serveur l'attribue.
         'quotes': devis.map(_devisEnJson).toList(),
+        // Ticket DEV3 — la DEMANDE de conversion (`pushQuoteConversions`, après `quotes`) : l'UUID du devis et l'instant
+        // du clic, heure du Bénin comme `sold_at`. Le serveur crée la facture, la numérote et en rend le lien.
+        if (devis.any((d) => d.conversionRequestedAt != null && d.convertedSaleId == null))
+          'quote_conversions': [
+            for (final d in devis)
+              if (d.conversionRequestedAt != null && d.convertedSaleId == null)
+                {'id': d.id, 'requested_at': _instant(d.conversionRequestedAt!)},
+          ],
         'livestock_reproduction_events': saillies.map(_saillieEnJson).toList(),
         'purchases': achats
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
@@ -5362,12 +5376,19 @@ class SyncEngine {
 
     // Ticket DEV — n'acquitte que la VERSION partie (instant de saisie inchangé, voir [_marquerSiInchangee]) : un devis
     // avancé dans son cycle ou archivé PENDANT l'envoi de sa version précédente reste `pending` et repart.
+    // Ticket DEV3 — un devis qui porte une DEMANDE DE CONVERSION n'est acquitté que par la réponse de cette demande
+    // (`quote_conversions`, ci-dessous) : l'accusé de sa saisie le marquerait `synced` avant que la facture existe, et une
+    // demande sans réponse (serveur antérieur à DEV3) serait perdue.
+    final enConversion = {
+      for (final d in devis)
+        if (d.conversionRequestedAt != null && d.convertedSaleId == null) d.id,
+    };
     accepte += await _acquitter(
       'quotes',
       corps['quotes'],
       (ids, statut) => _marquerSiInchangee(
         [for (final d in devis) (d.id, d.updatedAt)],
-        ids,
+        statut == SyncStatus.synced ? [for (final id in ids) if (!enConversion.contains(id)) id] : ids,
         (id, saisie) =>
             (_db.update(_db.quotes)..where(
                   (t) => Expression.and([
@@ -5378,6 +5399,45 @@ class SyncEngine {
                 ))
                 .write(QuotesCompanion(syncStatus: Value(statut))),
       ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket DEV3 — la DEMANDE de conversion : acceptée (ou déjà exécutée : renvoi), le devis devient `facture` et prend le
+    // lien et le numéro que le serveur rend (`invoices`) ; refusée, il passe en `conflict` avec le motif du serveur mot pour
+    // mot (SyncConflict `quote_conversions:<id>`) et attend « Annuler la demande » ou une relance. Une demande n'est jamais
+    // partie sans que son devis soit `pending` : rien d'autre à comparer.
+    final factures = corps['quote_conversions'] is Map && (corps['quote_conversions'] as Map)['invoices'] is Map
+        ? Map<String, dynamic>.from((corps['quote_conversions'] as Map)['invoices'] as Map)
+        : const <String, dynamic>{};
+    accepte += await _acquitter(
+      'quote_conversions',
+      corps['quote_conversions'],
+      (ids, statut) async {
+        for (final id in ids) {
+          final facture = factures[id];
+          await (_db.update(_db.quotes)..where(
+                (t) => Expression.and([
+                  t.id.equals(id),
+                  Expression.or([
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                    t.syncStatus.equalsValue(SyncStatus.conflict),
+                  ]),
+                ]),
+              ))
+              .write(
+                statut == SyncStatus.synced
+                    ? QuotesCompanion(
+                        syncStatus: const Value(SyncStatus.synced),
+                        status: const Value('facture'),
+                        conversionRequestedAt: const Value(null),
+                        convertedSaleId: Value(facture is Map ? facture['sale_id']?.toString() : null),
+                        invoiceNumber: Value(facture is Map ? facture['invoice_number']?.toString() : null),
+                      )
+                    : QuotesCompanion(syncStatus: Value(statut)),
+              );
+        }
+      },
       motifs,
       (n) => rejete += n,
     );
@@ -5560,6 +5620,8 @@ class SyncEngine {
     'customers',
     // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
     'quotes',
+    // Ticket DEV3 — la DEMANDE de conversion d'un devis, juste après les devis (le devis du même envoi existe alors déjà).
+    'quote_conversions',
     'mails',
     'archived_documents',
     'administrative_documents',
@@ -5797,6 +5859,13 @@ class SyncEngine {
         // Ticket S-T5 — fusions par clé naturelle (`products`, `suppliers`, `customers`), mises bout à bout.
         if (value['merged'] is List) {
           (cible.putIfAbsent('merged', () => <Object?>[]) as List).addAll(value['merged'] as List);
+        }
+        // Ticket DEV3 — les factures rendues aux demandes de conversion (devis → { sale_id, invoice_number }), réunies.
+        if (value['invoices'] is Map) {
+          final factures = cible.putIfAbsent('invoices', () => <String, dynamic>{}) as Map<String, dynamic>;
+          for (final f in (value['invoices'] as Map).entries) {
+            factures[f.key.toString()] = f.value;
+          }
         }
       } else if (value is num && deja is num) {
         fusion[key] = deja + value;
@@ -6097,7 +6166,8 @@ class SyncEngine {
               const CustomersCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       // Ticket DEV — un devis refusé (exercice clos, statut interdit, client inconnu…) se corrige puis se relance.
-      'quotes' =>
+      // Ticket DEV3 — une demande de conversion refusée (client archivé, plan incomplet, exercice clos…) se relance de même.
+      'quotes' || 'quote_conversions' =>
         () =>
             (_db.update(_db.quotes)..where((t) => t.id.equals(conflit.recordId))).write(
               const QuotesCompanion(syncStatus: Value(SyncStatus.pending)),
