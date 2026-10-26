@@ -5,11 +5,13 @@ namespace App\Actions;
 use App\Exceptions\DepenseNonModifiableException;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
+use App\Models\CostCenter;
 use App\Models\Expense;
 use App\Models\ExpenseLine;
 use App\Models\TreasuryAccount;
 use App\Services\AccountingEntryService;
 use App\Services\ConversionDepensesEnLignes;
+use App\Services\DetteFournisseurService;
 use App\Support\MotifsRefusPush;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +41,16 @@ use Illuminate\Validation\ValidationException;
  *  - EX5 : exercice clos (date d'origine ou nouvelle) → motif R4, avant toute écriture ;
  *  - archivage : contre-passation de l'écriture d'origine, datée du jour, trésorerie réintégrée, `is_active = false`.
  *
+ * 🔴→✅ DEP6 (DEP-Q1 : OUI) — LE CENTRE DE COÛT EST OBLIGATOIRE (web, absorbeur). Un poste ANCIEN (document sans la clé
+ * `on_credit`, que seul un poste migré envoie : plat ou à lignes d'avant DEP6) qui n'envoie pas de centre est ACCEPTÉ et reçoit
+ * « Général » (`CostCenter::general()`) : l'envoi d'anciennes dépenses n'est jamais bloqué. Un poste migré qui n'en envoie pas
+ * est refusé, motif explicite.
+ *
+ * 🔴→✅ DEP7 (DEP-Q3 : OUI) — `supplier_id` + `on_credit` : une dépense à un fournisseur NON payée comptant crédite le 401 au lieu
+ * de la trésorerie, naît `en_attente` et ouvre une dette (`DetteFournisseurService`, le mécanisme des achats à crédit). Aucune
+ * trésorerie n'est alors choisie ni touchée. Soldée par l'écran des dettes, elle passe `payee`. Archivée SANS règlement : sa
+ * charge et sa dette sont contre-passées ; déjà réglée en tout ou partie : archivage refusé.
+ *
  * ⚠️ VERROUS : la dépense est relue SOUS VERROU (`lockForUpdate`) avant toute écriture, puis la trésorerie est touchée
  * — même ordre partout.
  */
@@ -52,6 +64,15 @@ class SaisieDepenseAction
 
     public const MESSAGE_ARCHIVEE = 'Cette dépense est archivée : elle ne peut plus être modifiée.';
 
+    /** Ticket DEP6 — refus d'une saisie sans centre de coût (web : sous le champ ; poste migré : motif du rejet). */
+    public const MESSAGE_CENTRE_OBLIGATOIRE = 'Le centre de coût est obligatoire : choisissez la filière ou le lot qui supporte cette dépense.';
+
+    /** Ticket DEP7 — une dépense à crédit sans fournisseur ne crée aucune dette. */
+    public const MESSAGE_CREDIT_SANS_FOURNISSEUR = 'Choisissez le fournisseur : une dépense à crédit crée une dette à son nom.';
+
+    /** Ticket DEP7 — une dépense existante sans pièce (reprise de l'ancien) ne reçoit jamais de pièce rétroactive, donc pas de dette. */
+    public const MESSAGE_CREDIT_SANS_PIECE = 'Une dépense existante sans pièce ne peut pas passer à crédit : archivez-la, puis saisissez-la à nouveau à crédit.';
+
     public const ARCHIVEE = 'archivee';
 
     public const ARCHIVEE_SANS_ANNULATION = 'archivee_sans_annulation';
@@ -64,7 +85,7 @@ class SaisieDepenseAction
         return [
             'expense_date' => 'date de la dépense', 'treasury_account_id' => 'compte de trésorerie',
             'payment_mode' => 'mode de paiement', 'cost_center_id' => 'centre de coût', 'supplier_id' => 'fournisseur',
-            'beneficiary' => 'bénéficiaire', 'amount' => 'total', 'category' => 'catégorie', 'label' => 'libellé',
+            'on_credit' => 'règlement', 'beneficiary' => 'bénéficiaire', 'amount' => 'total', 'category' => 'catégorie', 'label' => 'libellé',
             'lines' => 'lignes', 'lines.*.id' => 'identifiant de la ligne', 'lines.*.label' => 'libellé de la ligne',
             'lines.*.charge_account_id' => 'compte de charge de la ligne', 'lines.*.amount' => 'montant de la ligne',
         ];
@@ -74,6 +95,8 @@ class SaisieDepenseAction
     public static function messages(): array
     {
         return [
+            'cost_center_id.required' => self::MESSAGE_CENTRE_OBLIGATOIRE,
+            'supplier_id.required' => self::MESSAGE_CREDIT_SANS_FOURNISSEUR,
             'lines.required' => 'Ajoutez au moins une ligne à la dépense.',
             'lines.min' => 'Ajoutez au moins une ligne à la dépense.',
             'lines.array' => 'Ajoutez au moins une ligne à la dépense.',
@@ -115,11 +138,24 @@ class SaisieDepenseAction
             }
         }
 
+        // Ticket DEP7 — à crédit, AUCUNE trésorerie ni mode de paiement : ce qu'un poste en enverrait est écarté, jamais décaissé.
+        $donnees['on_credit'] = self::estACredit($donnees);
+        if ($donnees['on_credit']) {
+            $donnees['treasury_account_id'] = null;
+            $donnees['payment_mode'] = null;
+        }
+
         if (empty($donnees['payment_mode']) && ! empty($donnees['treasury_account_id'])) {
             $donnees['payment_mode'] = TreasuryAccount::whereKey($donnees['treasury_account_id'])->value('type');
         }
 
         return $donnees;
+    }
+
+    /** Le règlement choisi : vrai pour « À crédit (dette fournisseur) » ; absent ou faux : payée comptant (comme avant). */
+    private static function estACredit(array $donnees): bool
+    {
+        return filter_var($donnees['on_credit'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     /** Le document est-il celui, PLAT, d'un poste non migré (ni `lines`, mais `label` / `category` / `amount`) ? */
@@ -142,12 +178,16 @@ class SaisieDepenseAction
     {
         $messages = ($pourLEnvoi ? MotifsRefusPush::messages() : []) + self::messages();
         $attributs = ($pourLEnvoi ? MotifsRefusPush::attributs() : []) + self::attributs();
+        // Ticket DEP6 — un poste ANCIEN (ni `on_credit` ni centre : il ne connaît ni l'un ni l'autre) est accepté au centre « Général ».
+        $ancien = $pourLEnvoi && ! array_key_exists('on_credit', $donnees);
+        $credit = self::estACredit($donnees);
         $commun = [
             'expense_date' => ['required', 'date'],
-            'treasury_account_id' => ['required', 'exists:treasury_accounts,id'],
+            'treasury_account_id' => $credit ? ['nullable'] : ['required', 'exists:treasury_accounts,id'],
             'payment_mode' => ['nullable', Rule::in(array_keys(Expense::MODES_DE_PAIEMENT))],
-            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
-            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'cost_center_id' => [$ancien ? 'nullable' : 'required', 'exists:cost_centers,id'],
+            'supplier_id' => [$credit ? 'required' : 'nullable', 'exists:suppliers,id'],
+            'on_credit' => ['nullable', 'boolean'],
             'beneficiary' => ['nullable', 'string', 'max:150'],
         ];
 
@@ -190,6 +230,11 @@ class SaisieDepenseAction
         });
 
         $validateur->validate();
+
+        // Ticket DEP6 — le centre par défaut n'est créé qu'une fois le document déclaré valable.
+        if ($ancien && empty($donnees['cost_center_id'])) {
+            $donnees['cost_center_id'] = CostCenter::general()->id;
+        }
 
         return $donnees;
     }
@@ -270,15 +315,17 @@ class SaisieDepenseAction
                 'label' => $this->resume($donnees['lines']),
                 'category' => $this->categorieDeCompatibilite($donnees['lines']),
                 'amount' => $this->total($donnees['lines']),
-                'treasury_account_id' => $donnees['treasury_account_id'],
+                'treasury_account_id' => $donnees['treasury_account_id'] ?? null,
                 'payment_mode' => $donnees['payment_mode'] ?? null,
                 'cost_center_id' => $donnees['cost_center_id'] ?? null,
                 'supplier_id' => $donnees['supplier_id'] ?? null,
                 'beneficiary' => ($donnees['beneficiary'] ?? null) !== null && trim($donnees['beneficiary']) !== '' ? trim($donnees['beneficiary']) : null,
                 'created_by' => auth()->id() ?? auth('sanctum')->id(),
                 'receipt_path' => $justificatif,
-                // Une dépense saisie est immédiatement décaissée : le compte débité est obligatoire.
-                'status' => 'payee',
+                // Payée comptant : immédiatement décaissée (le compte débité est obligatoire). Ticket DEP7 — À CRÉDIT : aucune
+                // trésorerie, `en_attente` jusqu'au règlement de sa dette.
+                'on_credit' => $donnees['on_credit'],
+                'status' => $donnees['on_credit'] ? 'en_attente' : 'payee',
                 'is_active' => true,
             ]);
             $depense->save();
@@ -288,7 +335,14 @@ class SaisieDepenseAction
             // Débit Classe 6 (un par compte) / Crédit Classe 5 (CDC §1.4 [M2]). Refus ⇒ exception ⇒ tout est annulé.
             app(RecordExpenseAccountingEntryAction::class)->execute($depense);
 
-            TreasuryAccount::where('id', $donnees['treasury_account_id'])->decrement('balance', $depense->amount);
+            if ($depense->on_credit) {
+                // Ticket DEP7 — la dette fournisseur, par le service des achats à crédit ; la trésorerie ne bouge pas.
+                app(DetteFournisseurService::class)->ouvrir(
+                    $depense->supplier_id, (float) $depense->amount, expenseId: $depense->id, datePiece: $depense->expense_date,
+                );
+            } else {
+                TreasuryAccount::where('id', $donnees['treasury_account_id'])->decrement('balance', $depense->amount);
+            }
 
             return $depense->fresh(['lines']);
         });
@@ -324,6 +378,11 @@ class SaisieDepenseAction
             // (contre-passation) puis une nouvelle saisie.
             if ($depense->accounting_entry_id) {
                 throw new DepenseNonModifiableException(self::MESSAGE_DEJA_COMPTABILISEE);
+            }
+
+            // Ticket DEP7 — une reprise de l'ancien (sans pièce) ne reçoit jamais de pièce rétroactive : donc ni crédit ni dette.
+            if ($donnees['on_credit']) {
+                throw new DepenseNonModifiableException(self::MESSAGE_CREDIT_SANS_PIECE);
             }
 
             // Réajuste la trésorerie : annule l'ancien total, applique le nouveau.
@@ -367,10 +426,21 @@ class SaisieDepenseAction
             // 🔴→✅ Ticket EX5 (EF5) — une dépense d'un exercice CLOS ne s'archive plus. Motif R4 de sa date.
             app(AccountingEntryService::class)->refuserSiExerciceClos($depense->expense_date->format('Y-m-d'));
 
+            // Ticket DEP7 — une dépense À CRÉDIT déjà réglée en tout ou partie ne s'archive pas (rien n'est écrit) ; sinon sa dette
+            // est retirée avec la contre-passation, et aucune trésorerie n'est réintégrée (aucune n'était sortie).
+            $aCredit = (bool) $depense->on_credit;
+            if ($aCredit) {
+                app(DetteFournisseurService::class)->verifierAnnulable($depense);
+            }
+
             // TICKET 14.33 — CONTRE-PASSATION, jamais suppression de l'originale : le grand livre est immuable.
             $annulation = app(RecordExpenseAccountingEntryAction::class)->reverse($depense);
 
-            TreasuryAccount::where('id', $depense->treasury_account_id)->increment('balance', $depense->amount);
+            if ($aCredit) {
+                app(DetteFournisseurService::class)->annulerPourDepense($depense);
+            } else {
+                TreasuryAccount::where('id', $depense->treasury_account_id)->increment('balance', $depense->amount);
+            }
             $depense->update(['is_active' => false]);
             AuditLog::record('expense.archived', 'achats');
 
@@ -399,7 +469,8 @@ class SaisieDepenseAction
         ])->sortBy('id')->values()->all();
 
         return $depense->expense_date?->format('Y-m-d') === Carbon::parse($donnees['expense_date'])->format('Y-m-d')
-            && $depense->treasury_account_id === $donnees['treasury_account_id']
+            && $depense->treasury_account_id === ($donnees['treasury_account_id'] ?? null)
+            && (bool) $depense->on_credit === (bool) ($donnees['on_credit'] ?? false)
             && $vide($depense->payment_mode) === $vide($donnees['payment_mode'] ?? null)
             && $vide($depense->cost_center_id) === $vide($donnees['cost_center_id'] ?? null)
             && $vide($depense->supplier_id) === $vide($donnees['supplier_id'] ?? null)

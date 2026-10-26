@@ -157,12 +157,12 @@ class SyncDepensesPaieTirageTest extends TestCase
         // Ticket U14 — plus `status` (badge et filtre du Blade) et `accounting_entry_id` (règle de modification).
         // Ticket DEP3 — plus l'en-tête d'une dépense à plusieurs lignes (mode, centre de coût, fournisseur, bénéficiaire, auteur).
         $this->assertSame(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active', 'status',
-            'accounting_entry_id', 'payment_mode', 'cost_center_id', 'supplier_id', 'beneficiary', 'created_by', 'updated_at'], array_keys($complet[$active->id]));
+            'accounting_entry_id', 'payment_mode', 'cost_center_id', 'supplier_id', 'beneficiary', 'created_by', 'on_credit', 'updated_at'], array_keys($complet[$active->id]));
         $this->assertEquals([
             'id' => $active->id, 'expense_date' => '2026-10-03', 'label' => 'Carburant groupe', 'category' => '605 - Énergie',
             'amount' => 15000.0, 'treasury_account_id' => $this->caisse->id, 'is_active' => true,
             'status' => $active->status, 'accounting_entry_id' => $active->accounting_entry_id,
-            'payment_mode' => null, 'cost_center_id' => null, 'supplier_id' => null, 'beneficiary' => null, 'created_by' => null,
+            'payment_mode' => null, 'cost_center_id' => null, 'supplier_id' => null, 'beneficiary' => null, 'created_by' => null, 'on_credit' => false,
             'updated_at' => $active->updated_at->toIso8601String(),
         ], $complet[$active->id]);
 

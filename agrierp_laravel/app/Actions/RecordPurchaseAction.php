@@ -4,11 +4,11 @@ namespace App\Actions;
 
 use App\Exceptions\AchatNonComptabilisableException;
 use App\Models\AuditLog;
-use App\Models\Payable;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
 use App\Models\TreasuryAccount;
+use App\Services\DetteFournisseurService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -110,14 +110,8 @@ class RecordPurchaseAction
             // le TOTAL avec la part déjà réglée — jamais le seul reste dû : la
             // balance âgée a besoin des deux pour dire ce qui a été payé.
             if ($regle < $total) {
-                Payable::create([
-                    'supplier_id' => $supplierId,
-                    'purchase_id' => $achat->id,
-                    'amount' => $total,
-                    'amount_paid' => $regle,
-                    'due_date' => now()->addDays(30),
-                    'status' => 'en_cours',
-                ]);
+                // Ticket DEP7 — la dette naît par le service PARTAGÉ avec la dépense à crédit (même échéance, même statut).
+                app(DetteFournisseurService::class)->ouvrir($supplierId, $total, $regle, purchaseId: $achat->id);
             }
 
             $ecriture = app(RecordPurchaseAccountingEntryAction::class)

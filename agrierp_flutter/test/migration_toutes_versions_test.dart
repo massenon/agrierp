@@ -253,6 +253,9 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // Ticket ARC3 — deux tables créées (aucune colonne ajoutée à une table existante).
   58: [],
+  // Tickets DEP6 / DEP7 — la dépense à crédit (`on_credit`). Le passage de `treasury_account_id` à NULLABLE (table
+  // reconstruite depuis une base dont la colonne est encore obligatoire) est vérifié par `depenses_a_credit_test.dart`.
+  59: [(d.expenses, d.expenses.onCredit)],
   // Ticket MOD1 — les modules actifs se basculent au poste. ⚠️ 57, 58 et 59 sont réservés à d'autres branches.
   60: [
     (d.modulesConfig, d.modulesConfig.syncStatus),
@@ -352,12 +355,13 @@ void main() {
     } catch (_) {}
   });
 
-  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) est complète ; le 55 est inutilisé', () {
+  test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
     expect(d.schemaVersion, 60, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés');
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
+    expect(_colonnesAjoutees(d)[59], [(d.expenses, d.expenses.onCredit)]);
     expect(_tablesCreees(d).containsKey(55) || _colonnesAjoutees(d).containsKey(55), isFalse);
     expect(_tablesCreees(d)[53], [d.quotes]);
     expect(_tablesCreees(d)[54], [d.creditNotes]);
@@ -365,6 +369,7 @@ void main() {
     expect(source, contains('if (from < 53) {'));
     expect(source, contains('if (from < 54) {'));
     expect(source, contains('if (from < 56) {'));
+    expect(source, contains('if (from < 59) {'));
     expect(source, contains('if (from < 57) {'));
     expect(source, contains('if (from < 58) {'));
     expect(source, isNot(contains('if (from < 55) {')));

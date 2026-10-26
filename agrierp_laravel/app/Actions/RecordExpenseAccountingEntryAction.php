@@ -8,6 +8,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Expense;
 use App\Models\TreasuryAccount;
 use App\Services\AccountingEntryService;
+use App\Services\DetteFournisseurService;
 
 /**
  * Ticket 14.33 (Sprint 14) — ÉCRITURE COMPTABLE D'UNE DÉPENSE.
@@ -19,6 +20,7 @@ use App\Services\AccountingEntryService;
  * Ticket DEP1 — UNE DÉPENSE, PLUSIEURS LIGNES. L'écriture produite :
  *     Débit  chaque COMPTE de charge distinct des lignes ..... somme des montants des lignes de ce compte
  *     Crédit compte de trésorerie qui paie ................... le total (somme de toutes les lignes)
+ *             — OU, pour une dépense À CRÉDIT (ticket DEP7), le compte 401 Fournisseurs (la dette envers le fournisseur)
  * Les débits sont REGROUPÉS par compte (deux lignes « 601 » donnent un seul débit 601), dans l'ordre des codes ; le
  * centre de coût de l'en-tête (facultatif) est porté par chaque ligne d'écriture (Comptabilité analytique). Datée de la
  * DÉPENSE : une charge appartient à la période où elle est engagée. Elle passe par `AccountingEntryService::record()`
@@ -49,16 +51,29 @@ class RecordExpenseAccountingEntryAction
             return null;
         }
 
-        $tresorerie = $this->compteDeTresorerie($expense->treasury_account_id);
+        // Ticket DEP7 (DEP-Q3) — une dépense À CRÉDIT crédite le 401 du fournisseur (la dette) au lieu de la trésorerie : le même
+        // compte, lu par le même service, que l'écriture d'un achat à crédit.
+        if ($expense->on_credit) {
+            $contrepartie = app(DetteFournisseurService::class)->compteFournisseurs();
 
-        if (! $tresorerie) {
-            $compte = TreasuryAccount::find($expense->treasury_account_id);
+            if (! $contrepartie) {
+                throw new DepenseNonComptabilisableException(
+                    'La dépense à crédit ne peut pas être enregistrée : le compte 401 « Fournisseurs » est absent du plan comptable. '
+                    .'Aucune pièce comptable ne peut être passée.'
+                );
+            }
+        } else {
+            $contrepartie = $this->compteDeTresorerie($expense->treasury_account_id);
 
-            throw new DepenseNonComptabilisableException(
-                'La dépense ne peut pas être enregistrée : le compte de trésorerie « '.($compte?->label ?? '—')
-                .' » n\'est relié à aucun compte du plan comptable'.($compte?->account_code ? ' (compte '.$compte->account_code.' absent)' : '')
-                .'. Aucune pièce comptable ne peut être passée.'
-            );
+            if (! $contrepartie) {
+                $compte = TreasuryAccount::find($expense->treasury_account_id);
+
+                throw new DepenseNonComptabilisableException(
+                    'La dépense ne peut pas être enregistrée : le compte de trésorerie « '.($compte?->label ?? '—')
+                    .' » n\'est relié à aucun compte du plan comptable'.($compte?->account_code ? ' (compte '.$compte->account_code.' absent)' : '')
+                    .'. Aucune pièce comptable ne peut être passée.'
+                );
+            }
         }
 
         $centre = $expense->cost_center_id;
@@ -74,7 +89,7 @@ class RecordExpenseAccountingEntryAction
         foreach ($comptes as $compte) {
             $ecriture[] = ['account_id' => $compte->id, 'cost_center_id' => $centre, 'debit' => round($parCompte[$compte->id], 2), 'credit' => 0];
         }
-        $ecriture[] = ['account_id' => $tresorerie->id, 'cost_center_id' => $centre, 'debit' => 0, 'credit' => $total];
+        $ecriture[] = ['account_id' => $contrepartie->id, 'cost_center_id' => $centre, 'debit' => 0, 'credit' => $total];
 
         $entry = app(AccountingEntryService::class)->record(
             lines: $ecriture,

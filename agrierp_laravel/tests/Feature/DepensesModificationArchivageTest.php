@@ -71,6 +71,7 @@ class DepensesModificationArchivageTest extends TestCase
         $this->actingAs($this->admin);
         $depense = app(SaisieDepenseAction::class)->creer([
             'expense_date' => $date ?? now()->format('Y-m-d'), 'treasury_account_id' => $this->caisse->id,
+            'cost_center_id' => \App\Models\CostCenter::general()->id,
             'lines' => [['label' => $libelle, 'charge_account_id' => ChartOfAccount::where('code', '601')->value('id'), 'amount' => 25_000]],
         ]);
         $this->assertNotNull($depense->accounting_entry_id);
@@ -84,7 +85,8 @@ class DepensesModificationArchivageTest extends TestCase
         $this->actingAs($this->admin);
         $d = new Expense();
         $d->fill(['expense_date' => now()->format('Y-m-d'), 'label' => $libelle, 'category' => '601 - Aliments', 'amount' => 25_000,
-            'treasury_account_id' => $this->caisse->id, 'payment_mode' => 'caisse', 'status' => 'payee', 'is_active' => true]);
+            'treasury_account_id' => $this->caisse->id, 'payment_mode' => 'caisse', 'status' => 'payee', 'is_active' => true,
+            'cost_center_id' => \App\Models\CostCenter::general()->id]);
         $d->save();
         $l = new ExpenseLine();
         $l->id = ExpenseLine::idDeConversion($d->id);
@@ -110,7 +112,7 @@ class DepensesModificationArchivageTest extends TestCase
 
         return array_merge([
             'id' => $d->id, 'expense_date' => $d->expense_date->format('Y-m-d'), 'treasury_account_id' => $d->treasury_account_id,
-            'payment_mode' => $d->payment_mode, 'lines' => [$ligne], 'is_active' => true,
+            'payment_mode' => $d->payment_mode, 'lines' => [$ligne], 'is_active' => true, 'cost_center_id' => $d->cost_center_id,
         ], $remplacements);
     }
 

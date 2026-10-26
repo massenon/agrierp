@@ -193,7 +193,9 @@ void main() {
           ..removeAll(colonnesPermises[table] ?? const <String>{});
         // SQL brut : `SET stock_qty = 0` et rien d'autre (aucune seconde colonne après une virgule).
         final sqlPermis = RegExp(r'SET\s+stock_qty\s*=\s*0(?![\w,])').hasMatch(extrait) ||
-            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait));
+            (table == 'expenses' && RegExp(r'SET\s+payment_mode\s*=\s*\?\s+WHERE').hasMatch(extrait)) ||
+            // Ticket DEP6 — palier v59 : le centre « Général » posé aux dépenses locales qui n'en avaient pas (colonne dérivée).
+            (table == 'expenses' && RegExp(r'SET\s+cost_center_id\s*=\s*\(SELECT\s+id\s+FROM\s+cost_centers').hasMatch(extrait));
         final sqlHors = extrait.contains('SET') && !sqlPermis;
         if (hors.isNotEmpty || sqlHors || extrait.contains('syncStatus') || extrait.contains('sync_status')) {
           parasites.add('$cle écrit au-delà de ses colonnes dérivées : $extrait');

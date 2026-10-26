@@ -9,7 +9,7 @@ class Payable extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['supplier_id', 'purchase_id', 'amount', 'amount_paid', 'due_date', 'status'];
+    protected $fillable = ['supplier_id', 'purchase_id', 'expense_id', 'amount', 'amount_paid', 'due_date', 'status'];
 
     protected function casts(): array
     {
@@ -28,6 +28,12 @@ class Payable extends Model
     public function purchase()
     {
         return $this->belongsTo(Purchase::class, 'purchase_id');
+    }
+
+    /** Ticket DEP7 — la dépense à crédit qui a ouvert cette dette (nul pour la dette d'un achat). */
+    public function expense()
+    {
+        return $this->belongsTo(Expense::class, 'expense_id');
     }
 
     public function getBalanceAttribute(): float

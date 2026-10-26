@@ -148,6 +148,33 @@ class DepensesRepository {
   static const toastEnregistree = 'Dépense enregistrée avec succès.';
   static const toastArchivee = 'Dépense archivée — trésorerie réintégrée et charge annulée.';
 
+  /// `SaisieDepenseAction::MESSAGE_CENTRE_OBLIGATOIRE` du web, mot pour mot (ticket DEP6, DEP-Q1).
+  static const messageCentreObligatoire =
+      'Le centre de coût est obligatoire : choisissez la filière ou le lot qui supporte cette dépense.';
+
+  /// `SaisieDepenseAction::MESSAGE_CREDIT_SANS_FOURNISSEUR` du web, mot pour mot (ticket DEP7, DEP-Q3).
+  static const messageCreditSansFournisseur =
+      'Choisissez le fournisseur : une dépense à crédit crée une dette à son nom.';
+
+  /// `SaisieDepenseAction::MESSAGE_CREDIT_SANS_PIECE` du web, mot pour mot (ticket DEP7).
+  static const messageCreditSansPiece =
+      'Une dépense existante sans pièce ne peut pas passer à crédit : archivez-la, puis saisissez-la à nouveau à crédit.';
+
+  /// Toast du web quand on archive une dépense À CRÉDIT (`SaisieDepenses::archiveExpense()`, ticket DEP7).
+  static const toastArchiveeACredit = 'Dépense archivée — dette fournisseur annulée et charge annulée.';
+
+  /// « Règlement » de la modale (`Expense::REGLEMENTS` du web, mot pour mot) : clé = valeur du champ, valeur = libellé.
+  static const reglements = {
+    'comptant': 'Payée comptant',
+    'credit': 'À crédit (dette fournisseur)',
+  };
+
+  /// `Expense::libelleReglement()` du web, mot pour mot : le règlement tel que le détail déplié le dit.
+  static String libelleReglement({required bool aCredit, required String statut}) {
+    if (!aCredit) return 'Payée comptant';
+    return statut == 'payee' ? 'À crédit — réglée' : 'À crédit — en attente';
+  }
+
   /// Options du filtre « Pièce » du Blade (`<option value="">Toutes les pièces</option><option>Comptabilisée</option>…`).
   static const filtresPiece = ['Comptabilisée', 'Sans pièce'];
 
@@ -318,7 +345,8 @@ class DepensesRepository {
   /// valable. [compteTresorerie] : le compte choisi (type comparé au mode), `null` s'il est inconnu ou non choisi.
   ///
   /// `expense_date` `required|date` · `payment_mode` cohérent avec le type du compte · `treasury_account_id`
-  /// `required|exists` · `beneficiary` `max:150` · `lines` `required|min:1` · par ligne : `label` `required|max:255`,
+  /// `required|exists` (sauf À CRÉDIT, DEP7 : `supplier_id` `required` à la place) · `cost_center_id` `required|exists`
+  /// (DEP6) · `beneficiary` `max:150` · `lines` `required|min:1` · par ligne : `label` `required|max:255`,
   /// `charge_account_id` `required|exists` (classe 6 du plan), `amount` `required|integer|min:1`.
   static Map<String, String> valider({
     required DateTime? date,
@@ -329,21 +357,38 @@ class DepensesRepository {
     required String beneficiaire,
     required List<LigneSaisie> lignes,
     required Set<String> comptesDeChargeConnus,
+    String? centreCoutId,
+    bool centreConnu = true,
+    String? fournisseurId,
+    bool aCredit = false,
   }) {
     final erreurs = <String, String>{};
     if (date == null) {
       erreurs['date'] = 'Le champ date de la dépense est obligatoire.';
     }
-    if (mode == null || mode.isEmpty) {
-      erreurs['mode'] = 'Le champ mode de paiement est obligatoire.';
+    // Ticket DEP7 — à crédit : ni mode ni trésorerie (rien n'est décaissé), mais un FOURNISSEUR (la dette est à son nom).
+    if (aCredit) {
+      if (fournisseurId == null || fournisseurId.isEmpty) {
+        erreurs['fournisseur'] = messageCreditSansFournisseur;
+      }
+    } else {
+      if (mode == null || mode.isEmpty) {
+        erreurs['mode'] = 'Le champ mode de paiement est obligatoire.';
+      }
+      if (compteTresorerieId == null || compteTresorerieId.isEmpty) {
+        erreurs['compte'] = 'Le champ compte de trésorerie est obligatoire.';
+      } else if (!compteConnu) {
+        erreurs['compte'] =
+            "La valeur sélectionnée pour le champ compte de trésorerie n'existe pas.";
+      } else if (mode != null && mode.isNotEmpty && typeDuCompte != null && typeDuCompte != mode) {
+        erreurs['mode'] = 'Le mode de paiement ne correspond pas au type du compte de trésorerie choisi.';
+      }
     }
-    if (compteTresorerieId == null || compteTresorerieId.isEmpty) {
-      erreurs['compte'] = 'Le champ compte de trésorerie est obligatoire.';
-    } else if (!compteConnu) {
-      erreurs['compte'] =
-          "La valeur sélectionnée pour le champ compte de trésorerie n'existe pas.";
-    } else if (mode != null && mode.isNotEmpty && typeDuCompte != null && typeDuCompte != mode) {
-      erreurs['mode'] = 'Le mode de paiement ne correspond pas au type du compte de trésorerie choisi.';
+    // Ticket DEP6 (DEP-Q1) — le centre de coût est OBLIGATOIRE (`cost_center_id` `required|exists`).
+    if (centreCoutId == null || centreCoutId.isEmpty) {
+      erreurs['centre'] = messageCentreObligatoire;
+    } else if (!centreConnu) {
+      erreurs['centre'] = "La valeur sélectionnée pour le champ centre de coût n'existe pas.";
     }
     if (beneficiaire.runes.length > 150) {
       erreurs['beneficiaire'] = 'Le champ bénéficiaire ne doit pas dépasser 150 caractères.';
@@ -414,6 +459,7 @@ class DepensesRepository {
     String? fournisseurId,
     String beneficiaire = '',
     String? idEnModification,
+    bool aCredit = false,
   }) async {
     final existante = idEnModification == null
         ? null
@@ -430,6 +476,11 @@ class DepensesRepository {
                 ..where((t) => t.id.equals(compteTresorerieId)))
               .getSingleOrNull();
     final planDeCharge = {for (final c in await comptesDeCharge()) c.id: c};
+    // Ticket DEP7 — un règlement « À crédit » n'a de sens qu'avec un fournisseur choisi (la modale réinitialise sinon).
+    final credit = aCredit && fournisseurId != null && fournisseurId.isNotEmpty;
+    final centreConnu = centreCoutId == null || centreCoutId.isEmpty
+        ? false
+        : await (_db.select(_db.costCenters)..where((c) => c.id.equals(centreCoutId))).getSingleOrNull() != null;
 
     final erreurs = valider(
       date: date,
@@ -440,6 +491,10 @@ class DepensesRepository {
       beneficiaire: beneficiaire,
       lignes: lignes,
       comptesDeChargeConnus: planDeCharge.keys.toSet(),
+      centreCoutId: centreCoutId,
+      centreConnu: centreConnu,
+      fournisseurId: fournisseurId,
+      aCredit: aCredit,
     );
     if (erreurs.isNotEmpty) throw DepenseRefusee(erreurs);
 
@@ -487,6 +542,10 @@ class DepensesRepository {
       if (existante.accountingEntryId != null) {
         throw DepenseRefusee({'formulaire': messageDejaComptabilisee});
       }
+      // Ticket DEP7 — une reprise de l'ancien (sans pièce) ne reçoit jamais de pièce rétroactive : ni crédit ni dette.
+      if (credit) {
+        throw DepenseRefusee({'formulaire': messageCreditSansPiece});
+      }
 
       await _db.transaction(() async {
         await (_db.update(
@@ -497,11 +556,12 @@ class DepensesRepository {
             label: Value(resumeLibelle),
             category: Value(categorie),
             amount: Value(totalSaisi.toDouble()),
-            treasuryAccountId: Value(compteTresorerieId!),
+            treasuryAccountId: Value(compteTresorerieId),
             paymentMode: Value(modePaiement),
-            costCenterId: Value(centreCoutId == null || centreCoutId.isEmpty ? null : centreCoutId),
+            costCenterId: Value(centreCoutId),
             supplierId: Value(fournisseurId == null || fournisseurId.isEmpty ? null : fournisseurId),
             beneficiary: Value(beneficiaireNet),
+            onCredit: const Value(false),
             ecritureRefus: const Value(null),
             isActive: const Value(true),
             syncStatus: const Value(SyncStatus.pending),
@@ -534,11 +594,15 @@ class DepensesRepository {
               label: resumeLibelle,
               category: categorie,
               amount: totalSaisi.toDouble(),
-              treasuryAccountId: compteTresorerieId!,
-              paymentMode: Value(modePaiement),
-              costCenterId: Value(centreCoutId == null || centreCoutId.isEmpty ? null : centreCoutId),
+              // Ticket DEP7 — à crédit : AUCUNE trésorerie ni mode (la dette crédite le 401 au serveur), `en_attente` jusqu'au
+              // règlement de la dette ; payée comptant : `payee`, comme avant.
+              treasuryAccountId: Value(credit ? null : compteTresorerieId),
+              paymentMode: Value(credit ? null : modePaiement),
+              costCenterId: Value(centreCoutId),
               supplierId: Value(fournisseurId == null || fournisseurId.isEmpty ? null : fournisseurId),
               beneficiary: Value(beneficiaireNet),
+              onCredit: Value(credit),
+              status: Value(credit ? 'en_attente' : 'payee'),
               createdBy: Value(_auteurId?.call()),
             ),
           );

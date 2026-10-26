@@ -7,6 +7,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Purchase;
 use App\Models\TreasuryAccount;
 use App\Services\AccountingEntryService;
+use App\Services\DetteFournisseurService;
 use App\Services\TvaSettingService;
 use App\Services\VatDeclarationService;
 
@@ -87,7 +88,7 @@ class RecordPurchaseAccountingEntryAction
         }
 
         if ($reste > 0) {
-            $fournisseurs = ChartOfAccount::where('code', '401')->first();
+            $fournisseurs = app(DetteFournisseurService::class)->compteFournisseurs();
 
             if (! $fournisseurs) {
                 return null;

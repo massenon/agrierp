@@ -170,7 +170,7 @@ void main() {
           label: 'Transport',
           category: 'transport',
           amount: 12500,
-          treasuryAccountId: uuid('caisse'),
+          treasuryAccountId: Value(uuid('caisse')),
           isActive: const Value(false),
         ),
       );

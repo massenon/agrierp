@@ -451,6 +451,7 @@ class SelecteurExerciceTest extends TestCase
             ->call('nouvelleDepense')
             ->set('expenseDate', '2027-02-05')
             ->set('treasuryAccountId', $caisse->id)
+            ->set('costCenterId', \App\Models\CostCenter::general()->id)
             ->set('lines.0.label', 'Carburant')
             ->set('lines.0.chargeAccountId', \App\Models\ChartOfAccount::where('code', '605')->value('id'))
             ->set('lines.0.amount', '5000')

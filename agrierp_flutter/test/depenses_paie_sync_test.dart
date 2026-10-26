@@ -128,7 +128,7 @@ void main() {
           label: 'Saisie locale',
           category: '601 - Aliments',
           amount: montant,
-          treasuryAccountId: caisse,
+          treasuryAccountId: Value(caisse),
         ),
       );
 

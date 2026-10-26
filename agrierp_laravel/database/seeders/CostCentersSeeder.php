@@ -36,5 +36,8 @@ class CostCentersSeeder extends Seeder
                 ['parent_species_id' => $speciesId, 'is_active' => true]
             );
         }
+
+        // Ticket DEP6 (DEP-Q1) — le centre par défaut des dépenses sans centre (poste ancien, reprise de l'existant).
+        CostCenter::general();
     }
 }

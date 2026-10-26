@@ -1697,7 +1697,10 @@ class Expenses extends Table with SyncColumns {
   TextColumn get label => text()();
   TextColumn get category => text()();
   RealColumn get amount => real()();
-  TextColumn get treasuryAccountId => text()();
+
+  /// Compte de trésorerie débité. Ticket DEP7 (DEP-Q3) — NULLABLE : une dépense À CRÉDIT (`onCredit`) crédite le 401 du
+  /// fournisseur et ne touche AUCUNE trésorerie ; payée comptant, il reste obligatoire (saisie et envoi).
+  TextColumn get treasuryAccountId => text().nullable()();
 
   /// Ticket U13 — archivage logique du web (`SaisieDepenses::archiveExpense()` : montant réintégré, charge
   /// contre-passée). Une dépense archivée n'est plus une dépense : aucun écran ni rapport ne la compte. Défaut `true` :
@@ -1727,6 +1730,12 @@ class Expenses extends Table with SyncColumns {
 
   /// Auteur de la saisie (`users.id`) : celui du compte connecté au poste, ou celui que le serveur a servi.
   TextColumn get createdBy => text().nullable()();
+
+  /// Ticket DEP7 (PRD `docs/prd/depenses-multilignes.md`, § 11, DEP-Q3) — dépense À CRÉDIT chez un fournisseur : le serveur
+  /// crédite le 401 au lieu de la trésorerie, la dépense est `en_attente` et sa dette descend avec `payables` (écran
+  /// « Dettes Fournisseurs »). Défaut `false` : payée comptant, comme avant. Envoyée avec le document : sa seule présence
+  /// dit au serveur que ce poste connaît le centre de coût obligatoire (DEP6).
+  BoolColumn get onCredit => boolean().withDefault(const Constant(false))();
 
   /// ➕ PROPRE AU POSTE (absent du schéma Laravel, déclaré dans `SchemaDepensesPosteTest`) — le REFUS de la pièce par le
   /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
@@ -1931,10 +1940,10 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.executor);
 
-  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 60
-  /// (modules actifs envoyés au serveur, MOD1).** Le numéro 55 (unicité des codes, finalement sans palier Drift) n'est PAS
-  /// utilisé : il reste simplement vide, `from < 56` et `schemaVersion = 56` l'enjambent sans trou. Les numéros 57 à 59
-  /// sont réservés (57 : conversion des devis, DEV3, posé ci-dessous ; 58 : corbeille, ARC3 ; dépenses : autre branche) : `from < 60` les enjambe de même.
+  /// ⚠️ **CHAÎNE FINALE 52 → 53 (devis, `quotes`) → 54 (avoirs, `credit_notes`) → 56 (dépenses à lignes, DEP4) → 57 (conversion des
+  /// devis, DEV3) → 58 (corbeille, ARC3) → 59 (dépense à crédit et centre de coût obligatoire, DEP6/DEP7) → 60 (modules actifs
+  /// envoyés au serveur, MOD1).** Le numéro 55 (unicité des codes, finalement sans palier Drift) n'est PAS utilisé : il reste
+  /// simplement vide, et `from < 56` l'enjambe sans trou.
   ///
   /// ⚠️ TOUTE TABLE OU COLONNE AJOUTÉE IMPOSE D'INCRÉMENTER CE NUMÉRO **et**
   /// d'écrire son pas de migration ci-dessous. Sans cela, une base déjà
@@ -2505,11 +2514,16 @@ class AppDatabase extends _$AppDatabase {
       }
 
       // v58 — ticket ARC3 : la Corbeille au poste (`corbeille_elements`, instantané servi ; `corbeille_demandes`, table
-      // mixte des demandes). Les numéros 57 (conversion des devis), 59 (dépenses) et 60 (modules) sont réservés à d'autres
-      // branches : la fusion renumérotera si un palier manque. Une base en v56 ou en v58 passe ici sans trou.
+      // mixte des demandes). Une base en v56 ou en v58 passe ici sans trou.
       if (from < 58) {
         if (!await _tableExiste(m, corbeilleElements)) await m.createTable(corbeilleElements);
         if (!await _tableExiste(m, corbeilleDemandes)) await m.createTable(corbeilleDemandes);
+      }
+
+      // v59 — tickets DEP6 et DEP7 : la dépense À CRÉDIT (`on_credit`, trésorerie facultative) et le centre de coût
+      // obligatoire. Voir [_depensesACreditEtCentreObligatoire].
+      if (from < 59) {
+        await _depensesACreditEtCentreObligatoire(m);
       }
 
       // v60 — ticket MOD1 : les modules actifs se basculent au poste et partent au serveur (`syncStatus`, `updatedAt`).
@@ -2520,6 +2534,45 @@ class AppDatabase extends _$AppDatabase {
       }
     },
   );
+
+  /// Palier v59 (tickets DEP6 et DEP7) — deux changements d'un seul palier, tous deux sans perte :
+  ///
+  ///  1. `expenses.on_credit` (défaut faux : toute dépense existante est payée comptant) et `treasury_account_id` devenu
+  ///     NULLABLE (une dépense à crédit ne touche aucune trésorerie) : SQLite ne sait pas retirer un « NOT NULL » d'une
+  ///     colonne, la table est donc RECONSTRUITE (`TableMigration`, toutes les lignes recopiées) — seulement si la colonne
+  ///     est encore obligatoire (un `createTable` du même démarrage a déjà posé le schéma courant : rien à faire).
+  ///  2. Centre de coût obligatoire : une dépense locale SANS centre reçoit « Général » SI ce poste connaît déjà ce centre
+  ///     (le serveur l'a créé et servi) ; sinon elle reste sans centre — le serveur l'accepte et lui affecte « Général »
+  ///     (poste ancien), et la prochaine modification à la modale exige un centre. Ni `sync_status`, ni `updated_at`, ni
+  ///     `accounting_entry_id` ne bougent : une saisie `pending` le reste, une pièce passée n'est jamais régénérée.
+  Future<void> _depensesACreditEtCentreObligatoire(Migrator m) async {
+    final colonnes = await m.database.customSelect('PRAGMA table_info("expenses")').get();
+    final aOnCredit = colonnes.any((c) => c.read<String>('name') == 'on_credit');
+    final tresorerieObligatoire = colonnes.any(
+      (c) => c.read<String>('name') == 'treasury_account_id' && c.read<int>('notnull') == 1,
+    );
+
+    if (tresorerieObligatoire) {
+      await m.alterTable(TableMigration(expenses, newColumns: [if (!aOnCredit) expenses.onCredit]));
+    } else if (!aOnCredit) {
+      await _ajouterColonneSiAbsente(m, expenses, expenses.onCredit);
+    }
+
+    await customUpdate(
+      'UPDATE expenses SET cost_center_id = (SELECT id FROM cost_centers WHERE label = ? AND type = ? LIMIT 1) '
+      'WHERE cost_center_id IS NULL '
+      'AND EXISTS (SELECT 1 FROM cost_centers WHERE label = ? AND type = ?)',
+      variables: [
+        Variable.withString(libelleCentreGeneral),
+        Variable.withString('filiere'),
+        Variable.withString(libelleCentreGeneral),
+        Variable.withString('filiere'),
+      ],
+    );
+  }
+
+  /// Centre de coût par défaut (`CostCenter::LIBELLE_GENERAL` au serveur, créé par la migration DEP6).
+  static const libelleCentreGeneral = 'Général';
 
   /// Compte « charges diverses » du plan (`ConversionDepensesEnLignes::COMPTE_DIVERS` au serveur).
   static const compteChargesDiverses = '628';

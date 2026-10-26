@@ -20,6 +20,10 @@ import 'depenses_repository.dart';
 /// lignes, jamais saisie), « Enregistrer la Dépense ». Les erreurs se posent sous leur champ avec les messages du web
 /// (`DepenseRefusee`) ; une soumission réussie ferme la modale (résultat `true`).
 ///
+/// 🔴→✅ Tickets DEP6 et DEP7 — « Centre de Coût * » est OBLIGATOIRE (message sous le champ, comme le web) ; dès qu'un
+/// fournisseur est choisi, « Règlement * » propose « Payée comptant » ou « À crédit (dette fournisseur) » : à crédit, ni
+/// « Mode de Paiement » ni « Compte de Trésorerie Débité » (aucun décaissement, la dette naît au serveur).
+///
 /// Mode et compte de trésorerie ne se contredisent jamais (comme `updatedPaymentMode()` / `updatedTreasuryAccountId()` du
 /// web) : choisir un mode filtre les comptes et abandonne celui d'un autre type ; choisir un compte fixe le mode.
 ///
@@ -82,6 +86,9 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   String? _compteId;
   String? _centreId;
   String? _fournisseurId;
+
+  /// Ticket DEP7 — `comptant` ou `credit` (`DepensesRepository.reglements`) ; `comptant` tant qu'aucun fournisseur n'est choisi.
+  String _reglement = 'comptant';
   final _beneficiaire = TextEditingController();
   final List<_LigneEdition> _lignes = [];
 
@@ -143,6 +150,9 @@ class _ModaleDepenseState extends State<ModaleDepense> {
       }
     });
   }
+
+  /// La dépense est saisie À CRÉDIT : fournisseur choisi ET règlement « À crédit » (`getACreditProperty()` du web).
+  bool get _aCredit => _fournisseurId != null && _fournisseurId!.isNotEmpty && _reglement == 'credit';
 
   int get _total => DepensesRepository.total([for (final l in _lignes) l.enSaisie()]);
 
@@ -344,11 +354,11 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   }
 
   Widget _champCentre() => _champ(
-    'Centre de Coût',
+    'Centre de Coût *',
     _liste(
       cle: 'centre',
       valeur: _centreId,
-      vide: '-- Aucun --',
+      vide: '-- Sélectionner --',
       options: [for (final c in _centres) (c.id, c.label)],
       surChangement: (v) => setState(() => _centreId = v),
     ),
@@ -360,9 +370,42 @@ class _ModaleDepenseState extends State<ModaleDepense> {
       cle: 'fournisseur',
       valeur: _fournisseurId,
       vide: '-- Aucun --',
-      options: [for (final f in _fournisseurs) (f.id, f.name)],
-      surChangement: (v) => setState(() => _fournisseurId = v),
+      // « -- Aucun -- » reste un choix (le fournisseur est facultatif) : il retire le fournisseur et donc le crédit.
+      options: [('', '-- Aucun --'), for (final f in _fournisseurs) (f.id, f.name)],
+      surChangement: (w) => setState(() {
+        final v = w == null || w.isEmpty ? null : w;
+        _fournisseurId = v;
+        // Sans fournisseur, pas de crédit (`updatedSupplierId()` du web).
+        if (v == null || v.isEmpty) _reglement = 'comptant';
+      }),
     ),
+  );
+
+  /// « Règlement * » (ticket DEP7) : proposé dès qu'un fournisseur est choisi ; à crédit, une aide dit qu'aucune
+  /// trésorerie n'est touchée (`data-aide-credit` du Blade).
+  Widget _champReglement() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _champ(
+        'Règlement *',
+        _liste(
+          cle: 'reglement',
+          valeur: _reglement,
+          vide: '-- Sélectionner --',
+          options: [for (final e in DepensesRepository.reglements.entries) (e.key, e.value)],
+          surChangement: (v) => setState(() => _reglement = v ?? 'comptant'),
+        ),
+      ),
+      if (_aCredit)
+        const Padding(
+          padding: EdgeInsets.only(top: AgriSpacing.xs),
+          child: Text(
+            "Aucune trésorerie n'est touchée : la dette est créée au nom du fournisseur et se règle dans « Dettes Fournisseurs ».",
+            key: Key('depense-aide-credit'),
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        ),
+    ],
   );
 
   Widget _champBeneficiaire() => _champ(
@@ -537,6 +580,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
         beneficiaire: _beneficiaire.text,
         lignes: [for (final l in _lignes) l.enSaisie()],
         idEnModification: widget.enModification?.depense.id,
+        aCredit: _aCredit,
       );
     } on DepenseRefusee catch (e) {
       if (!mounted) return;
@@ -565,10 +609,11 @@ class _ModaleDepenseState extends State<ModaleDepense> {
     final large = AgriBreakpoints.moyen(context);
     final entete = <Widget>[
       _champDate(),
-      _champMode(),
-      _champCompte(),
+      // Ticket DEP7 — à crédit, ni mode ni compte de trésorerie (`@unless($this->aCredit)` du Blade).
+      if (!_aCredit) ...[_champMode(), _champCompte()],
       _champCentre(),
       _champFournisseur(),
+      if (_fournisseurId != null && _fournisseurId!.isNotEmpty) _champReglement(),
       _champBeneficiaire(),
     ];
     return ModaleAgri(

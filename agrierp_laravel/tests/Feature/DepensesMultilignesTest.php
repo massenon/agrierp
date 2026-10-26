@@ -283,7 +283,7 @@ class DepensesMultilignesTest extends TestCase
 
         $depense = $this->action()->creer([
             'expense_date' => '2026-06-15', 'label' => 'Gasoil livraison', 'category' => '605 - Énergie',
-            'amount' => 25_000, 'treasury_account_id' => $this->caisse->id,
+            'amount' => 25_000, 'treasury_account_id' => $this->caisse->id, 'cost_center_id' => $this->filiere->id,
         ], $id);
 
         $this->assertCount(1, $depense->lines);

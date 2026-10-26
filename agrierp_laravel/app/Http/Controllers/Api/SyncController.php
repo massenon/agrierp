@@ -1709,7 +1709,7 @@ class SyncController extends Controller
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                     ->select(['id', 'expense_date', 'label', 'category', 'amount', 'treasury_account_id', 'is_active',
                         'status', 'accounting_entry_id', 'payment_mode', 'cost_center_id', 'supplier_id', 'beneficiary',
-                        'created_by', 'updated_at']),
+                        'created_by', 'on_credit', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('expense_date')->orderBy('id'),
                 'enJson' => fn (\App\Models\Expense $d) => [
                     'id' => $d->id,
@@ -1729,6 +1729,9 @@ class SyncController extends Controller
                     'supplier_id' => $d->supplier_id,
                     'beneficiary' => $d->beneficiary,
                     'created_by' => $d->created_by,
+                    // Ticket DEP7 — dépense À CRÉDIT (crédite le 401, aucune trésorerie : `treasury_account_id` nul) ; sa dette
+                    // descend avec `payables`.
+                    'on_credit' => (bool) $d->on_credit,
                     'updated_at' => $d->updated_at?->toIso8601String(),
                 ],
                 'lignes' => [

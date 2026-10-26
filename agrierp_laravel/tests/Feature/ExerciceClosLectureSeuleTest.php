@@ -265,7 +265,7 @@ class ExerciceClosLectureSeuleTest extends TestCase
 
     private function depenseComptabilisee(): Expense
     {
-        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_B, '2027-02-10'), self::UUID_B);
+        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_B, '2027-02-10') + ['cost_center_id' => \App\Models\CostCenter::general()->id], self::UUID_B);
         $this->assertNotNull($depense->accounting_entry_id, 'décor : la dépense doit être comptabilisée');
 
         return $depense;
@@ -300,6 +300,7 @@ class ExerciceClosLectureSeuleTest extends TestCase
                 ->call('nouvelleDepense')
                 ->set('expenseDate', '2026-12-20')
                 ->set('treasuryAccountId', $this->caisse->id)
+                ->set('costCenterId', \App\Models\CostCenter::general()->id)
                 ->set('lines.0.label', 'Facture SBEE')
                 ->set('lines.0.chargeAccountId', $this->comptes['605']->id)
                 ->set('lines.0.amount', '25000')
@@ -319,7 +320,7 @@ class ExerciceClosLectureSeuleTest extends TestCase
     public function test_une_depense_d_un_exercice_clos_ne_se_modifie_ni_ne_s_archive(): void
     {
         FiscalYear::where('year', 2026)->update(['status' => 'ouvert']);
-        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_A, '2026-12-20'), self::UUID_A);
+        $depense = app(SaisieDepenseAction::class)->creer($this->depenseDuPoste(self::UUID_A, '2026-12-20') + ['cost_center_id' => \App\Models\CostCenter::general()->id], self::UUID_A);
         FiscalYear::where('year', 2026)->update(['status' => 'cloture']);
 
         Livewire::test(SaisieDepenses::class)

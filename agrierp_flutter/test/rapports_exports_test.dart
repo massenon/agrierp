@@ -88,7 +88,7 @@ void main() {
           label: libelle,
           category: categorie,
           amount: montant,
-          treasuryAccountId: uuid('tc'),
+          treasuryAccountId: Value(uuid('tc')),
         ),
       );
 
