@@ -48,18 +48,12 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
- * Pont Toast : tout composant Livewire déclenche
- *   $this->dispatch('toast', message: '...', type: 'success|error|info');
- * capté ici et re-diffusé comme CustomEvent DOM 'toast' que
- * components/toast-container.blade.php écoute via x-on:toast.window.
- * Un seul point d'entrée pour tous les toasts de l'application
- * (AVOID_INSTRUCTIONS.md — un seul point de vérité par mécanisme partagé).
+ * Livewire 3 dispatche $this->dispatch('toast', ...) DIRECTEMENT comme browser event sur window.
+ * Le relais Livewire.on('toast') ci-dessous n'est plus nécessaire et causait un doublon :
+ * toast-container.blade.php recevait l'event une première fois depuis Livewire 3 (natif),
+ * et une seconde fois depuis ce relais — supprimé le 26/10/2026.
  */
 document.addEventListener('livewire:init', () => {
-    Livewire.on('toast', (event) => {
-        window.dispatchEvent(new CustomEvent('toast', { detail: event }));
-    });
-
     /**
      * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) EN FRANÇAIS.
      *

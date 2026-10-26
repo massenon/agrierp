@@ -3,7 +3,7 @@
         <span class="material-symbols-outlined">sync</span>
     </button>
 
-    <x-modal name="modal-etat-synchronisation" max-width="lg">
+    <x-modal name="modal-etat-synchronisation" max-width="2xl">
         <div class="flex items-start justify-between mb-md">
             <div>
                 <p class="text-[10px] font-bold uppercase tracking-wider text-outline">Postes de la ferme</p>

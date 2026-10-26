@@ -715,6 +715,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
   /// cours à chaque tirage.
   int _versionTirage = 0;
 
+  /// Incrémenté par « Actualiser » du menu contextuel (clic droit) : force la
+  /// reconstruction de l'écran courant sans changer d'écran.
+  int _cleActualisation = 0;
+
   /// Sujet dont la fiche est ouverte, et l'écran d'où l'on est venu (le bouton
   /// « Retour » y revient : le poste n'a pas de bouton « précédent » de
   /// navigateur).
@@ -879,6 +883,25 @@ class _SocleAccueilState extends State<SocleAccueil> {
     super.dispose();
   }
 
+  /// Menu contextuel clic droit — une seule entrée « Actualiser » qui recrée l'écran courant.
+  Future<void> _afficherMenuContextuel(BuildContext context, Offset position) async {
+    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final zone = RelativeRect.fromRect(
+      Rect.fromLTWH(position.dx, position.dy, 1, 1),
+      Offset.zero & overlay.size,
+    );
+    final choix = await showMenu<String>(
+      context: context,
+      position: zone,
+      items: [
+        const PopupMenuItem<String>(value: 'actualiser', child: Row(children: [Icon(Icons.refresh, size: 18), SizedBox(width: 8), Text('Actualiser')])),
+      ],
+    );
+    if (choix == 'actualiser' && mounted) {
+      setState(() => _cleActualisation++);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final (groupe, ecranCourant) = _situation;
@@ -889,7 +912,13 @@ class _SocleAccueilState extends State<SocleAccueil> {
       child: NavigationPoste(
         ouvrir: (e) => setState(() => _ecran = e),
         child: Scaffold(
-      body: Row(
+      body: Listener(
+        onPointerDown: (event) {
+          if (event.buttons == 0x2) {  // bouton secondaire (clic droit)
+            _afficherMenuContextuel(context, event.position);
+          }
+        },
+        child: Row(
         children: [
           // ⚠️ La bascule de la barre supérieure replie la barre latérale,
           // comme `menu` / `menu_open` dans la maquette.
@@ -989,7 +1018,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                             const BandeauExercice(),
                             Expanded(
                               child: KeyedSubtree(
-                                key: ValueKey('exercice-${_exercice.etat?.annee}-${_exercice.etat?.clos}'),
+                                key: ValueKey('exercice-${_exercice.etat?.annee}-${_exercice.etat?.clos}-$_cleActualisation'),
                                 child: _contenu(),
                               ),
                             ),
@@ -1010,6 +1039,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
             onReafficher: () => setState(() => _menuOuvert = true),
           ),
         ],
+      ),
       ),
       ),
       ),

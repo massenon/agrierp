@@ -259,9 +259,7 @@
         </div>
     </div>
 
-    <button title="Visite guidée de cette page" class="fixed z-[60] flex items-center justify-center w-12 h-12 rounded-full bg-info-blue hover:bg-blue-800 text-white shadow-lg" style="bottom:144px; right:16px;">
-        <span class="material-symbols-outlined" style="font-size:24px;">help</span>
-    </button>
+    {{-- Visite guidée désactivée (client, 26/10/2026) --}}
 
     <x-pwa-install />
     {{-- Ticket POP1 — fenêtre « Rappels du jour » à l'ouverture, pour qui voit Soins et vaccins (view-elevage). --}}
