@@ -17,9 +17,9 @@ Future<void> montrerRappelsDuJour(
   required VoidCallback surMasquer,
   VoidCallback? surOuvrirSoins,
 }) {
-  return showDialog<void>(
+  return afficherModale<void>(
     context: context,
-    builder: (contexte) => ModaleAgri(
+    constructeur: (contexte) => ModaleAgri(
       surtitre: "Soins, vaccins et délais d'attente",
       titre: 'Rappels du jour',
       largeur: LargeurModale.xl,

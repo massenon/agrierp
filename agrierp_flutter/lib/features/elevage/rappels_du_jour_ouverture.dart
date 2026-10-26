@@ -30,7 +30,8 @@ class ReglageRappels {
     try {
       await _coffre.write(key: _cle(idUtilisateur), value: jour);
     } on Object catch (e) {
-      debugPrint('Rappels du jour : préférence illisible ou non enregistrée ($e).');
+      debugPrint('Rappels du jour : préférence non enregistrée.');
+      debugPrint('$e');
     }
   }
 }
@@ -55,7 +56,8 @@ class OuvertureRappels {
       final rappels = await depot.pourRole(role, quand: quand);
       return rappels.vide ? null : rappels;
     } on Object catch (e, pile) {
-      debugPrint('Rappels du jour : calcul impossible ($e).\n$pile');
+      debugPrint('Rappels du jour : calcul impossible.');
+      debugPrint('$e\n$pile');
       return null;
     }
   }

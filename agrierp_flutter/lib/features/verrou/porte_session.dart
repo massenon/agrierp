@@ -120,7 +120,8 @@ class _PorteSessionState extends State<PorteSession> {
     try {
       await surOuverture(context);
     } on Object catch (e) {
-      debugPrint('Rappels du jour : ouverture impossible ($e).');
+      debugPrint('Rappels du jour : ouverture impossible.');
+      debugPrint('$e');
     }
   }
 
