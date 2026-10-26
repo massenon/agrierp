@@ -34,12 +34,17 @@ class AttestationController extends Controller
         abort_unless($request->user()->can('view-rh'), 403, "Votre rôle ne permet pas d'éditer des attestations.");
 
         $v = $request->validate([
-            'type' => ['required', 'in:'.implode(',', AttestationService::TYPES)],
-            'person_id' => ['required', 'string'],
-            'contract_type' => ['nullable', 'string', 'max:60'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date'],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'type'           => ['required', 'in:'.implode(',', AttestationService::TYPES)],
+            'person_id'      => ['required', 'string'],
+            'contract_type'  => ['nullable', 'string', 'max:60'],
+            'start_date'     => ['nullable', 'date'],
+            'end_date'       => ['nullable', 'date'],
+            'note'           => ['nullable', 'string', 'max:1000'],
+            'domaines'       => ['nullable', 'array'],
+            'domaines.*'     => ['string', 'in:'.implode(',', array_keys(AttestationService::DOMAINES))],
+            'appreciation'   => ['nullable', 'string', 'max:500'],
+            'birth_date'     => ['nullable', 'date'],
+            'birth_place'    => ['nullable', 'string', 'max:100'],
         ], [
             'person_id.required' => 'Ce champ est obligatoire.',
         ]);
@@ -59,6 +64,10 @@ class AttestationController extends Controller
             $v['start_date'] ?? null,
             $v['end_date'] ?? null,
             $v['note'] ?? null,
+            $v['domaines'] ?? [],
+            $v['appreciation'] ?? null,
+            $v['birth_date'] ?? null,
+            $v['birth_place'] ?? null,
         );
 
         return response($resultat['octets'], 200, [

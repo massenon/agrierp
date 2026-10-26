@@ -765,6 +765,15 @@ class AttestationTemplates extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get type => text()();
   TextColumn get bodyText => text()();
+  // ATT-1 : numéro de séquence annuel pour le référencement officiel (N°XX/ANNÉE/FEO/DG).
+  IntColumn get numeroSequence => integer().withDefault(const Constant(0))();
+  // ATT-1 : trois blocs de signature configurables (Examinateur, Président du Jury, DG).
+  TextColumn get sig1Titre => text().nullable()();
+  TextColumn get sig1Nom => text().nullable()();
+  TextColumn get sig2Titre => text().nullable()();
+  TextColumn get sig2Nom => text().nullable()();
+  TextColumn get sig3Titre => text().nullable()();
+  TextColumn get sig3Nom => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1063,6 +1072,11 @@ class Internships extends Table {
   DateTimeColumn get endDate => dateTime().nullable()();
   RealColumn get monthlyFee => real().nullable()();
   BoolColumn get feePaid => boolean().withDefault(const Constant(false))();
+  // ATT-1 : date et lieu de naissance du stagiaire (identité pour l'attestation de formation).
+  DateTimeColumn get birthDate => dateTime().nullable()();
+  TextColumn get birthPlace => text().nullable()();
+  // ATT-1 : civilité (M. / Mme) — conditionne l'accord grammatical dans l'attestation.
+  TextColumn get civilite => text().withDefault(const Constant('M.'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1964,7 +1978,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 64;
+  int get schemaVersion => 65;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2554,6 +2568,26 @@ class AppDatabase extends _$AppDatabase {
       if (from < 64) {
         await _ajouterColonneSiAbsente(m, expenses, expenses.receiptLocalPath);
         await _ajouterColonneSiAbsente(m, purchases, purchases.receiptLocalPath);
+      }
+      // v65 — ticket ATT-1 : date/lieu de naissance, civilité, colonnes signataires.
+      if (from < 65) {
+        await _ajouterColonneSiAbsente(m, internships, internships.birthDate);
+        await _ajouterColonneSiAbsente(m, internships, internships.birthPlace);
+        await _ajouterColonneSiAbsente(m, internships, internships.civilite);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.numeroSequence);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Nom);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Nom);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Nom);
       }
     },
   );

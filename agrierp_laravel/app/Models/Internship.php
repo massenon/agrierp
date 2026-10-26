@@ -9,13 +9,14 @@ class Internship extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['first_name', 'last_name', 'school', 'start_date', 'end_date', 'monthly_fee', 'fee_paid'];
+    protected $fillable = ['first_name', 'last_name', 'school', 'start_date', 'end_date', 'monthly_fee', 'fee_paid', 'birth_date', 'birth_place', 'civilite'];
 
     protected function casts(): array
     {
         return [
             'start_date' => 'date',
-            'end_date' => 'date',
+            'end_date'   => 'date',
+            'birth_date' => 'date',
             'monthly_fee' => 'decimal:2',
         ];
     }

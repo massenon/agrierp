@@ -70,11 +70,38 @@ class _AttestationsVueState extends State<AttestationsVue> {
   ];
 
   // En-tête du certificat — celui de la page web (RCCM de la directive officielle,
-  // pas l'IFU de démonstration du prototype) et le Directeur Général qu'elle nomme.
+  // pas l'IFU de démonstration du prototype).
   static const _ferme = 'FERME ÉCOLE OLOUWACHEGOUN';
-  static const _adresse = 'Attan-Ewé, Ikpinlè, Adja-Ouèrè, Bénin';
+  static const _sousActivites =
+      'Production Animale | Production Végétale | Transformation Agro-alimentaire';
+  static const _sousActivites2 =
+      'Fabrication de Cages Galvanisées | Formation Agricole | Suivi-Appuis et Conseils';
   static const _rccm = 'RCCM : RB/PNO/22 A 33870';
-  static const _directeur = 'M. Olouchègoun';   // décision client du 17/10/2026, comme le web
+
+  // ATT-1 — 3 signataires (décision client conforme au vrai modèle PDF).
+  static const _sig1Titre = "L'Examinateur";
+  static const _sig1Nom = 'SOGNIGBE Gbédjinou Serge Bruno';
+  static const _sig1Sous = 'Chef Cellule Communale\nATDA Pôle 6 (Plateau)';
+  static const _sig2Titre = 'Président du Jury';
+  static const _sig2Nom = 'Elisée Kocou HOUNKPONOU';
+  static const _sig2Sous = 'Président FN-CCPB';
+  static const _sig3Titre = 'Le Directeur Général';
+  static const _sig3Nom = 'Hassimiyou O. OLOUKOUNLE';
+  static const _sig3Sous = 'Directeur Général FEO';
+
+  // ATT-1 — domaines de formation cochables (identique à AttestationService::DOMAINES).
+  static const _domainesDisponibles = <String, String>{
+    'maraichage': 'Maraîchage et cultures légumières',
+    'elevage': 'Élevage (Lapins, Porcs, Poulets)',
+    'rations': 'Fabrication de rations alimentaires',
+    'gestion': 'Gestion agricole',
+  };
+
+  // Mois en français pour la date longue (décision ATT-1).
+  static const _mois = [
+    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+  ];
 
   String _onglet = 'generer';
   String _type = 'employe';
@@ -86,6 +113,11 @@ class _AttestationsVueState extends State<AttestationsVue> {
   final _debut = TextEditingController();
   final _fin = TextEditingController();
   final _note = TextEditingController();
+  // ATT-1 — champs spécifiques au stagiaire.
+  final _appreciation = TextEditingController();
+  final _naissance = TextEditingController();
+  final _lieuNaissance = TextEditingController();
+  final Set<String> _domaines = {};
 
   final _modeles = <String, TextEditingController>{
     'employe': TextEditingController(),
@@ -114,6 +146,9 @@ class _AttestationsVueState extends State<AttestationsVue> {
     _debut.dispose();
     _fin.dispose();
     _note.dispose();
+    _appreciation.dispose();
+    _naissance.dispose();
+    _lieuNaissance.dispose();
     for (final c in _modeles.values) {
       c.dispose();
     }
@@ -166,6 +201,10 @@ class _AttestationsVueState extends State<AttestationsVue> {
       _personneId = '';
       _debut.clear();
       _fin.clear();
+      _appreciation.clear();
+      _naissance.clear();
+      _lieuNaissance.clear();
+      _domaines.clear();
       _retour = null;
       _erreurs = const {};
     });
@@ -179,6 +218,11 @@ class _AttestationsVueState extends State<AttestationsVue> {
       // Comme la page web : la personne préremplit les dates.
       _debut.text = _ecrire(x.debut);
       _fin.text = _ecrire(x.fin);
+      // ATT-1 : pré-remplissage de la naissance pour un stagiaire.
+      if (_type == 'stagiaire') {
+        _naissance.text = _ecrire(x.birthDate);
+        _lieuNaissance.text = x.birthPlace ?? '';
+      }
     });
   }
 
@@ -224,6 +268,10 @@ class _AttestationsVueState extends State<AttestationsVue> {
         debut: _lire(_debut.text),
         fin: _lire(_fin.text),
         note: _note.text,
+        domaines: _domaines.toList(),
+        appreciation: _appreciation.text,
+        birthDate: _lire(_naissance.text),
+        birthPlace: _lieuNaissance.text,
       );
       final chemin = await widget.enregistrer(pdf);
       if (!mounted) return;
@@ -559,6 +607,112 @@ class _AttestationsVueState extends State<AttestationsVue> {
               ),
             ],
           ),
+          // ATT-1 — champs naissance + domaines + appréciation (stagiaire seulement).
+          if (!employe) ...[
+            const SizedBox(height: AgriSpacing.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _champDate(
+                    'Date de Naissance',
+                    _naissance,
+                    'att-naissance',
+                    'naissance',
+                  ),
+                ),
+                const SizedBox(width: AgriSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Lieu de Naissance'.toUpperCase(), style: _etiquette),
+                      const SizedBox(height: AgriSpacing.xs),
+                      TextField(
+                        key: const Key('att-lieu-naissance'),
+                        controller: _lieuNaissance,
+                        onChanged: (_) => setState(() {}),
+                        style: StylesChampsAgri.valeurFormulaire,
+                        decoration: _decor(
+                          'Ex : Cotonou',
+                          hauteurFixe: AgriChamps.hauteurFormulaire,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AgriSpacing.md),
+            Text('Domaines de Formation'.toUpperCase(), style: _etiquette),
+            const SizedBox(height: AgriSpacing.xs),
+            Container(
+              padding: const EdgeInsets.all(AgriSpacing.sm),
+              decoration: _carte(fond: AgriColors.surfaceZebra),
+              child: Column(
+                children: [
+                  for (final entry in _domainesDisponibles.entries)
+                    InkWell(
+                      key: Key('att-domaine-${entry.key}'),
+                      onTap: () => setState(() {
+                        if (_domaines.contains(entry.key)) {
+                          _domaines.remove(entry.key);
+                        } else {
+                          _domaines.add(entry.key);
+                        }
+                      }),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AgriSpacing.xs / 2,
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: Checkbox(
+                                value: _domaines.contains(entry.key),
+                                onChanged: (_) => setState(() {
+                                  if (_domaines.contains(entry.key)) {
+                                    _domaines.remove(entry.key);
+                                  } else {
+                                    _domaines.add(entry.key);
+                                  }
+                                }),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                activeColor: AgriColors.brandEmerald,
+                              ),
+                            ),
+                            const SizedBox(width: AgriSpacing.sm),
+                            Flexible(
+                              child: Text(
+                                entry.value,
+                                style: const TextStyle(
+                                  fontSize: AgriTypography.xs,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AgriSpacing.md),
+            Text('Appréciation'.toUpperCase(), style: _etiquette),
+            const SizedBox(height: AgriSpacing.xs),
+            TextField(
+              key: const Key('att-appreciation'),
+              controller: _appreciation,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: AgriTypography.sm),
+              decoration: _decor(
+                "sa ponctualité, son esprit d'initiative, sa capacité d'adaptation…",
+              ),
+            ),
+          ],
           const SizedBox(height: AgriSpacing.md),
           Text(
             "Note d'Évaluation (optionnel)".toUpperCase(),
@@ -767,10 +921,12 @@ class _AttestationsVueState extends State<AttestationsVue> {
 
   // ── Aperçu du certificat ──────────────────────────────────────────────────
 
+  String _dateLongue(DateTime d) =>
+      '${d.day} ${_mois[d.month - 1]} ${d.year}';
+
   Widget _carteApercu() {
-    final titre = _type == 'employe'
-        ? 'Attestation de Travail'
-        : 'Attestation de Stage';
+    final stagiaire = _type == 'stagiaire';
+    final titre = stagiaire ? 'Attestation de Formation' : 'Attestation de Travail';
     final x = _personne;
     final modele = _modeles[_type]!.text;
 
@@ -783,6 +939,8 @@ class _AttestationsVueState extends State<AttestationsVue> {
         contrat: _contrat,
         debut: _lire(_debut.text),
         fin: _lire(_fin.text),
+        birthDate: _lire(_naissance.text),
+        birthPlace: _lieuNaissance.text,
       );
     }
 
@@ -802,9 +960,9 @@ class _AttestationsVueState extends State<AttestationsVue> {
           Positioned.fill(
             child: IgnorePointer(
               child: Center(
-                child: Opacity(
+                child: const Opacity(
                   opacity: 0.05,
-                  child: const Icon(SymbolesAgri.agriculture, size: 220),
+                  child: Icon(SymbolesAgri.agriculture, size: 220),
                 ),
               ),
             ),
@@ -812,6 +970,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ─── En-tête : logo | ferme + activités + RCCM | lieu-date ───
               Container(
                 padding: const EdgeInsets.only(bottom: AgriSpacing.md),
                 decoration: const BoxDecoration(
@@ -819,67 +978,97 @@ class _AttestationsVueState extends State<AttestationsVue> {
                     bottom: BorderSide(width: 2, color: AgriColors.brandForest),
                   ),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(
-                      SymbolesAgri.agriculture,
-                      size: 36,
-                      color: AgriColors.brandEmerald,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          SymbolesAgri.agriculture,
+                          size: 36,
+                          color: AgriColors.brandEmerald,
+                        ),
+                        const SizedBox(width: AgriSpacing.sm),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _ferme,
+                                style: TextStyle(
+                                  fontSize: AgriTypography.sm,
+                                  fontWeight: FontWeight.w900,
+                                  color: AgriColors.brandForest,
+                                ),
+                              ),
+                              Text(
+                                _sousActivites,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AgriColors.outline,
+                                ),
+                              ),
+                              Text(
+                                _sousActivites2,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AgriColors.outline,
+                                ),
+                              ),
+                              Text(
+                                _rccm,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AgriColors.outline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          'ATTAN - ÉWÉ, le ${_dateLongue(_aujourdhui)}',
+                          key: const Key('att-apercu-lieu-date'),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: AgriTypography.gras,
+                            color: AgriColors.outline,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: AgriSpacing.sm),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _ferme,
-                            style: TextStyle(
-                              fontSize: AgriTypography.sm,
-                              fontWeight: FontWeight.w900,
-                              color: AgriColors.brandForest,
-                            ),
-                          ),
-                          Text(
-                            _adresse,
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: AgriColors.outline,
-                            ),
-                          ),
-                          Text(
-                            _rccm,
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: AgriColors.outline,
-                            ),
-                          ),
-                        ],
+                    if (stagiaire) ...[
+                      const SizedBox(height: AgriSpacing.xs),
+                      const Text(
+                        'N°—/FEO/DG',
+                        key: Key('att-apercu-numero'),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: AgriTypography.gras,
+                          color: AgriColors.brandForest,
+                        ),
                       ),
-                    ),
-                    Text(
-                      titre.toUpperCase(),
-                      key: const Key('att-apercu-titre'),
-                      style: const TextStyle(
-                        fontSize: AgriTypography.sm,
-                        fontWeight: AgriTypography.gras,
-                        color: AgriColors.brandEmerald,
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: AgriSpacing.md),
+              // ─── Titre centré souligné ───
               Text(
                 titre.toUpperCase(),
+                key: const Key('att-apercu-titre'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: AgriTypography.xs,
                   fontWeight: AgriTypography.gras,
                   letterSpacing: 0.8,
                   color: AgriColors.brandForest,
+                  decoration: TextDecoration.underline,
                 ),
               ),
               const SizedBox(height: AgriSpacing.sm),
+              // ─── Corps ───
               if (corps != null)
                 Text(
                   corps,
@@ -898,6 +1087,32 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   key: const Key('att-apercu-vide'),
                   style: mute,
                 ),
+              // ─── Domaines (stagiaire) ───
+              if (stagiaire && _domaines.isNotEmpty) ...[
+                const SizedBox(height: AgriSpacing.sm),
+                for (final cle in _domaines)
+                  if (_domainesDisponibles.containsKey(cle))
+                    Text(
+                      '➢ ${_domainesDisponibles[cle]} ;',
+                      key: Key('att-apercu-domaine-$cle'),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+              ],
+              // ─── Appréciation (stagiaire) ───
+              if (stagiaire && _appreciation.text.trim().isNotEmpty &&
+                  x != null) ...[
+                const SizedBox(height: AgriSpacing.sm),
+                Text(
+                  "Au cours de sa formation, ${x.libelle} s'est distingué(e) "
+                  'par ${_appreciation.text}.',
+                  key: const Key('att-apercu-appreciation'),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+              // ─── Note ───
               if (_note.text.trim().isNotEmpty) ...[
                 const SizedBox(height: AgriSpacing.md),
                 Text(
@@ -906,31 +1121,27 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   style: mute,
                 ),
               ],
-              const SizedBox(height: AgriSpacing.lg),
-              Text(
-                'Fait à Ikpinlè, le ${_ecrire(_aujourdhui)}.',
-                style: const TextStyle(fontSize: AgriTypography.xs),
-              ),
-              const SizedBox(height: AgriSpacing.xl),
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Column(
-                  children: [
-                    Text(
-                      'Le Directeur Général',
-                      style: TextStyle(fontSize: 10, color: AgriColors.outline),
-                    ),
-                    SizedBox(height: AgriSpacing.lg),
-                    Text(
-                      _directeur,
-                      style: TextStyle(
-                        fontSize: AgriTypography.xs,
-                        fontWeight: AgriTypography.gras,
-                        color: AgriColors.brandForest,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: AgriSpacing.sm),
+              // ─── Formule de clôture ───
+              const Text(
+                'En foi de quoi, la présente attestation lui est délivrée '
+                'pour servir et valoir ce que de droit.',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
                 ),
+              ),
+              const SizedBox(height: AgriSpacing.lg),
+              // ─── 3 blocs de signature (ATT-1) ───
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _blocSignature(_sig1Titre, _sig1Nom, _sig1Sous)),
+                  const SizedBox(width: AgriSpacing.sm),
+                  Expanded(child: _blocSignature(_sig2Titre, _sig2Nom, _sig2Sous)),
+                  const SizedBox(width: AgriSpacing.sm),
+                  Expanded(child: _blocSignature(_sig3Titre, _sig3Nom, _sig3Sous)),
+                ],
               ),
             ],
           ),
@@ -938,6 +1149,45 @@ class _AttestationsVueState extends State<AttestationsVue> {
       ),
     );
   }
+
+  Widget _blocSignature(String titre, String nom, String sousTitre) =>
+      Column(
+        children: [
+          Text(
+            titre.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 8,
+              fontWeight: AgriTypography.gras,
+              color: AgriColors.brandForest,
+            ),
+          ),
+          const SizedBox(height: AgriSpacing.lg),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: AgriColors.outlineVariant,
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          Text(
+            nom,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: AgriTypography.gras,
+              color: AgriColors.brandForest,
+            ),
+          ),
+          Text(
+            sousTitre,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 7.5,
+              color: AgriColors.outline,
+            ),
+          ),
+        ],
+      );
 
   Widget _bandeau(bool reussi, String message) {
     final couleur = reussi ? AgriColors.brandEmerald : AgriColors.errorRed;
@@ -986,7 +1236,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
       'stagiaire',
       SymbolesAgri.school,
       'Modèle - Attestation de Stage (Stagiaire)',
-      'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], '
+      'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_NAISSANCE], [LIEU_NAISSANCE], '
           '[DATE_DEBUT], [DATE_FIN]',
     );
 

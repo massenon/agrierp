@@ -47,6 +47,10 @@ class ClientAttestations {
     DateTime? debut,
     DateTime? fin,
     String note = '',
+    List<String> domaines = const [],
+    String appreciation = '',
+    DateTime? birthDate,
+    String birthPlace = '',
   }) async {
     try {
       final reponse = await _client.post<List<int>>(
@@ -58,6 +62,12 @@ class ClientAttestations {
           'start_date': ?_jour(debut),
           'end_date': ?_jour(fin),
           if (note.trim().isNotEmpty) 'note': note,
+          if (type == 'stagiaire' && domaines.isNotEmpty) 'domaines': domaines,
+          if (type == 'stagiaire' && appreciation.trim().isNotEmpty)
+            'appreciation': appreciation,
+          if (type == 'stagiaire' && birthDate != null) 'birth_date': _jour(birthDate),
+          if (type == 'stagiaire' && birthPlace.trim().isNotEmpty)
+            'birth_place': birthPlace,
         },
         options: Options(responseType: ResponseType.bytes),
       );
@@ -167,6 +177,8 @@ class PersonneAttestation {
     required this.etablissement,
     required this.debut,
     required this.fin,
+    this.birthDate,
+    this.birthPlace,
   });
 
   final String id;
@@ -184,6 +196,12 @@ class PersonneAttestation {
 
   /// Employé : jamais (un contrat en cours n'a pas de fin). Stagiaire : fin.
   final DateTime? fin;
+
+  /// Date de naissance du stagiaire (ATT-1).
+  final DateTime? birthDate;
+
+  /// Lieu de naissance du stagiaire (ATT-1).
+  final String? birthPlace;
 
   /// « AGOSSOU Jean » — l'ordre de la page web (`last_name first_name`).
   String get libelle => '$nom $prenom';
@@ -241,6 +259,8 @@ class AttestationsRepository {
           etablissement: s.school,
           debut: s.startDate,
           fin: s.endDate,
+          birthDate: s.birthDate,
+          birthPlace: s.birthPlace,
         ),
     ];
   }
@@ -276,6 +296,8 @@ class AttestationsRepository {
     required String contrat,
     DateTime? debut,
     DateTime? fin,
+    DateTime? birthDate,
+    String birthPlace = '',
   }) {
     final remplacements = type == 'employe'
         ? {
@@ -291,6 +313,8 @@ class AttestationsRepository {
             '[ETABLISSEMENT]': personne.etablissement ?? '',
             '[DATE_DEBUT]': _date(debut) ?? '',
             '[DATE_FIN]': _date(fin) ?? 'ce jour',
+            '[DATE_NAISSANCE]': _date(birthDate) ?? '',
+            '[LIEU_NAISSANCE]': birthPlace,
           };
 
     var texte = modele;
@@ -312,6 +336,10 @@ class AttestationsRepository {
     DateTime? debut,
     DateTime? fin,
     String note = '',
+    List<String> domaines = const [],
+    String appreciation = '',
+    DateTime? birthDate,
+    String birthPlace = '',
   }) async => _client().generer(
     type: type,
     personneId: personne.id,
@@ -319,6 +347,10 @@ class AttestationsRepository {
     debut: debut,
     fin: fin,
     note: note,
+    domaines: domaines,
+    appreciation: appreciation,
+    birthDate: birthDate,
+    birthPlace: birthPlace,
   );
 
   /// Enregistre un modèle : le serveur d'abord, la base locale ensuite.
