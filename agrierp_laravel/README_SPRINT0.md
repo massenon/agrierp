@@ -22459,3 +22459,5 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 **Tests (rouges d'abord)** : `DepenseCentreCoutObligatoireTest` (10), `DepenseFournisseurCreditTest` (17), `DepenseFournisseurCreditLivewireTest` (7), `SyncDepenseFournisseurCreditTest` (7) ; adaptation des tests existants (centre au décor) ; poste `depenses_a_credit_test` (16), `depenses_a_credit_parite_test` (5), migration toutes versions. **Mutations tuées** : Laravel 8/8, poste 5/5 + 1 ajoutée après survie (trésorerie envoyée à crédit).
 **Questions nouvelles (client)** : DEP-Q9 (archiver une dépense à crédit déjà réglée : refusé), DEP-Q10 (échéance), DEP-Q11 (règlement d'une dette précise). **Risque** : un poste non migré qui reçoit une dépense à crédit refuse la page au tirage (trésorerie absente) → migrer les postes avant d'ouvrir « À crédit ». **NON vérifié** : MySQL peuplé (migration éprouvée sur SQLite), poste Windows réel.
 
+
+**Mesures finales (après fusion de la branche principale, Drift 60)** : suite Laravel **2 446 verts** (25 722 assertions) ; poste `flutter analyze` propre, **3 512 verts, 17 sautés, 0 rouge** (`flutter test --concurrency=3`).
