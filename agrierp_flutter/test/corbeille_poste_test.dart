@@ -37,6 +37,7 @@ void main() {
     String detail = '',
     String module = 'ventes',
     DateTime? archiveLe,
+    String? archivePar,
     bool restaurable = true,
     String? motifRestauration,
     bool supprimable = true,
@@ -50,6 +51,7 @@ void main() {
       detail: Value(detail),
       module: module,
       archiveLe: Value(archiveLe ?? maintenant),
+      archivePar: Value(archivePar),
       restaurable: restaurable,
       motifRestauration: Value(motifRestauration),
       supprimable: supprimable,
@@ -119,6 +121,21 @@ void main() {
       expect(depense.restaurable, isFalse);
       expect(depense.motifRestauration, CorbeilleRepository.refusDepense);
       expect(depense.locale, isFalse);
+    });
+
+    test('⚠️ ARC-Q2 — la ligne porte l\'auteur servi (null : inconnu) ; une entité archivée ICI et pas encore servie n\'en a pas', () async {
+      await element('clients', 'kossi', 'Kossi Adjovi', archivePar: 'Marie Gestionnaire');
+      await element('clients', 'sogea', 'SOGEA');
+      await db.into(db.customers).insert(
+        CustomersCompanion.insert(id: uuid('client-local'), name: 'Client archivé ici', isActive: const Value(false), syncStatus: const Value(SyncStatus.pending)),
+      );
+
+      final l = {for (final e in await depot.lignes()) e.titre: e};
+
+      expect(l['Kossi Adjovi']!.archivePar, 'Marie Gestionnaire');
+      expect(l['SOGEA']!.archivePar, isNull);
+      expect(l['Client archivé ici']!.locale, isTrue);
+      expect(l['Client archivé ici']!.archivePar, isNull, reason: 'le poste ne devine pas : le serveur le dira au prochain tirage');
     });
 
     test('PRD § 5.3 — les trois cartes : 4 archivés, 3 restaurables, 1 supprimable', () async {
@@ -406,17 +423,18 @@ void main() {
       expect(valeur(tester, 'kpi-Suppression définitive possible'), contains('1'));
     });
 
-    testWidgets('le tableau : six colonnes, une ligne par élément, « — » pour un détail vide, jour et heure du Bénin', (tester) async {
+    testWidgets('le tableau : sept colonnes, une ligne par élément, « — » pour un détail vide, jour et heure du Bénin', (tester) async {
       await element('provendes', 'prov', 'Provende croissance', module: 'elevage', archiveLe: DateTime(2026, 6, 20, 9, 5));
       await monter(tester);
 
-      for (final c in ['TYPE', 'ÉLÉMENT', 'DÉTAIL', 'MODULE', 'ARCHIVÉ LE', 'ACTIONS']) {
+      for (final c in ['TYPE', 'ÉLÉMENT', 'DÉTAIL', 'MODULE', 'ARCHIVÉ LE', 'ARCHIVÉ PAR', 'ACTIONS']) {
         // « TYPE » est aussi l'étiquette du filtre : deux occurrences.
         expect(find.text(c), c == 'TYPE' ? findsNWidgets(2) : findsOneWidget, reason: c);
       }
       expect(find.text('Type de provende'), findsWidgets);
       expect(find.text('Provende croissance'), findsOneWidget);
-      expect(find.text('—'), findsOneWidget, reason: 'détail vide');
+      // deux « — » : le détail vide ET l'auteur inconnu (ARC-Q2)
+      expect(find.text('—'), findsNWidgets(2), reason: 'détail vide + auteur inconnu');
       expect(find.text('Elevage'), findsOneWidget, reason: 'ucfirst(module)');
       expect(find.text('20/06/2026 à 09:05'), findsOneWidget);
     });
@@ -592,6 +610,17 @@ void main() {
       expect(find.text('27 éléments — page 2 sur 2'), findsOneWidget);
       expect(find.text('Client 01'), findsOneWidget);
       expect(find.text('Client 02'), findsOneWidget);
+    });
+
+    testWidgets('⚠️ ARC-Q2 — « Archivé par » affiche le nom servi par le serveur, « — » quand il est inconnu (jamais « 0 », jamais un nom inventé)', (tester) async {
+      await element('clients', 'kossi', 'Kossi Adjovi', detail: '+22997000001', archivePar: 'Marie Gestionnaire');
+      await element('fournisseurs', 'ancien', 'Ancien fournisseur', detail: 'x');
+      await monter(tester);
+
+      expect(find.text('ARCHIVÉ PAR'), findsOneWidget);
+      expect(find.text('Marie Gestionnaire'), findsOneWidget);
+      expect(find.text('—'), findsOneWidget, reason: "l'ancien archivage : un seul tiret (détail renseigné), pas de nom");
+      expect(find.text('0'), findsNothing);
     });
 
     testWidgets('une entité archivée sur ce poste porte la mention « Archivé sur ce poste — pas encore synchronisé »', (tester) async {

@@ -183,7 +183,7 @@ class SaisieDevisAction
             $this->refuserSiExerciceClos($devis->quote_date->format('Y-m-d'), 'devis');
 
             $devis->update(['is_active' => false]);
-            AuditLog::record('quote.archived', 'ventes');
+            AuditLog::record('quote.archived', 'ventes', null, $devis);
 
             return self::ARCHIVE_MAINTENANT;
         });

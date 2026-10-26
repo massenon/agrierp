@@ -99,7 +99,7 @@ class DocumentAdministratifService
 
         $document->update(['is_active' => false]);
 
-        AuditLog::record('administrative_document.archived', 'administration');
+        AuditLog::record('administrative_document.archived', 'administration', null, $document);
 
         return true;
     }

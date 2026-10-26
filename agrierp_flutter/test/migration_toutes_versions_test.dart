@@ -261,6 +261,9 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.modulesConfig, d.modulesConfig.syncStatus),
     (d.modulesConfig, d.modulesConfig.updatedAt),
   ],
+  // Ticket ARC-Q2 — « Archivé par » : le nom de qui a archivé, servi par le serveur dans l'instantané de la Corbeille.
+  // ⚠️ 61 (ventes) et 62 (rappels) sont réservés à d'autres branches.
+  63: [(d.corbeilleElements, d.corbeilleElements.archivePar)],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -358,7 +361,8 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 60, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés');
+    expect(d.schemaVersion, 63, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches');
+    expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
     expect(_colonnesAjoutees(d)[59], [(d.expenses, d.expenses.onCredit)]);
@@ -372,6 +376,7 @@ void main() {
     expect(source, contains('if (from < 59) {'));
     expect(source, contains('if (from < 57) {'));
     expect(source, contains('if (from < 58) {'));
+    expect(source, contains('if (from < 63) {'));
     expect(source, isNot(contains('if (from < 55) {')));
   });
 

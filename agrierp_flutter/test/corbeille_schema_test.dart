@@ -24,8 +24,11 @@ void main() {
     final source = File('lib/core/database/app_database.dart').readAsStringSync();
     expect(source, contains('if (from < 58) {'));
     expect({for (final c in db.corbeilleElements.$columns) c.name}, {
-      'id', 'type', 'element_id', 'titre', 'detail', 'module', 'archive_le', 'restaurable', 'motif_restauration', 'supprimable', 'motif_suppression',
+      'id', 'type', 'element_id', 'titre', 'detail', 'module', 'archive_le', 'archive_par', 'restaurable', 'motif_restauration', 'supprimable', 'motif_suppression',
     });
+    // ARC-Q2 : « archive_par » arrive au palier 63 (61 ventes et 62 rappels sont réservés à d'autres branches).
+    expect(db.schemaVersion, greaterThanOrEqualTo(63));
+    expect(source, contains('if (from < 63) {'));
     expect({for (final c in db.corbeilleDemandes.$columns) c.name}, {
       'id', 'device_id', 'sync_status', 'updated_at', 'type', 'element_id', 'action', 'titre', 'confirmation',
     });
@@ -34,7 +37,7 @@ void main() {
   test('⚠️⚠️ ce que le tirage sert tient dans `corbeille_elements`', () {
     final bloc = controleur.readAsStringSync().split("'corbeille' => fn () =>")[1].split('])->values()')[0];
     final servies = {for (final m in RegExp(r"'([a-z_]+)' =>").allMatches(bloc)) m.group(1)!};
-    expect(servies, containsAll(['id', 'type', 'element_id', 'titre', 'detail', 'module', 'archive_le', 'restaurable', 'motif_restauration', 'supprimable', 'motif_suppression']));
+    expect(servies, containsAll(['id', 'type', 'element_id', 'titre', 'detail', 'module', 'archive_le', 'archive_par', 'restaurable', 'motif_restauration', 'supprimable', 'motif_suppression']));
     expect(servies.difference({for (final c in db.corbeilleElements.$columns) c.name}), isEmpty);
   }, skip: saut);
 

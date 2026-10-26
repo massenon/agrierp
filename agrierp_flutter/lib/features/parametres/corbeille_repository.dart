@@ -74,6 +74,7 @@ class LigneCorbeille {
     required this.supprimable,
     required this.motifSuppression,
     required this.locale,
+    this.archivePar,
     this.demande,
     this.refus,
   });
@@ -85,6 +86,10 @@ class LigneCorbeille {
   final String titre;
   final String detail;
   final DateTime? archiveLe;
+
+  /// Ticket ARC-Q2 — qui a archivé, tel que le serveur le sert ; `null` : inconnu (affiché « — »). Une entité archivée
+  /// ICI et pas encore servie n'a pas d'auteur : le poste ne le devine pas.
+  final String? archivePar;
   final bool restaurable;
   final String? motifRestauration;
   final bool supprimable;
@@ -199,6 +204,7 @@ class CorbeilleRepository {
       required String titre,
       required String detail,
       required DateTime? archiveLe,
+      String? archivePar,
       required bool restaurable,
       required String? motifRestauration,
       required bool supprimable,
@@ -216,6 +222,7 @@ class CorbeilleRepository {
         titre: titre,
         detail: detail,
         archiveLe: archiveLe,
+        archivePar: archivePar,
         restaurable: restaurable,
         motifRestauration: motifRestauration,
         supprimable: supprimable,
@@ -234,6 +241,7 @@ class CorbeilleRepository {
           titre: e.titre,
           detail: e.detail,
           archiveLe: e.archiveLe,
+          archivePar: e.archivePar,
           restaurable: e.restaurable,
           motifRestauration: e.motifRestauration,
           supprimable: e.supprimable,

@@ -90,7 +90,7 @@ class SupplierCatalogService
         AuditLog::record('supplier.updated', 'achats');
 
         if ($etaitActif && ! $fournisseur->is_active) {
-            AuditLog::record('supplier.archived', 'achats');
+            AuditLog::record('supplier.archived', 'achats', null, $fournisseur);
         }
 
         return $fournisseur->fresh();
@@ -100,6 +100,6 @@ class SupplierCatalogService
     {
         $fournisseur->update(['is_active' => false]);
 
-        AuditLog::record('supplier.archived', 'achats');
+        AuditLog::record('supplier.archived', 'achats', null, $fournisseur);
     }
 }

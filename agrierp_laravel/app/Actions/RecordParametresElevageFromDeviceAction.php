@@ -125,14 +125,22 @@ class RecordParametresElevageFromDeviceAction
         $actif = (bool) ($v['is_active'] ?? true);
         $valeurs = array_intersect_key($v, array_flip($champs)) + ['is_active' => $actif];
 
+        // Ticket ARC-Q2 — un renvoi (accusé perdu) d'une ligne DÉJÀ archivée n'écrit pas un second audit d'archivage :
+        // l'auteur de la Corbeille reste celui qui a archivé.
+        $dejaArchive = $existant !== null && ! $existant->is_active;
+
         if ($existant === null) {
             $modele->id = $v['id'];
             $modele->fill($valeurs)->save();
+            $cible = $modele;
         } else {
             $existant->update($valeurs);
+            $cible = $existant;
         }
 
-        AuditLog::record($actif ? $actionSave : $actionArchive, 'elevage');
+        if ($actif || ! $dejaArchive) {
+            AuditLog::record($actif ? $actionSave : $actionArchive, 'elevage', null, $cible);
+        }
     }
 
     private function numerotation(array $ligne): string

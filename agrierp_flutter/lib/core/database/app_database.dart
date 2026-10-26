@@ -1460,6 +1460,10 @@ class CorbeilleElements extends Table {
   TextColumn get detail => text().withDefault(const Constant(''))();
   TextColumn get module => text()();
   DateTimeColumn get archiveLe => dateTime().nullable()();
+
+  /// Ticket ARC-Q2 — le NOM de qui a archivé (dernier audit d'archivage de l'élément, lu par le serveur). `null` :
+  /// inconnu (archivage antérieur à l'audit de l'entité) — l'écran affiche « — », jamais « 0 » ni un nom deviné.
+  TextColumn get archivePar => text().nullable()();
   BoolColumn get restaurable => boolean()();
   TextColumn get motifRestauration => text().nullable()();
   BoolColumn get supprimable => boolean()();
@@ -1952,7 +1956,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 60;
+  int get schemaVersion => 63;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2531,6 +2535,13 @@ class AppDatabase extends _$AppDatabase {
       if (from < 60) {
         await _ajouterColonneSiAbsente(m, modulesConfig, modulesConfig.syncStatus);
         await _ajouterColonneSiAbsente(m, modulesConfig, modulesConfig.updatedAt);
+      }
+
+      // v63 — ticket ARC-Q2 : « Archivé par » dans la Corbeille. Une colonne nullable sur l'instantané (remplacé en
+      // entier au prochain tirage). ⚠️ 61 (ventes) et 62 (rappels) sont réservés à d'autres branches : ce palier les
+      // enjambe sans les supposer.
+      if (from < 63) {
+        await _ajouterColonneSiAbsente(m, corbeilleElements, corbeilleElements.archivePar);
       }
     },
   );

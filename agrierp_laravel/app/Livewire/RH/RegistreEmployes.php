@@ -147,8 +147,9 @@ class RegistreEmployes extends Component
     public function archiveEmployee(string $id): void
     {
         $this->authorize('manage-rh');
-        Employee::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('employee.archived', 'rh');
+        $employe = Employee::findOrFail($id);
+        $employe->update(['is_active' => false]);
+        AuditLog::record('employee.archived', 'rh', null, $employe);
         $this->dispatch('toast', message: 'Employé archivé avec succès.', type: 'warning');
     }
 

@@ -154,6 +154,33 @@ void main() {
   });
 
   group('TIRAGE : absorbeur de `corbeille`', () {
+    test('⚠️ ARC-Q2 — « archive_par » est absorbé ; null et clé absente (serveur ancien) donnent « inconnu »', () async {
+      final connu = ligne(uuid('a1'))..['archive_par'] = 'Marie Gestionnaire';
+      final inconnu = ligne(uuid('a2'))
+        ..['element_id'] = 'dddddddd-0000-4000-8000-000000000002'
+        ..['archive_par'] = null;
+      final ancien = ligne(uuid('a3'))..['element_id'] = 'dddddddd-0000-4000-8000-000000000003';
+      serveur.tirage = {'server_time': '2026-10-21T09:00:00Z', 'corbeille': [connu, inconnu, ancien]};
+
+      await moteur.synchroniser();
+
+      final l = {for (final e in await db.select(db.corbeilleElements).get()) e.id: e};
+      expect(l[uuid('a1')]!.archivePar, 'Marie Gestionnaire');
+      expect(l[uuid('a2')]!.archivePar, isNull);
+      expect(l[uuid('a3')]!.archivePar, isNull);
+    });
+
+    test('⚠️ ARC-Q2 — un « archive_par » qui n\'est pas un texte refuse le lot (jamais « 0 » affiché)', () async {
+      await instantane(uuid('i1'));
+      for (final mauvais in <Object>[0, 12, true, ['Marie']]) {
+        serveur.tirage = {'server_time': '2026-10-21T09:00:00Z', 'corbeille': [ligne(uuid('a1'))..['archive_par'] = mauvais]};
+
+        await expectLater(moteur.synchroniser(), throwsA(anything), reason: '$mauvais');
+
+        expect((await db.select(db.corbeilleElements).get()).map((e) => e.id), [uuid('i1')], reason: '$mauvais');
+      }
+    });
+
     test('l\'instantané est absorbé tel quel ; la date est l\'heure murale du serveur', () async {
       serveur.tirage = {'server_time': '2026-10-21T09:00:00Z', 'corbeille': [ligne(uuid('a1')), ligne(uuid('a2'), restaurable: false, motif: 'Parce que.')]};
       // deux lignes d'un même élément seraient refusées : on varie l'élément

@@ -210,8 +210,9 @@ class RegistreStagiaires extends Component
         // Le registre sert à délivrer des attestations : effacer une absence
         // modifie rétroactivement ce que l'école atteste, sans que rien ne le
         // montre. Archivée, elle reste restaurable.
-        InternshipAbsence::findOrFail($id)->update(['is_active' => false]);
-        AuditLog::record('internship_absence.archived', 'rh');
+        $absence = InternshipAbsence::findOrFail($id);
+        $absence->update(['is_active' => false]);
+        AuditLog::record('internship_absence.archived', 'rh', null, $absence);
         $this->dispatch('toast', message: 'Absence archivée — restaurable depuis Paramètres > Restauration.', type: 'warning');
     }
 

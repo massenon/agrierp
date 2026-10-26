@@ -686,8 +686,9 @@ Web (modale « Centre de Coût * », message sous le champ), absorbeur strict, p
 ### ARC3 ✅ Poste : Drift **v58** (`corbeille_elements` instantané, `corbeille_demandes` mixte), absorbeur strict, envoi, relance. Bug trouvé par les tests : la garde « rien à envoyer » ignorait la nouvelle table.
 ### ARC4 ✅ Poste : onglet « Corbeille » de Paramètres Général (même place qu'au web), parité lue par `corbeille_blade_test.dart`.
 ### ARC5 ✅ Docs (PRD, plan, audit § 12, README_SPRINT0, CLAUDE.md).
+### ARC6 ✅ (26/10/2026) « Archivé par » — décision client ARC-Q2 = OUI. Web d'abord : migration `audit_logs.entity_type/entity_id` (nullables, index, rejouable), `AuditLog::record()` accepte l'entité visée (4e paramètre facultatif), tous les chemins d'archivage la renseignent (dont l'envoi du poste : auteur = utilisateur du jeton), colonne « Archivé par » (« — » si inconnu). Poste : `archive_par` dans le tirage `corbeille`, Drift **v63** (61 ventes et 62 rappels réservés), colonne identique. Tests `CorbeilleArchiveParTest` (Laravel) et `corbeille_*_test` (poste).
 
-**Questions au client (non tranchées) :** ARC-Q1 restauration d'une dépense avec re-comptabilisation (recommandé : NON pour l'instant) · ARC-Q2 savoir QUI a archivé (recommandé : OUI, `entity_id` dans `audit_logs`) · ARC-Q3 suppression d'un devis/courrier (NON : trou de numérotation) · ARC-Q4 délai avant suppression définitive (NON) · ARC-Q5 écritures contre-passées en consultation (NON) · ARC-Q6 ligne supprimée restée archivée sur les postes tiers (OUI, acceptable).
+**Questions au client :** ARC-Q2 close (OUI) ; les autres suivent la recommandation (déjà le comportement livré) ; ARC-Q1 restauration d'une dépense avec re-comptabilisation (recommandé : NON pour l'instant) · ARC-Q2 savoir QUI a archivé (✅ OUI, construit : ARC6) · ARC-Q3 suppression d'un devis/courrier (NON : trou de numérotation) · ARC-Q4 délai avant suppression définitive (NON) · ARC-Q5 écritures contre-passées en consultation (NON) · ARC-Q6 ligne supprimée restée archivée sur les postes tiers (OUI, acceptable).
 
 ## Sprint MOD — « Modules Actifs » : activer / désactiver au poste (bug rapporté par le client, 21/10/2026)
 

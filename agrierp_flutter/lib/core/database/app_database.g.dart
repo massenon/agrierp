@@ -31576,6 +31576,17 @@ class $CorbeilleElementsTable extends CorbeilleElements
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _archiveParMeta = const VerificationMeta(
+    'archivePar',
+  );
+  @override
+  late final GeneratedColumn<String> archivePar = GeneratedColumn<String>(
+    'archive_par',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _restaurableMeta = const VerificationMeta(
     'restaurable',
   );
@@ -31636,6 +31647,7 @@ class $CorbeilleElementsTable extends CorbeilleElements
     detail,
     module,
     archiveLe,
+    archivePar,
     restaurable,
     motifRestauration,
     supprimable,
@@ -31700,6 +31712,12 @@ class $CorbeilleElementsTable extends CorbeilleElements
       context.handle(
         _archiveLeMeta,
         archiveLe.isAcceptableOrUnknown(data['archive_le']!, _archiveLeMeta),
+      );
+    }
+    if (data.containsKey('archive_par')) {
+      context.handle(
+        _archiveParMeta,
+        archivePar.isAcceptableOrUnknown(data['archive_par']!, _archiveParMeta),
       );
     }
     if (data.containsKey('restaurable')) {
@@ -31779,6 +31797,10 @@ class $CorbeilleElementsTable extends CorbeilleElements
         DriftSqlType.dateTime,
         data['${effectivePrefix}archive_le'],
       ),
+      archivePar: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}archive_par'],
+      ),
       restaurable: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}restaurable'],
@@ -31815,6 +31837,10 @@ class ElementCorbeille extends DataClass
   final String detail;
   final String module;
   final DateTime? archiveLe;
+
+  /// Ticket ARC-Q2 — le NOM de qui a archivé (dernier audit d'archivage de l'élément, lu par le serveur). `null` :
+  /// inconnu (archivage antérieur à l'audit de l'entité) — l'écran affiche « — », jamais « 0 » ni un nom deviné.
+  final String? archivePar;
   final bool restaurable;
   final String? motifRestauration;
   final bool supprimable;
@@ -31827,6 +31853,7 @@ class ElementCorbeille extends DataClass
     required this.detail,
     required this.module,
     this.archiveLe,
+    this.archivePar,
     required this.restaurable,
     this.motifRestauration,
     required this.supprimable,
@@ -31843,6 +31870,9 @@ class ElementCorbeille extends DataClass
     map['module'] = Variable<String>(module);
     if (!nullToAbsent || archiveLe != null) {
       map['archive_le'] = Variable<DateTime>(archiveLe);
+    }
+    if (!nullToAbsent || archivePar != null) {
+      map['archive_par'] = Variable<String>(archivePar);
     }
     map['restaurable'] = Variable<bool>(restaurable);
     if (!nullToAbsent || motifRestauration != null) {
@@ -31866,6 +31896,9 @@ class ElementCorbeille extends DataClass
       archiveLe: archiveLe == null && nullToAbsent
           ? const Value.absent()
           : Value(archiveLe),
+      archivePar: archivePar == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivePar),
       restaurable: Value(restaurable),
       motifRestauration: motifRestauration == null && nullToAbsent
           ? const Value.absent()
@@ -31890,6 +31923,7 @@ class ElementCorbeille extends DataClass
       detail: serializer.fromJson<String>(json['detail']),
       module: serializer.fromJson<String>(json['module']),
       archiveLe: serializer.fromJson<DateTime?>(json['archiveLe']),
+      archivePar: serializer.fromJson<String?>(json['archivePar']),
       restaurable: serializer.fromJson<bool>(json['restaurable']),
       motifRestauration: serializer.fromJson<String?>(
         json['motifRestauration'],
@@ -31909,6 +31943,7 @@ class ElementCorbeille extends DataClass
       'detail': serializer.toJson<String>(detail),
       'module': serializer.toJson<String>(module),
       'archiveLe': serializer.toJson<DateTime?>(archiveLe),
+      'archivePar': serializer.toJson<String?>(archivePar),
       'restaurable': serializer.toJson<bool>(restaurable),
       'motifRestauration': serializer.toJson<String?>(motifRestauration),
       'supprimable': serializer.toJson<bool>(supprimable),
@@ -31924,6 +31959,7 @@ class ElementCorbeille extends DataClass
     String? detail,
     String? module,
     Value<DateTime?> archiveLe = const Value.absent(),
+    Value<String?> archivePar = const Value.absent(),
     bool? restaurable,
     Value<String?> motifRestauration = const Value.absent(),
     bool? supprimable,
@@ -31936,6 +31972,7 @@ class ElementCorbeille extends DataClass
     detail: detail ?? this.detail,
     module: module ?? this.module,
     archiveLe: archiveLe.present ? archiveLe.value : this.archiveLe,
+    archivePar: archivePar.present ? archivePar.value : this.archivePar,
     restaurable: restaurable ?? this.restaurable,
     motifRestauration: motifRestauration.present
         ? motifRestauration.value
@@ -31954,6 +31991,9 @@ class ElementCorbeille extends DataClass
       detail: data.detail.present ? data.detail.value : this.detail,
       module: data.module.present ? data.module.value : this.module,
       archiveLe: data.archiveLe.present ? data.archiveLe.value : this.archiveLe,
+      archivePar: data.archivePar.present
+          ? data.archivePar.value
+          : this.archivePar,
       restaurable: data.restaurable.present
           ? data.restaurable.value
           : this.restaurable,
@@ -31979,6 +32019,7 @@ class ElementCorbeille extends DataClass
           ..write('detail: $detail, ')
           ..write('module: $module, ')
           ..write('archiveLe: $archiveLe, ')
+          ..write('archivePar: $archivePar, ')
           ..write('restaurable: $restaurable, ')
           ..write('motifRestauration: $motifRestauration, ')
           ..write('supprimable: $supprimable, ')
@@ -31996,6 +32037,7 @@ class ElementCorbeille extends DataClass
     detail,
     module,
     archiveLe,
+    archivePar,
     restaurable,
     motifRestauration,
     supprimable,
@@ -32012,6 +32054,7 @@ class ElementCorbeille extends DataClass
           other.detail == this.detail &&
           other.module == this.module &&
           other.archiveLe == this.archiveLe &&
+          other.archivePar == this.archivePar &&
           other.restaurable == this.restaurable &&
           other.motifRestauration == this.motifRestauration &&
           other.supprimable == this.supprimable &&
@@ -32026,6 +32069,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
   final Value<String> detail;
   final Value<String> module;
   final Value<DateTime?> archiveLe;
+  final Value<String?> archivePar;
   final Value<bool> restaurable;
   final Value<String?> motifRestauration;
   final Value<bool> supprimable;
@@ -32039,6 +32083,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
     this.detail = const Value.absent(),
     this.module = const Value.absent(),
     this.archiveLe = const Value.absent(),
+    this.archivePar = const Value.absent(),
     this.restaurable = const Value.absent(),
     this.motifRestauration = const Value.absent(),
     this.supprimable = const Value.absent(),
@@ -32053,6 +32098,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
     this.detail = const Value.absent(),
     required String module,
     this.archiveLe = const Value.absent(),
+    this.archivePar = const Value.absent(),
     required bool restaurable,
     this.motifRestauration = const Value.absent(),
     required bool supprimable,
@@ -32073,6 +32119,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
     Expression<String>? detail,
     Expression<String>? module,
     Expression<DateTime>? archiveLe,
+    Expression<String>? archivePar,
     Expression<bool>? restaurable,
     Expression<String>? motifRestauration,
     Expression<bool>? supprimable,
@@ -32087,6 +32134,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
       if (detail != null) 'detail': detail,
       if (module != null) 'module': module,
       if (archiveLe != null) 'archive_le': archiveLe,
+      if (archivePar != null) 'archive_par': archivePar,
       if (restaurable != null) 'restaurable': restaurable,
       if (motifRestauration != null) 'motif_restauration': motifRestauration,
       if (supprimable != null) 'supprimable': supprimable,
@@ -32103,6 +32151,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
     Value<String>? detail,
     Value<String>? module,
     Value<DateTime?>? archiveLe,
+    Value<String?>? archivePar,
     Value<bool>? restaurable,
     Value<String?>? motifRestauration,
     Value<bool>? supprimable,
@@ -32117,6 +32166,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
       detail: detail ?? this.detail,
       module: module ?? this.module,
       archiveLe: archiveLe ?? this.archiveLe,
+      archivePar: archivePar ?? this.archivePar,
       restaurable: restaurable ?? this.restaurable,
       motifRestauration: motifRestauration ?? this.motifRestauration,
       supprimable: supprimable ?? this.supprimable,
@@ -32149,6 +32199,9 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
     if (archiveLe.present) {
       map['archive_le'] = Variable<DateTime>(archiveLe.value);
     }
+    if (archivePar.present) {
+      map['archive_par'] = Variable<String>(archivePar.value);
+    }
     if (restaurable.present) {
       map['restaurable'] = Variable<bool>(restaurable.value);
     }
@@ -32177,6 +32230,7 @@ class CorbeilleElementsCompanion extends UpdateCompanion<ElementCorbeille> {
           ..write('detail: $detail, ')
           ..write('module: $module, ')
           ..write('archiveLe: $archiveLe, ')
+          ..write('archivePar: $archivePar, ')
           ..write('restaurable: $restaurable, ')
           ..write('motifRestauration: $motifRestauration, ')
           ..write('supprimable: $supprimable, ')
@@ -54307,6 +54361,7 @@ typedef $$CorbeilleElementsTableCreateCompanionBuilder =
       Value<String> detail,
       required String module,
       Value<DateTime?> archiveLe,
+      Value<String?> archivePar,
       required bool restaurable,
       Value<String?> motifRestauration,
       required bool supprimable,
@@ -54322,6 +54377,7 @@ typedef $$CorbeilleElementsTableUpdateCompanionBuilder =
       Value<String> detail,
       Value<String> module,
       Value<DateTime?> archiveLe,
+      Value<String?> archivePar,
       Value<bool> restaurable,
       Value<String?> motifRestauration,
       Value<bool> supprimable,
@@ -54370,6 +54426,11 @@ class $$CorbeilleElementsTableFilterComposer
 
   ColumnFilters<DateTime> get archiveLe => $composableBuilder(
     column: $table.archiveLe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get archivePar => $composableBuilder(
+    column: $table.archivePar,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -54438,6 +54499,11 @@ class $$CorbeilleElementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get archivePar => $composableBuilder(
+    column: $table.archivePar,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get restaurable => $composableBuilder(
     column: $table.restaurable,
     builder: (column) => ColumnOrderings(column),
@@ -54488,6 +54554,11 @@ class $$CorbeilleElementsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get archiveLe =>
       $composableBuilder(column: $table.archiveLe, builder: (column) => column);
+
+  GeneratedColumn<String> get archivePar => $composableBuilder(
+    column: $table.archivePar,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get restaurable => $composableBuilder(
     column: $table.restaurable,
@@ -54557,6 +54628,7 @@ class $$CorbeilleElementsTableTableManager
                 Value<String> detail = const Value.absent(),
                 Value<String> module = const Value.absent(),
                 Value<DateTime?> archiveLe = const Value.absent(),
+                Value<String?> archivePar = const Value.absent(),
                 Value<bool> restaurable = const Value.absent(),
                 Value<String?> motifRestauration = const Value.absent(),
                 Value<bool> supprimable = const Value.absent(),
@@ -54570,6 +54642,7 @@ class $$CorbeilleElementsTableTableManager
                 detail: detail,
                 module: module,
                 archiveLe: archiveLe,
+                archivePar: archivePar,
                 restaurable: restaurable,
                 motifRestauration: motifRestauration,
                 supprimable: supprimable,
@@ -54585,6 +54658,7 @@ class $$CorbeilleElementsTableTableManager
                 Value<String> detail = const Value.absent(),
                 required String module,
                 Value<DateTime?> archiveLe = const Value.absent(),
+                Value<String?> archivePar = const Value.absent(),
                 required bool restaurable,
                 Value<String?> motifRestauration = const Value.absent(),
                 required bool supprimable,
@@ -54598,6 +54672,7 @@ class $$CorbeilleElementsTableTableManager
                 detail: detail,
                 module: module,
                 archiveLe: archiveLe,
+                archivePar: archivePar,
                 restaurable: restaurable,
                 motifRestauration: motifRestauration,
                 supprimable: supprimable,

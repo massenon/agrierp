@@ -442,7 +442,7 @@ class SaisieDepenseAction
                 TreasuryAccount::where('id', $depense->treasury_account_id)->increment('balance', $depense->amount);
             }
             $depense->update(['is_active' => false]);
-            AuditLog::record('expense.archived', 'achats');
+            AuditLog::record('expense.archived', 'achats', null, $depense);
 
             return $depense->accounting_entry_id && ! $annulation ? self::ARCHIVEE_SANS_ANNULATION : self::ARCHIVEE;
         });

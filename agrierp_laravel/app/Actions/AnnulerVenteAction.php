@@ -41,7 +41,7 @@ class AnnulerVenteAction
 
         $sale->update(['status' => 'annulee']);
 
-        AuditLog::record('sale.cancelled', 'ventes');
+        AuditLog::record('sale.cancelled', 'ventes', null, $sale);
 
         return true;
     }

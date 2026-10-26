@@ -64,6 +64,7 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Détail</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Module</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Archivé le</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Archivé par</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
                     </tr>
                 </thead>
@@ -77,6 +78,7 @@
                             <td data-label="Archivé le" class="px-md py-sm text-xs text-outline">
                                 {{ $element['archive_le']?->format('d/m/Y à H:i') ?? '—' }}
                             </td>
+                            <td data-label="Archivé par" class="px-md py-sm text-xs text-outline">{{ $element['archive_par'] ?? '—' }}</td>
                             <td data-label="Actions" class="px-md py-sm text-right">
                                 <div class="flex flex-col items-end gap-xs">
                                     @if($element['restaurable'])
@@ -108,7 +110,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-md py-lg text-center text-outline text-xs">
+                            <td colspan="7" class="px-md py-lg text-center text-outline text-xs">
                                 @if($vide)
                                     La corbeille est vide — aucun élément archivé.
                                 @else

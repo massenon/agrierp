@@ -376,6 +376,7 @@ class _OngletCorbeilleState extends State<OngletCorbeille> {
     ColonneTableau('Détail', 4),
     ColonneTableau('Module', 3),
     ColonneTableau('Archivé le', 3),
+    ColonneTableau('Archivé par', 3),
     ColonneTableau('Actions', 6, droite: true),
   ];
 
@@ -399,7 +400,7 @@ class _OngletCorbeilleState extends State<OngletCorbeille> {
 
     return TableauAgri(
       colonnes: _colonnes,
-      largeur: 1180,
+      largeur: 1330,
       clePrefixe: 'corbeille',
       videTexte: vide
           ? 'La corbeille est vide — aucun élément archivé.'
@@ -428,6 +429,8 @@ class _OngletCorbeilleState extends State<OngletCorbeille> {
           ),
       ],
     ),
+    // Ticket ARC-Q2 : `{{ $element['archive_par'] ?? '—' }}`.
+    Text(l.archivePar ?? '—', style: styleCellule.copyWith(color: AgriColors.outline)),
     _actions(l),
   ];
 

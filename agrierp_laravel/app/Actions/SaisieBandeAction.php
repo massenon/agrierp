@@ -196,7 +196,7 @@ class SaisieBandeAction
             }
 
             $lot->update(['is_active' => false]);
-            AuditLog::record('livestock_lot.archived', 'elevage');
+            AuditLog::record('livestock_lot.archived', 'elevage', null, $lot);
 
             return self::ARCHIVEE_MAINTENANT;
         });

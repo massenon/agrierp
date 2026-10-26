@@ -265,7 +265,7 @@ class JournalComptable extends Component
             return;
         }
 
-        AuditLog::record('accounting_entry.archived', 'comptabilite');
+        AuditLog::record('accounting_entry.archived', 'comptabilite', null, $entry);
         $this->dispatch('toast', message: 'Écriture archivée avec succès.', type: 'warning');
     }
 
