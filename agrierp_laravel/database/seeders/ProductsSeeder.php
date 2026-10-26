@@ -33,7 +33,7 @@ class ProductsSeeder extends Seeder
         // Les deux noms de catégorie sont ceux du filtre de `gestion-stocks.html`
         // (Aliments, Animaux, Matériel, Médicaments, Produits transformés) —
         // jamais inventés.
-        $categoryLabels = ['Cuniculture', 'Aviculture', 'Porciculture', 'Maraîchage', 'Transformation', 'Équipements', 'Aliments', 'Médicaments'];
+        $categoryLabels = ['Cuniculture', 'Aviculture', 'Porciculture', 'Maraîchage', 'Transformation', 'Équipements', 'Aliments', 'Médicaments', 'Autre'];
         $categoryIds = [];
         foreach ($categoryLabels as $label) {
             $id = (string) Str::uuid();
