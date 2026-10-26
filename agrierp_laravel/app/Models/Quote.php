@@ -39,6 +39,18 @@ class Quote extends Model
         return $this->belongsTo(Customer::class, 'customer_id');
     }
 
+    /** La facture issue de ce devis (une facture EST une vente), `null` tant qu'il n'est pas converti (DEV3). */
+    public function sale()
+    {
+        return $this->belongsTo(Sale::class, 'converted_sale_id');
+    }
+
+    /** `FV-AAAA-XXXXXX` de la facture issue du devis (`Sale::numero_facture`), `null` avant la conversion. */
+    public function getNumeroFactureAttribute(): ?string
+    {
+        return $this->sale?->numero_facture;
+    }
+
     public function getValidUntilAttribute(): \Illuminate\Support\Carbon
     {
         return $this->quote_date->copy()->addDays($this->validity_days);

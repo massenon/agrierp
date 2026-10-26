@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Ventes;
 
+use App\Actions\ConvertirDevisEnFactureAction;
 use App\Actions\SaisieDevisAction;
+use App\Exceptions\ConversionDevisRefuseeException;
 use App\Models\Customer;
 use App\Models\Quote;
+use App\Services\Mecef\FacturationMecefService;
 use Livewire\Attributes\Url;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -28,14 +31,10 @@ use Livewire\Component;
  * Numérotation continue réelle (`Quote::generateQuoteNumber()`, même
  * principe que `LivestockLot::suggestNextCode()`, ticket 3.3).
  *
- * ⚠️ "CONVERTIR EN FACTURE" NON IMPLÉMENTÉ, SIGNALÉ EXPLICITEMENT : un
- * devis est une description libre sans lignes produit structurées,
- * contrairement à `sale_lines` qui exige un `product_id` réel. Convertir
- * un devis en vente nécessiterait soit de forcer une réconciliation
- * artificielle avec le catalogue produits, soit d'attendre le module
- * Facturation (Sprint 7) qui définira le bon mécanisme. Le bouton reste
- * visible pour un devis Accepté (fidélité au prototype) mais affiche un
- * message d'attente plutôt qu'une fausse conversion.
+ * 🔴→✅ TICKET DEV3 — « CONVERTIR EN FACTURE » CONSTRUIT (il n'affichait qu'un toast d'attente). Un devis accepté
+ * devient une facture : une vente à crédit SANS ligne (un devis est une prestation libre, pas un produit du catalogue :
+ * `sale_lines` exige un `product_id`, qu'on ne force pas), à son total TTC, avec sa créance et son écriture de vente,
+ * liée au devis (`converted_sale_id`, statut `facture`). Voir `ConvertirDevisEnFactureAction` et le PRD § 11.
  *
  * 🔴→✅ TROUVÉ PAR COMPARAISON STRUCTURELLE RIGOUREUSE : le filtre
  * "Client" et le bouton "Exporter" de la barre d'outils étaient
@@ -104,7 +103,7 @@ class Devis extends Component
 
     public function getQuotesProperty()
     {
-        return Quote::with('customer')
+        return Quote::with(['customer', 'sale'])
             ->where('is_active', true)
             ->when($this->search, fn ($q) => $q->where(fn ($q2) => $q2->where('quote_number', 'like', '%'.$this->search.'%')
                 ->orWhereHas('customer', fn ($q3) => $q3->where('name', 'like', '%'.$this->search.'%'))))
@@ -224,9 +223,41 @@ class Devis extends Component
         $this->changerStatut($id, 'refuse', 'Devis marqué comme refusé.', 'warning');
     }
 
+    /**
+     * Ticket DEV3 — « Convertir en Facture » (DEV-Q1 close) : un devis ACCEPTÉ devient une facture (une vente à crédit
+     * sans ligne, `ConvertirDevisEnFactureAction`, le point de passage que la demande du poste rejoue aussi). Droits :
+     * `manage-ventes` ET `manage-facturation`. Refus : toast d'erreur avec le motif. Déjà converti : toast d'avertissement
+     * et AUCUNE seconde facture. La facture normalisée suit le circuit de toute vente (`FacturationMecefService`, après la
+     * transaction) ; un échec ne défait rien : « Erreur MeCeF », à retransmettre depuis Facturation & MeCeF.
+     */
     public function convertToInvoice(string $id): void
     {
-        $this->dispatch('toast', message: 'La conversion en facture réelle arrive avec le module Facturation (Sprint 7).', type: 'warning');
+        $this->authorize('manage-ventes');
+        $this->authorize('manage-facturation');
+
+        try {
+            $resultat = app(ConvertirDevisEnFactureAction::class)->execute($id);
+        } catch (ConversionDevisRefuseeException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
+
+        $vente = $resultat['vente'];
+
+        if ($resultat['deja']) {
+            $this->dispatch('toast', message: 'Ce devis est déjà facturé : facture '.$vente->numero_facture.'.', type: 'warning');
+
+            return;
+        }
+
+        $facture = app(FacturationMecefService::class)->facturer($vente);
+
+        $this->dispatch('toast', message: 'Devis converti en facture '.$vente->numero_facture.' avec succès.', type: 'success');
+
+        if (! $facture['transmise']) {
+            $this->dispatch('toast', message: 'Facture '.$vente->numero_facture.' créée — ATTENTION : facture normalisée MeCeF non transmise ('.$facture['message'].'). La facture reste à transmettre : retransmettez-la depuis Facturation & MeCeF.', type: 'warning');
+        }
     }
 
     public function archiveQuote(string $id): void

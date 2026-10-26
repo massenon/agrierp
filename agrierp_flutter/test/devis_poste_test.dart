@@ -699,7 +699,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    Future<void> afficher(WidgetTester tester, {bool peutGerer = true, bool peutExporter = true}) async {
+    Future<void> afficher(WidgetTester tester, {bool peutGerer = true, bool peutExporter = true, bool peutConvertir = true}) async {
       tester.view.physicalSize = const Size(1600, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -711,6 +711,7 @@ void main() {
               depot: depot,
               peutGerer: peutGerer,
               peutExporter: peutExporter,
+              peutConvertir: peutConvertir,
               imprimer: (document, maintenant) async {
                 espion.add((document, maintenant));
                 return null;
@@ -856,17 +857,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Devis marqué comme refusé.'), findsOneWidget);
       expect((await lire('b')).status, 'refuse');
-    });
-
-    cas('⚠️ convertir en facture : le message d attente du web, le statut ne change pas', (tester) async {
-      await devisServeur('a', statut: 'accepte');
-      await afficher(tester);
-
-      await tester.tap(find.byKey(Key('devis-convertir-${_uuid('a')}')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('La conversion en facture réelle arrive avec le module Facturation (Sprint 7).'), findsOneWidget);
-      expect((await lire('a')).status, 'accepte');
     });
 
     cas('⚠️ archiver : confirmation « Confirmer l archivage », toast d avertissement, ligne retirée de la liste', (tester) async {
