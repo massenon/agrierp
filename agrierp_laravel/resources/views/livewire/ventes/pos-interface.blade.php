@@ -50,28 +50,32 @@
             <h3 class="font-bold text-brand-forest text-sm">Panier de Vente</h3>
             <span class="w-6 h-6 rounded-full bg-brand-emerald text-white text-xs font-bold flex items-center justify-center">{{ count($cart) }}</span>
         </div>
-        <div class="p-md space-y-sm border-b border-outline-variant flex-shrink-0">
-            <label class="block text-[10px] text-brand-forest font-bold uppercase">Client</label>
-            <div class="flex items-center gap-xs">
-                <select wire:model="customerId" class="flex-1 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
-                    <option value="">Client Anonyme</option>
-                    @foreach($this->customers as $customer)
-                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                    @endforeach
-                </select>
-                <button type="button" wire:click="openAddClientModal" class="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-emerald text-white flex-shrink-0"><span class="material-symbols-outlined text-[18px]">person_add</span></button>
-            </div>
-            {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
-            @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
-            {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
-                 décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
-            <div>
-                <label for="date-vente" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la vente</label>
-                <input id="date-vente" dusk="date-vente" type="date" wire:model.live="dateVente" max="{{ $this->dateMax }}" @if($this->dateMin) min="{{ $this->dateMin }}" @endif class="w-full h-10 px-md border rounded-lg text-xs bg-white {{ $errors->has('dateVente') ? 'is-invalid' : 'border-outline-variant' }}">
-                @error('dateVente') <p class="invalid-feedback" dusk="date-vente-erreur">{{ $message }}</p> @enderror
-                @if(! $errors->has('dateVente') && $dateVente !== '' && $dateVente < now()->format('Y-m-d'))
-                    <p class="text-[10px] text-outline mt-xs">Vente antérieure : écriture, stock, créance et fiche seront datés du {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
-                @endif
+        <div class="p-md border-b border-outline-variant flex-shrink-0">
+            <div class="grid grid-cols-2 gap-sm items-start">
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Client</label>
+                    <div class="flex items-center gap-xs">
+                        <select wire:model="customerId" class="flex-1 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                            <option value="">Client Anonyme</option>
+                            @foreach($this->customers as $customer)
+                                <option value="{{ $customer->id }}">{{ $customer->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" wire:click="openAddClientModal" class="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-emerald text-white flex-shrink-0"><span class="material-symbols-outlined text-[18px]">person_add</span></button>
+                    </div>
+                    {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
+                    @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
+                         décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
+                    <label for="date-vente" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la vente</label>
+                    <input id="date-vente" dusk="date-vente" type="date" wire:model.live="dateVente" max="{{ $this->dateMax }}" @if($this->dateMin) min="{{ $this->dateMin }}" @endif class="w-full h-10 px-md border rounded-lg text-xs bg-white {{ $errors->has('dateVente') ? 'is-invalid' : 'border-outline-variant' }}">
+                    @error('dateVente') <p class="invalid-feedback" dusk="date-vente-erreur">{{ $message }}</p> @enderror
+                    @if(! $errors->has('dateVente') && $dateVente !== '' && $dateVente < now()->format('Y-m-d'))
+                        <p class="text-[10px] text-outline mt-xs">Vente antérieure : écriture, stock, créance et fiche seront datés du {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
+                    @endif
+                </div>
             </div>
         </div>
 

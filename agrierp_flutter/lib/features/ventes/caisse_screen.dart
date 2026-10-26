@@ -552,21 +552,28 @@ class _CaisseScreenState extends State<CaisseScreen> {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(AgriSpacing.md),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'CLIENT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CLIENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AgriColors.brandForest,
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                      _champClient(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: AgriSpacing.xs),
-                _champClient(),
-                const SizedBox(height: AgriSpacing.sm),
-                _champDateVente(),
+                const SizedBox(width: AgriSpacing.sm),
+                Expanded(child: _champDateVente()),
               ],
             ),
           ),
