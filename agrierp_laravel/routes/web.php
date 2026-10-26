@@ -91,6 +91,18 @@ Route::post('/logout', \App\Http\Controllers\Auth\LogoutController::class)
     ->name('logout')
     ->middleware('auth');
 
+// Sprint VW — verrou de session web (PRD docs/prd/verrou-web.md). Routes `auth` seul, comme /mon-profil : le verrou
+// protège la session de tout compte connecté. `SessionVerrouillee` (groupe web) les laisse passer verrouillées.
+Route::post('/verrouiller', [\App\Http\Controllers\Auth\VerrouSessionController::class, 'verrouiller'])
+    ->name('session.verrouiller')
+    ->middleware('auth');
+Route::post('/deverrouiller', [\App\Http\Controllers\Auth\VerrouSessionController::class, 'deverrouiller'])
+    ->name('session.deverrouiller')
+    ->middleware('auth');
+Route::get('/verrouillage', \App\Livewire\Auth\EcranVerrouillage::class)
+    ->name('session.verrou')
+    ->middleware('auth');
+
 // Ticket 1.3 (Sprint 1) — dashboard.html → Livewire\Dashboard\Index
 Route::get('/dashboard', \App\Livewire\Dashboard\Index::class)
     ->name('dashboard.index')

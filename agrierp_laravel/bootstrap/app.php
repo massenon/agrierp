@@ -14,7 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Sprint VW : le verrou de session s'applique à TOUTE requête web (pages, `/livewire/update`, envois de
+        // fichiers). Dans le groupe `web` et nulle part ailleurs : l'API du poste (jetons Sanctum) n'a pas de session.
+        $middleware->web(append: [
+            \App\Http\Middleware\SessionVerrouillee::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Ticket U5 (D-U5) : le `message` des réponses JSON d'erreur (API du poste) en français

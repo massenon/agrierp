@@ -72,6 +72,14 @@ use Livewire\Component;
 class Login extends Component
 {
     /**
+     * Sprint VW — SEUILS DU LIMITEUR DE CONNEXION, nommés pour être réutilisés : le déverrouillage de session
+     * (`VerrouSessionService`) applique les mêmes (5 essais, blocage de 15 minutes), jamais un second jeu de chiffres.
+     */
+    public const MAX_TENTATIVES = 5;
+
+    public const DUREE_BLOCAGE = 900;
+
+    /**
      * Ticket 14.50 — NOM D'UTILISATEUR **OU** E-MAIL, comme l'annonce le
      * libellé du champ depuis la maquette. La propriete ne s'appelle plus
      * `email` : elle ne contient plus forcement une adresse, et un nom qui
@@ -118,7 +126,7 @@ class Login extends Component
         $throttleKey = $this->throttleKey();
 
         if (! Auth::attempt([$this->champIdentifiant() => $this->identifiant, 'password' => $this->password, 'is_active' => true], $this->remember)) {
-            RateLimiter::hit($throttleKey, 900);
+            RateLimiter::hit($throttleKey, self::DUREE_BLOCAGE);
 
             // 🔴→✅ TICKET 14.42 — L'ÉCHEC EST ENFIN TRACÉ.
             //
@@ -150,6 +158,9 @@ class Login extends Component
         }
 
         RateLimiter::clear($throttleKey);
+
+        // Sprint VW : une session neuve ne naît jamais verrouillée (drapeau périmé d'une session précédente).
+        session()->forget([\App\Services\VerrouSessionService::CLE_ETAT, \App\Services\VerrouSessionService::CLE_ECHECS]);
 
         // `session()` et non `request()->session()` : forme idiomatique, déjà
         // celle des deux appels suivants de cette même méthode, et qui ne
@@ -212,7 +223,7 @@ class Login extends Component
     {
         $throttleKey = $this->throttleKey();
 
-        $this->lockedSecondsRemaining = RateLimiter::tooManyAttempts($throttleKey, 5)
+        $this->lockedSecondsRemaining = RateLimiter::tooManyAttempts($throttleKey, self::MAX_TENTATIVES)
             ? RateLimiter::availableIn($throttleKey)
             : null;
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\VerrouSessionService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -53,7 +54,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'verrouillage_minutes' => 'integer',
         ];
+    }
+
+    /**
+     * Sprint VW — durée d'inactivité (minutes) avant le verrouillage automatique de la session web ; 0 = « Jamais ».
+     * Une valeur inconnue en base retombe sur le défaut (5 min) : mieux vaut verrouiller que ne jamais verrouiller
+     * par accident. Hors `$fillable` : seul Mon Profil l'écrit, après validation.
+     */
+    public function delaiVerrouillage(): int
+    {
+        $minutes = $this->verrouillage_minutes;
+
+        return VerrouSessionService::dureeValide($minutes) ? $minutes : VerrouSessionService::DUREE_PAR_DEFAUT;
     }
 
     /**

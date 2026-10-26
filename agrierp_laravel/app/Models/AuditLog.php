@@ -86,6 +86,11 @@ class AuditLog extends Model
         'login.failed' => 'Tentative de connexion échouée',
         'login.locked' => 'Compte verrouillé (trop de tentatives)',
         'logout' => 'Déconnexion',
+        // Sprint VW — verrou de session web. Le mot de passe saisi n'est jamais journalisé.
+        'session.verrouillee' => 'Session verrouillée',
+        'session.deverrouillee' => 'Session déverrouillée',
+        'session.deverrouillage_echec' => 'Échec de déverrouillage de la session',
+        'session.deconnexion_apres_echecs' => "Déconnexion après trop d'échecs de déverrouillage",
         'password.updated' => 'Mot de passe modifié',
         'user.created' => 'Utilisateur créé',
         'user.updated' => 'Utilisateur modifié',
