@@ -694,16 +694,18 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         ],
       ),
       const SizedBox(height: AgriSpacing.md),
+      // ⚠️ Pas d'`IntrinsicHeight` : le tableau des articles contient un
+      // `LayoutBuilder` (largeur minimale du défilement horizontal), qui refuse
+      // les dimensions intrinsèques. Les deux cartes sont alignées en haut, donc
+      // aucune hauteur commune n'était de toute façon imposée.
       if (large)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 60, child: _panneauArticles(d)),
-              const SizedBox(width: AgriSpacing.md),
-              Expanded(flex: 40, child: _panneauReglement(d)),
-            ],
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 60, child: _panneauArticles(d)),
+            const SizedBox(width: AgriSpacing.md),
+            Expanded(flex: 40, child: _panneauReglement(d)),
+          ],
         )
       else ...[
         _panneauArticles(d),
