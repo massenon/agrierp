@@ -148,26 +148,39 @@ void main() {
         ),
       );
 
+  /// Un modèle tel que le serveur le sert au tirage : texte, règle de signature et signataires du modèle officiel
+  /// (`ReglageSignature.defaut`). ⚠️ Sans eux, aucun signataire ne s'imprimerait : un modèle sans nom ne signe rien.
+  AttestationTemplatesCompanion modeleServeur(String cle, String type, String texte) {
+    final r = ReglageSignature.defaut;
+    SignataireModele sig(int n) => r.signataires[n]!;
+
+    return AttestationTemplatesCompanion.insert(
+      id: uuid(cle),
+      type: type,
+      bodyText: texte,
+      seuilSignatureMois: Value(r.seuilMois),
+      sig1Titre: Value(sig(1).titre),
+      sig1Nom: Value(sig(1).nom),
+      sig1Fonction: Value(sig(1).fonction),
+      sig2Titre: Value(sig(2).titre),
+      sig2Nom: Value(sig(2).nom),
+      sig2Fonction: Value(sig(2).fonction),
+      sig3Titre: Value(sig(3).titre),
+      sig3Nom: Value(sig(3).nom),
+      sig3Fonction: Value(sig(3).fonction),
+      sig1Court: Value(sig(1).court),
+      sig2Court: Value(sig(2).court),
+      sig3Court: Value(sig(3).court),
+      sig1Long: Value(sig(1).long),
+      sig2Long: Value(sig(2).long),
+      sig3Long: Value(sig(3).long),
+    );
+  }
+
   Future<void> modeles({bool stagiaires = true}) async {
-    await db
-        .into(db.attestationTemplates)
-        .insert(
-          AttestationTemplatesCompanion.insert(
-            id: uuid('m-employe'),
-            type: 'employe',
-            bodyText: _modeleEmploye,
-          ),
-        );
+    await db.into(db.attestationTemplates).insert(modeleServeur('m-employe', 'employe', _modeleEmploye));
     if (stagiaires) {
-      await db
-          .into(db.attestationTemplates)
-          .insert(
-            AttestationTemplatesCompanion.insert(
-              id: uuid('m-stagiaire'),
-              type: 'stagiaire',
-              bodyText: _modeleStagiaire,
-            ),
-          );
+      await db.into(db.attestationTemplates).insert(modeleServeur('m-stagiaire', 'stagiaire', _modeleStagiaire));
     }
   }
 
@@ -374,6 +387,8 @@ void main() {
           // ⚠️ `Y-m-d` : un ISO complet décalerait d'un jour selon le fuseau.
           'start_date': '2024-03-01',
           'note': 'Sérieux',
+          // ATT-1 : la civilité part toujours (accord grammatical du texte).
+          'civilite': 'M.',
         });
         expect(String.fromCharCodes(pdf.octets), startsWith('%PDF'));
         expect(pdf.fichier, 'attestation-agossou-jean.pdf');
@@ -399,6 +414,7 @@ void main() {
           'person_id': 'x',
           'start_date': '2026-02-01',
           'end_date': '2026-05-31',
+          'civilite': 'M.',
         });
       },
     );
@@ -762,9 +778,10 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('att-apercu-corps'))).data,
         contains('sous contrat CDD'),
       );
-      expect(find.byKey(const Key('att-apercu-note')), findsOneWidget);
+      // ATT-2 : la saisie de l'émetteur EST l'appréciation imprimée (elle remplace la phrase standard du modèle).
+      expect(find.byKey(const Key('att-apercu-appreciation')), findsOneWidget);
       expect(
-        tester.widget<Text>(find.byKey(const Key('att-apercu-note'))).data,
+        tester.widget<Text>(find.byKey(const Key('att-apercu-appreciation'))).data,
         'Très assidu',
       );
     });
@@ -785,7 +802,7 @@ void main() {
         expect(contenu(tester, 'att-fin'), '31/05/2026');
         expect(
           tester.widget<Text>(find.byKey(const Key('att-apercu-titre'))).data,
-          'ATTESTATION DE STAGE',
+          'ATTESTATION DE FORMATION',
         );
         expect(
           tester.widget<Text>(find.byKey(const Key('att-apercu-corps'))).data,
@@ -801,9 +818,15 @@ void main() {
       await afficher(tester);
 
       expect(find.text('FERME ÉCOLE OLOUWACHEGOUN'), findsOneWidget);
-      expect(find.text('RCCM : RB/PNO/22 A 33870'), findsOneWidget);
-      expect(find.text('M. Olouchègoun'), findsOneWidget);
-      expect(find.text('Fait à Ikpinlè, le 28/07/2026.'), findsOneWidget);
+      expect(find.textContaining('RCCM : RB/PNO/22 A 33870'), findsOneWidget);
+      // ATT-2 : le LOGO RÉEL de la ferme (en-tête et filigrane), plus une icône générique.
+      expect(find.byKey(const Key('att-apercu-logo')), findsOneWidget);
+      expect(find.byKey(const Key('att-apercu-filigrane')), findsOneWidget);
+      expect(find.text('ATTAN - ÉWÉ, le 28 juillet 2026'), findsOneWidget);
+      // Sans durée connue : le promoteur seul signe, avec la fonction du modèle.
+      expect(find.byKey(const Key('att-apercu-sig-1')), findsOneWidget);
+      expect(find.text('Hassimiyou O. OLOUKOUNLE'), findsOneWidget);
+      expect(find.text('Directeur de la Ferme ÉCOLE OLOUWACHEGOUN'), findsOneWidget);
       // L'IFU de démonstration du prototype n'est PAS repris.
       expect(find.textContaining('3202601234567'), findsNothing);
     });
@@ -942,9 +965,7 @@ void main() {
       expect(contenu(tester, 'att-texte-employe'), _modeleEmploye);
       expect(contenu(tester, 'att-texte-stagiaire'), _modeleStagiaire);
       expect(
-        find.text(
-          'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]',
-        ),
+        find.textContaining('Balises : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]'),
         findsOneWidget,
       );
       expect(find.text('ENREGISTRER CE MODÈLE'), findsNothing);

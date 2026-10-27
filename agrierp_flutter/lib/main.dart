@@ -894,7 +894,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
       context: context,
       position: zone,
       items: [
-        const PopupMenuItem<String>(value: 'actualiser', child: Row(children: [Icon(Icons.refresh, size: 18), SizedBox(width: 8), Text('Actualiser')])),
+        const PopupMenuItem<String>(value: 'actualiser', child: Row(children: [Icon(SymbolesAgri.sync, size: 18), SizedBox(width: 8), Text('Actualiser')])),
       ],
     );
     if (choix == 'actualiser' && mounted) {

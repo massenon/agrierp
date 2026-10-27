@@ -264,6 +264,39 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   // Ticket ARC-Q2 — « Archivé par » : le nom de qui a archivé, servi par le serveur dans l'instantané de la Corbeille.
   // ⚠️ 61 (ventes) et 62 (rappels) sont réservés à d'autres branches.
   63: [(d.corbeilleElements, d.corbeilleElements.archivePar)],
+  // v64 — ticket #48 : justificatifs copiés sur le poste (chemin local, jamais synchronisé).
+  64: [
+    (d.expenses, d.expenses.receiptLocalPath),
+    (d.purchases, d.purchases.receiptLocalPath),
+  ],
+  // v65 — ticket ATT-1 : naissance et civilité du stagiaire, numéro de séquence et trois signataires du modèle.
+  65: [
+    (d.internships, d.internships.birthDate),
+    (d.internships, d.internships.birthPlace),
+    (d.internships, d.internships.civilite),
+    (d.attestationTemplates, d.attestationTemplates.numeroSequence),
+    (d.attestationTemplates, d.attestationTemplates.sig1Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig1Nom),
+    (d.attestationTemplates, d.attestationTemplates.sig2Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig2Nom),
+    (d.attestationTemplates, d.attestationTemplates.sig3Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig3Nom),
+  ],
+  // v66 — ticket ATT-2 : règle de signature selon la durée, fonctions des signataires, appréciation.
+  66: [
+    (d.attestationTemplates, d.attestationTemplates.seuilSignatureMois),
+    (d.attestationTemplates, d.attestationTemplates.sig1Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig2Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig3Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig1Court),
+    (d.attestationTemplates, d.attestationTemplates.sig2Court),
+    (d.attestationTemplates, d.attestationTemplates.sig3Court),
+    (d.attestationTemplates, d.attestationTemplates.sig1Long),
+    (d.attestationTemplates, d.attestationTemplates.sig2Long),
+    (d.attestationTemplates, d.attestationTemplates.sig3Long),
+    (d.attestationTemplates, d.attestationTemplates.appreciationText),
+    (d.attestationTemplates, d.attestationTemplates.appreciationImprimee),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -361,7 +394,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 63, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches');
+    expect(d.schemaVersion, 66, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

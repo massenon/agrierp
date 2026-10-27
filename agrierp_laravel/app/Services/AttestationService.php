@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Internship;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 /**
@@ -28,13 +29,34 @@ class AttestationService
 {
     public const TYPES = ['employe', 'stagiaire'];
 
-    /** Domaines de formation cochables dans l'attestation officielle. */
+    /** Domaines de formation cochables dans l'attestation officielle (libellés de l'écran). */
     public const DOMAINES = [
         'maraichage' => 'Maraîchage',
         'elevage'    => 'Élevage',
         'rations'    => 'Rations alimentaires',
         'gestion'    => "Gestion d'entreprise",
     ];
+
+    /**
+     * Les mêmes domaines tels que le modèle officiel les imprime : une ligne à puce (➢) par domaine coché,
+     * dans cet ordre (modèle fourni par le client, attestation de formation du 24/10/2026).
+     */
+    public const DOMAINES_PUCES = [
+        'maraichage' => "Conduite de cultures maraîchères et vivrières (Mais, Manioc, Soja, Tomate, Piment, Légumes divers) ;",
+        'elevage'    => "Conduite d'élevages et applications de soins vétérinaires (Cuniculture, Aviculture, Héliciculture, Porciculture, Petits Ruminant) ;",
+        'rations'    => "Notion de formulation des rations alimentaires des animaux d'élevage ;",
+        'gestion'    => 'Notion de gestion des entreprises agricoles.',
+    ];
+
+    public const PALIER_COURT = 'court';
+
+    public const PALIER_LONG = 'long';
+
+    /** Ordre d'impression des signataires, de gauche à droite : Examinateur (2), Président du Jury (3), Directeur Général (1). */
+    public const ORDRE_SIGNATURES = [2, 3, 1];
+
+    private const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+        'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
     public function titre(string $type): string
     {
@@ -47,12 +69,17 @@ class AttestationService
     }
 
     /**
-     * Texte du certificat : le modèle, balises remplacées.
+     * Texte du certificat : le modèle, balises remplacées, SANS les marques de gras (`**`).
+     *
+     * C'est le texte de l'aperçu (web et poste) et celui que lisent les tests ; le PDF, lui, imprime
+     * `corpsMarque()` (gras et vert du modèle officiel).
      *
      * Balises disponibles :
      * - [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]  (employe)
      * - [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN]  (stagiaire)
      * - [DUREE]  → « six (06) mois », « un (01) an et trois (03) mois »…
+     * - [DE_DUREE]  → « d'un (01) an », « de six (06) mois » (avec son espace d'attache ; vide sans durée)
+     * - [DATE_DEBUT_LONGUE], [DATE_FIN_LONGUE], [DATE_NAISSANCE_LONGUE]  → « 15 octobre 2025 »
      * - [CIVILITE]  → « M. » ou « Mme »
      * - [TITRE_NOM]  → « Monsieur NOM » ou « Madame NOM »
      * - [ACCORD_E]  → « » (masculin) ou « e » (féminin)
@@ -69,10 +96,72 @@ class AttestationService
         ?string $fin,
         string $civilite = 'M.',
     ): string {
-        $modele = AttestationTemplate::forType($type)->body_text;
+        return str_replace('**', '', $this->corpsMarque($type, $personne, $contrat, $debut, $fin, $civilite));
+    }
+
+    /** Le texte du modèle, balises remplacées, marques `**gras**` conservées (entrée du PDF). */
+    public function corpsMarque(
+        string $type,
+        Employee|Internship $personne,
+        string $contrat,
+        ?string $debut,
+        ?string $fin,
+        string $civilite = 'M.',
+    ): string {
+        return $this->remplacer(
+            AttestationTemplate::forType($type)->body_text,
+            $type, $personne, $contrat, $debut, $fin, $civilite,
+        );
+    }
+
+    /**
+     * Phrase d'appréciation du document : la saisie de l'émetteur, sinon celle du modèle
+     * (`appreciation_text`, phrase standard du modèle fourni pour une formation). `null` = rien à imprimer.
+     * Les marques `**gras**` sont CONSERVÉES (le nom y est en gras, comme au modèle) : `enHtml()` pour le PDF,
+     * `sansMarques()` pour un aperçu.
+     * ⚠️ Un modèle dont `appreciation_imprimee` est faux n'imprime que ce que l'émetteur saisit.
+     */
+    public function appreciation(
+        string $type,
+        Employee|Internship $personne,
+        ?string $saisie,
+        ?string $debut,
+        ?string $fin,
+        string $civilite = 'M.',
+    ): ?string {
+        if ($saisie !== null && trim($saisie) !== '') {
+            return trim($saisie);
+        }
+
+        $tpl = AttestationTemplate::forType($type);
+
+        if (! $tpl->appreciation_imprimee) {
+            return null;
+        }
+
+        $texte = $tpl->appreciation_text ?? ($type === 'stagiaire' ? AttestationTemplate::APPRECIATION_STAGIAIRE : '');
+
+        if (trim($texte) === '') {
+            return null;
+        }
+
+        return $this->remplacer($texte, $type, $personne, '', $debut, $fin, $civilite);
+    }
+
+    private function remplacer(
+        string $modele,
+        string $type,
+        Employee|Internship $personne,
+        string $contrat,
+        ?string $debut,
+        ?string $fin,
+        string $civilite,
+    ): string {
         $nom = $personne->last_name.' '.$personne->first_name;
         $d = $debut ? Carbon::parse($debut)->format('d/m/Y') : '';
         $f = $fin ? Carbon::parse($fin)->format('d/m/Y') : 'ce jour';
+        $dLongue = $debut ? static::dateLongue(Carbon::parse($debut)) : '';
+        $fLongue = $fin ? static::dateLongue(Carbon::parse($fin)) : 'ce jour';
         $titreNom = ($civilite === 'Mme' ? 'Madame' : 'Monsieur').' '.$nom;
         $accordE = $civilite === 'Mme' ? 'e' : '';
 
@@ -80,10 +169,14 @@ class AttestationService
             '[NOM]'        => $nom,
             '[CIVILITE]'   => $civilite,
             '[TITRE_NOM]'  => $titreNom,
+            '[CIVILITE_LONGUE]' => $civilite === 'Mme' ? 'Madame' : 'Monsieur',
             '[ACCORD_E]'   => $accordE,
             '[DATE_DEBUT]' => $d,
             '[DATE_FIN]'   => $f,
+            '[DATE_DEBUT_LONGUE]' => $dLongue,
+            '[DATE_FIN_LONGUE]'   => $fLongue,
             '[DUREE]'      => static::formatDuree($debut, $fin),
+            '[DE_DUREE]'   => static::deDuree($debut, $fin),
         ];
 
         if ($type === 'employe') {
@@ -95,10 +188,14 @@ class AttestationService
             $naissance = $personne instanceof Internship
                 ? ($personne->birth_date?->format('d/m/Y') ?? '')
                 : '';
+            $naissanceLongue = $personne instanceof Internship && $personne->birth_date
+                ? static::dateLongue($personne->birth_date)
+                : '';
             $remplacements += [
                 '[SPECIALITE]'     => $personne->school ?? '',
                 '[ETABLISSEMENT]'  => $personne->school ?? '',
                 '[DATE_NAISSANCE]' => $naissance,
+                '[DATE_NAISSANCE_LONGUE]' => $naissanceLongue,
                 '[LIEU_NAISSANCE]' => ($personne instanceof Internship ? $personne->birth_place : '') ?? '',
             ];
         }
@@ -107,11 +204,97 @@ class AttestationService
     }
 
     /**
+     * Texte marqué → HTML du PDF : échappé, `**…**` en gras, et en gras VERT quand il porte le nom de la
+     * ferme (comme le modèle officiel : « FERME ECOLE OLOUWACHEGOUN »).
+     */
+    public static function enHtml(string $texte): string
+    {
+        return preg_replace_callback('/\*\*(.+?)\*\*/su', function (array $m): string {
+            $vert = stripos($m[1], 'OLOUWACHEGOUN') !== false;
+
+            return '<strong'.($vert ? ' class="vert"' : '').'>'.$m[1].'</strong>';
+        }, e($texte));
+    }
+
+    /** Texte marqué → texte brut (aperçu) : retire les `**`. */
+    public static function sansMarques(string $texte): string
+    {
+        return str_replace('**', '', $texte);
+    }
+
+    /** « 15 octobre 2025 ». */
+    public static function dateLongue(Carbon $date): string
+    {
+        return $date->day.' '.self::MOIS[$date->month - 1].' '.$date->year;
+    }
+
+    /**
+     * Durée de la période : « court » (jusqu'à `seuil_signature_mois` mois INCLUS) ou « long » (au-delà).
+     *
+     * ⚠️ Compté en mois CALENDAIRES depuis la date de début : du 15/10/2025 au 15/10/2026 = 12 mois exactement
+     * = palier court ; le 16/10/2026 = palier long. Sans date de fin, la durée court jusqu'à aujourd'hui ;
+     * sans date de début, rien n'est mesurable : palier court (le promoteur seul).
+     */
+    public static function palier(?string $debut, ?string $fin, int $seuilMois): string
+    {
+        if (! $debut) {
+            return self::PALIER_COURT;
+        }
+
+        $d = Carbon::parse($debut)->startOfDay();
+        $f = ($fin ? Carbon::parse($fin) : now())->startOfDay();
+
+        return $f->greaterThan($d->copy()->addMonthsNoOverflow($seuilMois))
+            ? self::PALIER_LONG
+            : self::PALIER_COURT;
+    }
+
+    /**
+     * Les signataires à imprimer, de gauche à droite (Examinateur, Président du Jury, Directeur Général).
+     *
+     * ⚠️ QUI SIGNE EST UNE RÈGLE DU MODÈLE, PAS UNE CONSTANTE (ATT-2) : chaque signataire a un drapeau
+     * « signe les attestations courtes » et « signe les attestations longues », et le seuil des deux paliers est
+     * `seuil_signature_mois` (défaut 12 : d'un mois à un an, le promoteur seul ; au-delà, trois signataires).
+     * Les intitulés, noms et fonctions sont ceux du modèle, remplacés par `$surcharges` (« sig1 » … « sig3 »)
+     * quand l'émetteur les a modifiés pour CETTE attestation — jamais pour désigner un signataire que la
+     * règle n'appelle pas.
+     *
+     * @param  array<string, array{titre?: ?string, nom?: ?string, fonction?: ?string}>  $surcharges
+     * @return list<array{position: int, titre: string, nom: string, fonction: string}>
+     */
+    public function signataires(string $type, ?string $debut, ?string $fin, array $surcharges = []): array
+    {
+        $modele = AttestationTemplate::forType($type);
+        $palier = static::palier($debut, $fin, (int) $modele->seuil_signature_mois);
+        $liste = [];
+
+        foreach (self::ORDRE_SIGNATURES as $position) {
+            if (! $modele->{'sig'.$position.'_'.$palier}) {
+                continue;
+            }
+
+            $modif = $surcharges['sig'.$position] ?? [];
+            $titre = trim((string) ($modif['titre'] ?? $modele->{'sig'.$position.'_titre'}));
+            $nom = trim((string) ($modif['nom'] ?? $modele->{'sig'.$position.'_nom'}));
+            $fonction = trim((string) ($modif['fonction'] ?? $modele->{'sig'.$position.'_fonction'}));
+
+            if ($titre === '' && $nom === '' && $fonction === '') {
+                continue;
+            }
+
+            $liste[] = ['position' => $position, 'titre' => $titre, 'nom' => $nom, 'fonction' => $fonction];
+        }
+
+        return $liste;
+    }
+
+    /**
      * Génère le PDF ET journalise la génération.
      *
-     * Les signataires sont éditables par attestation (valeurs par défaut issues
-     * du modèle). Les domaines et la civilité sont spécifiques à chaque émission.
+     * Les signataires sont ceux que la durée appelle (`signataires()`), éditables par attestation (`$signataires`
+     * = surcharges « sig1 » … « sig3 »). Les domaines et la civilité sont spécifiques à chaque émission.
      *
+     * @param  array<string, array{titre?: ?string, nom?: ?string, fonction?: ?string}>  $signataires
      * @return array{octets: string, fichier: string}
      */
     public function generer(
@@ -123,39 +306,38 @@ class AttestationService
         ?string $note,
         array $domaines = [],
         string $civilite = 'M.',
-        ?string $sig1Nom = null,
-        ?string $sig1Titre = null,
-        ?string $sig2Nom = null,
-        ?string $sig2Titre = null,
-        ?string $sig3Nom = null,
-        ?string $sig3Titre = null,
+        array $signataires = [],
     ): array {
         $nom = $personne->last_name.' '.$personne->first_name;
         $numero = $this->prochainNumero();
 
         AuditLog::record('attestation.generated.'.$type, 'rh');
 
-        $tpl = AttestationTemplate::forType($type);
-
-        $moisFr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-                   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-        $now = now();
-        $dateLieu = $now->day.' '.$moisFr[$now->month - 1].' '.$now->year;
+        // DomPDF range ici les polices converties (ufm) ; le dossier doit exister et être inscriptible.
+        File::ensureDirectoryExists(storage_path('fonts'));
 
         $pdf = Pdf::loadView('exports.attestation', [
-            'title'     => $this->titre($type),
-            'body'      => $this->corps($type, $personne, $contrat, $debut, $fin, $civilite),
-            'note'      => $note,
-            'numero'    => $numero,
-            'dateLieu'  => $dateLieu,
-            'domaines'  => $domaines,
-            'sig1Titre' => $sig1Titre ?? $tpl->sig1_titre ?? 'Le Directeur Général',
-            'sig1Nom'   => $sig1Nom   ?? $tpl->sig1_nom   ?? 'M. Olouchègoun',
-            'sig2Titre' => $sig2Titre ?? $tpl->sig2_titre ?? "L'Examinateur",
-            'sig2Nom'   => $sig2Nom   ?? $tpl->sig2_nom   ?? '',
-            'sig3Titre' => $sig3Titre ?? $tpl->sig3_titre ?? 'Le Président du Jury',
-            'sig3Nom'   => $sig3Nom   ?? $tpl->sig3_nom   ?? '',
-        ])->setPaper('a4', 'landscape');
+            'title'      => $this->titre($type),
+            'corps'      => $this->corpsMarque($type, $personne, $contrat, $debut, $fin, $civilite),
+            'puces'      => array_values(array_intersect_key(
+                self::DOMAINES_PUCES,
+                array_flip(array_filter($domaines, fn ($c) => isset(self::DOMAINES_PUCES[$c]))),
+            )),
+            'appreciation' => $this->appreciation($type, $personne, $note, $debut, $fin, $civilite),
+            'numero'     => $numero,
+            'dateLieu'   => static::dateLongue(now()),
+            'signataires' => $this->signataires($type, $debut, $fin, $signataires),
+            'entete'     => config('attestation'),
+            'images'     => [
+                'logo'      => resource_path('attestation/images/logo-ferme.png'),
+                'filigrane' => resource_path('attestation/images/filigrane.png'),
+                'decor'     => resource_path('attestation/images/decor-floral.png'),
+            ],
+            'polices'    => resource_path('attestation/fonts'),
+        ])->setPaper('a4', 'landscape')
+            // Caladea (équivalent libre de Cambria) a une boîte englobante très haute : DomPDF en tire un interligne de
+            // 1,6 em, bien au-delà de celui du modèle (1,25 em). Le ratio ramène l'interligne à celui du modèle.
+            ->setOption(['font_height_ratio' => 0.86]);
 
         return [
             'octets'  => $pdf->output(),
@@ -212,6 +394,21 @@ class AttestationService
         }
 
         return implode(' et ', $parties);
+    }
+
+    /**
+     * « d'un (01) an » / « de six (06) mois » — avec l'espace qui l'attache au mot précédent ; vide sans durée.
+     * L'élision ne vaut que devant « un » (« d'un an ») : « de onze », « de huit »…
+     */
+    public static function deDuree(?string $debut, ?string $fin): string
+    {
+        $duree = static::formatDuree($debut, $fin);
+
+        if ($duree === '') {
+            return '';
+        }
+
+        return str_starts_with($duree, 'un ') ? " d'".$duree : ' de '.$duree;
     }
 
     /** Nombre en lettres françaises (1–24). */

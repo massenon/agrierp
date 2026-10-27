@@ -331,7 +331,10 @@ class CorrectionsElevage17OctobreTest extends TestCase
 
         foreach (['database/seeders', 'resources/views', 'app'] as $dossier) {
             foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path($dossier))) as $fichier) {
-                if ($fichier->isFile()) {
+                // ⚠️ Exception (24/10/2026) : le modèle d'ATTESTATION reprend mot pour mot le texte officiel fourni par le
+                // client, qui s'écrit « OLOUKOUNLE O. Hassimiyou » (corps du certificat et signature). Partout ailleurs, le
+                // nom du client vient des paramètres, jamais du code.
+                if ($fichier->isFile() && ! in_array($fichier->getFilename(), ['AttestationTemplate.php', '2026_10_27_000001_parametrer_signataires_attestation.php'], true)) {
                     $this->assertStringNotContainsString('OLOUKOUNLE', file_get_contents($fichier->getPathname()), $fichier->getPathname());
                 }
             }

@@ -1364,11 +1364,7 @@ class SyncController extends Controller
             // ne peut donc pas recompter — le serveur le fait sur l'historique entier.
             'attestation_templates' => fn () => collect(AttestationService::TYPES)
                 ->map(fn (string $type) => AttestationTemplate::forType($type))
-                ->map(fn (AttestationTemplate $m) => [
-                    'id' => $m->id,
-                    'type' => $m->type,
-                    'body_text' => $m->body_text,
-                ])
+                ->map(fn (AttestationTemplate $m) => $m->pourLePoste())
                 ->values(),
             'attestation_counts' => fn () => app(AttestationService::class)->compteurs(),
 

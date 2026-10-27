@@ -69,32 +69,28 @@ class _AttestationsVueState extends State<AttestationsVue> {
     ('modeles', 'Personnaliser les Modèles', SymbolesAgri.edit_note),
   ];
 
-  // En-tête du certificat — celui de la page web (RCCM de la directive officielle,
-  // pas l'IFU de démonstration du prototype).
+  // En-tête du certificat — celui du modèle officiel (config/attestation.php du serveur).
   static const _ferme = 'FERME ÉCOLE OLOUWACHEGOUN';
-  static const _sousActivites =
-      'Production Animale | Production Végétale | Transformation Agro-alimentaire';
-  static const _sousActivites2 =
-      'Fabrication de Cages Galvanisées | Formation Agricole | Suivi-Appuis et Conseils';
-  static const _rccm = 'RCCM : RB/PNO/22 A 33870';
+  static const _activites =
+      'Production Animale | Production Végétale | Transformation Agro-alimentaire| Fabrication de Cages '
+      'Galvanisées | Formation Agricole | Suivi-Appuis et Conseils';
+  static const _adresse = "Adresse : Attan-Ewé, Arrondissement d'Ikpinlè, Commune d'Adja-Ouèrè, Bénin";
+  static const _telephone = 'Téléphone : +229 01 97 84 02 85 / 01 43 46 08 71, RCCM : RB/PNO/22 A 33870';
 
-  // ATT-1 — 3 signataires (décision client conforme au vrai modèle PDF).
-  static const _sig1Titre = "L'Examinateur";
-  static const _sig1Nom = 'SOGNIGBE Gbédjinou Serge Bruno';
-  static const _sig1Sous = 'Chef Cellule Communale\nATDA Pôle 6 (Plateau)';
-  static const _sig2Titre = 'Président du Jury';
-  static const _sig2Nom = 'Elisée Kocou HOUNKPONOU';
-  static const _sig2Sous = 'Président FN-CCPB';
-  static const _sig3Titre = 'Le Directeur Général';
-  static const _sig3Nom = 'Hassimiyou O. OLOUKOUNLE';
-  static const _sig3Sous = 'Directeur Général FEO';
-
-  // ATT-1 — domaines de formation cochables (identique à AttestationService::DOMAINES).
+  // Domaines de formation cochables — LES LIBELLÉS DE L'ÉCRAN WEB (`AttestationService::DOMAINES`) ; le PDF imprime, lui,
+  // la phrase longue du modèle officiel (`DOMAINES_PUCES`), reprise ici pour l'aperçu.
   static const _domainesDisponibles = <String, String>{
-    'maraichage': 'Maraîchage et cultures légumières',
-    'elevage': 'Élevage (Lapins, Porcs, Poulets)',
-    'rations': 'Fabrication de rations alimentaires',
-    'gestion': 'Gestion agricole',
+    'maraichage': 'Maraîchage',
+    'elevage': 'Élevage',
+    'rations': 'Rations alimentaires',
+    'gestion': "Gestion d'entreprise",
+  };
+
+  static const _domainesPuces = <String, String>{
+    'maraichage': 'Conduite de cultures maraîchères et vivrières (Mais, Manioc, Soja, Tomate, Piment, Légumes divers) ;',
+    'elevage': "Conduite d’élevages et applications de soins vétérinaires (Cuniculture, Aviculture, Héliciculture, Porciculture, Petits Ruminant) ;",
+    'rations': 'Notion de formulation des rations alimentaires des animaux d’élevage ;',
+    'gestion': 'Notion de gestion des entreprises agricoles.',
   };
 
   // Mois en français pour la date longue (décision ATT-1).
@@ -121,13 +117,21 @@ class _AttestationsVueState extends State<AttestationsVue> {
   final _lieuNaissance = TextEditingController();
   final Set<String> _domaines = {};
 
-  // ATT-1 — signataires éditables par attestation (pré-remplis depuis le modèle).
-  final _sig1TitreCtrl = TextEditingController(text: _sig1Titre);
-  final _sig1NomCtrl = TextEditingController(text: _sig1Nom);
-  final _sig2TitreCtrl = TextEditingController(text: _sig2Titre);
-  final _sig2NomCtrl = TextEditingController(text: _sig2Nom);
-  final _sig3TitreCtrl = TextEditingController(text: _sig3Titre);
-  final _sig3NomCtrl = TextEditingController(text: _sig3Nom);
+  // ATT-2 — les modifications des signataires POUR CETTE attestation, par position serveur (1 = Directeur Général,
+  // 2 = Examinateur, 3 = Président du Jury). Vides : le modèle s'applique (il est montré en indication).
+  final _surcharges = <int, ({TextEditingController titre, TextEditingController nom, TextEditingController fonction})>{
+    for (final n in [1, 2, 3])
+      n: (titre: TextEditingController(), nom: TextEditingController(), fonction: TextEditingController()),
+  };
+
+  /// La règle de signature de chaque modèle, telle que le poste l'a reçue (`null` : pas encore reçue).
+  final _reglages = <String, ReglageSignature?>{'employe': null, 'stagiaire': null};
+
+  /// Les champs de l'onglet « Personnaliser les Modèles » (règle de signature), par type.
+  final _champsReglage = <String, _ChampsReglage>{
+    'employe': _ChampsReglage(),
+    'stagiaire': _ChampsReglage(),
+  };
 
   final _modeles = <String, TextEditingController>{
     'employe': TextEditingController(),
@@ -159,12 +163,14 @@ class _AttestationsVueState extends State<AttestationsVue> {
     _appreciation.dispose();
     _naissance.dispose();
     _lieuNaissance.dispose();
-    _sig1TitreCtrl.dispose();
-    _sig1NomCtrl.dispose();
-    _sig2TitreCtrl.dispose();
-    _sig2NomCtrl.dispose();
-    _sig3TitreCtrl.dispose();
-    _sig3NomCtrl.dispose();
+    for (final c in _surcharges.values) {
+      c.titre.dispose();
+      c.nom.dispose();
+      c.fonction.dispose();
+    }
+    for (final c in _champsReglage.values) {
+      c.dispose();
+    }
     for (final c in _modeles.values) {
       c.dispose();
     }
@@ -179,6 +185,9 @@ class _AttestationsVueState extends State<AttestationsVue> {
       final texte = await widget.depot.modele(t);
       _modelesRecus[t] = texte != null;
       if (texte != null && _modeles[t]!.text.isEmpty) _modeles[t]!.text = texte;
+      final reglage = await widget.depot.reglage(t);
+      _reglages[t] = reglage;
+      if (reglage != null && !_champsReglage[t]!.initialise) _champsReglage[t]!.charger(reglage);
     }
     if (!mounted) return;
     setState(() {
@@ -290,12 +299,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
         birthDate: _lire(_naissance.text),
         birthPlace: _lieuNaissance.text,
         civilite: _civilite,
-        sig1Titre: _sig1TitreCtrl.text.trim().isEmpty ? null : _sig1TitreCtrl.text,
-        sig1Nom: _sig1NomCtrl.text.trim().isEmpty ? null : _sig1NomCtrl.text,
-        sig2Titre: _sig2TitreCtrl.text.trim().isEmpty ? null : _sig2TitreCtrl.text,
-        sig2Nom: _sig2NomCtrl.text.trim().isEmpty ? null : _sig2NomCtrl.text,
-        sig3Titre: _sig3TitreCtrl.text.trim().isEmpty ? null : _sig3TitreCtrl.text,
-        sig3Nom: _sig3NomCtrl.text.trim().isEmpty ? null : _sig3NomCtrl.text,
+        signataires: _signatairesSaisis(),
       );
       final chemin = await widget.enregistrer(pdf);
       if (!mounted) return;
@@ -351,6 +355,70 @@ class _AttestationsVueState extends State<AttestationsVue> {
       setState(() {
         _enCours = false;
         _erreurs = {for (final c in e.champs.entries) 'modele-$type': c.value};
+        _retour = (false, e.message);
+      });
+    }
+  }
+
+  /// Les modifications saisies pour CETTE attestation, sous les clés du serveur (`sig2_nom`, `sig3_fonction`…).
+  Map<String, String> _signatairesSaisis() => {
+    for (final e in _surcharges.entries) ...{
+      if (e.value.titre.text.trim().isNotEmpty) 'sig${e.key}_titre': e.value.titre.text.trim(),
+      if (e.value.nom.text.trim().isNotEmpty) 'sig${e.key}_nom': e.value.nom.text.trim(),
+      if (e.value.fonction.text.trim().isNotEmpty) 'sig${e.key}_fonction': e.value.fonction.text.trim(),
+    },
+  };
+
+  /// La règle du modèle du type courant — celle du serveur, ou les valeurs d'un modèle neuf tant qu'elle n'est pas reçue.
+  ReglageSignature get _reglage => _reglages[_type] ?? ReglageSignature.defaut;
+
+  /// Palier de la durée saisie : `court` (le promoteur seul) ou `long` (trois signataires).
+  String get _palier => ReglageSignature.palier(_lire(_debut.text), _lire(_fin.text), _reglage.seuilMois, _aujourdhui);
+
+  /// Les signataires que la durée appelle, tels qu'ils s'imprimeront.
+  List<SignataireModele> get _signatairesRequis => _reglage.requis(
+    debut: _lire(_debut.text),
+    fin: _lire(_fin.text),
+    aujourdhui: _aujourdhui,
+    surcharges: {
+      for (final e in _surcharges.entries)
+        e.key: {'titre': e.value.titre.text, 'nom': e.value.nom.text, 'fonction': e.value.fonction.text},
+    },
+  );
+
+  Future<void> _enregistrerReglage(String type) async {
+    if (_enCours) return;
+    final champs = _champsReglage[type]!;
+    final erreur = champs.erreurSeuil();
+
+    if (erreur != null) {
+      setState(() {
+        _erreurs = {'reglage-$type': erreur};
+        _retour = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _enCours = true;
+      _erreurs = const {};
+      _retour = null;
+    });
+
+    try {
+      final reglage = champs.versReglage();
+      await widget.depot.enregistrerReglage(type, reglage);
+      if (!mounted) return;
+      setState(() {
+        _enCours = false;
+        _reglages[type] = reglage;
+        _retour = (true, 'Règle de signature enregistrée.');
+      });
+    } on EchecAttestation catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _enCours = false;
+        _erreurs = {for (final c in e.champs.entries) 'reglage-$type': c.value};
         _retour = (false, e.message);
       });
     }
@@ -781,81 +849,9 @@ class _AttestationsVueState extends State<AttestationsVue> {
             style: const TextStyle(fontSize: AgriTypography.sm),
             decoration: _decor('Assiduité, rigueur, compétences acquises...'),
           ),
-          // ATT-1 — signataires éditables par attestation.
+          // ATT-2 — les signataires que la DURÉE appelle ; un champ vide reprend le modèle.
           const SizedBox(height: AgriSpacing.md),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              key: const Key('att-signataires'),
-              tilePadding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
-              shape: RoundedRectangleBorder(
-                side: const BorderSide(color: AgriColors.outlineVariant),
-                borderRadius: BorderRadius.circular(AgriRadius.lg),
-              ),
-              collapsedShape: RoundedRectangleBorder(
-                side: const BorderSide(color: AgriColors.outlineVariant),
-                borderRadius: BorderRadius.circular(AgriRadius.lg),
-              ),
-              title: Text(
-                'Signataires (modifiables)'.toUpperCase(),
-                style: _etiquette,
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AgriSpacing.sm, 0, AgriSpacing.sm, AgriSpacing.sm,
-                  ),
-                  child: Column(
-                    children: [
-                      for (final (titreCtrl, nomCtrl, label) in [
-                        (_sig2TitreCtrl, _sig2NomCtrl, "Signataire 1 (Examinateur)"),
-                        (_sig3TitreCtrl, _sig3NomCtrl, "Signataire 2 (Président du Jury)"),
-                        (_sig1TitreCtrl, _sig1NomCtrl, "Signataire 3 (Directeur Général)"),
-                      ]) ...[
-                        const SizedBox(height: AgriSpacing.xs),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('$label — Titre'.toUpperCase(), style: _etiquette),
-                                  const SizedBox(height: AgriSpacing.xs),
-                                  TextField(
-                                    controller: titreCtrl,
-                                    onChanged: (_) => setState(() {}),
-                                    style: StylesChampsAgri.valeurFormulaire,
-                                    decoration: _decor('', hauteurFixe: AgriChamps.hauteurFormulaire),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AgriSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('$label — Nom'.toUpperCase(), style: _etiquette),
-                                  const SizedBox(height: AgriSpacing.xs),
-                                  TextField(
-                                    controller: nomCtrl,
-                                    onChanged: (_) => setState(() {}),
-                                    style: StylesChampsAgri.valeurFormulaire,
-                                    decoration: _decor('', hauteurFixe: AgriChamps.hauteurFormulaire),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _blocSignataires(),
           const SizedBox(height: AgriSpacing.md),
           FilledButton.icon(
             key: const Key('att-generer'),
@@ -1079,6 +1075,21 @@ class _AttestationsVueState extends State<AttestationsVue> {
       color: AgriColors.outline,
     );
 
+    final debut = _lire(_debut.text);
+    final fin = _lire(_fin.text);
+    final appreciation = x == null
+        ? null
+        : AttestationsRepository.appreciation(
+            type: _type,
+            personne: x,
+            saisie: _note.text.trim().isNotEmpty ? _note.text : _appreciation.text,
+            reglage: _reglages[_type],
+            debut: debut,
+            fin: fin,
+            civilite: _civilite,
+            aujourdhui: _aujourdhui,
+          );
+
     return Container(
       key: const Key('att-apercu'),
       constraints: const BoxConstraints(minHeight: 480),
@@ -1086,12 +1097,13 @@ class _AttestationsVueState extends State<AttestationsVue> {
       decoration: _carte(),
       child: Stack(
         children: [
+          // Filigrane : le logo officiel de la ferme, très pâle (comme le PDF).
           Positioned.fill(
             child: IgnorePointer(
               child: Center(
-                child: const Opacity(
-                  opacity: 0.05,
-                  child: Icon(SymbolesAgri.agriculture, size: 220),
+                child: Opacity(
+                  opacity: 0.12,
+                  child: Image.asset('assets/images/logo.png', key: const Key('att-apercu-filigrane'), width: 240),
                 ),
               ),
             ),
@@ -1099,99 +1111,59 @@ class _AttestationsVueState extends State<AttestationsVue> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ─── En-tête : logo | ferme + activités + RCCM | lieu-date ───
+              // ─── En-tête : logo officiel | nom, activités, adresse, téléphone ───
               Container(
-                padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+                padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
                 decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(width: 2, color: AgriColors.brandForest),
-                  ),
+                  border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          SymbolesAgri.agriculture,
-                          size: 36,
-                          color: AgriColors.brandEmerald,
-                        ),
-                        const SizedBox(width: AgriSpacing.sm),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _ferme,
-                                style: TextStyle(
-                                  fontSize: AgriTypography.sm,
-                                  fontWeight: FontWeight.w900,
-                                  color: AgriColors.brandForest,
-                                ),
-                              ),
-                              Text(
-                                _sousActivites,
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: AgriColors.outline,
-                                ),
-                              ),
-                              Text(
-                                _sousActivites2,
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: AgriColors.outline,
-                                ),
-                              ),
-                              Text(
-                                _rccm,
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: AgriColors.outline,
-                                ),
-                              ),
-                            ],
+                    Image.asset('assets/images/logo.png', key: const Key('att-apercu-logo'), width: 56),
+                    const SizedBox(width: AgriSpacing.sm),
+                    const Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            _ferme,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: AgriTypography.sm,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF2E6B1A),
+                            ),
                           ),
-                        ),
-                        Text(
-                          'ATTAN - ÉWÉ, le ${_dateLongue(_aujourdhui)}',
-                          key: const Key('att-apercu-lieu-date'),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: AgriTypography.gras,
-                            color: AgriColors.outline,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (stagiaire) ...[
-                      const SizedBox(height: AgriSpacing.xs),
-                      const Text(
-                        'N°—/FEO/DG',
-                        key: Key('att-apercu-numero'),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: AgriTypography.gras,
-                          color: AgriColors.brandForest,
-                        ),
+                          Text(_activites, textAlign: TextAlign.center, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+                          Text(_adresse, textAlign: TextAlign.center, style: TextStyle(fontSize: 8)),
+                          Text(_telephone, textAlign: TextAlign.center, style: TextStyle(fontSize: 8)),
+                        ],
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: AgriSpacing.md),
+              const SizedBox(height: AgriSpacing.xs),
+              Text(
+                'ATTAN - ÉWÉ, le ${_dateLongue(_aujourdhui)}',
+                key: const Key('att-apercu-lieu-date'),
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
+              ),
+              const Text(
+                'N°—/FEO/DG',
+                key: Key('att-apercu-numero'),
+                style: TextStyle(fontSize: 9, fontWeight: AgriTypography.gras),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
               // ─── Titre centré souligné ───
               Text(
                 titre.toUpperCase(),
                 key: const Key('att-apercu-titre'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: AgriTypography.xs,
+                  fontSize: AgriTypography.sm,
                   fontWeight: AgriTypography.gras,
-                  letterSpacing: 0.8,
                   color: AgriColors.brandForest,
                   decoration: TextDecoration.underline,
                 ),
@@ -1203,10 +1175,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   corps,
                   key: const Key('att-apercu-corps'),
                   textAlign: TextAlign.justify,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    height: 1.6,
-                  ),
+                  style: const TextStyle(fontSize: AgriTypography.xs, height: 1.6),
                 )
               else
                 Text(
@@ -1216,79 +1185,59 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   key: const Key('att-apercu-vide'),
                   style: mute,
                 ),
-              // ─── Domaines (stagiaire) ───
-              if (stagiaire && _domaines.isNotEmpty) ...[
+              // ─── Domaines : une puce ➢ par domaine coché, dans l'ordre du modèle ───
+              if (_domaines.isNotEmpty) ...[
                 const SizedBox(height: AgriSpacing.sm),
-                for (final cle in _domaines)
-                  if (_domainesDisponibles.containsKey(cle))
-                    Text(
-                      '➢ ${_domainesDisponibles[cle]} ;',
-                      key: Key('att-apercu-domaine-$cle'),
-                      style: const TextStyle(fontSize: 10),
+                for (final cle in _domainesPuces.keys)
+                  if (_domaines.contains(cle))
+                    Padding(
+                      padding: const EdgeInsets.only(left: AgriSpacing.md),
+                      child: Text(
+                        '➢ ${_domainesPuces[cle]}',
+                        key: Key('att-apercu-domaine-$cle'),
+                        style: const TextStyle(fontSize: 10),
+                      ),
                     ),
               ],
-              // ─── Appréciation (stagiaire) ───
-              if (stagiaire && _appreciation.text.trim().isNotEmpty &&
-                  x != null) ...[
+              // ─── Appréciation : la saisie, sinon celle du modèle ───
+              if (appreciation != null) ...[
                 const SizedBox(height: AgriSpacing.sm),
                 Text(
-                  "Au cours de sa formation, ${x.libelle} s'est distingué${_civilite == 'Mme' ? 'e' : ''} "
-                  'par ${_appreciation.text}.',
+                  appreciation,
                   key: const Key('att-apercu-appreciation'),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  style: const TextStyle(fontSize: 10),
                 ),
               ],
-              // ─── Note ───
-              if (_note.text.trim().isNotEmpty) ...[
-                const SizedBox(height: AgriSpacing.md),
-                Text(
-                  _note.text,
-                  key: const Key('att-apercu-note'),
-                  style: mute,
+              if (x != null) ...[
+                const SizedBox(height: AgriSpacing.sm),
+                const Text(
+                  'En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.',
+                  key: Key('att-apercu-cloture'),
+                  style: TextStyle(fontSize: 10),
                 ),
               ],
-              const SizedBox(height: AgriSpacing.sm),
-              // ─── Formule de clôture ───
-              const Text(
-                'En foi de quoi, la présente attestation lui est délivrée '
-                'pour servir et valoir ce que de droit.',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
               const SizedBox(height: AgriSpacing.lg),
-              // ─── 3 blocs de signature (ATT-1) ───
+              // ─── Signataires appelés par la durée : trois (Examinateur, Président du Jury, Directeur) ou le promoteur seul ───
               Row(
+                key: const Key('att-apercu-signataires'),
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: _blocSignature(
-                      _sig2TitreCtrl.text.isEmpty ? _sig2Titre : _sig2TitreCtrl.text,
-                      _sig2NomCtrl.text.isEmpty ? _sig2Nom : _sig2NomCtrl.text,
-                      _sig2Sous,
+                  for (final sig in _signatairesRequis)
+                    Expanded(
+                      flex: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: AgriSpacing.sm),
+                        child: _blocSignature(sig),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AgriSpacing.sm),
-                  Expanded(
-                    child: _blocSignature(
-                      _sig3TitreCtrl.text.isEmpty ? _sig3Titre : _sig3TitreCtrl.text,
-                      _sig3NomCtrl.text.isEmpty ? _sig3Nom : _sig3NomCtrl.text,
-                      _sig3Sous,
-                    ),
-                  ),
-                  const SizedBox(width: AgriSpacing.sm),
-                  Expanded(
-                    child: _blocSignature(
-                      _sig1TitreCtrl.text.isEmpty ? _sig1Titre : _sig1TitreCtrl.text,
-                      _sig1NomCtrl.text.isEmpty ? _sig1Nom : _sig1NomCtrl.text,
-                      _sig1Sous,
-                    ),
-                  ),
                 ],
+              ),
+              const SizedBox(height: AgriSpacing.xs),
+              const Text(
+                'Aperçu simplifié : le PDF du serveur reprend le modèle officiel (décor, filigrane, polices).',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 8, color: AgriColors.outline),
               ),
             ],
           ),
@@ -1297,44 +1246,301 @@ class _AttestationsVueState extends State<AttestationsVue> {
     );
   }
 
-  Widget _blocSignature(String titre, String nom, String sousTitre) =>
-      Column(
+  Widget _blocSignature(SignataireModele sig) => Column(
+    key: Key('att-apercu-sig-${sig.position}'),
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      if (sig.titre.isNotEmpty)
+        Align(
+          alignment: Alignment.center,
+          child: Text(
+            sig.titre,
+            style: const TextStyle(fontSize: 9, fontWeight: AgriTypography.gras, decoration: TextDecoration.underline),
+          ),
+        ),
+      const SizedBox(height: AgriSpacing.xs),
+      Text(
+        sig.nom.isEmpty ? '…' : sig.nom,
+        textAlign: TextAlign.right,
+        style: const TextStyle(fontSize: 9, fontWeight: AgriTypography.gras),
+      ),
+      if (sig.fonction.isNotEmpty)
+        Text(sig.fonction, textAlign: TextAlign.right, style: const TextStyle(fontSize: 8)),
+    ],
+  );
+
+  // ── ATT-2 : signataires selon la durée ───────────────────────────────────
+
+  /// Le bloc « Signataires » du formulaire : ceux que la DURÉE appelle, un champ vide reprenant le modèle.
+  Widget _blocSignataires() {
+    final seuil = _reglage.seuilMois;
+    final long = _palier == 'long';
+    final requis = _signatairesRequis;
+    final titre = long
+        ? 'trois signataires (attestation de plus de $seuil mois)'
+        : "le promoteur seul (jusqu'à $seuil mois)";
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: const Key('att-signataires'),
+        initiallyExpanded: _debut.text.trim().isNotEmpty,
+        tilePadding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm),
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AgriColors.outlineVariant),
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          side: const BorderSide(color: AgriColors.outlineVariant),
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
+        ),
+        title: Text(
+          'Signataires — $titre'.toUpperCase(),
+          key: const Key('att-signataires-titre'),
+          style: _etiquette,
+        ),
         children: [
-          Text(
-            titre.toUpperCase(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: AgriTypography.gras,
-              color: AgriColors.brandForest,
-            ),
-          ),
-          const SizedBox(height: AgriSpacing.lg),
-          Container(
-            width: double.infinity,
-            height: 1,
-            color: AgriColors.outlineVariant,
-          ),
-          const SizedBox(height: AgriSpacing.xs),
-          Text(
-            nom,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: AgriTypography.gras,
-              color: AgriColors.brandForest,
-            ),
-          ),
-          Text(
-            sousTitre,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 7.5,
-              color: AgriColors.outline,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AgriSpacing.sm, 0, AgriSpacing.sm, AgriSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (requis.isEmpty)
+                  const Text(
+                    "Aucun signataire n'est appelé par la règle de ce modèle (voir « Personnaliser les Modèles »).",
+                    key: Key('att-signataires-aucun'),
+                    style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                  ),
+                for (final sig in requis) ...[
+                  const SizedBox(height: AgriSpacing.xs),
+                  Row(
+                    key: Key('att-signataire-${sig.position}'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final (champ, libelle, indication, ctrl) in [
+                        ('titre', 'Intitulé', _reglage.signataires[sig.position]?.titre ?? '', _surcharges[sig.position]!.titre),
+                        ('nom', 'Nom', _reglage.signataires[sig.position]?.nom ?? '', _surcharges[sig.position]!.nom),
+                        ('fonction', 'Fonction', _reglage.signataires[sig.position]?.fonction ?? '', _surcharges[sig.position]!.fonction),
+                      ]) ...[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(libelle.toUpperCase(), style: _etiquette),
+                              const SizedBox(height: AgriSpacing.xs),
+                              TextField(
+                                key: Key('att-sig${sig.position}-$champ'),
+                                controller: ctrl,
+                                onChanged: (_) => setState(() {}),
+                                style: StylesChampsAgri.valeurFormulaire,
+                                decoration: _decor(indication.isEmpty ? '—' : indication, hauteurFixe: AgriChamps.hauteurFormulaire),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (champ != 'fonction') const SizedBox(width: AgriSpacing.xs),
+                      ],
+                    ],
+                  ),
+                ],
+                const SizedBox(height: AgriSpacing.xs),
+                const Text(
+                  "Champs vides : le modèle s'applique. Qui signe, et à partir de quelle durée, se règle dans « Personnaliser les Modèles ».",
+                  style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                ),
+              ],
             ),
           ),
         ],
-      );
+      ),
+    );
+  }
+
+  /// Carte « Signataires et règle de signature » d'un modèle (onglet « Personnaliser les Modèles »).
+  Widget _carteReglage(String type, String libelleModele) {
+    final c = _champsReglage[type]!;
+
+    Widget champ(String cle, TextEditingController ctrl, String indication) => Expanded(
+      child: TextField(
+        key: Key(cle),
+        controller: ctrl,
+        style: StylesChampsAgri.valeurFormulaire,
+        decoration: _decor(indication, hauteurFixe: AgriChamps.hauteurFormulaire),
+      ),
+    );
+
+    return Container(
+      key: Key('att-reglage-$type'),
+      padding: const EdgeInsets.all(AgriSpacing.md),
+      decoration: _carte(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(SymbolesAgri.workspace_premium, size: 18, color: AgriColors.brandForest),
+              const SizedBox(width: AgriSpacing.xs),
+              Flexible(
+                child: Text(
+                  'Signataires et règle de signature — $libelleModele'.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    fontWeight: AgriTypography.gras,
+                    color: AgriColors.brandForest,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AgriSpacing.md),
+          if (_reglages[type] == null)
+            const Padding(
+              padding: EdgeInsets.only(bottom: AgriSpacing.sm),
+              child: Text(
+                'Règle pas encore reçue du serveur — synchronisez. Les valeurs ci-dessous sont celles d\'un modèle neuf.',
+                key: Key('att-reglage-absent'),
+                style: TextStyle(fontSize: AgriTypography.xs, fontStyle: FontStyle.italic, color: AgriColors.outline),
+              ),
+            ),
+          Row(
+            children: [
+              const Text("Palier court : jusqu'à ", style: TextStyle(fontSize: AgriTypography.xs)),
+              SizedBox(
+                width: 72,
+                child: TextField(
+                  key: Key('att-seuil-$type'),
+                  controller: c.seuil,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.right,
+                  style: StylesChampsAgri.valeurFormulaire,
+                  decoration: _decor('12', erreur: _erreurs.containsKey('reglage-$type'), hauteurFixe: AgriChamps.hauteurFormulaire),
+                ),
+              ),
+              const Expanded(
+                child: Text(
+                  ' mois inclus ; au-delà, palier long. Durée comptée de la date de début à la date de fin (à aujourd\'hui sans date de fin).',
+                  style: TextStyle(fontSize: AgriTypography.xs),
+                ),
+              ),
+            ],
+          ),
+          _erreur('reglage-$type'),
+          for (final (n, role) in [
+            (1, 'Directeur Général (le promoteur)'),
+            (2, 'Examinateur'),
+            (3, 'Président du Jury'),
+          ]) ...[
+            const SizedBox(height: AgriSpacing.sm),
+            Container(
+              key: Key('att-reglage-$type-sig$n'),
+              padding: const EdgeInsets.all(AgriSpacing.sm),
+              decoration: _carte(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(role.toUpperCase(), style: _etiquette),
+                  const SizedBox(height: AgriSpacing.xs),
+                  Row(
+                    children: [
+                      champ('att-$type-sig$n-titre', c.titre[n]!, 'Intitulé imprimé (vide : aucun)'),
+                      const SizedBox(width: AgriSpacing.xs),
+                      champ('att-$type-sig$n-nom', c.nom[n]!, 'Nom'),
+                      const SizedBox(width: AgriSpacing.xs),
+                      champ('att-$type-sig$n-fonction', c.fonction[n]!, 'Fonction'),
+                    ],
+                  ),
+                  const SizedBox(height: AgriSpacing.xs),
+                  Row(
+                    children: [
+                      for (final (palier, libelle) in [('court', 'Signe le palier court'), ('long', 'Signe le palier long')])
+                        Expanded(
+                          child: InkWell(
+                            key: Key('att-$type-sig$n-$palier'),
+                            onTap: () => setState(() => c.basculer(n, palier)),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: Checkbox(
+                                    value: palier == 'court' ? c.court[n]! : c.long[n]!,
+                                    onChanged: (_) => setState(() => c.basculer(n, palier)),
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    activeColor: AgriColors.brandEmerald,
+                                  ),
+                                ),
+                                const SizedBox(width: AgriSpacing.xs),
+                                Flexible(child: Text(libelle, style: const TextStyle(fontSize: AgriTypography.xs))),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: AgriSpacing.md),
+          InkWell(
+            key: Key('att-$type-appreciation-imprimee'),
+            onTap: () => setState(() => c.appreciationImprimee = !c.appreciationImprimee),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: Checkbox(
+                    value: c.appreciationImprimee,
+                    onChanged: (v) => setState(() => c.appreciationImprimee = v ?? true),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeColor: AgriColors.brandEmerald,
+                  ),
+                ),
+                const SizedBox(width: AgriSpacing.xs),
+                const Flexible(
+                  child: Text(
+                    "Imprimer l'appréciation par défaut (modifiable à chaque émission)",
+                    style: TextStyle(fontSize: AgriTypography.xs),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          TextField(
+            key: Key('att-$type-appreciation'),
+            controller: c.appreciation,
+            minLines: 2,
+            maxLines: 2,
+            style: const TextStyle(fontSize: AgriTypography.xs),
+            decoration: _decor(
+              type == 'stagiaire' ? AttestationsRepository.appreciationStagiaire : 'Aucune phrase standard',
+            ),
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          const Text(
+            "Vide : la phrase standard du modèle officiel. **texte** s'imprime en gras. Balises : [CIVILITE_LONGUE], [NOM], [TITRE_NOM], [ACCORD_E].",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+          const SizedBox(height: AgriSpacing.md),
+          FilledButton(
+            key: Key('att-enregistrer-reglage-$type'),
+            onPressed: _enCours ? null : () => _enregistrerReglage(type),
+            style: FilledButton.styleFrom(
+              backgroundColor: AgriColors.brandEmerald,
+              padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AgriRadius.lg)),
+            ),
+            child: const Text(
+              'Enregistrer la règle de signature',
+              style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _bandeau(bool reussi, String message) {
     final couleur = reussi ? AgriColors.brandEmerald : AgriColors.errorRed;
@@ -1377,14 +1583,16 @@ class _AttestationsVueState extends State<AttestationsVue> {
       'employe',
       SymbolesAgri.badge,
       'Modèle - Attestation de Travail (Employé)',
-      'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN], [DUREE], [CIVILITE], [TITRE_NOM], [ACCORD_E]',
+      'Balises : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN], [DATE_DEBUT_LONGUE], [DATE_FIN_LONGUE], [DUREE], '
+          "[DE_DUREE], [CIVILITE], [CIVILITE_LONGUE], [TITRE_NOM], [ACCORD_E]. **texte** s'imprime en gras.",
     );
     final stagiaire = _carteModele(
       'stagiaire',
       SymbolesAgri.school,
-      'Modèle - Attestation de Stage (Stagiaire)',
-      'Balises disponibles : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN], [DUREE], '
-          '[DATE_NAISSANCE], [LIEU_NAISSANCE], [CIVILITE], [TITRE_NOM], [ACCORD_E]',
+      'Modèle - Attestation de Formation (Stagiaire)',
+      'Balises : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN], [DATE_DEBUT_LONGUE], [DATE_FIN_LONGUE], '
+          '[DUREE], [DE_DUREE], [CIVILITE], [CIVILITE_LONGUE], [TITRE_NOM], [ACCORD_E], [DATE_NAISSANCE], '
+          "[DATE_NAISSANCE_LONGUE], [LIEU_NAISSANCE]. **texte** s'imprime en gras.",
     );
 
     return Column(
@@ -1406,6 +1614,10 @@ class _AttestationsVueState extends State<AttestationsVue> {
                   stagiaire,
                 ],
               ),
+        const SizedBox(height: AgriSpacing.md),
+        _carteReglage('employe', 'Attestation de Travail (Employé)'),
+        const SizedBox(height: AgriSpacing.md),
+        _carteReglage('stagiaire', 'Attestation de Formation (Stagiaire)'),
         if (_retour != null) ...[
           const SizedBox(height: AgriSpacing.md),
           _bandeau(_retour!.$1, _retour!.$2),
@@ -1494,4 +1706,78 @@ class _AttestationsVueState extends State<AttestationsVue> {
       ],
     ),
   );
+}
+
+/// Les champs de l'onglet « Personnaliser les Modèles » pour la règle de signature d'UN modèle (ATT-2).
+class _ChampsReglage {
+  final seuil = TextEditingController();
+  final appreciation = TextEditingController();
+  bool appreciationImprimee = true;
+  final titre = {for (final n in [1, 2, 3]) n: TextEditingController()};
+  final nom = {for (final n in [1, 2, 3]) n: TextEditingController()};
+  final fonction = {for (final n in [1, 2, 3]) n: TextEditingController()};
+  final court = <int, bool>{1: true, 2: false, 3: false};
+  final long = <int, bool>{1: true, 2: true, 3: true};
+
+  /// Vrai dès que les valeurs du serveur ont été chargées : un rechargement ne doit pas écraser une saisie en cours.
+  bool initialise = false;
+
+  void charger(ReglageSignature r) {
+    initialise = true;
+    seuil.text = '${r.seuilMois}';
+    appreciation.text = r.appreciationText ?? '';
+    appreciationImprimee = r.appreciationImprimee;
+    for (final n in [1, 2, 3]) {
+      final sig = r.signataires[n];
+      titre[n]!.text = sig?.titre ?? '';
+      nom[n]!.text = sig?.nom ?? '';
+      fonction[n]!.text = sig?.fonction ?? '';
+      court[n] = sig?.court ?? false;
+      long[n] = sig?.long ?? false;
+    }
+  }
+
+  void basculer(int n, String palier) {
+    if (palier == 'court') {
+      court[n] = !court[n]!;
+    } else {
+      long[n] = !long[n]!;
+    }
+  }
+
+  /// Les messages du serveur (`Attestations::saveReglage`, mêmes mots), sans aller-retour.
+  String? erreurSeuil() {
+    final texte = seuil.text.trim();
+    if (texte.isEmpty) return 'Indiquez la durée en mois.';
+    final n = int.tryParse(texte);
+    if (n == null) return 'La durée est un nombre entier de mois.';
+    if (n < 1) return "La durée doit être d'au moins 1 mois.";
+    if (n > 120) return 'La durée ne peut pas dépasser 120 mois.';
+    return null;
+  }
+
+  ReglageSignature versReglage() => ReglageSignature(
+    seuilMois: int.parse(seuil.text.trim()),
+    appreciationText: appreciation.text.trim().isEmpty ? null : appreciation.text,
+    appreciationImprimee: appreciationImprimee,
+    signataires: {
+      for (final n in [1, 2, 3])
+        n: SignataireModele(
+          position: n,
+          titre: titre[n]!.text.trim(),
+          nom: nom[n]!.text.trim(),
+          fonction: fonction[n]!.text.trim(),
+          court: court[n]!,
+          long: long[n]!,
+        ),
+    },
+  );
+
+  void dispose() {
+    seuil.dispose();
+    appreciation.dispose();
+    for (final c in [...titre.values, ...nom.values, ...fonction.values]) {
+      c.dispose();
+    }
+  }
 }

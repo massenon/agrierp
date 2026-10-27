@@ -108,26 +108,32 @@
                     <textarea wire:model.live="note" rows="3" placeholder="Assiduité, rigueur, compétences acquises..." class="w-full px-md py-sm border border-outline-variant rounded-lg text-sm"></textarea>
                 </div>
 
-                {{-- Signataires éditables --}}
-                <details class="border border-outline-variant rounded-lg p-sm">
-                    <summary class="text-[10px] font-bold text-brand-forest uppercase cursor-pointer select-none">Signataires (modifiables)</summary>
+                {{-- Signataires : ceux que la DURÉE appelle (ATT-2). Un champ vide reprend le modèle. --}}
+                <details class="border border-outline-variant rounded-lg p-sm" @if($startDate) open @endif>
+                    <summary class="text-[10px] font-bold text-brand-forest uppercase cursor-pointer select-none">
+                        Signataires — {{ $this->palier === 'long' ? 'trois signataires (attestation de plus de '.($reglage[$personType]['seuil_signature_mois'] ?? 12).' mois)' : 'le promoteur seul (jusqu\'à '.($reglage[$personType]['seuil_signature_mois'] ?? 12).' mois)' }}
+                    </summary>
                     <div class="mt-sm space-y-sm">
-                        @foreach([
-                            ['sig2Titre', 'sig2Nom', "Signataire 1 (Examinateur)"],
-                            ['sig3Titre', 'sig3Nom', "Signataire 2 (Président du Jury)"],
-                            ['sig1Titre', 'sig1Nom', "Signataire 3 (Directeur Général)"],
-                        ] as [$titreField, $nomField, $label])
-                        <div class="grid grid-cols-2 gap-xs">
+                        @forelse($this->signatairesRequis as $sig)
+                        @php $cle = 'sig'.$sig['position']; @endphp
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-xs">
                             <div>
-                                <label class="block text-[9px] text-brand-forest font-bold uppercase mb-xs">{{ $label }} — Titre</label>
-                                <input wire:model.live="{{ $titreField }}" type="text" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                                <label class="block text-[9px] text-brand-forest font-bold uppercase mb-xs">Intitulé</label>
+                                <input wire:model.live.debounce.400ms="sigs.{{ $cle }}.titre" type="text" placeholder="{{ $sig['titre'] ?: '—' }}" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs">
                             </div>
                             <div>
-                                <label class="block text-[9px] text-brand-forest font-bold uppercase mb-xs">{{ $label }} — Nom</label>
-                                <input wire:model.live="{{ $nomField }}" type="text" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                                <label class="block text-[9px] text-brand-forest font-bold uppercase mb-xs">Nom</label>
+                                <input wire:model.live.debounce.400ms="sigs.{{ $cle }}.nom" type="text" placeholder="{{ $sig['nom'] }}" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] text-brand-forest font-bold uppercase mb-xs">Fonction</label>
+                                <input wire:model.live.debounce.400ms="sigs.{{ $cle }}.fonction" type="text" placeholder="{{ $sig['fonction'] }}" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs">
                             </div>
                         </div>
-                        @endforeach
+                        @empty
+                        <p class="text-[10px] text-outline">Aucun signataire n'est appelé par la règle de ce modèle (voir « Personnaliser les Modèles »).</p>
+                        @endforelse
+                        <p class="text-[10px] text-outline">Champs vides : le modèle s'applique. Qui signe, et à partir de quelle durée, se règle dans « Personnaliser les Modèles ».</p>
                     </div>
                 </details>
 
@@ -136,46 +142,26 @@
                 </button>
             </div>
 
-            {{-- ── Aperçu du certificat ── --}}
+            {{-- ── Aperçu du certificat : même composition que le PDF (logo, filigrane, titre, corps, signataires). ── --}}
             <div class="bg-white border border-outline-variant rounded-lg p-lg relative overflow-hidden" style="min-height:480px;">
-                <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05]">
-                    <span class="material-symbols-outlined" style="font-size:220px;">agriculture</span>
-                </div>
+                <img src="{{ asset('assets/images/logo_ferme_ecole_officiel.png') }}" alt="" class="absolute pointer-events-none" style="left:50%; top:52%; width:62%; transform:translate(-50%,-50%); opacity:.12;">
                 <div class="relative space-y-sm text-xs">
 
-                    {{-- En-tête : ferme à gauche, lieu+date à droite --}}
-                    <div class="flex items-start justify-between border-b-2 border-brand-forest pb-md gap-sm">
-                        <div class="flex items-start gap-sm">
-                            <span class="material-symbols-outlined text-brand-emerald" style="font-size:30px;">agriculture</span>
-                            <div>
-                                <p class="font-black text-brand-forest text-sm">FERME ÉCOLE OLOUWACHEGOUN</p>
-                                <p class="text-[7px] text-brand-forest/70 font-bold leading-tight">MARAÎCHAGE - ÉLEVAGE - PISCICULTURE - AVICULTURE - TRANSFORMATION - GESTION D'ENTREPRISE</p>
-                                <p class="text-[8px] text-outline leading-tight mt-0.5">Attan-Ewé, Ikpinlè, Adja-Ouèrè, Bénin</p>
-                                <p class="text-[8px] text-outline">RCCM : RB/PNO/22 A 33870</p>
-                            </div>
-                        </div>
-                        <div class="text-right shrink-0">
-                            <p class="font-bold text-brand-forest text-[9px]">ATTAN-ÉWÉ, le {{ now()->day }} {{ ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][now()->month-1] }} {{ now()->year }}</p>
-                            <p class="text-[9px] text-brand-forest/80 font-semibold mt-0.5">Réf. : {{ app(\App\Services\AttestationService::class)->prochainNumero() }}</p>
+                    <div class="flex items-start gap-sm border-b border-outline-variant pb-sm">
+                        <img src="{{ asset('assets/images/logo_ferme_ecole_officiel.png') }}" alt="Logo de la ferme" class="w-14 h-auto shrink-0">
+                        <div class="flex-1 text-center">
+                            <p class="font-black text-[#2e6b1a] text-sm tracking-wide">{{ config('attestation.nom') }}</p>
+                            <p class="text-[8px] font-bold leading-tight">{{ implode(' ', config('attestation.activites')) }}</p>
+                            <p class="text-[8px] leading-tight"><strong>Adresse</strong> : {{ config('attestation.adresse') }}</p>
+                            <p class="text-[8px] leading-tight"><strong>Téléphone</strong> : {{ config('attestation.telephones') }}, <strong>RCCM</strong> : {{ config('attestation.rccm') }}</p>
                         </div>
                     </div>
 
-                    {{-- Titre --}}
-                    <p class="text-center font-bold text-brand-forest uppercase tracking-wide pt-sm">{{ $personType === 'employe' ? 'Attestation de Travail' : 'Attestation de Formation' }}</p>
+                    <p class="text-right font-bold italic text-[9px]">{{ config('attestation.lieu') }}, le {{ \App\Services\AttestationService::dateLongue(now()) }}</p>
+                    <p class="font-bold text-[9px]">{{ app(\App\Services\AttestationService::class)->prochainNumero() }}</p>
 
-                    {{-- Domaines cochés --}}
-                    @if(! empty($domaines))
-                    <div class="flex flex-wrap gap-x-lg gap-y-xs py-xs border-y border-outline-variant">
-                        @foreach(\App\Services\AttestationService::DOMAINES as $cle => $libelle)
-                        <span class="flex items-center gap-xs text-[9px]">
-                            <span class="inline-flex items-center justify-center w-3 h-3 border border-brand-forest {{ in_array($cle, $domaines) ? 'bg-brand-forest text-white' : '' }} text-[8px] font-bold">{{ in_array($cle, $domaines) ? '✓' : '' }}</span>
-                            {{ $libelle }}
-                        </span>
-                        @endforeach
-                    </div>
-                    @endif
+                    <p class="text-center font-bold text-brand-forest uppercase underline text-sm pt-sm">{{ $personType === 'employe' ? 'Attestation de Travail' : 'Attestation de Formation' }}</p>
 
-                    {{-- Corps --}}
                     <p class="leading-relaxed text-justify pt-xs">
                         @if($this->selectedPerson)
                             {{ $this->previewBody }}
@@ -184,25 +170,35 @@
                         @endif
                     </p>
 
-                    @if($note)
-                        <p class="text-outline italic">{{ $note }}</p>
+                    @if(! empty($domaines))
+                    <ul class="space-y-0.5 pl-md">
+                        @foreach(\App\Services\AttestationService::DOMAINES_PUCES as $cle => $ligne)
+                            @if(in_array($cle, $domaines))
+                            <li class="flex gap-xs"><span>&#10146;</span><span>{{ $ligne }}</span></li>
+                            @endif
+                        @endforeach
+                    </ul>
                     @endif
 
-                    {{-- 3 blocs de signature --}}
-                    <div class="grid grid-cols-3 gap-sm pt-xl">
-                        <div class="text-center">
-                            <p class="text-[9px] text-outline mb-8">{{ $sig2Titre }}</p>
-                            <p class="font-bold text-brand-forest text-[9px] border-t border-outline-variant pt-xs">{{ $sig2Nom ?: '…' }}</p>
+                    @if($this->selectedPerson && $this->previewAppreciation)
+                        <p>{{ $this->previewAppreciation }}</p>
+                    @endif
+
+                    @if($this->selectedPerson)
+                        <p>En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.</p>
+                    @endif
+
+                    {{-- Signataires appelés par la durée : 3 (Examinateur, Président du Jury, Directeur Général) ou 1 (le promoteur). --}}
+                    <div class="flex justify-between gap-sm pt-lg">
+                        @foreach($this->signatairesRequis as $sig)
+                        <div class="{{ count($this->signatairesRequis) === 1 ? 'ml-auto' : '' }} flex-1 max-w-[33%] text-right">
+                            @if($sig['titre'] !== '')<p class="text-[9px] font-bold underline text-center mb-xs">{{ $sig['titre'] }}</p>@endif
+                            <p class="font-bold text-[9px] leading-tight">{{ $sig['nom'] ?: '…' }}</p>
+                            @if($sig['fonction'] !== '')<p class="text-[8px] leading-tight">{{ $sig['fonction'] }}</p>@endif
                         </div>
-                        <div class="text-center">
-                            <p class="text-[9px] text-outline mb-8">{{ $sig3Titre }}</p>
-                            <p class="font-bold text-brand-forest text-[9px] border-t border-outline-variant pt-xs">{{ $sig3Nom ?: '…' }}</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-[9px] text-outline mb-8">{{ $sig1Titre }}</p>
-                            <p class="font-bold text-brand-forest text-[9px] border-t border-outline-variant pt-xs">{{ $sig1Nom ?: '…' }}</p>
-                        </div>
+                        @endforeach
                     </div>
+                    <p class="text-[8px] text-outline text-center pt-xs">Aperçu simplifié : le PDF reprend le modèle officiel (décor, filigrane, polices).</p>
                 </div>
             </div>
         </div>
@@ -215,7 +211,7 @@
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Texte du certificat</label>
                     <textarea wire:model="tplEmployeText" rows="6" class="w-full px-md py-sm border border-outline-variant rounded-lg text-xs"></textarea>
-                    <p class="text-[10px] text-outline mt-xs">Balises : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN], [DUREE], [CIVILITE], [TITRE_NOM], [ACCORD_E]</p>
+                    <p class="text-[10px] text-outline mt-xs">Balises : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN], [DATE_DEBUT_LONGUE], [DATE_FIN_LONGUE], [DUREE], [DE_DUREE], [CIVILITE], [CIVILITE_LONGUE], [TITRE_NOM], [ACCORD_E]. **texte** s'imprime en gras.</p>
                 </div>
                 <button type="button" wire:click="saveTemplate('employe')" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Enregistrer ce Modèle</button>
             </div>
@@ -225,10 +221,51 @@
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Texte du certificat</label>
                     <textarea wire:model="tplStagiaireText" rows="6" class="w-full px-md py-sm border border-outline-variant rounded-lg text-xs"></textarea>
-                    <p class="text-[10px] text-outline mt-xs">Balises : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN], [DUREE], [CIVILITE], [TITRE_NOM], [ACCORD_E], [DATE_NAISSANCE], [LIEU_NAISSANCE]</p>
+                    <p class="text-[10px] text-outline mt-xs">Balises : [NOM], [SPECIALITE], [ETABLISSEMENT], [DATE_DEBUT], [DATE_FIN], [DATE_DEBUT_LONGUE], [DATE_FIN_LONGUE], [DUREE], [DE_DUREE], [CIVILITE], [CIVILITE_LONGUE], [TITRE_NOM], [ACCORD_E], [DATE_NAISSANCE], [DATE_NAISSANCE_LONGUE], [LIEU_NAISSANCE]. **texte** s'imprime en gras.</p>
                 </div>
                 <button type="button" wire:click="saveTemplate('stagiaire')" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Enregistrer ce Modèle</button>
             </div>
+        </div>
+
+        {{-- ATT-2 — Règle de signature selon la durée, par modèle. --}}
+        <div class="grid grid-cols-1 gap-md mt-md">
+            @foreach(['employe' => 'Attestation de Travail (Employé)', 'stagiaire' => 'Attestation de Formation (Stagiaire)'] as $type => $libelleModele)
+            <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md" dusk="reglage-{{ $type }}">
+                <p class="text-xs font-bold text-brand-forest uppercase flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">workspace_premium</span>Signataires et règle de signature — {{ $libelleModele }}</p>
+
+                <div class="flex flex-wrap items-center gap-sm text-xs">
+                    <span>Palier court : jusqu'à</span>
+                    <input wire:model="reglage.{{ $type }}.seuil_signature_mois" type="number" min="1" max="120" dusk="seuil-{{ $type }}" class="w-20 h-9 px-sm border rounded-lg text-xs text-right {{ $errors->has('reglage.'.$type.'.seuil_signature_mois') ? 'is-invalid' : 'border-outline-variant' }}">
+                    <span>mois <strong>inclus</strong> ; au-delà, palier long. Durée comptée de la date de début à la date de fin (à aujourd'hui sans date de fin).</span>
+                </div>
+                @error('reglage.'.$type.'.seuil_signature_mois') <p class="invalid-feedback">{{ $message }}</p> @enderror
+
+                <div class="space-y-sm">
+                    @foreach([1 => 'Directeur Général (le promoteur)', 2 => 'Examinateur', 3 => 'Président du Jury'] as $n => $role)
+                    <div class="border border-outline-variant rounded-lg p-sm space-y-xs">
+                        <p class="text-[10px] font-bold text-brand-forest uppercase">{{ $role }}</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-xs">
+                            <input wire:model="reglage.{{ $type }}.sig{{ $n }}_titre" type="text" placeholder="Intitulé imprimé (vide : aucun)" class="h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                            <input wire:model="reglage.{{ $type }}.sig{{ $n }}_nom" type="text" placeholder="Nom" class="h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                            <input wire:model="reglage.{{ $type }}.sig{{ $n }}_fonction" type="text" placeholder="Fonction" class="h-9 px-sm border border-outline-variant rounded-lg text-xs">
+                        </div>
+                        <div class="flex flex-wrap gap-md text-xs">
+                            <label class="flex items-center gap-xs cursor-pointer"><input type="checkbox" wire:model="reglage.{{ $type }}.sig{{ $n }}_court" class="accent-brand-emerald">Signe le palier court</label>
+                            <label class="flex items-center gap-xs cursor-pointer"><input type="checkbox" wire:model="reglage.{{ $type }}.sig{{ $n }}_long" class="accent-brand-emerald">Signe le palier long</label>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+
+                <div>
+                    <label class="flex items-center gap-xs text-xs cursor-pointer mb-xs"><input type="checkbox" wire:model="reglage.{{ $type }}.appreciation_imprimee" class="accent-brand-emerald">Imprimer l'appréciation par défaut (modifiable à chaque émission)</label>
+                    <textarea wire:model="reglage.{{ $type }}.appreciation_text" rows="2" placeholder="{{ $type === 'stagiaire' ? \App\Models\AttestationTemplate::APPRECIATION_STAGIAIRE : 'Aucune phrase standard' }}" class="w-full px-md py-sm border border-outline-variant rounded-lg text-xs"></textarea>
+                    <p class="text-[10px] text-outline mt-xs">Vide : la phrase standard du modèle officiel. **texte** s'imprime en gras. Balises : [CIVILITE_LONGUE], [NOM], [TITRE_NOM], [ACCORD_E].</p>
+                </div>
+
+                <button type="button" wire:click="saveReglage('{{ $type }}')" dusk="enregistrer-reglage-{{ $type }}" class="w-full py-sm rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs">Enregistrer la règle de signature</button>
+            </div>
+            @endforeach
         </div>
     @endif
 </div>

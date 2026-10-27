@@ -189,4 +189,94 @@ class ApiAttestationsTest extends TestCase
         $this->avec('rh')->putJson('/api/attestation-templates/inconnu', ['body_text' => 'x'])
             ->assertNotFound();
     }
+
+    // ───────────── ATT-2 : civilité, signataires et règle de signature depuis le poste ─────────────
+
+    public function test_la_civilite_et_les_signataires_du_poste_arrivent_a_la_fabrique(): void
+    {
+        $espion = \Mockery::mock(AttestationService::class)->makePartial();
+        $espion->shouldReceive('generer')->once()->withArgs(function (...$a) {
+            return $a[0] === 'stagiaire'
+                && $a[2] === 'CDI'
+                && $a[3] === '2024-01-01'
+                && $a[5] === 'Très assidu.'                       // « appreciation » du poste devient la note
+                && $a[7] === 'Mme'                                // la civilité n'est PLUS avalée
+                && $a[8] === ['sig2' => ['nom' => 'KPOHAZOUNDE Jean', 'fonction' => 'Chef ATDA Pôle 5']];
+        })->andReturn(['octets' => '%PDF-1.4 essai', 'fichier' => 'attestation-adjovi-felicite.pdf']);
+        $this->app->instance(AttestationService::class, $espion);
+
+        $this->avec('rh')->postJson('/api/attestations', [
+            'type' => 'stagiaire', 'person_id' => $this->stagiaire->id,
+            'start_date' => '2024-01-01', 'end_date' => '2026-05-31',
+            'appreciation' => 'Très assidu.', 'civilite' => 'Mme',
+            'sig2_nom' => 'KPOHAZOUNDE Jean', 'sig2_fonction' => 'Chef ATDA Pôle 5',
+        ])->assertOk();
+    }
+
+    public function test_une_civilite_inconnue_est_refusee(): void
+    {
+        $this->avec('rh')->postJson('/api/attestations', [
+            'type' => 'stagiaire', 'person_id' => $this->stagiaire->id, 'civilite' => 'Dr',
+        ])->assertStatus(422)->assertJsonValidationErrors('civilite');
+        $this->assertSame(0, AuditLog::where('action', 'like', 'attestation.generated%')->count());
+    }
+
+    public function test_le_tirage_sert_la_regle_de_signature_et_les_signataires(): void
+    {
+        $m = collect($this->avec('caisse')->getJson('/api/sync/pull')->assertOk()->json('attestation_templates'))->firstWhere('type', 'stagiaire');
+
+        $this->assertSame(12, $m['seuil_signature_mois']);
+        $this->assertSame('Hassimiyou O. OLOUKOUNLE', $m['sig1_nom']);
+        $this->assertSame('Examinateur', $m['sig2_titre']);
+        $this->assertTrue($m['sig1_court']);
+        $this->assertFalse($m['sig2_court']);
+        $this->assertTrue($m['sig3_long']);
+        $this->assertTrue($m['appreciation_imprimee']);
+    }
+
+    public function test_la_regle_de_signature_s_enregistre_depuis_le_poste(): void
+    {
+        $this->avec('rh')->putJson('/api/attestation-templates/stagiaire', [
+            'seuil_signature_mois' => 6, 'sig2_court' => true, 'sig2_nom' => 'KPOHAZOUNDE Jean',
+            'sig3_fonction' => 'Président FN-CCPB', 'appreciation_imprimee' => false,
+        ])->assertOk();
+
+        $m = AttestationTemplate::forType('stagiaire')->fresh();
+        $this->assertSame(6, $m->seuil_signature_mois);
+        $this->assertTrue($m->sig2_court);
+        $this->assertSame('KPOHAZOUNDE Jean', $m->sig2_nom);
+        $this->assertSame('Président FN-CCPB', $m->sig3_fonction);
+        $this->assertFalse($m->appreciation_imprimee);
+        $this->assertSame($m->body_text, AttestationTemplate::CORPS_STAGIAIRE, 'le texte n\'est pas touché quand il n\'est pas envoyé');
+    }
+
+    public function test_un_intitule_vide_du_poste_est_enregistre_sans_erreur(): void
+    {
+        // Le poste envoie '' pour le Directeur (pas d'intitulé) ; le middleware le lit `null`, la colonne est NON NULLABLE.
+        $this->avec('rh')->putJson('/api/attestation-templates/stagiaire', [
+            'sig1_titre' => '', 'sig1_fonction' => '', 'appreciation_text' => '',
+        ])->assertOk();
+
+        $m = AttestationTemplate::forType('stagiaire')->fresh();
+        $this->assertSame('', $m->sig1_titre);
+        $this->assertNull($m->appreciation_text, 'vide = la phrase standard du modèle');
+    }
+
+    public function test_un_seuil_invalide_ne_change_rien(): void
+    {
+        $rh = $this->avec('rh');
+        foreach ([0, 121, 'abc'] as $mauvais) {
+            $rh->putJson('/api/attestation-templates/stagiaire', ['seuil_signature_mois' => $mauvais])
+                ->assertStatus(422)->assertJsonValidationErrors('seuil_signature_mois');
+        }
+
+        $this->assertSame(12, AttestationTemplate::forType('stagiaire')->seuil_signature_mois);
+    }
+
+    public function test_un_lecteur_ne_change_pas_la_regle_de_signature(): void
+    {
+        $this->avec('lecteur')->putJson('/api/attestation-templates/stagiaire', ['seuil_signature_mois' => 3])->assertStatus(403);
+
+        $this->assertSame(12, AttestationTemplate::forType('stagiaire')->seuil_signature_mois);
+    }
 }

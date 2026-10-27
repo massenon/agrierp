@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
@@ -52,12 +53,7 @@ class ClientAttestations {
     DateTime? birthDate,
     String birthPlace = '',
     String civilite = 'M.',
-    String? sig1Titre,
-    String? sig1Nom,
-    String? sig2Titre,
-    String? sig2Nom,
-    String? sig3Titre,
-    String? sig3Nom,
+    Map<String, String> signataires = const {},
   }) async {
     try {
       final reponse = await _client.post<List<int>>(
@@ -74,12 +70,9 @@ class ClientAttestations {
           if (birthDate != null) 'birth_date': _jour(birthDate),
           if (birthPlace.trim().isNotEmpty) 'birth_place': birthPlace,
           'civilite': civilite,
-          'sig1_titre': ?sig1Titre,
-          'sig1_nom': ?sig1Nom,
-          'sig2_titre': ?sig2Titre,
-          'sig2_nom': ?sig2Nom,
-          'sig3_titre': ?sig3Titre,
-          'sig3_nom': ?sig3Nom,
+          // ATT-2 : les modifications des signataires POUR CETTE attestation (`sig2_nom`, `sig3_fonction`…). Les clés sont
+          // celles du serveur ; la position 1 est le Directeur Général, 2 l'Examinateur, 3 le Président du Jury.
+          ...signataires,
         },
         options: Options(responseType: ResponseType.bytes),
       );
@@ -106,6 +99,18 @@ class ClientAttestations {
       await _client.put<dynamic>(
         '/api/attestation-templates/$type',
         data: {'body_text': texte},
+      );
+    } on DioException catch (e) {
+      throw _echec(e);
+    }
+  }
+
+  /// Enregistre la règle de signature d'un modèle (ATT-2) : seuil, signataires, qui signe chaque palier, appréciation.
+  Future<void> enregistrerReglage(String type, ReglageSignature r) async {
+    try {
+      await _client.put<dynamic>(
+        '/api/attestation-templates/$type',
+        data: r.versServeur(),
       );
     } on DioException catch (e) {
       throw _echec(e);
@@ -140,6 +145,7 @@ class ClientAttestations {
         'person_id': 'personne',
         'type': 'personne',
         'body_text': 'modele',
+        'seuil_signature_mois': 'reglage',
       };
       (corps['errors'] as Map).forEach((cle, messages) {
         final champ = correspondance[cle];
@@ -177,6 +183,182 @@ class ClientAttestations {
 
     return const {};
   }
+}
+
+/// Un signataire du modèle d'attestation (ATT-2).
+///
+/// ⚠️ LA POSITION EST CELLE DU SERVEUR : 1 = Directeur Général (le promoteur), 2 = Examinateur, 3 = Président du Jury.
+/// L'ordre d'IMPRESSION, de gauche à droite, est Examinateur (2), Président du Jury (3), Directeur Général (1).
+class SignataireModele {
+  const SignataireModele({
+    required this.position,
+    this.titre = '',
+    this.nom = '',
+    this.fonction = '',
+    this.court = false,
+    this.long = false,
+  });
+
+  final int position;
+
+  /// Intitulé souligné au-dessus du nom (« Examinateur ») ; vide pour le Directeur, qui n'en a pas.
+  final String titre;
+  final String nom;
+  final String fonction;
+
+  /// Signe-t-il les attestations du palier court (jusqu'au seuil) / long (au-delà) ?
+  final bool court;
+  final bool long;
+
+  SignataireModele avec({String? titre, String? nom, String? fonction, bool? court, bool? long}) => SignataireModele(
+    position: position,
+    titre: titre ?? this.titre,
+    nom: nom ?? this.nom,
+    fonction: fonction ?? this.fonction,
+    court: court ?? this.court,
+    long: long ?? this.long,
+  );
+}
+
+/// La règle de signature d'un modèle d'attestation (ATT-2) : seuil de durée, signataires, appréciation.
+///
+/// ⚠️⚠️ **QUI SIGNE EST UNE RÈGLE DU MODÈLE, SERVIE PAR LE SERVEUR** — jamais une constante du poste. Demande du client :
+/// d'un mois à un an, SEUL le promoteur signe ; au-delà d'un an, TROIS personnes signent. `palier` et `requis` sont la
+/// transposition de `AttestationService::palier()` / `signataires()` ; `test/attestations_parite_php_test.dart` les
+/// exécute contre le vrai PHP. Le PDF, lui, vient du serveur et fait foi : ceci pilote le formulaire et l'aperçu.
+class ReglageSignature {
+  const ReglageSignature({
+    this.seuilMois = 12,
+    required this.signataires,
+    this.appreciationText,
+    this.appreciationImprimee = true,
+  });
+
+  /// Jusqu'à ce nombre de mois INCLUS : palier court ; au-delà : palier long.
+  final int seuilMois;
+
+  /// Clés 1 à 3.
+  final Map<int, SignataireModele> signataires;
+
+  /// Phrase d'appréciation par défaut ; `null` = la phrase standard du modèle officiel.
+  final String? appreciationText;
+
+  /// Faux : seule l'appréciation saisie à l'émission s'imprime.
+  final bool appreciationImprimee;
+
+  static const ordreImpression = [2, 3, 1];
+
+  /// Les valeurs d'un modèle neuf du serveur (modèle fourni par le client, attestation du 24/10/2026).
+  static const defaut = ReglageSignature(
+    signataires: {
+      1: SignataireModele(
+        position: 1,
+        nom: 'Hassimiyou O. OLOUKOUNLE',
+        fonction: 'Directeur de la Ferme ÉCOLE OLOUWACHEGOUN',
+        court: true,
+        long: true,
+      ),
+      2: SignataireModele(
+        position: 2,
+        titre: 'Examinateur',
+        nom: 'SOGNIGBE Gbédjinou Serge Bruno',
+        fonction: "Chef Cellule Communale de l'ATDA Pôle 6(Plateau)",
+        long: true,
+      ),
+      3: SignataireModele(
+        position: 3,
+        titre: 'Président du Jury',
+        nom: 'Elisée Kocou HOUNKPONOU',
+        fonction:
+            'Président de la Fédération Nationale des Coopératives de Cuniculteurs Modernes et Professionnel du Bénin FN-CCPB',
+        long: true,
+      ),
+    },
+  );
+
+  ReglageSignature avec({
+    int? seuilMois,
+    Map<int, SignataireModele>? signataires,
+    String? appreciationText,
+    bool effacerAppreciation = false,
+    bool? appreciationImprimee,
+  }) => ReglageSignature(
+    seuilMois: seuilMois ?? this.seuilMois,
+    signataires: signataires ?? this.signataires,
+    appreciationText: effacerAppreciation ? null : (appreciationText ?? this.appreciationText),
+    appreciationImprimee: appreciationImprimee ?? this.appreciationImprimee,
+  );
+
+  /// `court` ou `long` — voir `AttestationService::palier()`.
+  ///
+  /// Compté en mois CALENDAIRES depuis la date de début : du 15/10/2025 au 15/10/2026 = 12 mois exactement = palier court ;
+  /// le 16/10/2026 = palier long. Sans date de fin, la durée court jusqu'à [aujourdhui] ; sans date de début, rien n'est
+  /// mesurable : palier court (le promoteur seul).
+  static String palier(DateTime? debut, DateTime? fin, int seuilMois, DateTime aujourdhui) {
+    if (debut == null) return 'court';
+
+    final d = DateTime(debut.year, debut.month, debut.day);
+    final f = fin ?? aujourdhui;
+    final limite = ajouterMois(d, seuilMois);
+
+    return DateTime(f.year, f.month, f.day).isAfter(limite) ? 'long' : 'court';
+  }
+
+  /// `addMonthsNoOverflow` de Carbon : le 31 janvier + 1 mois = le 28 (ou 29) février.
+  static DateTime ajouterMois(DateTime d, int n) {
+    final total = d.year * 12 + (d.month - 1) + n;
+    final annee = total ~/ 12;
+    final mois = total % 12 + 1;
+    final dernier = DateTime(annee, mois + 1, 0).day;
+
+    return DateTime(annee, mois, math.min(d.day, dernier));
+  }
+
+  /// Les signataires à imprimer, de gauche à droite, pour cette durée — voir `AttestationService::signataires()`.
+  /// [surcharges] : « sig1 » … « sig3 » → (`titre` | `nom` | `fonction`) saisis pour CETTE attestation (vides ignorés).
+  List<SignataireModele> requis({
+    required DateTime? debut,
+    required DateTime? fin,
+    required DateTime aujourdhui,
+    Map<int, Map<String, String>> surcharges = const {},
+  }) {
+    final p = palier(debut, fin, seuilMois, aujourdhui);
+    final liste = <SignataireModele>[];
+
+    for (final position in ordreImpression) {
+      final s = signataires[position];
+      if (s == null || !(p == 'long' ? s.long : s.court)) continue;
+
+      String choix(String champ, String modele) {
+        final saisi = (surcharges[position]?[champ] ?? '').trim();
+        return saisi.isNotEmpty ? saisi : modele.trim();
+      }
+
+      final titre = choix('titre', s.titre);
+      final nom = choix('nom', s.nom);
+      final fonction = choix('fonction', s.fonction);
+      if (titre.isEmpty && nom.isEmpty && fonction.isEmpty) continue;
+
+      liste.add(s.avec(titre: titre, nom: nom, fonction: fonction));
+    }
+
+    return liste;
+  }
+
+  /// Le corps de `PUT /api/attestation-templates/{type}` pour cette règle (le texte du modèle n'y est pas : il a son
+  /// propre bouton, et le serveur ne touche pas à ce qui n'est pas envoyé).
+  Map<String, Object?> versServeur() => {
+    'seuil_signature_mois': seuilMois,
+    'appreciation_text': (appreciationText ?? '').trim().isEmpty ? null : appreciationText,
+    'appreciation_imprimee': appreciationImprimee,
+    for (final n in [1, 2, 3]) ...{
+      'sig${n}_titre': signataires[n]?.titre ?? '',
+      'sig${n}_nom': signataires[n]?.nom ?? '',
+      'sig${n}_fonction': signataires[n]?.fonction ?? '',
+      'sig${n}_court': signataires[n]?.court ?? false,
+      'sig${n}_long': signataires[n]?.long ?? false,
+    },
+  };
 }
 
 /// Une personne proposée au sélecteur, avec ce que la page préremplit.
@@ -290,6 +472,55 @@ class AttestationsRepository {
     return ligne?.bodyText;
   }
 
+  /// La règle de signature d'un modèle (ATT-2), `null` tant que le poste ne l'a pas reçue.
+  Future<ReglageSignature?> reglage(String type) async {
+    final m = await (database.select(
+      database.attestationTemplates,
+    )..where((t) => t.type.equals(type))).getSingleOrNull();
+    if (m == null) return null;
+
+    return ReglageSignature(
+      seuilMois: m.seuilSignatureMois,
+      appreciationText: m.appreciationText,
+      appreciationImprimee: m.appreciationImprimee,
+      signataires: {
+        1: SignataireModele(position: 1, titre: m.sig1Titre ?? '', nom: m.sig1Nom ?? '', fonction: m.sig1Fonction ?? '', court: m.sig1Court, long: m.sig1Long),
+        2: SignataireModele(position: 2, titre: m.sig2Titre ?? '', nom: m.sig2Nom ?? '', fonction: m.sig2Fonction ?? '', court: m.sig2Court, long: m.sig2Long),
+        3: SignataireModele(position: 3, titre: m.sig3Titre ?? '', nom: m.sig3Nom ?? '', fonction: m.sig3Fonction ?? '', court: m.sig3Court, long: m.sig3Long),
+      },
+    );
+  }
+
+  /// Enregistre la règle de signature : le serveur d'abord, la base locale ensuite (comme [enregistrerModele] : une règle
+  /// affichée « enregistrée » avant que le serveur l'ait prise ferait produire des attestations avec l'ancienne).
+  Future<void> enregistrerReglage(String type, ReglageSignature r) async {
+    await _client().enregistrerReglage(type, r);
+
+    final sig = r.signataires;
+    await (database.update(database.attestationTemplates)..where((m) => m.type.equals(type))).write(
+      AttestationTemplatesCompanion(
+        seuilSignatureMois: Value(r.seuilMois),
+        appreciationText: Value((r.appreciationText ?? '').trim().isEmpty ? null : r.appreciationText),
+        appreciationImprimee: Value(r.appreciationImprimee),
+        sig1Titre: Value(sig[1]?.titre ?? ''),
+        sig1Nom: Value(sig[1]?.nom ?? ''),
+        sig1Fonction: Value(sig[1]?.fonction ?? ''),
+        sig2Titre: Value(sig[2]?.titre ?? ''),
+        sig2Nom: Value(sig[2]?.nom ?? ''),
+        sig2Fonction: Value(sig[2]?.fonction ?? ''),
+        sig3Titre: Value(sig[3]?.titre ?? ''),
+        sig3Nom: Value(sig[3]?.nom ?? ''),
+        sig3Fonction: Value(sig[3]?.fonction ?? ''),
+        sig1Court: Value(sig[1]?.court ?? false),
+        sig2Court: Value(sig[2]?.court ?? false),
+        sig3Court: Value(sig[3]?.court ?? false),
+        sig1Long: Value(sig[1]?.long ?? false),
+        sig2Long: Value(sig[2]?.long ?? false),
+        sig3Long: Value(sig[3]?.long ?? false),
+      ),
+    );
+  }
+
   /// Nombre d'attestations émises d'un type, `null` si le poste ne l'a jamais
   /// reçu — ⚠️ jamais zéro : « 0 » dirait qu'aucune n'a été délivrée.
   Future<int?> emises(String type) async {
@@ -316,41 +547,159 @@ class AttestationsRepository {
     DateTime? birthDate,
     String birthPlace = '',
     String civilite = 'M.',
+    DateTime? aujourdhui,
+  }) => sansMarques(
+    remplacer(
+      modele: modele,
+      type: type,
+      personne: personne,
+      contrat: contrat,
+      debut: debut,
+      fin: fin,
+      birthDate: birthDate,
+      birthPlace: birthPlace,
+      civilite: civilite,
+      aujourdhui: aujourdhui,
+    ),
+  );
+
+  /// Phrase standard d'appréciation du modèle « stagiaire » (modèle officiel) — `AttestationTemplate::APPRECIATION_STAGIAIRE`.
+  static const appreciationStagiaire =
+      'Au cours de sa formation, [CIVILITE_LONGUE] **[NOM]** s’est distingué[ACCORD_E] par sa ponctualité, '
+      'son esprit d’initiative, sa capacité d’adaptation et sa motivation à apprendre.';
+
+  /// La phrase d'appréciation du document : la saisie de l'émetteur, sinon celle du modèle (`appreciationText`, ou la
+  /// phrase standard d'une formation) ; `null` = rien à imprimer — `AttestationService::appreciation()`. Sans les `**`.
+  static String? appreciation({
+    required String type,
+    required PersonneAttestation personne,
+    required String saisie,
+    required ReglageSignature? reglage,
+    DateTime? debut,
+    DateTime? fin,
+    String civilite = 'M.',
+    DateTime? aujourdhui,
+  }) {
+    if (saisie.trim().isNotEmpty) return saisie.trim();
+    if (reglage != null && !reglage.appreciationImprimee) return null;
+
+    final modele = reglage?.appreciationText ?? (type == 'stagiaire' ? appreciationStagiaire : '');
+    if (modele.trim().isEmpty) return null;
+
+    return sansMarques(
+      remplacer(
+        modele: modele,
+        type: type,
+        personne: personne,
+        contrat: '',
+        debut: debut,
+        fin: fin,
+        civilite: civilite,
+        aujourdhui: aujourdhui,
+      ),
+    );
+  }
+
+  /// Retire les marques `**gras**` du texte du modèle (l'aperçu les affiche sans astérisques ; le PDF les imprime en gras).
+  static String sansMarques(String texte) => texte.replaceAll('**', '');
+
+  /// Le texte du modèle, balises remplacées, marques `**gras**` CONSERVÉES — `AttestationService::remplacer()`.
+  static String remplacer({
+    required String modele,
+    required String type,
+    required PersonneAttestation personne,
+    required String contrat,
+    DateTime? debut,
+    DateTime? fin,
+    DateTime? birthDate,
+    String birthPlace = '',
+    String civilite = 'M.',
+    DateTime? aujourdhui,
   }) {
     final accordE = civilite == 'Mme' ? 'e' : '';
-    final titreNom = civilite == 'Mme'
-        ? 'Madame ${personne.libelle}'
-        : 'Monsieur ${personne.libelle}';
-    final remplacements = type == 'employe'
-        ? {
-            '[NOM]': personne.libelle,
-            '[POSTE]': personne.poste ?? '',
-            '[CONTRAT]': contrat,
-            '[DATE_DEBUT]': _date(debut) ?? '',
-            '[DATE_FIN]': _date(fin) ?? 'ce jour',
-            '[CIVILITE]': civilite,
-            '[TITRE_NOM]': titreNom,
-            '[ACCORD_E]': accordE,
-          }
+    final civiliteLongue = civilite == 'Mme' ? 'Madame' : 'Monsieur';
+    final titreNom = '$civiliteLongue ${personne.libelle}';
+    final commun = <String, String>{
+      '[NOM]': personne.libelle,
+      '[CIVILITE]': civilite,
+      '[TITRE_NOM]': titreNom,
+      '[CIVILITE_LONGUE]': civiliteLongue,
+      '[ACCORD_E]': accordE,
+      '[DATE_DEBUT]': _date(debut) ?? '',
+      '[DATE_FIN]': _date(fin) ?? 'ce jour',
+      '[DATE_DEBUT_LONGUE]': debut == null ? '' : dateLongue(debut),
+      '[DATE_FIN_LONGUE]': fin == null ? 'ce jour' : dateLongue(fin),
+      '[DUREE]': formatDuree(debut, fin, aujourdhui: aujourdhui),
+      '[DE_DUREE]': deDuree(debut, fin, aujourdhui: aujourdhui),
+    };
+    final propres = type == 'employe'
+        ? {'[POSTE]': personne.poste ?? '', '[CONTRAT]': contrat}
         : {
-            '[NOM]': personne.libelle,
             '[SPECIALITE]': personne.etablissement ?? '',
             '[ETABLISSEMENT]': personne.etablissement ?? '',
-            '[DATE_DEBUT]': _date(debut) ?? '',
-            '[DATE_FIN]': _date(fin) ?? 'ce jour',
             '[DATE_NAISSANCE]': _date(birthDate) ?? '',
+            '[DATE_NAISSANCE_LONGUE]': birthDate == null ? '' : dateLongue(birthDate),
             '[LIEU_NAISSANCE]': birthPlace,
-            '[CIVILITE]': civilite,
-            '[TITRE_NOM]': titreNom,
-            '[ACCORD_E]': accordE,
           };
 
-    var texte = modele;
-    remplacements.forEach((balise, valeur) {
-      texte = texte.replaceAll(balise, valeur);
-    });
-    return texte;
+    // ⚠️ UN SEUL PASSAGE, comme `strtr` du serveur : une valeur qui ressemblerait à une balise n'est pas remplacée à son tour.
+    final toutes = {...commun, ...propres};
+    final motif = RegExp(toutes.keys.map(RegExp.escape).join('|'));
+
+    return modele.replaceAllMapped(motif, (m) => toutes[m.group(0)]!);
   }
+
+  static const _mois = [
+    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+  ];
+
+  /// « 15 octobre 2025 » — `AttestationService::dateLongue()`.
+  static String dateLongue(DateTime d) => '${d.day} ${_mois[d.month - 1]} ${d.year}';
+
+  /// Durée entre deux dates en mois PLEINS, dite en toutes lettres : « six (06) mois », « un (01) an et trois (03) mois ».
+  /// ⚠️ « an » (jamais « ans ») pour 1 an exactement. Vide sous un mois — `AttestationService::formatDuree()`.
+  static String formatDuree(DateTime? debut, DateTime? fin, {DateTime? aujourdhui}) {
+    if (debut == null) return '';
+
+    final d = DateTime(debut.year, debut.month, debut.day);
+    final f0 = fin ?? aujourdhui ?? DateTime.now();
+    final f = DateTime(f0.year, f0.month, f0.day);
+
+    var total = (f.year - d.year) * 12 + (f.month - d.month);
+    if (f.day < d.day) total -= 1;
+    if (total <= 0) return '';
+
+    final ans = total ~/ 12;
+    final mois = total % 12;
+    final parties = <String>[];
+
+    if (ans > 0) {
+      parties.add('${_motNombre(ans)} (${ans.toString().padLeft(2, '0')}) ${ans == 1 ? 'an' : 'ans'}');
+    }
+    if (mois > 0) {
+      parties.add('${_motNombre(mois)} (${mois.toString().padLeft(2, '0')}) mois');
+    }
+
+    return parties.join(' et ');
+  }
+
+  /// « d'un (01) an » / « de six (06) mois », avec l'espace qui l'attache au mot précédent ; vide sans durée.
+  static String deDuree(DateTime? debut, DateTime? fin, {DateTime? aujourdhui}) {
+    final duree = formatDuree(debut, fin, aujourdhui: aujourdhui);
+    if (duree.isEmpty) return '';
+
+    return duree.startsWith('un ') ? " d'$duree" : ' de $duree';
+  }
+
+  static String _motNombre(int n) =>
+      const {
+        1: 'un', 2: 'deux', 3: 'trois', 4: 'quatre', 5: 'cinq', 6: 'six', 7: 'sept', 8: 'huit', 9: 'neuf',
+        10: 'dix', 11: 'onze', 12: 'douze', 13: 'treize', 14: 'quatorze', 15: 'quinze', 16: 'seize',
+        17: 'dix-sept', 18: 'dix-huit', 19: 'dix-neuf', 20: 'vingt', 21: 'vingt et un', 22: 'vingt-deux',
+        23: 'vingt-trois', 24: 'vingt-quatre',
+      }[n] ??
+      '$n';
 
   static String? _date(DateTime? d) => d == null
       ? null
@@ -369,12 +718,7 @@ class AttestationsRepository {
     DateTime? birthDate,
     String birthPlace = '',
     String civilite = 'M.',
-    String? sig1Titre,
-    String? sig1Nom,
-    String? sig2Titre,
-    String? sig2Nom,
-    String? sig3Titre,
-    String? sig3Nom,
+    Map<String, String> signataires = const {},
   }) async => _client().generer(
     type: type,
     personneId: personne.id,
@@ -387,12 +731,7 @@ class AttestationsRepository {
     birthDate: birthDate,
     birthPlace: birthPlace,
     civilite: civilite,
-    sig1Titre: sig1Titre,
-    sig1Nom: sig1Nom,
-    sig2Titre: sig2Titre,
-    sig2Nom: sig2Nom,
-    sig3Titre: sig3Titre,
-    sig3Nom: sig3Nom,
+    signataires: signataires,
   );
 
   /// Enregistre un modèle : le serveur d'abord, la base locale ensuite.

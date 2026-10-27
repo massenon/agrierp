@@ -775,6 +775,24 @@ class AttestationTemplates extends Table {
   TextColumn get sig3Titre => text().nullable()();
   TextColumn get sig3Nom => text().nullable()();
 
+  // ATT-2 (v66) — SIGNATAIRES SELON LA DURÉE, PARAMÉTRABLES (serveur : migration 2026_10_27_000001).
+  // Position 1 = Directeur Général (le promoteur), 2 = Examinateur, 3 = Président du Jury — la numérotation du serveur.
+  // Jusqu'à `seuilSignatureMois` mois INCLUS : palier « court » (par défaut le promoteur seul) ; au-delà, palier « long »
+  // (par défaut les trois). Le serveur sert ces valeurs au tirage ; le poste les modifie par `PUT /api/attestation-templates`.
+  IntColumn get seuilSignatureMois => integer().withDefault(const Constant(12))();
+  TextColumn get sig1Fonction => text().nullable()();
+  TextColumn get sig2Fonction => text().nullable()();
+  TextColumn get sig3Fonction => text().nullable()();
+  BoolColumn get sig1Court => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig2Court => boolean().withDefault(const Constant(false))();
+  BoolColumn get sig3Court => boolean().withDefault(const Constant(false))();
+  BoolColumn get sig1Long => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig2Long => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig3Long => boolean().withDefault(const Constant(true))();
+  // Phrase d'appréciation imprimée par défaut ; `null` = la phrase standard du modèle. `appreciationImprimee` faux : aucune.
+  TextColumn get appreciationText => text().nullable()();
+  BoolColumn get appreciationImprimee => boolean().withDefault(const Constant(true))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1978,7 +1996,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 65;
+  int get schemaVersion => 66;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2588,6 +2606,33 @@ class AppDatabase extends _$AppDatabase {
             m, attestationTemplates, attestationTemplates.sig3Titre);
         await _ajouterColonneSiAbsente(
             m, attestationTemplates, attestationTemplates.sig3Nom);
+      }
+      // v66 — ticket ATT-2 : règle de signature selon la durée (seuil, qui signe chaque palier), fonctions, appréciation.
+      if (from < 66) {
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.seuilSignatureMois);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.appreciationText);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.appreciationImprimee);
       }
     },
   );

@@ -346,6 +346,7 @@ return [
         'provende_price_kg' => 'prix au kg',
         'provende_species_id' => 'espèce',
         'purchase_date' => 'date de l\'achat',
+        'purchaseDate' => 'date de l\'achat',
         'qty' => 'quantité',
         'qtyAnimals' => 'nombre d\'animaux',
         'qtyProduced' => 'quantité produite',

@@ -17910,6 +17910,165 @@ class $AttestationTemplatesTable extends AttestationTemplates
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _seuilSignatureMoisMeta =
+      const VerificationMeta('seuilSignatureMois');
+  @override
+  late final GeneratedColumn<int> seuilSignatureMois = GeneratedColumn<int>(
+    'seuil_signature_mois',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(12),
+  );
+  static const VerificationMeta _sig1FonctionMeta = const VerificationMeta(
+    'sig1Fonction',
+  );
+  @override
+  late final GeneratedColumn<String> sig1Fonction = GeneratedColumn<String>(
+    'sig1_fonction',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig2FonctionMeta = const VerificationMeta(
+    'sig2Fonction',
+  );
+  @override
+  late final GeneratedColumn<String> sig2Fonction = GeneratedColumn<String>(
+    'sig2_fonction',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig3FonctionMeta = const VerificationMeta(
+    'sig3Fonction',
+  );
+  @override
+  late final GeneratedColumn<String> sig3Fonction = GeneratedColumn<String>(
+    'sig3_fonction',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sig1CourtMeta = const VerificationMeta(
+    'sig1Court',
+  );
+  @override
+  late final GeneratedColumn<bool> sig1Court = GeneratedColumn<bool>(
+    'sig1_court',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig1_court" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sig2CourtMeta = const VerificationMeta(
+    'sig2Court',
+  );
+  @override
+  late final GeneratedColumn<bool> sig2Court = GeneratedColumn<bool>(
+    'sig2_court',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig2_court" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sig3CourtMeta = const VerificationMeta(
+    'sig3Court',
+  );
+  @override
+  late final GeneratedColumn<bool> sig3Court = GeneratedColumn<bool>(
+    'sig3_court',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig3_court" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sig1LongMeta = const VerificationMeta(
+    'sig1Long',
+  );
+  @override
+  late final GeneratedColumn<bool> sig1Long = GeneratedColumn<bool>(
+    'sig1_long',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig1_long" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sig2LongMeta = const VerificationMeta(
+    'sig2Long',
+  );
+  @override
+  late final GeneratedColumn<bool> sig2Long = GeneratedColumn<bool>(
+    'sig2_long',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig2_long" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sig3LongMeta = const VerificationMeta(
+    'sig3Long',
+  );
+  @override
+  late final GeneratedColumn<bool> sig3Long = GeneratedColumn<bool>(
+    'sig3_long',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sig3_long" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _appreciationTextMeta = const VerificationMeta(
+    'appreciationText',
+  );
+  @override
+  late final GeneratedColumn<String> appreciationText = GeneratedColumn<String>(
+    'appreciation_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _appreciationImprimeeMeta =
+      const VerificationMeta('appreciationImprimee');
+  @override
+  late final GeneratedColumn<bool> appreciationImprimee = GeneratedColumn<bool>(
+    'appreciation_imprimee',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("appreciation_imprimee" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -17922,6 +18081,18 @@ class $AttestationTemplatesTable extends AttestationTemplates
     sig2Nom,
     sig3Titre,
     sig3Nom,
+    seuilSignatureMois,
+    sig1Fonction,
+    sig2Fonction,
+    sig3Fonction,
+    sig1Court,
+    sig2Court,
+    sig3Court,
+    sig1Long,
+    sig2Long,
+    sig3Long,
+    appreciationText,
+    appreciationImprimee,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -18001,6 +18172,96 @@ class $AttestationTemplatesTable extends AttestationTemplates
         sig3Nom.isAcceptableOrUnknown(data['sig3_nom']!, _sig3NomMeta),
       );
     }
+    if (data.containsKey('seuil_signature_mois')) {
+      context.handle(
+        _seuilSignatureMoisMeta,
+        seuilSignatureMois.isAcceptableOrUnknown(
+          data['seuil_signature_mois']!,
+          _seuilSignatureMoisMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sig1_fonction')) {
+      context.handle(
+        _sig1FonctionMeta,
+        sig1Fonction.isAcceptableOrUnknown(
+          data['sig1_fonction']!,
+          _sig1FonctionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sig2_fonction')) {
+      context.handle(
+        _sig2FonctionMeta,
+        sig2Fonction.isAcceptableOrUnknown(
+          data['sig2_fonction']!,
+          _sig2FonctionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sig3_fonction')) {
+      context.handle(
+        _sig3FonctionMeta,
+        sig3Fonction.isAcceptableOrUnknown(
+          data['sig3_fonction']!,
+          _sig3FonctionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sig1_court')) {
+      context.handle(
+        _sig1CourtMeta,
+        sig1Court.isAcceptableOrUnknown(data['sig1_court']!, _sig1CourtMeta),
+      );
+    }
+    if (data.containsKey('sig2_court')) {
+      context.handle(
+        _sig2CourtMeta,
+        sig2Court.isAcceptableOrUnknown(data['sig2_court']!, _sig2CourtMeta),
+      );
+    }
+    if (data.containsKey('sig3_court')) {
+      context.handle(
+        _sig3CourtMeta,
+        sig3Court.isAcceptableOrUnknown(data['sig3_court']!, _sig3CourtMeta),
+      );
+    }
+    if (data.containsKey('sig1_long')) {
+      context.handle(
+        _sig1LongMeta,
+        sig1Long.isAcceptableOrUnknown(data['sig1_long']!, _sig1LongMeta),
+      );
+    }
+    if (data.containsKey('sig2_long')) {
+      context.handle(
+        _sig2LongMeta,
+        sig2Long.isAcceptableOrUnknown(data['sig2_long']!, _sig2LongMeta),
+      );
+    }
+    if (data.containsKey('sig3_long')) {
+      context.handle(
+        _sig3LongMeta,
+        sig3Long.isAcceptableOrUnknown(data['sig3_long']!, _sig3LongMeta),
+      );
+    }
+    if (data.containsKey('appreciation_text')) {
+      context.handle(
+        _appreciationTextMeta,
+        appreciationText.isAcceptableOrUnknown(
+          data['appreciation_text']!,
+          _appreciationTextMeta,
+        ),
+      );
+    }
+    if (data.containsKey('appreciation_imprimee')) {
+      context.handle(
+        _appreciationImprimeeMeta,
+        appreciationImprimee.isAcceptableOrUnknown(
+          data['appreciation_imprimee']!,
+          _appreciationImprimeeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18050,6 +18311,54 @@ class $AttestationTemplatesTable extends AttestationTemplates
         DriftSqlType.string,
         data['${effectivePrefix}sig3_nom'],
       ),
+      seuilSignatureMois: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}seuil_signature_mois'],
+      )!,
+      sig1Fonction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig1_fonction'],
+      ),
+      sig2Fonction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig2_fonction'],
+      ),
+      sig3Fonction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sig3_fonction'],
+      ),
+      sig1Court: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig1_court'],
+      )!,
+      sig2Court: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig2_court'],
+      )!,
+      sig3Court: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig3_court'],
+      )!,
+      sig1Long: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig1_long'],
+      )!,
+      sig2Long: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig2_long'],
+      )!,
+      sig3Long: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sig3_long'],
+      )!,
+      appreciationText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}appreciation_text'],
+      ),
+      appreciationImprimee: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}appreciation_imprimee'],
+      )!,
     );
   }
 
@@ -18071,6 +18380,18 @@ class AttestationTemplate extends DataClass
   final String? sig2Nom;
   final String? sig3Titre;
   final String? sig3Nom;
+  final int seuilSignatureMois;
+  final String? sig1Fonction;
+  final String? sig2Fonction;
+  final String? sig3Fonction;
+  final bool sig1Court;
+  final bool sig2Court;
+  final bool sig3Court;
+  final bool sig1Long;
+  final bool sig2Long;
+  final bool sig3Long;
+  final String? appreciationText;
+  final bool appreciationImprimee;
   const AttestationTemplate({
     required this.id,
     required this.type,
@@ -18082,6 +18403,18 @@ class AttestationTemplate extends DataClass
     this.sig2Nom,
     this.sig3Titre,
     this.sig3Nom,
+    required this.seuilSignatureMois,
+    this.sig1Fonction,
+    this.sig2Fonction,
+    this.sig3Fonction,
+    required this.sig1Court,
+    required this.sig2Court,
+    required this.sig3Court,
+    required this.sig1Long,
+    required this.sig2Long,
+    required this.sig3Long,
+    this.appreciationText,
+    required this.appreciationImprimee,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -18108,6 +18441,26 @@ class AttestationTemplate extends DataClass
     if (!nullToAbsent || sig3Nom != null) {
       map['sig3_nom'] = Variable<String>(sig3Nom);
     }
+    map['seuil_signature_mois'] = Variable<int>(seuilSignatureMois);
+    if (!nullToAbsent || sig1Fonction != null) {
+      map['sig1_fonction'] = Variable<String>(sig1Fonction);
+    }
+    if (!nullToAbsent || sig2Fonction != null) {
+      map['sig2_fonction'] = Variable<String>(sig2Fonction);
+    }
+    if (!nullToAbsent || sig3Fonction != null) {
+      map['sig3_fonction'] = Variable<String>(sig3Fonction);
+    }
+    map['sig1_court'] = Variable<bool>(sig1Court);
+    map['sig2_court'] = Variable<bool>(sig2Court);
+    map['sig3_court'] = Variable<bool>(sig3Court);
+    map['sig1_long'] = Variable<bool>(sig1Long);
+    map['sig2_long'] = Variable<bool>(sig2Long);
+    map['sig3_long'] = Variable<bool>(sig3Long);
+    if (!nullToAbsent || appreciationText != null) {
+      map['appreciation_text'] = Variable<String>(appreciationText);
+    }
+    map['appreciation_imprimee'] = Variable<bool>(appreciationImprimee);
     return map;
   }
 
@@ -18135,6 +18488,26 @@ class AttestationTemplate extends DataClass
       sig3Nom: sig3Nom == null && nullToAbsent
           ? const Value.absent()
           : Value(sig3Nom),
+      seuilSignatureMois: Value(seuilSignatureMois),
+      sig1Fonction: sig1Fonction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig1Fonction),
+      sig2Fonction: sig2Fonction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig2Fonction),
+      sig3Fonction: sig3Fonction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sig3Fonction),
+      sig1Court: Value(sig1Court),
+      sig2Court: Value(sig2Court),
+      sig3Court: Value(sig3Court),
+      sig1Long: Value(sig1Long),
+      sig2Long: Value(sig2Long),
+      sig3Long: Value(sig3Long),
+      appreciationText: appreciationText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appreciationText),
+      appreciationImprimee: Value(appreciationImprimee),
     );
   }
 
@@ -18154,6 +18527,20 @@ class AttestationTemplate extends DataClass
       sig2Nom: serializer.fromJson<String?>(json['sig2Nom']),
       sig3Titre: serializer.fromJson<String?>(json['sig3Titre']),
       sig3Nom: serializer.fromJson<String?>(json['sig3Nom']),
+      seuilSignatureMois: serializer.fromJson<int>(json['seuilSignatureMois']),
+      sig1Fonction: serializer.fromJson<String?>(json['sig1Fonction']),
+      sig2Fonction: serializer.fromJson<String?>(json['sig2Fonction']),
+      sig3Fonction: serializer.fromJson<String?>(json['sig3Fonction']),
+      sig1Court: serializer.fromJson<bool>(json['sig1Court']),
+      sig2Court: serializer.fromJson<bool>(json['sig2Court']),
+      sig3Court: serializer.fromJson<bool>(json['sig3Court']),
+      sig1Long: serializer.fromJson<bool>(json['sig1Long']),
+      sig2Long: serializer.fromJson<bool>(json['sig2Long']),
+      sig3Long: serializer.fromJson<bool>(json['sig3Long']),
+      appreciationText: serializer.fromJson<String?>(json['appreciationText']),
+      appreciationImprimee: serializer.fromJson<bool>(
+        json['appreciationImprimee'],
+      ),
     );
   }
   @override
@@ -18170,6 +18557,18 @@ class AttestationTemplate extends DataClass
       'sig2Nom': serializer.toJson<String?>(sig2Nom),
       'sig3Titre': serializer.toJson<String?>(sig3Titre),
       'sig3Nom': serializer.toJson<String?>(sig3Nom),
+      'seuilSignatureMois': serializer.toJson<int>(seuilSignatureMois),
+      'sig1Fonction': serializer.toJson<String?>(sig1Fonction),
+      'sig2Fonction': serializer.toJson<String?>(sig2Fonction),
+      'sig3Fonction': serializer.toJson<String?>(sig3Fonction),
+      'sig1Court': serializer.toJson<bool>(sig1Court),
+      'sig2Court': serializer.toJson<bool>(sig2Court),
+      'sig3Court': serializer.toJson<bool>(sig3Court),
+      'sig1Long': serializer.toJson<bool>(sig1Long),
+      'sig2Long': serializer.toJson<bool>(sig2Long),
+      'sig3Long': serializer.toJson<bool>(sig3Long),
+      'appreciationText': serializer.toJson<String?>(appreciationText),
+      'appreciationImprimee': serializer.toJson<bool>(appreciationImprimee),
     };
   }
 
@@ -18184,6 +18583,18 @@ class AttestationTemplate extends DataClass
     Value<String?> sig2Nom = const Value.absent(),
     Value<String?> sig3Titre = const Value.absent(),
     Value<String?> sig3Nom = const Value.absent(),
+    int? seuilSignatureMois,
+    Value<String?> sig1Fonction = const Value.absent(),
+    Value<String?> sig2Fonction = const Value.absent(),
+    Value<String?> sig3Fonction = const Value.absent(),
+    bool? sig1Court,
+    bool? sig2Court,
+    bool? sig3Court,
+    bool? sig1Long,
+    bool? sig2Long,
+    bool? sig3Long,
+    Value<String?> appreciationText = const Value.absent(),
+    bool? appreciationImprimee,
   }) => AttestationTemplate(
     id: id ?? this.id,
     type: type ?? this.type,
@@ -18195,6 +18606,20 @@ class AttestationTemplate extends DataClass
     sig2Nom: sig2Nom.present ? sig2Nom.value : this.sig2Nom,
     sig3Titre: sig3Titre.present ? sig3Titre.value : this.sig3Titre,
     sig3Nom: sig3Nom.present ? sig3Nom.value : this.sig3Nom,
+    seuilSignatureMois: seuilSignatureMois ?? this.seuilSignatureMois,
+    sig1Fonction: sig1Fonction.present ? sig1Fonction.value : this.sig1Fonction,
+    sig2Fonction: sig2Fonction.present ? sig2Fonction.value : this.sig2Fonction,
+    sig3Fonction: sig3Fonction.present ? sig3Fonction.value : this.sig3Fonction,
+    sig1Court: sig1Court ?? this.sig1Court,
+    sig2Court: sig2Court ?? this.sig2Court,
+    sig3Court: sig3Court ?? this.sig3Court,
+    sig1Long: sig1Long ?? this.sig1Long,
+    sig2Long: sig2Long ?? this.sig2Long,
+    sig3Long: sig3Long ?? this.sig3Long,
+    appreciationText: appreciationText.present
+        ? appreciationText.value
+        : this.appreciationText,
+    appreciationImprimee: appreciationImprimee ?? this.appreciationImprimee,
   );
   AttestationTemplate copyWithCompanion(AttestationTemplatesCompanion data) {
     return AttestationTemplate(
@@ -18210,6 +18635,30 @@ class AttestationTemplate extends DataClass
       sig2Nom: data.sig2Nom.present ? data.sig2Nom.value : this.sig2Nom,
       sig3Titre: data.sig3Titre.present ? data.sig3Titre.value : this.sig3Titre,
       sig3Nom: data.sig3Nom.present ? data.sig3Nom.value : this.sig3Nom,
+      seuilSignatureMois: data.seuilSignatureMois.present
+          ? data.seuilSignatureMois.value
+          : this.seuilSignatureMois,
+      sig1Fonction: data.sig1Fonction.present
+          ? data.sig1Fonction.value
+          : this.sig1Fonction,
+      sig2Fonction: data.sig2Fonction.present
+          ? data.sig2Fonction.value
+          : this.sig2Fonction,
+      sig3Fonction: data.sig3Fonction.present
+          ? data.sig3Fonction.value
+          : this.sig3Fonction,
+      sig1Court: data.sig1Court.present ? data.sig1Court.value : this.sig1Court,
+      sig2Court: data.sig2Court.present ? data.sig2Court.value : this.sig2Court,
+      sig3Court: data.sig3Court.present ? data.sig3Court.value : this.sig3Court,
+      sig1Long: data.sig1Long.present ? data.sig1Long.value : this.sig1Long,
+      sig2Long: data.sig2Long.present ? data.sig2Long.value : this.sig2Long,
+      sig3Long: data.sig3Long.present ? data.sig3Long.value : this.sig3Long,
+      appreciationText: data.appreciationText.present
+          ? data.appreciationText.value
+          : this.appreciationText,
+      appreciationImprimee: data.appreciationImprimee.present
+          ? data.appreciationImprimee.value
+          : this.appreciationImprimee,
     );
   }
 
@@ -18225,13 +18674,25 @@ class AttestationTemplate extends DataClass
           ..write('sig2Titre: $sig2Titre, ')
           ..write('sig2Nom: $sig2Nom, ')
           ..write('sig3Titre: $sig3Titre, ')
-          ..write('sig3Nom: $sig3Nom')
+          ..write('sig3Nom: $sig3Nom, ')
+          ..write('seuilSignatureMois: $seuilSignatureMois, ')
+          ..write('sig1Fonction: $sig1Fonction, ')
+          ..write('sig2Fonction: $sig2Fonction, ')
+          ..write('sig3Fonction: $sig3Fonction, ')
+          ..write('sig1Court: $sig1Court, ')
+          ..write('sig2Court: $sig2Court, ')
+          ..write('sig3Court: $sig3Court, ')
+          ..write('sig1Long: $sig1Long, ')
+          ..write('sig2Long: $sig2Long, ')
+          ..write('sig3Long: $sig3Long, ')
+          ..write('appreciationText: $appreciationText, ')
+          ..write('appreciationImprimee: $appreciationImprimee')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     type,
     bodyText,
@@ -18242,7 +18703,19 @@ class AttestationTemplate extends DataClass
     sig2Nom,
     sig3Titre,
     sig3Nom,
-  );
+    seuilSignatureMois,
+    sig1Fonction,
+    sig2Fonction,
+    sig3Fonction,
+    sig1Court,
+    sig2Court,
+    sig3Court,
+    sig1Long,
+    sig2Long,
+    sig3Long,
+    appreciationText,
+    appreciationImprimee,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -18256,7 +18729,19 @@ class AttestationTemplate extends DataClass
           other.sig2Titre == this.sig2Titre &&
           other.sig2Nom == this.sig2Nom &&
           other.sig3Titre == this.sig3Titre &&
-          other.sig3Nom == this.sig3Nom);
+          other.sig3Nom == this.sig3Nom &&
+          other.seuilSignatureMois == this.seuilSignatureMois &&
+          other.sig1Fonction == this.sig1Fonction &&
+          other.sig2Fonction == this.sig2Fonction &&
+          other.sig3Fonction == this.sig3Fonction &&
+          other.sig1Court == this.sig1Court &&
+          other.sig2Court == this.sig2Court &&
+          other.sig3Court == this.sig3Court &&
+          other.sig1Long == this.sig1Long &&
+          other.sig2Long == this.sig2Long &&
+          other.sig3Long == this.sig3Long &&
+          other.appreciationText == this.appreciationText &&
+          other.appreciationImprimee == this.appreciationImprimee);
 }
 
 class AttestationTemplatesCompanion
@@ -18271,6 +18756,18 @@ class AttestationTemplatesCompanion
   final Value<String?> sig2Nom;
   final Value<String?> sig3Titre;
   final Value<String?> sig3Nom;
+  final Value<int> seuilSignatureMois;
+  final Value<String?> sig1Fonction;
+  final Value<String?> sig2Fonction;
+  final Value<String?> sig3Fonction;
+  final Value<bool> sig1Court;
+  final Value<bool> sig2Court;
+  final Value<bool> sig3Court;
+  final Value<bool> sig1Long;
+  final Value<bool> sig2Long;
+  final Value<bool> sig3Long;
+  final Value<String?> appreciationText;
+  final Value<bool> appreciationImprimee;
   final Value<int> rowid;
   const AttestationTemplatesCompanion({
     this.id = const Value.absent(),
@@ -18283,6 +18780,18 @@ class AttestationTemplatesCompanion
     this.sig2Nom = const Value.absent(),
     this.sig3Titre = const Value.absent(),
     this.sig3Nom = const Value.absent(),
+    this.seuilSignatureMois = const Value.absent(),
+    this.sig1Fonction = const Value.absent(),
+    this.sig2Fonction = const Value.absent(),
+    this.sig3Fonction = const Value.absent(),
+    this.sig1Court = const Value.absent(),
+    this.sig2Court = const Value.absent(),
+    this.sig3Court = const Value.absent(),
+    this.sig1Long = const Value.absent(),
+    this.sig2Long = const Value.absent(),
+    this.sig3Long = const Value.absent(),
+    this.appreciationText = const Value.absent(),
+    this.appreciationImprimee = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttestationTemplatesCompanion.insert({
@@ -18296,6 +18805,18 @@ class AttestationTemplatesCompanion
     this.sig2Nom = const Value.absent(),
     this.sig3Titre = const Value.absent(),
     this.sig3Nom = const Value.absent(),
+    this.seuilSignatureMois = const Value.absent(),
+    this.sig1Fonction = const Value.absent(),
+    this.sig2Fonction = const Value.absent(),
+    this.sig3Fonction = const Value.absent(),
+    this.sig1Court = const Value.absent(),
+    this.sig2Court = const Value.absent(),
+    this.sig3Court = const Value.absent(),
+    this.sig1Long = const Value.absent(),
+    this.sig2Long = const Value.absent(),
+    this.sig3Long = const Value.absent(),
+    this.appreciationText = const Value.absent(),
+    this.appreciationImprimee = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        type = Value(type),
@@ -18311,6 +18832,18 @@ class AttestationTemplatesCompanion
     Expression<String>? sig2Nom,
     Expression<String>? sig3Titre,
     Expression<String>? sig3Nom,
+    Expression<int>? seuilSignatureMois,
+    Expression<String>? sig1Fonction,
+    Expression<String>? sig2Fonction,
+    Expression<String>? sig3Fonction,
+    Expression<bool>? sig1Court,
+    Expression<bool>? sig2Court,
+    Expression<bool>? sig3Court,
+    Expression<bool>? sig1Long,
+    Expression<bool>? sig2Long,
+    Expression<bool>? sig3Long,
+    Expression<String>? appreciationText,
+    Expression<bool>? appreciationImprimee,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -18324,6 +18857,20 @@ class AttestationTemplatesCompanion
       if (sig2Nom != null) 'sig2_nom': sig2Nom,
       if (sig3Titre != null) 'sig3_titre': sig3Titre,
       if (sig3Nom != null) 'sig3_nom': sig3Nom,
+      if (seuilSignatureMois != null)
+        'seuil_signature_mois': seuilSignatureMois,
+      if (sig1Fonction != null) 'sig1_fonction': sig1Fonction,
+      if (sig2Fonction != null) 'sig2_fonction': sig2Fonction,
+      if (sig3Fonction != null) 'sig3_fonction': sig3Fonction,
+      if (sig1Court != null) 'sig1_court': sig1Court,
+      if (sig2Court != null) 'sig2_court': sig2Court,
+      if (sig3Court != null) 'sig3_court': sig3Court,
+      if (sig1Long != null) 'sig1_long': sig1Long,
+      if (sig2Long != null) 'sig2_long': sig2Long,
+      if (sig3Long != null) 'sig3_long': sig3Long,
+      if (appreciationText != null) 'appreciation_text': appreciationText,
+      if (appreciationImprimee != null)
+        'appreciation_imprimee': appreciationImprimee,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -18339,6 +18886,18 @@ class AttestationTemplatesCompanion
     Value<String?>? sig2Nom,
     Value<String?>? sig3Titre,
     Value<String?>? sig3Nom,
+    Value<int>? seuilSignatureMois,
+    Value<String?>? sig1Fonction,
+    Value<String?>? sig2Fonction,
+    Value<String?>? sig3Fonction,
+    Value<bool>? sig1Court,
+    Value<bool>? sig2Court,
+    Value<bool>? sig3Court,
+    Value<bool>? sig1Long,
+    Value<bool>? sig2Long,
+    Value<bool>? sig3Long,
+    Value<String?>? appreciationText,
+    Value<bool>? appreciationImprimee,
     Value<int>? rowid,
   }) {
     return AttestationTemplatesCompanion(
@@ -18352,6 +18911,18 @@ class AttestationTemplatesCompanion
       sig2Nom: sig2Nom ?? this.sig2Nom,
       sig3Titre: sig3Titre ?? this.sig3Titre,
       sig3Nom: sig3Nom ?? this.sig3Nom,
+      seuilSignatureMois: seuilSignatureMois ?? this.seuilSignatureMois,
+      sig1Fonction: sig1Fonction ?? this.sig1Fonction,
+      sig2Fonction: sig2Fonction ?? this.sig2Fonction,
+      sig3Fonction: sig3Fonction ?? this.sig3Fonction,
+      sig1Court: sig1Court ?? this.sig1Court,
+      sig2Court: sig2Court ?? this.sig2Court,
+      sig3Court: sig3Court ?? this.sig3Court,
+      sig1Long: sig1Long ?? this.sig1Long,
+      sig2Long: sig2Long ?? this.sig2Long,
+      sig3Long: sig3Long ?? this.sig3Long,
+      appreciationText: appreciationText ?? this.appreciationText,
+      appreciationImprimee: appreciationImprimee ?? this.appreciationImprimee,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -18389,6 +18960,42 @@ class AttestationTemplatesCompanion
     if (sig3Nom.present) {
       map['sig3_nom'] = Variable<String>(sig3Nom.value);
     }
+    if (seuilSignatureMois.present) {
+      map['seuil_signature_mois'] = Variable<int>(seuilSignatureMois.value);
+    }
+    if (sig1Fonction.present) {
+      map['sig1_fonction'] = Variable<String>(sig1Fonction.value);
+    }
+    if (sig2Fonction.present) {
+      map['sig2_fonction'] = Variable<String>(sig2Fonction.value);
+    }
+    if (sig3Fonction.present) {
+      map['sig3_fonction'] = Variable<String>(sig3Fonction.value);
+    }
+    if (sig1Court.present) {
+      map['sig1_court'] = Variable<bool>(sig1Court.value);
+    }
+    if (sig2Court.present) {
+      map['sig2_court'] = Variable<bool>(sig2Court.value);
+    }
+    if (sig3Court.present) {
+      map['sig3_court'] = Variable<bool>(sig3Court.value);
+    }
+    if (sig1Long.present) {
+      map['sig1_long'] = Variable<bool>(sig1Long.value);
+    }
+    if (sig2Long.present) {
+      map['sig2_long'] = Variable<bool>(sig2Long.value);
+    }
+    if (sig3Long.present) {
+      map['sig3_long'] = Variable<bool>(sig3Long.value);
+    }
+    if (appreciationText.present) {
+      map['appreciation_text'] = Variable<String>(appreciationText.value);
+    }
+    if (appreciationImprimee.present) {
+      map['appreciation_imprimee'] = Variable<bool>(appreciationImprimee.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -18408,6 +19015,18 @@ class AttestationTemplatesCompanion
           ..write('sig2Nom: $sig2Nom, ')
           ..write('sig3Titre: $sig3Titre, ')
           ..write('sig3Nom: $sig3Nom, ')
+          ..write('seuilSignatureMois: $seuilSignatureMois, ')
+          ..write('sig1Fonction: $sig1Fonction, ')
+          ..write('sig2Fonction: $sig2Fonction, ')
+          ..write('sig3Fonction: $sig3Fonction, ')
+          ..write('sig1Court: $sig1Court, ')
+          ..write('sig2Court: $sig2Court, ')
+          ..write('sig3Court: $sig3Court, ')
+          ..write('sig1Long: $sig1Long, ')
+          ..write('sig2Long: $sig2Long, ')
+          ..write('sig3Long: $sig3Long, ')
+          ..write('appreciationText: $appreciationText, ')
+          ..write('appreciationImprimee: $appreciationImprimee, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -48485,6 +49104,18 @@ typedef $$AttestationTemplatesTableCreateCompanionBuilder =
       Value<String?> sig2Nom,
       Value<String?> sig3Titre,
       Value<String?> sig3Nom,
+      Value<int> seuilSignatureMois,
+      Value<String?> sig1Fonction,
+      Value<String?> sig2Fonction,
+      Value<String?> sig3Fonction,
+      Value<bool> sig1Court,
+      Value<bool> sig2Court,
+      Value<bool> sig3Court,
+      Value<bool> sig1Long,
+      Value<bool> sig2Long,
+      Value<bool> sig3Long,
+      Value<String?> appreciationText,
+      Value<bool> appreciationImprimee,
       Value<int> rowid,
     });
 typedef $$AttestationTemplatesTableUpdateCompanionBuilder =
@@ -48499,6 +49130,18 @@ typedef $$AttestationTemplatesTableUpdateCompanionBuilder =
       Value<String?> sig2Nom,
       Value<String?> sig3Titre,
       Value<String?> sig3Nom,
+      Value<int> seuilSignatureMois,
+      Value<String?> sig1Fonction,
+      Value<String?> sig2Fonction,
+      Value<String?> sig3Fonction,
+      Value<bool> sig1Court,
+      Value<bool> sig2Court,
+      Value<bool> sig3Court,
+      Value<bool> sig1Long,
+      Value<bool> sig2Long,
+      Value<bool> sig3Long,
+      Value<String?> appreciationText,
+      Value<bool> appreciationImprimee,
       Value<int> rowid,
     });
 
@@ -48558,6 +49201,66 @@ class $$AttestationTemplatesTableFilterComposer
 
   ColumnFilters<String> get sig3Nom => $composableBuilder(
     column: $table.sig3Nom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get seuilSignatureMois => $composableBuilder(
+    column: $table.seuilSignatureMois,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig1Fonction => $composableBuilder(
+    column: $table.sig1Fonction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig2Fonction => $composableBuilder(
+    column: $table.sig2Fonction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sig3Fonction => $composableBuilder(
+    column: $table.sig3Fonction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig1Court => $composableBuilder(
+    column: $table.sig1Court,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig2Court => $composableBuilder(
+    column: $table.sig2Court,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig3Court => $composableBuilder(
+    column: $table.sig3Court,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig1Long => $composableBuilder(
+    column: $table.sig1Long,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig2Long => $composableBuilder(
+    column: $table.sig2Long,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sig3Long => $composableBuilder(
+    column: $table.sig3Long,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appreciationText => $composableBuilder(
+    column: $table.appreciationText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get appreciationImprimee => $composableBuilder(
+    column: $table.appreciationImprimee,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -48620,6 +49323,66 @@ class $$AttestationTemplatesTableOrderingComposer
     column: $table.sig3Nom,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get seuilSignatureMois => $composableBuilder(
+    column: $table.seuilSignatureMois,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig1Fonction => $composableBuilder(
+    column: $table.sig1Fonction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig2Fonction => $composableBuilder(
+    column: $table.sig2Fonction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sig3Fonction => $composableBuilder(
+    column: $table.sig3Fonction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig1Court => $composableBuilder(
+    column: $table.sig1Court,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig2Court => $composableBuilder(
+    column: $table.sig2Court,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig3Court => $composableBuilder(
+    column: $table.sig3Court,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig1Long => $composableBuilder(
+    column: $table.sig1Long,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig2Long => $composableBuilder(
+    column: $table.sig2Long,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sig3Long => $composableBuilder(
+    column: $table.sig3Long,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appreciationText => $composableBuilder(
+    column: $table.appreciationText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get appreciationImprimee => $composableBuilder(
+    column: $table.appreciationImprimee,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AttestationTemplatesTableAnnotationComposer
@@ -48662,6 +49425,54 @@ class $$AttestationTemplatesTableAnnotationComposer
 
   GeneratedColumn<String> get sig3Nom =>
       $composableBuilder(column: $table.sig3Nom, builder: (column) => column);
+
+  GeneratedColumn<int> get seuilSignatureMois => $composableBuilder(
+    column: $table.seuilSignatureMois,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sig1Fonction => $composableBuilder(
+    column: $table.sig1Fonction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sig2Fonction => $composableBuilder(
+    column: $table.sig2Fonction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sig3Fonction => $composableBuilder(
+    column: $table.sig3Fonction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get sig1Court =>
+      $composableBuilder(column: $table.sig1Court, builder: (column) => column);
+
+  GeneratedColumn<bool> get sig2Court =>
+      $composableBuilder(column: $table.sig2Court, builder: (column) => column);
+
+  GeneratedColumn<bool> get sig3Court =>
+      $composableBuilder(column: $table.sig3Court, builder: (column) => column);
+
+  GeneratedColumn<bool> get sig1Long =>
+      $composableBuilder(column: $table.sig1Long, builder: (column) => column);
+
+  GeneratedColumn<bool> get sig2Long =>
+      $composableBuilder(column: $table.sig2Long, builder: (column) => column);
+
+  GeneratedColumn<bool> get sig3Long =>
+      $composableBuilder(column: $table.sig3Long, builder: (column) => column);
+
+  GeneratedColumn<String> get appreciationText => $composableBuilder(
+    column: $table.appreciationText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get appreciationImprimee => $composableBuilder(
+    column: $table.appreciationImprimee,
+    builder: (column) => column,
+  );
 }
 
 class $$AttestationTemplatesTableTableManager
@@ -48717,6 +49528,18 @@ class $$AttestationTemplatesTableTableManager
                 Value<String?> sig2Nom = const Value.absent(),
                 Value<String?> sig3Titre = const Value.absent(),
                 Value<String?> sig3Nom = const Value.absent(),
+                Value<int> seuilSignatureMois = const Value.absent(),
+                Value<String?> sig1Fonction = const Value.absent(),
+                Value<String?> sig2Fonction = const Value.absent(),
+                Value<String?> sig3Fonction = const Value.absent(),
+                Value<bool> sig1Court = const Value.absent(),
+                Value<bool> sig2Court = const Value.absent(),
+                Value<bool> sig3Court = const Value.absent(),
+                Value<bool> sig1Long = const Value.absent(),
+                Value<bool> sig2Long = const Value.absent(),
+                Value<bool> sig3Long = const Value.absent(),
+                Value<String?> appreciationText = const Value.absent(),
+                Value<bool> appreciationImprimee = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttestationTemplatesCompanion(
                 id: id,
@@ -48729,6 +49552,18 @@ class $$AttestationTemplatesTableTableManager
                 sig2Nom: sig2Nom,
                 sig3Titre: sig3Titre,
                 sig3Nom: sig3Nom,
+                seuilSignatureMois: seuilSignatureMois,
+                sig1Fonction: sig1Fonction,
+                sig2Fonction: sig2Fonction,
+                sig3Fonction: sig3Fonction,
+                sig1Court: sig1Court,
+                sig2Court: sig2Court,
+                sig3Court: sig3Court,
+                sig1Long: sig1Long,
+                sig2Long: sig2Long,
+                sig3Long: sig3Long,
+                appreciationText: appreciationText,
+                appreciationImprimee: appreciationImprimee,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -48743,6 +49578,18 @@ class $$AttestationTemplatesTableTableManager
                 Value<String?> sig2Nom = const Value.absent(),
                 Value<String?> sig3Titre = const Value.absent(),
                 Value<String?> sig3Nom = const Value.absent(),
+                Value<int> seuilSignatureMois = const Value.absent(),
+                Value<String?> sig1Fonction = const Value.absent(),
+                Value<String?> sig2Fonction = const Value.absent(),
+                Value<String?> sig3Fonction = const Value.absent(),
+                Value<bool> sig1Court = const Value.absent(),
+                Value<bool> sig2Court = const Value.absent(),
+                Value<bool> sig3Court = const Value.absent(),
+                Value<bool> sig1Long = const Value.absent(),
+                Value<bool> sig2Long = const Value.absent(),
+                Value<bool> sig3Long = const Value.absent(),
+                Value<String?> appreciationText = const Value.absent(),
+                Value<bool> appreciationImprimee = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttestationTemplatesCompanion.insert(
                 id: id,
@@ -48755,6 +49602,18 @@ class $$AttestationTemplatesTableTableManager
                 sig2Nom: sig2Nom,
                 sig3Titre: sig3Titre,
                 sig3Nom: sig3Nom,
+                seuilSignatureMois: seuilSignatureMois,
+                sig1Fonction: sig1Fonction,
+                sig2Fonction: sig2Fonction,
+                sig3Fonction: sig3Fonction,
+                sig1Court: sig1Court,
+                sig2Court: sig2Court,
+                sig3Court: sig3Court,
+                sig1Long: sig1Long,
+                sig2Long: sig2Long,
+                sig3Long: sig3Long,
+                appreciationText: appreciationText,
+                appreciationImprimee: appreciationImprimee,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

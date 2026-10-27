@@ -3033,6 +3033,9 @@ class SyncEngine {
     return lignes.length;
   }
 
+  /// Valeur reçue → `Value` Drift : absente (`null`), la colonne garde son défaut.
+  static Value<T> _valeur<T>(T? v) => v == null ? const Value.absent() : Value(v);
+
   /// Modèles d'attestation — l'ENSEMBLE est remplacé à chaque tirage (F0.64).
   ///
   /// ⚠️ Un tirage sans ce bloc ne vide rien (serveur plus ancien). Absorbeur
@@ -3054,6 +3057,26 @@ class SyncEngine {
                 id: l['id'] as String,
                 type: l['type'] as String,
                 bodyText: l['body_text'] as String,
+                // ATT-2 : la règle de signature et les signataires. Un serveur plus ancien ne les sert pas : la valeur
+                // absente reprend le défaut de la table (12 mois, le promoteur seul au palier court, les trois au long).
+                seuilSignatureMois: _valeur(_entier(l['seuil_signature_mois'])),
+                appreciationText: _valeur(l['appreciation_text'] as String?),
+                appreciationImprimee: _valeur(l['appreciation_imprimee'] as bool?),
+                sig1Titre: _valeur(l['sig1_titre'] as String?),
+                sig1Nom: _valeur(l['sig1_nom'] as String?),
+                sig1Fonction: _valeur(l['sig1_fonction'] as String?),
+                sig2Titre: _valeur(l['sig2_titre'] as String?),
+                sig2Nom: _valeur(l['sig2_nom'] as String?),
+                sig2Fonction: _valeur(l['sig2_fonction'] as String?),
+                sig3Titre: _valeur(l['sig3_titre'] as String?),
+                sig3Nom: _valeur(l['sig3_nom'] as String?),
+                sig3Fonction: _valeur(l['sig3_fonction'] as String?),
+                sig1Court: _valeur(l['sig1_court'] as bool?),
+                sig2Court: _valeur(l['sig2_court'] as bool?),
+                sig3Court: _valeur(l['sig3_court'] as bool?),
+                sig1Long: _valeur(l['sig1_long'] as bool?),
+                sig2Long: _valeur(l['sig2_long'] as bool?),
+                sig3Long: _valeur(l['sig3_long'] as bool?),
               ),
             );
       }

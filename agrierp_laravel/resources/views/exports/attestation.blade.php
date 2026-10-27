@@ -2,198 +2,117 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+{{--
+    ATT-2 — ATTESTATION : FIDÉLITÉ AU MODÈLE OFFICIEL (attestation de formation du 24/10/2026).
+
+    A4 PAYSAGE, tout en positions absolues (points) : DomPDF ne sait pas faire flex ni grille, et le modèle est
+    une page unique à composition fixe. Mesures relevées sur la capture du modèle (2000 × 1413 px = 842 × 595 pt,
+    1 px = 0,421 pt). Ressources : `resources/attestation/` (logo, filigrane, décor floral, polices libres).
+--}}
 <style>
-    body {
-        font-family: 'DejaVu Sans', sans-serif;
-        color: #191c1d;
-        font-size: 11px;
-        padding: 20px 40px;
-        margin: 0;
-    }
-    .entete {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        border-bottom: 2px solid #052e16;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-    }
-    .ferme-nom {
-        font-weight: 900;
-        color: #052e16;
-        font-size: 13px;
-        margin: 0 0 2px;
-    }
-    .ferme-activites {
-        font-size: 7px;
-        color: #065f46;
-        letter-spacing: 0.2px;
-        margin: 2px 0;
-        font-weight: bold;
-    }
-    .ferme-meta {
-        font-size: 8px;
-        color: #6f7973;
-        margin: 1px 0;
-    }
-    .lieu-date {
-        text-align: right;
-        font-size: 10px;
-        font-weight: bold;
-        color: #052e16;
-        white-space: nowrap;
-        padding-left: 20px;
-    }
-    .numero {
-        text-align: right;
-        font-size: 10px;
-        color: #065f46;
-        font-weight: bold;
-        margin: 6px 0;
-    }
-    .titre-doc {
-        text-align: center;
-        font-weight: 900;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        color: #052e16;
-        margin: 14px 0 10px;
-        text-decoration: underline;
-    }
-    .domaines-titre {
-        font-size: 9px;
-        font-weight: bold;
-        color: #374151;
-        margin-bottom: 4px;
-    }
-    .domaines {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0 30px;
-        padding: 6px 0;
-        margin-bottom: 10px;
-        border-top: 1px solid #d1d5db;
-        border-bottom: 1px solid #d1d5db;
-    }
-    .domaine {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 10px;
-        margin: 2px 0;
-    }
-    .cb {
-        width: 11px;
-        height: 11px;
-        border: 1px solid #052e16;
-        display: inline-block;
-        text-align: center;
-        line-height: 11px;
-        font-size: 9px;
-        font-weight: bold;
-    }
-    .cb-coche { background-color: #052e16; color: #ffffff; }
-    .corps {
-        line-height: 1.9;
-        text-align: justify;
-        margin: 12px 0;
-        font-size: 11px;
-    }
-    .appreciation {
-        font-style: italic;
-        color: #374151;
-        margin: 8px 0 16px;
-        line-height: 1.6;
-    }
-    .signatures {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 40px;
-    }
-    .sig { text-align: center; width: 30%; }
-    .sig-titre { font-size: 9px; color: #6f7973; margin-bottom: 0; }
-    .sig-espace { height: 48px; }
-    .sig-nom {
-        font-weight: bold;
-        color: #052e16;
-        font-size: 10px;
-        border-top: 1px solid #bec9c2;
-        padding-top: 4px;
-        display: inline-block;
-        min-width: 120px;
-    }
-    .sig-vide {
-        display: inline-block;
-        min-width: 120px;
-        border-top: 1px solid #bec9c2;
-        height: 4px;
-    }
+    @page { size: 842pt 595pt; margin: 0; }
+    @font-face { font-family: 'Corps'; font-style: normal; font-weight: normal; src: url('{{ str_replace('\\', '/', $polices) }}/Caladea-400.ttf') format('truetype'); }
+    @font-face { font-family: 'Corps'; font-style: normal; font-weight: bold; src: url('{{ str_replace('\\', '/', $polices) }}/Caladea-700.ttf') format('truetype'); }
+    @font-face { font-family: 'Corps'; font-style: italic; font-weight: normal; src: url('{{ str_replace('\\', '/', $polices) }}/Caladea-400i.ttf') format('truetype'); }
+    @font-face { font-family: 'Corps'; font-style: italic; font-weight: bold; src: url('{{ str_replace('\\', '/', $polices) }}/Caladea-700i.ttf') format('truetype'); }
+    @font-face { font-family: 'Note'; font-style: normal; font-weight: normal; src: url('{{ str_replace('\\', '/', $polices) }}/Carlito-400.ttf') format('truetype'); }
+    @font-face { font-family: 'Note'; font-style: normal; font-weight: bold; src: url('{{ str_replace('\\', '/', $polices) }}/Carlito-700.ttf') format('truetype'); }
+    @font-face { font-family: 'Note'; font-style: italic; font-weight: bold; src: url('{{ str_replace('\\', '/', $polices) }}/Carlito-700i.ttf') format('truetype'); }
+    @font-face { font-family: 'Titre'; font-style: normal; font-weight: normal; src: url('{{ str_replace('\\', '/', $polices) }}/Bevan-400.ttf') format('truetype'); }
+
+    body { margin: 0; padding: 0; font-family: 'Corps', 'DejaVu Serif', serif; font-size: 14pt; color: #000; }
+    .abs { position: absolute; }
+    .vert { color: #2e6b1a; }
+
+    .decor { left: 0; top: 0; width: 842pt; height: 595pt; }
+    .filigrane { left: 224pt; top: 128pt; width: 395pt; }
+    .logo { left: 6pt; top: -6pt; width: 146pt; }
+
+    .nom-ferme { left: 150pt; top: 4.6pt; width: 596pt; text-align: center; font-family: 'Titre', 'Corps', serif; font-size: 20pt; line-height: 24pt; color: #2e6b1a; }
+    .activites { left: 150pt; width: 660pt; text-align: center; font-weight: bold; font-size: 13pt; line-height: 15.2pt; }
+    .identite { left: 150pt; width: 660pt; text-align: center; font-size: 13pt; line-height: 15.2pt; }
+
+    .lieu-date { right: 27pt; top: 111.4pt; width: 400pt; text-align: right; font-family: 'Note', sans-serif; font-weight: bold; font-style: italic; font-size: 12pt; }
+    .numero { left: 34pt; top: 147pt; font-family: 'Note', sans-serif; font-weight: bold; font-size: 12pt; }
+
+    .titre-doc { left: 34pt; top: 198.5pt; width: 781pt; text-align: center; font-weight: bold; font-size: 25pt; }
+    /* Soulignement par une bordure : le text-decoration de DomPDF suit les métriques de la police et coupe les lettres. */
+    .souligne { display: inline-block; border-bottom: 1.3pt solid #000; padding-bottom: 0; line-height: 24pt; }
+
+    .texte { left: 34pt; width: 781pt; text-align: justify; font-size: 15.2pt; line-height: 17.7pt; }
+    .texte p { margin: 0; }
+    .puces { margin: 6pt 0 0 21pt; padding: 0; }
+    .puce { margin: 0; padding: 0 0 0 16pt; position: relative; font-size: 14.2pt; }
+    .fleche { position: absolute; left: -3pt; top: 1pt; font-family: 'DejaVu Sans', sans-serif; font-size: 15pt; line-height: 15pt; }
+    .suite { margin-top: 5.5pt !important; }
+
+    .sig { font-size: 11.7pt; line-height: 12.8pt; text-align: right; }
+    .sig-titre { text-align: center; margin: 0; font-weight: bold; font-size: 11.7pt; line-height: 14pt; }
+    .sig-titre span { display: inline-block; border-bottom: 1pt solid #000; line-height: 12.5pt; }
+    .sig-nom { font-weight: bold; font-size: 13.7pt; margin: 0; line-height: 16pt; text-align: right; white-space: nowrap; }
+    .sig-fonction { margin: 1.5pt 0 0; font-size: 11.5pt; line-height: 13pt; text-align: right; }
+
+    .pied { left: 34pt; width: 825pt; text-align: center; font-size: 13pt; line-height: 15.2pt; }
+    .sep { display: inline-block; line-height: 12pt; }
+    .lien { color: #0563c1; display: inline-block; border-bottom: .8pt solid #0563c1; line-height: 12pt; }
 </style>
 </head>
 <body>
 
-    <div class="entete">
-        <div>
-            <p class="ferme-nom">FERME ÉCOLE OLOUWACHEGOUN</p>
-            <p class="ferme-activites">MARAÎCHAGE - ÉLEVAGE - PISCICULTURE - AVICULTURE - TRANSFORMATION DES PRODUITS AGRICOLES - GESTION D'ENTREPRISE</p>
-            <p class="ferme-meta">Attan-Ewé, Arrondissement d'Ikpinlè, Commune d'Adja-Ouèrè, Bénin</p>
-            <p class="ferme-meta">Tél. : +229 01 97 84 02 85 &nbsp;|&nbsp; RCCM : RB/PNO/22 A 33870</p>
+    <img class="abs decor" src="{{ $images['decor'] }}">
+    <img class="abs filigrane" src="{{ $images['filigrane'] }}">
+    <img class="abs logo" src="{{ $images['logo'] }}">
+
+    <div class="abs nom-ferme">{{ $entete['nom'] }}</div>
+    <div class="abs activites" style="top: 34.5pt;">{{ $entete['activites'][0] }}</div>
+    <div class="abs activites" style="top: 49.7pt;">{{ $entete['activites'][1] }}</div>
+    <div class="abs identite" style="top: 64.9pt;"><strong>Adresse</strong> : {{ $entete['adresse'] }}</div>
+    <div class="abs identite" style="top: 80.1pt;"><strong>Téléphone</strong> : {{ $entete['telephones'] }}, <strong>RCCM</strong> : {{ $entete['rccm'] }}</div>
+
+    <div class="abs lieu-date">{{ $entete['lieu'] }}, le {{ $dateLieu }}</div>
+    <div class="abs numero">{{ $numero }}</div>
+
+    <div class="abs titre-doc"><span class="souligne">{{ mb_strtoupper($title) }}</span></div>
+
+    @php
+        $long = mb_strlen($corps) + mb_strlen((string) $appreciation) + array_sum(array_map('mb_strlen', $puces));
+        $taille = $long > 1000 ? '13.4pt' : '15.2pt';
+        $pas = $long > 1000 ? '15.9pt' : '17.7pt';
+    @endphp
+    <div class="abs texte" style="top: 232.7pt; font-size: {{ $taille }}; line-height: {{ $pas }};">
+        <p>{!! \App\Services\AttestationService::enHtml($corps) !!}</p>
+
+        @if(! empty($puces))
+        <div class="puces">
+            @foreach($puces as $ligne)
+            <div class="puce"><span class="fleche">&#10146;</span>{{ str_replace("'", '’', $ligne) }}</div>
+            @endforeach
         </div>
-        <div class="lieu-date">ATTAN-ÉWÉ, le {{ $dateLieu }}</div>
+        @endif
+
+        @if($appreciation)
+        <p>{!! \App\Services\AttestationService::enHtml($appreciation) !!}</p>
+        @endif
+
+        <p class="suite">En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.</p>
     </div>
 
-    <p class="numero">Réf. : {{ $numero }}</p>
-
-    <p class="titre-doc">{{ $title }}</p>
-
-    @if(! empty($domaines))
-    <p class="domaines-titre">Domaine(s) de formation :</p>
-    <div class="domaines">
-        @foreach(\App\Services\AttestationService::DOMAINES as $cle => $libelle)
-        <div class="domaine">
-            <span class="cb {{ in_array($cle, $domaines) ? 'cb-coche' : '' }}">{{ in_array($cle, $domaines) ? '&#10003;' : '&nbsp;' }}</span>
-            <span>{{ $libelle }}</span>
+    @foreach($signataires as $sig)
+        @php
+            // Position 2 = Examinateur (gauche), 3 = Président du Jury (centre), 1 = Directeur Général (droite) :
+            // [bord gauche de la boîte, largeur, retrait de la fonction] mesurés sur le modèle (pt).
+            [$gauche, $largeur, $retrait] = [2 => [38, 205, 0], 3 => [316, 208, 0], 1 => [623, 190, 40]][$sig['position']] ?? [623, 190, 40];
+            $haut = $sig['titre'] !== '' ? (($sig['position'] === 3) ? 482.5 : 479) : 500;
+        @endphp
+        <div class="abs sig" style="left: {{ $gauche }}pt; top: {{ $haut }}pt; width: {{ $largeur }}pt;">
+            @if($sig['titre'] !== '')<p class="sig-titre"><span>{{ $sig['titre'] }}</span></p>@endif
+            <p class="sig-nom" style="margin-top: {{ $sig['titre'] !== '' ? 6 : 0 }}pt;">{{ $sig['nom'] }}</p>
+            @if($sig['fonction'] !== '')<p class="sig-fonction" style="padding-left: {{ $retrait }}pt;">{{ str_replace("'", '’', $sig['fonction']) }}</p>@endif
         </div>
-        @endforeach
-    </div>
-    @endif
+    @endforeach
 
-    <p class="corps">{!! nl2br(e($body)) !!}</p>
-
-    @if($note)
-    <p class="appreciation">{{ $note }}</p>
-    @endif
-
-    <div class="signatures">
-        <div class="sig">
-            <p class="sig-titre">{{ $sig2Titre }}</p>
-            <div class="sig-espace"></div>
-            @if($sig2Nom)
-            <span class="sig-nom">{{ $sig2Nom }}</span>
-            @else
-            <span class="sig-vide"></span>
-            @endif
-        </div>
-        <div class="sig">
-            <p class="sig-titre">{{ $sig3Titre }}</p>
-            <div class="sig-espace"></div>
-            @if($sig3Nom)
-            <span class="sig-nom">{{ $sig3Nom }}</span>
-            @else
-            <span class="sig-vide"></span>
-            @endif
-        </div>
-        <div class="sig">
-            <p class="sig-titre">{{ $sig1Titre }}</p>
-            <div class="sig-espace"></div>
-            @if($sig1Nom)
-            <span class="sig-nom">{{ $sig1Nom }}</span>
-            @else
-            <span class="sig-vide"></span>
-            @endif
-        </div>
-    </div>
+    <div class="abs pied" style="top: 559pt;"><strong>E-mail</strong> : <span class="lien">{{ $entete['emails'][0] }}</span><span class="sep"> / </span><span class="lien">{{ $entete['emails'][1] }}</span></div>
+    <div class="abs pied" style="top: 571.4pt;"><strong>Site web</strong>:<span class="lien">{{ $entete['site'] }}</span></div>
 
 </body>
 </html>
