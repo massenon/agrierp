@@ -1,12 +1,19 @@
 @props([
     'name',
-    'maxWidth' => 'sm', // sm | md | lg | xl
+    'maxWidth' => 'sm', // sm | md | lg | xl | 2xl
+    // true : la modale est déplacée sous <body>. À employer quand elle est rendue dans un
+    // conteneur qui crée son propre empilement (l'en-tête collant z-30 passe sous la barre
+    // latérale z-50 : la modale était alors rognée à gauche par la barre).
+    'teleport' => false,
 ])
 @php
     // Classes statiques (jamais de construction dynamique — voir kpi-card.blade.php)
     $widths = ['sm' => 'max-w-sm', 'md' => 'max-w-md', 'lg' => 'max-w-lg', 'xl' => 'max-w-3xl', '2xl' => 'max-w-5xl'];
     $widthClass = $widths[$maxWidth] ?? $widths['sm'];
 @endphp
+@if($teleport)
+<div x-data><template x-teleport="body">
+@endif
 <div
     x-data="{ show: false }"
     x-on:open-modal.window="if ($event.detail.name === '{{ $name }}') show = true"
@@ -19,3 +26,6 @@
         {{ $slot }}
     </div>
 </div>
+@if($teleport)
+</template></div>
+@endif

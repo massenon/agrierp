@@ -3,7 +3,7 @@
         <span class="material-symbols-outlined">sync</span>
     </button>
 
-    <x-modal name="modal-etat-synchronisation" max-width="2xl">
+    <x-modal name="modal-etat-synchronisation" max-width="xl" :teleport="true">
         <div class="flex items-start justify-between mb-md">
             <div>
                 <p class="text-[10px] font-bold uppercase tracking-wider text-outline">Postes de la ferme</p>
@@ -11,8 +11,8 @@
             </div>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="text-outline hover:text-on-surface"><span class="material-symbols-outlined">close</span></button>
         </div>
-        <p class="text-xs text-outline mb-md">Le site est la base de référence : il ne synchronise rien lui-même. Chaque poste Windows envoie ses saisies et reçoit les données du site quand il synchronise ; voici ce que le serveur en sait. « Demander la synchronisation » dépose une demande que chaque poste connecté lit dans les 30 secondes ; c'est lui qui envoie et reçoit.</p>
-        <p class="text-xs text-outline mb-md">Quand le site a servi de base (poste en panne), les postes doivent récupérer ce qui y a été saisi : chaque ligne dit ce que le poste n'a pas encore reçu. « Renvoyer vers ce poste » lui fait refaire un tirage complet à son prochain contact, même s'il est resté hors ligne des semaines.</p>
+        <p class="text-xs text-outline mb-sm">Le site est la base de référence : il ne synchronise rien lui-même. Chaque poste envoie ses saisies et reçoit celles du site quand il synchronise. « Demander la synchronisation » dépose une demande que chaque poste connecté lit dans les 30 secondes.</p>
+        <p class="text-xs text-outline mb-sm">Si le site a servi de base (poste en panne), chaque ligne dit ce que le poste n'a pas encore reçu. « Renvoyer vers ce poste » lui fait refaire un tirage complet à son prochain contact.</p>
 
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
