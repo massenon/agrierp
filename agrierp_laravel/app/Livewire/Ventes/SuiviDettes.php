@@ -5,7 +5,7 @@ namespace App\Livewire\Ventes;
 use App\Models\AuditLog;
 use App\Models\CustomerAdvance;
 use App\Models\CustomerReminder;
-use App\Actions\RecordSettlementAccountingEntryAction;
+use App\Services\CustomerSettlementService;
 use App\Models\Receivable;
 use App\Models\TreasuryAccount;
 use Livewire\Attributes\Url;
@@ -106,9 +106,10 @@ class SuiviDettes extends Component
     }
 
     /**
-     * Même logique que `ProfileClient::confirmRegularisation()` (ciblée
-     * sur une créance précise) — un seul point de vérité pour le
-     * règlement de créance client dans tout le projet.
+     * Ticket VC-1 — l'encaissement passe par `CustomerSettlementService`, le point de passage unique partagé avec la fiche
+     * client (`ProfileClient::confirmRegularisation`) ET l'envoi des postes (`SyncController::pushReceivablePayments`) :
+     * créance, trésorerie (deux livres), écriture et audit dans UNE transaction. Exercice clos ou absent : motif en toast,
+     * rien n'est écrit.
      */
     public function confirmPayment(): void
     {
@@ -120,25 +121,24 @@ class SuiviDettes extends Component
         ]);
 
         $receivable = Receivable::findOrFail($this->paymentTargetId);
-        $montant = min($this->paymentMontant, $receivable->balance);
-        $treasury = TreasuryAccount::findOrFail($this->paymentTreasuryId);
 
-        $receivable->update(['amount_paid' => (float) $receivable->amount_paid + $montant]);
-        $treasury->update(['balance' => (float) $treasury->balance + $montant]);
+        try {
+            app(CustomerSettlementService::class)->encaisser(
+                $receivable->customer_id,
+                (float) $this->paymentMontant,
+                $this->paymentTreasuryId,
+                $receivable->id,
+            );
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
-        // 🔴→✅ TICKET 14.34 — ÉCRITURE ENFIN GÉNÉRÉE. L'argent entrait dans la
-        // table de trésorerie sans jamais entrer au grand livre : 411 restait
-        // débité après paiement, et le Bilan sous-évaluait la trésorerie du
-        // montant de tous les règlements de la période.
-        $ecriture = app(RecordSettlementAccountingEntryAction::class)->collectFromCustomer(
-            $treasury, $montant, $receivable->customer?->name, $receivable->id
-        );
+            return;
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
-        AuditLog::record('receivable.payment_recorded', 'ventes');
-
-        if ($ecriture === null) {
-            AuditLog::record('receivable.accounting_entry_missing', 'comptabilite');
+            return;
         }
+
         $this->dispatch('close-modal', name: 'modal-add-payment');
         $this->dispatch('toast', message: 'Règlement enregistré avec succès.', type: 'success');
     }

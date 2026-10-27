@@ -10,6 +10,7 @@ import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'avances_modales.dart';
 import 'clients_creances_repository.dart';
 import 'fiche_client_modales.dart';
+import 'recouvrement_modale.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/creances-clients.html` → Clients et Créances.
@@ -571,6 +572,18 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           large,
         ),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket VC-1 — « Ajouter un Recouvrement » (en-tête du Blade) : l'encaissement d'une créance, écrit en local.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            key: const Key('ajouter-recouvrement'),
+            onPressed: () => _encaisser(d, null),
+            icon: const Icon(SymbolesAgri.add_circle, size: 18),
+            style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
+            label: const Text('Ajouter un Recouvrement', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.md),
         _grilleKpis(large, [
           CarteKpi(
             libelle: 'Encours Global',
@@ -655,12 +668,34 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   ),
                   3,
                 ),
-                (_actionInerte(), 2),
+                (
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      key: Key('creance-encaisser-$i'),
+                      tooltip: 'Enregistrer un règlement',
+                      onPressed: lignes[i].resteDu > 0 ? () => _encaisser(d, lignes[i]) : null,
+                      icon: const Icon(SymbolesAgri.credit_card, size: 18),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      color: AgriColors.brandEmerald,
+                    ),
+                  ),
+                  2,
+                ),
               ]),
           ],
         ),
       ],
     );
+  }
+
+  /// Ticket VC-1 — « Enregistrer un Recouvrement » : écrit le FAIT en local, le serveur solde et passe l'écriture.
+  Future<void> _encaisser(DonneesClients d, LigneCreance? depart) async {
+    final ecrit = await ouvrirRecouvrement(context: context, depot: widget.depot, donnees: d, depart: depart);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer('Règlement enregistré — il sera appliqué à la prochaine synchronisation.');
   }
 
   /// Échéance, colorée par son retard.
@@ -1486,17 +1521,6 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           color: couleur,
         ),
       ),
-    ),
-  );
-
-  /// ⚠️ Les actions de la maquette — fiche client, relance, encaissement —
-  /// modifient des référentiels du serveur. La colonne reste, l'action est
-  /// inerte.
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 

@@ -572,6 +572,21 @@ class AdvanceImputations extends Table with SyncColumns {
   DateTimeColumn get imputationDate => dateTime()();
 }
 
+/// Ticket VC-1 — encaissement d'une créance client saisi au poste.
+///
+/// ⚠️⚠️ **LE POSTE N'ENCAISSE RIEN** : il enregistre « tel client a versé tel montant sur tel compte, tel jour »
+/// (et la créance visée, nulle pour un versement global en FIFO) et ne touche NI `amount_paid` de la créance NI le
+/// solde du compte. Le serveur applique (`CustomerSettlementService`) : créance, trésorerie (deux livres), écriture
+/// D 5xx / C 411. Cette table ne descend pas du serveur.
+@DataClassName('EncaissementCreance')
+class ReceivablePayments extends Table with SyncColumns {
+  TextColumn get customerId => text().withLength(min: 36, max: 36)();
+  TextColumn get receivableId => text().nullable()();
+  TextColumn get treasuryAccountId => text().withLength(min: 36, max: 36)();
+  RealColumn get amount => real()();
+  DateTimeColumn get paymentDate => dateTime()();
+}
+
 /// Fournisseur de la ferme — référentiel servi par le serveur.
 ///
 /// ⚠️⚠️ **SANS LUI, LE POSTE N'ACHÈTE RIEN HORS LIGNE.** Même dépendance que
@@ -2014,6 +2029,7 @@ class SyncState extends Table {
     Animals,
     LivestockSpecies,
     SupplierPayments,
+    ReceivablePayments,
     PurchaseReturns,
     SupplierRefunds,
     SupplierCredits,
@@ -2062,7 +2078,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 68;
+  int get schemaVersion => 69;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2717,6 +2733,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 68) {
         await _utilisateursMixtes(m);
       }
+      // v69 — ticket VC-1 : encaissements de créances clients saisis au poste.
+      if (from < 69) {
+        if (!await _tableExiste(m, receivablePayments)) await m.createTable(receivablePayments);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -3047,6 +3067,8 @@ class AppDatabase extends _$AppDatabase {
     'products',
     'suppliers',
     'supplier_payments',
+    // Ticket VC-1 — encaissements de créances clients (le fait seul : le serveur applique).
+    'receivable_payments',
     'customers',
     'mails',
     'archived_documents',
@@ -3119,7 +3141,7 @@ class AppDatabase extends _$AppDatabase {
     'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
-    'advance_imputations', 'sales', 'sale_lines', 'credit_notes', // AV1
+    'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
     'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',

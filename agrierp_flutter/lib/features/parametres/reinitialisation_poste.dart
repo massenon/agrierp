@@ -170,6 +170,7 @@ class ReinitialisationPoste {
     'internship_absences': 'Absences de stagiaires',
     'payslip_requests': 'Demandes de règlement de paie',
     'utilisateurs': 'Comptes utilisateurs',
+    'receivable_payments': 'Encaissements de créances',
     'suppliers': 'Fournisseurs',
     'supplier_payments': 'Règlements fournisseurs',
     'customers': 'Clients',

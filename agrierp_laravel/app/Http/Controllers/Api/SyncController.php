@@ -120,7 +120,7 @@ class SyncController extends Controller
         // Ticket BS1 — bandes créées, modifiées et archivées au poste.
         'livestock_lots',
         'livestock_reproduction_events', 'purchases', 'attendance_records', 'products', 'suppliers',
-        'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments',
+        'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments', 'receivable_payments',
         'purchase_returns', 'supplier_refunds', 'customer_advances', 'advance_imputations',
         'product_categories', 'receivables', 'customer_reminders', 'feed_types', 'elevage_numbering',
         'purchase_orders', 'payables', 'employees', 'internships', 'chart_of_accounts', 'fiscal_years',
@@ -2122,6 +2122,8 @@ class SyncController extends Controller
             'archived_documents' => ['accepted' => [], 'rejected' => []],
             'administrative_documents' => ['accepted' => [], 'rejected' => []],
             'supplier_payments' => ['accepted' => [], 'rejected' => []],
+            // Ticket VC-1 — encaissements de créances clients saisis au poste.
+            'receivable_payments' => ['accepted' => [], 'rejected' => []],
             'purchase_returns' => ['accepted' => [], 'rejected' => []],
             'supplier_refunds' => ['accepted' => [], 'rejected' => []],
             'customer_advances' => ['accepted' => [], 'rejected' => []],
@@ -2390,6 +2392,16 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket VC-1 — APRÈS les ventes, les avances et leurs imputations (la créance d'une vente du même envoi existe, et ce que l'avance a déjà imputé réduit le solde) : encaissement d'une créance client,
+        // rejoué par `CustomerSettlementService`, le point de passage de `SuiviDettes` et `ProfileClient`.
+        if ($request->has('receivable_payments')) {
+            $result['receivable_payments'] = $this->pushReceivablePayments(
+                $this->envoiTraduit($request, 'receivable_payments'),
+                $request->user(),
+                $request->input('device_id'),
+            );
+        }
+
         if ($request->has('livestock_reproduction_events')) {
             $result['livestock_reproduction_events'] =
                 $this->pushReproductionEvents($request->input('livestock_reproduction_events'));
@@ -2519,6 +2531,8 @@ class SyncController extends Controller
         'internship_absences' => 'manage-rh',
         'payslip_requests' => 'manage-rh',
         'sales' => 'manage-ventes',
+        // Ticket VC-1 — le droit de `SuiviDettes` / `ProfileClient` du web.
+        'receivable_payments' => 'manage-ventes',
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
         // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
@@ -4292,6 +4306,70 @@ class SyncController extends Controller
                     $valides['supplier_id'],
                     (float) $valides['amount'],
                     $valides['treasury_account_id'],
+                    $valides['payment_date'],
+                    $valides['id'],
+                    $deviceId,
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+                $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket VC-1 — ENCAISSEMENTS DE CRÉANCES CLIENTS saisis au poste.
+     *
+     * ⚠️⚠️ LE POSTE N'ENVOIE QUE LE FAIT : « tel client a versé tel montant sur tel compte, tel jour » (et la créance visée,
+     * s'il y en a une). Ce qui entre en trésorerie, la créance soldée et l'écriture D 5xx / C 411 sont faits ICI, par
+     * `CustomerSettlementService`, partagé avec la page web, en une transaction.
+     *
+     * ⚠️ IDEMPOTENCE : `id` = UUID de l'encaissement ; un `id` déjà reçu est acquitté sans rien rejouer (un accusé perdu en
+     * route ferait encaisser deux fois). Un refus (droit, créance absente ou soldée, exercice clos) est rendu AVEC SON
+     * MOTIF et n'échoue que cet encaissement.
+     */
+    private function pushReceivablePayments(array $paiements, $utilisateur, ?string $deviceId): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\CustomerSettlementService::class);
+
+        foreach ($paiements as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'encaisser une créance client.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'customer_id' => ['required', 'uuid', 'exists:customers,id'],
+                    'receivable_id' => ['nullable', 'uuid'],
+                    'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
+                    'amount' => ['required', 'numeric', 'min:1'],
+                    'payment_date' => ['required', 'date', 'before_or_equal:today'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if (\App\Models\ReceivablePayment::find($valides['id']) !== null) {
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                $service->encaisser(
+                    $valides['customer_id'],
+                    (float) $valides['amount'],
+                    $valides['treasury_account_id'],
+                    $valides['receivable_id'] ?? null,
                     $valides['payment_date'],
                     $valides['id'],
                     $deviceId,

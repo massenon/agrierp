@@ -356,6 +356,15 @@ class ClientsCreancesRepository {
       }
     }
 
+    // Ticket VC-1 — les ENCAISSEMENTS en attente réduisent aussi le solde de leur créance (le poste ne modifie jamais
+    // `amount_paid` : le serveur l'applique et le tirage de confirmation le rend).
+    for (final e in await (database.select(
+      database.receivablePayments,
+    )..where((p) => p.syncStatus.equalsValue(SyncStatus.pending))).get()) {
+      final cible = e.receivableId;
+      if (cible != null) parCreance[cible] = (parCreance[cible] ?? 0) + e.amount;
+    }
+
     final refus = {
       for (final c in await (database.select(
         database.syncConflicts,
@@ -471,6 +480,18 @@ class ClientsCreancesRepository {
   }
 
   Future<double> _enAttenteDe({String? avanceId, String? creanceId}) async {
+    var encaisse = 0.0;
+    if (creanceId != null) {
+      // Ticket VC-1 — encaissements en attente sur cette créance.
+      encaisse = (await (database.select(database.receivablePayments)..where(
+                (p) => Expression.and([
+                  p.syncStatus.equalsValue(SyncStatus.pending),
+                  p.receivableId.equals(creanceId),
+                ]),
+              ))
+              .get())
+          .fold<double>(0, (t, p) => t + p.amount);
+    }
     final lignes =
         await (database.select(database.advanceImputations)..where(
               (i) => Expression.and([
@@ -480,7 +501,7 @@ class ClientsCreancesRepository {
               ]),
             ))
             .get();
-    return lignes.fold<double>(0, (t, i) => t + i.amount);
+    return encaisse + lignes.fold<double>(0, (t, i) => t + i.amount);
   }
 
   /// Enregistre un acompte reçu, EN ATTENTE d'envoi.
@@ -677,6 +698,82 @@ class ClientsCreancesRepository {
     return (database.select(
       database.advanceImputations,
     )..where((i) => i.id.equals(id))).getSingle();
+  }
+
+  /// Ticket VC-1 — « Enregistrer un Recouvrement » (`suivi-dettes.blade.php`, `modal-add-payment`) : encaisse une
+  /// créance, EN ATTENTE d'envoi.
+  ///
+  /// ⚠️⚠️ **LE POSTE N'ÉCRIT QUE LE FAIT.** Ni `amount_paid` de la créance, ni solde de compte, ni écriture : le
+  /// serveur (`CustomerSettlementService`) solde la créance, fait entrer l'argent dans les DEUX livres de trésorerie et
+  /// passe D 5xx / C 411, dans une transaction. Le poste AFFICHE le solde net de ce qu'il a saisi (`soldeCreance`).
+  ///
+  /// ⚠️ **REFUSER AVANT D'ÉCRIRE**, avec les messages du serveur : montant d'au moins 1 FCFA, créance et compte connus,
+  /// créance non soldée, jamais plus que son solde (le web plafonne en silence ; le poste le dit, comme pour les
+  /// avances), exercice de la date ouvert (EX6).
+  Future<EncaissementCreance> encaisserCreance({
+    required String creanceId,
+    required double montant,
+    required String compteId,
+    DateTime? date,
+  }) async {
+    if (montant.isNaN || montant.isInfinite || montant <= 0) {
+      throw const SaisieRefusee('Le montant du règlement doit être supérieur à zéro.');
+    }
+    if (montant < 1) {
+      throw const SaisieRefusee("Le montant du règlement doit être d'au moins 1 FCFA.");
+    }
+
+    final creance = await (database.select(
+      database.receivables,
+    )..where((c) => c.id.equals(creanceId))).getSingleOrNull();
+    if (creance == null) {
+      throw const SaisieRefusee('Créance introuvable — synchronisez le poste.');
+    }
+
+    final compte = await (database.select(
+      database.treasuryAccounts,
+    )..where((c) => c.id.equals(compteId))).getSingleOrNull();
+    if (compte == null) {
+      throw const SaisieRefusee('Compte de trésorerie inconnu — synchronisez le poste avant de saisir.');
+    }
+
+    final solde = await soldeCreance(creance);
+    if (solde <= 0) {
+      throw const SaisieRefusee('Cette créance est déjà soldée : rien à encaisser.');
+    }
+    if (montant > solde + 0.005) {
+      throw SaisieRefusee(
+        'Le montant dépasse le solde de la créance (${solde.toStringAsFixed(0)} F), '
+        'encaissements et imputations en attente déduits.',
+      );
+    }
+
+    final jour = date ?? HeureBenin.maintenant();
+
+    // L'écriture D 5xx / C 411 est datée du règlement : exercice absent (sans filet R2) ou clos → refusé AVANT d'écrire.
+    await ExerciceDeSaisie(database).refuser(jour);
+
+    final id = _uuid.v4();
+
+    await database
+        .into(database.receivablePayments)
+        .insert(
+          ReceivablePaymentsCompanion.insert(
+            id: id,
+            deviceId: deviceId,
+            syncStatus: const Value(SyncStatus.pending),
+            updatedAt: DateTime.now(),
+            customerId: creance.customerId,
+            receivableId: Value(creanceId),
+            treasuryAccountId: compteId,
+            amount: montant,
+            paymentDate: DateTime(jour.year, jour.month, jour.day),
+          ),
+        );
+
+    return (database.select(
+      database.receivablePayments,
+    )..where((p) => p.id.equals(id))).getSingle();
   }
 }
 

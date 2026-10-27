@@ -123,6 +123,10 @@ class ProfileClient extends Component
         $this->dispatch('open-modal', name: 'modal-regularisation');
     }
 
+    /**
+     * Ticket VC-1 — l'encaissement passe par `CustomerSettlementService` (une créance précise, ou le solde global en
+     * FIFO), comme « Ajouter un Recouvrement » et l'envoi des postes.
+     */
     public function confirmRegularisation(): void
     {
         $this->authorize('manage-ventes');
@@ -132,50 +136,25 @@ class ProfileClient extends Component
             'regularisationTreasuryId' => ['required', 'exists:treasury_accounts,id'],
         ]);
 
-        $montant = $this->regularisationMontant;
-        $treasury = TreasuryAccount::findOrFail($this->regularisationTreasuryId);
+        try {
+            app(\App\Services\CustomerSettlementService::class)->encaisser(
+                $this->customer->id,
+                (float) $this->regularisationMontant,
+                $this->regularisationTreasuryId,
+                $this->regularisationTarget !== '' ? $this->regularisationTarget : null,
+            );
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
-        if ($this->regularisationTarget) {
-            // Règlement d'une créance précise — jamais au-delà de son solde dû.
-            $receivable = Receivable::findOrFail($this->regularisationTarget);
-            $montant = min($montant, $receivable->balance);
-            $receivable->update(['amount_paid' => (float) $receivable->amount_paid + $montant]);
-        } else {
-            // Règlement du solde global — FIFO sur les créances les plus
-            // anciennes en premier, même discipline que
-            // DettesFournisseurs (ticket 5.7) côté achats.
-            $remaining = $montant;
-            foreach ($this->receivables as $receivable) {
-                if ($remaining <= 0) {
-                    break;
-                }
-                $applied = min($remaining, $receivable->balance);
-                $receivable->update(['amount_paid' => (float) $receivable->amount_paid + $applied]);
-                $remaining -= $applied;
-            }
+            return;
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+
+            return;
         }
 
-        $treasury->update(['balance' => (float) $treasury->balance + $montant]);
-
-        // 🔴→✅ TICKET 14.34 — UNE SEULE ÉCRITURE POUR LE VERSEMENT, même
-        // lorsqu'il apure plusieurs créances en FIFO : un versement est un fait
-        // comptable unique, et le relevé bancaire ne portera qu'une ligne.
-        $ecriture = app(RecordSettlementAccountingEntryAction::class)->collectFromCustomer(
-            $treasury, $montant, $this->customer?->name, $this->regularisationTarget
-        );
-
-        if ($ecriture === null) {
-            AuditLog::record('receivable.accounting_entry_missing', 'comptabilite');
-        }
-
-        AuditLog::record('receivable.payment_recorded', 'ventes');
-
-        // 🔴→✅ TICKET 14.3 — `receivables` ne retient que les créances NON
-        // soldées (`whereColumn('amount_paid', '<', 'amount')`) et a été lue
-        // plus haut dans la branche FIFO, donc mémoïsée pour la requête. Une
-        // créance intégralement réglée par ce règlement restait affichée dans
-        // la liste jusqu'à un rafraîchissement manuel — et `soldeGlobal`, qui
-        // en dérive, restait calculé sur la collection périmée.
+        // 🔴→✅ TICKET 14.3 — `receivables` ne retient que les créances NON soldées : mémoïsée pour la requête, elle
+        // restait affichée après un règlement complet, `soldeGlobal` avec elle.
         unset($this->receivables, $this->soldeGlobal);
 
         $this->dispatch('close-modal', name: 'modal-regularisation');

@@ -78,6 +78,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   58: [d.corbeilleElements, d.corbeilleDemandes],
   // Tickets RH-2 / RH-4 — absences de stagiaire, barème ITS, demandes de règlement de paie.
   67: [d.internshipAbsences, d.incomeTaxBrackets, d.payslipRequests],
+  // Ticket VC-1 — encaissements de créances clients saisis au poste.
+  69: [d.receivablePayments],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -426,7 +428,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 68, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1');
+    expect(d.schemaVersion, 69, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

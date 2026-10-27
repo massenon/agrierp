@@ -43,6 +43,8 @@ void main() {
     'payslip_requests': 'lib/features/rh/personnel_repository.dart',
     // Ticket UT-1 — « Gestion Utilisateurs » : les comptes se créent, se modifient, s'archivent et se réactivent par ce dépôt.
     'utilisateurs': 'lib/features/parametres/parametres_generaux_repository.dart',
+    // Ticket VC-1 — « Suivi des Dettes » : l'encaissement d'une créance s'écrit par ce dépôt.
+    'receivable_payments': 'lib/features/clients/clients_creances_repository.dart',
     'products': 'lib/features/stocks/produits_repository.dart',
     'suppliers': 'lib/features/achats/fournisseurs_repository.dart',
     'supplier_payments': 'lib/features/achats/fournisseurs_repository.dart',

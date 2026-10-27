@@ -81,6 +81,9 @@ class MotifsRefusPush
             'expense_date' => 'date de la dépense', 'label' => 'libellé', 'category' => 'catégorie',
             'employee_id' => 'employé', 'attendance_date' => 'date de pointage', 'check_in' => 'heure d\'arrivée',
             'check_out' => 'heure de départ', 'status' => 'statut',
+            // Ticket VC-1 — encaissements de créances.
+            'customer_id' => 'client', 'receivable_id' => 'créance', 'treasury_account_id' => 'compte de trésorerie',
+            'amount' => 'montant', 'payment_date' => 'date du règlement',
             // Ticket UT-1 — comptes utilisateurs.
             'name' => 'nom complet', 'username' => "nom d'utilisateur", 'role' => 'rôle',
             'password' => 'mot de passe',

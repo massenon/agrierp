@@ -5127,6 +5127,11 @@ class SyncEngine {
       _db.advanceImputations,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket VC-1 — encaissements de créances clients : le fait seul part, le serveur applique.
+    final encaissements = await (_db.select(
+      _db.receivablePayments,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final retours = await (_db.select(
       _db.purchaseReturns,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -5212,6 +5217,7 @@ class SyncEngine {
         demandesCorbeille.isEmpty &&
         avances.isEmpty &&
         imputations.isEmpty &&
+        encaissements.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
         fournisseurs.isEmpty &&
@@ -5389,6 +5395,8 @@ class SyncEngine {
         // les deux voyagent ensemble dans le même paquet, jamais séparés.
         'customer_advances': avances.map(_avanceEnJson).toList(),
         'advance_imputations': imputations.map(_imputationEnJson).toList(),
+        // Ticket VC-1 — traité par le serveur APRÈS les ventes, les avances et leurs imputations.
+        'receivable_payments': encaissements.map(_encaissementEnJson).toList(),
       });
 
     var accepte = 0;
@@ -6045,6 +6053,17 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket VC-1 — acquitté seulement quand le serveur a passé créance, trésorerie (deux livres) et écriture.
+    accepte += await _acquitter(
+      'receivable_payments',
+      corps['receivable_payments'],
+      (ids, statut) =>
+          (_db.update(_db.receivablePayments)..where((t) => t.id.isIn(ids)))
+              .write(ReceivablePaymentsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // ⚠️ Retours et remboursements : le serveur ne renvoie un `id` en `accepted` qu'une fois
     // le stock, la dette, la trésorerie et l'écriture passés dans UNE transaction.
     final retoursAcceptes = await _acquitter(
@@ -6138,6 +6157,8 @@ class SyncEngine {
     // Ticket AV1 — après les ventes (un retour peut viser la vente du même envoi), avant les imputations.
     'credit_notes',
     'advance_imputations',
+    // Ticket VC-1 — après les ventes, les avances et leurs imputations, comme au serveur.
+    'receivable_payments',
     'livestock_reproduction_events',
     'infirmary_records',
     'veterinary_calendar_events',
@@ -6729,6 +6750,16 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket VC-1 — un encaissement refusé (créance soldée entre-temps, exercice clos…) se relance.
+      'receivable_payments' =>
+        () =>
+            (_db.update(
+              _db.receivablePayments,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ReceivablePaymentsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
       'supplier_payments' =>
         () =>
             (_db.update(
@@ -7066,6 +7097,16 @@ class SyncEngine {
     if (i.saleId != null) 'sale_id': i.saleId,
     'amount': i.amount,
     'imputation_date': _jour(i.imputationDate),
+  };
+
+  /// Ticket VC-1 — encaissement de créance : ni solde, ni écriture, ni imputation ne partent, seulement le fait.
+  Map<String, dynamic> _encaissementEnJson(EncaissementCreance e) => {
+    'id': e.id,
+    'customer_id': e.customerId,
+    'receivable_id': e.receivableId,
+    'treasury_account_id': e.treasuryAccountId,
+    'amount': e.amount,
+    'payment_date': _jour(e.paymentDate),
   };
 
   /// Règlement fournisseur : ni imputation ni solde ne partent, seulement le fait.

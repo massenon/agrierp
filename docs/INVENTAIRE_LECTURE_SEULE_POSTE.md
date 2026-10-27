@@ -52,7 +52,8 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 
 | Écran web | Fonction web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
-| `SuiviDettes` | confirmPayment (encaisser une créance), sendReminder | ABSENT : P `clients/clients_creances_screen.dart:658` (inerte) ; `clients_creances_repository.dart:213-214` | `receivables`, `customer_reminders` (refusés) | VC-1 |
+| `SuiviDettes` | confirmPayment (encaisser une créance) | **PRÉSENT depuis VC-1 (28/10/2026)** : `ClientsCreancesRepository.encaisserCreance` ; serveur `CustomerSettlementService` + `pushReceivablePayments` | `receivable_payments` (Drift v69) | VC-1 ✅ |
+| `SuiviDettes` | sendReminder | ABSENT (inerte) | `customer_reminders` (refusé) | VC-2 |
 | `RelancesClients` | sendMailReminder, sendWhatsappReminder, sendSmsReminder, exportCourrierPdf | ABSENT : l. 700-713, mention l. 839-841 | `customer_reminders` | VC-2 |
 | `ProfileClient` | confirmRegularisation, sendQuickReminder | ABSENT : aucun écran profil client | `receivables` | VC-3 |
 | `HistoriqueAvances` | editAdvance, archiveAdvance | ABSENT, voulu (D4/D5) : `clients_creances_screen.dart:31`, l. 1224-1226 | — | VC-4 (décision à revoir : « toutes les fonctions ») |

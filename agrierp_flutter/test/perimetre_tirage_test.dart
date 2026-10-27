@@ -114,6 +114,8 @@ void main() {
     'corbeille_demandes',
     // Ticket RH-4 — demandes de règlement de paie (envoyées, jamais tirées : le bulletin redescend dans `payslips`).
     'payslip_requests',
+    // Ticket VC-1 — encaissements de créances (envoyés, jamais tirés : la créance soldée redescend dans `receivables`).
+    'receivable_payments',
     'sync_conflicts',
     'app_settings',
     'sync_state',

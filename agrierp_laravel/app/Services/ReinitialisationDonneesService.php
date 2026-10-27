@@ -123,6 +123,9 @@ class ReinitialisationDonneesService
     {
         return [
             // Ventes et clientèle
+            // Ticket VC-1 : encaissements de créances reçus des postes (idempotence) — AVANT les créances et les clients
+            // qu'ils référencent (clés étrangères).
+            'receivable_payments',
             'sale_lines', 'sales', 'credit_notes', 'quotes', 'receivables',
             'advance_imputations', 'customer_advances', 'customer_reminders', 'customers',
             // Achats et fournisseurs

@@ -167,6 +167,10 @@ PRD : `docs/prd/rh-crud-poste.md`. **Trois points de passage uniques, partagés 
 
 `App\Actions\SaisieUtilisateurAction` est le point de passage unique de `Livewire\Parametres\GestionUtilisateurs` ET de `SyncController::pushUsers` (clé d'envoi `users`, droit `manage-users`, après `employees`) : mêmes règles (`regles($id, $creation)` : identifiant sans arobase, unicité, rôle existant, `Password::defaults()`), mêmes effets (rôle, jetons révoqués à l'archivage, audit), mêmes messages ; le propre compte de l'auteur ne s'archive pas ; un compte connu et identique est acquitté sans écriture ; `password` facultatif à la modification (absent = conservé), jamais journalisé ni servi. Le tirage `users` sert `updated_at`. Tests : `SyncUtilisateursTest`.
 
+### Encaissement d'une créance au poste (VC-1 — 28/10/2026)
+
+`App\Services\CustomerSettlementService::encaisser()` est le point de passage unique de `SuiviDettes::confirmPayment`, `ProfileClient::confirmRegularisation` ET de `SyncController::pushReceivablePayments` (clé d'envoi `receivable_payments`, droit `manage-ventes`, traitée après `sales`, `customer_advances` et `advance_imputations`). Une créance précise (`receivable_id`) ou, sans elle, le solde du client en FIFO ; créance, trésorerie (deux livres), écriture D 5xx / C 411 et audit dans UNE transaction ; **seule la part imputée entre en caisse** ; idempotent par l'UUID du poste (`receivable_payments`, vidée par la réinitialisation avant les créances). Tests : `SyncEncaissementCreanceTest`.
+
 ### Scheduling
 
 `routes/console.php` holds all 5 scheduled tasks (daily `agrierp:backup` at 02:00, `DailyProphylaxyReminderJob` at 06:00 Africa/Porto-Novo, weekly session GC / notification purge / failed-job prune, weekly backup-download reminder). Production uses **one** cPanel cron entry running `php artisan schedule:run` every minute — never one cron per task.

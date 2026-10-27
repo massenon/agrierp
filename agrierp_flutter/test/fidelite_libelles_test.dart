@@ -305,7 +305,10 @@ void main() {
       'lib/features/clients/clients_creances_screen.dart',
       'lib/features/clients/fiche_client_modales.dart',
     ],
-    'suivi-dettes.html': ['lib/features/clients/clients_creances_screen.dart'],
+    'suivi-dettes.html': [
+      'lib/features/clients/clients_creances_screen.dart',
+      'lib/features/clients/recouvrement_modale.dart',
+    ],
     'relances-clients.html': [
       'lib/features/clients/clients_creances_screen.dart',
     ],
@@ -397,14 +400,12 @@ void main() {
     //    ont été retirées (elles masquaient d'autres pages) — chaque page garde
     //    la sienne, voir `exemptionsParPage`.
 
-    // ── Un règlement décaisse ET passe son écriture SYSCOHADA : il ne peut
-    //    pas se faire hors ligne sans canal d'envoi, et `receivables` n'en a
-    //    pas. Encaisser reste une opération de la surface web.
-    'Ajouter un Recouvrement': 'encaissement non embarqué au poste',
-    'Valider le Décaissement': 'encaissement non embarqué au poste',
-    'Montant du Règlement (FCFA)': 'encaissement non embarqué au poste',
-    'Compte Débité': 'encaissement non embarqué au poste',
-    'Nouveau Solde Dû': 'encaissement non embarqué au poste',
+    // ── Ticket VC-1 : l'encaissement d'une créance s'écrit au poste (modale « Enregistrer un Recouvrement », le fait
+    //    seul part, le serveur solde et passe l'écriture) — les exemptions « encaissement non embarqué » sont levées.
+    //    Seuls « Valider le Décaissement » et « Compte Débité » (mots de la maquette) restent : le web dit
+    //    « Valider le Règlement » et « Compte de Trésorerie », portés tels quels.
+    'Valider le Décaissement': 'le web dit « Valider le Règlement » (VC-1)',
+    'Compte Débité': 'le web dit « Compte de Trésorerie » : un encaissement CRÉDITE le compte (VC-1)',
 
     // ── Envoyer une relance suppose le réseau ET le canal mail du serveur ;
     //    surtout, `customer_reminders` est en lecture seule : une relance
@@ -851,7 +852,7 @@ void main() {
     //    le porte désormais. Retirée du global, gardée ici où elle est vraie.
     'suivi-dettes.html': {
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Enregistrer un Règlement': 'encaissement non embarqué au poste',
+      'Enregistrer un Règlement': 'le web titre la modale « Enregistrer un Recouvrement » (VC-1)',
     },
 
     // ── Ticket F0.71 — Fiche fournisseur écrite au poste ───────────────────
@@ -1139,8 +1140,9 @@ void main() {
   /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
   /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
   /// RH-1 à RH-4 (27/10/2026) : 197 → 189. Les registres RH s'écrivent au poste : leurs libellés de modale sont portés.
+  /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 177;
+  const plafondManquesMasques = 173;
 
   for (final entree in portages.entries) {
     final page = entree.key;
