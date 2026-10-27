@@ -147,11 +147,16 @@
                 <img src="{{ asset('assets/images/logo_ferme_ecole_officiel.png') }}" alt="" class="absolute pointer-events-none" style="left:50%; top:52%; width:62%; transform:translate(-50%,-50%); opacity:.12;">
                 <div class="relative space-y-sm text-xs">
 
-                    <div class="flex items-start gap-sm border-b border-outline-variant pb-sm">
-                        <img src="{{ asset('assets/images/logo_ferme_ecole_officiel.png') }}" alt="Logo de la ferme" class="w-14 h-auto shrink-0">
+                    {{-- En-tête du modèle officiel : logo à gauche (≈ 17 % de la largeur, pas plus), nom de la ferme en vert, activités
+                         sur deux lignes, adresse, téléphone. ⚠️ Largeur en `style` : une classe Tailwind absente du CSS compilé
+                         (`w-14` n'y était pas) rendait le logo à sa taille NATURELLE (476 px) et écrasait l'aperçu. --}}
+                    <div class="flex items-start gap-sm">
+                        <img src="{{ asset('assets/images/logo_ferme_ecole_officiel.png') }}" alt="Logo de la ferme" style="width:17%; max-width:96px; height:auto; flex-shrink:0;">
                         <div class="flex-1 text-center">
                             <p class="font-black text-[#2e6b1a] text-sm tracking-wide">{{ config('attestation.nom') }}</p>
-                            <p class="text-[8px] font-bold leading-tight">{{ implode(' ', config('attestation.activites')) }}</p>
+                            @foreach(config('attestation.activites') as $ligne)
+                            <p class="text-[8px] font-bold leading-tight">{{ $ligne }}</p>
+                            @endforeach
                             <p class="text-[8px] leading-tight"><strong>Adresse</strong> : {{ config('attestation.adresse') }}</p>
                             <p class="text-[8px] leading-tight"><strong>Téléphone</strong> : {{ config('attestation.telephones') }}, <strong>RCCM</strong> : {{ config('attestation.rccm') }}</p>
                         </div>

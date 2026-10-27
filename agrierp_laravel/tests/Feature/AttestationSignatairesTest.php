@@ -243,6 +243,20 @@ class AttestationSignatairesTest extends TestCase
             ->assignRole($role);
     }
 
+    public function test_web_le_logo_de_l_apercu_a_une_largeur_en_style_et_les_activites_sont_sur_deux_lignes(): void
+    {
+        $html = Livewire::actingAs($this->admin())->test(Attestations::class)->html();
+
+        // ⚠️ Largeur portée par `style`, jamais par une classe Tailwind : `w-14` absente du CSS compilé rendait le logo à sa
+        // taille naturelle (476 px) et écrasait tout l'aperçu. Une classe de plus dans un Blade ne suffit pas sans `npm run build`.
+        $this->assertMatchesRegularExpression('/<img[^>]*alt="Logo de la ferme"[^>]*style="[^"]*width:\s*17%/', $html);
+        $this->assertStringNotContainsString('alt="Logo de la ferme" class="w-14', $html);
+
+        foreach (config('attestation.activites') as $ligne) {
+            $this->assertStringContainsString(e($ligne), $html, 'chaque ligne d\'activités est imprimée telle quelle, sur sa propre ligne');
+        }
+    }
+
     public function test_web_la_regle_de_signature_s_enregistre(): void
     {
         Livewire::actingAs($this->admin())->test(Attestations::class)
