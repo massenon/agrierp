@@ -688,7 +688,11 @@ class RolesApplicatifs extends Table {
 /// ⚠️ **NI MOT DE PASSE NI JETON** : la liste sert à savoir QUI travaille sur
 /// la ferme, jamais à s'authentifier. L'authentification du poste passe par
 /// `POST /api/auth/login`.
-class Utilisateurs extends Table {
+/// Ticket UT-1 — table MIXTE : les comptes se créent, se modifient, s'archivent et se réactivent au poste (`pending`),
+/// et descendent du serveur. ⚠️ Le mot de passe n'est JAMAIS en base : en attente d'envoi, il vit au coffre du
+/// système (`ParametresGenerauxRepository.cleMotDePasse`), effacé à l'acquit.
+class Utilisateurs extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get name => text()();
   TextColumn get username => text().nullable()();
@@ -2058,7 +2062,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 67;
+  int get schemaVersion => 68;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2709,6 +2713,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 67) {
         await _registresRhMixtes(m);
       }
+      // v68 — ticket UT-1 : `utilisateurs` devient MIXTE (colonnes de synchronisation posées par reconstruction).
+      if (from < 68) {
+        await _utilisateursMixtes(m);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -2761,6 +2769,24 @@ class AppDatabase extends _$AppDatabase {
         companySettings.cnssEmployerFamilyRate, companySettings.cnssEmployerRiskRate]) {
       await _ajouterColonneSiAbsente(m, companySettings, c);
     }
+  }
+
+  /// Ticket UT-1 — `utilisateurs` reçoit [SyncColumns] par RECONSTRUCTION (`TableMigration`) : les comptes déjà tirés
+  /// sont `synced`, `device_id` = 'serveur'. Idempotent (une base qui a déjà `sync_status` n'est pas touchée).
+  Future<void> _utilisateursMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${utilisateurs.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        utilisateurs,
+        newColumns: [for (final c in utilisateurs.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          utilisateurs.deviceId: const Constant<String>('serveur'),
+          utilisateurs.syncStatus: const Constant<String>('synced'),
+          utilisateurs.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
   }
 
   /// Pose ce qui manque, table par table et colonne par colonne, par rapport au schéma courant (voir `onUpgrade`).
@@ -3016,6 +3042,8 @@ class AppDatabase extends _$AppDatabase {
     'internships',
     'internship_absences',
     'payslip_requests',
+    // Ticket UT-1 — comptes utilisateurs (clé `users` du serveur ; la table Drift s'appelle `utilisateurs`).
+    'utilisateurs',
     'products',
     'suppliers',
     'supplier_payments',

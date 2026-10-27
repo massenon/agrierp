@@ -201,7 +201,7 @@ Le second bouton flottant, « Visite guidée » (`help`, bleu), est **inerte au 
 | Calendrier, fonctions | ❌ | « Planifier une Intervention » et sa modale ; confirmation d'administration au clic |
 | Calendrier, fenêtre | ⚠️ | J → J+13 au web, J−3 → J+10 au poste |
 | KPI « Vaccinations planifiées » | ⚠️ | règle différente |
-| Archivage d'un soin | ❌ | `is_active` absent au poste ; limite de 50 lignes |
+| Archivage d'un soin | ✅ | porté au ticket U3 (`is_active`, `SoinsRepository.archiverSoin`) — ligne corrigée le 27/10/2026 |
 | Registre | ⚠️ | 6 colonnes au web (« Statut » ➕ au poste) ; cellule « CODE (Espèce) » |
 | Coût | ⚠️ | « 12 500 FCFA » au web |
 | Modale Nouveau Soin | ⚠️ | largeur sm ; aide et couleur rouge de la rémanence ; exemples ; zone de texte pour les symptômes |
@@ -212,7 +212,7 @@ Le second bouton flottant, « Visite guidée » (`help`, bleu), est **inerte au 
 
 ## 7. Paramètres Élevage (`ParametresElevage.php`)
 
-Le poste reproduit les 4 onglets, mais **en lecture seule par choix** : les référentiels sont imposés par le serveur.
+Le poste reproduit les 4 onglets ; **modifiables au poste depuis H9b** (`ParametresElevageRepository`, décision D-H9) — phrase corrigée le 27/10/2026.
 
 | Élément | Verdict | Détail |
 |---|---|---|

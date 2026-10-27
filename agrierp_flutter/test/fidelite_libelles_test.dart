@@ -540,13 +540,11 @@ void main() {
     // ⚠️ Modifier une facture déjà transmise à la DGI romprait l'intégrité
     //    fiscale : le web ne le fait pas non plus.
     'Modifier — Facturation & MeCeF': 'intégrité fiscale — jamais modifiable',
-    // ── Hub Personnel & Stages (ticket F0.48). Les registres sont des
-    //    référentiels du serveur : embaucher, corriger un salaire ou
-    //    archiver une fiche depuis le poste donnerait une saisie effacée au
-    //    tirage suivant.
-    '+ Nouvel Employé': 'référentiel en lecture seule au poste',
-    'Salaire (FCFA) *': 'référentiel en lecture seule au poste',
-    "Établissement d'origine *": 'référentiel en lecture seule au poste',
+    // ── Hub Personnel & Stages : les registres s'écrivent au poste depuis RH-1 / RH-2 (27/10/2026). Le « + » de la
+    //    maquette est l'icône `add` du bouton ; le libellé porté est le texte (« Nouvel Employé », « Nouvel Utilisateur »).
+    '+ Nouvel Employé': "le « + » est l'icône du bouton ; « Nouvel Employé » est porté (RH-1)",
+    '+ Nouvel Utilisateur': "le « + » est l'icône du bouton ; « Nouvel Utilisateur » est porté (UT-1)",
+    'Salaire (FCFA) *': 'le web nomme le champ « Salaire de base (FCFA) », porté tel quel (RH-1)',
 
     // ⚠️⚠️ LES ABSENCES D'UN STAGIAIRE vivent dans `internship_absences`,
     //    que le poste ne reçoit pas — et la feuille de pointage ne les couvre
@@ -642,14 +640,8 @@ void main() {
     'Supprimer ce Rôle ?': 'définition des rôles réservée au web',
     'Supprimer Définitivement': 'définition des rôles réservée au web',
 
-    // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT AU POSTE, et un compte ne
-    //    s'y crée donc pas : il faudrait choisir un mot de passe, c'est-à-dire
-    //    le faire transiter et le stocker sur la machine la plus exposée du
-    //    dispositif.
-    'Nouvel Utilisateur': "création de compte réservée au web",
-    '+ Nouvel Utilisateur': "création de compte réservée au web",
-    'Email *': "création de compte réservée au web",
-    'Rôle *': "création de compte réservée au web",
+    // Ticket UT-1 (27/10/2026) : les comptes se créent au poste (mot de passe au coffre du système jusqu'à l'envoi,
+    // jamais en base) — les exemptions « création de compte réservée au web » sont levées.
 
     // ⚠️⚠️ LE SERVEUR SMTP PORTE UN MOT DE PASSE. Le descendre ferait d'un
     //    poste volé une clé d'accès à la boîte mail de la ferme :
@@ -887,13 +879,11 @@ void main() {
 
     // ── Ticket F0.72 — « Nom complet * » n'est plus exempté partout : ces deux pages
     //    gardent le motif d'origine, à réexaminer avec leur écran.
+    // Ticket UT-1 : « Archiver » et « Nom complet * » sont portés (comptes créés, modifiés, archivés au poste).
     'gestion-utilisateurs.html': {
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver l'utilisateur ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Nom complet *': 'référentiel en lecture seule au poste',
     },
     // Ticket RH-1 : « Archiver » est porté (archivage d'un employé).
     'registre-employes.html': {
@@ -1149,7 +1139,8 @@ void main() {
   /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
   /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
   /// RH-1 à RH-4 (27/10/2026) : 197 → 189. Les registres RH s'écrivent au poste : leurs libellés de modale sont portés.
-  const plafondManquesMasques = 189;
+  /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
+  const plafondManquesMasques = 177;
 
   for (final entree in portages.entries) {
     final page = entree.key;

@@ -18187,6 +18187,42 @@ class $UtilisateursTable extends Utilisateurs
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($UtilisateursTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -18243,6 +18279,9 @@ class $UtilisateursTable extends Utilisateurs
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     name,
     username,
     email,
@@ -18265,6 +18304,22 @@ class $UtilisateursTable extends Utilisateurs
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -18311,6 +18366,20 @@ class $UtilisateursTable extends Utilisateurs
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $UtilisateursTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -18338,10 +18407,16 @@ class $UtilisateursTable extends Utilisateurs
   $UtilisateursTable createAlias(String alias) {
     return $UtilisateursTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String name;
   final String? username;
   final String? email;
@@ -18349,6 +18424,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   final bool isActive;
   const Utilisateur({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     required this.name,
     this.username,
     this.email,
@@ -18359,6 +18437,13 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $UtilisateursTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || username != null) {
       map['username'] = Variable<String>(username);
@@ -18376,6 +18461,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   UtilisateursCompanion toCompanion(bool nullToAbsent) {
     return UtilisateursCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       name: Value(name),
       username: username == null && nullToAbsent
           ? const Value.absent()
@@ -18395,6 +18483,11 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Utilisateur(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $UtilisateursTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       name: serializer.fromJson<String>(json['name']),
       username: serializer.fromJson<String?>(json['username']),
       email: serializer.fromJson<String?>(json['email']),
@@ -18407,6 +18500,11 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $UtilisateursTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'name': serializer.toJson<String>(name),
       'username': serializer.toJson<String?>(username),
       'email': serializer.toJson<String?>(email),
@@ -18417,6 +18515,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
 
   Utilisateur copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     String? name,
     Value<String?> username = const Value.absent(),
     Value<String?> email = const Value.absent(),
@@ -18424,6 +18525,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     bool? isActive,
   }) => Utilisateur(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     name: name ?? this.name,
     username: username.present ? username.value : this.username,
     email: email.present ? email.value : this.email,
@@ -18433,6 +18537,11 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   Utilisateur copyWithCompanion(UtilisateursCompanion data) {
     return Utilisateur(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       name: data.name.present ? data.name.value : this.name,
       username: data.username.present ? data.username.value : this.username,
       email: data.email.present ? data.email.value : this.email,
@@ -18445,6 +18554,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   String toString() {
     return (StringBuffer('Utilisateur(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('name: $name, ')
           ..write('username: $username, ')
           ..write('email: $email, ')
@@ -18455,12 +18567,25 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, username, email, role, isActive);
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    name,
+    username,
+    email,
+    role,
+    isActive,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Utilisateur &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.name == this.name &&
           other.username == this.username &&
           other.email == this.email &&
@@ -18470,6 +18595,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
 
 class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String> name;
   final Value<String?> username;
   final Value<String?> email;
@@ -18478,6 +18606,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   final Value<int> rowid;
   const UtilisateursCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.name = const Value.absent(),
     this.username = const Value.absent(),
     this.email = const Value.absent(),
@@ -18487,6 +18618,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   });
   UtilisateursCompanion.insert({
     required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
     required String name,
     this.username = const Value.absent(),
     this.email = const Value.absent(),
@@ -18494,9 +18628,14 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
        name = Value(name);
   static Insertable<Utilisateur> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? name,
     Expression<String>? username,
     Expression<String>? email,
@@ -18506,6 +18645,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (name != null) 'name': name,
       if (username != null) 'username': username,
       if (email != null) 'email': email,
@@ -18517,6 +18659,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
 
   UtilisateursCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String>? name,
     Value<String?>? username,
     Value<String?>? email,
@@ -18526,6 +18671,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   }) {
     return UtilisateursCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       name: name ?? this.name,
       username: username ?? this.username,
       email: email ?? this.email,
@@ -18540,6 +18688,17 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $UtilisateursTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -18566,6 +18725,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   String toString() {
     return (StringBuffer('UtilisateursCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('name: $name, ')
           ..write('username: $username, ')
           ..write('email: $email, ')
@@ -51667,6 +51829,9 @@ typedef $$RolesApplicatifsTableProcessedTableManager =
 typedef $$UtilisateursTableCreateCompanionBuilder =
     UtilisateursCompanion Function({
       required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
       required String name,
       Value<String?> username,
       Value<String?> email,
@@ -51677,6 +51842,9 @@ typedef $$UtilisateursTableCreateCompanionBuilder =
 typedef $$UtilisateursTableUpdateCompanionBuilder =
     UtilisateursCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String> name,
       Value<String?> username,
       Value<String?> email,
@@ -51696,6 +51864,22 @@ class $$UtilisateursTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -51739,6 +51923,21 @@ class $$UtilisateursTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -51776,6 +51975,18 @@ class $$UtilisateursTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -51825,6 +52036,9 @@ class $$UtilisateursTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> username = const Value.absent(),
                 Value<String?> email = const Value.absent(),
@@ -51833,6 +52047,9 @@ class $$UtilisateursTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => UtilisateursCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 name: name,
                 username: username,
                 email: email,
@@ -51843,6 +52060,9 @@ class $$UtilisateursTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
                 required String name,
                 Value<String?> username = const Value.absent(),
                 Value<String?> email = const Value.absent(),
@@ -51851,6 +52071,9 @@ class $$UtilisateursTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => UtilisateursCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 name: name,
                 username: username,
                 email: email,

@@ -38,9 +38,9 @@ use App\Models\IncomeTaxBracket;
  * ⚠️ BARÈME EN BASE, PAS EN DUR (`income_tax_brackets`). Un barème fiscal
  * change par loi de finances ; le figer dans le code imposerait un
  * redéploiement à chaque révision et rendrait invisible la version réellement
- * appliquée à un bulletin donné. **Le barème semé doit être validé par le
- * client avant toute paie réelle** : ni le prototype ni le CDC ne le
- * documentent.
+ * appliquée à un bulletin donné. Le barème semé a été VALIDÉ par le client
+ * (décision RH-Q2 du 27/10/2026) : ni le prototype ni le CDC ne le
+ * documentaient.
  */
 class PayrollCalculationService
 {

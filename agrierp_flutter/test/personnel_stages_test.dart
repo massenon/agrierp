@@ -511,6 +511,34 @@ void main() {
       }
     });
 
+    /// RH-Q1 (décision client du 27/10/2026 : OUI) — le filtre « Archivé » du Blade liste les archivés, en lecture.
+    testWidgets('RH-Q1 — le filtre « Archivé » liste les employés archivés, en lecture seule', (
+      tester,
+    ) async {
+      await employe('e1', 'Kossi', 'AGBODJI', fonction: "Chef d'élevage");
+      await employe('e2', 'Aline', 'DOSSOU', fonction: 'Gardien');
+      await (db.update(db.employees)..where((t) => t.id.equals(uuid('e2')))).write(const EmployeesCompanion(isActive: Value(false)));
+
+      await afficher(tester);
+
+      // Par défaut : les actifs seuls, et la carte compte les actifs.
+      expect(find.text('Kossi AGBODJI'), findsOneWidget);
+      expect(find.text('Aline DOSSOU'), findsNothing);
+      expect(find.descendant(of: find.byKey(const Key('kpi-employes-actifs')), matching: find.text('1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('employes-filtre')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archivé').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aline DOSSOU'), findsOneWidget);
+      expect(find.text('Kossi AGBODJI'), findsNothing);
+      expect(find.text('Archivé'), findsWidgets);
+      expect(find.byKey(const Key('employe-lecture-seule-0')), findsOneWidget);
+      expect(find.byKey(const Key('employe-modifier-0')), findsNothing);
+      expect(find.byKey(const Key('employe-archiver-0')), findsNothing);
+    });
+
     testWidgets('un employé descendu est nommé avec sa fonction', (
       tester,
     ) async {

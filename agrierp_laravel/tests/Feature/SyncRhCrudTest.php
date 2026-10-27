@@ -219,4 +219,25 @@ class SyncRhCrudTest extends TestCase
         $this->assertSame([], $reponse->json('internship_absences.accepted'));
         $this->assertSame(0, InternshipAbsence::count());
     }
+
+    /**
+     * RH-Q1 (décision client du 27/10/2026 : OUI) — le filtre « Archivé » du Registre Employés liste les archivés, en
+     * lecture (ni « Modifier » ni « Archiver ») ; les autres filtres ne les montrent jamais.
+     */
+    public function test_le_filtre_archive_du_registre_liste_les_employes_archives_en_lecture(): void
+    {
+        $actif = Employee::create(['first_name' => 'Koffi', 'last_name' => 'ADJOVI', 'position' => 'Gardien', 'hire_date' => '2025-03-01', 'status' => 'actif', 'is_active' => true]);
+        $archive = Employee::create(['first_name' => 'Aline', 'last_name' => 'DOSSOU', 'position' => 'Gardien', 'hire_date' => '2025-03-01', 'status' => 'actif', 'is_active' => false]);
+
+        $composant = \Livewire\Livewire::actingAs($this->rh)->test(\App\Livewire\RH\RegistreEmployes::class);
+        $this->assertSame([$actif->id], $composant->get('employees')->pluck('id')->all());
+        $composant->assertDontSee('DOSSOU');
+
+        $composant->set('statusFilter', 'Archivé');
+        $this->assertSame([$archive->id], $composant->get('employees')->pluck('id')->all());
+        $composant->assertSee('DOSSOU')->assertSee('Archivé')->assertSee('Lecture seule')->assertDontSee("editEmployee('{$archive->id}')", false);
+
+        $composant->set('statusFilter', 'Actif');
+        $this->assertSame([$actif->id], $composant->get('employees')->pluck('id')->all());
+    }
 }

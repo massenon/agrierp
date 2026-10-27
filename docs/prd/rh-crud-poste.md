@@ -1,5 +1,5 @@
 # PRD — CRUD RH au poste : Registre Employés, Registre Stagiaires, Feuille de Pointage, Gestion de la Paie
-**Statut :** brouillon (livré par les tickets RH-1 à RH-4 le 27/10/2026 ; RH-Q1 à RH-Q3 en attente du client) · **Date :** 2026-10-27 · **Ticket(s) :** RH-1, RH-2, RH-3, RH-4 (nouveaux ; aucun ticket du `PLAN_FINALISATION.md` ne couvrait ces quatre onglets)
+**Statut :** livré (tickets RH-1 à RH-4, puis RH-Q1 à RH-Q3 tranchées et appliquées le 27/10/2026) · **Date :** 2026-10-27 · **Ticket(s) :** RH-1, RH-2, RH-3, RH-4 (nouveaux ; aucun ticket du `PLAN_FINALISATION.md` ne couvrait ces quatre onglets)
 
 ## 1. Problème
 Le hub « Personnel & Stages » du poste a cinq onglets, mais **un seul écrit** : la feuille de pointage ne sait que *créer* un pointage du jour. Tout le reste est en lecture seule, avec une mention « se fait sur la surface web » :
@@ -72,10 +72,10 @@ Web : inchangé (déjà complet). Poste : modales `ModaleAgri` avec les libellé
 - Pointage des stagiaires (un stagiaire n'est pas un employé : décision 8.1, inchangée).
 - Choix du compte de trésorerie au règlement (le web prend le premier actif ; inchangé).
 
-## 9. Questions ouvertes pour le client
-- **RH-Q1** Le poste doit-il montrer les employés archivés (avec filtre) ou seulement les actifs comme le web ? *Proposition : actifs seuls, comme le web.*
-- **RH-Q2** Le barème ITS semé n'a jamais été validé (note de `PayrollCalculationService`). Avant toute paie réelle, le faire valider par le cabinet FAGUEZ. *Proposition : afficher « barème ITS non renseigné » au poste comme au web tant qu'il est vide.*
-- **RH-Q3** La paie d'un mois dont les pointages ont plus de 60 jours ne peut pas compter les absences au poste (seuls 60 jours sont tirés). *Proposition : limiter la validation au poste aux deux derniers mois ; au-delà, le web.*
+## 9. Questions ouvertes pour le client — TRANCHÉES le 27/10/2026
+- **RH-Q1** Montrer les employés archivés au poste ? **OUI** : option « Archivé » du filtre de statut, au web d'abord (`RegistreEmployes`, Blade) puis au poste ; un employé archivé est en lecture (« Lecture seule », ni « Modifier » ni « Archiver »), jamais compté dans les cartes ni pointable.
+- **RH-Q2** Barème ITS : **déjà validé** par le cabinet FAGUEZ. La note « doit être validé avant toute paie réelle » est retirée de `PayrollCalculationService`.
+- **RH-Q3** Pointages au-delà de 60 jours : **NE PAS LIMITER — le poste doit avoir toutes les fonctions actives.** `attendance_records` devient une famille PAGINÉE servie en entier (curseur `updated_at`, `id`) : la paie de tout mois se compte au poste.
 
 ## 10. Critères d'acceptation
 - Laravel : `SyncRhCrudTest` (création / modification / archivage d'un employé, d'un stagiaire, d'une absence depuis le poste : effets, audit, idempotence, refus par rôle), `SyncPointageTest` (modification, archivage, `is_active` au tirage), `SyncPaieDemandeTest` (demande → bulletin + écriture + trésorerie ; renvoi acquitté ; exercice clos refusé avec motif ; tirage des colonnes RH à `view-rh` seulement).

@@ -157,6 +157,22 @@ void main() {
       expect((await employe(id)).syncStatus, SyncStatus.synced, reason: 'rien n\'est réécrit');
     });
 
+    /// RH-Q1 — les archivés sont listés à part (filtre « Archivé »), jamais parmi les actifs ni dans les cartes.
+    test('RH-Q1 — les employés archivés se lisent par le filtre « archive », à part des actifs', () async {
+      final actif = await depot.enregistrerEmploye(prenom: 'Koffi', nom: 'ADJOVI', fonction: 'Gardien', embauche: DateTime(2026, 10, 1), statut: 'conge');
+      final archive = await depot.enregistrerEmploye(prenom: 'Aline', nom: 'DOSSOU', fonction: 'Gardien', embauche: DateTime(2026, 10, 1), statut: 'actif');
+      await depot.archiverEmploye(archive);
+
+      final d = await depot.charger();
+      expect(d.employes.map((e) => e.id), [actif]);
+      expect(d.employesArchives.map((e) => e.id), [archive]);
+      expect(d.employesFiltres('').map((e) => e.id), [actif]);
+      expect(d.employesFiltres('conge').map((e) => e.id), [actif]);
+      expect(d.employesFiltres('actif'), isEmpty, reason: 'l\'archivé était « actif » : il ne compte plus nulle part');
+      expect(d.employesFiltres('archive').map((e) => e.id), [archive]);
+      expect(d.employesActifs, 1);
+    });
+
     test('⚠️ un employé archivé ne se modifie plus (message du web)', () async {
       final id = await depot.enregistrerEmploye(prenom: 'Ange', nom: 'TOSSOU', fonction: 'Gardien', embauche: DateTime(2026, 10, 1), statut: 'actif');
       await depot.archiverEmploye(id);
@@ -300,6 +316,22 @@ void main() {
   });
 
   group('pointages (RH-3)', () {
+    /// RH-Q3 (décision client du 27/10/2026 : NE PAS LIMITER) — un pointage de plus de 60 jours, reçu du serveur, compte
+    /// dans la paie de SON mois : le serveur sert désormais toute la table (famille paginée).
+    test('RH-Q3 — un pointage ancien reçu du serveur compte dans la paie de son mois', () async {
+      final e = await depot.enregistrerEmploye(prenom: 'Kossi', nom: 'AGBODJI', fonction: 'Gardien', embauche: DateTime(2025, 3, 1), salaire: 100000, statut: 'actif');
+      serveur.tirage = {
+        'server_time': '2026-10-27T12:00:00Z',
+        'attendance_records': [pointageJson(uuid('p-ancien'), e, jour: '2026-06-15'), pointageJson(uuid('p-ancien-2'), e, jour: '2026-06-16')],
+      };
+
+      await moteur.synchroniser();
+
+      expect(await depot.joursAbsence(e, '2026-06'), 2);
+      expect((await depot.paie('2026-06')).lignes.single.joursAbsence, 2);
+      expect(await depot.joursAbsence(e, '2026-10'), 0);
+    });
+
     test('⚠️⚠️ archivé au poste : ne compte plus (cartes, absences de la paie), repart avec is_active faux', () async {
       final e = await depot.enregistrerEmploye(prenom: 'Kossi', nom: 'AGBODJI', fonction: 'Gardien', embauche: DateTime(2025, 3, 1), salaire: 100000, statut: 'actif');
       final p = await depot.pointer(employeId: e, jour: DateTime(2026, 10, 5), statut: StatutPointage.absent);

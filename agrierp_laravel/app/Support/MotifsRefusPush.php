@@ -81,6 +81,9 @@ class MotifsRefusPush
             'expense_date' => 'date de la dépense', 'label' => 'libellé', 'category' => 'catégorie',
             'employee_id' => 'employé', 'attendance_date' => 'date de pointage', 'check_in' => 'heure d\'arrivée',
             'check_out' => 'heure de départ', 'status' => 'statut',
+            // Ticket UT-1 — comptes utilisateurs.
+            'name' => 'nom complet', 'username' => "nom d'utilisateur", 'role' => 'rôle',
+            'password' => 'mot de passe',
             // Tickets RH-1, RH-2, RH-4.
             'first_name' => 'prénom', 'last_name' => 'nom', 'position' => 'fonction', 'hire_date' => 'date d\'embauche',
             'base_salary' => 'salaire de base', 'school' => 'établissement', 'start_date' => 'date de début', 'end_date' => 'date de fin',

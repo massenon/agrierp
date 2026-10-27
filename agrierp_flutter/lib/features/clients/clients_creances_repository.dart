@@ -210,8 +210,9 @@ class DonneesClients {
 /// Bord et de l'historique des ventes, et le nom du client dans cet
 /// historique.
 ///
-/// ⚠️ **LECTURE SEULE.** Une créance se solde par un encaissement, jamais par
-/// une édition : le serveur ignore tout envoi sur ces trois référentiels.
+/// ⚠️ Les CRÉANCES (`receivables`) et les RELANCES se lisent seulement : une créance se solde par un
+/// encaissement, geste encore réservé au web (ticket VC-1 de `docs/INVENTAIRE_LECTURE_SEULE_POSTE.md`).
+/// Les clients et les avances, eux, s'écrivent ici depuis F0.55 (`creerClient`, `enregistrerAvance`…).
 class ClientsCreancesRepository {
   ClientsCreancesRepository({
     required this.database,

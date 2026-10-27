@@ -368,7 +368,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   );
 
   late final ParametresGenerauxRepository _parametresGeneraux =
-      ParametresGenerauxRepository(database: _db);
+      ParametresGenerauxRepository(database: _db, identifiantPoste: widget.identifiantPoste);
 
   late final RapportsRepository _rapports = RapportsRepository(database: _db);
 
@@ -789,6 +789,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     reinitialisation: widget.reinitialisation,
     corbeille: widget.corbeille,
     ongletInitial: ongletInitial,
+    idUtilisateurConnecte: widget.auth.utilisateur?.id,
   );
 
   /// Ticket EX7 (EF8) — l'exercice AFFICHÉ, un seul pour la session, diffusé par [PorteeExerciceChoisi] : sélecteur de

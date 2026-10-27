@@ -122,9 +122,23 @@ class DonneesPersonnel {
     required this.jour,
     this.attestationsEmises,
     this.absencesStagiaires = const [],
+    this.employesArchives = const [],
   });
 
+  /// Les employés ACTIFS (sous contrat) : cartes, pointage, paie.
   final List<Employee> employes;
+
+  /// RH-Q1 (décision client du 27/10/2026 : OUI) — les employés ARCHIVÉS, listés par le filtre « Archivé » du
+  /// registre, en lecture seule (un employé archivé ne se modifie ni ne s'archive, règle du web).
+  final List<Employee> employesArchives;
+
+  /// Le registre tel que le filtre de `registre-employes.blade.php` le montre : `''` = tous les actifs,
+  /// `actif` / `conge` / `suspendu` par statut, `archive` = les archivés.
+  List<Employee> employesFiltres(String filtre) => switch (filtre) {
+    '' => employes,
+    'archive' => employesArchives,
+    _ => employes.where((e) => e.status == filtre).toList(),
+  };
   final List<Internship> stagiaires;
   final List<LignePointage> pointages;
   final DateTime jour;
@@ -264,7 +278,8 @@ class PersonnelRepository {
 
   Future<DonneesPersonnel> charger({DateTime? jour}) async {
     // Ticket RH-1 / RH-3 — les archivés ne sont pas listés (comme le web : `where('is_active', true)`).
-    final employes = await (database.select(database.employees)..where((t) => t.isActive.equals(true))).get();
+    final tousLesEmployes = await database.select(database.employees).get();
+    final employes = tousLesEmployes.where((e) => e.isActive).toList();
     final stagiaires = await database.select(database.internships).get();
     final pointages = await (database.select(database.attendanceRecords)..where((t) => t.isActive.equals(true))).get();
     final absences = await (database.select(database.internshipAbsences)
@@ -285,6 +300,8 @@ class PersonnelRepository {
       absencesStagiaires: absences,
       jour: jour ?? HeureBenin.maintenant(),
       employes: employes.toList()
+        ..sort((a, b) => a.lastName.compareTo(b.lastName)),
+      employesArchives: tousLesEmployes.where((e) => !e.isActive).toList()
         ..sort((a, b) => a.lastName.compareTo(b.lastName)),
       stagiaires: stagiaires.toList()
         ..sort(

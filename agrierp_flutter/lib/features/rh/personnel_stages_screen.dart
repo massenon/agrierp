@@ -65,6 +65,18 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
   DonneesPersonnel? _donnees;
   String? _message;
 
+  /// RH-Q1 — le filtre « statut » de `registre-employes.blade.php` (`''`, `actif`, `conge`, `suspendu`, `archive`).
+  String _filtreEmployes = '';
+
+  /// Les options du filtre, dans l'ordre et avec les mots du Blade.
+  static const filtresEmployes = <(String, String)>[
+    ('', 'Tous les statuts'),
+    ('actif', 'Actif'),
+    ('conge', 'Congé'),
+    ('suspendu', 'Suspendu'),
+    ('archive', 'Archivé'),
+  ];
+
   /// Ticket RH-4 — le mois affiché par « Gestion de la Paie » (`AAAA-MM`), le mois courant à l'ouverture.
   late String _periodePaie = PersonnelRepository.periodeDe(HeureBenin.maintenant());
   PaieDuMois? _paie;
@@ -334,6 +346,20 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
       const SizedBox(height: AgriSpacing.md),
       // Ticket RH-1 — « Nouvel Employé » (bouton de `registre-employes.blade.php`), créé hors ligne.
       _boutonAjout('nouvel-employe', 'Nouvel Employé', () => _ouvrirEmploye(null)),
+      const SizedBox(height: AgriSpacing.md),
+      // RH-Q1 — le filtre « statut » du Blade ; « Archivé » liste les employés archivés, en lecture.
+      Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 220,
+          child: _liste<String>(
+            cle: 'employes-filtre',
+            valeur: _filtreEmployes,
+            choix: filtresEmployes,
+            onChanged: (v) => setState(() => _filtreEmployes = v ?? ''),
+          ),
+        ),
+      ),
       if (_message != null && _onglet == 'Registre Employés') ...[
         const SizedBox(height: AgriSpacing.md),
         _bandeau(_message!, cle: const Key('bandeau-employes')),
@@ -351,11 +377,11 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
         ],
         vide: '— Aucun employé —',
         lignes: [
-          for (var i = 0; i < d.employes.length; i++)
+          for (final (i, e) in d.employesFiltres(_filtreEmployes).indexed)
             _ligne(i, [
               (
                 Text(
-                  '${d.employes[i].firstName} ${d.employes[i].lastName}',
+                  '${e.firstName} ${e.lastName}',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
@@ -366,33 +392,36 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
               ),
               (
                 Text(
-                  d.employes[i].position ?? '—',
+                  e.position ?? '—',
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
                 4,
               ),
-              (Text(_date(d.employes[i].hireDate), style: _cellule), 3),
-              (Text(_montant(d.employes[i].baseSalary), style: _cellule), 3),
+              (Text(_date(e.hireDate), style: _cellule), 3),
+              (Text(_montant(e.baseSalary), style: _cellule), 3),
               (
-                _pastilleEmploye(d.employes[i]),
+                _pastilleEmploye(e),
                 3,
               ),
               (
-                _actions([
-                  ('employe-modifier-$i', SymbolesAgri.edit, AgriColors.infoBlue, () => _ouvrirEmploye(d.employes[i])),
-                  (
-                    'employe-archiver-$i',
-                    SymbolesAgri.archive,
-                    AgriColors.errorRed,
-                    () => _confirmerArchivage(
-                      "Archiver l'employé",
-                      '${d.employes[i].lastName} ${d.employes[i].firstName} sera archivé(e) : il restera restaurable depuis la Corbeille.',
-                      () => widget.depot.archiverEmploye(d.employes[i].id),
-                      'Employé archivé avec succès.',
-                    ),
-                  ),
-                ]),
+                // RH-Q1 — un employé archivé est en lecture (« Lecture seule », comme le Blade) : ni « Modifier » ni « Archiver ».
+                e.isActive
+                    ? _actions([
+                        ('employe-modifier-$i', SymbolesAgri.edit, AgriColors.infoBlue, () => _ouvrirEmploye(e)),
+                        (
+                          'employe-archiver-$i',
+                          SymbolesAgri.archive,
+                          AgriColors.errorRed,
+                          () => _confirmerArchivage(
+                            "Archiver l'employé",
+                            '${e.lastName} ${e.firstName} sera archivé(e) : il restera restaurable depuis la Corbeille.',
+                            () => widget.depot.archiverEmploye(e.id),
+                            'Employé archivé avec succès.',
+                          ),
+                        ),
+                      ])
+                    : Text('Lecture seule', key: Key('employe-lecture-seule-$i'), textAlign: TextAlign.right, style: const TextStyle(fontSize: AgriTypography.xs, fontStyle: FontStyle.italic, color: AgriColors.outline)),
                 2,
               ),
             ]),
@@ -402,12 +431,15 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
   );
 
   Widget _pastilleEmploye(Employee e) {
-    final libelle = PersonnelRepository.statutsEmploye[e.status] ?? (e.status ?? '—');
-    final couleur = switch (e.status) {
-      'conge' => AgriColors.accentYellow,
-      'suspendu' => AgriColors.errorRed,
-      _ => AgriColors.brandEmerald,
-    };
+    // RH-Q1 — « Archivé » avant le statut, comme le Blade.
+    final libelle = !e.isActive ? 'Archivé' : PersonnelRepository.statutsEmploye[e.status] ?? (e.status ?? '—');
+    final couleur = !e.isActive
+        ? AgriColors.outline
+        : switch (e.status) {
+            'conge' => AgriColors.accentYellow,
+            'suspendu' => AgriColors.errorRed,
+            _ => AgriColors.brandEmerald,
+          };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -667,7 +699,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
                 ],
               ),
               const SizedBox(height: AgriSpacing.sm),
-              _etiquette('Établissement *'),
+              _etiquette("Établissement d'origine *"),
               _champ('stagiaire-etablissement', etablissement, indication: 'ex : Lycée agricole de Sékou', erreur: erreurs['etablissement']),
               const SizedBox(height: AgriSpacing.sm),
               Row(

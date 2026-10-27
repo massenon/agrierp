@@ -17,13 +17,10 @@ import '../../core/theme/symboles_agri.dart';
 ///
 /// ⚠️⚠️ **LE CATALOGUE EST EN LECTURE SEULE, SAUF LA CRÉATION ET LA MODIFICATION
 /// D'UN PRODUIT (ticket F0.67, enregistrées localement puis synchronisées).**
-/// Ce qui suit décrit le cas général, toujours vrai pour catégories et seuils : `products` et `product_categories` sont des **référentiels** : le
-/// point d'entrée de synchronisation les compte explicitement dans
-/// `referentiels_ignored` et **ignore tout envoi** les concernant — « le
-/// serveur a toujours raison ». Offrir « Nouveau Produit » ou la modification
-/// d'un seuil ici donnerait une saisie que le serveur jetterait en silence,
-/// puis que le tirage suivant effacerait. Les boutons de la maquette sont
-/// donc présents et inertes, avec leur raison.
+/// `products` s'écrit au poste depuis 15.15 / F0.67 (création, modification par `ProduitsRepository`) ;
+/// `product_categories` reste un **référentiel** du serveur (`referentiels_ignored`). L'archivage d'un produit
+/// et la modification d'un seuil DANS CET ONGLET ne sont pas encore portés (tickets ST-1 / ST-2 de
+/// `docs/INVENTAIRE_LECTURE_SEULE_POSTE.md`) : ces boutons de la maquette sont présents et inertes, avec leur raison.
 ///
 /// ⚠️ **CE N'EST PAS LE MÊME DÉPÔT QU'UN SECOND LECTEUR** : l'écran réutilise
 /// `StocksRepository`, déjà lecteur de ces deux tables (ticket F0.38). Deux

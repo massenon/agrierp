@@ -323,6 +323,12 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.companySettings, d.companySettings.cnssEmployerFamilyRate),
     (d.companySettings, d.companySettings.cnssEmployerRiskRate),
   ],
+  // v68 — ticket UT-1 : `utilisateurs` MIXTE (colonnes de synchronisation posées par reconstruction : `_utilisateursMixtes`).
+  68: [
+    (d.utilisateurs, d.utilisateurs.deviceId),
+    (d.utilisateurs, d.utilisateurs.syncStatus),
+    (d.utilisateurs, d.utilisateurs.updatedAt),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -420,7 +426,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 67, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4');
+    expect(d.schemaVersion, 68, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

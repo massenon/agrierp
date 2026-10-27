@@ -1025,30 +1025,8 @@ class SyncController extends Controller
                     'rate' => (float) $t->rate,
                 ]),
 
-            // ⚠️ BORNE A 60 JOURS, ET C'EST DELIBERE. La table porte deja 870
-            // lignes et grossit d'une par employe et par jour : la servir en
-            // entier alourdirait chaque tirage pour une donnee que personne ne
-            // consulte au-dela du mois courant. Le poste a besoin du mois en
-            // cours pour ne pas repointer ; l'historique vit sur le web.
-            // Ticket RH-3 — archivés COMPRIS (`is_active`) : un pointage archivé au web cesse de compter au poste.
-            'attendance_records' => fn () => AttendanceRecord::query()
-                ->where('attendance_date', '>=', now()->subDays(60)->toDateString())
-                ->orderByDesc('attendance_date')
-                ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status', 'is_active'])
-                ->map(fn (AttendanceRecord $p) => [
-                    'id' => $p->id,
-                    'employee_id' => $p->employee_id,
-                    // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent
-                    // serialise une colonne `date` en « 2026-08-16T23:00:00Z » : le
-                    // 17 aout local devient le 16 a 23 h UTC, et un poste qui lit
-                    // l'instant sans le ramener a l'heure locale pointe la veille.
-                    // Le meme piege a deja coute une echeance de creance (14.75).
-                    'attendance_date' => $p->attendance_date?->format('Y-m-d'),
-                    'check_in' => $p->check_in,
-                    'check_out' => $p->check_out,
-                    'status' => $p->status,
-                    'is_active' => (bool) $p->is_active,
-                ]),
+            // RH-Q3 (décision client du 27/10/2026 : NE PAS LIMITER) — les pointages sont une FAMILLE PAGINÉE
+            // (`famillesPaginees`), servis en entier par le curseur : la paie d'un mois ancien se compte au poste.
 
             // 🔴→✅ TICKET 14.82 — LE SECRETARIAT DESCEND AU POSTE.
             //
@@ -1254,9 +1232,10 @@ class SyncController extends Controller
 
             // ⚠️ NI MOT DE PASSE NI JETON : la liste sert a SAVOIR QUI travaille
             // sur la ferme, pas a s'authentifier.
+            // Ticket UT-1 — `updated_at` (ISO 8601) : le poste n'écrase jamais un compte qu'il a en attente.
             'users' => fn () => User::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'username', 'email', 'is_active'])
+                ->get(['id', 'name', 'username', 'email', 'is_active', 'updated_at'])
                 ->map(fn (User $u) => [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -1264,6 +1243,7 @@ class SyncController extends Controller
                     'email' => $u->email,
                     'is_active' => $u->is_active,
                     'role' => $u->getRoleNames()->first(),
+                    'updated_at' => $u->updated_at?->toIso8601String(),
                 ]),
 
             // ⚠️ BORNE A 100 LIGNES : la table grossit d'une ligne par action et
@@ -1518,6 +1498,30 @@ class SyncController extends Controller
                 'cle' => 'veterinary_calendar_events',
                 'requete' => fn () => \App\Models\VeterinaryCalendarEvent::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+            ],
+            [
+                // RH-Q3 (27/10/2026) — LES POINTAGES, EN ENTIER. Jusqu'ici bornés à 60 jours (page 1, « l'historique vit sur
+                // le web ») : le client veut la paie de tout mois au poste, donc ses absences. Famille paginée par le
+                // curseur (`updated_at`, `id`) : un poste neuf reçoit l'historique page par page ; ensuite seul ce qui a
+                // bougé. Ticket RH-3 — archivés COMPRIS (`is_active`) : un pointage archivé au web cesse de compter au poste.
+                'cle' => 'attendance_records',
+                'requete' => fn () => AttendanceRecord::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status', 'is_active', 'updated_at']),
+                'historique' => fn ($q) => $q->orderByDesc('attendance_date')->orderBy('id'),
+                'enJson' => fn (AttendanceRecord $p) => [
+                    'id' => $p->id,
+                    'employee_id' => $p->employee_id,
+                    // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent sérialise une colonne `date` en
+                    // « 2026-08-16T23:00:00Z » : le 17 août local devient le 16 à 23 h UTC, et un poste qui lit l'instant
+                    // sans le ramener à l'heure locale pointe la veille. Le même piège a déjà coûté une échéance (14.75).
+                    'attendance_date' => $p->attendance_date?->format('Y-m-d'),
+                    'check_in' => $p->check_in,
+                    'check_out' => $p->check_out,
+                    'status' => $p->status,
+                    'is_active' => (bool) $p->is_active,
+                    'updated_at' => $p->updated_at?->toIso8601String(),
+                ],
             ],
             [
                 // 🔴→✅ TICKET 14.72 — LE CYCLE DE REPRODUCTION DESCEND AU POSTE.
@@ -2102,6 +2106,8 @@ class SyncController extends Controller
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
+            // Ticket UT-1 — comptes utilisateurs créés, modifiés, archivés ou réactivés au poste.
+            'users' => ['accepted' => [], 'rejected' => []],
             'internships' => ['accepted' => [], 'rejected' => []],
             'internship_absences' => ['accepted' => [], 'rejected' => []],
             'payslip_requests' => ['accepted' => [], 'rejected' => []],
@@ -2145,7 +2151,7 @@ class SyncController extends Controller
             'accounting_entries',
             'accounting_entry_lines',
             'roles',
-            'users',
+            // Ticket UT-1 : `users` s'écrit au poste (`pushUsers`, `manage-users`).
             'audit_logs',
             'notifications',
             'lot_revenues',
@@ -2212,6 +2218,10 @@ class SyncController extends Controller
         // envoi peut viser l'employé créé à l'instant ; une absence, le stagiaire créé à l'instant.
         if ($request->has('employees')) {
             $result['employees'] = $this->pushEmployees($request->input('employees'));
+        }
+        // Ticket UT-1 — comptes utilisateurs (`manage-users`), rejoués par `SaisieUtilisateurAction`.
+        if ($request->has('users')) {
+            $result['users'] = $this->pushUsers($request->input('users'), $request->user());
         }
         if ($request->has('internships')) {
             $result['internships'] = $this->pushInternships($request->input('internships'));
@@ -2503,6 +2513,8 @@ class SyncController extends Controller
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
+        // Ticket UT-1 — le droit de `GestionUtilisateurs` du web : l'écran le plus sensible du projet.
+        'users' => 'manage-users',
         'internships' => 'manage-rh',
         'internship_absences' => 'manage-rh',
         'payslip_requests' => 'manage-rh',
@@ -4596,6 +4608,62 @@ class SyncController extends Controller
                         return;
                     }
                     $saisie->modifier($existant->id, $valides);
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket UT-1 — COMPTES UTILISATEURS CRÉÉS, MODIFIÉS, ARCHIVÉS OU RÉACTIVÉS AU POSTE, rejoués par
+     * `SaisieUtilisateurAction` (`GestionUtilisateurs`). Le mot de passe voyage une fois (TLS), n'est ni journalisé ni
+     * renvoyé ; à la modification il est facultatif. Un compte connu et identique est acquitté sans écriture. Le propre
+     * compte de l'auteur ne s'archive pas (message du web).
+     *
+     * @param  array<int, mixed>  $comptes
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: string|null, reason: string}>}
+     */
+    private function pushUsers(array $comptes, ?User $auteur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieUtilisateurAction::class);
+
+        foreach ($comptes as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $id = is_string($data['id'] ?? null) ? $data['id'] : null;
+                $existant = $id === null ? null : User::with('roles')->find($id);
+                $valides = validator($data, \App\Actions\SaisieUtilisateurAction::regles($existant?->id, $existant === null) + [
+                    'id' => ['required', 'uuid'],
+                    'is_active' => ['sometimes', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $actif = ! array_key_exists('is_active', $valides) || filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($saisie, $valides, $actif, $existant, $auteur) {
+                    if ($existant === null) {
+                        $saisie->creer($valides, $valides['id']);
+                        if (! $actif) {
+                            $saisie->archiver($valides['id'], $auteur?->id);
+                        }
+
+                        return;
+                    }
+                    if (! $saisie->identique($existant, $valides)) {
+                        $saisie->modifier($existant->id, $valides);
+                    }
+                    if ($actif) {
+                        $saisie->reactiver($existant->id);
+                    } else {
+                        $saisie->archiver($existant->id, $auteur?->id);
+                    }
                 });
 
                 $accepted[] = $valides['id'];

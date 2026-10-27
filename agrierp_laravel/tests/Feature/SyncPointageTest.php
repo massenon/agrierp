@@ -196,6 +196,34 @@ class SyncPointageTest extends TestCase
             ->assertJsonPath('attendance_records.0.attendance_date', now()->toDateString());
     }
 
+    /**
+     * RH-Q3 (décision client du 27/10/2026 : NE PAS LIMITER) — un pointage de plus de 60 jours descend au poste, par
+     * le tirage paginé (famille `attendance_records`) comme par le tirage complet : la paie d'un mois ancien se compte
+     * au poste. Avant, la page 1 bornait la table à 60 jours.
+     */
+    public function test_a_pointing_older_than_sixty_days_still_reaches_the_device(): void
+    {
+        AttendanceRecord::create([
+            'employee_id' => $this->employe->id, 'attendance_date' => now()->subDays(95)->toDateString(),
+            'status' => 'absent', 'is_active' => true,
+        ]);
+
+        $this->tirer()->assertOk()
+            ->assertJsonCount(1, 'attendance_records')
+            ->assertJsonPath('attendance_records.0.attendance_date', now()->subDays(95)->toDateString());
+
+        // Le tirage paginé ne sert pas ce qui vient d'être écrit (`HORIZON_TIRAGE_SECONDES`) : on avance l'horloge.
+        \Carbon\Carbon::setTestNow(now()->addMinutes(3));
+        $pagine = $this->actingAs($this->utilisateur, 'sanctum')->getJson('/api/sync/pull?page=1')->assertOk();
+        $jours = collect($pagine->json('attendance_records'))->pluck('attendance_date')->all();
+        while ($pagine->json('page_suivante')) {
+            $pagine = $this->actingAs($this->utilisateur, 'sanctum')
+                ->getJson('/api/sync/pull?page=1&curseur_page='.urlencode($pagine->json('page_suivante')))->assertOk();
+            $jours = [...$jours, ...collect($pagine->json('attendance_records'))->pluck('attendance_date')->all()];
+        }
+        $this->assertSame([now()->subDays(95)->toDateString()], $jours);
+    }
+
     /** Ticket RH-3 — un pointage ARCHIVÉ au poste (`is_active` faux) l'est au serveur, avec sa trace d'audit. */
     public function test_an_attendance_archived_on_the_device_is_archived_here(): void
     {

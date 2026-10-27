@@ -80,6 +80,9 @@ void main() {
         ));
     await d.into(d.utilisateurs).insert(UtilisateursCompanion.insert(
           id: '00000000-0000-0000-0000-000000000021',
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           name: 'Comptable',
           username: const Value('compta'),
           email: const Value('compta@olouwachegoun.bj'),

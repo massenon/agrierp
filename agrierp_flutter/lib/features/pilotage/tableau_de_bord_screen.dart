@@ -824,8 +824,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
   /// Les cinq onglets du web, dans son ordre, avec leurs messages vides exacts.
   ///
-  /// ⚠️ ÉCART (donnée absente) : l'onglet Devis n'a pas de table au poste (`quotes` ne descend pas). Il reste
-  /// à sa place et affiche le message vide du web plutôt que de disparaître.
+  /// Depuis le ticket DEV, `quotes` descend au poste (table mixte) ; l'onglet Devis garde sa place et le message
+  /// vide du web quand la ferme n'a aucun devis.
   static const _ongletsTx = <(String, String)>[
     ('Vente', 'Aucune vente récente.'),
     ('Achat', 'Aucun achat récent.'),

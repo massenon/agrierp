@@ -35,7 +35,8 @@ void main() {
     // Ticket ARC3 : + `corbeille_demandes`, restaurer / supprimer définitivement (demandes).
     // Ticket MOD1 (21/10/2026) : + `modules_config`, les bascules des Modules Actifs faites au poste.
     // Tickets RH-1, RH-2, RH-4 (27/10/2026) : + `employees`, `internships`, `internship_absences`, `payslip_requests`.
-    expect(lues, hasLength(37), reason: 'trente-sept tables envoyées (ARC3 : les demandes de la corbeille ; BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis ; MOD1 : les modules ; RH-1 à RH-4 : les registres RH) : $lues');
+    // Ticket UT-1 (27/10/2026) : + `utilisateurs` (clé `users` du serveur).
+    expect(lues, hasLength(38), reason: 'trente-huit tables envoyées (ARC3 : les demandes de la corbeille ; BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis ; MOD1 : les modules ; RH-1 à RH-4 : les registres RH ; UT-1 : les comptes) : $lues');
     expect(AppDatabase.tablesEnvoyees.toSet(), lues);
   });
 }

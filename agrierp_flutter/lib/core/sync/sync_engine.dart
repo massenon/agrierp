@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visibleForTesting;
 
@@ -108,6 +109,7 @@ class SyncEngine {
     Connectivity? connectivity,
     DateTime Function()? maintenant,
     Future<void> Function()? apresSynchronisation,
+    FlutterSecureStorage? coffre,
   }) : // `prefer_initializing_formals` suggère `this._client` : Dart
        // l'interdit sur un paramètre NOMMÉ privé. L'affectation explicite
        // est donc la seule forme possible ici.
@@ -116,12 +118,16 @@ class SyncEngine {
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
        _db = database,
+       _coffre = coffre ?? const FlutterSecureStorage(),
        // ignore: prefer_initializing_formals
        _apresSynchronisation = apresSynchronisation,
        _connectivity = connectivity ?? Connectivity(),
        _maintenant = maintenant ?? DateTime.now;
 
   final AppDatabase _db;
+
+  /// Ticket UT-1 — le coffre du système, où un mot de passe saisi au poste attend son envoi (jamais en base).
+  final FlutterSecureStorage _coffre;
   final Dio _client;
   final String _deviceId;
   final Connectivity _connectivity;
@@ -2825,31 +2831,35 @@ class SyncEngine {
   }
 
   /// Utilisateurs — référentiel remplacé à chaque tirage.
+  /// Ticket UT-1 — fusion STRICTE : un compte `pending` / `conflict` de ce poste n'est jamais écrasé par le tirage.
   Future<int> _absorberUtilisateurs(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.utilisateurs).go();
+    final vus = <String>{};
+    final recus = <UtilisateursCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Utilisateur');
+      recus.add(
+        UtilisateursCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          name: (l['name'] ?? '') as String,
+          username: Value(l['username'] as String?),
+          email: Value(l['email'] as String?),
+          role: Value(l['role'] as String?),
+          isActive: Value(_bool(l['is_active'])),
+        ),
+      );
+    }
 
-      for (final l in lignes) {
-        await _db
-            .into(_db.utilisateurs)
-            .insert(
-              UtilisateursCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                username: Value(l['username'] as String?),
-                email: Value(l['email'] as String?),
-                role: Value(l['role'] as String?),
-                isActive: Value(_bool(l['is_active'])),
-              ),
-            );
-      }
-    });
+    await _fusionnerMixte(_db.utilisateurs, recus, vus);
 
-    return lignes.length;
+    return recus.length;
   }
 
   /// Journal d'audit — les deux cents dernières actions (U14 : la liste du web), remplacées à chaque tirage.
@@ -3639,6 +3649,7 @@ class SyncEngine {
     EmployeesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     InternshipsCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     InternshipAbsencesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    UtilisateursCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     _ => c,
   };
 
@@ -5073,6 +5084,12 @@ class SyncEngine {
     final stagiaires = await (_db.select(_db.internships)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
     final absencesStagiaires = await (_db.select(_db.internshipAbsences)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
     final demandesPaie = await (_db.select(_db.payslipRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    // Ticket UT-1 — comptes utilisateurs ; le mot de passe en attente est lu au coffre, jamais en base.
+    final utilisateurs = await (_db.select(_db.utilisateurs)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final motsDePasse = <String, String>{
+      for (final u in utilisateurs)
+        if (await _coffre.read(key: cleMotDePasse(u.id)) case final String mdp) u.id: mdp,
+    };
 
     final produits = await (_db.select(
       _db.products,
@@ -5211,7 +5228,8 @@ class SyncEngine {
         employes.isEmpty &&
         stagiaires.isEmpty &&
         absencesStagiaires.isEmpty &&
-        demandesPaie.isEmpty) {
+        demandesPaie.isEmpty &&
+        utilisateurs.isEmpty) {
       return (0, 0, <String>[]);
     }
 
@@ -5343,6 +5361,8 @@ class SyncEngine {
         // Tickets RH-1 / RH-2 — `pushEmployees` / `pushInternships` / `pushInternshipAbsences` (manage-rh) : le serveur les
         // traite AVANT les pointages et la paie du même envoi. Une clé VIDE n'est pas envoyée (postes anciens côté serveur).
         if (employes.isNotEmpty) 'employees': employes.map(_employeEnJson).toList(),
+        // Ticket UT-1 — `pushUsers` (manage-users), après les employés ; le mot de passe part UNE fois, s'il a été saisi.
+        if (utilisateurs.isNotEmpty) 'users': [for (final u in utilisateurs) _utilisateurEnJson(u, motsDePasse[u.id])],
         if (stagiaires.isNotEmpty) 'internships': stagiaires.map(_stagiaireEnJson).toList(),
         if (absencesStagiaires.isNotEmpty) 'internship_absences': absencesStagiaires.map(_absenceStagiaireEnJson).toList(),
         // Ticket RH-4 — la DEMANDE seule (`pushPayslipRequests`, après les pointages) : jamais un montant.
@@ -5715,6 +5735,25 @@ class SyncEngine {
       motifs,
       (n) => rejete += n,
     );
+    // Ticket UT-1 — comptes utilisateurs ; le mot de passe acquitté est effacé du coffre (une ligne refusée le garde).
+    accepte += await _acquitter(
+      'users',
+      corps['users'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in utilisateurs) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.utilisateurs)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(UtilisateursCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    for (final u in utilisateurs) {
+      if (_acquittes(corps['users']).contains(u.id)) await _coffre.delete(key: cleMotDePasse(u.id));
+    }
     accepte += await _acquitter(
       'internships',
       corps['internships'],
@@ -6068,6 +6107,8 @@ class SyncEngine {
     'customers',
     // Tickets RH-1 / RH-2 — registres RH après les clients, avant les pointages et la paie du même envoi.
     'employees',
+    // Ticket UT-1 — comptes utilisateurs, juste après les employés comme au serveur.
+    'users',
     'internships',
     'internship_absences',
     // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
@@ -6596,6 +6637,10 @@ class SyncEngine {
       'internships' =>
         () => (_db.update(_db.internships)..where((t) => t.id.equals(conflit.recordId)))
             .write(const InternshipsCompanion(syncStatus: Value(SyncStatus.pending))),
+      // Ticket UT-1 — un compte refusé se corrige puis se relance.
+      'users' =>
+        () => (_db.update(_db.utilisateurs)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const UtilisateursCompanion(syncStatus: Value(SyncStatus.pending))),
       'internship_absences' =>
         () => (_db.update(_db.internshipAbsences)..where((t) => t.id.equals(conflit.recordId)))
             .write(const InternshipAbsencesCompanion(syncStatus: Value(SyncStatus.pending))),
@@ -7197,6 +7242,26 @@ class SyncEngine {
     'status': e.status ?? 'actif',
     'is_active': e.isActive,
     'device_id': e.deviceId,
+  };
+
+  /// Identifiants acquittés (`accepted`) d'une réponse de table.
+  static Set<String> _acquittes(Object? resultat) =>
+      resultat is Map ? ((resultat['accepted'] as List?)?.cast<String>().toSet() ?? const {}) : const {};
+
+  /// Ticket UT-1 — clé du coffre où attend le mot de passe d'un compte saisi au poste.
+  static String cleMotDePasse(String idUtilisateur) => 'agrierp.utilisateur.mdp.$idUtilisateur';
+
+  /// Ticket UT-1 — compte tel que `pushUsers` le valide (règles de `SaisieUtilisateurAction`) ; `password` seulement
+  /// s'il a été saisi (création, ou changement) : absent, le serveur conserve l'actuel.
+  Map<String, dynamic> _utilisateurEnJson(Utilisateur u, String? motDePasse) => {
+    'id': u.id,
+    'name': u.name,
+    'username': u.username,
+    'email': u.email,
+    'role': u.role,
+    'is_active': u.isActive,
+    'password': ?motDePasse,
+    'device_id': u.deviceId,
   };
 
   /// Ticket RH-2 — stagiaire tel que `pushInternships` le valide (règles de `SaisieStagiaireAction`).

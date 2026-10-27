@@ -57,9 +57,11 @@ class RegistreEmployes extends Component
     {
         $statusMap = ['Actif' => 'actif', 'Congé' => 'conge', 'Suspendu' => 'suspendu'];
 
-        return Employee::where('is_active', true)
+        // RH-Q1 (décision client du 27/10/2026 : OUI) — le filtre « Archivé » liste les employés archivés ; sinon les actifs,
+        // comme avant. Un employé archivé ne se modifie ni ne s'archive (`SaisieEmployeAction`) : la ligne est en lecture.
+        return Employee::where('is_active', $this->statusFilter !== 'Archivé')
             ->when($this->search, fn ($q) => $q->where(fn ($q2) => $q2->where('first_name', 'like', '%'.$this->search.'%')->orWhere('last_name', 'like', '%'.$this->search.'%')))
-            ->when($this->statusFilter, fn ($q) => $q->where('status', $statusMap[$this->statusFilter] ?? $this->statusFilter))
+            ->when($this->statusFilter !== '' && $this->statusFilter !== 'Archivé', fn ($q) => $q->where('status', $statusMap[$this->statusFilter] ?? $this->statusFilter))
             ->orderBy('last_name')
             ->get();
     }

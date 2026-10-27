@@ -8,9 +8,11 @@ import '../../core/audit/libelles_audit.dart';
 import '../../core/config/envoi_email_test.dart';
 import '../../core/config/parametres_smtp.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'appairage_poste.dart';
 import 'corbeille_repository.dart';
@@ -66,9 +68,13 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.reinitialisation,
     this.corbeille,
     this.ongletInitial,
+    this.idUtilisateurConnecte,
   });
 
   final ParametresGenerauxRepository depot;
+
+  /// Ticket UT-1 — le compte connecté sur ce poste : il ne peut pas s'archiver lui-même (règle du web).
+  final String? idUtilisateurConnecte;
 
   /// Ticket CFG-2 — réglages SMTP de ce poste et e-mail de test ; `null` : l'onglet le dit.
   final ParametresSmtp? smtp;
@@ -743,6 +749,9 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   // ── Onglet 4 : Gestion Utilisateurs ───────────────────────────────────────
 
+  /// Ticket UT-1 — `gestion-utilisateurs.blade.php` : les deux cartes, le tableau à cinq colonnes, « Nouvel
+  /// Utilisateur », « Modifier », « Archiver » (confirmation) / « Réactiver ». Chaque geste s'écrit LOCALEMENT
+  /// (`pending`) et part à la prochaine synchronisation ; le serveur rejoue par `SaisieUtilisateurAction`.
   Widget _ongletUtilisateurs(DonneesParametresGeneraux d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -768,6 +777,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.icon(
+          key: const Key('nouvel-utilisateur'),
+          onPressed: () => _ouvrirUtilisateur(d, null),
+          icon: const Icon(SymbolesAgri.add_circle, size: 18),
+          style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
+          label: const Text('Nouvel Utilisateur', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.md),
       _tableau(
         largeur: 900,
         colonnes: const [
@@ -777,18 +797,26 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ('Statut', 3),
           ('Actions', 2),
         ],
-        vide: '— Aucun utilisateur synchronisé —',
+        vide: 'Aucun utilisateur pour le moment.',
         lignes: [
           for (var i = 0; i < d.utilisateurs.length; i++)
             _ligne(i, [
               (
-                Text(
-                  d.utilisateurs[i].name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      d.utilisateurs[i].name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AgriTypography.xs,
+                        fontWeight: AgriTypography.gras,
+                      ),
+                    ),
+                    if (d.utilisateurs[i].username case final String identifiant)
+                      Text(identifiant, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AgriColors.outline, fontFamily: 'monospace')),
+                  ],
                 ),
                 5,
               ),
@@ -802,7 +830,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               ),
               (
                 Text(
-                  d.utilisateurs[i].role ?? '—',
+                  _libelleRole(d.utilisateurs[i].role),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -812,31 +840,234 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               // pas « Inactif ». Un compte désactivé n'est jamais supprimé :
               // l'archivage logique est la règle du projet.
               (
-                _pastille(
-                  d.utilisateurs[i].isActive ? 'Actif' : 'Désactivé',
-                  couleur: d.utilisateurs[i].isActive
-                      ? AgriColors.brandEmerald
-                      : AgriColors.outline,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: _pastille(
+                        d.utilisateurs[i].isActive ? 'Actif' : 'Désactivé',
+                        couleur: d.utilisateurs[i].isActive ? AgriColors.brandEmerald : AgriColors.outline,
+                      ),
+                    ),
+                    if (d.utilisateurs[i].syncStatus != SyncStatus.synced) ...[
+                      const SizedBox(width: AgriSpacing.xs),
+                      Flexible(
+                        child: _pastille(
+                          d.utilisateurs[i].syncStatus == SyncStatus.conflict ? 'Refusé' : 'Pas encore envoyé',
+                          couleur: d.utilisateurs[i].syncStatus == SyncStatus.conflict ? AgriColors.errorRed : AgriColors.accentYellow,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 3,
               ),
-              (_actionInerte(), 2),
+              (
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      key: Key('utilisateur-modifier-$i'),
+                      onPressed: () => _ouvrirUtilisateur(d, d.utilisateurs[i]),
+                      icon: const Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
+                    if (d.utilisateurs[i].isActive)
+                      IconButton(
+                        key: Key('utilisateur-archiver-$i'),
+                        onPressed: () => _confirmerArchivageUtilisateur(d.utilisateurs[i]),
+                        icon: const Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorRed),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      )
+                    else
+                      IconButton(
+                        key: Key('utilisateur-reactiver-$i'),
+                        onPressed: () => _gesteUtilisateur(
+                          () => widget.depot.reactiverUtilisateur(d.utilisateurs[i].id),
+                          'Utilisateur réactivé avec succès.',
+                        ),
+                        icon: const Icon(SymbolesAgri.restart_alt, size: 18, color: AgriColors.brandEmerald),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                  ],
+                ),
+                2,
+              ),
             ]),
         ],
       ),
       const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT. La liste sert à savoir QUI
-      // travaille sur la ferme ; l'authentification du poste passe par
-      // `POST /api/auth/login`, contre le serveur.
+      // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT ; un mot de passe saisi ici attend au coffre du système et part
+      // une fois. L'authentification du poste passe par `POST /api/auth/login`, contre le serveur.
       _mentionPoste(
-        'La liste dit qui travaille sur la ferme — jamais comment se '
-        'connecter : aucun mot de passe ni jeton ne descend. Créer un compte, '
-        'archiver un utilisateur ou réinitialiser un mot de passe se fait sur '
-        'la surface web.',
+        'Un compte créé, modifié, archivé ou réactivé ici part à la prochaine synchronisation ; il ne peut se '
+        "connecter qu'une fois reçu par le serveur. Aucun mot de passe ni jeton ne descend du serveur. "
+        '« Déconnecter toutes les sessions » se fait sur la surface web.',
         cle: 'utilisateurs',
       ),
     ],
   );
+
+  /// `User::ROLE_LABELS` du web (`role_label`) ; un rôle inconnu garde son nom, `null` → « — ».
+  static String _libelleRole(String? role) => switch (role) {
+    null || '' => '—',
+    'admin' => 'Administrateur',
+    'comptable' => 'Comptable',
+    'caissier' => 'Caissière POS',
+    'animalier' => "Chef d'Élevage",
+    final autre => autre,
+  };
+
+  Future<void> _gesteUtilisateur(Future<void> Function() geste, String succes) async {
+    try {
+      await geste();
+    } on RefusSaisieUtilisateur catch (e) {
+      if (mounted) ToastAgri.afficher(context, e.toString());
+      return;
+    }
+    if (!mounted) return;
+    ToastAgri.afficher(context, succes);
+    await _charger();
+  }
+
+  Future<void> _confirmerArchivageUtilisateur(Utilisateur u) async {
+    if (u.id == widget.idUtilisateurConnecte) {
+      ToastAgri.afficher(context, ParametresGenerauxRepository.messagePropreCompte);
+      return;
+    }
+    await afficherModale<void>(
+      context: context,
+      constructeur: (context) => ModaleConfirmation(
+        icone: SymbolesAgri.archive,
+        titre: "Archiver l'utilisateur",
+        message: '${u.name} sera archivé(e) : le compte ne pourra plus se connecter, sur le web comme sur les postes.',
+        couleurIcone: AgriColors.accentYellow,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+          BoutonModalePrimaire(
+            libelle: 'Archiver',
+            couleur: AgriColors.errorRed,
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _gesteUtilisateur(
+                () => widget.depot.archiverUtilisateur(u.id, idConnecte: widget.idUtilisateurConnecte),
+                'Utilisateur archivé avec succès.',
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// La modale « Nouvel Utilisateur » / « Modifier l'Utilisateur » de `gestion-utilisateurs.blade.php` — mêmes champs.
+  void _ouvrirUtilisateur(DonneesParametresGeneraux d, Utilisateur? u) {
+    final nom = TextEditingController(text: u?.name ?? '');
+    final identifiant = TextEditingController(text: u?.username ?? '');
+    final email = TextEditingController(text: u?.email ?? '');
+    final motDePasse = TextEditingController();
+    var role = u?.role ?? '';
+    var erreurs = <String, String>{};
+
+    Widget champ(String cle, TextEditingController c, {String? indication, String? erreur, bool secret = false}) => TextField(
+      key: Key(cle),
+      controller: c,
+      obscureText: secret,
+      decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), hintText: indication, errorText: erreur),
+      style: const TextStyle(fontSize: AgriTypography.sm),
+    );
+    Widget etiquette(String texte) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(texte.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+    );
+
+    afficherModale<void>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, majModale) => ModaleAgri(
+          titre: u == null ? 'Nouvel Utilisateur' : "Modifier l'Utilisateur",
+          contenu: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (erreurs[''] != null) ...[
+                Text(erreurs['']!, key: const Key('utilisateur-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorRed)),
+                const SizedBox(height: AgriSpacing.sm),
+              ],
+              etiquette('Nom complet *'),
+              champ('utilisateur-nom', nom, erreur: erreurs['nom']),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette("Nom d'utilisateur *"),
+              champ('utilisateur-identifiant', identifiant, indication: 'ex : compta', erreur: erreurs['identifiant']),
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text('Lettres, chiffres, point, tiret et souligne. Sans arobase.', style: TextStyle(fontSize: 10, color: AgriColors.outline)),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette('Email *'),
+              champ('utilisateur-email', email, erreur: erreurs['email']),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette('Rôle *'),
+              DropdownButtonFormField<String>(
+                key: const Key('utilisateur-role'),
+                initialValue: role,
+                isDense: true,
+                isExpanded: true,
+                decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), errorText: erreurs['role']),
+                style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('-- Sélectionner --')),
+                  for (final r in d.roles) DropdownMenuItem(value: r.name, child: Text(_majuscule(r.name))),
+                  if (role.isNotEmpty && !d.roles.any((r) => r.name == role)) DropdownMenuItem(value: role, child: Text(_majuscule(role))),
+                ],
+                onChanged: (v) => majModale(() => role = v ?? ''),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette(u == null ? 'Mot de passe *' : 'Nouveau mot de passe'),
+              champ(
+                'utilisateur-mot-de-passe',
+                motDePasse,
+                indication: u == null ? 'Minimum 8 caractères' : 'Laisser vide pour conserver le mot de passe actuel',
+                erreur: erreurs['motDePasse'],
+                secret: true,
+              ),
+            ],
+          ),
+          actions: [
+            BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+            BoutonModalePrimaire(
+              libelle: 'Enregistrer',
+              onPressed: () async {
+                try {
+                  await widget.depot.enregistrerUtilisateur(
+                    id: u?.id,
+                    nom: nom.text,
+                    identifiant: identifiant.text,
+                    email: email.text,
+                    role: role,
+                    motDePasse: motDePasse.text,
+                  );
+                } on RefusSaisieUtilisateur catch (e) {
+                  majModale(() => erreurs = e.champs);
+                  return;
+                }
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (mounted) ToastAgri.afficher(this.context, u == null ? 'Utilisateur créé avec succès.' : 'Utilisateur modifié avec succès.');
+                await _charger();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// `ucfirst()` du Blade sur le nom du rôle.
+  static String _majuscule(String texte) => texte.isEmpty ? texte : '${texte[0].toUpperCase()}${texte.substring(1)}';
 
   // ── Onglet 5 : Modes de Paiement ──────────────────────────────────────────
 

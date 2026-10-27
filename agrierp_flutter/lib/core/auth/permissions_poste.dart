@@ -57,10 +57,10 @@ enum EcranPoste {
   /// la carte n'ouvre donc l'écran qu'à `admin`, dont la liste vaut `null`.
   ///
   /// ⚠️ Ici, la restriction se défend : ces quatre référentiels fixent la
-  /// ration servie et le protocole sanitaire de toute la ferme. Mais l'écran
-  /// est en LECTURE SEULE au poste — le priver à l'animalier revient à lui
-  /// cacher la règle qu'il applique. **ARBITRAGE CLIENT**, avec les trois
-  /// autres pages absentes de la carte.
+  /// ration servie et le protocole sanitaire de toute la ferme. L'écran se
+  /// MODIFIE au poste depuis H9b (décision D-H9) — le priver à l'animalier
+  /// revient à lui cacher la règle qu'il applique. **ARBITRAGE CLIENT**, avec
+  /// les trois autres pages absentes de la carte.
   parametresElevage('parametres-elevage.html'),
   ficheElevage('fiche-lapins.html'),
   fichePondeuses('fiche-volailles-pondeuses.html'),

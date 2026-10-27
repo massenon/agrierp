@@ -1,5 +1,6 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
@@ -79,7 +80,11 @@ void main() {
       .insert(
         UtilisateursCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           name: nom,
+          username: Value(cle),
           email: Value('$cle@fermeolouwachegoun.com'),
           role: Value(role),
           isActive: Value(actif),

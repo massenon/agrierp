@@ -7,9 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Url;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 use Livewire\Component;
 
 /**
@@ -138,52 +136,23 @@ class GestionUtilisateurs extends Component
         $this->dispatch('open-modal', name: 'modal-create-gestion-utilisateurs');
     }
 
+    /** Ticket UT-1 — les règles et les effets vivent dans `SaisieUtilisateurAction`, partagée avec l'envoi des postes. */
     public function saveUser(): void
     {
         $this->authorize('manage-users');
 
-        $this->validate([
-            'name' => ['required', 'string', 'max:150'],
-            // ⚠️ `regex` INTERDISANT L'ARROBASE : la connexion choisit sa colonne
-            // selon la presence d'un « @ ». Un identifiant qui en contiendrait
-            // serait cherche parmi les ADRESSES, donc introuvable — un compte
-            // creable mais inatteignable, sans le moindre message d'erreur.
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-zA-Z0-9._-]+$/', 'unique:users,username,'.$this->editingUserId],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email,'.$this->editingUserId],
-            'role' => ['required', 'exists:roles,name'],
-            // ⚠️ TICKET 14.65 — meme politique qu'a la reinitialisation :
-            // `min:8` seul laissait passer « 12345678 ».
-            'password' => [
-                $this->editingUserId ? 'nullable' : 'required',
-                'string',
-                PasswordRule::defaults(),
-            ],
-        ]);
+        $this->validate(\App\Actions\SaisieUtilisateurAction::regles($this->editingUserId, $this->editingUserId === null));
 
+        $donnees = [
+            'name' => $this->name, 'username' => $this->username, 'email' => $this->email,
+            'role' => $this->role, 'password' => $this->password,
+        ];
+        $saisie = app(\App\Actions\SaisieUtilisateurAction::class);
         if ($this->editingUserId) {
-            $user = User::findOrFail($this->editingUserId);
-            $payload = [
-                'name' => $this->name,
-                'username' => $this->username,
-                'email' => $this->email,
-            ];
-            if ($this->password) {
-                $payload['password'] = Hash::make($this->password);
-            }
-            $user->update($payload);
-            $user->syncRoles([$this->role]);
-            AuditLog::record('user.updated', 'parametres');
+            $saisie->modifier($this->editingUserId, $donnees);
             $message = 'Utilisateur modifié avec succès.';
         } else {
-            $user = User::create([
-                'name' => $this->name,
-                'username' => $this->username,
-                'email' => $this->email,
-                'password' => Hash::make($this->password),
-                'is_active' => true,
-            ]);
-            $user->assignRole($this->role);
-            AuditLog::record('user.created', 'parametres');
+            $saisie->creer($donnees);
             $message = 'Utilisateur créé avec succès.';
         }
 
@@ -195,17 +164,13 @@ class GestionUtilisateurs extends Component
     {
         $this->authorize('manage-users');
 
-        if ($id === Auth::id()) {
-            $this->dispatch('toast', message: 'Vous ne pouvez pas archiver votre propre compte.', type: 'error');
+        try {
+            app(\App\Actions\SaisieUtilisateurAction::class)->archiver($id, Auth::id());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
             return;
         }
-
-        $utilisateur = User::findOrFail($id);
-        $utilisateur->update(['is_active' => false]);
-        // Ticket S3 — les jetons de ses postes sont révoqués : la désactivation vaut aussi hors du web.
-        $utilisateur->tokens()->delete();
-        AuditLog::record('user.archived', 'parametres', null, $utilisateur);
         $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
     }
 
@@ -213,8 +178,7 @@ class GestionUtilisateurs extends Component
     {
         $this->authorize('manage-users');
 
-        User::findOrFail($id)->update(['is_active' => true]);
-        AuditLog::record('user.reactivated', 'parametres');
+        app(\App\Actions\SaisieUtilisateurAction::class)->reactiver($id);
         $this->dispatch('toast', message: 'Utilisateur réactivé avec succès.', type: 'success');
     }
 
