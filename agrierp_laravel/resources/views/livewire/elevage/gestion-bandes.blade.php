@@ -1,20 +1,20 @@
 <div>
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
-        <div>
+    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
+        <div class="min-w-0">
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
                 <span class="material-symbols-outlined text-brand-emerald text-[26px]">layers</span>Bandes &amp; Sujets
             </h2>
             <p class="text-xs text-outline mt-xs">Effectif vivant en temps réel, stade physiologique et statut, par bande.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-sm">
-            <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+        <div class="flex flex-wrap xl:flex-nowrap items-center gap-sm xl:shrink-0">
+            <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
                 <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
             </a>
-            <a href="{{ route('elevage.reproducteurs') }}" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+            <a href="{{ route('elevage.reproducteurs') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
                 <span class="material-symbols-outlined text-[18px]">badge</span>Registre des Reproducteurs
             </a>
             @can('manage-elevage')
-            <button type="button" wire:click="newLot" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+            <button type="button" wire:click="newLot" class="flex items-center whitespace-nowrap gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
             </button>
             @endcan
