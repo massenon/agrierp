@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\AttestationEmission;
 use App\Models\AttestationTemplate;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\Internship;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -19,7 +21,8 @@ use Illuminate\Support\Str;
  * MÊME PDF. L'attestation est un document officiel : deux implémentations qui
  * divergent d'une virgule donneraient deux textes « certifiés » différents.
  *
- * ⚠️ LE PDF EST PRODUIT ICI, JAMAIS AU POSTE. Il porte l'en-tête de la ferme, son
+ * ⚠️ LE PDF DU WEB EST PRODUIT ICI ; LE POSTE FABRIQUE LE SIEN (ATT-3, hors ligne comprise) et ne fait que déclarer son
+ * émission (`emettre()`) : le SERVEUR reste l'autorité du numéro et de la trace. Le PDF porte l'en-tête de la ferme, son
  * RCCM, la mention du Directeur Général : des éléments d'identité qui n'ont pas à
  * être recopiés sur chaque machine. Et la génération laisse sa TRACE d'audit
  * (`attestation.generated.employe|stagiaire`) — le compteur « Attestations
@@ -47,6 +50,9 @@ class AttestationService
         'rations'    => "Notion de formulation des rations alimentaires des animaux d'élevage ;",
         'gestion'    => 'Notion de gestion des entreprises agricoles.',
     ];
+
+    /** `entity_type` de la ligne d'audit d'une attestation fabriquée au poste (`entity_id` = identifiant d'émission du poste). */
+    public const ENTITE_EMISSION = 'attestation_emission';
 
     public const PALIER_COURT = 'court';
 
@@ -343,6 +349,55 @@ class AttestationService
             'octets'  => $pdf->output(),
             'fichier' => 'attestation-'.Str::slug($nom).'.pdf',
         ];
+    }
+
+    /**
+     * ATT-3 — ÉMISSION D'UNE ATTESTATION FABRIQUÉE AU POSTE : attribue le numéro et journalise, sans produire de PDF.
+     *
+     * Le poste fabrique lui-même le document (hors ligne comprise) ; le serveur reste l'AUTORITÉ DU NUMÉRO
+     * (`N°04/2026/FEO/DG`, jamais inventé au poste) et de la TRACE d'audit (`attestation.generated.*`, que décompte le
+     * registre des stagiaires). **Idempotent par l'identifiant d'émission du poste** : un envoi rejoué (réponse perdue,
+     * émission restée en file hors ligne) rend le même numéro et ne compte qu'une fois.
+     *
+     * ⚠️ Le numéro est FIGÉ dans `attestation_emissions` : l'année est celle de l'INSTANT de l'émission, le rang le
+     * nombre d'attestations de cette année une fois la trace écrite (comme `prochainNumero()`, qui compte aussi celles
+     * du web). Une émission faite hors ligne et reçue tard prend le rang suivant — jamais un rang déjà donné.
+     *
+     * @return array{numero: string, deja_enregistree: bool}
+     */
+    public function emettre(string $type, string $emissionId, ?Carbon $quand = null): array
+    {
+        return DB::transaction(function () use ($type, $emissionId, $quand) {
+            $existante = AttestationEmission::find($emissionId);
+
+            if ($existante) {
+                return ['numero' => $existante->numero, 'deja_enregistree' => true];
+            }
+
+            // Un instant du poste ne peut pas être dans le futur (horloge déréglée) : au-delà de maintenant, c'est maintenant.
+            $instant = $quand && $quand->lessThanOrEqualTo(now()) ? $quand : now();
+
+            // Insertion directe : `AuditLog::record()` ne sait désigner qu'un modèle, ici l'entité est une émission du poste.
+            $trace = new AuditLog([
+                'user_id' => auth()->id(),
+                'action' => 'attestation.generated.'.$type,
+                'module' => 'rh',
+                'entity_type' => self::ENTITE_EMISSION,
+                'entity_id' => $emissionId,
+                'ip_address' => request()->ip(),
+            ]);
+            $trace->created_at = $instant; // hors `$fillable` : l'instant de l'ÉMISSION, pas celui de la réception
+            $trace->save();
+
+            $rang = AuditLog::where('action', 'like', 'attestation.generated.%')->whereYear('created_at', $instant->year)->count();
+            $numero = sprintf('N°%02d/%d/FEO/DG', $rang, $instant->year);
+
+            AttestationEmission::create([
+                'id' => $emissionId, 'type' => $type, 'numero' => $numero, 'issued_at' => $instant, 'user_id' => auth()->id(),
+            ]);
+
+            return ['numero' => $numero, 'deja_enregistree' => false];
+        });
     }
 
     /**

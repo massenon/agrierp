@@ -325,6 +325,9 @@ return [
         'paymentTreasuryAccountId' => 'compte de trésorerie',
         'paymentTreasuryId' => 'compte de trésorerie',
         'person_id' => 'personne',
+        // ATT-3 : émission d'une attestation fabriquée au poste.
+        'issued_at' => "date d'émission",
+        'id' => 'identifiant',
         'personId' => 'personne',
         'phone' => 'téléphone',
         'phoneNumber' => 'numéro de téléphone',

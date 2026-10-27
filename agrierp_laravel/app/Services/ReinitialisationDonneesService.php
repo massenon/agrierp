@@ -193,6 +193,9 @@ class ReinitialisationDonneesService
             // Ticket ARC1 — journal de la Corbeille (qui a restauré ou supprimé définitivement quoi) : une trace d'administration
             // comme `audit_logs`, utile précisément après une suppression irréversible. Ses éléments, eux, sont partis.
             'corbeille_operations',
+            // ATT-3 — numéros d'attestation FIGÉS (un par émission du poste ou du web) : le rang d'un numéro se compte sur
+            // `audit_logs`, préservé ; vider ceci laisserait un poste rejouer une émission et recevoir un AUTRE numéro.
+            'attestation_emissions',
         ];
     }
 

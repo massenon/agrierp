@@ -9,7 +9,7 @@
 
 ## 2. Objectifs
 - Le PDF reproduit le modèle : **logo réel de la ferme** en en-tête, **logo en filigrane**, décor floral des coins, titre, corps en gras / vert, puces ➢, appréciation, formule de clôture, signataires, pied de page.
-- **Une seule fabrique** pour le web et le poste (le PDF est produit par le serveur) : un seul visuel, jamais deux.
+- **Un seul visuel**, deux fabriques fidèles : le serveur produit le PDF du web (DomPDF), le poste produit le sien (package `pdf`, hors ligne comprise) — mêmes mesures, mêmes polices libres, mêmes images, mêmes règles de signature (ATT-3, demande du client : « le poste doit produire aussi »).
 - La règle de signature est **une donnée du modèle**, modifiable au web et au poste : seuil de durée, signataires, palier de chacun.
 - Les trois boutons de « Bandes & Sujets » restent **sur une ligne**.
 
@@ -17,7 +17,7 @@
 - Les cases « Filigrane / En-tête / Signature / Cachet » du modèle (ignorées du PDF) : hors périmètre, le filigrane et l'en-tête sont toujours imprimés.
 - Signature manuscrite ou cachet numérique (images) : non demandé.
 - Un second gabarit (portrait, autre ferme) : non demandé.
-- Le poste ne fabrique pas le PDF (trace d'audit et identité de la ferme restent au serveur).
+- ~~Le poste ne fabrique pas le PDF~~ — **corrigé (ATT-3)** : le poste fabrique le PDF. Ce que le serveur garde : **le numéro** (`N°04/2026/FEO/DG`, jamais inventé au poste) et **la trace d'audit** (`POST /api/attestations/emissions`, idempotent par l'identifiant d'émission tiré au poste, table `attestation_emissions`). Hors ligne : PDF produit quand même, numéro vide `N°—/AAAA/FEO/DG`, émission mise en file (`app_settings`) et déclarée à la synchronisation suivante. Question ouverte : le numéro vide d'un document imprimé hors ligne n'est pas rétro-imprimé ; le numéro attribué s'affiche au registre.
 
 ## 4. Règle de signature (paramétrable)
 | Palier | Durée (début → fin, à aujourd'hui sans fin) | Signataires par défaut |

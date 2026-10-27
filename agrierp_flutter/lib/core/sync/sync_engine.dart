@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visibleForTesting;
 
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
@@ -107,6 +107,7 @@ class SyncEngine {
     required String deviceId,
     Connectivity? connectivity,
     DateTime Function()? maintenant,
+    Future<void> Function()? apresSynchronisation,
   }) : // `prefer_initializing_formals` suggère `this._client` : Dart
        // l'interdit sur un paramètre NOMMÉ privé. L'affectation explicite
        // est donc la seule forme possible ici.
@@ -115,6 +116,8 @@ class SyncEngine {
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
        _db = database,
+       // ignore: prefer_initializing_formals
+       _apresSynchronisation = apresSynchronisation,
        _connectivity = connectivity ?? Connectivity(),
        _maintenant = maintenant ?? DateTime.now;
 
@@ -122,6 +125,11 @@ class SyncEngine {
   final Dio _client;
   final String _deviceId;
   final Connectivity _connectivity;
+
+  /// ATT-3 — ce que le poste déclare au serveur une fois la liaison établie, hors des tables synchronisées : les émissions
+  /// d'attestation faites hors ligne (le serveur y attribue le numéro et garde la trace). Silencieux : un échec n'est pas
+  /// celui de la synchronisation, et la file reste pour la fois suivante.
+  final Future<void> Function()? _apresSynchronisation;
 
   /// Horloge du poste — injectable pour les tests (F0.90). Elle date la RÉCEPTION d'une vente
   /// tirée du serveur (voir [_absorberVentes]).
@@ -318,6 +326,12 @@ class SyncEngine {
     final etat = await _db.etatDeSynchronisation();
     if (etat?.lastPulledAt != null) {
       await _db.noterEtatDeSynchronisation(reussi: etat!.lastPulledAt);
+    }
+
+    try {
+      await _apresSynchronisation?.call();
+    } on Object catch (e) {
+      debugPrint('Émissions d\'attestation non déclarées (détail technique) : $e');
     }
 
     return SyncOutcome(

@@ -188,6 +188,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
     // poste. La constante partagée d'avant rendait deux postes de la ferme
     // indiscernables : aucun conflit n'était explicable.
     deviceId: widget.identifiantPoste,
+    // ATT-3 : les attestations produites hors ligne sont déclarées au serveur (numéro, trace) à la synchronisation.
+    apresSynchronisation: () => AttestationsRepository.viderLaFile(_db, ClientAttestations(_client)),
   );
 
   /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).

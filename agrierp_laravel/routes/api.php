@@ -50,6 +50,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
 
     Route::post('/attestations', [AttestationController::class, 'generer'])
         ->middleware('throttle:30,1');
+    // ATT-3 : le poste fabrique le PDF ; le serveur attribue le numéro et journalise (idempotent par `id`).
+    Route::post('/attestations/emissions', [AttestationController::class, 'emission'])
+        ->middleware('throttle:60,1');
     Route::put('/attestation-templates/{type}', [AttestationController::class, 'enregistrerModele']);
 
     // Ticket 15.11 : « Contactez l'Éditeur » depuis le poste. Limité : chaque

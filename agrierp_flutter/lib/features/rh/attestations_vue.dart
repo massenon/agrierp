@@ -25,14 +25,14 @@ class LivraisonAttestation {
 /// `prototype_html/rh-attestations.html` → onglet « Attestations » du hub
 /// Personnel & Stages.
 ///
-/// ⚠️⚠️ **LE PDF EST PRODUIT ET COMPTÉ PAR LE SERVEUR** (voir [ClientAttestations]) :
-/// l'aperçu est un confort calculé au poste avec les mêmes règles, le document
-/// officiel vient du serveur — sa trace d'audit aussi. Générer exige donc le
-/// réseau, et le dit.
+/// ⚠️⚠️ **LE POSTE FABRIQUE LUI-MÊME LE PDF** (ATT-3, voir [AttestationsRepository.produire]) :
+/// hors ligne comprise. Le serveur attribue le numéro et garde la trace d'audit : l'émission lui est
+/// déclarée à la génération, ou mise en file (numéro vide sur le document) et déclarée à la
+/// synchronisation suivante.
 ///
 /// ⚠️ **ÉCARTS ASSUMÉS, TOUS DE LARAVEL** :
 ///  * pas de cases « Filigrane / En-tête / Signature / Cachet » ni de choix de
-///    format : le PDF du serveur n'en tient AUCUN compte (la table les porte, la
+///    format : le PDF n'en tient AUCUN compte (la table les porte, la
 ///    page web ne les propose pas). Des options qui ne changent rien seraient des
 ///    promesses fausses ;
 ///  * pour un stagiaire, « Établissement » remplace « Poste » et le type de contrat
@@ -84,13 +84,6 @@ class _AttestationsVueState extends State<AttestationsVue> {
     'elevage': 'Élevage',
     'rations': 'Rations alimentaires',
     'gestion': "Gestion d'entreprise",
-  };
-
-  static const _domainesPuces = <String, String>{
-    'maraichage': 'Conduite de cultures maraîchères et vivrières (Mais, Manioc, Soja, Tomate, Piment, Légumes divers) ;',
-    'elevage': "Conduite d’élevages et applications de soins vétérinaires (Cuniculture, Aviculture, Héliciculture, Porciculture, Petits Ruminant) ;",
-    'rations': 'Notion de formulation des rations alimentaires des animaux d’élevage ;',
-    'gestion': 'Notion de gestion des entreprises agricoles.',
   };
 
   // Mois en français pour la date longue (décision ATT-1).
@@ -287,7 +280,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
     });
 
     try {
-      final pdf = await widget.depot.generer(
+      final produite = await widget.depot.produire(
         type: _type,
         personne: personne,
         contrat: _contrat,
@@ -299,14 +292,21 @@ class _AttestationsVueState extends State<AttestationsVue> {
         birthDate: _lire(_naissance.text),
         birthPlace: _lieuNaissance.text,
         civilite: _civilite,
-        signataires: _signatairesSaisis(),
+        surcharges: _surchargesSaisies(),
+        aujourdhui: _aujourdhui,
       );
+      final pdf = produite.pdf;
       final chemin = await widget.enregistrer(pdf);
       if (!mounted) return;
       setState(() {
         _enCours = false;
         _dernierPdf = pdf;
-        _retour = (true, 'Attestation enregistrée : $chemin');
+        // ⚠️ HORS LIGNE EST NORMAL : le document est produit, son numéro vient à la prochaine synchronisation.
+        _retour = (
+          true,
+          'Attestation enregistrée : $chemin'
+              '${produite.horsLigne ? ' — numéro à attribuer à la prochaine synchronisation' : ' — ${produite.numero}'}',
+        );
       });
     } on EchecAttestation catch (e) {
       if (!mounted) return;
@@ -360,13 +360,10 @@ class _AttestationsVueState extends State<AttestationsVue> {
     }
   }
 
-  /// Les modifications saisies pour CETTE attestation, sous les clés du serveur (`sig2_nom`, `sig3_fonction`…).
-  Map<String, String> _signatairesSaisis() => {
-    for (final e in _surcharges.entries) ...{
-      if (e.value.titre.text.trim().isNotEmpty) 'sig${e.key}_titre': e.value.titre.text.trim(),
-      if (e.value.nom.text.trim().isNotEmpty) 'sig${e.key}_nom': e.value.nom.text.trim(),
-      if (e.value.fonction.text.trim().isNotEmpty) 'sig${e.key}_fonction': e.value.fonction.text.trim(),
-    },
+  /// Les modifications saisies pour CETTE attestation, par position du signataire (vides ignorés par la règle).
+  Map<int, Map<String, String>> _surchargesSaisies() => {
+    for (final e in _surcharges.entries)
+      e.key: {'titre': e.value.titre.text, 'nom': e.value.nom.text, 'fonction': e.value.fonction.text},
   };
 
   /// La règle du modèle du type courant — celle du serveur, ou les valeurs d'un modèle neuf tant qu'elle n'est pas reçue.
@@ -1188,12 +1185,12 @@ class _AttestationsVueState extends State<AttestationsVue> {
               // ─── Domaines : une puce ➢ par domaine coché, dans l'ordre du modèle ───
               if (_domaines.isNotEmpty) ...[
                 const SizedBox(height: AgriSpacing.sm),
-                for (final cle in _domainesPuces.keys)
+                for (final cle in AttestationsRepository.domainesPuces.keys)
                   if (_domaines.contains(cle))
                     Padding(
                       padding: const EdgeInsets.only(left: AgriSpacing.md),
                       child: Text(
-                        '➢ ${_domainesPuces[cle]}',
+                        '➢ ${AttestationsRepository.apostrophes(AttestationsRepository.domainesPuces[cle]!)}',
                         key: Key('att-apercu-domaine-$cle'),
                         style: const TextStyle(fontSize: 10),
                       ),
@@ -1235,7 +1232,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
               ),
               const SizedBox(height: AgriSpacing.xs),
               const Text(
-                'Aperçu simplifié : le PDF du serveur reprend le modèle officiel (décor, filigrane, polices).',
+                'Aperçu simplifié : le PDF reprend le modèle officiel (décor, filigrane, polices).',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 8, color: AgriColors.outline),
               ),

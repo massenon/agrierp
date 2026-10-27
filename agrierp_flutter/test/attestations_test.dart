@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/sync/emissions_attestation.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/rh/attestations_repository.dart';
@@ -17,9 +18,9 @@ import 'cartes_attendues.dart';
 
 /// Ticket F0.64 — ATTESTATIONS (`rh-attestations.html`).
 ///
-/// ⚠️⚠️ **LE PDF EST PRODUIT ET COMPTÉ PAR LE SERVEUR.** L'aperçu est calculé au
-/// poste avec les mêmes règles ; le document officiel, lui, vient du serveur, qui
-/// en garde la trace d'audit. Hors ligne, rien n'est produit en cachette.
+/// ⚠️⚠️ **LE POSTE FABRIQUE LUI-MÊME LE PDF** (ATT-3) ; le serveur attribue le numéro et garde la trace d'audit
+/// (`POST /api/attestations/emissions`). Hors ligne, l'attestation est produite quand même, son numéro vide, et son
+/// émission attend dans la file.
 const _modeleEmploye =
     'Nous soussigné, Ferme École OLOUWACHEGOUN, attestons que [NOM], est '
     'employé(e) au sein de notre structure en qualité de [POSTE] sous contrat '
@@ -866,24 +867,38 @@ void main() {
       expect(serveur.requetes, isEmpty);
     });
 
+    const emission = {'numero': 'N°04/2026/FEO/DG', 'deja_enregistree': false};
+
+    Future<void> generer(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('att-generer')));
+      // ⚠️ Le PDF se fabrique en lisant les polices et images du bundle (disque réel) : hors du temps simulé.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+      await tester.pumpAndSettle();
+    }
+
     testWidgets(
-      '⚠️⚠️ une génération réussie écrit le PDF et propose l\'impression',
+      '⚠️⚠️ une génération réussie déclare l\'émission, fabrique le PDF au poste et propose l\'impression',
       (tester) async {
         await donnees();
-        await afficher(tester);
+        await afficher(tester, faux: _ServeurFeint(corps: emission));
         await choisirPersonne(tester, 'AGOSSOU Jean');
 
-        await tester.tap(find.byKey(const Key('att-generer')));
-        await tester.pumpAndSettle();
+        await generer(tester);
 
-        expect(serveur.requetes, hasLength(1));
+        final r = serveur.requetes.single;
+        expect(r.path, '/api/attestations/emissions');
+        expect(r.method, 'POST');
+        expect((r.data as Map)['type'], 'employe');
+        expect((r.data as Map)['id'], hasLength(36));
+        expect((r.data as Map)['issued_at'], endsWith('Z'));
         expect(livrees, hasLength(1));
         expect(livrees.single.fichier, 'attestation-agossou-jean.pdf');
+        // ⚠️ Un VRAI PDF, fabriqué ici : pas la réponse du serveur.
+        expect(String.fromCharCodes(livrees.single.octets.take(5)), '%PDF-');
         expect(find.byKey(const Key('att-reussi')), findsOneWidget);
-        expect(
-          find.textContaining(r'C:\Documents\AgriERP\attestation.pdf'),
-          findsOneWidget,
-        );
+        expect(find.textContaining(r'C:\Documents\AgriERP\attestation.pdf'), findsOneWidget);
+        expect(find.textContaining('N°04/2026/FEO/DG'), findsWidgets);
+        expect(await FileEmissionsAttestation(db).lire(), isEmpty);
 
         await tester.tap(find.byKey(const Key('att-imprimer')));
         await tester.pumpAndSettle();
@@ -892,24 +907,60 @@ void main() {
     );
 
     testWidgets(
-      '⚠️⚠️ hors ligne : échec visible, aucun fichier, aucun succès',
+      '⚠️⚠️ hors ligne : l\'attestation est PRODUITE quand même, numéro vide, émission en file',
       (tester) async {
         await donnees();
         await afficher(tester, faux: _ServeurFeint(horsLigne: true));
         await choisirPersonne(tester, 'AGOSSOU Jean');
 
-        await tester.tap(find.byKey(const Key('att-generer')));
-        await tester.pumpAndSettle();
+        await generer(tester);
 
-        expect(find.byKey(const Key('att-echec')), findsOneWidget);
-        expect(find.byKey(const Key('att-reussi')), findsNothing);
-        expect(find.textContaining('nécessite le réseau'), findsOneWidget);
-        expect(livrees, isEmpty);
-        expect(find.byKey(const Key('att-imprimer')), findsNothing);
+        expect(find.byKey(const Key('att-reussi')), findsOneWidget);
+        expect(find.byKey(const Key('att-echec')), findsNothing);
+        expect(find.textContaining('numéro à attribuer'), findsOneWidget);
+        expect(livrees, hasLength(1));
+        expect(String.fromCharCodes(livrees.single.octets.take(5)), '%PDF-');
+        expect(find.byKey(const Key('att-imprimer')), findsOneWidget);
+
+        final file = await FileEmissionsAttestation(db).lire();
+        expect(file, hasLength(1));
+        expect(file.single.type, 'employe');
       },
     );
 
-    testWidgets('un refus de rôle affiche le message du serveur', (
+    testWidgets('sans session : produite aussi, émission en file', (tester) async {
+      await donnees();
+      await tester.pumpWidget(const SizedBox());
+      tester.view.physicalSize = const Size(1600, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: AttestationsVue(
+                depot: depot(),
+                maintenant: jour,
+                enregistrer: (pdf) async {
+                  livrees.add(pdf);
+                  return 'x.pdf';
+                },
+                imprimer: (pdf) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await choisirPersonne(tester, 'AGOSSOU Jean');
+
+      await generer(tester);
+
+      expect(livrees, hasLength(1));
+      expect(await FileEmissionsAttestation(db).lire(), hasLength(1));
+    });
+
+    testWidgets('⚠️ un refus de rôle : rien n\'est produit, rien n\'est mis en file', (
       tester,
     ) async {
       await donnees();
@@ -924,11 +975,11 @@ void main() {
       );
       await choisirPersonne(tester, 'AGOSSOU Jean');
 
-      await tester.tap(find.byKey(const Key('att-generer')));
-      await tester.pumpAndSettle();
+      await generer(tester);
 
       expect(find.textContaining('Votre rôle ne permet pas'), findsOneWidget);
       expect(livrees, isEmpty);
+      expect(await FileEmissionsAttestation(db).lire(), isEmpty);
     });
 
     testWidgets('une écriture de fichier qui échoue est dite, pas avalée', (
@@ -937,12 +988,12 @@ void main() {
       await donnees();
       await afficher(
         tester,
+        faux: _ServeurFeint(corps: emission),
         enregistrer: (_) async => throw const FileSystemExceptionFeinte(),
       );
       await choisirPersonne(tester, 'AGOSSOU Jean');
 
-      await tester.tap(find.byKey(const Key('att-generer')));
-      await tester.pumpAndSettle();
+      await generer(tester);
 
       expect(find.byKey(const Key('att-echec')), findsOneWidget);
       expect(

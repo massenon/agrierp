@@ -97,6 +97,8 @@ flutter:
     - assets/images/image_login.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+    # ATT-3 — l'attestation est fabriquée AU POSTE (hors ligne) : logo, filigrane, décor et polices libres du modèle officiel.
+    - assets/attestation/
 
   # Ticket H1 — LES ICÔNES DU WEB : Material Symbols Outlined (style `material-symbols-outlined`, FILL 0), et
   # non les Material Icons pleines de Flutter. Sous-ensemble tiré de la fonte complète du web par

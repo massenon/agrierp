@@ -6,11 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import '../temps/heure_benin.dart';
 
-/// Un PDF produit PAR LE SERVEUR et reçu en octets.
-///
-/// ⚠️ **LE POSTE NE LE FABRIQUE PAS** : une attestation, une fiche sujet portent
-/// l'en-tête officiel de la ferme, et leur génération laisse une trace d'audit
-/// côté serveur. Le poste ne fait que le recevoir, l'écrire et l'imprimer.
+/// Un PDF en octets : reçu du serveur (fiche sujet) ou fabriqué au poste (attestation, ATT-3 : l'émission est alors
+/// déclarée au serveur, qui en attribue le numéro et garde la trace d'audit). Le poste l'écrit et l'imprime.
 class PdfRecu {
   const PdfRecu({required this.octets, required this.fichier});
 

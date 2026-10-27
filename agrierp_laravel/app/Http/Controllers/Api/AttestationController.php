@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AttestationTemplate;
 use App\Models\AuditLog;
 use App\Services\AttestationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -76,6 +77,30 @@ class AttestationController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$resultat['fichier'].'"',
         ]);
+    }
+
+    /**
+     * ATT-3 — Le poste fabrique le PDF lui-même ; il demande ici le NUMÉRO et la TRACE d'audit (sans PDF).
+     * Mêmes droits que `generer` (`view-rh`). Idempotent par `id` : un envoi rejoué rend le même numéro.
+     * `issued_at` (UTC) : l'instant d'une émission faite hors ligne, rejouée plus tard.
+     */
+    public function emission(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('view-rh'), 403, "Votre rôle ne permet pas d'éditer des attestations.");
+
+        $v = $request->validate([
+            'id'        => ['required', 'uuid'],
+            'type'      => ['required', 'in:'.implode(',', AttestationService::TYPES)],
+            'issued_at' => ['nullable', 'date'],
+        ]);
+
+        $r = $this->service->emettre(
+            $v['type'],
+            $v['id'],
+            isset($v['issued_at']) ? Carbon::parse($v['issued_at'])->setTimezone(config('app.timezone')) : null,
+        );
+
+        return response()->json($r);
     }
 
     public function enregistrerModele(Request $request, string $type): JsonResponse

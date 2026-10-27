@@ -279,4 +279,94 @@ class ApiAttestationsTest extends TestCase
 
         $this->assertSame(12, AttestationTemplate::forType('stagiaire')->seuil_signature_mois);
     }
+
+    // ───────────── ATT-3 : le poste fabrique le PDF, le serveur attribue le numéro et journalise ─────────────
+
+    private const EMISSION_1 = '11111111-1111-4111-8111-111111111111';
+
+    private const EMISSION_2 = '22222222-2222-4222-8222-222222222222';
+
+    public function test_une_emission_du_poste_recoit_son_numero_et_laisse_sa_trace(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-10-24 10:00:00');
+        $rh = $this->avec('rh');
+
+        $r = $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertOk();
+
+        $this->assertSame('N°01/2026/FEO/DG', $r->json('numero'));
+        $this->assertFalse($r->json('deja_enregistree'));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'attestation.generated.stagiaire', 'entity_id' => self::EMISSION_1]);
+
+        $this->assertSame('N°02/2026/FEO/DG', $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'employe'])->json('numero'));
+        $this->assertSame(['employe' => 1, 'stagiaire' => 1], app(AttestationService::class)->compteurs());
+    }
+
+    public function test_une_emission_rejouee_rend_le_meme_numero_et_ne_compte_qu_une_fois(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-10-24 10:00:00');
+        $rh = $this->avec('rh');
+        $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertOk();
+        $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'stagiaire'])->assertOk();
+
+        $rejeu = $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertOk();
+
+        $this->assertSame('N°01/2026/FEO/DG', $rejeu->json('numero'), 'le numéro de la première émission, pas le suivant');
+        $this->assertTrue($rejeu->json('deja_enregistree'));
+        $this->assertSame(2, AuditLog::where('action', 'like', 'attestation.generated%')->count());
+    }
+
+    public function test_une_emission_faite_hors_ligne_garde_son_instant_et_jamais_dans_le_futur(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-10-24 10:00:00');
+        $rh = $this->avec('rh');
+
+        $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire', 'issued_at' => '2026-10-20T08:30:00Z'])->assertOk();
+        $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'stagiaire', 'issued_at' => '2027-01-01T00:00:00Z'])->assertOk();
+
+        $this->assertSame('2026-10-20', AuditLog::where('entity_id', self::EMISSION_1)->first()->created_at->format('Y-m-d'));
+        $this->assertSame('2026-10-24', AuditLog::where('entity_id', self::EMISSION_2)->first()->created_at->format('Y-m-d'), 'horloge du poste en avance : maintenant');
+    }
+
+    public function test_une_emission_faite_hors_ligne_et_recue_tard_ne_reprend_jamais_un_numero_deja_donne(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-10-24 10:00:00');
+        $rh = $this->avec('rh');
+        $premier = $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'stagiaire'])->assertOk()->json('numero');
+        // Émise plus tôt (poste hors ligne) mais REÇUE après : un rang déduit des dates redonnerait 01.
+        $tard = $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire', 'issued_at' => '2026-10-01T08:00:00Z'])->assertOk()->json('numero');
+
+        $this->assertSame('N°01/2026/FEO/DG', $premier);
+        $this->assertSame('N°02/2026/FEO/DG', $tard);
+        $this->assertSame($premier, $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'stagiaire'])->json('numero'), 'le numéro est figé');
+    }
+
+    public function test_les_attestations_du_web_et_celles_du_poste_se_suivent_dans_la_meme_numerotation(): void
+    {
+        \Carbon\Carbon::setTestNow('2026-10-24 10:00:00');
+        $rh = $this->avec('rh');
+        $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertOk();
+
+        $this->assertSame('N°02/2026/FEO/DG', app(AttestationService::class)->prochainNumero(), 'le web continue la suite du poste');
+        $this->assertSame('N°02/2026/FEO/DG', $rh->postJson('/api/attestations/emissions', ['id' => self::EMISSION_2, 'type' => 'employe'])->json('numero'));
+    }
+
+    public function test_une_emission_exige_le_droit_rh_et_des_champs_valides(): void
+    {
+        $this->avec('caisse')->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertStatus(403);
+        $this->assertSame(0, AuditLog::where('action', 'like', 'attestation.generated%')->count());
+    }
+
+    public function test_une_emission_invalide_est_refusee_sans_trace(): void
+    {
+        $rh = $this->avec('rh');
+        foreach ([['id' => 'pas-un-uuid', 'type' => 'stagiaire'], ['id' => self::EMISSION_1, 'type' => 'inconnu'], ['type' => 'stagiaire']] as $corps) {
+            $rh->postJson('/api/attestations/emissions', $corps)->assertStatus(422);
+        }
+        $this->assertSame(0, AuditLog::where('action', 'like', 'attestation.generated%')->count());
+    }
+
+    public function test_la_route_d_emission_est_fermee_sans_jeton(): void
+    {
+        $this->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertStatus(401);
+    }
 }

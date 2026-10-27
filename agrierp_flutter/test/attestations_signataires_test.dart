@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
@@ -15,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// Règle du client : d'un mois à un an, SEUL le promoteur (Directeur Général) signe ; au-delà d'un an, TROIS personnes
 /// signent (Examinateur, Président du Jury, Directeur Général). Le seuil et le palier de chaque signataire sont ceux du
-/// modèle, servis par le serveur et modifiables au poste. Le PDF vient du serveur ; ici : la règle, le formulaire, l'aperçu.
+/// modèle, servis par le serveur et modifiables au poste. Le PDF est fabriqué au poste (ATT-3) ; ici : la règle, le formulaire, l'aperçu.
 const _corpsOfficiel =
     'Je soussigné **OLOUKOUNLE O. Hassimiyou**, Directeur Général de la **FERME ECOLE OLOUWACHEGOUN,** atteste que le '
     'nommé[ACCORD_E] **[NOM],** né[ACCORD_E] le [DATE_NAISSANCE_LONGUE] à [LIEU_NAISSANCE], a suivi une formation '
@@ -51,7 +52,9 @@ class _Serveur extends Interceptor {
       Response<dynamic>(
         requestOptions: options,
         statusCode: 200,
-        data: options.method == 'PUT' ? <String, dynamic>{'message': 'ok'} : utf8.encode('%PDF-1.4 faux'),
+        data: options.method == 'PUT'
+            ? <String, dynamic>{'message': 'ok'}
+            : <String, dynamic>{'numero': 'N°01/2026/FEO/DG', 'deja_enregistree': false},
         headers: Headers.fromMap({
           'content-disposition': ['attachment; filename="attestation.pdf"'],
         }),
@@ -309,6 +312,8 @@ void main() {
 
   group('écran', () {
     late _Serveur serveur;
+    final livrees = <PdfAttestation>[];
+    setUp(livrees.clear);
 
     Future<void> modeles() async {
       for (final (cle, type, texte) in [('m-e', 'employe', 'Attestation de [NOM].'), ('m-s', 'stagiaire', _corpsOfficiel)]) {
@@ -358,7 +363,10 @@ void main() {
                   client: ClientAttestations(Dio(BaseOptions(baseUrl: 'http://serveur-feint'))..interceptors.add(serveur)),
                 ),
                 maintenant: aujourdhui,
-                enregistrer: (pdf) async => 'C:/attestation.pdf',
+                enregistrer: (pdf) async {
+                  livrees.add(pdf);
+                  return 'C:/attestation.pdf';
+                },
                 imprimer: (pdf) async {},
               ),
             ),
@@ -423,7 +431,7 @@ void main() {
       expect(find.byKey(const Key('att-apercu-sig-2')), findsOneWidget, reason: 'un an et un jour : long');
     });
 
-    testWidgets('⚠️ une modification du signataire part au serveur ET s\'affiche à l\'aperçu ; un champ vide reprend le modèle', (t) async {
+    testWidgets('⚠️ une modification du signataire s\'affiche à l\'aperçu ET s\'imprime dans le PDF du poste ; un champ vide reprend le modèle', (t) async {
       await stagiaire('s1', 'LONG', DateTime(2025, 1, 5), DateTime(2026, 10, 15));
       await afficher(t);
       await choisirStagiaire(t, 'LONG Félicité');
@@ -442,12 +450,26 @@ void main() {
       expect(dansApercu(3, 'Elisée Kocou HOUNKPONOU'), findsOneWidget, reason: 'les autres reprennent le modèle');
 
       await t.tap(find.byKey(const Key('att-generer')));
+      // ⚠️ Le PDF se fabrique au poste (polices et images du bundle, disque réel) : hors du temps simulé.
+      await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
       await t.pumpAndSettle();
 
+      // Le serveur ne reçoit que la DÉCLARATION d'émission : ni nom de signataire, ni texte.
       final corps = serveur.requetes.single.data as Map;
-      expect(corps['sig2_nom'], 'KPOHAZOUNDE Jean');
-      expect(corps.containsKey('sig3_nom'), isFalse, reason: 'champ vide : le serveur applique le modèle');
-      expect(corps.containsKey('sig1_nom'), isFalse);
+      expect(serveur.requetes.single.path, '/api/attestations/emissions');
+      expect(corps.keys.toSet(), {'id', 'type', 'issued_at'});
+
+      // Le document, lui, porte le nom modifié (relu par pdftotext quand il existe).
+      expect(livrees, hasLength(1));
+      await t.runAsync(() async {
+        if ((await Process.run('which', ['pdftotext'])).exitCode != 0) return;
+        final f = File('${Directory.systemTemp.path}/att_sig_test.pdf')..writeAsBytesSync(livrees.single.octets);
+        final texte = (await Process.run('pdftotext', ['-layout', f.path, '-'])).stdout as String;
+        f.deleteSync();
+        expect(texte, contains('KPOHAZOUNDE Jean'));
+        expect(texte, isNot(contains('SOGNIGBE')), reason: 'remplacé pour cette attestation');
+        expect(texte, contains('Elisée Kocou HOUNKPONOU'), reason: 'les autres reprennent le modèle');
+      });
     });
 
     testWidgets('l\'aperçu imprime la phrase d\'appréciation standard, et les puces ➢ dans l\'ordre du modèle', (t) async {
