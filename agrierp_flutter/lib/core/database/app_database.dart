@@ -624,6 +624,14 @@ class CompanySettings extends Table {
   /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
   IntColumn get rappelSoinsJours => integer().nullable()();
 
+  // Ticket RH-4 — taux de paie (`PayrollCalculationService`), tirés, jamais envoyés. Nuls tant que rien n'a été tiré
+  // d'un serveur qui les sert : le calcul prend alors les défauts du web (3,6 / 4 / 6,4 / 9 / 2 %).
+  RealColumn get vpsRate => real().nullable()();
+  RealColumn get cnssEmployeeRate => real().nullable()();
+  RealColumn get cnssEmployerPensionRate => real().nullable()();
+  RealColumn get cnssEmployerFamilyRate => real().nullable()();
+  RealColumn get cnssEmployerRiskRate => real().nullable()();
+
   /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
   /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
   TextColumn get syncStatus =>
@@ -1060,8 +1068,11 @@ class ArchivedDocuments extends Table {
 /// ⚠️⚠️ **SANS LUI, IL N'Y A PERSONNE À POINTER.** Le pointage est l'acte de
 /// terrain par excellence : il se fait à 7 h à la ferme, là où le réseau n'est
 /// pas.
-class Employees extends Table {
-  TextColumn get id => text().withLength(min: 36, max: 36)();
+///
+/// Ticket RH-1 — TABLE MIXTE depuis le palier 67 : le poste crée, modifie et archive ses employés (`pending`), rejoués
+/// au serveur par `SaisieEmployeAction` (le point de passage de `RegistreEmployes`). `is_active` descend (archivés
+/// compris) ; l'écran n'affiche que les actifs, comme le web.
+class Employees extends Table with SyncColumns {
   TextColumn get firstName => text()();
   TextColumn get lastName => text()();
   TextColumn get position => text().nullable()();
@@ -1071,8 +1082,8 @@ class Employees extends Table {
   /// `actif` · `conge` · `suspendu`.
   TextColumn get status => text().nullable()();
 
-  @override
-  Set<Column> get primaryKey => {id};
+  /// Faux : archivé (web ou poste).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Stagiaire accueilli par la ferme — référentiel servi par le serveur.
@@ -1081,8 +1092,10 @@ class Employees extends Table {
 /// relation vers `employees`. C'est aussi pourquoi la feuille de pointage ne
 /// le couvre pas — ses absences vivent dans `internship_absences`, que le
 /// poste ne reçoit pas.
-class Internships extends Table {
-  TextColumn get id => text().withLength(min: 36, max: 36)();
+///
+/// Ticket RH-2 — TABLE MIXTE depuis le palier 67 : le poste crée et modifie ses stagiaires (`pending`), rejoués au
+/// serveur par `SaisieStagiaireAction`. Ses absences vivent dans [InternshipAbsences], mixte aussi.
+class Internships extends Table with SyncColumns {
   TextColumn get firstName => text()();
   TextColumn get lastName => text()();
   TextColumn get school => text().nullable()();
@@ -1095,9 +1108,17 @@ class Internships extends Table {
   TextColumn get birthPlace => text().nullable()();
   // ATT-1 : civilité (M. / Mme) — conditionne l'accord grammatical dans l'attestation.
   TextColumn get civilite => text().withDefault(const Constant('M.'))();
+}
 
-  @override
-  Set<Column> get primaryKey => {id};
+/// Ticket RH-2 — absence d'un stagiaire (`internship_absences`), notée et archivée au poste comme au web
+/// (`RegistreStagiaires::saveAbsence` / `deleteAbsence` : archivage logique, jamais un effacement — 14.55).
+class InternshipAbsences extends Table with SyncColumns {
+  TextColumn get internshipId => text().withLength(min: 36, max: 36)();
+
+  /// Une DATE pure (minuit, heure murale).
+  DateTimeColumn get absenceDate => dateTime()();
+  TextColumn get reason => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Dette fournisseur — ce qu'un achat à crédit laisse à régler.
@@ -1399,6 +1420,9 @@ class AttendanceRecords extends Table with SyncColumns {
 
   /// `present` · `absent` · `conge` · `maladie` · `retard`.
   TextColumn get status => text()();
+
+  /// Ticket RH-3 — faux : archivé (web ou poste) ; ne compte plus (cartes, absences de la paie).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 class PurchaseLines extends Table {
@@ -1878,8 +1902,43 @@ class Payslips extends Table {
   /// Instant du règlement (`created_at`), en HEURE MURALE du serveur (Bénin) : le jour du rapport est son jour.
   DateTimeColumn get createdAt => dateTime()();
 
+  // Ticket RH-4 — colonnes RH, servies aux seuls comptes `view-rh` (nulles sinon) : l'onglet « Gestion de la Paie »
+  // du poste montre les bulletins réglés comme le web (`GestionPaie::getRowsProperty`).
+  TextColumn get employeeId => text().nullable()();
+
+  /// Premier jour de la période payée (`period_month`), DATE pure.
+  DateTimeColumn get periodMonth => dateTime().nullable()();
+  RealColumn get grossSalary => real().nullable()();
+  RealColumn get absenceDeduction => real().nullable()();
+  RealColumn get cnssDeduction => real().nullable()();
+  RealColumn get itsDeduction => real().nullable()();
+  RealColumn get chargesPatronales => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Ticket RH-4 — tranche du barème ITS (`income_tax_brackets`, actives), référentiel servi aux comptes `view-rh`.
+/// Le poste calcule la paie comme `PayrollCalculationService` ; sans tranche, l'ITS vaut 0 et l'écran le dit.
+class IncomeTaxBrackets extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  RealColumn get fromAmount => real()();
+
+  /// `null` : dernière tranche, sans plafond.
+  RealColumn get toAmount => real().nullable()();
+  RealColumn get rate => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket RH-4 — DEMANDE de règlement d'une paie faite au poste (« Valider le règlement ») : employé, période
+/// (`AAAA-MM`), instant du clic. Le serveur règle (`ReglementPaieService` : bulletin, trésorerie, écriture, audit) ; le
+/// bulletin redescend dans [Payslips]. ⚠️ Aucun montant ici : un net « vu au poste » ne fait jamais foi.
+class PayslipRequests extends Table with SyncColumns {
+  TextColumn get employeeId => text().withLength(min: 36, max: 36)();
+  TextColumn get periodMonth => text().withLength(min: 7, max: 7)();
+  DateTimeColumn get requestedAt => dateTime()();
 }
 
 class AppSettings extends Table {
@@ -1929,7 +1988,10 @@ class SyncState extends Table {
     Payables,
     Employees,
     Internships,
+    InternshipAbsences,
     AttendanceRecords,
+    IncomeTaxBrackets,
+    PayslipRequests,
     Mails,
     AdministrativeDocuments,
     ArchivedDocuments,
@@ -1996,7 +2058,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 66;
+  int get schemaVersion => 67;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2641,6 +2703,13 @@ class AppDatabase extends _$AppDatabase {
             m, attestationTemplates, attestationTemplates.appreciationImprimee);
       }
 
+      // v67 — tickets RH-1 à RH-4 : registres RH mixtes (colonnes de synchronisation, `is_active`), absences de
+      // stagiaire, `is_active` des pointages, colonnes RH des bulletins, barème ITS, taux de paie, demandes de règlement.
+      // ⚠️ Les lignes déjà là (tirées) reçoivent les défauts de [SyncColumns] : `device_id` = 'serveur', `synced`.
+      if (from < 67) {
+        await _registresRhMixtes(m);
+      }
+
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
       // `user_version` 60 SANS les tables ni les colonnes des paliers 57, 58 et 59 (« no such table: corbeille_elements »).
@@ -2652,6 +2721,47 @@ class AppDatabase extends _$AppDatabase {
       await _reconcilierSchema(m);
     },
   );
+
+  /// Palier v67 — [Employees] et [Internships] deviennent des tables MIXTES : `device_id`, `sync_status`, `updated_at`
+  /// (obligatoires, sans défaut : SQLite ne sait pas les ajouter à une table pleine) → la table est RECONSTRUITE, chaque
+  /// ligne recopiée avec `'serveur'` / `synced` / l'instant courant — elles viennent toutes du serveur, le poste ne les
+  /// écrivait pas avant ce palier. `is_active` reçoit son défaut (vrai : le serveur ne servait que les actifs).
+  Future<void> _registresRhMixtes(Migrator m) async {
+    for (final table in <TableInfo<Table, dynamic>>[employees, internships]) {
+      final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${table.actualTableName}")').get()) c.read<String>('name')};
+      if (colonnes.contains('sync_status')) continue;
+      final nouvelles = [for (final c in table.$columns) if (!colonnes.contains(c.name)) c];
+      await m.alterTable(
+        TableMigration(
+          table,
+          newColumns: nouvelles,
+          columnTransformer: {
+            if (table == employees) ...{
+              employees.deviceId: const Constant<String>('serveur'),
+              employees.syncStatus: const Constant<String>('synced'),
+              employees.updatedAt: currentDateAndTime,
+            } else ...{
+              internships.deviceId: const Constant<String>('serveur'),
+              internships.syncStatus: const Constant<String>('synced'),
+              internships.updatedAt: currentDateAndTime,
+            },
+          },
+        ),
+      );
+    }
+    for (final table in <TableInfo<Table, dynamic>>[internshipAbsences, incomeTaxBrackets, payslipRequests]) {
+      if (!await _tableExiste(m, table)) await m.createTable(table);
+    }
+    await _ajouterColonneSiAbsente(m, attendanceRecords, attendanceRecords.isActive);
+    for (final c in [payslips.employeeId, payslips.periodMonth, payslips.grossSalary, payslips.absenceDeduction,
+        payslips.cnssDeduction, payslips.itsDeduction, payslips.chargesPatronales]) {
+      await _ajouterColonneSiAbsente(m, payslips, c);
+    }
+    for (final c in [companySettings.vpsRate, companySettings.cnssEmployeeRate, companySettings.cnssEmployerPensionRate,
+        companySettings.cnssEmployerFamilyRate, companySettings.cnssEmployerRiskRate]) {
+      await _ajouterColonneSiAbsente(m, companySettings, c);
+    }
+  }
 
   /// Pose ce qui manque, table par table et colonne par colonne, par rapport au schéma courant (voir `onUpgrade`).
   Future<void> _reconcilierSchema(Migrator m) async {
@@ -2901,6 +3011,11 @@ class AppDatabase extends _$AppDatabase {
     'livestock_reproduction_events',
     'purchases',
     'attendance_records',
+    // Tickets RH-1, RH-2, RH-4 — registres RH, absences de stagiaire, demandes de règlement de paie.
+    'employees',
+    'internships',
+    'internship_absences',
+    'payslip_requests',
     'products',
     'suppliers',
     'supplier_payments',
@@ -2984,6 +3099,8 @@ class AppDatabase extends _$AppDatabase {
     'quotes', // DEV
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
+    // Tickets RH-2 / RH-4 — absences de stagiaire et demandes de règlement de paie.
+    'internship_absences', 'payslip_requests',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',
     'sync_conflicts',
@@ -2996,6 +3113,8 @@ class AppDatabase extends _$AppDatabase {
     'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
     'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers',
     'company_settings', 'modules_config', 'attestation_templates',
+    // Ticket RH-4 — barème ITS (référentiel, préservé au serveur).
+    'income_tax_brackets',
     'roles_applicatifs', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',
   ];

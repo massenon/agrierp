@@ -2,7 +2,6 @@
 
 namespace App\Livewire\RH;
 
-use App\Models\AuditLog;
 use App\Models\Employee;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -120,6 +119,7 @@ class RegistreEmployes extends Component
             'status' => ['required', 'in:actif,conge,suspendu'],
         ]);
 
+        // Ticket RH-1 — le point de passage unique, partagé avec l'envoi du poste (`SyncController::pushEmployees`).
         $payload = [
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
@@ -128,15 +128,13 @@ class RegistreEmployes extends Component
             'base_salary' => $this->baseSalary,
             'status' => $this->status,
         ];
+        $saisie = app(\App\Actions\SaisieEmployeAction::class);
 
         if ($this->editingEmployeeId) {
-            Employee::findOrFail($this->editingEmployeeId)->update($payload);
-            AuditLog::record('employee.updated', 'rh');
+            $saisie->modifier($this->editingEmployeeId, $payload);
             $message = 'Modification enregistrée avec succès.';
         } else {
-            $payload['is_active'] = true;
-            Employee::create($payload);
-            AuditLog::record('employee.created', 'rh');
+            $saisie->creer($payload);
             $message = 'Enregistrement effectué avec succès.';
         }
 
@@ -147,9 +145,7 @@ class RegistreEmployes extends Component
     public function archiveEmployee(string $id): void
     {
         $this->authorize('manage-rh');
-        $employe = Employee::findOrFail($id);
-        $employe->update(['is_active' => false]);
-        AuditLog::record('employee.archived', 'rh', null, $employe);
+        app(\App\Actions\SaisieEmployeAction::class)->archiver($id);
         $this->dispatch('toast', message: 'Employé archivé avec succès.', type: 'warning');
     }
 

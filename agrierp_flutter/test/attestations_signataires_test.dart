@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/rh/attestations_repository.dart';
 import 'package:agrierp/features/rh/attestations_vue.dart';
@@ -338,6 +339,9 @@ void main() {
     Future<void> stagiaire(String cle, String nom, DateTime debut, DateTime? fin) => db.into(db.internships).insert(
       InternshipsCompanion.insert(
         id: uuid(cle),
+        deviceId: 'serveur',
+        updatedAt: DateTime(2026, 1, 1),
+        syncStatus: const Value(SyncStatus.synced),
         firstName: 'Félicité',
         lastName: nom,
         school: const Value('Agronomie'),

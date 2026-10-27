@@ -2,14 +2,9 @@
 
 namespace App\Livewire\RH;
 
-use App\Models\AttendanceRecord;
-use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\Payslip;
 use App\Services\PayrollCalculationService;
-use App\Actions\RecordPayrollAccountingEntryAction;
-use App\Models\TreasuryAccount;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
@@ -62,17 +57,6 @@ class GestionPaie extends Component
         return $this->periodMonth.'-01';
     }
 
-    /**
-     * Ticket EX5 (Q4) — date de la charge d'une paie : le dernier jour de la période payée, sauf si le règlement a lieu
-     * avant (paie du mois en cours réglée avant sa fin) — jamais une charge datée APRÈS son règlement ni dans le futur.
-     */
-    private function dateDeLaCharge(string $period): string
-    {
-        $finDePeriode = \Carbon\Carbon::parse($period)->endOfMonth()->format('Y-m-d');
-
-        return min($finDePeriode, now()->format('Y-m-d'));
-    }
-
     public function getRowsProperty()
     {
         $employees = Employee::where('is_active', true)->orderBy('last_name')->get();
@@ -104,12 +88,8 @@ class GestionPaie extends Component
             }
 
             $gross = (float) ($employee->base_salary ?? 0);
-            $absenceDays = AttendanceRecord::where('employee_id', $employee->id)
-                ->where('status', 'absent')
-                ->where('is_active', true)   // un pointage archivé ne retient plus d'absence sur la paie
-                ->whereYear('attendance_date', substr($period, 0, 4))
-                ->whereMonth('attendance_date', substr($period, 5, 2))
-                ->count();
+            // Ticket RH-4 — même règle que le règlement (`ReglementPaieService::joursAbsence`).
+            $absenceDays = \App\Services\ReglementPaieService::joursAbsence($employee, $period);
 
             // 🔴→✅ TICKET 14.38 — MÊME SERVICE QUE LE RÈGLEMENT.
             //
@@ -171,96 +151,31 @@ class GestionPaie extends Component
         ];
     }
 
+    /**
+     * Ticket RH-4 — le règlement passe par `ReglementPaieService`, le point de passage unique partagé avec la demande
+     * d'un poste (`SyncController::pushPayslipRequests`) : bulletin, trésorerie, écriture, audit, règles d'exercice (EX5).
+     */
     public function validerReglement(string $employeeId): void
     {
         $this->authorize('manage-rh');
 
         $employee = Employee::findOrFail($employeeId);
-        $period = $this->periodDate();
 
-        $existing = Payslip::where('employee_id', $employee->id)->whereDate('period_month', $period)->first();
-
-        if ($existing) {
-            return;
-        }
-
-        // 🔴→✅ TICKET EX5 (EF5, EF6, décision Q4 du 20/10/2026) — À QUEL EXERCICE APPARTIENT LA PAIE ?
-        // La charge (661) appartient à la PÉRIODE payée : datée de son dernier jour (31/12/N pour décembre), jamais après
-        // le règlement ; le règlement, à sa date. Exercice de la charge clos → refus ; aucun exercice → refus. Avant : la
-        // paie de 11/2026 validée le 15/03/2027 passait au 15/03/2027 alors que 2026 était clos, et un exercice absent
-        // finissait en erreur 500. Contrôlé AVANT toute écriture : ni bulletin, ni trésorerie, ni écriture.
-        $dateCharge = $this->dateDeLaCharge($period);
-        $dateReglement = now()->format('Y-m-d');
         try {
-            app(\App\Services\AccountingEntryService::class)->exerciceOuvertPour($dateCharge);
-            app(\App\Services\AccountingEntryService::class)->exerciceOuvertPour($dateReglement);
-        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+            $resultat = app(\App\Services\ReglementPaieService::class)->valider($employee, $this->periodDate());
+        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\ReglementPaieRefuseException $e) {
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        $gross = (float) ($employee->base_salary ?? 0);
-        $absenceDays = AttendanceRecord::where('employee_id', $employee->id)
-            ->where('status', 'absent')
-            ->where('is_active', true)   // un pointage archivé ne retient plus d'absence sur la paie
-            ->whereYear('attendance_date', substr($period, 0, 4))
-            ->whereMonth('attendance_date', substr($period, 5, 2))
-            ->count();
+        if ($resultat['deja']) {
+            return;
+        }
 
-        // 🔴→✅ TICKET 14.38 — CALCUL DÉLÉGUÉ AU SERVICE DE PAIE.
-        //
-        // Le taux CNSS de 3,6 % était écrit en dur ici, et deux familles de
-        // prélèvements manquaient entièrement : l'ITS (retenue salariale
-        // progressive) et les charges patronales béninoises (VPS, CNSS
-        // pensions, prestations familiales, risques professionnels). Le
-        // bulletin sous-déclarait donc l'entreprise et surestimait le net.
-        $calcul = app(PayrollCalculationService::class)->calculer($gross, $absenceDays);
-
-        $absenceDeduction = $calcul['retenue_absence'];
-        $cnssDeduction = $calcul['cnss_salariale'];
-        $net = $calcul['net'];
-
-        DB::transaction(function () use ($employee, $period, $gross, $calcul, $absenceDeduction, $cnssDeduction, $net, $dateCharge, $dateReglement) {
-            $payslip = Payslip::create([
-                'employee_id' => $employee->id,
-                'period_month' => $period,
-                'gross_salary' => $gross,
-                'absence_deduction' => $absenceDeduction,
-                'cnss_deduction' => $cnssDeduction,
-                // Retenue salariale : diminue le net versé.
-                'its_deduction' => $calcul['its'],
-                // Charges patronales : payées EN PLUS, ne touchent pas le net.
-                'vps_employer' => $calcul['vps'],
-                'cnss_employer_pension' => $calcul['cnss_patronale_pension'],
-                'cnss_employer_family' => $calcul['cnss_patronale_famille'],
-                'cnss_employer_risk' => $calcul['cnss_patronale_risque'],
-                'net_salary' => $net,
-            ]);
-
-            // Décrément réel de trésorerie à la validation — voir docblock.
-            $account = TreasuryAccount::where('is_active', true)->first();
-            if ($account) {
-                $account->decrement('balance', $net);
-            }
-
-            // 🔴→✅ TICKET 14.25 — ÉCRITURE COMPTABLE ENFIN GÉNÉRÉE.
-            // Dernier des trois flux financiers cites par le CDC (vente, achat,
-            // paie) a n'en produire aucune. La charge portee au debit est le
-            // salaire REELLEMENT DU (net + retenue CNSS), la retenue etant une
-            // dette envers l'organisme et non une non-depense : comptabiliser
-            // le seul net sous-estimerait les charges de personnel chaque mois.
-            $ecriture = app(RecordPayrollAccountingEntryAction::class)
-                ->execute($payslip, $account?->id, $dateCharge, $dateReglement);
-
-            AuditLog::record('payslip.paid', 'rh');
-
-            if ($ecriture === null) {
-                // Jamais silencieux — meme discipline que le POS et les Achats.
-                AuditLog::record('payslip.accounting_entry_missing', 'comptabilite');
-                $this->dispatch('toast', message: "Règlement validé — ATTENTION : écriture comptable non générée (compte manquant au plan comptable). À régulariser au Journal Comptable.", type: 'warning');
-            }
-        });
+        if ($resultat['ecriture_manquante']) {
+            $this->dispatch('toast', message: "Règlement validé — ATTENTION : écriture comptable non générée (compte manquant au plan comptable). À régulariser au Journal Comptable.", type: 'warning');
+        }
 
         $this->dispatch('toast', message: "Règlement de {$employee->last_name} {$employee->first_name} validé.", type: 'success');
     }

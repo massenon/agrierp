@@ -544,16 +544,9 @@ void main() {
     //    référentiels du serveur : embaucher, corriger un salaire ou
     //    archiver une fiche depuis le poste donnerait une saisie effacée au
     //    tirage suivant.
-    'Nouvel Employé': 'référentiel en lecture seule au poste',
     '+ Nouvel Employé': 'référentiel en lecture seule au poste',
-    'Fonction *': 'référentiel en lecture seule au poste',
-    "Date d'embauche *": 'référentiel en lecture seule au poste',
     'Salaire (FCFA) *': 'référentiel en lecture seule au poste',
-    'Nouveau Stagiaire': 'référentiel en lecture seule au poste',
     "Établissement d'origine *": 'référentiel en lecture seule au poste',
-    'Date de début': 'référentiel en lecture seule au poste',
-    'Date de fin': 'référentiel en lecture seule au poste',
-    'Frais de stage (FCFA)': 'référentiel en lecture seule au poste',
 
     // ⚠️⚠️ LES ABSENCES D'UN STAGIAIRE vivent dans `internship_absences`,
     //    que le poste ne reçoit pas — et la feuille de pointage ne les couvre
@@ -561,7 +554,6 @@ void main() {
     //    stagiaire n'est pas un employé dans le schéma.
     'Absences / Abandon': 'absences de stagiaire non embarquées',
     "Date de l'absence": 'absences de stagiaire non embarquées',
-    'Motif': 'absences de stagiaire non embarquées',
 
     // ⚠️ LE BOUTON DE LA MODALE DE POINTAGE porte le libellé court de la
     //    maquette (« Enregistrer un Pointage ») ; la variante préfixée « + »
@@ -807,13 +799,10 @@ void main() {
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
     },
     // grand-livre.html et balance-generale.html : plus d'exemption, « Exporter PDF » porté (F0.87).
+    // Ticket RH-3 : « Date * » et « Archiver » sont portés (modale de pointage avec date, archivage d'un pointage).
     'feuille-pointage.html': {
-      'Date *':
-          "ÉCART À ARBITRER (F0.81, 09/10/2026) : la maquette attend « Date * » dans la modale de pointage, l'écran ne le porte pas ; écran non modifié, décision client",
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver le pointage ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
     // Ticket H9 : `parametres-elevage.html` est contrôlée contre le Blade — son exemption « Exporter PDF »
@@ -857,7 +846,7 @@ void main() {
     'registre-stagiaires.html': {
       // F0.72 : exemption globale « Nom complet * » retirée ; motif d'origine conservé,
       // à réexaminer avec l'écran Stagiaires.
-      'Nom complet *': 'référentiel en lecture seule au poste',
+      'Nom complet *': "scindé en « Prénom * » / « Nom * », comme le web (schéma `first_name` / `last_name`)",
       // La génération se fait depuis l'onglet « Attestations » du hub, où elle
       // est portée ; le registre, lui, reste une consultation.
       'Attestation de Stage': "génération faite depuis l'onglet Attestations",
@@ -906,13 +895,12 @@ void main() {
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
       'Nom complet *': 'référentiel en lecture seule au poste',
     },
+    // Ticket RH-1 : « Archiver » est porté (archivage d'un employé).
     'registre-employes.html': {
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver l'employé ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Nom complet *': 'référentiel en lecture seule au poste',
+      'Nom complet *': "scindé en « Prénom * » / « Nom * », comme le web (schéma `first_name` / `last_name`)",
     },
 
     // ── Ticket F0.72 — fiche client : la maquette dit « Détruire » avec mot de passe
@@ -1160,7 +1148,8 @@ void main() {
   /// Gestion des Stocks (modale « Ajouter Stock » du Blade).
   /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
   /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
-  const plafondManquesMasques = 197;
+  /// RH-1 à RH-4 (27/10/2026) : 197 → 189. Les registres RH s'écrivent au poste : leurs libellés de modale sont portés.
+  const plafondManquesMasques = 189;
 
   for (final entree in portages.entries) {
     final page = entree.key;

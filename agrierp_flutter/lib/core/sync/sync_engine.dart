@@ -859,6 +859,9 @@ class SyncEngine {
     recus += await _absorberMouvementsStock(corps['stock_movements']);
     recus += await _absorberEmployes(corps['employees']);
     recus += await _absorberStagiaires(corps['internships']);
+    // Ticket RH-2 — APRÈS les stagiaires. Ticket RH-4 — barème ITS.
+    recus += await _absorberAbsencesStagiaires(corps['internship_absences']);
+    recus += await _absorberBaremeIts(corps['income_tax_brackets']);
     recus += await _absorberPointages(corps['attendance_records']);
     recus += await _absorberCourriers(corps['mails']);
     // Ticket DEV — devis du serveur (table mixte : les saisies du poste en attente ne sont jamais écrasées).
@@ -2718,6 +2721,12 @@ class SyncEngine {
         rccm: Value(l['rccm'] as String?),
         tvaEnabled: Value(_bool(l['tva_enabled'])),
         tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
+        // Ticket RH-4 — taux de paie (clés absentes d'un serveur antérieur : nuls, défauts du web au calcul).
+        vpsRate: Value(_reel(l['vps_rate'])),
+        cnssEmployeeRate: Value(_reel(l['cnss_employee_rate'])),
+        cnssEmployerPensionRate: Value(_reel(l['cnss_employer_pension_rate'])),
+        cnssEmployerFamilyRate: Value(_reel(l['cnss_employer_family_rate'])),
+        cnssEmployerRiskRate: Value(_reel(l['cnss_employer_risk_rate'])),
         rappelSoinsJours: delaiServi && !protege
             ? Value(delai as int?)
             : const Value.absent(),
@@ -3448,68 +3457,190 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Employés — référentiel remplacé à chaque tirage.
+  /// Employés — table MIXTE depuis RH-1 : fusion par identifiant, un employé `pending` / `conflict` reste intouchable.
   ///
-  /// ⚠️ Un employé archivé côté serveur disparaît du tirage : le garder ferait
-  /// pointer quelqu'un qui a quitté la ferme, et le pointage serait rejeté à
-  /// l'envoi sans que le chef d'équipe comprenne.
+  /// ⚠️⚠️ **STRICT** comme les devis : identifiant invalide ou servi deux fois, nom absent → [FormatException], rien n'est
+  /// écrit. Archivés compris (`is_active`) : un employé archivé au web cesse d'être pointable ici. Une ligne tirée garde
+  /// `device_id = 'serveur'` ; un employé acquitté de CE poste garde son origine.
   Future<int> _absorberEmployes(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Employé';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.employees).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.employees)
-            .insert(
-              EmployeesCompanion.insert(
-                id: l['id'] as String,
-                firstName: (l['first_name'] ?? '') as String,
-                lastName: (l['last_name'] ?? '') as String,
-                position: Value(l['position'] as String?),
-                baseSalary: Value(_reel(l['base_salary'])),
-                hireDate: Value(_date(l['hire_date'])),
-                status: Value(l['status'] as String?),
-              ),
-            );
+    final vus = <String>{};
+    final recus = <EmployeesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final prenom = _texteStrict(l['first_name'], '$quoi $id : prénom');
+      final nom = _texteStrict(l['last_name'], '$quoi $id : nom');
+      if (prenom == null || nom == null || nom.isEmpty) {
+        throw FormatException('$quoi $id refusé : nom absent.');
       }
-    });
+      recus.add(
+        EmployeesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          firstName: prenom,
+          lastName: nom,
+          position: Value(_texteStrict(l['position'], '$quoi $id : fonction')),
+          baseSalary: Value(_reel(l['base_salary'])),
+          hireDate: Value(_date(l['hire_date'])),
+          status: Value(_texteStrict(l['status'], '$quoi $id : statut')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+        ),
+      );
+    }
 
-    return lignes.length;
+    await _fusionnerMixte(_db.employees, recus, vus);
+
+    return recus.length;
   }
 
-  /// Stagiaires — référentiel remplacé à chaque tirage.
+  /// Stagiaires — table MIXTE depuis RH-2 (mêmes règles que [_absorberEmployes]).
   Future<int> _absorberStagiaires(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Stagiaire';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <InternshipsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final prenom = _texteStrict(l['first_name'], '$quoi $id : prénom');
+      final nom = _texteStrict(l['last_name'], '$quoi $id : nom');
+      if (prenom == null || nom == null || nom.isEmpty) {
+        throw FormatException('$quoi $id refusé : nom absent.');
+      }
+      recus.add(
+        InternshipsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          firstName: prenom,
+          lastName: nom,
+          school: Value(_texteStrict(l['school'], '$quoi $id : établissement')),
+          startDate: Value(_date(l['start_date'])),
+          endDate: Value(_date(l['end_date'])),
+          monthlyFee: Value(_reel(l['monthly_fee'])),
+          feePaid: Value(_bool(l['fee_paid'])),
+          birthDate: Value(_date(l['birth_date'])),
+          birthPlace: Value(_texteStrict(l['birth_place'], '$quoi $id : lieu de naissance')),
+          civilite: Value(_texteStrict(l['civilite'], '$quoi $id : civilité') ?? 'M.'),
+        ),
+      );
+    }
+
+    await _fusionnerMixte(_db.internships, recus, vus);
+
+    return recus.length;
+  }
+
+  /// Ticket RH-2 — absences de stagiaire : table MIXTE, archivées comprises (`is_active`).
+  Future<int> _absorberAbsencesStagiaires(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Absence de stagiaire';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <InternshipAbsencesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final stagiaire = _texteStrict(l['internship_id'], '$quoi $id : stagiaire');
+      final jour = _date(l['absence_date']);
+      if (stagiaire == null || stagiaire.length != 36) {
+        throw FormatException('$quoi $id refusé : stagiaire absent ou illisible ($stagiaire).');
+      }
+      if (jour == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['absence_date']}).');
+      }
+      recus.add(
+        InternshipAbsencesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          internshipId: stagiaire,
+          absenceDate: DateTime(jour.year, jour.month, jour.day),
+          reason: Value(_texteStrict(l['reason'], '$quoi $id : motif')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+        ),
+      );
+    }
+
+    await _fusionnerMixte(_db.internshipAbsences, recus, vus);
+
+    return recus.length;
+  }
+
+  /// Ticket RH-4 — barème ITS (tranches actives) : référentiel remplacé à chaque tirage.
+  Future<int> _absorberBaremeIts(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Tranche ITS';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final recus = <IncomeTaxBracketsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final plancher = _nombreStrict(l['from_amount'], '$quoi $id : plancher');
+      final plafond = _nombreStrict(l['to_amount'], '$quoi $id : plafond');
+      final taux = _nombreStrict(l['rate'], '$quoi $id : taux');
+      if (plancher == null || plancher < 0 || taux == null || taux < 0) {
+        throw FormatException('$quoi $id refusé : plancher ou taux absent ou négatif.');
+      }
+      recus.add(IncomeTaxBracketsCompanion.insert(id: id, fromAmount: plancher, toAmount: Value(plafond), rate: taux));
+    }
 
     await _db.transaction(() async {
-      await _db.delete(_db.internships).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.internships)
-            .insert(
-              InternshipsCompanion.insert(
-                id: l['id'] as String,
-                firstName: (l['first_name'] ?? '') as String,
-                lastName: (l['last_name'] ?? '') as String,
-                school: Value(l['school'] as String?),
-                startDate: Value(_date(l['start_date'])),
-                endDate: Value(_date(l['end_date'])),
-                monthlyFee: Value(_reel(l['monthly_fee'])),
-                feePaid: Value(_bool(l['fee_paid'])),
-              ),
-            );
-      }
+      await _db.delete(_db.incomeTaxBrackets).go();
+      await _db.batch((b) => b.insertAll(_db.incomeTaxBrackets, recus));
     });
 
-    return lignes.length;
+    return recus.length;
   }
+
+  /// Fusion d'une table MIXTE (devis, employés, stagiaires, absences) : une ligne locale `pending` / `conflict` n'est
+  /// jamais écrasée ; une ligne acquittée de CE poste garde son `device_id` (l'origine de la saisie).
+  Future<void> _fusionnerMixte<T extends Table, D extends DataClass>(
+    TableInfo<T, D> table,
+    List<UpdateCompanion<D>> recus,
+    Set<String> vus,
+  ) async {
+    await _db.transaction(() async {
+      final locales = <String, String>{};
+      for (final l in await _db
+          .customSelect(
+            'SELECT id, sync_status FROM ${table.actualTableName} WHERE id IN (${List.filled(vus.length, '?').join(',')})',
+            variables: [for (final id in vus) Variable.withString(id)],
+            readsFrom: {table},
+          )
+          .get()) {
+        locales[l.read<String>('id')] = l.read<String>('sync_status');
+      }
+      for (final r in recus) {
+        final id = (r as dynamic).id.value as String;
+        final statut = locales[id];
+        if (statut != null && statut != 'synced') continue;
+        await _db.into(table).insert(r, onConflict: DoUpdate((_) => _sansDeviceId(r)));
+      }
+    });
+  }
+
+  static UpdateCompanion<D> _sansDeviceId<D extends DataClass>(UpdateCompanion<D> c) => switch (c) {
+    EmployeesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    InternshipsCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    InternshipAbsencesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    _ => c,
+  };
 
   /// Pointages — fusion, et un pointage `pending` reste intouchable.
   ///
@@ -3542,6 +3673,8 @@ class SyncEngine {
         checkIn: Value(l['check_in'] as String?),
         checkOut: Value(l['check_out'] as String?),
         status: (l['status'] ?? 'present') as String,
+        // Ticket RH-3 — archivé au web (ou ici, acquitté) : ne compte plus. Clé absente (serveur antérieur) : actif.
+        isActive: Value(_actifStrict(l, 'Pointage $id')),
       );
 
       await _db
@@ -4790,6 +4923,8 @@ class SyncEngine {
           '$quoi $id refusé : date de règlement illisible (${l['created_at']}).',
         );
       }
+      // Ticket RH-4 — colonnes RH, servies aux seuls comptes `view-rh` (absentes sinon : nulles ici).
+      final periode = _date(l['period_month']);
       recus.add(
         PayslipsCompanion.insert(
           id: id,
@@ -4797,6 +4932,13 @@ class SyncEngine {
           netSalary: net,
           // ⚠️ Heure MURALE du serveur, lue telle quelle : le jour du web (`toDateString()`) doit rester le jour.
           createdAt: instant,
+          employeeId: Value(_texteStrict(l['employee_id'], '$quoi $id : employé')),
+          periodMonth: Value(periode == null ? null : DateTime(periode.year, periode.month, periode.day)),
+          grossSalary: Value(_nombreStrict(l['gross_salary'], '$quoi $id : brut')),
+          absenceDeduction: Value(_nombreStrict(l['absence_deduction'], '$quoi $id : retenue absences')),
+          cnssDeduction: Value(_nombreStrict(l['cnss_deduction'], '$quoi $id : retenue CNSS')),
+          itsDeduction: Value(_nombreStrict(l['its_deduction'], '$quoi $id : retenue ITS')),
+          chargesPatronales: Value(_nombreStrict(l['charges_patronales'], '$quoi $id : charges patronales')),
         ),
       );
     }
@@ -4925,6 +5067,12 @@ class SyncEngine {
     final pointages = await (_db.select(
       _db.attendanceRecords,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Tickets RH-1, RH-2, RH-4 — registres RH écrits au poste, absences de stagiaire, demandes de règlement de paie.
+    final employes = await (_db.select(_db.employees)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final stagiaires = await (_db.select(_db.internships)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final absencesStagiaires = await (_db.select(_db.internshipAbsences)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final demandesPaie = await (_db.select(_db.payslipRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
     final produits = await (_db.select(
       _db.products,
@@ -5058,7 +5206,12 @@ class SyncEngine {
         devis.isEmpty &&
         saillies.isEmpty &&
         achats.isEmpty &&
-        pointages.isEmpty) {
+        pointages.isEmpty &&
+        // Tickets RH-1, RH-2, RH-4.
+        employes.isEmpty &&
+        stagiaires.isEmpty &&
+        absencesStagiaires.isEmpty &&
+        demandesPaie.isEmpty) {
       return (0, 0, <String>[]);
     }
 
@@ -5187,6 +5340,13 @@ class SyncEngine {
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
             .toList(),
         'attendance_records': pointages.map(_pointageEnJson).toList(),
+        // Tickets RH-1 / RH-2 — `pushEmployees` / `pushInternships` / `pushInternshipAbsences` (manage-rh) : le serveur les
+        // traite AVANT les pointages et la paie du même envoi. Une clé VIDE n'est pas envoyée (postes anciens côté serveur).
+        if (employes.isNotEmpty) 'employees': employes.map(_employeEnJson).toList(),
+        if (stagiaires.isNotEmpty) 'internships': stagiaires.map(_stagiaireEnJson).toList(),
+        if (absencesStagiaires.isNotEmpty) 'internship_absences': absencesStagiaires.map(_absenceStagiaireEnJson).toList(),
+        // Ticket RH-4 — la DEMANDE seule (`pushPayslipRequests`, après les pointages) : jamais un montant.
+        if (demandesPaie.isNotEmpty) 'payslip_requests': demandesPaie.map(_demandePaieEnJson).toList(),
         'products': produits.map(_produitEnJson).toList(),
         'supplier_payments': reglements.map(_reglementEnJson).toList(),
         // ⚠️ TICKET F0.74 — le serveur traite : achats → règlements → RETOURS →
@@ -5538,6 +5698,62 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Tickets RH-1, RH-2, RH-4 — n'acquittent que la VERSION partie (instant de saisie inchangé) : une ligne modifiée
+    // PENDANT l'envoi reste `pending` et repart.
+    accepte += await _acquitter(
+      'employees',
+      corps['employees'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in employes) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.employees)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(EmployeesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += await _acquitter(
+      'internships',
+      corps['internships'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in stagiaires) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.internships)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(InternshipsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += await _acquitter(
+      'internship_absences',
+      corps['internship_absences'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final a in absencesStagiaires) (a.id, a.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.internshipAbsences)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(InternshipAbsencesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += await _acquitter(
+      'payslip_requests',
+      corps['payslip_requests'],
+      (ids, statut) => (_db.update(_db.payslipRequests)..where((t) => t.id.isIn(ids)))
+          .write(PayslipRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     accepte += await _acquitter(
       'purchases',
       corps['purchases'],
@@ -5850,6 +6066,10 @@ class SyncEngine {
     'modules_config',
     'suppliers',
     'customers',
+    // Tickets RH-1 / RH-2 — registres RH après les clients, avant les pointages et la paie du même envoi.
+    'employees',
+    'internships',
+    'internship_absences',
     // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
     'quotes',
     // Ticket DEV3 — la DEMANDE de conversion d'un devis, juste après les devis (le devis du même envoi existe alors déjà).
@@ -5871,6 +6091,8 @@ class SyncEngine {
     'purchase_returns',
     'supplier_refunds',
     'attendance_records',
+    // Ticket RH-4 — après les pointages : les absences du mois comptent sur la paie demandée.
+    'payslip_requests',
     'sales',
     // Ticket AV1 — après les ventes (un retour peut viser la vente du même envoi), avant les imputations.
     'credit_notes',
@@ -6367,6 +6589,19 @@ class SyncEngine {
               ),
             ),
       'sales' => () => _relancerVente(conflit.recordId),
+      // Tickets RH-1, RH-2, RH-4 — un employé, un stagiaire, une absence ou une demande de paie refusés se corrigent puis se relancent.
+      'employees' =>
+        () => (_db.update(_db.employees)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const EmployeesCompanion(syncStatus: Value(SyncStatus.pending))),
+      'internships' =>
+        () => (_db.update(_db.internships)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const InternshipsCompanion(syncStatus: Value(SyncStatus.pending))),
+      'internship_absences' =>
+        () => (_db.update(_db.internshipAbsences)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const InternshipAbsencesCompanion(syncStatus: Value(SyncStatus.pending))),
+      'payslip_requests' =>
+        () => (_db.update(_db.payslipRequests)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const PayslipRequestsCompanion(syncStatus: Value(SyncStatus.pending))),
       'veterinary_records' =>
         () =>
             (_db.update(
@@ -6947,6 +7182,55 @@ class SyncEngine {
     'check_in': p.checkIn,
     'check_out': p.checkOut,
     'status': p.status,
+    // Ticket RH-3 — archivage au poste (`FeuillePointage::archiveRecord` au serveur).
+    'is_active': p.isActive,
+  };
+
+  /// Ticket RH-1 — employé tel que `SyncController::pushEmployees` le valide (règles de `SaisieEmployeAction`).
+  Map<String, dynamic> _employeEnJson(Employee e) => {
+    'id': e.id,
+    'first_name': e.firstName,
+    'last_name': e.lastName,
+    'position': e.position ?? '',
+    'hire_date': e.hireDate == null ? null : _jour(e.hireDate!),
+    'base_salary': e.baseSalary,
+    'status': e.status ?? 'actif',
+    'is_active': e.isActive,
+    'device_id': e.deviceId,
+  };
+
+  /// Ticket RH-2 — stagiaire tel que `pushInternships` le valide (règles de `SaisieStagiaireAction`).
+  Map<String, dynamic> _stagiaireEnJson(Internship s) => {
+    'id': s.id,
+    'first_name': s.firstName,
+    'last_name': s.lastName,
+    'school': s.school ?? '',
+    'start_date': s.startDate == null ? null : _jour(s.startDate!),
+    'end_date': s.endDate == null ? null : _jour(s.endDate!),
+    'monthly_fee': s.monthlyFee,
+    'fee_paid': s.feePaid,
+    'birth_date': s.birthDate == null ? null : _jour(s.birthDate!),
+    'birth_place': s.birthPlace,
+    'civilite': s.civilite,
+    'device_id': s.deviceId,
+  };
+
+  Map<String, dynamic> _absenceStagiaireEnJson(InternshipAbsence a) => {
+    'id': a.id,
+    'internship_id': a.internshipId,
+    'absence_date': _jour(a.absenceDate),
+    'reason': a.reason,
+    'is_active': a.isActive,
+    'device_id': a.deviceId,
+  };
+
+  /// Ticket RH-4 — la demande : employé, période `AAAA-MM`, instant du clic (UTC). ⚠️ Aucun montant.
+  Map<String, dynamic> _demandePaieEnJson(PayslipRequest d) => {
+    'id': d.id,
+    'employee_id': d.employeeId,
+    'period_month': d.periodMonth,
+    'requested_at': d.requestedAt.toUtc().toIso8601String(),
+    'device_id': d.deviceId,
   };
 
   /// Ticket 15.46 — transfert entre bandes tel que le serveur le rejoue (`TransferBetweenLotsAction`).

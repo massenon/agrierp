@@ -76,6 +76,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   56: [d.expenseLines, d.costCenters],
   // Ticket ARC3 — la Corbeille : instantané du serveur et demandes. ⚠️ 57, 59 et 60 sont réservés à d'autres branches.
   58: [d.corbeilleElements, d.corbeilleDemandes],
+  // Tickets RH-2 / RH-4 — absences de stagiaire, barème ITS, demandes de règlement de paie.
+  67: [d.internshipAbsences, d.incomeTaxBrackets, d.payslipRequests],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -297,6 +299,30 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.attestationTemplates, d.attestationTemplates.appreciationText),
     (d.attestationTemplates, d.attestationTemplates.appreciationImprimee),
   ],
+  // v67 — tickets RH-1 à RH-4 : registres RH mixtes (colonnes de synchronisation, posées par RECONSTRUCTION de la
+  // table : `_registresRhMixtes`), `is_active` des pointages, colonnes RH des bulletins, taux de paie.
+  67: [
+    (d.employees, d.employees.deviceId),
+    (d.employees, d.employees.syncStatus),
+    (d.employees, d.employees.updatedAt),
+    (d.employees, d.employees.isActive),
+    (d.internships, d.internships.deviceId),
+    (d.internships, d.internships.syncStatus),
+    (d.internships, d.internships.updatedAt),
+    (d.attendanceRecords, d.attendanceRecords.isActive),
+    (d.payslips, d.payslips.employeeId),
+    (d.payslips, d.payslips.periodMonth),
+    (d.payslips, d.payslips.grossSalary),
+    (d.payslips, d.payslips.absenceDeduction),
+    (d.payslips, d.payslips.cnssDeduction),
+    (d.payslips, d.payslips.itsDeduction),
+    (d.payslips, d.payslips.chargesPatronales),
+    (d.companySettings, d.companySettings.vpsRate),
+    (d.companySettings, d.companySettings.cnssEmployeeRate),
+    (d.companySettings, d.companySettings.cnssEmployerPensionRate),
+    (d.companySettings, d.companySettings.cnssEmployerFamilyRate),
+    (d.companySettings, d.companySettings.cnssEmployerRiskRate),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -394,7 +420,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 66, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2');
+    expect(d.schemaVersion, 67, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

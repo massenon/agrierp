@@ -65,6 +65,9 @@ void main() {
     'payables': 'payables',
     'employees': 'employees',
     'internships': 'internships',
+    // Ticket RH-2 — absences de stagiaire (table mixte) ; RH-4 — barème ITS (référentiel).
+    'internship_absences': 'internship_absences',
+    'income_tax_brackets': 'income_tax_brackets',
     'attendance_records': 'attendance_records',
     'mails': 'mails',
     'administrative_documents': 'administrative_documents',
@@ -109,6 +112,8 @@ void main() {
     'supplier_payments',
     'supplier_refunds',
     'corbeille_demandes',
+    // Ticket RH-4 — demandes de règlement de paie (envoyées, jamais tirées : le bulletin redescend dans `payslips`).
+    'payslip_requests',
     'sync_conflicts',
     'app_settings',
     'sync_state',

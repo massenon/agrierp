@@ -9587,6 +9587,42 @@ class $EmployeesTable extends Employees
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($EmployeesTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _firstNameMeta = const VerificationMeta(
     'firstName',
   );
@@ -9651,15 +9687,34 @@ class $EmployeesTable extends Employees
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     firstName,
     lastName,
     position,
     baseSalary,
     hireDate,
     status,
+    isActive,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9677,6 +9732,22 @@ class $EmployeesTable extends Employees
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('first_name')) {
       context.handle(
@@ -9718,6 +9789,12 @@ class $EmployeesTable extends Employees
         status.isAcceptableOrUnknown(data['status']!, _statusMeta),
       );
     }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     return context;
   }
 
@@ -9730,6 +9807,20 @@ class $EmployeesTable extends Employees
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $EmployeesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
       firstName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -9755,6 +9846,10 @@ class $EmployeesTable extends Employees
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
     );
   }
 
@@ -9762,10 +9857,16 @@ class $EmployeesTable extends Employees
   $EmployeesTable createAlias(String alias) {
     return $EmployeesTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class Employee extends DataClass implements Insertable<Employee> {
   final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String firstName;
   final String lastName;
   final String? position;
@@ -9774,19 +9875,33 @@ class Employee extends DataClass implements Insertable<Employee> {
 
   /// `actif` · `conge` · `suspendu`.
   final String? status;
+
+  /// Faux : archivé (web ou poste).
+  final bool isActive;
   const Employee({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     required this.firstName,
     required this.lastName,
     this.position,
     this.baseSalary,
     this.hireDate,
     this.status,
+    required this.isActive,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $EmployeesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     map['first_name'] = Variable<String>(firstName);
     map['last_name'] = Variable<String>(lastName);
     if (!nullToAbsent || position != null) {
@@ -9801,12 +9916,16 @@ class Employee extends DataClass implements Insertable<Employee> {
     if (!nullToAbsent || status != null) {
       map['status'] = Variable<String>(status);
     }
+    map['is_active'] = Variable<bool>(isActive);
     return map;
   }
 
   EmployeesCompanion toCompanion(bool nullToAbsent) {
     return EmployeesCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       firstName: Value(firstName),
       lastName: Value(lastName),
       position: position == null && nullToAbsent
@@ -9821,6 +9940,7 @@ class Employee extends DataClass implements Insertable<Employee> {
       status: status == null && nullToAbsent
           ? const Value.absent()
           : Value(status),
+      isActive: Value(isActive),
     );
   }
 
@@ -9831,12 +9951,18 @@ class Employee extends DataClass implements Insertable<Employee> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Employee(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $EmployeesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       firstName: serializer.fromJson<String>(json['firstName']),
       lastName: serializer.fromJson<String>(json['lastName']),
       position: serializer.fromJson<String?>(json['position']),
       baseSalary: serializer.fromJson<double?>(json['baseSalary']),
       hireDate: serializer.fromJson<DateTime?>(json['hireDate']),
       status: serializer.fromJson<String?>(json['status']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
   @override
@@ -9844,35 +9970,54 @@ class Employee extends DataClass implements Insertable<Employee> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $EmployeesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'firstName': serializer.toJson<String>(firstName),
       'lastName': serializer.toJson<String>(lastName),
       'position': serializer.toJson<String?>(position),
       'baseSalary': serializer.toJson<double?>(baseSalary),
       'hireDate': serializer.toJson<DateTime?>(hireDate),
       'status': serializer.toJson<String?>(status),
+      'isActive': serializer.toJson<bool>(isActive),
     };
   }
 
   Employee copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     String? firstName,
     String? lastName,
     Value<String?> position = const Value.absent(),
     Value<double?> baseSalary = const Value.absent(),
     Value<DateTime?> hireDate = const Value.absent(),
     Value<String?> status = const Value.absent(),
+    bool? isActive,
   }) => Employee(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     firstName: firstName ?? this.firstName,
     lastName: lastName ?? this.lastName,
     position: position.present ? position.value : this.position,
     baseSalary: baseSalary.present ? baseSalary.value : this.baseSalary,
     hireDate: hireDate.present ? hireDate.value : this.hireDate,
     status: status.present ? status.value : this.status,
+    isActive: isActive ?? this.isActive,
   );
   Employee copyWithCompanion(EmployeesCompanion data) {
     return Employee(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       firstName: data.firstName.present ? data.firstName.value : this.firstName,
       lastName: data.lastName.present ? data.lastName.value : this.lastName,
       position: data.position.present ? data.position.value : this.position,
@@ -9881,6 +10026,7 @@ class Employee extends DataClass implements Insertable<Employee> {
           : this.baseSalary,
       hireDate: data.hireDate.present ? data.hireDate.value : this.hireDate,
       status: data.status.present ? data.status.value : this.status,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
 
@@ -9888,12 +10034,16 @@ class Employee extends DataClass implements Insertable<Employee> {
   String toString() {
     return (StringBuffer('Employee(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('position: $position, ')
           ..write('baseSalary: $baseSalary, ')
           ..write('hireDate: $hireDate, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
@@ -9901,97 +10051,135 @@ class Employee extends DataClass implements Insertable<Employee> {
   @override
   int get hashCode => Object.hash(
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     firstName,
     lastName,
     position,
     baseSalary,
     hireDate,
     status,
+    isActive,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Employee &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.firstName == this.firstName &&
           other.lastName == this.lastName &&
           other.position == this.position &&
           other.baseSalary == this.baseSalary &&
           other.hireDate == this.hireDate &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.isActive == this.isActive);
 }
 
 class EmployeesCompanion extends UpdateCompanion<Employee> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String> firstName;
   final Value<String> lastName;
   final Value<String?> position;
   final Value<double?> baseSalary;
   final Value<DateTime?> hireDate;
   final Value<String?> status;
+  final Value<bool> isActive;
   final Value<int> rowid;
   const EmployeesCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.firstName = const Value.absent(),
     this.lastName = const Value.absent(),
     this.position = const Value.absent(),
     this.baseSalary = const Value.absent(),
     this.hireDate = const Value.absent(),
     this.status = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EmployeesCompanion.insert({
     required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
     required String firstName,
     required String lastName,
     this.position = const Value.absent(),
     this.baseSalary = const Value.absent(),
     this.hireDate = const Value.absent(),
     this.status = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
        firstName = Value(firstName),
        lastName = Value(lastName);
   static Insertable<Employee> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? firstName,
     Expression<String>? lastName,
     Expression<String>? position,
     Expression<double>? baseSalary,
     Expression<DateTime>? hireDate,
     Expression<String>? status,
+    Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
       if (position != null) 'position': position,
       if (baseSalary != null) 'base_salary': baseSalary,
       if (hireDate != null) 'hire_date': hireDate,
       if (status != null) 'status': status,
+      if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   EmployeesCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String>? firstName,
     Value<String>? lastName,
     Value<String?>? position,
     Value<double?>? baseSalary,
     Value<DateTime?>? hireDate,
     Value<String?>? status,
+    Value<bool>? isActive,
     Value<int>? rowid,
   }) {
     return EmployeesCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       position: position ?? this.position,
       baseSalary: baseSalary ?? this.baseSalary,
       hireDate: hireDate ?? this.hireDate,
       status: status ?? this.status,
+      isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -10001,6 +10189,17 @@ class EmployeesCompanion extends UpdateCompanion<Employee> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $EmployeesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (firstName.present) {
       map['first_name'] = Variable<String>(firstName.value);
@@ -10020,6 +10219,9 @@ class EmployeesCompanion extends UpdateCompanion<Employee> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -10030,12 +10232,16 @@ class EmployeesCompanion extends UpdateCompanion<Employee> {
   String toString() {
     return (StringBuffer('EmployeesCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('position: $position, ')
           ..write('baseSalary: $baseSalary, ')
           ..write('hireDate: $hireDate, ')
           ..write('status: $status, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10059,6 +10265,42 @@ class $InternshipsTable extends Internships
       maxTextLength: 36,
     ),
     type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($InternshipsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _firstNameMeta = const VerificationMeta(
@@ -10177,6 +10419,9 @@ class $InternshipsTable extends Internships
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     firstName,
     lastName,
     school,
@@ -10204,6 +10449,22 @@ class $InternshipsTable extends Internships
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('first_name')) {
       context.handle(
@@ -10282,6 +10543,20 @@ class $InternshipsTable extends Internships
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $InternshipsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       firstName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}first_name'],
@@ -10329,10 +10604,16 @@ class $InternshipsTable extends Internships
   $InternshipsTable createAlias(String alias) {
     return $InternshipsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class Internship extends DataClass implements Insertable<Internship> {
   final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String firstName;
   final String lastName;
   final String? school;
@@ -10345,6 +10626,9 @@ class Internship extends DataClass implements Insertable<Internship> {
   final String civilite;
   const Internship({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     required this.firstName,
     required this.lastName,
     this.school,
@@ -10360,6 +10644,13 @@ class Internship extends DataClass implements Insertable<Internship> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $InternshipsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     map['first_name'] = Variable<String>(firstName);
     map['last_name'] = Variable<String>(lastName);
     if (!nullToAbsent || school != null) {
@@ -10388,6 +10679,9 @@ class Internship extends DataClass implements Insertable<Internship> {
   InternshipsCompanion toCompanion(bool nullToAbsent) {
     return InternshipsCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       firstName: Value(firstName),
       lastName: Value(lastName),
       school: school == null && nullToAbsent
@@ -10420,6 +10714,11 @@ class Internship extends DataClass implements Insertable<Internship> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Internship(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $InternshipsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       firstName: serializer.fromJson<String>(json['firstName']),
       lastName: serializer.fromJson<String>(json['lastName']),
       school: serializer.fromJson<String?>(json['school']),
@@ -10437,6 +10736,11 @@ class Internship extends DataClass implements Insertable<Internship> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $InternshipsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'firstName': serializer.toJson<String>(firstName),
       'lastName': serializer.toJson<String>(lastName),
       'school': serializer.toJson<String?>(school),
@@ -10452,6 +10756,9 @@ class Internship extends DataClass implements Insertable<Internship> {
 
   Internship copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     String? firstName,
     String? lastName,
     Value<String?> school = const Value.absent(),
@@ -10464,6 +10771,9 @@ class Internship extends DataClass implements Insertable<Internship> {
     String? civilite,
   }) => Internship(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     firstName: firstName ?? this.firstName,
     lastName: lastName ?? this.lastName,
     school: school.present ? school.value : this.school,
@@ -10478,6 +10788,11 @@ class Internship extends DataClass implements Insertable<Internship> {
   Internship copyWithCompanion(InternshipsCompanion data) {
     return Internship(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       firstName: data.firstName.present ? data.firstName.value : this.firstName,
       lastName: data.lastName.present ? data.lastName.value : this.lastName,
       school: data.school.present ? data.school.value : this.school,
@@ -10499,6 +10814,9 @@ class Internship extends DataClass implements Insertable<Internship> {
   String toString() {
     return (StringBuffer('Internship(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('school: $school, ')
@@ -10516,6 +10834,9 @@ class Internship extends DataClass implements Insertable<Internship> {
   @override
   int get hashCode => Object.hash(
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     firstName,
     lastName,
     school,
@@ -10532,6 +10853,9 @@ class Internship extends DataClass implements Insertable<Internship> {
       identical(this, other) ||
       (other is Internship &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.firstName == this.firstName &&
           other.lastName == this.lastName &&
           other.school == this.school &&
@@ -10546,6 +10870,9 @@ class Internship extends DataClass implements Insertable<Internship> {
 
 class InternshipsCompanion extends UpdateCompanion<Internship> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String> firstName;
   final Value<String> lastName;
   final Value<String?> school;
@@ -10559,6 +10886,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   final Value<int> rowid;
   const InternshipsCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.firstName = const Value.absent(),
     this.lastName = const Value.absent(),
     this.school = const Value.absent(),
@@ -10573,6 +10903,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   });
   InternshipsCompanion.insert({
     required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
     required String firstName,
     required String lastName,
     this.school = const Value.absent(),
@@ -10585,10 +10918,15 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     this.civilite = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
        firstName = Value(firstName),
        lastName = Value(lastName);
   static Insertable<Internship> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? firstName,
     Expression<String>? lastName,
     Expression<String>? school,
@@ -10603,6 +10941,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
       if (school != null) 'school': school,
@@ -10619,6 +10960,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
 
   InternshipsCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String>? firstName,
     Value<String>? lastName,
     Value<String?>? school,
@@ -10633,6 +10977,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   }) {
     return InternshipsCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       school: school ?? this.school,
@@ -10652,6 +10999,17 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $InternshipsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (firstName.present) {
       map['first_name'] = Variable<String>(firstName.value);
@@ -10693,6 +11051,9 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
   String toString() {
     return (StringBuffer('InternshipsCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('school: $school, ')
@@ -10703,6 +11064,552 @@ class InternshipsCompanion extends UpdateCompanion<Internship> {
           ..write('birthDate: $birthDate, ')
           ..write('birthPlace: $birthPlace, ')
           ..write('civilite: $civilite, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $InternshipAbsencesTable extends InternshipAbsences
+    with TableInfo<$InternshipAbsencesTable, InternshipAbsence> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InternshipAbsencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $InternshipAbsencesTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _internshipIdMeta = const VerificationMeta(
+    'internshipId',
+  );
+  @override
+  late final GeneratedColumn<String> internshipId = GeneratedColumn<String>(
+    'internship_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _absenceDateMeta = const VerificationMeta(
+    'absenceDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> absenceDate = GeneratedColumn<DateTime>(
+    'absence_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    internshipId,
+    absenceDate,
+    reason,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'internship_absences';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InternshipAbsence> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('internship_id')) {
+      context.handle(
+        _internshipIdMeta,
+        internshipId.isAcceptableOrUnknown(
+          data['internship_id']!,
+          _internshipIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_internshipIdMeta);
+    }
+    if (data.containsKey('absence_date')) {
+      context.handle(
+        _absenceDateMeta,
+        absenceDate.isAcceptableOrUnknown(
+          data['absence_date']!,
+          _absenceDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_absenceDateMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InternshipAbsence map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InternshipAbsence(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $InternshipAbsencesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      internshipId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}internship_id'],
+      )!,
+      absenceDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}absence_date'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $InternshipAbsencesTable createAlias(String alias) {
+    return $InternshipAbsencesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class InternshipAbsence extends DataClass
+    implements Insertable<InternshipAbsence> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String internshipId;
+
+  /// Une DATE pure (minuit, heure murale).
+  final DateTime absenceDate;
+  final String? reason;
+  final bool isActive;
+  const InternshipAbsence({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.internshipId,
+    required this.absenceDate,
+    this.reason,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $InternshipAbsencesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['internship_id'] = Variable<String>(internshipId);
+    map['absence_date'] = Variable<DateTime>(absenceDate);
+    if (!nullToAbsent || reason != null) {
+      map['reason'] = Variable<String>(reason);
+    }
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  InternshipAbsencesCompanion toCompanion(bool nullToAbsent) {
+    return InternshipAbsencesCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      internshipId: Value(internshipId),
+      absenceDate: Value(absenceDate),
+      reason: reason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reason),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory InternshipAbsence.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InternshipAbsence(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $InternshipAbsencesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      internshipId: serializer.fromJson<String>(json['internshipId']),
+      absenceDate: serializer.fromJson<DateTime>(json['absenceDate']),
+      reason: serializer.fromJson<String?>(json['reason']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $InternshipAbsencesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'internshipId': serializer.toJson<String>(internshipId),
+      'absenceDate': serializer.toJson<DateTime>(absenceDate),
+      'reason': serializer.toJson<String?>(reason),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  InternshipAbsence copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? internshipId,
+    DateTime? absenceDate,
+    Value<String?> reason = const Value.absent(),
+    bool? isActive,
+  }) => InternshipAbsence(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    internshipId: internshipId ?? this.internshipId,
+    absenceDate: absenceDate ?? this.absenceDate,
+    reason: reason.present ? reason.value : this.reason,
+    isActive: isActive ?? this.isActive,
+  );
+  InternshipAbsence copyWithCompanion(InternshipAbsencesCompanion data) {
+    return InternshipAbsence(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      internshipId: data.internshipId.present
+          ? data.internshipId.value
+          : this.internshipId,
+      absenceDate: data.absenceDate.present
+          ? data.absenceDate.value
+          : this.absenceDate,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InternshipAbsence(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('internshipId: $internshipId, ')
+          ..write('absenceDate: $absenceDate, ')
+          ..write('reason: $reason, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    internshipId,
+    absenceDate,
+    reason,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InternshipAbsence &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.internshipId == this.internshipId &&
+          other.absenceDate == this.absenceDate &&
+          other.reason == this.reason &&
+          other.isActive == this.isActive);
+}
+
+class InternshipAbsencesCompanion extends UpdateCompanion<InternshipAbsence> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> internshipId;
+  final Value<DateTime> absenceDate;
+  final Value<String?> reason;
+  final Value<bool> isActive;
+  final Value<int> rowid;
+  const InternshipAbsencesCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.internshipId = const Value.absent(),
+    this.absenceDate = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InternshipAbsencesCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String internshipId,
+    required DateTime absenceDate,
+    this.reason = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       internshipId = Value(internshipId),
+       absenceDate = Value(absenceDate);
+  static Insertable<InternshipAbsence> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? internshipId,
+    Expression<DateTime>? absenceDate,
+    Expression<String>? reason,
+    Expression<bool>? isActive,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (internshipId != null) 'internship_id': internshipId,
+      if (absenceDate != null) 'absence_date': absenceDate,
+      if (reason != null) 'reason': reason,
+      if (isActive != null) 'is_active': isActive,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InternshipAbsencesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? internshipId,
+    Value<DateTime>? absenceDate,
+    Value<String?>? reason,
+    Value<bool>? isActive,
+    Value<int>? rowid,
+  }) {
+    return InternshipAbsencesCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      internshipId: internshipId ?? this.internshipId,
+      absenceDate: absenceDate ?? this.absenceDate,
+      reason: reason ?? this.reason,
+      isActive: isActive ?? this.isActive,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $InternshipAbsencesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (internshipId.present) {
+      map['internship_id'] = Variable<String>(internshipId.value);
+    }
+    if (absenceDate.present) {
+      map['absence_date'] = Variable<DateTime>(absenceDate.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InternshipAbsencesCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('internshipId: $internshipId, ')
+          ..write('absenceDate: $absenceDate, ')
+          ..write('reason: $reason, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10822,6 +11729,21 @@ class $AttendanceRecordsTable extends AttendanceRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -10833,6 +11755,7 @@ class $AttendanceRecordsTable extends AttendanceRecords
     checkIn,
     checkOut,
     status,
+    isActive,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -10906,6 +11829,12 @@ class $AttendanceRecordsTable extends AttendanceRecords
     } else if (isInserting) {
       context.missing(_statusMeta);
     }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     return context;
   }
 
@@ -10953,6 +11882,10 @@ class $AttendanceRecordsTable extends AttendanceRecords
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
     );
   }
 
@@ -10980,6 +11913,9 @@ class AttendanceRecord extends DataClass
 
   /// `present` · `absent` · `conge` · `maladie` · `retard`.
   final String status;
+
+  /// Ticket RH-3 — faux : archivé (web ou poste) ; ne compte plus (cartes, absences de la paie).
+  final bool isActive;
   const AttendanceRecord({
     required this.id,
     required this.deviceId,
@@ -10990,6 +11926,7 @@ class AttendanceRecord extends DataClass
     this.checkIn,
     this.checkOut,
     required this.status,
+    required this.isActive,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -11011,6 +11948,7 @@ class AttendanceRecord extends DataClass
       map['check_out'] = Variable<String>(checkOut);
     }
     map['status'] = Variable<String>(status);
+    map['is_active'] = Variable<bool>(isActive);
     return map;
   }
 
@@ -11029,6 +11967,7 @@ class AttendanceRecord extends DataClass
           ? const Value.absent()
           : Value(checkOut),
       status: Value(status),
+      isActive: Value(isActive),
     );
   }
 
@@ -11049,6 +11988,7 @@ class AttendanceRecord extends DataClass
       checkIn: serializer.fromJson<String?>(json['checkIn']),
       checkOut: serializer.fromJson<String?>(json['checkOut']),
       status: serializer.fromJson<String>(json['status']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
   @override
@@ -11066,6 +12006,7 @@ class AttendanceRecord extends DataClass
       'checkIn': serializer.toJson<String?>(checkIn),
       'checkOut': serializer.toJson<String?>(checkOut),
       'status': serializer.toJson<String>(status),
+      'isActive': serializer.toJson<bool>(isActive),
     };
   }
 
@@ -11079,6 +12020,7 @@ class AttendanceRecord extends DataClass
     Value<String?> checkIn = const Value.absent(),
     Value<String?> checkOut = const Value.absent(),
     String? status,
+    bool? isActive,
   }) => AttendanceRecord(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -11089,6 +12031,7 @@ class AttendanceRecord extends DataClass
     checkIn: checkIn.present ? checkIn.value : this.checkIn,
     checkOut: checkOut.present ? checkOut.value : this.checkOut,
     status: status ?? this.status,
+    isActive: isActive ?? this.isActive,
   );
   AttendanceRecord copyWithCompanion(AttendanceRecordsCompanion data) {
     return AttendanceRecord(
@@ -11107,6 +12050,7 @@ class AttendanceRecord extends DataClass
       checkIn: data.checkIn.present ? data.checkIn.value : this.checkIn,
       checkOut: data.checkOut.present ? data.checkOut.value : this.checkOut,
       status: data.status.present ? data.status.value : this.status,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
 
@@ -11121,7 +12065,8 @@ class AttendanceRecord extends DataClass
           ..write('attendanceDate: $attendanceDate, ')
           ..write('checkIn: $checkIn, ')
           ..write('checkOut: $checkOut, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
@@ -11137,6 +12082,7 @@ class AttendanceRecord extends DataClass
     checkIn,
     checkOut,
     status,
+    isActive,
   );
   @override
   bool operator ==(Object other) =>
@@ -11150,7 +12096,8 @@ class AttendanceRecord extends DataClass
           other.attendanceDate == this.attendanceDate &&
           other.checkIn == this.checkIn &&
           other.checkOut == this.checkOut &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.isActive == this.isActive);
 }
 
 class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
@@ -11163,6 +12110,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
   final Value<String?> checkIn;
   final Value<String?> checkOut;
   final Value<String> status;
+  final Value<bool> isActive;
   final Value<int> rowid;
   const AttendanceRecordsCompanion({
     this.id = const Value.absent(),
@@ -11174,6 +12122,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
     this.checkIn = const Value.absent(),
     this.checkOut = const Value.absent(),
     this.status = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttendanceRecordsCompanion.insert({
@@ -11186,6 +12135,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
     this.checkIn = const Value.absent(),
     this.checkOut = const Value.absent(),
     required String status,
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -11203,6 +12153,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
     Expression<String>? checkIn,
     Expression<String>? checkOut,
     Expression<String>? status,
+    Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -11215,6 +12166,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
       if (checkIn != null) 'check_in': checkIn,
       if (checkOut != null) 'check_out': checkOut,
       if (status != null) 'status': status,
+      if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -11229,6 +12181,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
     Value<String?>? checkIn,
     Value<String?>? checkOut,
     Value<String>? status,
+    Value<bool>? isActive,
     Value<int>? rowid,
   }) {
     return AttendanceRecordsCompanion(
@@ -11241,6 +12194,7 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
       status: status ?? this.status,
+      isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -11277,6 +12231,9 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -11295,6 +12252,824 @@ class AttendanceRecordsCompanion extends UpdateCompanion<AttendanceRecord> {
           ..write('checkIn: $checkIn, ')
           ..write('checkOut: $checkOut, ')
           ..write('status: $status, ')
+          ..write('isActive: $isActive, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $IncomeTaxBracketsTable extends IncomeTaxBrackets
+    with TableInfo<$IncomeTaxBracketsTable, IncomeTaxBracket> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $IncomeTaxBracketsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fromAmountMeta = const VerificationMeta(
+    'fromAmount',
+  );
+  @override
+  late final GeneratedColumn<double> fromAmount = GeneratedColumn<double>(
+    'from_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toAmountMeta = const VerificationMeta(
+    'toAmount',
+  );
+  @override
+  late final GeneratedColumn<double> toAmount = GeneratedColumn<double>(
+    'to_amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rateMeta = const VerificationMeta('rate');
+  @override
+  late final GeneratedColumn<double> rate = GeneratedColumn<double>(
+    'rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, fromAmount, toAmount, rate];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'income_tax_brackets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<IncomeTaxBracket> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('from_amount')) {
+      context.handle(
+        _fromAmountMeta,
+        fromAmount.isAcceptableOrUnknown(data['from_amount']!, _fromAmountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fromAmountMeta);
+    }
+    if (data.containsKey('to_amount')) {
+      context.handle(
+        _toAmountMeta,
+        toAmount.isAcceptableOrUnknown(data['to_amount']!, _toAmountMeta),
+      );
+    }
+    if (data.containsKey('rate')) {
+      context.handle(
+        _rateMeta,
+        rate.isAcceptableOrUnknown(data['rate']!, _rateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  IncomeTaxBracket map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IncomeTaxBracket(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fromAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}from_amount'],
+      )!,
+      toAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}to_amount'],
+      ),
+      rate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}rate'],
+      )!,
+    );
+  }
+
+  @override
+  $IncomeTaxBracketsTable createAlias(String alias) {
+    return $IncomeTaxBracketsTable(attachedDatabase, alias);
+  }
+}
+
+class IncomeTaxBracket extends DataClass
+    implements Insertable<IncomeTaxBracket> {
+  final String id;
+  final double fromAmount;
+
+  /// `null` : dernière tranche, sans plafond.
+  final double? toAmount;
+  final double rate;
+  const IncomeTaxBracket({
+    required this.id,
+    required this.fromAmount,
+    this.toAmount,
+    required this.rate,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['from_amount'] = Variable<double>(fromAmount);
+    if (!nullToAbsent || toAmount != null) {
+      map['to_amount'] = Variable<double>(toAmount);
+    }
+    map['rate'] = Variable<double>(rate);
+    return map;
+  }
+
+  IncomeTaxBracketsCompanion toCompanion(bool nullToAbsent) {
+    return IncomeTaxBracketsCompanion(
+      id: Value(id),
+      fromAmount: Value(fromAmount),
+      toAmount: toAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(toAmount),
+      rate: Value(rate),
+    );
+  }
+
+  factory IncomeTaxBracket.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IncomeTaxBracket(
+      id: serializer.fromJson<String>(json['id']),
+      fromAmount: serializer.fromJson<double>(json['fromAmount']),
+      toAmount: serializer.fromJson<double?>(json['toAmount']),
+      rate: serializer.fromJson<double>(json['rate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fromAmount': serializer.toJson<double>(fromAmount),
+      'toAmount': serializer.toJson<double?>(toAmount),
+      'rate': serializer.toJson<double>(rate),
+    };
+  }
+
+  IncomeTaxBracket copyWith({
+    String? id,
+    double? fromAmount,
+    Value<double?> toAmount = const Value.absent(),
+    double? rate,
+  }) => IncomeTaxBracket(
+    id: id ?? this.id,
+    fromAmount: fromAmount ?? this.fromAmount,
+    toAmount: toAmount.present ? toAmount.value : this.toAmount,
+    rate: rate ?? this.rate,
+  );
+  IncomeTaxBracket copyWithCompanion(IncomeTaxBracketsCompanion data) {
+    return IncomeTaxBracket(
+      id: data.id.present ? data.id.value : this.id,
+      fromAmount: data.fromAmount.present
+          ? data.fromAmount.value
+          : this.fromAmount,
+      toAmount: data.toAmount.present ? data.toAmount.value : this.toAmount,
+      rate: data.rate.present ? data.rate.value : this.rate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IncomeTaxBracket(')
+          ..write('id: $id, ')
+          ..write('fromAmount: $fromAmount, ')
+          ..write('toAmount: $toAmount, ')
+          ..write('rate: $rate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, fromAmount, toAmount, rate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IncomeTaxBracket &&
+          other.id == this.id &&
+          other.fromAmount == this.fromAmount &&
+          other.toAmount == this.toAmount &&
+          other.rate == this.rate);
+}
+
+class IncomeTaxBracketsCompanion extends UpdateCompanion<IncomeTaxBracket> {
+  final Value<String> id;
+  final Value<double> fromAmount;
+  final Value<double?> toAmount;
+  final Value<double> rate;
+  final Value<int> rowid;
+  const IncomeTaxBracketsCompanion({
+    this.id = const Value.absent(),
+    this.fromAmount = const Value.absent(),
+    this.toAmount = const Value.absent(),
+    this.rate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  IncomeTaxBracketsCompanion.insert({
+    required String id,
+    required double fromAmount,
+    this.toAmount = const Value.absent(),
+    required double rate,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fromAmount = Value(fromAmount),
+       rate = Value(rate);
+  static Insertable<IncomeTaxBracket> custom({
+    Expression<String>? id,
+    Expression<double>? fromAmount,
+    Expression<double>? toAmount,
+    Expression<double>? rate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fromAmount != null) 'from_amount': fromAmount,
+      if (toAmount != null) 'to_amount': toAmount,
+      if (rate != null) 'rate': rate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  IncomeTaxBracketsCompanion copyWith({
+    Value<String>? id,
+    Value<double>? fromAmount,
+    Value<double?>? toAmount,
+    Value<double>? rate,
+    Value<int>? rowid,
+  }) {
+    return IncomeTaxBracketsCompanion(
+      id: id ?? this.id,
+      fromAmount: fromAmount ?? this.fromAmount,
+      toAmount: toAmount ?? this.toAmount,
+      rate: rate ?? this.rate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fromAmount.present) {
+      map['from_amount'] = Variable<double>(fromAmount.value);
+    }
+    if (toAmount.present) {
+      map['to_amount'] = Variable<double>(toAmount.value);
+    }
+    if (rate.present) {
+      map['rate'] = Variable<double>(rate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IncomeTaxBracketsCompanion(')
+          ..write('id: $id, ')
+          ..write('fromAmount: $fromAmount, ')
+          ..write('toAmount: $toAmount, ')
+          ..write('rate: $rate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PayslipRequestsTable extends PayslipRequests
+    with TableInfo<$PayslipRequestsTable, PayslipRequest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PayslipRequestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($PayslipRequestsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _employeeIdMeta = const VerificationMeta(
+    'employeeId',
+  );
+  @override
+  late final GeneratedColumn<String> employeeId = GeneratedColumn<String>(
+    'employee_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodMonthMeta = const VerificationMeta(
+    'periodMonth',
+  );
+  @override
+  late final GeneratedColumn<String> periodMonth = GeneratedColumn<String>(
+    'period_month',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 7,
+      maxTextLength: 7,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _requestedAtMeta = const VerificationMeta(
+    'requestedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> requestedAt = GeneratedColumn<DateTime>(
+    'requested_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    employeeId,
+    periodMonth,
+    requestedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'payslip_requests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PayslipRequest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('employee_id')) {
+      context.handle(
+        _employeeIdMeta,
+        employeeId.isAcceptableOrUnknown(data['employee_id']!, _employeeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_employeeIdMeta);
+    }
+    if (data.containsKey('period_month')) {
+      context.handle(
+        _periodMonthMeta,
+        periodMonth.isAcceptableOrUnknown(
+          data['period_month']!,
+          _periodMonthMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_periodMonthMeta);
+    }
+    if (data.containsKey('requested_at')) {
+      context.handle(
+        _requestedAtMeta,
+        requestedAt.isAcceptableOrUnknown(
+          data['requested_at']!,
+          _requestedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_requestedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PayslipRequest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PayslipRequest(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $PayslipRequestsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      employeeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}employee_id'],
+      )!,
+      periodMonth: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period_month'],
+      )!,
+      requestedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}requested_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PayslipRequestsTable createAlias(String alias) {
+    return $PayslipRequestsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class PayslipRequest extends DataClass implements Insertable<PayslipRequest> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String employeeId;
+  final String periodMonth;
+  final DateTime requestedAt;
+  const PayslipRequest({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.employeeId,
+    required this.periodMonth,
+    required this.requestedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $PayslipRequestsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['employee_id'] = Variable<String>(employeeId);
+    map['period_month'] = Variable<String>(periodMonth);
+    map['requested_at'] = Variable<DateTime>(requestedAt);
+    return map;
+  }
+
+  PayslipRequestsCompanion toCompanion(bool nullToAbsent) {
+    return PayslipRequestsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      employeeId: Value(employeeId),
+      periodMonth: Value(periodMonth),
+      requestedAt: Value(requestedAt),
+    );
+  }
+
+  factory PayslipRequest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PayslipRequest(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $PayslipRequestsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      employeeId: serializer.fromJson<String>(json['employeeId']),
+      periodMonth: serializer.fromJson<String>(json['periodMonth']),
+      requestedAt: serializer.fromJson<DateTime>(json['requestedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $PayslipRequestsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'employeeId': serializer.toJson<String>(employeeId),
+      'periodMonth': serializer.toJson<String>(periodMonth),
+      'requestedAt': serializer.toJson<DateTime>(requestedAt),
+    };
+  }
+
+  PayslipRequest copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? employeeId,
+    String? periodMonth,
+    DateTime? requestedAt,
+  }) => PayslipRequest(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    employeeId: employeeId ?? this.employeeId,
+    periodMonth: periodMonth ?? this.periodMonth,
+    requestedAt: requestedAt ?? this.requestedAt,
+  );
+  PayslipRequest copyWithCompanion(PayslipRequestsCompanion data) {
+    return PayslipRequest(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      employeeId: data.employeeId.present
+          ? data.employeeId.value
+          : this.employeeId,
+      periodMonth: data.periodMonth.present
+          ? data.periodMonth.value
+          : this.periodMonth,
+      requestedAt: data.requestedAt.present
+          ? data.requestedAt.value
+          : this.requestedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PayslipRequest(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('employeeId: $employeeId, ')
+          ..write('periodMonth: $periodMonth, ')
+          ..write('requestedAt: $requestedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    employeeId,
+    periodMonth,
+    requestedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PayslipRequest &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.employeeId == this.employeeId &&
+          other.periodMonth == this.periodMonth &&
+          other.requestedAt == this.requestedAt);
+}
+
+class PayslipRequestsCompanion extends UpdateCompanion<PayslipRequest> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> employeeId;
+  final Value<String> periodMonth;
+  final Value<DateTime> requestedAt;
+  final Value<int> rowid;
+  const PayslipRequestsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.employeeId = const Value.absent(),
+    this.periodMonth = const Value.absent(),
+    this.requestedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PayslipRequestsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String employeeId,
+    required String periodMonth,
+    required DateTime requestedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       employeeId = Value(employeeId),
+       periodMonth = Value(periodMonth),
+       requestedAt = Value(requestedAt);
+  static Insertable<PayslipRequest> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? employeeId,
+    Expression<String>? periodMonth,
+    Expression<DateTime>? requestedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (employeeId != null) 'employee_id': employeeId,
+      if (periodMonth != null) 'period_month': periodMonth,
+      if (requestedAt != null) 'requested_at': requestedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PayslipRequestsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? employeeId,
+    Value<String>? periodMonth,
+    Value<DateTime>? requestedAt,
+    Value<int>? rowid,
+  }) {
+    return PayslipRequestsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      employeeId: employeeId ?? this.employeeId,
+      periodMonth: periodMonth ?? this.periodMonth,
+      requestedAt: requestedAt ?? this.requestedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $PayslipRequestsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (employeeId.present) {
+      map['employee_id'] = Variable<String>(employeeId.value);
+    }
+    if (periodMonth.present) {
+      map['period_month'] = Variable<String>(periodMonth.value);
+    }
+    if (requestedAt.present) {
+      map['requested_at'] = Variable<DateTime>(requestedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PayslipRequestsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('employeeId: $employeeId, ')
+          ..write('periodMonth: $periodMonth, ')
+          ..write('requestedAt: $requestedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -14764,6 +16539,61 @@ class $CompanySettingsTable extends CompanySettings
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _vpsRateMeta = const VerificationMeta(
+    'vpsRate',
+  );
+  @override
+  late final GeneratedColumn<double> vpsRate = GeneratedColumn<double>(
+    'vps_rate',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cnssEmployeeRateMeta = const VerificationMeta(
+    'cnssEmployeeRate',
+  );
+  @override
+  late final GeneratedColumn<double> cnssEmployeeRate = GeneratedColumn<double>(
+    'cnss_employee_rate',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cnssEmployerPensionRateMeta =
+      const VerificationMeta('cnssEmployerPensionRate');
+  @override
+  late final GeneratedColumn<double> cnssEmployerPensionRate =
+      GeneratedColumn<double>(
+        'cnss_employer_pension_rate',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _cnssEmployerFamilyRateMeta =
+      const VerificationMeta('cnssEmployerFamilyRate');
+  @override
+  late final GeneratedColumn<double> cnssEmployerFamilyRate =
+      GeneratedColumn<double>(
+        'cnss_employer_family_rate',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _cnssEmployerRiskRateMeta =
+      const VerificationMeta('cnssEmployerRiskRate');
+  @override
+  late final GeneratedColumn<double> cnssEmployerRiskRate =
+      GeneratedColumn<double>(
+        'cnss_employer_risk_rate',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   @override
   late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
       GeneratedColumn<String>(
@@ -14798,6 +16628,11 @@ class $CompanySettingsTable extends CompanySettings
     tvaEnabled,
     tvaDefaultRate,
     rappelSoinsJours,
+    vpsRate,
+    cnssEmployeeRate,
+    cnssEmployerPensionRate,
+    cnssEmployerFamilyRate,
+    cnssEmployerRiskRate,
     syncStatus,
     updatedAt,
   ];
@@ -14888,6 +16723,48 @@ class $CompanySettingsTable extends CompanySettings
         ),
       );
     }
+    if (data.containsKey('vps_rate')) {
+      context.handle(
+        _vpsRateMeta,
+        vpsRate.isAcceptableOrUnknown(data['vps_rate']!, _vpsRateMeta),
+      );
+    }
+    if (data.containsKey('cnss_employee_rate')) {
+      context.handle(
+        _cnssEmployeeRateMeta,
+        cnssEmployeeRate.isAcceptableOrUnknown(
+          data['cnss_employee_rate']!,
+          _cnssEmployeeRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cnss_employer_pension_rate')) {
+      context.handle(
+        _cnssEmployerPensionRateMeta,
+        cnssEmployerPensionRate.isAcceptableOrUnknown(
+          data['cnss_employer_pension_rate']!,
+          _cnssEmployerPensionRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cnss_employer_family_rate')) {
+      context.handle(
+        _cnssEmployerFamilyRateMeta,
+        cnssEmployerFamilyRate.isAcceptableOrUnknown(
+          data['cnss_employer_family_rate']!,
+          _cnssEmployerFamilyRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cnss_employer_risk_rate')) {
+      context.handle(
+        _cnssEmployerRiskRateMeta,
+        cnssEmployerRiskRate.isAcceptableOrUnknown(
+          data['cnss_employer_risk_rate']!,
+          _cnssEmployerRiskRateMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -14947,6 +16824,26 @@ class $CompanySettingsTable extends CompanySettings
         DriftSqlType.int,
         data['${effectivePrefix}rappel_soins_jours'],
       ),
+      vpsRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}vps_rate'],
+      ),
+      cnssEmployeeRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cnss_employee_rate'],
+      ),
+      cnssEmployerPensionRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cnss_employer_pension_rate'],
+      ),
+      cnssEmployerFamilyRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cnss_employer_family_rate'],
+      ),
+      cnssEmployerRiskRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cnss_employer_risk_rate'],
+      ),
       syncStatus: $CompanySettingsTable.$convertersyncStatus.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -14985,6 +16882,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
   /// au tirage et réglé au poste comme au web (`ParametresElevage::saveRappelSoins()`). Nul tant que rien
   /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
   final int? rappelSoinsJours;
+  final double? vpsRate;
+  final double? cnssEmployeeRate;
+  final double? cnssEmployerPensionRate;
+  final double? cnssEmployerFamilyRate;
+  final double? cnssEmployerRiskRate;
 
   /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
   /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
@@ -15004,6 +16906,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     required this.tvaEnabled,
     this.tvaDefaultRate,
     this.rappelSoinsJours,
+    this.vpsRate,
+    this.cnssEmployeeRate,
+    this.cnssEmployerPensionRate,
+    this.cnssEmployerFamilyRate,
+    this.cnssEmployerRiskRate,
     required this.syncStatus,
     this.updatedAt,
   });
@@ -15038,6 +16945,25 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     }
     if (!nullToAbsent || rappelSoinsJours != null) {
       map['rappel_soins_jours'] = Variable<int>(rappelSoinsJours);
+    }
+    if (!nullToAbsent || vpsRate != null) {
+      map['vps_rate'] = Variable<double>(vpsRate);
+    }
+    if (!nullToAbsent || cnssEmployeeRate != null) {
+      map['cnss_employee_rate'] = Variable<double>(cnssEmployeeRate);
+    }
+    if (!nullToAbsent || cnssEmployerPensionRate != null) {
+      map['cnss_employer_pension_rate'] = Variable<double>(
+        cnssEmployerPensionRate,
+      );
+    }
+    if (!nullToAbsent || cnssEmployerFamilyRate != null) {
+      map['cnss_employer_family_rate'] = Variable<double>(
+        cnssEmployerFamilyRate,
+      );
+    }
+    if (!nullToAbsent || cnssEmployerRiskRate != null) {
+      map['cnss_employer_risk_rate'] = Variable<double>(cnssEmployerRiskRate);
     }
     {
       map['sync_status'] = Variable<String>(
@@ -15077,6 +17003,21 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       rappelSoinsJours: rappelSoinsJours == null && nullToAbsent
           ? const Value.absent()
           : Value(rappelSoinsJours),
+      vpsRate: vpsRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vpsRate),
+      cnssEmployeeRate: cnssEmployeeRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnssEmployeeRate),
+      cnssEmployerPensionRate: cnssEmployerPensionRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnssEmployerPensionRate),
+      cnssEmployerFamilyRate: cnssEmployerFamilyRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnssEmployerFamilyRate),
+      cnssEmployerRiskRate: cnssEmployerRiskRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnssEmployerRiskRate),
       syncStatus: Value(syncStatus),
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
@@ -15101,6 +17042,17 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       tvaEnabled: serializer.fromJson<bool>(json['tvaEnabled']),
       tvaDefaultRate: serializer.fromJson<double?>(json['tvaDefaultRate']),
       rappelSoinsJours: serializer.fromJson<int?>(json['rappelSoinsJours']),
+      vpsRate: serializer.fromJson<double?>(json['vpsRate']),
+      cnssEmployeeRate: serializer.fromJson<double?>(json['cnssEmployeeRate']),
+      cnssEmployerPensionRate: serializer.fromJson<double?>(
+        json['cnssEmployerPensionRate'],
+      ),
+      cnssEmployerFamilyRate: serializer.fromJson<double?>(
+        json['cnssEmployerFamilyRate'],
+      ),
+      cnssEmployerRiskRate: serializer.fromJson<double?>(
+        json['cnssEmployerRiskRate'],
+      ),
       syncStatus: $CompanySettingsTable.$convertersyncStatus.fromJson(
         serializer.fromJson<String>(json['syncStatus']),
       ),
@@ -15122,6 +17074,15 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       'tvaEnabled': serializer.toJson<bool>(tvaEnabled),
       'tvaDefaultRate': serializer.toJson<double?>(tvaDefaultRate),
       'rappelSoinsJours': serializer.toJson<int?>(rappelSoinsJours),
+      'vpsRate': serializer.toJson<double?>(vpsRate),
+      'cnssEmployeeRate': serializer.toJson<double?>(cnssEmployeeRate),
+      'cnssEmployerPensionRate': serializer.toJson<double?>(
+        cnssEmployerPensionRate,
+      ),
+      'cnssEmployerFamilyRate': serializer.toJson<double?>(
+        cnssEmployerFamilyRate,
+      ),
+      'cnssEmployerRiskRate': serializer.toJson<double?>(cnssEmployerRiskRate),
       'syncStatus': serializer.toJson<String>(
         $CompanySettingsTable.$convertersyncStatus.toJson(syncStatus),
       ),
@@ -15141,6 +17102,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     bool? tvaEnabled,
     Value<double?> tvaDefaultRate = const Value.absent(),
     Value<int?> rappelSoinsJours = const Value.absent(),
+    Value<double?> vpsRate = const Value.absent(),
+    Value<double?> cnssEmployeeRate = const Value.absent(),
+    Value<double?> cnssEmployerPensionRate = const Value.absent(),
+    Value<double?> cnssEmployerFamilyRate = const Value.absent(),
+    Value<double?> cnssEmployerRiskRate = const Value.absent(),
     SyncStatus? syncStatus,
     Value<DateTime?> updatedAt = const Value.absent(),
   }) => CompanySetting(
@@ -15159,6 +17125,19 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     rappelSoinsJours: rappelSoinsJours.present
         ? rappelSoinsJours.value
         : this.rappelSoinsJours,
+    vpsRate: vpsRate.present ? vpsRate.value : this.vpsRate,
+    cnssEmployeeRate: cnssEmployeeRate.present
+        ? cnssEmployeeRate.value
+        : this.cnssEmployeeRate,
+    cnssEmployerPensionRate: cnssEmployerPensionRate.present
+        ? cnssEmployerPensionRate.value
+        : this.cnssEmployerPensionRate,
+    cnssEmployerFamilyRate: cnssEmployerFamilyRate.present
+        ? cnssEmployerFamilyRate.value
+        : this.cnssEmployerFamilyRate,
+    cnssEmployerRiskRate: cnssEmployerRiskRate.present
+        ? cnssEmployerRiskRate.value
+        : this.cnssEmployerRiskRate,
     syncStatus: syncStatus ?? this.syncStatus,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
@@ -15185,6 +17164,19 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
       rappelSoinsJours: data.rappelSoinsJours.present
           ? data.rappelSoinsJours.value
           : this.rappelSoinsJours,
+      vpsRate: data.vpsRate.present ? data.vpsRate.value : this.vpsRate,
+      cnssEmployeeRate: data.cnssEmployeeRate.present
+          ? data.cnssEmployeeRate.value
+          : this.cnssEmployeeRate,
+      cnssEmployerPensionRate: data.cnssEmployerPensionRate.present
+          ? data.cnssEmployerPensionRate.value
+          : this.cnssEmployerPensionRate,
+      cnssEmployerFamilyRate: data.cnssEmployerFamilyRate.present
+          ? data.cnssEmployerFamilyRate.value
+          : this.cnssEmployerFamilyRate,
+      cnssEmployerRiskRate: data.cnssEmployerRiskRate.present
+          ? data.cnssEmployerRiskRate.value
+          : this.cnssEmployerRiskRate,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
           : this.syncStatus,
@@ -15206,6 +17198,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
           ..write('tvaEnabled: $tvaEnabled, ')
           ..write('tvaDefaultRate: $tvaDefaultRate, ')
           ..write('rappelSoinsJours: $rappelSoinsJours, ')
+          ..write('vpsRate: $vpsRate, ')
+          ..write('cnssEmployeeRate: $cnssEmployeeRate, ')
+          ..write('cnssEmployerPensionRate: $cnssEmployerPensionRate, ')
+          ..write('cnssEmployerFamilyRate: $cnssEmployerFamilyRate, ')
+          ..write('cnssEmployerRiskRate: $cnssEmployerRiskRate, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -15225,6 +17222,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
     tvaEnabled,
     tvaDefaultRate,
     rappelSoinsJours,
+    vpsRate,
+    cnssEmployeeRate,
+    cnssEmployerPensionRate,
+    cnssEmployerFamilyRate,
+    cnssEmployerRiskRate,
     syncStatus,
     updatedAt,
   );
@@ -15243,6 +17245,11 @@ class CompanySetting extends DataClass implements Insertable<CompanySetting> {
           other.tvaEnabled == this.tvaEnabled &&
           other.tvaDefaultRate == this.tvaDefaultRate &&
           other.rappelSoinsJours == this.rappelSoinsJours &&
+          other.vpsRate == this.vpsRate &&
+          other.cnssEmployeeRate == this.cnssEmployeeRate &&
+          other.cnssEmployerPensionRate == this.cnssEmployerPensionRate &&
+          other.cnssEmployerFamilyRate == this.cnssEmployerFamilyRate &&
+          other.cnssEmployerRiskRate == this.cnssEmployerRiskRate &&
           other.syncStatus == this.syncStatus &&
           other.updatedAt == this.updatedAt);
 }
@@ -15259,6 +17266,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
   final Value<bool> tvaEnabled;
   final Value<double?> tvaDefaultRate;
   final Value<int?> rappelSoinsJours;
+  final Value<double?> vpsRate;
+  final Value<double?> cnssEmployeeRate;
+  final Value<double?> cnssEmployerPensionRate;
+  final Value<double?> cnssEmployerFamilyRate;
+  final Value<double?> cnssEmployerRiskRate;
   final Value<SyncStatus> syncStatus;
   final Value<DateTime?> updatedAt;
   final Value<int> rowid;
@@ -15274,6 +17286,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     this.tvaEnabled = const Value.absent(),
     this.tvaDefaultRate = const Value.absent(),
     this.rappelSoinsJours = const Value.absent(),
+    this.vpsRate = const Value.absent(),
+    this.cnssEmployeeRate = const Value.absent(),
+    this.cnssEmployerPensionRate = const Value.absent(),
+    this.cnssEmployerFamilyRate = const Value.absent(),
+    this.cnssEmployerRiskRate = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -15290,6 +17307,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     this.tvaEnabled = const Value.absent(),
     this.tvaDefaultRate = const Value.absent(),
     this.rappelSoinsJours = const Value.absent(),
+    this.vpsRate = const Value.absent(),
+    this.cnssEmployeeRate = const Value.absent(),
+    this.cnssEmployerPensionRate = const Value.absent(),
+    this.cnssEmployerFamilyRate = const Value.absent(),
+    this.cnssEmployerRiskRate = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -15306,6 +17328,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     Expression<bool>? tvaEnabled,
     Expression<double>? tvaDefaultRate,
     Expression<int>? rappelSoinsJours,
+    Expression<double>? vpsRate,
+    Expression<double>? cnssEmployeeRate,
+    Expression<double>? cnssEmployerPensionRate,
+    Expression<double>? cnssEmployerFamilyRate,
+    Expression<double>? cnssEmployerRiskRate,
     Expression<String>? syncStatus,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -15322,6 +17349,14 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
       if (tvaEnabled != null) 'tva_enabled': tvaEnabled,
       if (tvaDefaultRate != null) 'tva_default_rate': tvaDefaultRate,
       if (rappelSoinsJours != null) 'rappel_soins_jours': rappelSoinsJours,
+      if (vpsRate != null) 'vps_rate': vpsRate,
+      if (cnssEmployeeRate != null) 'cnss_employee_rate': cnssEmployeeRate,
+      if (cnssEmployerPensionRate != null)
+        'cnss_employer_pension_rate': cnssEmployerPensionRate,
+      if (cnssEmployerFamilyRate != null)
+        'cnss_employer_family_rate': cnssEmployerFamilyRate,
+      if (cnssEmployerRiskRate != null)
+        'cnss_employer_risk_rate': cnssEmployerRiskRate,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -15340,6 +17375,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     Value<bool>? tvaEnabled,
     Value<double?>? tvaDefaultRate,
     Value<int?>? rappelSoinsJours,
+    Value<double?>? vpsRate,
+    Value<double?>? cnssEmployeeRate,
+    Value<double?>? cnssEmployerPensionRate,
+    Value<double?>? cnssEmployerFamilyRate,
+    Value<double?>? cnssEmployerRiskRate,
     Value<SyncStatus>? syncStatus,
     Value<DateTime?>? updatedAt,
     Value<int>? rowid,
@@ -15356,6 +17396,13 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
       tvaEnabled: tvaEnabled ?? this.tvaEnabled,
       tvaDefaultRate: tvaDefaultRate ?? this.tvaDefaultRate,
       rappelSoinsJours: rappelSoinsJours ?? this.rappelSoinsJours,
+      vpsRate: vpsRate ?? this.vpsRate,
+      cnssEmployeeRate: cnssEmployeeRate ?? this.cnssEmployeeRate,
+      cnssEmployerPensionRate:
+          cnssEmployerPensionRate ?? this.cnssEmployerPensionRate,
+      cnssEmployerFamilyRate:
+          cnssEmployerFamilyRate ?? this.cnssEmployerFamilyRate,
+      cnssEmployerRiskRate: cnssEmployerRiskRate ?? this.cnssEmployerRiskRate,
       syncStatus: syncStatus ?? this.syncStatus,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -15398,6 +17445,27 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
     if (rappelSoinsJours.present) {
       map['rappel_soins_jours'] = Variable<int>(rappelSoinsJours.value);
     }
+    if (vpsRate.present) {
+      map['vps_rate'] = Variable<double>(vpsRate.value);
+    }
+    if (cnssEmployeeRate.present) {
+      map['cnss_employee_rate'] = Variable<double>(cnssEmployeeRate.value);
+    }
+    if (cnssEmployerPensionRate.present) {
+      map['cnss_employer_pension_rate'] = Variable<double>(
+        cnssEmployerPensionRate.value,
+      );
+    }
+    if (cnssEmployerFamilyRate.present) {
+      map['cnss_employer_family_rate'] = Variable<double>(
+        cnssEmployerFamilyRate.value,
+      );
+    }
+    if (cnssEmployerRiskRate.present) {
+      map['cnss_employer_risk_rate'] = Variable<double>(
+        cnssEmployerRiskRate.value,
+      );
+    }
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(
         $CompanySettingsTable.$convertersyncStatus.toSql(syncStatus.value),
@@ -15426,6 +17494,11 @@ class CompanySettingsCompanion extends UpdateCompanion<CompanySetting> {
           ..write('tvaEnabled: $tvaEnabled, ')
           ..write('tvaDefaultRate: $tvaDefaultRate, ')
           ..write('rappelSoinsJours: $rappelSoinsJours, ')
+          ..write('vpsRate: $vpsRate, ')
+          ..write('cnssEmployeeRate: $cnssEmployeeRate, ')
+          ..write('cnssEmployerPensionRate: $cnssEmployerPensionRate, ')
+          ..write('cnssEmployerFamilyRate: $cnssEmployerFamilyRate, ')
+          ..write('cnssEmployerRiskRate: $cnssEmployerRiskRate, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -39194,12 +41267,97 @@ class $PayslipsTable extends Payslips with TableInfo<$PayslipsTable, Payslip> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _employeeIdMeta = const VerificationMeta(
+    'employeeId',
+  );
+  @override
+  late final GeneratedColumn<String> employeeId = GeneratedColumn<String>(
+    'employee_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _periodMonthMeta = const VerificationMeta(
+    'periodMonth',
+  );
+  @override
+  late final GeneratedColumn<DateTime> periodMonth = GeneratedColumn<DateTime>(
+    'period_month',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _grossSalaryMeta = const VerificationMeta(
+    'grossSalary',
+  );
+  @override
+  late final GeneratedColumn<double> grossSalary = GeneratedColumn<double>(
+    'gross_salary',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _absenceDeductionMeta = const VerificationMeta(
+    'absenceDeduction',
+  );
+  @override
+  late final GeneratedColumn<double> absenceDeduction = GeneratedColumn<double>(
+    'absence_deduction',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cnssDeductionMeta = const VerificationMeta(
+    'cnssDeduction',
+  );
+  @override
+  late final GeneratedColumn<double> cnssDeduction = GeneratedColumn<double>(
+    'cnss_deduction',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _itsDeductionMeta = const VerificationMeta(
+    'itsDeduction',
+  );
+  @override
+  late final GeneratedColumn<double> itsDeduction = GeneratedColumn<double>(
+    'its_deduction',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _chargesPatronalesMeta = const VerificationMeta(
+    'chargesPatronales',
+  );
+  @override
+  late final GeneratedColumn<double> chargesPatronales =
+      GeneratedColumn<double>(
+        'charges_patronales',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     employeeName,
     netSalary,
     createdAt,
+    employeeId,
+    periodMonth,
+    grossSalary,
+    absenceDeduction,
+    cnssDeduction,
+    itsDeduction,
+    chargesPatronales,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -39243,6 +41401,66 @@ class $PayslipsTable extends Payslips with TableInfo<$PayslipsTable, Payslip> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('employee_id')) {
+      context.handle(
+        _employeeIdMeta,
+        employeeId.isAcceptableOrUnknown(data['employee_id']!, _employeeIdMeta),
+      );
+    }
+    if (data.containsKey('period_month')) {
+      context.handle(
+        _periodMonthMeta,
+        periodMonth.isAcceptableOrUnknown(
+          data['period_month']!,
+          _periodMonthMeta,
+        ),
+      );
+    }
+    if (data.containsKey('gross_salary')) {
+      context.handle(
+        _grossSalaryMeta,
+        grossSalary.isAcceptableOrUnknown(
+          data['gross_salary']!,
+          _grossSalaryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('absence_deduction')) {
+      context.handle(
+        _absenceDeductionMeta,
+        absenceDeduction.isAcceptableOrUnknown(
+          data['absence_deduction']!,
+          _absenceDeductionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cnss_deduction')) {
+      context.handle(
+        _cnssDeductionMeta,
+        cnssDeduction.isAcceptableOrUnknown(
+          data['cnss_deduction']!,
+          _cnssDeductionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('its_deduction')) {
+      context.handle(
+        _itsDeductionMeta,
+        itsDeduction.isAcceptableOrUnknown(
+          data['its_deduction']!,
+          _itsDeductionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('charges_patronales')) {
+      context.handle(
+        _chargesPatronalesMeta,
+        chargesPatronales.isAcceptableOrUnknown(
+          data['charges_patronales']!,
+          _chargesPatronalesMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -39268,6 +41486,34 @@ class $PayslipsTable extends Payslips with TableInfo<$PayslipsTable, Payslip> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      employeeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}employee_id'],
+      ),
+      periodMonth: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}period_month'],
+      ),
+      grossSalary: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}gross_salary'],
+      ),
+      absenceDeduction: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}absence_deduction'],
+      ),
+      cnssDeduction: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cnss_deduction'],
+      ),
+      itsDeduction: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}its_deduction'],
+      ),
+      chargesPatronales: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}charges_patronales'],
+      ),
     );
   }
 
@@ -39288,11 +41534,27 @@ class Payslip extends DataClass implements Insertable<Payslip> {
 
   /// Instant du règlement (`created_at`), en HEURE MURALE du serveur (Bénin) : le jour du rapport est son jour.
   final DateTime createdAt;
+  final String? employeeId;
+
+  /// Premier jour de la période payée (`period_month`), DATE pure.
+  final DateTime? periodMonth;
+  final double? grossSalary;
+  final double? absenceDeduction;
+  final double? cnssDeduction;
+  final double? itsDeduction;
+  final double? chargesPatronales;
   const Payslip({
     required this.id,
     this.employeeName,
     required this.netSalary,
     required this.createdAt,
+    this.employeeId,
+    this.periodMonth,
+    this.grossSalary,
+    this.absenceDeduction,
+    this.cnssDeduction,
+    this.itsDeduction,
+    this.chargesPatronales,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -39303,6 +41565,27 @@ class Payslip extends DataClass implements Insertable<Payslip> {
     }
     map['net_salary'] = Variable<double>(netSalary);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || employeeId != null) {
+      map['employee_id'] = Variable<String>(employeeId);
+    }
+    if (!nullToAbsent || periodMonth != null) {
+      map['period_month'] = Variable<DateTime>(periodMonth);
+    }
+    if (!nullToAbsent || grossSalary != null) {
+      map['gross_salary'] = Variable<double>(grossSalary);
+    }
+    if (!nullToAbsent || absenceDeduction != null) {
+      map['absence_deduction'] = Variable<double>(absenceDeduction);
+    }
+    if (!nullToAbsent || cnssDeduction != null) {
+      map['cnss_deduction'] = Variable<double>(cnssDeduction);
+    }
+    if (!nullToAbsent || itsDeduction != null) {
+      map['its_deduction'] = Variable<double>(itsDeduction);
+    }
+    if (!nullToAbsent || chargesPatronales != null) {
+      map['charges_patronales'] = Variable<double>(chargesPatronales);
+    }
     return map;
   }
 
@@ -39314,6 +41597,27 @@ class Payslip extends DataClass implements Insertable<Payslip> {
           : Value(employeeName),
       netSalary: Value(netSalary),
       createdAt: Value(createdAt),
+      employeeId: employeeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(employeeId),
+      periodMonth: periodMonth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(periodMonth),
+      grossSalary: grossSalary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grossSalary),
+      absenceDeduction: absenceDeduction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(absenceDeduction),
+      cnssDeduction: cnssDeduction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnssDeduction),
+      itsDeduction: itsDeduction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(itsDeduction),
+      chargesPatronales: chargesPatronales == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chargesPatronales),
     );
   }
 
@@ -39327,6 +41631,15 @@ class Payslip extends DataClass implements Insertable<Payslip> {
       employeeName: serializer.fromJson<String?>(json['employeeName']),
       netSalary: serializer.fromJson<double>(json['netSalary']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      employeeId: serializer.fromJson<String?>(json['employeeId']),
+      periodMonth: serializer.fromJson<DateTime?>(json['periodMonth']),
+      grossSalary: serializer.fromJson<double?>(json['grossSalary']),
+      absenceDeduction: serializer.fromJson<double?>(json['absenceDeduction']),
+      cnssDeduction: serializer.fromJson<double?>(json['cnssDeduction']),
+      itsDeduction: serializer.fromJson<double?>(json['itsDeduction']),
+      chargesPatronales: serializer.fromJson<double?>(
+        json['chargesPatronales'],
+      ),
     );
   }
   @override
@@ -39337,6 +41650,13 @@ class Payslip extends DataClass implements Insertable<Payslip> {
       'employeeName': serializer.toJson<String?>(employeeName),
       'netSalary': serializer.toJson<double>(netSalary),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'employeeId': serializer.toJson<String?>(employeeId),
+      'periodMonth': serializer.toJson<DateTime?>(periodMonth),
+      'grossSalary': serializer.toJson<double?>(grossSalary),
+      'absenceDeduction': serializer.toJson<double?>(absenceDeduction),
+      'cnssDeduction': serializer.toJson<double?>(cnssDeduction),
+      'itsDeduction': serializer.toJson<double?>(itsDeduction),
+      'chargesPatronales': serializer.toJson<double?>(chargesPatronales),
     };
   }
 
@@ -39345,11 +41665,31 @@ class Payslip extends DataClass implements Insertable<Payslip> {
     Value<String?> employeeName = const Value.absent(),
     double? netSalary,
     DateTime? createdAt,
+    Value<String?> employeeId = const Value.absent(),
+    Value<DateTime?> periodMonth = const Value.absent(),
+    Value<double?> grossSalary = const Value.absent(),
+    Value<double?> absenceDeduction = const Value.absent(),
+    Value<double?> cnssDeduction = const Value.absent(),
+    Value<double?> itsDeduction = const Value.absent(),
+    Value<double?> chargesPatronales = const Value.absent(),
   }) => Payslip(
     id: id ?? this.id,
     employeeName: employeeName.present ? employeeName.value : this.employeeName,
     netSalary: netSalary ?? this.netSalary,
     createdAt: createdAt ?? this.createdAt,
+    employeeId: employeeId.present ? employeeId.value : this.employeeId,
+    periodMonth: periodMonth.present ? periodMonth.value : this.periodMonth,
+    grossSalary: grossSalary.present ? grossSalary.value : this.grossSalary,
+    absenceDeduction: absenceDeduction.present
+        ? absenceDeduction.value
+        : this.absenceDeduction,
+    cnssDeduction: cnssDeduction.present
+        ? cnssDeduction.value
+        : this.cnssDeduction,
+    itsDeduction: itsDeduction.present ? itsDeduction.value : this.itsDeduction,
+    chargesPatronales: chargesPatronales.present
+        ? chargesPatronales.value
+        : this.chargesPatronales,
   );
   Payslip copyWithCompanion(PayslipsCompanion data) {
     return Payslip(
@@ -39359,6 +41699,27 @@ class Payslip extends DataClass implements Insertable<Payslip> {
           : this.employeeName,
       netSalary: data.netSalary.present ? data.netSalary.value : this.netSalary,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      employeeId: data.employeeId.present
+          ? data.employeeId.value
+          : this.employeeId,
+      periodMonth: data.periodMonth.present
+          ? data.periodMonth.value
+          : this.periodMonth,
+      grossSalary: data.grossSalary.present
+          ? data.grossSalary.value
+          : this.grossSalary,
+      absenceDeduction: data.absenceDeduction.present
+          ? data.absenceDeduction.value
+          : this.absenceDeduction,
+      cnssDeduction: data.cnssDeduction.present
+          ? data.cnssDeduction.value
+          : this.cnssDeduction,
+      itsDeduction: data.itsDeduction.present
+          ? data.itsDeduction.value
+          : this.itsDeduction,
+      chargesPatronales: data.chargesPatronales.present
+          ? data.chargesPatronales.value
+          : this.chargesPatronales,
     );
   }
 
@@ -39368,13 +41729,32 @@ class Payslip extends DataClass implements Insertable<Payslip> {
           ..write('id: $id, ')
           ..write('employeeName: $employeeName, ')
           ..write('netSalary: $netSalary, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('employeeId: $employeeId, ')
+          ..write('periodMonth: $periodMonth, ')
+          ..write('grossSalary: $grossSalary, ')
+          ..write('absenceDeduction: $absenceDeduction, ')
+          ..write('cnssDeduction: $cnssDeduction, ')
+          ..write('itsDeduction: $itsDeduction, ')
+          ..write('chargesPatronales: $chargesPatronales')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, employeeName, netSalary, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    employeeName,
+    netSalary,
+    createdAt,
+    employeeId,
+    periodMonth,
+    grossSalary,
+    absenceDeduction,
+    cnssDeduction,
+    itsDeduction,
+    chargesPatronales,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -39382,7 +41762,14 @@ class Payslip extends DataClass implements Insertable<Payslip> {
           other.id == this.id &&
           other.employeeName == this.employeeName &&
           other.netSalary == this.netSalary &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.employeeId == this.employeeId &&
+          other.periodMonth == this.periodMonth &&
+          other.grossSalary == this.grossSalary &&
+          other.absenceDeduction == this.absenceDeduction &&
+          other.cnssDeduction == this.cnssDeduction &&
+          other.itsDeduction == this.itsDeduction &&
+          other.chargesPatronales == this.chargesPatronales);
 }
 
 class PayslipsCompanion extends UpdateCompanion<Payslip> {
@@ -39390,12 +41777,26 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
   final Value<String?> employeeName;
   final Value<double> netSalary;
   final Value<DateTime> createdAt;
+  final Value<String?> employeeId;
+  final Value<DateTime?> periodMonth;
+  final Value<double?> grossSalary;
+  final Value<double?> absenceDeduction;
+  final Value<double?> cnssDeduction;
+  final Value<double?> itsDeduction;
+  final Value<double?> chargesPatronales;
   final Value<int> rowid;
   const PayslipsCompanion({
     this.id = const Value.absent(),
     this.employeeName = const Value.absent(),
     this.netSalary = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.employeeId = const Value.absent(),
+    this.periodMonth = const Value.absent(),
+    this.grossSalary = const Value.absent(),
+    this.absenceDeduction = const Value.absent(),
+    this.cnssDeduction = const Value.absent(),
+    this.itsDeduction = const Value.absent(),
+    this.chargesPatronales = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PayslipsCompanion.insert({
@@ -39403,6 +41804,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
     this.employeeName = const Value.absent(),
     required double netSalary,
     required DateTime createdAt,
+    this.employeeId = const Value.absent(),
+    this.periodMonth = const Value.absent(),
+    this.grossSalary = const Value.absent(),
+    this.absenceDeduction = const Value.absent(),
+    this.cnssDeduction = const Value.absent(),
+    this.itsDeduction = const Value.absent(),
+    this.chargesPatronales = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        netSalary = Value(netSalary),
@@ -39412,6 +41820,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
     Expression<String>? employeeName,
     Expression<double>? netSalary,
     Expression<DateTime>? createdAt,
+    Expression<String>? employeeId,
+    Expression<DateTime>? periodMonth,
+    Expression<double>? grossSalary,
+    Expression<double>? absenceDeduction,
+    Expression<double>? cnssDeduction,
+    Expression<double>? itsDeduction,
+    Expression<double>? chargesPatronales,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -39419,6 +41834,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
       if (employeeName != null) 'employee_name': employeeName,
       if (netSalary != null) 'net_salary': netSalary,
       if (createdAt != null) 'created_at': createdAt,
+      if (employeeId != null) 'employee_id': employeeId,
+      if (periodMonth != null) 'period_month': periodMonth,
+      if (grossSalary != null) 'gross_salary': grossSalary,
+      if (absenceDeduction != null) 'absence_deduction': absenceDeduction,
+      if (cnssDeduction != null) 'cnss_deduction': cnssDeduction,
+      if (itsDeduction != null) 'its_deduction': itsDeduction,
+      if (chargesPatronales != null) 'charges_patronales': chargesPatronales,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -39428,6 +41850,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
     Value<String?>? employeeName,
     Value<double>? netSalary,
     Value<DateTime>? createdAt,
+    Value<String?>? employeeId,
+    Value<DateTime?>? periodMonth,
+    Value<double?>? grossSalary,
+    Value<double?>? absenceDeduction,
+    Value<double?>? cnssDeduction,
+    Value<double?>? itsDeduction,
+    Value<double?>? chargesPatronales,
     Value<int>? rowid,
   }) {
     return PayslipsCompanion(
@@ -39435,6 +41864,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
       employeeName: employeeName ?? this.employeeName,
       netSalary: netSalary ?? this.netSalary,
       createdAt: createdAt ?? this.createdAt,
+      employeeId: employeeId ?? this.employeeId,
+      periodMonth: periodMonth ?? this.periodMonth,
+      grossSalary: grossSalary ?? this.grossSalary,
+      absenceDeduction: absenceDeduction ?? this.absenceDeduction,
+      cnssDeduction: cnssDeduction ?? this.cnssDeduction,
+      itsDeduction: itsDeduction ?? this.itsDeduction,
+      chargesPatronales: chargesPatronales ?? this.chargesPatronales,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -39454,6 +41890,27 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (employeeId.present) {
+      map['employee_id'] = Variable<String>(employeeId.value);
+    }
+    if (periodMonth.present) {
+      map['period_month'] = Variable<DateTime>(periodMonth.value);
+    }
+    if (grossSalary.present) {
+      map['gross_salary'] = Variable<double>(grossSalary.value);
+    }
+    if (absenceDeduction.present) {
+      map['absence_deduction'] = Variable<double>(absenceDeduction.value);
+    }
+    if (cnssDeduction.present) {
+      map['cnss_deduction'] = Variable<double>(cnssDeduction.value);
+    }
+    if (itsDeduction.present) {
+      map['its_deduction'] = Variable<double>(itsDeduction.value);
+    }
+    if (chargesPatronales.present) {
+      map['charges_patronales'] = Variable<double>(chargesPatronales.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -39467,6 +41924,13 @@ class PayslipsCompanion extends UpdateCompanion<Payslip> {
           ..write('employeeName: $employeeName, ')
           ..write('netSalary: $netSalary, ')
           ..write('createdAt: $createdAt, ')
+          ..write('employeeId: $employeeId, ')
+          ..write('periodMonth: $periodMonth, ')
+          ..write('grossSalary: $grossSalary, ')
+          ..write('absenceDeduction: $absenceDeduction, ')
+          ..write('cnssDeduction: $cnssDeduction, ')
+          ..write('itsDeduction: $itsDeduction, ')
+          ..write('chargesPatronales: $chargesPatronales, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -40040,8 +42504,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PayablesTable payables = $PayablesTable(this);
   late final $EmployeesTable employees = $EmployeesTable(this);
   late final $InternshipsTable internships = $InternshipsTable(this);
+  late final $InternshipAbsencesTable internshipAbsences =
+      $InternshipAbsencesTable(this);
   late final $AttendanceRecordsTable attendanceRecords =
       $AttendanceRecordsTable(this);
+  late final $IncomeTaxBracketsTable incomeTaxBrackets =
+      $IncomeTaxBracketsTable(this);
+  late final $PayslipRequestsTable payslipRequests = $PayslipRequestsTable(
+    this,
+  );
   late final $MailsTable mails = $MailsTable(this);
   late final $AdministrativeDocumentsTable administrativeDocuments =
       $AdministrativeDocumentsTable(this);
@@ -40148,7 +42619,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     payables,
     employees,
     internships,
+    internshipAbsences,
     attendanceRecords,
+    incomeTaxBrackets,
+    payslipRequests,
     mails,
     administrativeDocuments,
     archivedDocuments,
@@ -44866,23 +47340,31 @@ typedef $$PayablesTableProcessedTableManager =
 typedef $$EmployeesTableCreateCompanionBuilder =
     EmployeesCompanion Function({
       required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
       required String firstName,
       required String lastName,
       Value<String?> position,
       Value<double?> baseSalary,
       Value<DateTime?> hireDate,
       Value<String?> status,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 typedef $$EmployeesTableUpdateCompanionBuilder =
     EmployeesCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String> firstName,
       Value<String> lastName,
       Value<String?> position,
       Value<double?> baseSalary,
       Value<DateTime?> hireDate,
       Value<String?> status,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 
@@ -44897,6 +47379,22 @@ class $$EmployeesTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -44929,6 +47427,11 @@ class $$EmployeesTableFilterComposer
     column: $table.status,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$EmployeesTableOrderingComposer
@@ -44942,6 +47445,21 @@ class $$EmployeesTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -44974,6 +47492,11 @@ class $$EmployeesTableOrderingComposer
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EmployeesTableAnnotationComposer
@@ -44987,6 +47510,18 @@ class $$EmployeesTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get firstName =>
       $composableBuilder(column: $table.firstName, builder: (column) => column);
@@ -45007,6 +47542,9 @@ class $$EmployeesTableAnnotationComposer
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
 }
 
 class $$EmployeesTableTableManager
@@ -45038,41 +47576,57 @@ class $$EmployeesTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> firstName = const Value.absent(),
                 Value<String> lastName = const Value.absent(),
                 Value<String?> position = const Value.absent(),
                 Value<double?> baseSalary = const Value.absent(),
                 Value<DateTime?> hireDate = const Value.absent(),
                 Value<String?> status = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmployeesCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 firstName: firstName,
                 lastName: lastName,
                 position: position,
                 baseSalary: baseSalary,
                 hireDate: hireDate,
                 status: status,
+                isActive: isActive,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
                 required String firstName,
                 required String lastName,
                 Value<String?> position = const Value.absent(),
                 Value<double?> baseSalary = const Value.absent(),
                 Value<DateTime?> hireDate = const Value.absent(),
                 Value<String?> status = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmployeesCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 firstName: firstName,
                 lastName: lastName,
                 position: position,
                 baseSalary: baseSalary,
                 hireDate: hireDate,
                 status: status,
+                isActive: isActive,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -45100,6 +47654,9 @@ typedef $$EmployeesTableProcessedTableManager =
 typedef $$InternshipsTableCreateCompanionBuilder =
     InternshipsCompanion Function({
       required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
       required String firstName,
       required String lastName,
       Value<String?> school,
@@ -45115,6 +47672,9 @@ typedef $$InternshipsTableCreateCompanionBuilder =
 typedef $$InternshipsTableUpdateCompanionBuilder =
     InternshipsCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String> firstName,
       Value<String> lastName,
       Value<String?> school,
@@ -45139,6 +47699,22 @@ class $$InternshipsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -45207,6 +47783,21 @@ class $$InternshipsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get firstName => $composableBuilder(
     column: $table.firstName,
     builder: (column) => ColumnOrderings(column),
@@ -45269,6 +47860,18 @@ class $$InternshipsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get firstName =>
       $composableBuilder(column: $table.firstName, builder: (column) => column);
@@ -45337,6 +47940,9 @@ class $$InternshipsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> firstName = const Value.absent(),
                 Value<String> lastName = const Value.absent(),
                 Value<String?> school = const Value.absent(),
@@ -45350,6 +47956,9 @@ class $$InternshipsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => InternshipsCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 firstName: firstName,
                 lastName: lastName,
                 school: school,
@@ -45365,6 +47974,9 @@ class $$InternshipsTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
                 required String firstName,
                 required String lastName,
                 Value<String?> school = const Value.absent(),
@@ -45378,6 +47990,9 @@ class $$InternshipsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => InternshipsCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 firstName: firstName,
                 lastName: lastName,
                 school: school,
@@ -45415,6 +48030,284 @@ typedef $$InternshipsTableProcessedTableManager =
       Internship,
       PrefetchHooks Function()
     >;
+typedef $$InternshipAbsencesTableCreateCompanionBuilder =
+    InternshipAbsencesCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String internshipId,
+      required DateTime absenceDate,
+      Value<String?> reason,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+typedef $$InternshipAbsencesTableUpdateCompanionBuilder =
+    InternshipAbsencesCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> internshipId,
+      Value<DateTime> absenceDate,
+      Value<String?> reason,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+
+class $$InternshipAbsencesTableFilterComposer
+    extends Composer<_$AppDatabase, $InternshipAbsencesTable> {
+  $$InternshipAbsencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get internshipId => $composableBuilder(
+    column: $table.internshipId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get absenceDate => $composableBuilder(
+    column: $table.absenceDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InternshipAbsencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $InternshipAbsencesTable> {
+  $$InternshipAbsencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get internshipId => $composableBuilder(
+    column: $table.internshipId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get absenceDate => $composableBuilder(
+    column: $table.absenceDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InternshipAbsencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InternshipAbsencesTable> {
+  $$InternshipAbsencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get internshipId => $composableBuilder(
+    column: $table.internshipId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get absenceDate => $composableBuilder(
+    column: $table.absenceDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$InternshipAbsencesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InternshipAbsencesTable,
+          InternshipAbsence,
+          $$InternshipAbsencesTableFilterComposer,
+          $$InternshipAbsencesTableOrderingComposer,
+          $$InternshipAbsencesTableAnnotationComposer,
+          $$InternshipAbsencesTableCreateCompanionBuilder,
+          $$InternshipAbsencesTableUpdateCompanionBuilder,
+          (
+            InternshipAbsence,
+            BaseReferences<
+              _$AppDatabase,
+              $InternshipAbsencesTable,
+              InternshipAbsence
+            >,
+          ),
+          InternshipAbsence,
+          PrefetchHooks Function()
+        > {
+  $$InternshipAbsencesTableTableManager(
+    _$AppDatabase db,
+    $InternshipAbsencesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InternshipAbsencesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InternshipAbsencesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InternshipAbsencesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> internshipId = const Value.absent(),
+                Value<DateTime> absenceDate = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InternshipAbsencesCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                internshipId: internshipId,
+                absenceDate: absenceDate,
+                reason: reason,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String internshipId,
+                required DateTime absenceDate,
+                Value<String?> reason = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InternshipAbsencesCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                internshipId: internshipId,
+                absenceDate: absenceDate,
+                reason: reason,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InternshipAbsencesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InternshipAbsencesTable,
+      InternshipAbsence,
+      $$InternshipAbsencesTableFilterComposer,
+      $$InternshipAbsencesTableOrderingComposer,
+      $$InternshipAbsencesTableAnnotationComposer,
+      $$InternshipAbsencesTableCreateCompanionBuilder,
+      $$InternshipAbsencesTableUpdateCompanionBuilder,
+      (
+        InternshipAbsence,
+        BaseReferences<
+          _$AppDatabase,
+          $InternshipAbsencesTable,
+          InternshipAbsence
+        >,
+      ),
+      InternshipAbsence,
+      PrefetchHooks Function()
+    >;
 typedef $$AttendanceRecordsTableCreateCompanionBuilder =
     AttendanceRecordsCompanion Function({
       required String id,
@@ -45426,6 +48319,7 @@ typedef $$AttendanceRecordsTableCreateCompanionBuilder =
       Value<String?> checkIn,
       Value<String?> checkOut,
       required String status,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 typedef $$AttendanceRecordsTableUpdateCompanionBuilder =
@@ -45439,6 +48333,7 @@ typedef $$AttendanceRecordsTableUpdateCompanionBuilder =
       Value<String?> checkIn,
       Value<String?> checkOut,
       Value<String> status,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 
@@ -45496,6 +48391,11 @@ class $$AttendanceRecordsTableFilterComposer
     column: $table.status,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$AttendanceRecordsTableOrderingComposer
@@ -45551,6 +48451,11 @@ class $$AttendanceRecordsTableOrderingComposer
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AttendanceRecordsTableAnnotationComposer
@@ -45595,6 +48500,9 @@ class $$AttendanceRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
 }
 
 class $$AttendanceRecordsTableTableManager
@@ -45646,6 +48554,7 @@ class $$AttendanceRecordsTableTableManager
                 Value<String?> checkIn = const Value.absent(),
                 Value<String?> checkOut = const Value.absent(),
                 Value<String> status = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttendanceRecordsCompanion(
                 id: id,
@@ -45657,6 +48566,7 @@ class $$AttendanceRecordsTableTableManager
                 checkIn: checkIn,
                 checkOut: checkOut,
                 status: status,
+                isActive: isActive,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -45670,6 +48580,7 @@ class $$AttendanceRecordsTableTableManager
                 Value<String?> checkIn = const Value.absent(),
                 Value<String?> checkOut = const Value.absent(),
                 required String status,
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttendanceRecordsCompanion.insert(
                 id: id,
@@ -45681,6 +48592,7 @@ class $$AttendanceRecordsTableTableManager
                 checkIn: checkIn,
                 checkOut: checkOut,
                 status: status,
+                isActive: isActive,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -45710,6 +48622,456 @@ typedef $$AttendanceRecordsTableProcessedTableManager =
         >,
       ),
       AttendanceRecord,
+      PrefetchHooks Function()
+    >;
+typedef $$IncomeTaxBracketsTableCreateCompanionBuilder =
+    IncomeTaxBracketsCompanion Function({
+      required String id,
+      required double fromAmount,
+      Value<double?> toAmount,
+      required double rate,
+      Value<int> rowid,
+    });
+typedef $$IncomeTaxBracketsTableUpdateCompanionBuilder =
+    IncomeTaxBracketsCompanion Function({
+      Value<String> id,
+      Value<double> fromAmount,
+      Value<double?> toAmount,
+      Value<double> rate,
+      Value<int> rowid,
+    });
+
+class $$IncomeTaxBracketsTableFilterComposer
+    extends Composer<_$AppDatabase, $IncomeTaxBracketsTable> {
+  $$IncomeTaxBracketsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get fromAmount => $composableBuilder(
+    column: $table.fromAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get toAmount => $composableBuilder(
+    column: $table.toAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get rate => $composableBuilder(
+    column: $table.rate,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$IncomeTaxBracketsTableOrderingComposer
+    extends Composer<_$AppDatabase, $IncomeTaxBracketsTable> {
+  $$IncomeTaxBracketsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get fromAmount => $composableBuilder(
+    column: $table.fromAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get toAmount => $composableBuilder(
+    column: $table.toAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get rate => $composableBuilder(
+    column: $table.rate,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$IncomeTaxBracketsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $IncomeTaxBracketsTable> {
+  $$IncomeTaxBracketsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get fromAmount => $composableBuilder(
+    column: $table.fromAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get toAmount =>
+      $composableBuilder(column: $table.toAmount, builder: (column) => column);
+
+  GeneratedColumn<double> get rate =>
+      $composableBuilder(column: $table.rate, builder: (column) => column);
+}
+
+class $$IncomeTaxBracketsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $IncomeTaxBracketsTable,
+          IncomeTaxBracket,
+          $$IncomeTaxBracketsTableFilterComposer,
+          $$IncomeTaxBracketsTableOrderingComposer,
+          $$IncomeTaxBracketsTableAnnotationComposer,
+          $$IncomeTaxBracketsTableCreateCompanionBuilder,
+          $$IncomeTaxBracketsTableUpdateCompanionBuilder,
+          (
+            IncomeTaxBracket,
+            BaseReferences<
+              _$AppDatabase,
+              $IncomeTaxBracketsTable,
+              IncomeTaxBracket
+            >,
+          ),
+          IncomeTaxBracket,
+          PrefetchHooks Function()
+        > {
+  $$IncomeTaxBracketsTableTableManager(
+    _$AppDatabase db,
+    $IncomeTaxBracketsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$IncomeTaxBracketsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$IncomeTaxBracketsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$IncomeTaxBracketsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<double> fromAmount = const Value.absent(),
+                Value<double?> toAmount = const Value.absent(),
+                Value<double> rate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => IncomeTaxBracketsCompanion(
+                id: id,
+                fromAmount: fromAmount,
+                toAmount: toAmount,
+                rate: rate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required double fromAmount,
+                Value<double?> toAmount = const Value.absent(),
+                required double rate,
+                Value<int> rowid = const Value.absent(),
+              }) => IncomeTaxBracketsCompanion.insert(
+                id: id,
+                fromAmount: fromAmount,
+                toAmount: toAmount,
+                rate: rate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$IncomeTaxBracketsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $IncomeTaxBracketsTable,
+      IncomeTaxBracket,
+      $$IncomeTaxBracketsTableFilterComposer,
+      $$IncomeTaxBracketsTableOrderingComposer,
+      $$IncomeTaxBracketsTableAnnotationComposer,
+      $$IncomeTaxBracketsTableCreateCompanionBuilder,
+      $$IncomeTaxBracketsTableUpdateCompanionBuilder,
+      (
+        IncomeTaxBracket,
+        BaseReferences<
+          _$AppDatabase,
+          $IncomeTaxBracketsTable,
+          IncomeTaxBracket
+        >,
+      ),
+      IncomeTaxBracket,
+      PrefetchHooks Function()
+    >;
+typedef $$PayslipRequestsTableCreateCompanionBuilder =
+    PayslipRequestsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String employeeId,
+      required String periodMonth,
+      required DateTime requestedAt,
+      Value<int> rowid,
+    });
+typedef $$PayslipRequestsTableUpdateCompanionBuilder =
+    PayslipRequestsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> employeeId,
+      Value<String> periodMonth,
+      Value<DateTime> requestedAt,
+      Value<int> rowid,
+    });
+
+class $$PayslipRequestsTableFilterComposer
+    extends Composer<_$AppDatabase, $PayslipRequestsTable> {
+  $$PayslipRequestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PayslipRequestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PayslipRequestsTable> {
+  $$PayslipRequestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PayslipRequestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PayslipRequestsTable> {
+  $$PayslipRequestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get requestedAt => $composableBuilder(
+    column: $table.requestedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$PayslipRequestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PayslipRequestsTable,
+          PayslipRequest,
+          $$PayslipRequestsTableFilterComposer,
+          $$PayslipRequestsTableOrderingComposer,
+          $$PayslipRequestsTableAnnotationComposer,
+          $$PayslipRequestsTableCreateCompanionBuilder,
+          $$PayslipRequestsTableUpdateCompanionBuilder,
+          (
+            PayslipRequest,
+            BaseReferences<
+              _$AppDatabase,
+              $PayslipRequestsTable,
+              PayslipRequest
+            >,
+          ),
+          PayslipRequest,
+          PrefetchHooks Function()
+        > {
+  $$PayslipRequestsTableTableManager(
+    _$AppDatabase db,
+    $PayslipRequestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PayslipRequestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PayslipRequestsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PayslipRequestsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> employeeId = const Value.absent(),
+                Value<String> periodMonth = const Value.absent(),
+                Value<DateTime> requestedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PayslipRequestsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                employeeId: employeeId,
+                periodMonth: periodMonth,
+                requestedAt: requestedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String employeeId,
+                required String periodMonth,
+                required DateTime requestedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PayslipRequestsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                employeeId: employeeId,
+                periodMonth: periodMonth,
+                requestedAt: requestedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PayslipRequestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PayslipRequestsTable,
+      PayslipRequest,
+      $$PayslipRequestsTableFilterComposer,
+      $$PayslipRequestsTableOrderingComposer,
+      $$PayslipRequestsTableAnnotationComposer,
+      $$PayslipRequestsTableCreateCompanionBuilder,
+      $$PayslipRequestsTableUpdateCompanionBuilder,
+      (
+        PayslipRequest,
+        BaseReferences<_$AppDatabase, $PayslipRequestsTable, PayslipRequest>,
+      ),
+      PayslipRequest,
       PrefetchHooks Function()
     >;
 typedef $$MailsTableCreateCompanionBuilder =
@@ -47460,6 +50822,11 @@ typedef $$CompanySettingsTableCreateCompanionBuilder =
       Value<bool> tvaEnabled,
       Value<double?> tvaDefaultRate,
       Value<int?> rappelSoinsJours,
+      Value<double?> vpsRate,
+      Value<double?> cnssEmployeeRate,
+      Value<double?> cnssEmployerPensionRate,
+      Value<double?> cnssEmployerFamilyRate,
+      Value<double?> cnssEmployerRiskRate,
       Value<SyncStatus> syncStatus,
       Value<DateTime?> updatedAt,
       Value<int> rowid,
@@ -47477,6 +50844,11 @@ typedef $$CompanySettingsTableUpdateCompanionBuilder =
       Value<bool> tvaEnabled,
       Value<double?> tvaDefaultRate,
       Value<int?> rappelSoinsJours,
+      Value<double?> vpsRate,
+      Value<double?> cnssEmployeeRate,
+      Value<double?> cnssEmployerPensionRate,
+      Value<double?> cnssEmployerFamilyRate,
+      Value<double?> cnssEmployerRiskRate,
       Value<SyncStatus> syncStatus,
       Value<DateTime?> updatedAt,
       Value<int> rowid,
@@ -47543,6 +50915,31 @@ class $$CompanySettingsTableFilterComposer
 
   ColumnFilters<int> get rappelSoinsJours => $composableBuilder(
     column: $table.rappelSoinsJours,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get vpsRate => $composableBuilder(
+    column: $table.vpsRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cnssEmployeeRate => $composableBuilder(
+    column: $table.cnssEmployeeRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cnssEmployerPensionRate => $composableBuilder(
+    column: $table.cnssEmployerPensionRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cnssEmployerFamilyRate => $composableBuilder(
+    column: $table.cnssEmployerFamilyRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cnssEmployerRiskRate => $composableBuilder(
+    column: $table.cnssEmployerRiskRate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -47622,6 +51019,31 @@ class $$CompanySettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get vpsRate => $composableBuilder(
+    column: $table.vpsRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cnssEmployeeRate => $composableBuilder(
+    column: $table.cnssEmployeeRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cnssEmployerPensionRate => $composableBuilder(
+    column: $table.cnssEmployerPensionRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cnssEmployerFamilyRate => $composableBuilder(
+    column: $table.cnssEmployerFamilyRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cnssEmployerRiskRate => $composableBuilder(
+    column: $table.cnssEmployerRiskRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
     builder: (column) => ColumnOrderings(column),
@@ -47685,6 +51107,29 @@ class $$CompanySettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<double> get vpsRate =>
+      $composableBuilder(column: $table.vpsRate, builder: (column) => column);
+
+  GeneratedColumn<double> get cnssEmployeeRate => $composableBuilder(
+    column: $table.cnssEmployeeRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get cnssEmployerPensionRate => $composableBuilder(
+    column: $table.cnssEmployerPensionRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get cnssEmployerFamilyRate => $composableBuilder(
+    column: $table.cnssEmployerFamilyRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get cnssEmployerRiskRate => $composableBuilder(
+    column: $table.cnssEmployerRiskRate,
+    builder: (column) => column,
+  );
+
   GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
       $composableBuilder(
         column: $table.syncStatus,
@@ -47743,6 +51188,11 @@ class $$CompanySettingsTableTableManager
                 Value<bool> tvaEnabled = const Value.absent(),
                 Value<double?> tvaDefaultRate = const Value.absent(),
                 Value<int?> rappelSoinsJours = const Value.absent(),
+                Value<double?> vpsRate = const Value.absent(),
+                Value<double?> cnssEmployeeRate = const Value.absent(),
+                Value<double?> cnssEmployerPensionRate = const Value.absent(),
+                Value<double?> cnssEmployerFamilyRate = const Value.absent(),
+                Value<double?> cnssEmployerRiskRate = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47758,6 +51208,11 @@ class $$CompanySettingsTableTableManager
                 tvaEnabled: tvaEnabled,
                 tvaDefaultRate: tvaDefaultRate,
                 rappelSoinsJours: rappelSoinsJours,
+                vpsRate: vpsRate,
+                cnssEmployeeRate: cnssEmployeeRate,
+                cnssEmployerPensionRate: cnssEmployerPensionRate,
+                cnssEmployerFamilyRate: cnssEmployerFamilyRate,
+                cnssEmployerRiskRate: cnssEmployerRiskRate,
                 syncStatus: syncStatus,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -47775,6 +51230,11 @@ class $$CompanySettingsTableTableManager
                 Value<bool> tvaEnabled = const Value.absent(),
                 Value<double?> tvaDefaultRate = const Value.absent(),
                 Value<int?> rappelSoinsJours = const Value.absent(),
+                Value<double?> vpsRate = const Value.absent(),
+                Value<double?> cnssEmployeeRate = const Value.absent(),
+                Value<double?> cnssEmployerPensionRate = const Value.absent(),
+                Value<double?> cnssEmployerFamilyRate = const Value.absent(),
+                Value<double?> cnssEmployerRiskRate = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47790,6 +51250,11 @@ class $$CompanySettingsTableTableManager
                 tvaEnabled: tvaEnabled,
                 tvaDefaultRate: tvaDefaultRate,
                 rappelSoinsJours: rappelSoinsJours,
+                vpsRate: vpsRate,
+                cnssEmployeeRate: cnssEmployeeRate,
+                cnssEmployerPensionRate: cnssEmployerPensionRate,
+                cnssEmployerFamilyRate: cnssEmployerFamilyRate,
+                cnssEmployerRiskRate: cnssEmployerRiskRate,
                 syncStatus: syncStatus,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -59202,6 +62667,13 @@ typedef $$PayslipsTableCreateCompanionBuilder =
       Value<String?> employeeName,
       required double netSalary,
       required DateTime createdAt,
+      Value<String?> employeeId,
+      Value<DateTime?> periodMonth,
+      Value<double?> grossSalary,
+      Value<double?> absenceDeduction,
+      Value<double?> cnssDeduction,
+      Value<double?> itsDeduction,
+      Value<double?> chargesPatronales,
       Value<int> rowid,
     });
 typedef $$PayslipsTableUpdateCompanionBuilder =
@@ -59210,6 +62682,13 @@ typedef $$PayslipsTableUpdateCompanionBuilder =
       Value<String?> employeeName,
       Value<double> netSalary,
       Value<DateTime> createdAt,
+      Value<String?> employeeId,
+      Value<DateTime?> periodMonth,
+      Value<double?> grossSalary,
+      Value<double?> absenceDeduction,
+      Value<double?> cnssDeduction,
+      Value<double?> itsDeduction,
+      Value<double?> chargesPatronales,
       Value<int> rowid,
     });
 
@@ -59239,6 +62718,41 @@ class $$PayslipsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get grossSalary => $composableBuilder(
+    column: $table.grossSalary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get absenceDeduction => $composableBuilder(
+    column: $table.absenceDeduction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cnssDeduction => $composableBuilder(
+    column: $table.cnssDeduction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get itsDeduction => $composableBuilder(
+    column: $table.itsDeduction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get chargesPatronales => $composableBuilder(
+    column: $table.chargesPatronales,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -59271,6 +62785,41 @@ class $$PayslipsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get grossSalary => $composableBuilder(
+    column: $table.grossSalary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get absenceDeduction => $composableBuilder(
+    column: $table.absenceDeduction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cnssDeduction => $composableBuilder(
+    column: $table.cnssDeduction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get itsDeduction => $composableBuilder(
+    column: $table.itsDeduction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get chargesPatronales => $composableBuilder(
+    column: $table.chargesPatronales,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PayslipsTableAnnotationComposer
@@ -59295,6 +62844,41 @@ class $$PayslipsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get employeeId => $composableBuilder(
+    column: $table.employeeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get periodMonth => $composableBuilder(
+    column: $table.periodMonth,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get grossSalary => $composableBuilder(
+    column: $table.grossSalary,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get absenceDeduction => $composableBuilder(
+    column: $table.absenceDeduction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get cnssDeduction => $composableBuilder(
+    column: $table.cnssDeduction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get itsDeduction => $composableBuilder(
+    column: $table.itsDeduction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get chargesPatronales => $composableBuilder(
+    column: $table.chargesPatronales,
+    builder: (column) => column,
+  );
 }
 
 class $$PayslipsTableTableManager
@@ -59329,12 +62913,26 @@ class $$PayslipsTableTableManager
                 Value<String?> employeeName = const Value.absent(),
                 Value<double> netSalary = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> employeeId = const Value.absent(),
+                Value<DateTime?> periodMonth = const Value.absent(),
+                Value<double?> grossSalary = const Value.absent(),
+                Value<double?> absenceDeduction = const Value.absent(),
+                Value<double?> cnssDeduction = const Value.absent(),
+                Value<double?> itsDeduction = const Value.absent(),
+                Value<double?> chargesPatronales = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PayslipsCompanion(
                 id: id,
                 employeeName: employeeName,
                 netSalary: netSalary,
                 createdAt: createdAt,
+                employeeId: employeeId,
+                periodMonth: periodMonth,
+                grossSalary: grossSalary,
+                absenceDeduction: absenceDeduction,
+                cnssDeduction: cnssDeduction,
+                itsDeduction: itsDeduction,
+                chargesPatronales: chargesPatronales,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -59343,12 +62941,26 @@ class $$PayslipsTableTableManager
                 Value<String?> employeeName = const Value.absent(),
                 required double netSalary,
                 required DateTime createdAt,
+                Value<String?> employeeId = const Value.absent(),
+                Value<DateTime?> periodMonth = const Value.absent(),
+                Value<double?> grossSalary = const Value.absent(),
+                Value<double?> absenceDeduction = const Value.absent(),
+                Value<double?> cnssDeduction = const Value.absent(),
+                Value<double?> itsDeduction = const Value.absent(),
+                Value<double?> chargesPatronales = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PayslipsCompanion.insert(
                 id: id,
                 employeeName: employeeName,
                 netSalary: netSalary,
                 createdAt: createdAt,
+                employeeId: employeeId,
+                periodMonth: periodMonth,
+                grossSalary: grossSalary,
+                absenceDeduction: absenceDeduction,
+                cnssDeduction: cnssDeduction,
+                itsDeduction: itsDeduction,
+                chargesPatronales: chargesPatronales,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -59744,8 +63356,14 @@ class $AppDatabaseManager {
       $$EmployeesTableTableManager(_db, _db.employees);
   $$InternshipsTableTableManager get internships =>
       $$InternshipsTableTableManager(_db, _db.internships);
+  $$InternshipAbsencesTableTableManager get internshipAbsences =>
+      $$InternshipAbsencesTableTableManager(_db, _db.internshipAbsences);
   $$AttendanceRecordsTableTableManager get attendanceRecords =>
       $$AttendanceRecordsTableTableManager(_db, _db.attendanceRecords);
+  $$IncomeTaxBracketsTableTableManager get incomeTaxBrackets =>
+      $$IncomeTaxBracketsTableTableManager(_db, _db.incomeTaxBrackets);
+  $$PayslipRequestsTableTableManager get payslipRequests =>
+      $$PayslipRequestsTableTableManager(_db, _db.payslipRequests);
   $$MailsTableTableManager get mails =>
       $$MailsTableTableManager(_db, _db.mails);
   $$AdministrativeDocumentsTableTableManager get administrativeDocuments =>

@@ -164,6 +164,11 @@ class ReinitialisationPoste {
     'livestock_reproduction_events': 'Saillies et mises bas',
     'purchases': 'Achats',
     'attendance_records': 'Pointages',
+    // Tickets RH-1, RH-2, RH-4.
+    'employees': 'Employés',
+    'internships': 'Stagiaires',
+    'internship_absences': 'Absences de stagiaires',
+    'payslip_requests': 'Demandes de règlement de paie',
     'suppliers': 'Fournisseurs',
     'supplier_payments': 'Règlements fournisseurs',
     'customers': 'Clients',

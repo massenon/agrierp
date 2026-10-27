@@ -112,6 +112,9 @@ void main() {
     'payables',
     'employees',
     'internships',
+    // Ticket RH-2 — absences de stagiaire ; RH-4 — barème ITS.
+    'internship_absences',
+    'income_tax_brackets',
     'attendance_records',
     'mails',
     'administrative_documents',

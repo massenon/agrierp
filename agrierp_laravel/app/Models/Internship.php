@@ -18,6 +18,7 @@ class Internship extends Model
             'end_date'   => 'date',
             'birth_date' => 'date',
             'monthly_fee' => 'decimal:2',
+            'fee_paid' => 'boolean',
         ];
     }
 

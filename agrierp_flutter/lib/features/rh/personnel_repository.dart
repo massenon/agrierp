@@ -5,6 +5,75 @@ import '../../core/database/app_database.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
+import 'calcul_paie.dart';
+
+/// Refus d'une saisie RH au poste : les règles du web (`SaisieEmployeAction`, `SaisieStagiaireAction`,
+/// `FeuillePointage`), reproduites AVANT d'écrire, mêmes messages. [champs] : message par champ.
+class RefusSaisieRh implements Exception {
+  const RefusSaisieRh(this.champs);
+
+  final Map<String, String> champs;
+
+  @override
+  String toString() => champs.values.join(' ');
+}
+
+/// Une ligne de « Gestion de la Paie » pour le mois choisi — les mêmes colonnes que `GestionPaie::getRowsProperty()`.
+class LignePaie {
+  const LignePaie({
+    required this.employe,
+    required this.brut,
+    required this.joursAbsence,
+    required this.retenueAbsence,
+    required this.retenueCnss,
+    required this.retenueIts,
+    required this.net,
+    required this.chargesPatronales,
+    required this.bulletin,
+    required this.demande,
+    required this.baremeItsRenseigne,
+  });
+
+  final Employee employe;
+  final double brut;
+
+  /// `null` pour un bulletin réglé (le web n'affiche plus les jours une fois réglé).
+  final int? joursAbsence;
+  final double retenueAbsence;
+  final double retenueCnss;
+  final double retenueIts;
+  final double net;
+  final double chargesPatronales;
+
+  /// Le bulletin reçu du serveur, `null` tant que la paie n'est pas réglée.
+  final Payslip? bulletin;
+
+  /// La demande de règlement faite sur CE poste, `null` sans demande.
+  final PayslipRequest? demande;
+  final bool baremeItsRenseigne;
+
+  bool get reglee => bulletin != null;
+
+  /// Demande partie ou en attente d'envoi, sans bulletin encore reçu.
+  bool get demandeEnCours => bulletin == null && demande != null && demande!.syncStatus != SyncStatus.conflict;
+
+  bool get demandeRefusee => bulletin == null && demande != null && demande!.syncStatus == SyncStatus.conflict;
+}
+
+/// Les cartes et les lignes de la paie d'un mois.
+class PaieDuMois {
+  const PaieDuMois({required this.periode, required this.lignes, required this.baremeItsRenseigne});
+
+  /// `AAAA-MM`.
+  final String periode;
+  final List<LignePaie> lignes;
+  final bool baremeItsRenseigne;
+
+  double get masseSalariale => lignes.fold(0, (t, l) => t + l.brut);
+  int get bulletinsEmis => lignes.where((l) => l.reglee).length;
+  double get chargesCnss => lignes.fold(0, (t, l) => t + l.retenueCnss);
+  int get enAttente => lignes.where((l) => !l.reglee).length;
+}
 
 /// Statuts de pointage, tels que la maquette les nomme.
 enum StatutPointage {
@@ -52,12 +121,19 @@ class DonneesPersonnel {
     required this.pointages,
     required this.jour,
     this.attestationsEmises,
+    this.absencesStagiaires = const [],
   });
 
   final List<Employee> employes;
   final List<Internship> stagiaires;
   final List<LignePointage> pointages;
   final DateTime jour;
+
+  /// Ticket RH-2 — absences ACTIVES de tous les stagiaires, les plus récentes d'abord.
+  final List<InternshipAbsence> absencesStagiaires;
+
+  List<InternshipAbsence> absencesDe(String stagiaireId) =>
+      absencesStagiaires.where((a) => a.internshipId == stagiaireId).toList();
 
   List<LignePointage> get duJour => pointages
       .where(
@@ -93,11 +169,6 @@ class DonneesPersonnel {
     return employes.where((e) => !pointes.contains(e.id)).toList();
   }
 
-  /// ⚠️ **TOUJOURS `null`** : la paie se calcule sur le serveur — retenues
-  /// CNSS, barème ITS, bulletins. Le poste ne reçoit ni `payslips` ni le
-  /// barème, et recomposer un net à payer localement produirait un chiffre
-  /// que la ferme ne retrouverait sur aucun bulletin.
-  double? get masseSalariale => null;
 
   // ── Cartes de `registre-employes.html` (ticket F0.55) ─────────────────────
 
@@ -170,32 +241,7 @@ class DonneesPersonnel {
   /// reste la réponse honnête avant la première synchronisation.
   final int? attestationsEmises;
 
-  // ── Cartes de `gestion-paie.html` (ticket F0.55) ──────────────────────────
-  //
-  // ⚠️⚠️ **LES QUATRE SONT INCONNUES AU POSTE, ET AUCUNE NE DOIT ÊTRE
-  // APPROCHÉE.** La paie se calcule sur le serveur : retenues CNSS, barème ITS,
-  // bulletins. Le poste reçoit le salaire de BASE de chaque employé, et rien
-  // d'autre.
-  //
-  // La tentation serait d'afficher la somme des salaires de base comme « masse
-  // salariale ». Ce serait faux de deux façons : elle ignore primes et heures,
-  // et surtout elle **exclut les charges patronales**, qui font partie du coût
-  // et pas de la rémunération. La règle du projet est explicite —
-  // **cotisations salariales et charges patronales ne se confondent pas** — et
-  // un chiffre qui les mélange ou en oublie une moitié ne se retrouve sur
-  // aucun bulletin.
-
-  /// « Bulletins émis » — aucune table `payslips` ne descend au poste.
-  int? get bulletinsEmis => null;
-
-  /// « Charges Sociales (CNSS) » — calculées par le serveur, jamais ici.
-  ///
-  /// ⚠️ Le taux et l'assiette vivent dans les paramètres de l'entreprise, et
-  /// la part PATRONALE ne se déduit pas de la part salariale.
-  double? get chargesSociales => null;
-
-  /// « En Attente de Paiement » — dépend d'un statut de bulletin.
-  int? get bulletinsEnAttente => null;
+  // Les cartes de `gestion-paie.html` sont calculées par [PersonnelRepository.paie] (ticket RH-4), comme au web.
 }
 
 /// Lectures et écritures de `prototype_html/personnel-stages.html`.
@@ -217,9 +263,14 @@ class PersonnelRepository {
   static const _uuid = Uuid();
 
   Future<DonneesPersonnel> charger({DateTime? jour}) async {
-    final employes = await database.select(database.employees).get();
+    // Ticket RH-1 / RH-3 — les archivés ne sont pas listés (comme le web : `where('is_active', true)`).
+    final employes = await (database.select(database.employees)..where((t) => t.isActive.equals(true))).get();
     final stagiaires = await database.select(database.internships).get();
-    final pointages = await database.select(database.attendanceRecords).get();
+    final pointages = await (database.select(database.attendanceRecords)..where((t) => t.isActive.equals(true))).get();
+    final absences = await (database.select(database.internshipAbsences)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([(t) => OrderingTerm.desc(t.absenceDate)]))
+        .get();
     final emises =
         await (database.select(database.appSettings)..where(
               (r) =>
@@ -231,6 +282,7 @@ class PersonnelRepository {
 
     return DonneesPersonnel(
       attestationsEmises: emises == null ? null : int.tryParse(emises.value),
+      absencesStagiaires: absences,
       jour: jour ?? HeureBenin.maintenant(),
       employes: employes.toList()
         ..sort((a, b) => a.lastName.compareTo(b.lastName)),
@@ -279,6 +331,19 @@ class PersonnelRepository {
 
     final id = existant?.id ?? _uuid.v4();
 
+    // Ticket RH-3 — règles du web (`FeuillePointage::savePointage`, `pushAttendance`) : jour ≤ aujourd'hui, heures « HH:mm ».
+    final erreurs = <String, String>{};
+    final aujourdhui = HeureBenin.aujourdhui();
+    if (jourSeul.isAfter(DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day))) {
+      erreurs['date'] = 'La date de pointage doit être antérieure ou égale à aujourd\'hui.';
+    }
+    for (final (champ, valeur) in [('arrivee', arrivee), ('depart', depart)]) {
+      if (valeur != null && !RegExp(r'^\d{2}:\d{2}(:\d{2})?$').hasMatch(valeur)) {
+        erreurs[champ] = 'Le champ ${champ == 'arrivee' ? "heure d'arrivée" : 'heure de départ'} doit être au format HH:mm.';
+      }
+    }
+    if (erreurs.isNotEmpty) throw RefusSaisieRh(erreurs);
+
     final ligne = AttendanceRecordsCompanion.insert(
       id: id,
       deviceId: identifiantPoste,
@@ -290,11 +355,306 @@ class PersonnelRepository {
       checkIn: Value(arrivee),
       checkOut: Value(depart),
       status: statut.code,
+      // Repointer réactive un pointage archivé (le web fait de même : `is_active => true`).
+      isActive: const Value(true),
     );
 
     await database
         .into(database.attendanceRecords)
         .insert(ligne, onConflict: DoUpdate((_) => ligne));
+
+    return id;
+  }
+
+  /// Ticket RH-3 — archive un pointage (`FeuillePointage::archiveRecord`) : la ligne reste, `is_active` faux, renvoyée.
+  Future<void> archiverPointage(String id) async {
+    await (database.update(database.attendanceRecords)..where((t) => t.id.equals(id))).write(
+      AttendanceRecordsCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(DateTime.now()),
+        deviceId: Value(identifiantPoste),
+      ),
+    );
+  }
+
+  // ── Ticket RH-1 : employés ──────────────────────────────────────────────────
+
+  /// Fonctions proposées par la modale du web (`registre-employes.blade.php`).
+  static const fonctions = ["Chef d'élevage", 'Comptable', 'Gardien', 'Vendeuse POS', 'Ouvrier agricole'];
+
+  /// `actif` · `conge` · `suspendu`, libellés du web.
+  static const statutsEmploye = {'actif': 'Actif', 'conge': 'Congé', 'suspendu': 'Suspendu'};
+
+  /// Crée ou modifie un employé LOCALEMENT (`pending`), avec les règles de `SaisieEmployeAction::regles()`.
+  /// Un employé archivé ne se modifie plus (message du web). Rend l'identifiant.
+  Future<String> enregistrerEmploye({
+    String? id,
+    required String prenom,
+    required String nom,
+    required String fonction,
+    required DateTime? embauche,
+    double? salaire,
+    required String statut,
+  }) async {
+    final erreurs = <String, String>{};
+    if (prenom.trim().isEmpty) erreurs['prenom'] = 'Le champ prénom est obligatoire.';
+    if (prenom.trim().length > 100) erreurs['prenom'] = 'Le champ prénom ne peut pas dépasser 100 caractères.';
+    if (nom.trim().isEmpty) erreurs['nom'] = 'Le champ nom est obligatoire.';
+    if (nom.trim().length > 100) erreurs['nom'] = 'Le champ nom ne peut pas dépasser 100 caractères.';
+    if (fonction.trim().isEmpty) erreurs['fonction'] = 'Le champ fonction est obligatoire.';
+    if (embauche == null) erreurs['embauche'] = "Le champ date d'embauche est obligatoire.";
+    if (salaire != null && salaire < 0) erreurs['salaire'] = 'Le champ salaire de base doit être supérieur ou égal à 0.';
+    if (!statutsEmploye.containsKey(statut)) erreurs['statut'] = 'Le statut sélectionné est invalide.';
+    if (erreurs.isNotEmpty) throw RefusSaisieRh(erreurs);
+
+    if (id != null) {
+      final existant = await (database.select(database.employees)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (existant != null && !existant.isActive) {
+        throw const RefusSaisieRh({'employe': 'Cet employé est archivé : il ne peut plus être modifié.'});
+      }
+    }
+
+    final identifiant = id ?? _uuid.v4();
+    final ligne = EmployeesCompanion.insert(
+      id: identifiant,
+      deviceId: identifiantPoste,
+      syncStatus: const Value(SyncStatus.pending),
+      updatedAt: DateTime.now(),
+      firstName: prenom.trim(),
+      lastName: nom.trim(),
+      position: Value(fonction.trim()),
+      baseSalary: Value(salaire),
+      hireDate: Value(DateTime(embauche!.year, embauche.month, embauche.day)),
+      status: Value(statut),
+      isActive: const Value(true),
+    );
+    await database.into(database.employees).insert(ligne, onConflict: DoUpdate((_) => ligne));
+
+    return identifiant;
+  }
+
+  /// Archive un employé (`RegistreEmployes::archiveEmployee`) : `is_active` faux, renvoyé ; un second archivage ne fait rien.
+  Future<void> archiverEmploye(String id) async {
+    final existant = await (database.select(database.employees)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (existant == null || !existant.isActive) return;
+    await (database.update(database.employees)..where((t) => t.id.equals(id))).write(
+      EmployeesCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(DateTime.now()),
+        deviceId: Value(identifiantPoste),
+      ),
+    );
+  }
+
+  // ── Ticket RH-2 : stagiaires et absences ────────────────────────────────────
+
+  /// Crée ou modifie un stagiaire LOCALEMENT (`pending`), règles de `SaisieStagiaireAction::regles()`. Rend l'identifiant.
+  Future<String> enregistrerStagiaire({
+    String? id,
+    required String prenom,
+    required String nom,
+    required String etablissement,
+    required DateTime? debut,
+    DateTime? fin,
+    double? frais,
+    bool fraisRegles = false,
+  }) async {
+    final erreurs = <String, String>{};
+    if (prenom.trim().isEmpty) erreurs['prenom'] = 'Le champ prénom est obligatoire.';
+    if (nom.trim().isEmpty) erreurs['nom'] = 'Le champ nom est obligatoire.';
+    if (etablissement.trim().isEmpty) erreurs['etablissement'] = 'Le champ établissement est obligatoire.';
+    if (etablissement.trim().length > 150) erreurs['etablissement'] = 'Le champ établissement ne peut pas dépasser 150 caractères.';
+    if (debut == null) erreurs['debut'] = 'Le champ date de début est obligatoire.';
+    if (debut != null && fin != null && fin.isBefore(debut)) {
+      erreurs['fin'] = 'Le champ date de fin doit être une date postérieure ou égale à date de début.';
+    }
+    if (frais != null && frais < 0) erreurs['frais'] = 'Le champ frais de stage doit être supérieur ou égal à 0.';
+    if (erreurs.isNotEmpty) throw RefusSaisieRh(erreurs);
+
+    final identifiant = id ?? _uuid.v4();
+    final existant = id == null ? null : await (database.select(database.internships)..where((t) => t.id.equals(id))).getSingleOrNull();
+    final ligne = InternshipsCompanion.insert(
+      id: identifiant,
+      deviceId: identifiantPoste,
+      syncStatus: const Value(SyncStatus.pending),
+      updatedAt: DateTime.now(),
+      firstName: prenom.trim(),
+      lastName: nom.trim(),
+      school: Value(etablissement.trim()),
+      startDate: Value(DateTime(debut!.year, debut.month, debut.day)),
+      endDate: Value(fin == null ? null : DateTime(fin.year, fin.month, fin.day)),
+      monthlyFee: Value(frais),
+      feePaid: Value(fraisRegles),
+      // L'identité ATT-1 (naissance, civilité) n'est pas dans cette modale (web non plus) : conservée telle quelle.
+      birthDate: Value(existant?.birthDate),
+      birthPlace: Value(existant?.birthPlace),
+      civilite: Value(existant?.civilite ?? 'M.'),
+    );
+    await database.into(database.internships).insert(ligne, onConflict: DoUpdate((_) => ligne));
+
+    return identifiant;
+  }
+
+  /// Note une absence (`RegistreStagiaires::saveAbsence`) : date requise, motif facultatif (≤ 255). Rend l'identifiant.
+  Future<String> noterAbsence({required String stagiaireId, required DateTime? jour, String motif = ''}) async {
+    final erreurs = <String, String>{};
+    if (jour == null) erreurs['date'] = 'Le champ date est obligatoire.';
+    if (motif.trim().length > 255) erreurs['motif'] = 'Le champ motif ne peut pas dépasser 255 caractères.';
+    if (erreurs.isNotEmpty) throw RefusSaisieRh(erreurs);
+
+    final id = _uuid.v4();
+    await database.into(database.internshipAbsences).insert(
+      InternshipAbsencesCompanion.insert(
+        id: id,
+        deviceId: identifiantPoste,
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: DateTime.now(),
+        internshipId: stagiaireId,
+        absenceDate: DateTime(jour!.year, jour.month, jour.day),
+        reason: Value(motif.trim().isEmpty ? null : motif.trim()),
+        isActive: const Value(true),
+      ),
+    );
+
+    return id;
+  }
+
+  /// Archive une absence (`RegistreStagiaires::deleteAbsence`, 14.55 : jamais effacée).
+  Future<void> archiverAbsence(String id) async {
+    await (database.update(database.internshipAbsences)..where((t) => t.id.equals(id))).write(
+      InternshipAbsencesCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(DateTime.now()),
+        deviceId: Value(identifiantPoste),
+      ),
+    );
+  }
+
+  // ── Ticket RH-4 : paie ──────────────────────────────────────────────────────
+
+  /// `AAAA-MM` d'une date.
+  static String periodeDe(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+
+  /// Le barème ITS reçu (tranches actives, planchers croissants).
+  Future<List<TrancheIts>> baremeIts() async => [
+    for (final t in await (database.select(database.incomeTaxBrackets)..orderBy([(t) => OrderingTerm.asc(t.fromAmount)])).get())
+      TrancheIts(plancher: t.fromAmount, plafond: t.toAmount, taux: t.rate),
+  ];
+
+  /// Les taux de paie reçus (`company_settings`), défauts du web tant que rien n'a été tiré.
+  Future<TauxPaie> tauxPaie() async {
+    final e = await database.select(database.companySettings).getSingleOrNull();
+    if (e == null) return TauxPaie.defaut;
+
+    return TauxPaie(
+      cnssSalarie: e.cnssEmployeeRate,
+      vps: e.vpsRate,
+      cnssPatronalePension: e.cnssEmployerPensionRate,
+      cnssPatronaleFamille: e.cnssEmployerFamilyRate,
+      cnssPatronaleRisque: e.cnssEmployerRiskRate,
+    );
+  }
+
+  /// Jours d'absence RETENUS sur une période : pointages `absent` ACTIFS du mois (`ReglementPaieService::joursAbsence`).
+  Future<int> joursAbsence(String employeId, String periode) async {
+    final annee = int.parse(periode.substring(0, 4));
+    final mois = int.parse(periode.substring(5, 7));
+    final lignes = await (database.select(database.attendanceRecords)..where(
+          (t) => t.employeeId.equals(employeId) & t.status.equals('absent') & t.isActive.equals(true),
+        ))
+        .get();
+
+    return lignes.where((p) => p.attendanceDate.year == annee && p.attendanceDate.month == mois).length;
+  }
+
+  /// La paie d'un mois, ligne par employé actif — `GestionPaie::getRowsProperty()` : un bulletin reçu l'emporte (ses
+  /// montants), sinon le calcul local (`CalculPaie`, même formule que le serveur).
+  Future<PaieDuMois> paie(String periode) async {
+    final employes = await (database.select(database.employees)..where((t) => t.isActive.equals(true))).get()
+      ..sort((a, b) => a.lastName.compareTo(b.lastName));
+    final bareme = await baremeIts();
+    final taux = await tauxPaie();
+    final annee = int.parse(periode.substring(0, 4));
+    final mois = int.parse(periode.substring(5, 7));
+    final bulletins = {
+      for (final b in await database.select(database.payslips).get())
+        if (b.employeeId != null && b.periodMonth != null && b.periodMonth!.year == annee && b.periodMonth!.month == mois)
+          b.employeeId!: b,
+    };
+    final demandes = {
+      for (final d in await (database.select(database.payslipRequests)..where((t) => t.periodMonth.equals(periode))).get())
+        d.employeeId: d,
+    };
+
+    final lignes = <LignePaie>[];
+    for (final e in employes) {
+      final bulletin = bulletins[e.id];
+      if (bulletin != null) {
+        lignes.add(LignePaie(
+          employe: e,
+          brut: bulletin.grossSalary ?? 0,
+          joursAbsence: null,
+          retenueAbsence: bulletin.absenceDeduction ?? 0,
+          retenueCnss: bulletin.cnssDeduction ?? 0,
+          retenueIts: bulletin.itsDeduction ?? 0,
+          net: bulletin.netSalary,
+          chargesPatronales: bulletin.chargesPatronales ?? 0,
+          bulletin: bulletin,
+          demande: demandes[e.id],
+          baremeItsRenseigne: true,
+        ));
+        continue;
+      }
+      final jours = await joursAbsence(e.id, periode);
+      final calcul = CalculPaie.calculer(e.baseSalary ?? 0, jours, bareme: bareme, taux: taux);
+      lignes.add(LignePaie(
+        employe: e,
+        brut: calcul.brut,
+        joursAbsence: jours,
+        retenueAbsence: calcul.retenueAbsence,
+        retenueCnss: calcul.cnssSalariale,
+        retenueIts: calcul.its,
+        net: calcul.net,
+        chargesPatronales: calcul.totalChargesPatronales,
+        bulletin: null,
+        demande: demandes[e.id],
+        baremeItsRenseigne: calcul.baremeItsRenseigne,
+      ));
+    }
+
+    return PaieDuMois(periode: periode, lignes: lignes, baremeItsRenseigne: bareme.isNotEmpty);
+  }
+
+  /// « Valider le règlement » au poste : une DEMANDE (`pending`), réglée par le serveur. Une demande déjà en file pour
+  /// (employé, période) n'est pas doublée ; une demande refusée est relancée.
+  Future<String> demanderReglement({required String employeId, required String periode}) async {
+    final existante = await (database.select(database.payslipRequests)..where(
+          (t) => t.employeeId.equals(employeId) & t.periodMonth.equals(periode),
+        ))
+        .getSingleOrNull();
+    if (existante != null) {
+      if (existante.syncStatus == SyncStatus.conflict) {
+        await (database.update(database.payslipRequests)..where((t) => t.id.equals(existante.id)))
+            .write(const PayslipRequestsCompanion(syncStatus: Value(SyncStatus.pending)));
+      }
+      return existante.id;
+    }
+
+    final id = _uuid.v4();
+    await database.into(database.payslipRequests).insert(
+      PayslipRequestsCompanion.insert(
+        id: id,
+        deviceId: identifiantPoste,
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: DateTime.now(),
+        employeeId: employeId,
+        periodMonth: periode,
+        requestedAt: HeureBenin.versInstant(HeureBenin.maintenant()),
+      ),
+    );
 
     return id;
   }

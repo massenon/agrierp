@@ -109,7 +109,8 @@ class SyncDepensesPaieTirageTest extends TestCase
     public function test_la_correspondance_des_permissions_de_u13(): void
     {
         $this->assertNull(SyncController::PERMISSIONS_DE_TIRAGE['expenses']);
-        $this->assertSame(['view-rapports'], SyncController::PERMISSIONS_DE_TIRAGE['payslips']);
+        // Ticket RH-4 : les comptes RH reçoivent aussi la paie (avec ses colonnes RH, voir `SyncPaieDemandeTest`).
+        $this->assertSame(['view-rapports', 'view-rh'], SyncController::PERMISSIONS_DE_TIRAGE['payslips']);
     }
 
     public function test_depenses_a_tous_les_roles_paie_aux_seuls_comptes_qui_lisent_les_rapports(): void

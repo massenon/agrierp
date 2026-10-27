@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/emissions_attestation.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
@@ -122,6 +123,9 @@ void main() {
       .insert(
         EmployeesCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           position: Value(poste),
@@ -141,6 +145,9 @@ void main() {
       .insert(
         InternshipsCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           school: Value(ecole),

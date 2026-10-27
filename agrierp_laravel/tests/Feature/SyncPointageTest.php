@@ -196,17 +196,43 @@ class SyncPointageTest extends TestCase
             ->assertJsonPath('attendance_records.0.attendance_date', now()->toDateString());
     }
 
-    /** ⚠️ Employés et stagiaires sont des référentiels : tout envoi est ignoré ET compté. */
-    public function test_the_registers_cannot_be_written_from_the_device(): void
+    /** Ticket RH-3 — un pointage ARCHIVÉ au poste (`is_active` faux) l'est au serveur, avec sa trace d'audit. */
+    public function test_an_attendance_archived_on_the_device_is_archived_here(): void
+    {
+        $this->pousser([$this->pointage()])->assertOk();
+        $this->pousser([$this->pointage(['is_active' => false])])->assertOk();
+
+        $pointage = AttendanceRecord::where('employee_id', $this->employe->id)->firstOrFail();
+        $this->assertFalse($pointage->is_active);
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'attendance.archived')->where('entity_id', $pointage->id)->count());
+
+        // Renvoyé archivé : rien ne change, pas de seconde trace.
+        $this->pousser([$this->pointage(['is_active' => false])])->assertOk();
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'attendance.archived')->count());
+
+        // Le tirage le sert ARCHIVÉ (le poste apprend un archivage fait au web).
+        $this->tirer()->assertOk()->assertJsonPath('attendance_records.0.is_active', false);
+    }
+
+    /** Tickets RH-1 / RH-2 — les registres s'écrivent désormais depuis le poste, par les Actions du web. */
+    public function test_the_registers_are_written_from_the_device_through_the_web_actions(): void
     {
         $reponse = $this->actingAs($this->utilisateur, 'sanctum')->postJson('/api/sync/push', [
-            'employees' => [['id' => $this->employe->id, 'last_name' => 'FALSIFIÉ']],
-            'internships' => [['id' => '66666666-6666-4666-8666-666666666666']],
+            'employees' => [[
+                'id' => '77777777-7777-4777-8777-777777777777', 'first_name' => 'Ange', 'last_name' => 'TOSSOU',
+                'position' => 'Ouvrier agricole', 'hire_date' => '2026-10-01', 'base_salary' => 45000, 'status' => 'actif',
+            ]],
+            'internships' => [[
+                'id' => '66666666-6666-4666-8666-666666666666', 'first_name' => 'Félicité', 'last_name' => 'ADJOVI',
+                'school' => 'Lycée agricole de Sékou', 'start_date' => '2026-02-01', 'end_date' => '2026-05-31', 'monthly_fee' => 25000,
+            ]],
         ]);
 
         $reponse->assertOk();
-        $this->assertGreaterThanOrEqual(2, $reponse->json('referentiels_ignored'));
-        $this->assertSame('AGBODJI', $this->employe->fresh()->last_name);
-        $this->assertSame(0, Internship::count());
+        $this->assertSame(0, $reponse->json('referentiels_ignored'));
+        $this->assertSame(['77777777-7777-4777-8777-777777777777'], $reponse->json('employees.accepted'));
+        $this->assertSame(['66666666-6666-4666-8666-666666666666'], $reponse->json('internships.accepted'));
+        $this->assertSame('TOSSOU', Employee::find('77777777-7777-4777-8777-777777777777')?->last_name);
+        $this->assertSame(1, Internship::count());
     }
 }

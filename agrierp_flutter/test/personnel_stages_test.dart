@@ -50,6 +50,9 @@ void main() {
       .insert(
         EmployeesCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           position: Value(fonction),
@@ -74,6 +77,9 @@ void main() {
       .insert(
         InternshipsCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           school: Value(ecole),
@@ -112,6 +118,7 @@ void main() {
   Future<void> afficher(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1700, 2200);
     tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       MaterialApp(home: PersonnelStagesScreen(depot: depot)),
@@ -212,11 +219,13 @@ void main() {
       expect(d.nonPointes().single.lastName, 'DOSSOU');
     });
 
-    /// ⚠️ La paie se calcule sur le serveur : le poste ne l'invente pas.
-    test('⚠️ la masse salariale reste nulle, faute de barème', () async {
-      final d = await depot.charger();
+    /// Ticket RH-4 : la paie du mois se calcule au poste comme au web (`CalculPaie`) ; sans employé, rien.
+    test('sans employé, la paie du mois est vide', () async {
+      final p = await depot.paie(PersonnelRepository.periodeDe(aujourdhui));
 
-      expect(d.masseSalariale, isNull);
+      expect(p.lignes, isEmpty);
+      expect(p.masseSalariale, 0);
+      expect(p.enAttente, 0);
     });
   });
 
@@ -340,26 +349,22 @@ void main() {
       expect((await depot.charger()).attestationsEmises, 0);
     });
 
-    /// ⚠️⚠️ **LES QUATRE CARTES DE PAIE RESTENT À TIRET, ET CE TEST EST LÀ POUR
-    /// QUE ÇA DURE.** La tentation, un jour de zèle, sera d'afficher la somme
-    /// des salaires de base comme « masse salariale ». Ce serait faux deux
-    /// fois : elle ignore primes et heures, et surtout elle **exclut les
-    /// charges patronales**. La règle du projet est nette — cotisations
-    /// salariales et charges patronales ne se confondent pas — et un chiffre
-    /// qui en oublie une moitié ne se retrouve sur aucun bulletin.
-    test('⚠️⚠️ aucun indicateur de paie n est approché au poste', () async {
+    /// Ticket RH-4 : les quatre cartes de `gestion-paie.html` sont CALCULÉES comme `GestionPaie::getKpisProperty()`
+    /// (masse = somme des bruts, CNSS = somme des retenues salariales, bulletins émis / en attente par l'existence
+    /// d'un bulletin). Les charges patronales restent HORS de ces cartes, comme au web.
+    test('les quatre cartes de paie sont celles du web', () async {
       await employe('e1', 'Koffi', 'ADJOVI', salaire: 120000);
       await employe('e2', 'Aline', 'DOSSOU', salaire: 95000);
 
-      final d = await depot.charger();
+      final p = await depot.paie(PersonnelRepository.periodeDe(aujourdhui));
 
-      expect(d.masseSalariale, isNull);
-      expect(d.bulletinsEmis, isNull);
-      expect(d.chargesSociales, isNull);
-      expect(d.bulletinsEnAttente, isNull);
+      expect(p.masseSalariale, 215000);
+      expect(p.bulletinsEmis, 0);
+      expect(p.chargesCnss, closeTo(120000 * 0.036 + 95000 * 0.036, 0.02));
+      expect(p.enAttente, 2);
     });
 
-    testWidgets('les quatre cartes de paie sont là, toutes à tiret', (
+    testWidgets('les quatre cartes de paie portent les montants du mois', (
       tester,
     ) async {
       await employe('e1', 'Koffi', 'ADJOVI', salaire: 120000);
@@ -367,26 +372,26 @@ void main() {
       await afficher(tester);
       await ouvrir(tester, 'Gestion de la Paie');
 
-      for (final cle in [
-        'kpi-paie-masse',
-        'kpi-paie-bulletins',
-        'kpi-paie-cnss',
-        'kpi-paie-attente',
-      ]) {
-        expect(
-          find.descendant(of: find.byKey(Key(cle)), matching: find.text('—')),
-          findsOneWidget,
-          reason: cle,
-        );
-      }
-
-      // ⚠️ Et surtout : le salaire de base ne fuit PAS dans une carte.
       expect(
         find.descendant(
           of: find.byKey(const Key('kpi-paie-masse')),
           matching: find.text('120 000'),
         ),
-        findsNothing,
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kpi-paie-attente')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('kpi-paie-bulletins')),
+          matching: find.text('0'),
+        ),
+        findsOneWidget,
       );
     });
 
@@ -542,9 +547,8 @@ void main() {
       }
     });
 
-    /// ⚠️⚠️ Un stagiaire n'est pas un employé : la feuille de pointage ne le
-    /// couvre pas, et l'écran le dit.
-    testWidgets('⚠️⚠️ les stagiaires disent pourquoi ils ne se pointent pas', (
+    /// Ticket RH-2 : un stagiaire a ses ABSENCES (modale « Absences »), pas de pointage — comme au web.
+    testWidgets('un stagiaire est listé avec son établissement et ses absences', (
       tester,
     ) async {
       await stagiaire('s1', 'Ange', 'TOSSOU', ecole: 'Lycée Agricole de Sékou');
@@ -553,13 +557,8 @@ void main() {
       await ouvrir(tester, 'Registre Stagiaires');
 
       expect(find.text('Ange TOSSOU'), findsOneWidget);
-      expect(
-        find.textContaining(
-          "la feuille de pointage ne s'applique qu'aux "
-          'employés',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Lycée Agricole de Sékou'), findsOneWidget);
+      expect(find.byKey(const Key('stagiaire-absences-0')), findsOneWidget);
     });
 
     testWidgets('le pointage porte les six colonnes de la maquette', (
@@ -639,8 +638,9 @@ void main() {
       }
     });
 
-    /// ⚠️⚠️ Le brut est connu, le net ne l'est pas — et c'est son salaire.
-    testWidgets('⚠️⚠️ la paie montre le brut et dit pourquoi le net manque', (
+    /// Ticket RH-4 : le brut ET le net (même formule que le serveur, `paie_parite_php_test.dart`), avec la mention
+    /// qu'un ITS nul faute de barème n'est pas un ITS nul par seuil.
+    testWidgets('la paie montre le brut, le net et le dit quand le barème manque', (
       tester,
     ) async {
       await employe('e1', 'Kossi', 'AGBODJI', salaire: 120000);
@@ -648,9 +648,11 @@ void main() {
       await afficher(tester);
       await ouvrir(tester, 'Gestion de la Paie');
 
-      expect(find.text('120 000'), findsOneWidget);
-      expect(find.text('—'), findsWidgets);
-      expect(find.textContaining('barème ITS, retenues CNSS'), findsOneWidget);
+      expect(find.byKey(const Key('paie-brut-0')), findsOneWidget);
+      expect(find.text('120 000'), findsWidgets);
+      // 120 000 − CNSS 3,6 % = 115 680 ; sans barème, ITS = 0.
+      expect(find.text('115 680'), findsOneWidget);
+      expect(find.textContaining('Barème ITS non renseigné'), findsOneWidget);
     });
 
     /// ⚠️ SANS ACCÈS AU SERVEUR, L'ONGLET LE DIT au lieu de se taire. Le contenu
@@ -666,13 +668,13 @@ void main() {
 
     testWidgets('sans donnée, chaque tableau le dit', (tester) async {
       await afficher(tester);
-      expect(find.text('— Aucun employé synchronisé —'), findsOneWidget);
+      expect(find.text('— Aucun employé —'), findsWidgets);
 
       await ouvrir(tester, 'Registre Stagiaires');
-      expect(find.text('— Aucun stagiaire synchronisé —'), findsOneWidget);
+      expect(find.text('— Aucun stagiaire —'), findsOneWidget);
 
       await ouvrir(tester, 'Feuille de Pointage');
-      expect(find.text('— Aucun pointage synchronisé —'), findsOneWidget);
+      expect(find.text('— Aucun pointage —'), findsOneWidget);
     });
   });
 }

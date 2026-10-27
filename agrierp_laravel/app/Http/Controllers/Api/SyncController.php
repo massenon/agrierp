@@ -145,6 +145,8 @@ class SyncController extends Controller
         'credit_notes',
         // Ticket ARC2 — Corbeille : demandes de restauration / de suppression définitive (le serveur fait les effets).
         'corbeille_demandes',
+        // Ticket RH-2 / RH-4 — absences de stagiaire et demandes de règlement de paie du poste.
+        'internship_absences', 'payslip_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -223,6 +225,10 @@ class SyncController extends Controller
         'employees' => ['view-rh'],
         'internships' => ['view-rh'],
         'attendance_records' => ['view-rh'],
+        // Ticket RH-2 — absences des stagiaires (table mixte au poste depuis RH-2).
+        'internship_absences' => ['view-rh'],
+        // Ticket RH-4 — barème ITS : le poste calcule la paie comme le web (`PayrollCalculationService`).
+        'income_tax_brackets' => ['view-rh'],
         'mails' => ['view-administration'],
         'administrative_documents' => ['view-administration'],
         'archived_documents' => ['view-administration'],
@@ -269,7 +275,9 @@ class SyncController extends Controller
         // n'affiche aucun bulletin : les cartes de la paie y sont des « — »), ni base ; et seulement ce que le rapport
         // affiche au web à ces mêmes comptes (instant du règlement, nom de l'employé, NET versé) — jamais le brut, les
         // retenues, les charges patronales ni la période (voir [famillesPaginees]).
-        'payslips' => ['view-rapports'],
+        // Ticket RH-4 — aux comptes RH aussi : ils voient les bulletins complets au web (`GestionPaie`) ; les colonnes RH
+        // (employé, période, brut, retenues) ne descendent QU'À EUX, la vue réduite reste celle de `view-rapports`.
+        'payslips' => ['view-rapports', 'view-rh'],
         // Ticket ARC2 — CORBEILLE : l'instantané des éléments archivés, avec ce que le serveur permet d'en faire. Aux
         // seuls comptes qui gèrent les Paramètres (l'administrateur) : la liste agrège les archives de TOUS les modules.
         'corbeille' => ['manage-parametres'],
@@ -971,10 +979,11 @@ class SyncController extends Controller
             // 7 h a la ferme, ou le reseau n'est pas. Sans les employes au poste,
             // il n'y a personne a pointer ; sans les pointages deja saisis, le
             // chef d'equipe repointe quelqu'un que le web connait deja.
+            // Ticket RH-1 — archivés COMPRIS (`is_active`) : le poste écrit cette table (table mixte) et doit apprendre un
+            // archivage fait au web ; il n'affiche que les actifs, comme le web.
             'employees' => fn () => Employee::query()
-                ->where('is_active', true)
                 ->orderBy('last_name')
-                ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status'])
+                ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status', 'is_active', 'updated_at'])
                 // 🔴→✅ TICKET S3 — LE SALAIRE NE DESCEND QU'AUX RÔLES RH. Il partait vers tout poste connecté,
                 // caissier compris. Sans `view-rh`, le poste reçoit `null` et affiche « — » (salaire inconnu).
                 ->each(function (Employee $employe) use ($request) {
@@ -991,16 +1000,41 @@ class SyncController extends Controller
                 ->orderByDesc('start_date')
                 ->get(),
 
+            // Ticket RH-2 — les absences des stagiaires descendent (archivées comprises, `is_active`) : le poste les note et
+            // les archive désormais (table mixte).
+            'internship_absences' => fn () => \App\Models\InternshipAbsence::query()
+                ->orderByDesc('absence_date')
+                ->get(['id', 'internship_id', 'absence_date', 'reason', 'is_active'])
+                ->map(fn (\App\Models\InternshipAbsence $a) => [
+                    'id' => $a->id,
+                    'internship_id' => $a->internship_id,
+                    'absence_date' => $a->absence_date?->format('Y-m-d'),
+                    'reason' => $a->reason,
+                    'is_active' => (bool) $a->is_active,
+                ]),
+
+            // Ticket RH-4 — barème ITS (tranches actives), pour que la paie du poste soit celle du web.
+            'income_tax_brackets' => fn () => \App\Models\IncomeTaxBracket::query()
+                ->where('is_active', true)
+                ->orderBy('from_amount')
+                ->get(['id', 'from_amount', 'to_amount', 'rate'])
+                ->map(fn (\App\Models\IncomeTaxBracket $t) => [
+                    'id' => $t->id,
+                    'from_amount' => (float) $t->from_amount,
+                    'to_amount' => $t->to_amount === null ? null : (float) $t->to_amount,
+                    'rate' => (float) $t->rate,
+                ]),
+
             // ⚠️ BORNE A 60 JOURS, ET C'EST DELIBERE. La table porte deja 870
             // lignes et grossit d'une par employe et par jour : la servir en
             // entier alourdirait chaque tirage pour une donnee que personne ne
             // consulte au-dela du mois courant. Le poste a besoin du mois en
             // cours pour ne pas repointer ; l'historique vit sur le web.
+            // Ticket RH-3 — archivés COMPRIS (`is_active`) : un pointage archivé au web cesse de compter au poste.
             'attendance_records' => fn () => AttendanceRecord::query()
-                ->where('is_active', true)
                 ->where('attendance_date', '>=', now()->subDays(60)->toDateString())
                 ->orderByDesc('attendance_date')
-                ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status'])
+                ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status', 'is_active'])
                 ->map(fn (AttendanceRecord $p) => [
                     'id' => $p->id,
                     'employee_id' => $p->employee_id,
@@ -1013,6 +1047,7 @@ class SyncController extends Controller
                     'check_in' => $p->check_in,
                     'check_out' => $p->check_out,
                     'status' => $p->status,
+                    'is_active' => (bool) $p->is_active,
                 ]),
 
             // 🔴→✅ TICKET 14.82 — LE SECRETARIAT DESCEND AU POSTE.
@@ -1178,6 +1213,12 @@ class SyncController extends Controller
                     'rccm' => $entreprise->rccm,
                     'tva_enabled' => $entreprise->tva_enabled,
                     'tva_default_rate' => $entreprise->tva_default_rate,
+                    // Ticket RH-4 — taux de paie (`PayrollCalculationService`) : le poste calcule comme le web.
+                    'vps_rate' => $entreprise->vps_rate,
+                    'cnss_employee_rate' => $entreprise->cnss_employee_rate,
+                    'cnss_employer_pension_rate' => $entreprise->cnss_employer_pension_rate,
+                    'cnss_employer_family_rate' => $entreprise->cnss_employer_family_rate,
+                    'cnss_employer_risk_rate' => $entreprise->cnss_employer_risk_rate,
                     // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
                     'rappel_soins_jours' => $entreprise->rappel_soins_jours,
                 ];
@@ -1770,14 +1811,27 @@ class SyncController extends Controller
                     ->with('employee:id,first_name,last_name')
                     ->when($since, fn ($q) => $q->where(fn ($w) => $w->where('updated_at', '>', $since)
                         ->orWhereHas('employee', fn ($e) => $e->where('updated_at', '>', $since))))
-                    ->select(['id', 'employee_id', 'net_salary', 'created_at', 'updated_at']),
+                    ->select(['id', 'employee_id', 'period_month', 'gross_salary', 'absence_deduction', 'cnss_deduction',
+                        'its_deduction', 'vps_employer', 'cnss_employer_pension', 'cnss_employer_family', 'cnss_employer_risk',
+                        'net_salary', 'created_at', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
+                // Ticket RH-4 — les colonnes RH (employé, période, brut, retenues, charges) ne descendent QU'AUX comptes
+                // `view-rh`, qui les voient au web (`GestionPaie`) ; `view-rapports` garde la vue réduite (S3).
                 'enJson' => fn (\App\Models\Payslip $p) => [
                     'id' => $p->id,
                     'employee_name' => $p->employee === null ? null : $p->employee->last_name.' '.$p->employee->first_name,
                     'net_salary' => (float) $p->net_salary,
                     'created_at' => $p->created_at?->format('Y-m-d H:i:s'),
-                ],
+                ] + (request()->user()?->can('view-rh') ? [
+                    'employee_id' => $p->employee_id,
+                    'period_month' => $p->period_month?->format('Y-m-d'),
+                    'gross_salary' => (float) $p->gross_salary,
+                    'absence_deduction' => (float) $p->absence_deduction,
+                    'cnss_deduction' => (float) $p->cnss_deduction,
+                    'its_deduction' => (float) ($p->its_deduction ?? 0),
+                    'charges_patronales' => round((float) ($p->vps_employer ?? 0) + (float) ($p->cnss_employer_pension ?? 0)
+                        + (float) ($p->cnss_employer_family ?? 0) + (float) ($p->cnss_employer_risk ?? 0), 2),
+                ] : []),
             ],
             [
                 // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
@@ -2046,6 +2100,11 @@ class SyncController extends Controller
             'veterinary_calendar_events' => ['accepted' => [], 'rejected' => []],
             'purchases' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
+            // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
+            'employees' => ['accepted' => [], 'rejected' => []],
+            'internships' => ['accepted' => [], 'rejected' => []],
+            'internship_absences' => ['accepted' => [], 'rejected' => []],
+            'payslip_requests' => ['accepted' => [], 'rejected' => []],
             // Ticket S-T5 — `merged` : créations du poste fusionnées avec une fiche existante (voir `FusionReferentielsService`).
             'products' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'suppliers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
@@ -2080,8 +2139,7 @@ class SyncController extends Controller
             'customer_reminders',
             'purchase_orders',
             'payables',
-            'employees',
-            'internships',
+            // Tickets RH-1 / RH-2 : `employees` et `internships` s'écrivent au poste depuis RH-1 (tables mixtes).
             'chart_of_accounts',
             'fiscal_years',
             'accounting_entries',
@@ -2148,6 +2206,18 @@ class SyncController extends Controller
         // peut viser un client créé au poste à l'instant.
         if ($request->has('customers')) {
             $result['customers'] = $this->pushCustomers($request->input('customers'), $request->user(), $this->nomDuPoste($request));
+        }
+
+        // Tickets RH-1 / RH-2 — REGISTRES RH AVANT LE POINTAGE ET LA PAIE : un pointage ou une demande de règlement du même
+        // envoi peut viser l'employé créé à l'instant ; une absence, le stagiaire créé à l'instant.
+        if ($request->has('employees')) {
+            $result['employees'] = $this->pushEmployees($request->input('employees'));
+        }
+        if ($request->has('internships')) {
+            $result['internships'] = $this->pushInternships($request->input('internships'));
+        }
+        if ($request->has('internship_absences')) {
+            $result['internship_absences'] = $this->pushInternshipAbsences($request->input('internship_absences'));
         }
 
         // Ticket DEV — LES DEVIS APRÈS LES CLIENTS : un devis du même envoi peut viser un client créé (ou fusionné) au
@@ -2274,6 +2344,11 @@ class SyncController extends Controller
 
         if ($request->has('attendance_records')) {
             $result['attendance_records'] = $this->pushAttendance($request->input('attendance_records'));
+        }
+
+        // Ticket RH-4 — APRÈS les pointages : les absences du mois, reçues dans le même envoi, comptent sur la paie.
+        if ($request->has('payslip_requests')) {
+            $result['payslip_requests'] = $this->pushPayslipRequests($request->input('payslip_requests'));
         }
 
         if ($request->has('sales')) {
@@ -2426,6 +2501,11 @@ class SyncController extends Controller
         'expenses' => 'manage-achats',
         'purchases' => 'manage-achats',
         'attendance_records' => 'manage-rh',
+        // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
+        'employees' => 'manage-rh',
+        'internships' => 'manage-rh',
+        'internship_absences' => 'manage-rh',
+        'payslip_requests' => 'manage-rh',
         'sales' => 'manage-ventes',
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
@@ -4474,6 +4554,170 @@ class SyncController extends Controller
         return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
+
+    /**
+     * Ticket RH-1 — EMPLOYÉS CRÉÉS, MODIFIÉS OU ARCHIVÉS AU POSTE, rejoués par `SaisieEmployeAction` (le point de
+     * passage de `RegistreEmployes`). Idempotent : une ligne identique à celle du serveur est acquittée sans rien
+     * écrire ; un archivage renvoyé ne fait rien. Un employé archivé ne se modifie plus (motif du web).
+     */
+    private function pushEmployees(array $employes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieEmployeAction::class);
+
+        foreach ($employes as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieEmployeAction::regles() + [
+                    'id' => ['required', 'uuid'],
+                    'is_active' => ['sometimes', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archive = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $existant = Employee::find($valides['id']);
+
+                DB::transaction(function () use ($saisie, $valides, $archive, $existant) {
+                    if ($existant === null) {
+                        $saisie->creer($valides, $valides['id']);
+                        if ($archive) {
+                            $saisie->archiver($valides['id']);
+                        }
+
+                        return;
+                    }
+                    if ($archive) {
+                        $saisie->archiver($existant->id);
+
+                        return;
+                    }
+                    if ($existant->is_active && $saisie->identique($existant, $valides)) {
+                        return;
+                    }
+                    $saisie->modifier($existant->id, $valides);
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /** Ticket RH-2 — STAGIAIRES CRÉÉS OU MODIFIÉS AU POSTE, rejoués par `SaisieStagiaireAction` (`RegistreStagiaires`). */
+    private function pushInternships(array $stagiaires): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieStagiaireAction::class);
+
+        foreach ($stagiaires as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieStagiaireAction::regles() + [
+                    'id' => ['required', 'uuid'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $existant = Internship::find($valides['id']);
+                if ($existant === null) {
+                    $saisie->creer($valides, $valides['id']);
+                } elseif (! $saisie->identique($existant, $valides)) {
+                    $saisie->modifier($existant->id, $valides);
+                }
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RH-2 — ABSENCES DE STAGIAIRE NOTÉES OU ARCHIVÉES AU POSTE (`SaisieStagiaireAction::absence()` /
+     * `archiverAbsence()`). Une absence déjà connue est acquittée sans réécriture ; `is_active` faux l'archive.
+     */
+    private function pushInternshipAbsences(array $absences): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieStagiaireAction::class);
+
+        foreach ($absences as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieStagiaireAction::reglesAbsence() + [
+                    'id' => ['required', 'uuid'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archive = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($saisie, $valides, $archive) {
+                    $saisie->absence($valides, $valides['id']);
+                    if ($archive) {
+                        $saisie->archiverAbsence($valides['id']);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RH-4 — DEMANDES DE RÈGLEMENT DE PAIE DU POSTE, rejouées par `ReglementPaieService` (le point de passage de
+     * `GestionPaie::validerReglement`). ⚠️ Le poste n'envoie que la DEMANDE : employé, période (`AAAA-MM`), instant du
+     * clic. Montants, compte de trésorerie, écriture, audit : ICI. Idempotent : un bulletin déjà réglé pour (employé,
+     * période) est acquitté sans rien rejouer. Un refus (exercice clos, employé archivé) porte son motif.
+     */
+    private function pushPayslipRequests(array $demandes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ReglementPaieService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'employee_id' => ['required', 'uuid', 'exists:employees,id'],
+                    'period_month' => ['required', 'date_format:Y-m'],
+                    'requested_at' => ['nullable', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $employe = Employee::findOrFail($valides['employee_id']);
+                $quand = isset($valides['requested_at']) ? Carbon::parse($valides['requested_at'])->setTimezone(config('app.timezone')) : now();
+                // Un instant du poste ne peut pas être dans le futur (horloge déréglée).
+                if ($quand->greaterThan(now())) {
+                    $quand = now();
+                }
+
+                $service->valider($employe, $valides['period_month'].'-01', $quand);
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\ReglementPaieRefuseException $e) {
+                $rejected[] = ['id' => $id, 'reason' => 'Règlement refusé : '.$e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     private function pushAttendance(array $records): array
     {
         $accepted = [];
@@ -4488,21 +4732,28 @@ class SyncController extends Controller
                     'check_in' => ['nullable', 'date_format:H:i,H:i:s'],
                     'check_out' => ['nullable', 'date_format:H:i,H:i:s'],
                     'status' => ['required', 'in:present,absent,conge,maladie,retard'],
+                    // Ticket RH-3 — `false` : le pointage est ARCHIVÉ au poste (`FeuillePointage::archiveRecord`).
+                    'is_active' => ['sometimes', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 $existant = AttendanceRecord::where('employee_id', $validated['employee_id'])
                     ->whereDate('attendance_date', $validated['attendance_date'])
                     ->first();
 
+                $actif = ! array_key_exists('is_active', $validated) || filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
                 $charge = [
                     'check_in' => $validated['check_in'] ?? null,
                     'check_out' => $validated['check_out'] ?? null,
                     'status' => $validated['status'],
-                    'is_active' => true,
+                    'is_active' => $actif,
                 ];
 
                 if ($existant) {
+                    $archiveMaintenant = $existant->is_active && ! $actif;
                     $existant->update($charge);
+                    if ($archiveMaintenant) {
+                        AuditLog::record('attendance.archived', 'rh', null, $existant);
+                    }
                 } else {
                     $pointage = new AttendanceRecord();
                     // ⚠️ MEME PIEGE QUE LES ACHATS (14.78) : `id` n'est pas

@@ -135,6 +135,7 @@ class RegistreStagiaires extends Component
             'monthlyFee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        // Ticket RH-2 — le point de passage unique, partagé avec l'envoi du poste (`SyncController::pushInternships`).
         $payload = [
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
@@ -144,14 +145,13 @@ class RegistreStagiaires extends Component
             'monthly_fee' => $this->monthlyFee,
             'fee_paid' => $this->feePaid,
         ];
+        $saisie = app(\App\Actions\SaisieStagiaireAction::class);
 
         if ($this->editingInternshipId) {
-            Internship::findOrFail($this->editingInternshipId)->update($payload);
-            AuditLog::record('internship.updated', 'rh');
+            $saisie->modifier($this->editingInternshipId, $payload);
             $message = 'Modification enregistrée avec succès.';
         } else {
-            Internship::create($payload);
-            AuditLog::record('internship.created', 'rh');
+            $saisie->creer($payload);
             $message = 'Enregistrement effectué avec succès.';
         }
 
@@ -190,13 +190,11 @@ class RegistreStagiaires extends Component
             'absenceReason' => ['nullable', 'string', 'max:255'],
         ]);
 
-        InternshipAbsence::create([
+        app(\App\Actions\SaisieStagiaireAction::class)->absence([
             'internship_id' => $this->absenceInternshipId,
             'absence_date' => $this->absenceDate,
             'reason' => $this->absenceReason ?: null,
         ]);
-
-        AuditLog::record('internship_absence.recorded', 'rh');
         $this->dispatch('toast', message: 'Absence enregistrée avec succès.', type: 'success');
         $this->absenceDate = now()->format('Y-m-d');
         $this->absenceReason = '';
@@ -210,9 +208,7 @@ class RegistreStagiaires extends Component
         // Le registre sert à délivrer des attestations : effacer une absence
         // modifie rétroactivement ce que l'école atteste, sans que rien ne le
         // montre. Archivée, elle reste restaurable.
-        $absence = InternshipAbsence::findOrFail($id);
-        $absence->update(['is_active' => false]);
-        AuditLog::record('internship_absence.archived', 'rh', null, $absence);
+        app(\App\Actions\SaisieStagiaireAction::class)->archiverAbsence($id);
         $this->dispatch('toast', message: 'Absence archivée — restaurable depuis Paramètres > Restauration.', type: 'warning');
     }
 

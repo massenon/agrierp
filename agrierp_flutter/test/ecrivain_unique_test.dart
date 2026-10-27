@@ -36,6 +36,11 @@ void main() {
     'livestock_reproduction_events': 'lib/features/elevage/suivi_reproduction_repository.dart',
     'purchases': 'lib/features/achats/achats_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
+    // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
+    'employees': 'lib/features/rh/personnel_repository.dart',
+    'internships': 'lib/features/rh/personnel_repository.dart',
+    'internship_absences': 'lib/features/rh/personnel_repository.dart',
+    'payslip_requests': 'lib/features/rh/personnel_repository.dart',
     'products': 'lib/features/stocks/produits_repository.dart',
     'suppliers': 'lib/features/achats/fournisseurs_repository.dart',
     'supplier_payments': 'lib/features/achats/fournisseurs_repository.dart',
