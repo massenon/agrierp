@@ -2124,6 +2124,8 @@ class SyncController extends Controller
             'supplier_payments' => ['accepted' => [], 'rejected' => []],
             // Ticket VC-1 — encaissements de créances clients saisis au poste.
             'receivable_payments' => ['accepted' => [], 'rejected' => []],
+            // Ticket VC-2 — relances de clients faites ou demandées au poste.
+            'customer_reminders' => ['accepted' => [], 'rejected' => []],
             'purchase_returns' => ['accepted' => [], 'rejected' => []],
             'supplier_refunds' => ['accepted' => [], 'rejected' => []],
             'customer_advances' => ['accepted' => [], 'rejected' => []],
@@ -2144,7 +2146,7 @@ class SyncController extends Controller
         foreach ([
             'product_categories',
             'receivables',
-            'customer_reminders',
+            // Ticket VC-2 : `customer_reminders` s'écrit au poste (`pushCustomerReminders`).
             'purchase_orders',
             'payables',
             // Tickets RH-1 / RH-2 : `employees` et `internships` s'écrivent au poste depuis RH-1 (tables mixtes).
@@ -2402,6 +2404,14 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket VC-2 — APRÈS les encaissements : une relance du poste est jouée avec l'état courant des créances.
+        if ($request->has('customer_reminders')) {
+            $result['customer_reminders'] = $this->pushCustomerReminders(
+                $this->envoiTraduit($request, 'customer_reminders'),
+                $request->user(),
+            );
+        }
+
         if ($request->has('livestock_reproduction_events')) {
             $result['livestock_reproduction_events'] =
                 $this->pushReproductionEvents($request->input('livestock_reproduction_events'));
@@ -2533,6 +2543,8 @@ class SyncController extends Controller
         'sales' => 'manage-ventes',
         // Ticket VC-1 — le droit de `SuiviDettes` / `ProfileClient` du web.
         'receivable_payments' => 'manage-ventes',
+        // Ticket VC-2 — le droit de `RelancesClients` / `SuiviDettes` du web.
+        'customer_reminders' => 'manage-ventes',
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
         // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
@@ -4316,6 +4328,64 @@ class SyncController extends Controller
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
             } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
                 $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket VC-2 — RELANCES DE CLIENTS faites (WhatsApp, courrier) ou DEMANDÉES (e-mail, SMS) au poste.
+     *
+     * ⚠️ Le poste envoie le fait « relance de ce client / cette créance, par ce canal, avec ce message, tel jour » ;
+     * `RelanceClientService` — partagé avec `RelancesClients` — fait l'envoi que le canal exige (e-mail, SMS : le SERVEUR
+     * envoie) puis tient la trace. Un envoi refusé (client sans adresse, SMS non configuré) est rendu AVEC SON MOTIF et ne
+     * laisse AUCUNE trace. ⚠️ Idempotence par l'UUID du poste : un rejeu ne renvoie ni mail ni SMS.
+     */
+    private function pushCustomerReminders(array $relances, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\RelanceClientService::class);
+
+        foreach ($relances as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de relancer un client.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'customer_id' => ['required', 'uuid', 'exists:customers,id'],
+                    'receivable_id' => ['nullable', 'uuid', 'exists:receivables,id'],
+                    'channel' => ['required', 'in:'.implode(',', \App\Services\RelanceClientService::CANAUX)],
+                    'message' => ['required', 'string', 'max:5000'],
+                    'reminder_date' => ['required', 'date', 'before_or_equal:today'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if (\App\Models\CustomerReminder::find($valides['id']) !== null) {
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                $service->relancer(
+                    \App\Models\Customer::findOrFail($valides['customer_id']),
+                    isset($valides['receivable_id']) ? \App\Models\Receivable::find($valides['receivable_id']) : null,
+                    $valides['channel'],
+                    $valides['message'],
+                    $valides['reminder_date'],
+                    $valides['id'],
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
             }
         }
 

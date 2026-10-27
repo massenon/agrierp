@@ -6157,6 +6157,42 @@ class $CustomerRemindersTable extends CustomerReminders
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($CustomerRemindersTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _customerIdMeta = const VerificationMeta(
     'customerId',
   );
@@ -6219,6 +6255,9 @@ class $CustomerRemindersTable extends CustomerReminders
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     customerId,
     receivableId,
     channel,
@@ -6241,6 +6280,22 @@ class $CustomerRemindersTable extends CustomerReminders
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('customer_id')) {
       context.handle(
@@ -6295,6 +6350,20 @@ class $CustomerRemindersTable extends CustomerReminders
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $CustomerRemindersTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       customerId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
@@ -6322,11 +6391,17 @@ class $CustomerRemindersTable extends CustomerReminders
   $CustomerRemindersTable createAlias(String alias) {
     return $CustomerRemindersTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class CustomerReminder extends DataClass
     implements Insertable<CustomerReminder> {
   final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String customerId;
   final String? receivableId;
 
@@ -6336,6 +6411,9 @@ class CustomerReminder extends DataClass
   final String? message;
   const CustomerReminder({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     required this.customerId,
     this.receivableId,
     required this.channel,
@@ -6346,6 +6424,13 @@ class CustomerReminder extends DataClass
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $CustomerRemindersTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     map['customer_id'] = Variable<String>(customerId);
     if (!nullToAbsent || receivableId != null) {
       map['receivable_id'] = Variable<String>(receivableId);
@@ -6363,6 +6448,9 @@ class CustomerReminder extends DataClass
   CustomerRemindersCompanion toCompanion(bool nullToAbsent) {
     return CustomerRemindersCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       customerId: Value(customerId),
       receivableId: receivableId == null && nullToAbsent
           ? const Value.absent()
@@ -6384,6 +6472,11 @@ class CustomerReminder extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CustomerReminder(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $CustomerRemindersTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       customerId: serializer.fromJson<String>(json['customerId']),
       receivableId: serializer.fromJson<String?>(json['receivableId']),
       channel: serializer.fromJson<String>(json['channel']),
@@ -6396,6 +6489,11 @@ class CustomerReminder extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $CustomerRemindersTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'customerId': serializer.toJson<String>(customerId),
       'receivableId': serializer.toJson<String?>(receivableId),
       'channel': serializer.toJson<String>(channel),
@@ -6406,6 +6504,9 @@ class CustomerReminder extends DataClass
 
   CustomerReminder copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     String? customerId,
     Value<String?> receivableId = const Value.absent(),
     String? channel,
@@ -6413,6 +6514,9 @@ class CustomerReminder extends DataClass
     Value<String?> message = const Value.absent(),
   }) => CustomerReminder(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     customerId: customerId ?? this.customerId,
     receivableId: receivableId.present ? receivableId.value : this.receivableId,
     channel: channel ?? this.channel,
@@ -6422,6 +6526,11 @@ class CustomerReminder extends DataClass
   CustomerReminder copyWithCompanion(CustomerRemindersCompanion data) {
     return CustomerReminder(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
@@ -6440,6 +6549,9 @@ class CustomerReminder extends DataClass
   String toString() {
     return (StringBuffer('CustomerReminder(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('customerId: $customerId, ')
           ..write('receivableId: $receivableId, ')
           ..write('channel: $channel, ')
@@ -6450,13 +6562,25 @@ class CustomerReminder extends DataClass
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, customerId, receivableId, channel, reminderDate, message);
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    customerId,
+    receivableId,
+    channel,
+    reminderDate,
+    message,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CustomerReminder &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.customerId == this.customerId &&
           other.receivableId == this.receivableId &&
           other.channel == this.channel &&
@@ -6466,6 +6590,9 @@ class CustomerReminder extends DataClass
 
 class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String> customerId;
   final Value<String?> receivableId;
   final Value<String> channel;
@@ -6474,6 +6601,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   final Value<int> rowid;
   const CustomerRemindersCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.customerId = const Value.absent(),
     this.receivableId = const Value.absent(),
     this.channel = const Value.absent(),
@@ -6483,6 +6613,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   });
   CustomerRemindersCompanion.insert({
     required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
     required String customerId,
     this.receivableId = const Value.absent(),
     required String channel,
@@ -6490,10 +6623,15 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     this.message = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
        customerId = Value(customerId),
        channel = Value(channel);
   static Insertable<CustomerReminder> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? customerId,
     Expression<String>? receivableId,
     Expression<String>? channel,
@@ -6503,6 +6641,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (customerId != null) 'customer_id': customerId,
       if (receivableId != null) 'receivable_id': receivableId,
       if (channel != null) 'channel': channel,
@@ -6514,6 +6655,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
 
   CustomerRemindersCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String>? customerId,
     Value<String?>? receivableId,
     Value<String>? channel,
@@ -6523,6 +6667,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   }) {
     return CustomerRemindersCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       customerId: customerId ?? this.customerId,
       receivableId: receivableId ?? this.receivableId,
       channel: channel ?? this.channel,
@@ -6537,6 +6684,17 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $CustomerRemindersTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
@@ -6563,6 +6721,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   String toString() {
     return (StringBuffer('CustomerRemindersCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('customerId: $customerId, ')
           ..write('receivableId: $receivableId, ')
           ..write('channel: $channel, ')
@@ -46433,6 +46594,9 @@ typedef $$CustomerAdvancesTableProcessedTableManager =
 typedef $$CustomerRemindersTableCreateCompanionBuilder =
     CustomerRemindersCompanion Function({
       required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
       required String customerId,
       Value<String?> receivableId,
       required String channel,
@@ -46443,6 +46607,9 @@ typedef $$CustomerRemindersTableCreateCompanionBuilder =
 typedef $$CustomerRemindersTableUpdateCompanionBuilder =
     CustomerRemindersCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String> customerId,
       Value<String?> receivableId,
       Value<String> channel,
@@ -46462,6 +46629,22 @@ class $$CustomerRemindersTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -46505,6 +46688,21 @@ class $$CustomerRemindersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get customerId => $composableBuilder(
     column: $table.customerId,
     builder: (column) => ColumnOrderings(column),
@@ -46542,6 +46740,18 @@ class $$CustomerRemindersTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get customerId => $composableBuilder(
     column: $table.customerId,
@@ -46606,6 +46816,9 @@ class $$CustomerRemindersTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> customerId = const Value.absent(),
                 Value<String?> receivableId = const Value.absent(),
                 Value<String> channel = const Value.absent(),
@@ -46614,6 +46827,9 @@ class $$CustomerRemindersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => CustomerRemindersCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 customerId: customerId,
                 receivableId: receivableId,
                 channel: channel,
@@ -46624,6 +46840,9 @@ class $$CustomerRemindersTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
                 required String customerId,
                 Value<String?> receivableId = const Value.absent(),
                 required String channel,
@@ -46632,6 +46851,9 @@ class $$CustomerRemindersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => CustomerRemindersCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 customerId: customerId,
                 receivableId: receivableId,
                 channel: channel,

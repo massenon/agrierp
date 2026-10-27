@@ -213,17 +213,17 @@ class SyncClientsCreancesTest extends TestCase
      * Ticket 15.18 : `customers` N'EN FAIT PLUS PARTIE — les fiches clients s'écrivent au
      * poste, sous le droit `manage-ventes` (voir `SyncClientTest`).
      * Ticket 15.19 : `customer_advances` non plus — l'avance s'encaisse au poste
-     * (voir `SyncAvancesClientsTest`). Ne restent ignorés que les créances et les relances.
+     * (voir `SyncAvancesClientsTest`). Ticket VC-2 : `customer_reminders` non plus — la relance
+     * s'envoie du poste (voir `SyncRelancesClientsTest`). Ne restent ignorées que les créances.
      */
     public function test_the_device_cannot_write_back_on_these_referentials(): void
     {
         $reponse = $this->actingAs($this->utilisateur, 'sanctum')->postJson('/api/sync/push', [
             'receivables' => [['id' => '11111111-1111-4111-8111-111111111111', 'amount' => 1]],
-            'customer_reminders' => [['id' => '22222222-2222-4222-8222-222222222222']],
         ]);
 
         $reponse->assertOk();
-        $this->assertGreaterThanOrEqual(2, $reponse->json('referentiels_ignored'));
+        $this->assertGreaterThanOrEqual(1, $reponse->json('referentiels_ignored'));
         $this->assertSame('AMOUSSOU Régis', $this->client->fresh()->name);
         $this->assertSame(0, Receivable::count());
         $this->assertSame(0, CustomerReminder::count());

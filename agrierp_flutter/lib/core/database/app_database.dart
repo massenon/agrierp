@@ -1199,7 +1199,11 @@ class PurchaseOrders extends Table {
 /// le réseau ET le canal mail du serveur (`CustomerReminderMail`) : un envoi
 /// tenté depuis le poste hors ligne ne serait enregistré nulle part, et le
 /// client serait rappelé une seconde fois le lendemain.
-class CustomerReminders extends Table {
+///
+/// Ticket VC-2 — table MIXTE : une relance se FAIT (WhatsApp, courrier) ou se DEMANDE (e-mail, SMS : c'est le serveur qui
+/// envoie) au poste, en `pending`, et se tient en un seul exemplaire (UUID du poste, rejeu sans double envoi).
+class CustomerReminders extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get customerId => text().withLength(min: 36, max: 36)();
   TextColumn get receivableId => text().nullable()();
@@ -2078,7 +2082,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 69;
+  int get schemaVersion => 70;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2737,6 +2741,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 69) {
         if (!await _tableExiste(m, receivablePayments)) await m.createTable(receivablePayments);
       }
+      // v70 — ticket VC-2 : `customer_reminders` devient MIXTE (colonnes de synchronisation posées par reconstruction).
+      if (from < 70) {
+        await _relancesMixtes(m);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -2804,6 +2812,24 @@ class AppDatabase extends _$AppDatabase {
           utilisateurs.deviceId: const Constant<String>('serveur'),
           utilisateurs.syncStatus: const Constant<String>('synced'),
           utilisateurs.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket VC-2 — `customer_reminders` reçoit [SyncColumns] par RECONSTRUCTION (`TableMigration`) : les relances déjà
+  /// tirées sont `synced`, `device_id` = 'serveur'. Idempotent.
+  Future<void> _relancesMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${customerReminders.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        customerReminders,
+        newColumns: [for (final c in customerReminders.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          customerReminders.deviceId: const Constant<String>('serveur'),
+          customerReminders.syncStatus: const Constant<String>('synced'),
+          customerReminders.updatedAt: currentDateAndTime,
         },
       ),
     );
@@ -3069,6 +3095,8 @@ class AppDatabase extends _$AppDatabase {
     'supplier_payments',
     // Ticket VC-1 — encaissements de créances clients (le fait seul : le serveur applique).
     'receivable_payments',
+    // Ticket VC-2 — relances de clients (WhatsApp, courrier faits ; e-mail, SMS demandés).
+    'customer_reminders',
     'customers',
     'mails',
     'archived_documents',

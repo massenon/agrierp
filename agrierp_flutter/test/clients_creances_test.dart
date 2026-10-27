@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
@@ -101,6 +102,9 @@ void main() {
       .into(db.customerReminders)
       .insert(
         CustomerRemindersCompanion.insert(
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           id: uuid(cle),
           customerId: uuid(cleClient),
           channel: canal,
@@ -114,6 +118,9 @@ void main() {
       .into(db.customerReminders)
       .insert(
         CustomerRemindersCompanion.insert(
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           id: uuid(cle),
           customerId: uuid(cleClient),
           channel: 'sms',
@@ -446,13 +453,13 @@ void main() {
 
     /// ⚠️ Le texte est celui de la maquette, au caractère près.
     testWidgets(
-      '⚠️ le modèle affiché est le niveau 2, comme dans la maquette',
+      '⚠️ le modèle affiché est le niveau 2, avec le texte du WEB (VC-2)',
       (tester) async {
         await afficher(tester);
         await ouvrir(tester, 'Relances Clients');
 
         expect(
-          find.textContaining('est en retard de paiement depuis le'),
+          find.textContaining('Malgré notre précédent rappel'),
           findsOneWidget,
         );
       },
@@ -468,19 +475,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('Nous vous mettons en demeure de régulariser'),
+        find.textContaining('Mise en demeure — [NOM]'),
         findsOneWidget,
       );
     });
 
-    /// ⚠️⚠️ Une relance partie du poste ne serait inscrite nulle part : le
-    /// client serait rappelé deux fois depuis le web le lendemain.
-    testWidgets('⚠️⚠️ l écran dit pourquoi il n envoie pas', (tester) async {
+    /// Ticket VC-2 : les relances se font (WhatsApp, courrier) ou se demandent (e-mail, SMS) au poste ; l'écran dit qui
+    /// fait quoi — et la trace est tenue, donc le client n'est pas rappelé deux fois.
+    testWidgets('⚠️⚠️ l écran dit qui envoie quoi', (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Relances Clients');
 
       expect(
-        find.textContaining('Le client serait rappelé deux fois.'),
+        find.textContaining('part du serveur à la prochaine synchronisation'),
         findsOneWidget,
       );
     });

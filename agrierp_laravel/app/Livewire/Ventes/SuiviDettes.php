@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\CustomerAdvance;
 use App\Models\CustomerReminder;
 use App\Services\CustomerSettlementService;
+use App\Services\RelanceClientService;
 use App\Models\Receivable;
 use App\Models\TreasuryAccount;
 use Livewire\Attributes\Url;
@@ -155,15 +156,14 @@ class SuiviDettes extends Component
             return;
         }
 
-        CustomerReminder::create([
-            'customer_id' => $receivable->customer_id,
-            'receivable_id' => $receivable->id,
-            'channel' => 'whatsapp',
-            'reminder_date' => now(),
-            'message' => 'Relance — solde dû '.number_format($receivable->balance, 0, ',', ' ').' FCFA.',
-        ]);
+        // Ticket VC-2 — la trace passe par `RelanceClientService`, comme l'écran « Relances Clients » et les postes.
+        app(RelanceClientService::class)->journaliser(
+            $receivable->customer,
+            $receivable,
+            'whatsapp',
+            'Relance — solde dû '.number_format($receivable->balance, 0, ',', ' ').' FCFA.',
+        );
 
-        AuditLog::record('customer.reminder_sent', 'ventes');
         $this->dispatch('toast', message: 'Relance envoyée à '.$receivable->customer->name.'.', type: 'success');
     }
 

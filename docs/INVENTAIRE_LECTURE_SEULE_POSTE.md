@@ -53,9 +53,9 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | Écran web | Fonction web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
 | `SuiviDettes` | confirmPayment (encaisser une créance) | **PRÉSENT depuis VC-1 (28/10/2026)** : `ClientsCreancesRepository.encaisserCreance` ; serveur `CustomerSettlementService` + `pushReceivablePayments` | `receivable_payments` (Drift v69) | VC-1 ✅ |
-| `SuiviDettes` | sendReminder | ABSENT (inerte) | `customer_reminders` (refusé) | VC-2 |
-| `RelancesClients` | sendMailReminder, sendWhatsappReminder, sendSmsReminder, exportCourrierPdf | ABSENT : l. 700-713, mention l. 839-841 | `customer_reminders` | VC-2 |
-| `ProfileClient` | confirmRegularisation, sendQuickReminder | ABSENT : aucun écran profil client | `receivables` | VC-3 |
+| `SuiviDettes` | sendReminder | **PRÉSENT depuis VC-2 (28/10/2026)** : `ClientsCreancesRepository.relancer`, serveur `RelanceClientService` | `customer_reminders` (v70, envoyée) | VC-2 ✅ |
+| `RelancesClients` | sendMailReminder, sendWhatsappReminder, sendSmsReminder, exportCourrierPdf | **PRÉSENT depuis VC-2** : e-mail/SMS envoyés par le serveur au push, WhatsApp via `wa.me`, courrier PDF existant | `customer_reminders` | VC-2 ✅ |
+| `ProfileClient` | confirmRegularisation, sendQuickReminder | **PRÉSENT depuis VC-3 (28/10/2026)** : `profil_client_page.dart`, `encaisserSolde`, `relancer(clientId:)` | `receivable_payments`, `customer_reminders` | VC-3 ✅ |
 | `HistoriqueAvances` | editAdvance, archiveAdvance | ABSENT, voulu (D4/D5) : `clients_creances_screen.dart:31`, l. 1224-1226 | — | VC-4 (décision à revoir : « toutes les fonctions ») |
 | `Facturation` | retryMecef | ABSENT (QR : mention `ventes/facturation_screen.dart:466-471`) | `sales` | VC-5 (en ligne) |
 | `PosInterface`, `HistoriqueVentes`, `RetoursAvoirs`, `Devis`, `ListeClients`, `HistoriqueAvances` (création, imputation) | — | PRÉSENT | — | — |

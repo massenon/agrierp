@@ -15,25 +15,53 @@ import 'clients_creances_repository.dart';
 ///
 /// ⚠️⚠️ **LE POSTE N'ÉCRIT QUE LE FAIT** : le serveur solde la créance, fait entrer l'argent dans les DEUX livres de
 /// trésorerie et passe D 5xx / C 411 (`CustomerSettlementService`). « Nouveau Solde Dû » (maquette) n'est qu'un aperçu.
+///
+/// Ticket VC-3 — la fiche client ouvre la MÊME modale : « Régler » une créance ([depart], [titre] « Enregistrer un
+/// Règlement », [libelleReference] « Référence ») ou « Enregistrer un règlement » du solde GLOBAL ([clientGlobal] et
+/// [soldeGlobal] : encaissement sans créance visée, imputé aux plus anciennes d'abord par le serveur).
 Future<bool> ouvrirRecouvrement({
   required BuildContext context,
   required ClientsCreancesRepository depot,
   required DonneesClients donnees,
   LigneCreance? depart,
+  String titre = 'Enregistrer un Recouvrement',
+  String libelleReference = 'Débiteur / Facture',
+  String? clientGlobal,
+  double soldeGlobal = 0,
 }) async {
   final ok = await afficherModale<bool>(
     context: context,
-    constructeur: (_) => _ModaleRecouvrement(depot: depot, donnees: donnees, depart: depart),
+    constructeur: (_) => _ModaleRecouvrement(
+      depot: depot,
+      donnees: donnees,
+      depart: depart,
+      titre: titre,
+      libelleReference: libelleReference,
+      clientGlobal: clientGlobal,
+      soldeGlobal: soldeGlobal,
+    ),
   );
   return ok == true;
 }
 
 class _ModaleRecouvrement extends StatefulWidget {
-  const _ModaleRecouvrement({required this.depot, required this.donnees, required this.depart});
+  const _ModaleRecouvrement({
+    required this.depot,
+    required this.donnees,
+    required this.depart,
+    required this.titre,
+    required this.libelleReference,
+    required this.clientGlobal,
+    required this.soldeGlobal,
+  });
 
   final ClientsCreancesRepository depot;
   final DonneesClients donnees;
   final LigneCreance? depart;
+  final String titre;
+  final String libelleReference;
+  final String? clientGlobal;
+  final double soldeGlobal;
 
   @override
   State<_ModaleRecouvrement> createState() => _ModaleRecouvrementState();
@@ -65,6 +93,8 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
       if (c.resteDu > 0) c,
   ];
 
+  bool get _global => widget.clientGlobal != null;
+
   LigneCreance? get _creance {
     for (final c in widget.donnees.creances) {
       if (c.creance.id == _creanceId) return c;
@@ -75,6 +105,8 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
   double? get _saisi => double.tryParse(_montant.text.trim().replaceAll(' ', '').replaceAll(',', '.'));
 
   static String _f(double v) => v.round().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ' ');
+
+  static String _reference(LigneCreance c) => (c.creance.saleId ?? c.creance.id).substring(0, 8).toUpperCase();
 
   static String _etiquette(LigneCreance c) => '${c.nomClient} — ${c.creance.saleId == null ? c.creance.id.substring(0, 8).toUpperCase() : c.creance.saleId!.substring(0, 8).toUpperCase()}';
 
@@ -88,13 +120,17 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
           ? 'Le champ montant du règlement doit être supérieur ou égal à 1.'
           : null;
       _erreurCompte = _compteId.isEmpty ? 'Le champ compte de trésorerie est obligatoire.' : null;
-      _refus = c == null ? 'Veuillez choisir une créance.' : null;
+      _refus = c == null && !_global ? 'Veuillez choisir une créance.' : null;
     });
     if (_erreurMontant != null || _erreurCompte != null || _refus != null) return;
 
     setState(() => _envoi = true);
     try {
-      await widget.depot.encaisserCreance(creanceId: c!.creance.id, montant: montant!, compteId: _compteId);
+      if (_global) {
+        await widget.depot.encaisserSolde(clientId: widget.clientGlobal!, montant: montant!, compteId: _compteId);
+      } else {
+        await widget.depot.encaisserCreance(creanceId: c!.creance.id, montant: montant!, compteId: _compteId);
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on SaisieRefusee catch (e) {
@@ -132,15 +168,16 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
   Widget build(BuildContext context) {
     final c = _creance;
     final saisi = _saisi;
-    final nouveau = c == null ? null : (c.resteDu - (saisi ?? 0)).clamp(0, double.infinity);
+    final solde = _global ? widget.soldeGlobal : c?.resteDu;
+    final nouveau = solde == null ? null : (solde - (saisi ?? 0)).clamp(0, double.infinity);
 
     return ModaleAgri(
-      titre: 'Enregistrer un Recouvrement',
+      titre: widget.titre,
       contenu: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.depart == null)
+          if (widget.depart == null && !_global)
             _bloc(
               'Débiteur / Facture',
               DropdownButtonFormField<String>(
@@ -166,10 +203,10 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Flexible(child: Text('Débiteur / Facture', style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline))),
+                    Flexible(child: Text(widget.libelleReference, style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline))),
                     Flexible(
                       child: Text(
-                        c == null ? '—' : _etiquette(c),
+                        _global ? 'Solde global' : (c == null ? '—' : widget.libelleReference == 'Référence' ? _reference(c) : _etiquette(c)),
                         key: const Key('recouvrement-debiteur'),
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
@@ -183,7 +220,7 @@ class _ModaleRecouvrementState extends State<_ModaleRecouvrement> {
                   children: [
                     const Flexible(child: Text('Solde restant', style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline))),
                     Flexible(child: Text(
-                      c == null ? '—' : '${_f(c.resteDu)} FCFA',
+                      solde == null ? '—' : '${_f(solde)} FCFA',
                       key: const Key('recouvrement-solde'),
                       style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.errorDeep),
                     )),

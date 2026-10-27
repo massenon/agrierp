@@ -45,6 +45,8 @@ void main() {
     'utilisateurs': 'lib/features/parametres/parametres_generaux_repository.dart',
     // Ticket VC-1 — « Suivi des Dettes » : l'encaissement d'une créance s'écrit par ce dépôt.
     'receivable_payments': 'lib/features/clients/clients_creances_repository.dart',
+    // Ticket VC-2 — « Relances Clients » : WhatsApp, e-mail, courrier, SMS s'écrivent par ce dépôt.
+    'customer_reminders': 'lib/features/clients/clients_creances_repository.dart',
     'products': 'lib/features/stocks/produits_repository.dart',
     'suppliers': 'lib/features/achats/fournisseurs_repository.dart',
     'supplier_payments': 'lib/features/achats/fournisseurs_repository.dart',

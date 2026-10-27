@@ -407,14 +407,8 @@ void main() {
     'Valider le Décaissement': 'le web dit « Valider le Règlement » (VC-1)',
     'Compte Débité': 'le web dit « Compte de Trésorerie » : un encaissement CRÉDITE le compte (VC-1)',
 
-    // ── Envoyer une relance suppose le réseau ET le canal mail du serveur ;
-    //    surtout, `customer_reminders` est en lecture seule : une relance
-    //    partie du poste ne serait inscrite nulle part, et le client serait
-    //    rappelé une seconde fois depuis le web le lendemain. Le motif est
-    //    affiché à l'écran, pas seulement ici.
-    'Relancer WhatsApp': 'envoi impossible hors ligne et non traçable au poste',
-    'Relancer par Mail': 'envoi impossible hors ligne et non traçable au poste',
-    'Exporter Courrier': "chaîne d'édition non embarquée",
+    // ── Ticket VC-2 : les relances se font (WhatsApp, courrier) ou se demandent (e-mail, SMS) au poste : les exemptions
+    //    « envoi impossible hors ligne » et « chaîne d'édition non embarquée » sont levées.
     // ⚠️ Aucune table de modèles n'existe — le web le documente aussi : son
     //    propre bouton n'y persiste rien. Un bouton qui annonce « sauvegardé »
     //    sans rien enregistrer est un mensonge d'interface.
@@ -1140,9 +1134,10 @@ void main() {
   /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
   /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
   /// RH-1 à RH-4 (27/10/2026) : 197 → 189. Les registres RH s'écrivent au poste : leurs libellés de modale sont portés.
+  /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 173;
+  const plafondManquesMasques = 170;
 
   for (final entree in portages.entries) {
     final page = entree.key;

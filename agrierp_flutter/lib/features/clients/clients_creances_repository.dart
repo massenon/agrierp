@@ -364,6 +364,8 @@ class ClientsCreancesRepository {
       final cible = e.receivableId;
       if (cible != null) parCreance[cible] = (parCreance[cible] ?? 0) + e.amount;
     }
+    // Ticket VC-3 — les encaissements GLOBAUX (sans créance visée) pèsent sur les plus anciennes d'abord.
+    await _repartirGlobaux(creances, parCreance);
 
     final refus = {
       for (final c in await (database.select(
@@ -475,8 +477,146 @@ class ClientsCreancesRepository {
 
   /// Solde d'une créance, imputations EN ATTENTE déduites.
   Future<double> soldeCreance(Receivable c) async {
-    final net = c.amount - c.amountPaid - await _enAttenteDe(creanceId: c.id);
+    final net = c.amount - c.amountPaid - ((await _enAttenteParCreance())[c.id] ?? 0);
     return net < 0 ? 0 : net;
+  }
+
+  /// Ce qui pèse DÉJÀ sur chaque créance, en attente d'envoi : imputations d'acompte, encaissements visant la créance
+  /// (VC-1) et encaissements globaux répartis (VC-3).
+  Future<Map<String, double>> _enAttenteParCreance() async {
+    final creances = await database.select(database.receivables).get();
+    final parCreance = <String, double>{};
+    for (final i in await (database.select(database.advanceImputations)
+          ..where((i) => i.syncStatus.equalsValue(SyncStatus.pending)))
+        .get()) {
+      final cible = i.receivableId;
+      if (cible != null) parCreance[cible] = (parCreance[cible] ?? 0) + i.amount;
+    }
+    for (final e in await (database.select(database.receivablePayments)
+          ..where((p) => p.syncStatus.equalsValue(SyncStatus.pending)))
+        .get()) {
+      final cible = e.receivableId;
+      if (cible != null) parCreance[cible] = (parCreance[cible] ?? 0) + e.amount;
+    }
+    await _repartirGlobaux(creances, parCreance);
+    return parCreance;
+  }
+
+  /// Répartit les encaissements GLOBAUX en attente (`receivable_id` nul) sur les créances de leur client, les plus
+  /// anciennes d'abord (échéance croissante, la règle de `CustomerSettlementService`), dans la limite de ce qui reste
+  /// dû après tout ce qui pèse déjà sur chaque créance.
+  Future<void> _repartirGlobaux(List<Receivable> creances, Map<String, double> parCreance) async {
+    final globaux = await (database.select(database.receivablePayments)
+          ..where((p) => Expression.and([p.syncStatus.equalsValue(SyncStatus.pending), p.receivableId.isNull()]))
+          ..orderBy([(p) => OrderingTerm(expression: p.updatedAt)]))
+        .get();
+    for (final p in globaux) {
+      var reste = p.amount;
+      final siennes = creances.where((c) => c.customerId == p.customerId).toList()
+        ..sort((a, b) => (a.dueDate ?? DateTime(2100)).compareTo(b.dueDate ?? DateTime(2100)));
+      for (final c in siennes) {
+        if (reste <= 0) break;
+        final libre = c.amount - c.amountPaid - (parCreance[c.id] ?? 0);
+        if (libre <= 0) continue;
+        final part = reste < libre ? reste : libre;
+        parCreance[c.id] = (parCreance[c.id] ?? 0) + part;
+        reste -= part;
+      }
+    }
+  }
+
+  /// Ticket VC-3 — « Enregistrer un règlement » de la fiche client (solde global, FIFO) : un encaissement SANS créance
+  /// visée, EN ATTENTE d'envoi. Refus reproduits avant d'écrire : montant ≥ 1, client et compte connus, solde du client
+  /// non nul, jamais plus que ce solde (net de tout ce qui est en attente), exercice ouvert.
+  Future<EncaissementCreance> encaisserSolde({
+    required String clientId,
+    required double montant,
+    required String compteId,
+    DateTime? date,
+  }) async {
+    if (montant.isNaN || montant.isInfinite || montant <= 0) {
+      throw const SaisieRefusee('Le montant du règlement doit être supérieur à zéro.');
+    }
+    if (montant < 1) throw const SaisieRefusee("Le montant du règlement doit être d'au moins 1 FCFA.");
+
+    final client = await clientDe(clientId);
+    if (client == null) throw const SaisieRefusee('Client inconnu — synchronisez le poste.');
+    final compte = await (database.select(database.treasuryAccounts)..where((c) => c.id.equals(compteId))).getSingleOrNull();
+    if (compte == null) throw const SaisieRefusee('Compte de trésorerie inconnu — synchronisez le poste avant de saisir.');
+
+    final charges = await _enAttenteParCreance();
+    final solde = (await (database.select(database.receivables)..where((c) => c.customerId.equals(clientId))).get())
+        .fold<double>(0, (t, c) {
+      final net = c.amount - c.amountPaid - (charges[c.id] ?? 0);
+      return t + (net > 0 ? net : 0);
+    });
+    if (solde <= 0) throw const SaisieRefusee("Ce client n'a aucune créance ouverte.");
+    if (montant > solde + 0.005) {
+      throw SaisieRefusee(
+        'Le montant dépasse le solde du client (${solde.toStringAsFixed(0)} F), '
+        'encaissements et imputations en attente déduits.',
+      );
+    }
+
+    final jour = date ?? HeureBenin.maintenant();
+    await ExerciceDeSaisie(database).refuser(jour);
+
+    final id = _uuid.v4();
+    await database.into(database.receivablePayments).insert(
+      ReceivablePaymentsCompanion.insert(
+        id: id,
+        deviceId: deviceId,
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: DateTime.now(),
+        customerId: clientId,
+        treasuryAccountId: compteId,
+        amount: montant,
+        paymentDate: DateTime(jour.year, jour.month, jour.day),
+      ),
+    );
+    return (database.select(database.receivablePayments)..where((p) => p.id.equals(id))).getSingle();
+  }
+
+  /// Ticket VC-3 — le contenu de « Profil Client » (`ProfileClient`) : ce que le poste sait de ce client.
+  Future<ProfilClient?> profil(String clientId) async {
+    final client = await clientDe(clientId);
+    if (client == null) return null;
+
+    final donnees = await charger();
+    final creances = donnees.creances.where((l) => l.creance.customerId == clientId && l.resteDu > 0).toList()
+      ..sort((a, b) => (a.creance.dueDate ?? DateTime(2100)).compareTo(b.creance.dueDate ?? DateTime(2100)));
+
+    final ventes = await (database.select(database.sales)
+          ..where((v) => v.customerId.equals(clientId))
+          ..orderBy([(v) => OrderingTerm.desc(v.soldAt)])
+          ..limit(20))
+        .get();
+    final lignes = ventes.isEmpty
+        ? <SaleLine>[]
+        : await (database.select(database.saleLines)..where((l) => l.saleId.isIn([for (final v in ventes) v.id]))).get();
+    final produits = {for (final p in await database.select(database.products).get()) p.id: p.name};
+
+    return ProfilClient(
+      client: client,
+      soldeGlobal: creances.fold<double>(0, (t, l) => t + l.resteDu),
+      ventes: [
+        for (final v in ventes)
+          VenteDuClient(
+            vente: v,
+            articles: [
+              for (final l in lignes)
+                if (l.saleId == v.id && produits[l.productId] != null) produits[l.productId]!,
+            ].join(', '),
+          ),
+      ],
+      creances: creances,
+      avances: donnees.avances.where((a) => a.avance.customerId == clientId && !a.soldee && a.avance.isActive).toList(),
+      relances: (await (database.select(database.customerReminders)
+                ..where((r) => r.customerId.equals(clientId))
+                ..orderBy([(r) => OrderingTerm.desc(r.reminderDate)]))
+              .get()),
+      comptes: donnees.comptes,
+    );
   }
 
   Future<double> _enAttenteDe({String? avanceId, String? creanceId}) async {
@@ -775,6 +915,150 @@ class ClientsCreancesRepository {
       database.receivablePayments,
     )..where((p) => p.id.equals(id))).getSingle();
   }
+
+  // ── Ticket VC-2 — relances de clients ────────────────────────────────────────
+
+  /// Téléphone d'un client (lien WhatsApp), `null` s'il est inconnu.
+  Future<String?> telephoneDe(String clientId) async => (await clientDe(clientId))?.phone;
+
+  Future<Customer?> clientDe(String clientId) => (database.select(database.customers)..where((c) => c.id.equals(clientId))).getSingleOrNull();
+
+  /// Les quatre canaux (`RelanceClientService::CANAUX`).
+  static const canauxRelance = ['whatsapp', 'email', 'sms', 'courrier'];
+
+  /// Les trois modèles du WEB (`RelancesClients::defaultTemplates`) — le web est le maître, au caractère près.
+  static const modelesRelance = <String, String>{
+    '1':
+        "Bonjour [NOM],\n\nNous vous rappelons amicalement que la facture [FACTURE] d'un montant de [MONTANT_DU] FCFA est arrivée à échéance le [DATE_ECHEANCE]. Merci de bien vouloir régulariser votre situation.\n\nCordialement,\nFerme École OLOUWACHEGOUN",
+    '2':
+        "Bonjour [NOM],\n\nMalgré notre précédent rappel, la facture [FACTURE] d'un montant de [MONTANT_DU] FCFA reste impayée depuis le [DATE_ECHEANCE]. Merci de régulariser rapidement votre situation.\n\nCordialement,\nFerme École OLOUWACHEGOUN",
+    '3':
+        "Mise en demeure — [NOM],\n\nSauf erreur de notre part, la facture [FACTURE] d'un montant de [MONTANT_DU] FCFA demeure impayée malgré nos relances. À défaut de règlement sous 8 jours, nous nous verrons contraints d'engager les démarches de recouvrement nécessaires.\n\nFerme École OLOUWACHEGOUN",
+  };
+
+  /// `RelancesClients::renderTemplate` : [NOM], [FACTURE] (8 premiers caractères en majuscules), [MONTANT_DU] (solde,
+  /// milliers séparés par une espace) et [DATE_ECHEANCE] (jj/mm/aaaa).
+  static String rendreModele(String modele, LigneCreance ligne) {
+    final identifiant = ligne.creance.saleId ?? ligne.creance.id;
+    final echeance = ligne.creance.dueDate;
+    return modele
+        .replaceAll('[NOM]', ligne.nomClient)
+        .replaceAll('[FACTURE]', identifiant.substring(0, identifiant.length < 8 ? identifiant.length : 8).toUpperCase())
+        .replaceAll('[MONTANT_DU]', DocumentsAvances.formaterMontant(ligne.resteDu))
+        .replaceAll('[DATE_ECHEANCE]', echeance == null ? '' : DocumentsAvances.formaterJour(echeance));
+  }
+
+  /// Le lien `wa.me` du web : numéro réduit à ses chiffres, message encodé.
+  static String lienWhatsapp(String telephone, String message) =>
+      'https://wa.me/${telephone.replaceAll(RegExp(r'[^0-9]'), '')}?text=${Uri.encodeComponent(message)}';
+
+  /// Lettre de relance (`exports.courrier-relance`) : destinataire, ville, date, puis le message.
+  static DocumentOfficiel lettreRelance({required String client, String? ville, required DateTime date, required String message}) {
+    return DocumentOfficiel(
+      titre: 'Lettre de Relance',
+      sousTitre: client,
+      entetes: const ['Champ', 'Valeur'],
+      lignes: [
+        DonneesDocument(['Destinataire', client]),
+        if (ville != null && ville.isNotEmpty) DonneesDocument(['Ville', ville]),
+        DonneesDocument(['Date', DocumentsAvances.formaterJour(date)]),
+        DonneesDocument(['Message', message]),
+      ],
+    );
+  }
+
+  /// « Relancer WhatsApp » / « par Mail » / « par SMS » / « Exporter Courrier » : écrit la relance, EN ATTENTE d'envoi.
+  ///
+  /// ⚠️⚠️ **LE POSTE FAIT CE QUE L'APPAREIL PEUT FAIRE, ET DEMANDE LE RESTE.** WhatsApp (lien `wa.me`) et le courrier
+  /// (PDF) se font ICI — l'écran les déclenche APRÈS cette écriture ; l'e-mail et le SMS partent du SERVEUR (SMTP et
+  /// fournisseur SMS de l'entreprise) : la demande attend la synchronisation, qui l'acquitte ou la refuse avec son motif.
+  /// Les refus du serveur sont reproduits AVANT d'écrire, mêmes messages : numéro (WhatsApp, SMS), adresse (e-mail),
+  /// message obligatoire.
+  Future<CustomerReminder> relancer({
+    String? creanceId,
+    String? clientId,
+    required String canal,
+    required String message,
+    DateTime? date,
+  }) async {
+    if (!canauxRelance.contains(canal)) throw const SaisieRefusee('Canal de relance inconnu.');
+    if (message.trim().isEmpty) throw const SaisieRefusee('Le champ message est obligatoire.');
+
+    // Ticket VC-3 — « relance rapide » de la fiche client : sans créance visée, `clientId` seul.
+    Receivable? creance;
+    if (creanceId != null) {
+      creance = await (database.select(database.receivables)..where((c) => c.id.equals(creanceId))).getSingleOrNull();
+      if (creance == null) throw const SaisieRefusee('Créance introuvable — synchronisez le poste.');
+    }
+    final idClient = creance?.customerId ?? clientId;
+    if (idClient == null) throw const SaisieRefusee('Client inconnu — synchronisez le poste.');
+    final client = await clientDe(idClient);
+    if (client == null) throw const SaisieRefusee('Client inconnu — synchronisez le poste.');
+
+    final telephone = (client.phone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    if ((canal == 'whatsapp' || canal == 'sms') && telephone.isEmpty) {
+      throw const SaisieRefusee("Ce client n'a pas de numéro de téléphone enregistré.");
+    }
+    if (canal == 'email' && (client.email ?? '').trim().isEmpty) {
+      throw const SaisieRefusee("Ce client n'a pas d'adresse email enregistrée.");
+    }
+
+    final jour = date ?? HeureBenin.maintenant();
+    final id = _uuid.v4();
+
+    await database
+        .into(database.customerReminders)
+        .insert(
+          CustomerRemindersCompanion.insert(
+            id: id,
+            deviceId: deviceId,
+            syncStatus: const Value(SyncStatus.pending),
+            updatedAt: DateTime.now(),
+            customerId: client.id,
+            receivableId: Value(creanceId),
+            channel: canal,
+            reminderDate: Value(DateTime(jour.year, jour.month, jour.day)),
+            message: Value(message),
+          ),
+        );
+
+    return (database.select(database.customerReminders)..where((r) => r.id.equals(id))).getSingle();
+  }
+}
+
+/// Une vente de la fiche client (« Ventes ») et la liste de ses articles.
+class VenteDuClient {
+  const VenteDuClient({required this.vente, required this.articles});
+
+  final Sale vente;
+  final String articles;
+}
+
+/// Ticket VC-3 — ce que « Profil Client » affiche d'un client (`ProfileClient` du web).
+class ProfilClient {
+  const ProfilClient({
+    required this.client,
+    required this.soldeGlobal,
+    required this.ventes,
+    required this.creances,
+    required this.avances,
+    required this.relances,
+    required this.comptes,
+  });
+
+  final Customer client;
+
+  /// « Solde Global Dû » : somme des soldes NETS des créances encore dues.
+  final double soldeGlobal;
+  final List<VenteDuClient> ventes;
+  final List<LigneCreance> creances;
+  final List<LigneAvance> avances;
+  final List<CustomerReminder> relances;
+  final List<TreasuryAccount> comptes;
+
+  /// Part du crédit autorisé utilisée, 0–100 (`null` : pas de plafond).
+  int? get pourcentageCredit =>
+      client.creditLimit > 0 ? (soldeGlobal / client.creditLimit * 100).round().clamp(0, 100) : null;
 }
 
 /// Saisie d'avance ou d'imputation refusée AVANT d'être écrite — le motif est montré

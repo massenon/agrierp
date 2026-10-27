@@ -171,6 +171,10 @@ PRD : `docs/prd/rh-crud-poste.md`. **Trois points de passage uniques, partagés 
 
 `App\Services\CustomerSettlementService::encaisser()` est le point de passage unique de `SuiviDettes::confirmPayment`, `ProfileClient::confirmRegularisation` ET de `SyncController::pushReceivablePayments` (clé d'envoi `receivable_payments`, droit `manage-ventes`, traitée après `sales`, `customer_advances` et `advance_imputations`). Une créance précise (`receivable_id`) ou, sans elle, le solde du client en FIFO ; créance, trésorerie (deux livres), écriture D 5xx / C 411 et audit dans UNE transaction ; **seule la part imputée entre en caisse** ; idempotent par l'UUID du poste (`receivable_payments`, vidée par la réinitialisation avant les créances). Tests : `SyncEncaissementCreanceTest`.
 
+### Relances clients au poste (VC-2 — 28/10/2026)
+
+`App\Services\RelanceClientService` (`relancer` : e-mail via la configuration SMTP des paramètres ou SMS via `SmsService`, puis journal ; `journaliser` : trace seule, WhatsApp et courrier) est le point de passage unique de `RelancesClients`, `SuiviDettes::sendReminder` ET de `SyncController::pushCustomerReminders` (clé `customer_reminders`, droit `manage-ventes`, idempotent par UUID du poste, `referentiels_ignored` si le client ou la créance est inconnu). Garde : `tests/Feature/SyncRelancesClientsTest.php`.
+
 ### Scheduling
 
 `routes/console.php` holds all 5 scheduled tasks (daily `agrierp:backup` at 02:00, `DailyProphylaxyReminderJob` at 06:00 Africa/Porto-Novo, weekly session GC / notification purge / failed-job prune, weekly backup-download reminder). Production uses **one** cPanel cron entry running `php artisan schedule:run` every minute — never one cron per task.

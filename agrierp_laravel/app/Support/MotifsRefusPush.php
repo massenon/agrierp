@@ -84,6 +84,7 @@ class MotifsRefusPush
             // Ticket VC-1 — encaissements de créances.
             'customer_id' => 'client', 'receivable_id' => 'créance', 'treasury_account_id' => 'compte de trésorerie',
             'amount' => 'montant', 'payment_date' => 'date du règlement',
+            'channel' => 'canal', 'message' => 'message', 'reminder_date' => 'date de la relance',
             // Ticket UT-1 — comptes utilisateurs.
             'name' => 'nom complet', 'username' => "nom d'utilisateur", 'role' => 'rôle',
             'password' => 'mot de passe',

@@ -1,4 +1,5 @@
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/perimetre_tirage.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/sync/coherence_repository.dart';
@@ -419,6 +420,9 @@ void main() {
           .into(db.customerReminders)
           .insert(
             CustomerRemindersCompanion.insert(
+              deviceId: 'serveur',
+              updatedAt: DateTime(2026, 1, 1),
+              syncStatus: const Value(SyncStatus.synced),
               id: 'e1e2e3e4-4444-4000-8000-000000000001',
               customerId: 'e1e2e3e4-5555-4000-8000-000000000001',
               channel: 'sms',

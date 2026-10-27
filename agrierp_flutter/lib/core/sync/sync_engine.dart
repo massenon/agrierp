@@ -3649,6 +3649,7 @@ class SyncEngine {
     EmployeesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     InternshipsCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     InternshipAbsencesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    CustomerRemindersCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     UtilisateursCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
     _ => c,
   };
@@ -4301,31 +4302,36 @@ class SyncEngine {
   /// contacté ce matin par WhatsApp est présenté exactement comme le voisin que
   /// personne n'a jamais appelé. Le poste faisait rappeler deux fois — la faute
   /// la plus visible pour un client, et la seule qu'il raconte.
+  /// Ticket VC-2 — fusion STRICTE : une relance `pending` / `conflict` de ce poste n'est jamais écrasée par le tirage ;
+  /// ce que le serveur sert (toutes les relances de la ferme, web compris) est fusionné par identifiant.
   Future<int> _absorberRelances(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.customerReminders).go();
+    final vus = <String>{};
+    final recus = <CustomerRemindersCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Relance');
+      recus.add(
+        CustomerRemindersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _maintenant(),
+          customerId: (l['customer_id'] ?? '') as String,
+          receivableId: Value(l['receivable_id'] as String?),
+          channel: (l['channel'] ?? 'courrier') as String,
+          reminderDate: Value(_date(l['reminder_date'])),
+          message: Value(l['message'] as String?),
+        ),
+      );
+    }
 
-      for (final l in lignes) {
-        await _db
-            .into(_db.customerReminders)
-            .insert(
-              CustomerRemindersCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                receivableId: Value(l['receivable_id'] as String?),
-                channel: (l['channel'] ?? 'courrier') as String,
-                reminderDate: Value(_date(l['reminder_date'])),
-                message: Value(l['message'] as String?),
-              ),
-            );
-      }
-    });
+    await _fusionnerMixte(_db.customerReminders, recus, vus);
 
-    return lignes.length;
+    return recus.length;
   }
 
   /// Protocole prophylactique : référentiel remplacé à chaque tirage.
@@ -5132,6 +5138,11 @@ class SyncEngine {
       _db.receivablePayments,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket VC-2 — relances de clients : WhatsApp et courrier FAITS, e-mail et SMS DEMANDÉS (le serveur envoie).
+    final relances = await (_db.select(
+      _db.customerReminders,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final retours = await (_db.select(
       _db.purchaseReturns,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -5218,6 +5229,7 @@ class SyncEngine {
         avances.isEmpty &&
         imputations.isEmpty &&
         encaissements.isEmpty &&
+        relances.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
         fournisseurs.isEmpty &&
@@ -5397,6 +5409,8 @@ class SyncEngine {
         'advance_imputations': imputations.map(_imputationEnJson).toList(),
         // Ticket VC-1 — traité par le serveur APRÈS les ventes, les avances et leurs imputations.
         'receivable_payments': encaissements.map(_encaissementEnJson).toList(),
+        // Ticket VC-2 — après les encaissements, comme au serveur.
+        'customer_reminders': relances.map(_relanceEnJson).toList(),
       });
 
     var accepte = 0;
@@ -6053,6 +6067,17 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket VC-2 — acquittée quand le serveur a fait l'envoi demandé (e-mail, SMS) et tenu la trace.
+    accepte += await _acquitter(
+      'customer_reminders',
+      corps['customer_reminders'],
+      (ids, statut) =>
+          (_db.update(_db.customerReminders)..where((t) => t.id.isIn(ids)))
+              .write(CustomerRemindersCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // Ticket VC-1 — acquitté seulement quand le serveur a passé créance, trésorerie (deux livres) et écriture.
     accepte += await _acquitter(
       'receivable_payments',
@@ -6159,6 +6184,8 @@ class SyncEngine {
     'advance_imputations',
     // Ticket VC-1 — après les ventes, les avances et leurs imputations, comme au serveur.
     'receivable_payments',
+    // Ticket VC-2 — après les encaissements, comme au serveur.
+    'customer_reminders',
     'livestock_reproduction_events',
     'infirmary_records',
     'veterinary_calendar_events',
@@ -6750,6 +6777,16 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket VC-2 — une relance refusée (client sans adresse, SMS non configuré) se corrige puis se relance.
+      'customer_reminders' =>
+        () =>
+            (_db.update(
+              _db.customerReminders,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const CustomerRemindersCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
       // Ticket VC-1 — un encaissement refusé (créance soldée entre-temps, exercice clos…) se relance.
       'receivable_payments' =>
         () =>
@@ -7097,6 +7134,17 @@ class SyncEngine {
     if (i.saleId != null) 'sale_id': i.saleId,
     'amount': i.amount,
     'imputation_date': _jour(i.imputationDate),
+  };
+
+  /// Ticket VC-2 — relance : le fait « ce client / cette créance, ce canal, ce message, ce jour ». Pour l'e-mail et le SMS,
+  /// c'est une DEMANDE d'envoi : le serveur envoie, tient la trace, et refuse avec son motif s'il ne peut pas.
+  Map<String, dynamic> _relanceEnJson(CustomerReminder r) => {
+    'id': r.id,
+    'customer_id': r.customerId,
+    'receivable_id': r.receivableId,
+    'channel': r.channel,
+    'message': r.message ?? '',
+    'reminder_date': r.reminderDate == null ? _jour(HeureBenin.aujourdhui()) : _jour(r.reminderDate!),
   };
 
   /// Ticket VC-1 — encaissement de créance : ni solde, ni écriture, ni imputation ne partent, seulement le fait.
