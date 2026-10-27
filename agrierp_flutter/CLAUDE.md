@@ -296,6 +296,15 @@ The window is created **frameless** (`WS_POPUP`, `windows/runner/win32_window.cp
 - The HTTP client is built at startup, so a changed address needs a restart — and the screen **says so**, otherwise it reads as a network failure.
 - **One shared Dio client.** It carries the `Authorization` header once the session opens; a second client for sync would go out tokenless and get a 401 — all the more baffling because login itself succeeded.
 
+## Démarrage et migration d'une VRAIE base (27/10/2026) — « le logiciel ne s'ouvre pas »
+
+Symptôme : après désinstallation puis réinstallation (la base reste dans le profil Windows), `agrierp.exe` tourne dans les processus d'arrière-plan et **aucune fenêtre ne s'ouvre** ; un poste neuf s'ouvre. Cause : la fenêtre est créée CACHÉE et montrée à la première image ; une exception (ou une attente) dans `main()` avant `runApp` — ici la migration de l'ancienne base — ne dessine jamais d'image.
+
+- ⚠️ **Un `TableMigration` recopie TOUTES les colonnes du schéma COURANT depuis l'ancienne table** : toute colonne ajoutée par un palier ultérieur (`receipt_local_path`, v64) y manque → « no such column ». Déclarer en `newColumns` les colonnes absentes de la table réelle (`_depensesACreditEtCentreObligatoire`).
+- ⚠️ **`user_version` ne dit pas ce que la base contient** : les paliers 57 à 59 ont été numérotés sur des branches parallèles ; une base en version 60 d'une autre chaîne n'a ni la Corbeille ni `expenses.on_credit`. `_ajouterColonneSiAbsente` crée la table absente, et `_reconcilierSchema` (fin d'`onUpgrade`) pose tout ce qui manque.
+- `lib/core/demarrage/demarrage_poste.dart` : toute panne de démarrage donne un ÉCRAN (« AgriERP ne peut pas démarrer », bouton Quitter) et une ligne dans `demarrage.log` (dossier des données du poste, `%APPDATA%\bj.olouwachegoun\agrierp\`) ; au-delà de 45 s la préparation est tenue pour bloquée.
+- Garde-fou : `test/migration_bases_reelles_test.dart` reproduit ces deux formes de base (`migration_toutes_versions_test` part d'une base neuve et ne les voit pas). Méthode d'origine : générer des bases avec d'anciens commits (`git archive <commit> agrierp_flutter/lib`), les migrer avec le code courant, comparer le schéma à celui d'une base neuve — 12 versions de 38 à 64, zéro écart.
+
 ## Flutter-specific traps already paid for
 
 - **PDF : `ExportOfficiel.construire` DOIT recevoir `polices` (`chargerPolices()`).** La police par défaut du moteur PDF (Helvetica) n'a pas Unicode : « — » et « ’ » sortent en CARRÉ BARRÉ, sans erreur (un avertissement de journal seulement) — pied des trois structures, adresse de la ferme, tirets des valeurs inconnues. Roboto est embarquée (`assets/fonts/`, Apache 2.0). Corrigé au ticket F0.75 ; `test/liste_achats_detail_test.dart` lit les flux du PDF et compte les glyphes manquants.

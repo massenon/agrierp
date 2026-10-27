@@ -33,15 +33,22 @@ void main() {
       expect(LocalisationPoste.locale, const Locale('fr'));
       expect(LocalisationPoste.locales, [const Locale('fr')]);
 
-      // Un seul MaterialApp dans lib/ : un second échapperait à la localisation.
+      // Deux MaterialApp dans lib/, pas un de plus : celui du poste et celui de l'écran « AgriERP ne peut pas démarrer »
+      // (montré AVANT que l'application existe). Un autre échapperait à la localisation ; et le second doit porter
+      // EXACTEMENT la même localisation que le premier.
       final applications = Directory('lib')
           .listSync(recursive: true)
           .whereType<File>()
           .where((f) => f.path.endsWith('.dart'))
           .where((f) => f.readAsStringSync().contains('MaterialApp('))
           .map((f) => f.path.replaceAll(r'\', '/'))
-          .toList();
-      expect(applications, ['lib/main.dart']);
+          .toList()
+        ..sort();
+      expect(applications, ['lib/core/demarrage/demarrage_poste.dart', 'lib/main.dart']);
+      final demarrage = File('lib/core/demarrage/demarrage_poste.dart').readAsStringSync();
+      expect(demarrage, contains('locale: LocalisationPoste.locale'));
+      expect(demarrage, contains('supportedLocales: LocalisationPoste.locales'));
+      expect(demarrage, contains('localizationsDelegates: LocalisationPoste.delegues'));
     });
 
     testWidgets(

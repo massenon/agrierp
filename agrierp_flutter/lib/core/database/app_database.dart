@@ -2017,6 +2017,12 @@ class AppDatabase extends _$AppDatabase {
     final existantes = await m.database
         .customSelect('PRAGMA table_info("${table.actualTableName}")')
         .get();
+    // Table ABSENTE (base d'une chaîne de paliers parallèle : `user_version` 60 sans la Corbeille du palier 58) : la créer
+    // au schéma courant pose aussi la colonne.
+    if (existantes.isEmpty) {
+      await m.createTable(table);
+      return;
+    }
     if (existantes.any((l) => l.read<String>('name') == colonne.name)) return;
     await m.addColumn(table, colonne);
   }
@@ -2634,8 +2640,31 @@ class AppDatabase extends _$AppDatabase {
         await _ajouterColonneSiAbsente(
             m, attestationTemplates, attestationTemplates.appreciationImprimee);
       }
+
+      // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
+      // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
+      // `user_version` 60 SANS les tables ni les colonnes des paliers 57, 58 et 59 (« no such table: corbeille_elements »).
+      // Après tous les paliers, ce qui manque encore par rapport au schéma courant est posé : tables absentes créées,
+      // colonnes absentes ajoutées. Sans effet sur une base complète.
+      if (from >= 59 && from < 66) {
+        await _depensesACreditEtCentreObligatoire(m);
+      }
+      await _reconcilierSchema(m);
     },
   );
+
+  /// Pose ce qui manque, table par table et colonne par colonne, par rapport au schéma courant (voir `onUpgrade`).
+  Future<void> _reconcilierSchema(Migrator m) async {
+    for (final table in allTables) {
+      if (!await _tableExiste(m, table)) {
+        await m.createTable(table);
+        continue;
+      }
+      for (final colonne in table.$columns) {
+        await _ajouterColonneSiAbsente(m, table, colonne);
+      }
+    }
+  }
 
   /// Palier v59 (tickets DEP6 et DEP7) — deux changements d'un seul palier, tous deux sans perte :
   ///
@@ -2655,7 +2684,14 @@ class AppDatabase extends _$AppDatabase {
     );
 
     if (tresorerieObligatoire) {
-      await m.alterTable(TableMigration(expenses, newColumns: [if (!aOnCredit) expenses.onCredit]));
+      // 🔴 ⚠️⚠️ LA RECONSTRUCTION RECOPIE CHAQUE COLONNE DU SCHÉMA COURANT depuis l'ancienne table : toute colonne ajoutée
+      // APRÈS ce palier (`receipt_local_path`, v64…) n'existe pas encore dans une base ancienne, et la copie échouait
+      // (« no such column ») — le poste ne s'ouvrait plus. Les colonnes absentes de l'ancienne table sont donc déclarées
+      // NOUVELLES (remplies par leur défaut, ou NULL), quel que soit le palier qui les a posées.
+      final presentes = {for (final c in colonnes) c.read<String>('name')};
+      await m.alterTable(
+        TableMigration(expenses, newColumns: [for (final c in expenses.$columns) if (!presentes.contains(c.name)) c]),
+      );
     } else if (!aOnCredit) {
       await _ajouterColonneSiAbsente(m, expenses, expenses.onCredit);
     }

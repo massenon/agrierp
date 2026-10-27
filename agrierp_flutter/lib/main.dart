@@ -97,6 +97,7 @@ import 'features/notifications/notifications_repository.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/pilotage/tableau_de_bord_repository.dart';
 import 'features/pilotage/tableau_de_bord_screen.dart';
+import 'core/demarrage/demarrage_poste.dart';
 import 'features/profil/mon_profil_repository.dart';
 import 'features/profil/mon_profil_screen.dart';
 import 'features/sync/synchronisation_screen.dart';
@@ -133,15 +134,21 @@ Future<void> main() async {
   Intl.defaultLocale = 'fr_FR';
   await initializeDateFormatting('fr_FR');
 
-  final db = AppDatabase();
-  final parametres = ParametresPoste(database: db);
-
+  // ⚠️ Une panne de démarrage (base illisible, migration impossible, fichier verrouillé) se VOIT : sans cela la fenêtre,
+  // créée cachée et montrée à la première image, ne s'ouvrait jamais et `agrierp.exe` restait fantôme en arrière-plan.
   runApp(
-    AgriErpApp(
-      database: db,
-      identifiantPoste: await parametres.identifiant(),
-      adresseServeur: await parametres.adresseServeur(),
-      parametres: parametres,
+    await DemarragePoste.preparer(
+      construire: () async {
+        final db = AppDatabase();
+        final parametres = ParametresPoste(database: db);
+
+        return AgriErpApp(
+          database: db,
+          identifiantPoste: await parametres.identifiant(),
+          adresseServeur: await parametres.adresseServeur(),
+          parametres: parametres,
+        );
+      },
     ),
   );
 }
