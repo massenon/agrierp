@@ -159,6 +159,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: AchatsCommandesScreen(depot: depot)),
     );
+    // Un pump() laisse _charger() compléter et retire le CircularProgressIndicator
+    // (animation infinie) AVANT pumpAndSettle — sinon le spinner tourne indéfiniment
+    // et provoque un timeout avec 6000+ assertions !semantics.parentDataDirty.
+    await tester.pump();
     await tester.pumpAndSettle();
   }
 
