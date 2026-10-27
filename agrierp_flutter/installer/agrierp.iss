@@ -3,9 +3,16 @@
 ; /DAppEnv=dev|recette|production /DNomInstallateur=... installer\agrierp.iss).
 ;
 ; La base locale (Drift/SQLite) vit dans le profil Windows de l'utilisateur
-; (path_provider), JAMAIS dans le dossier d'installation : desinstaller ou
-; mettre a jour l'application ne touche pas aux ventes et fiches non
-; synchronisees.
+; (path_provider : %APPDATA%\bj.olouwachegoun\agrierp, CompanyName et
+; ProductName de Runner.rc), JAMAIS dans le dossier d'installation : une MISE A
+; JOUR ne touche pas aux ventes et fiches non synchronisees.
+;
+; Ticket DES-1 (decision du client du 27/10/2026) : la DESINSTALLATION supprime
+; aussi la base locale et ses journaux ([UninstallDelete] + [Code]). Les saisies
+; faites hors ligne et pas encore envoyees sont PERDUES : le desinstallateur le
+; dit et demande confirmation (InitializeUninstall) avant de retirer quoi que ce
+; soit. Le coffre du systeme (PIN, mots de passe en attente : Gestionnaire
+; d'identification Windows) n'est pas touche ; un PIN orphelin est sans effet.
 
 #ifndef AppVersion
   #define AppVersion "1.0.0"
@@ -75,3 +82,22 @@ Name: "{autodesktop}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{ap
 
 [Run]
 Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags: nowait postinstall skipifsilent
+
+; Ticket DES-1 : la base locale, demarrage.log et les justificatifs copies en local partent avec le programme.
+[UninstallDelete]
+Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"
+Type: dirifempty; Name: "{userappdata}\bj.olouwachegoun"
+
+[Code]
+// Ticket DES-1 : la desinstallation supprime la base locale ; ce qui n'est pas parti au serveur est perdu.
+// L'utilisateur le lit et confirme ; « Non » annule la desinstallation entiere.
+function InitializeUninstall(): Boolean;
+begin
+  Result := MsgBox(
+    'La desinstallation d''AgriERP supprime aussi la base locale de ce poste' + #13#10 +
+    '(' + ExpandConstant('{userappdata}\bj.olouwachegoun\agrierp') + ').' + #13#10#13#10 +
+    'Les ventes, fiches, depenses et autres saisies faites HORS LIGNE et pas encore' + #13#10 +
+    'synchronisees seront PERDUES. Synchronisez le poste avant de continuer.' + #13#10#13#10 +
+    'Desinstaller AgriERP et supprimer ses donnees locales ?',
+    mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+end;

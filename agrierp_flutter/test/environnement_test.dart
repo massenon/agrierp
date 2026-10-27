@@ -170,5 +170,22 @@ void main() {
       final fin = RegExp(r'^#endif', multiLine: true).allMatches(source).length;
       expect(si, fin);
     });
+
+    /// Ticket DES-1 (décision du client du 27/10/2026) : la DÉSINSTALLATION supprime la base locale — le dossier des
+    /// données du poste (`%APPDATA%\bj.olouwachegoun\agrierp`, CompanyName / ProductName de Runner.rc) — après une
+    /// confirmation qui dit que les saisies non synchronisées seront perdues. Une MISE À JOUR, elle, n'y touche jamais.
+    test('agrierp.iss : la désinstallation supprime la base locale, après confirmation (DES-1)', () {
+      final source = iss.readAsStringSync();
+      expect(source, contains('[UninstallDelete]'));
+      expect(source, contains(r'Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"'));
+      expect(source, contains('function InitializeUninstall(): Boolean;'));
+      expect(source, contains('PERDUES'));
+      expect(source, contains('MB_YESNO'));
+      expect(source, isNot(contains('[InstallDelete]')), reason: 'une mise à jour ne touche pas aux données');
+
+      final rc = File('windows/runner/Runner.rc').readAsStringSync();
+      expect(rc, contains('"CompanyName", "bj.olouwachegoun"'));
+      expect(rc, contains('"ProductName", "agrierp"'));
+    });
   });
 }
