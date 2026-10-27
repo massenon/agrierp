@@ -161,6 +161,7 @@ class ReinitialisationPoste {
     'veterinary_records': 'Soins vétérinaires',
     'expenses': 'Dépenses',
     'quotes': 'Devis',
+    'purchase_orders': 'Bons de commande',
     'livestock_reproduction_events': 'Saillies et mises bas',
     'purchases': 'Achats',
     'attendance_records': 'Pointages',

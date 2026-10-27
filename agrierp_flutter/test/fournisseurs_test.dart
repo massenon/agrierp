@@ -894,6 +894,34 @@ void main() {
       }
     });
 
+    /// Ticket AC-4 — la colonne « Actions » n'est plus inerte : « Régler » ouvre la modale sur le fournisseur de la ligne
+    /// (`openPaymentModal($supplierId)` du web) ; une dette soldée n'offre rien.
+    testWidgets('⚠️ « Régler » ouvre la modale sur le fournisseur de la ligne ; une dette soldée n\'a pas d\'action', (
+      tester,
+    ) async {
+      await fournisseur('f1', 'Quincaillerie ADJOVI');
+      await fournisseur('f2', 'Provenderie du Plateau');
+      await dette('d1', cleFournisseur: 'f1', montant: 100000, regle: 40000);
+      await dette('d2', cleFournisseur: 'f2', montant: 50000, regle: 50000, nom: 'Provenderie du Plateau');
+      await compte('c1', 'Caisse Physique');
+
+      await afficher(tester);
+      await ouvrir(tester, 'Dettes Fournisseurs');
+
+      expect(find.byKey(const Key('regler-dette-0')), findsOneWidget);
+      expect(find.byKey(const Key('regler-dette-1')), findsNothing, reason: 'dette soldée : rien à régler');
+
+      await tester.tap(find.byKey(const Key('regler-dette-0')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enregistrer un Règlement'), findsOneWidget);
+      expect(
+        tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('reglement-fournisseur'))).initialValue,
+        uuid('f1'),
+        reason: 'le fournisseur de la ligne est déjà choisi',
+      );
+    });
+
     /// ⚠️⚠️ 312 000 facturés, 156 000 réglés : la colonne montre 156 000.
     testWidgets('⚠️⚠️ la dette affiche le reste dû, jamais le total facturé', (
       tester,

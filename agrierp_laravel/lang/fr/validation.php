@@ -254,6 +254,8 @@ return [
         'exportPeriod' => 'période d\'export',
         'faviconFile' => 'icône du site',
         'file' => 'fichier',
+        // Ticket AC-3 — `POST /api/sync/receipts`.
+        'table' => 'table',
         'first_name' => 'prénom',
         'firstName' => 'prénom',
         'forgotEmail' => 'adresse e-mail',

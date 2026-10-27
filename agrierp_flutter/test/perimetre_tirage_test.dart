@@ -116,6 +116,8 @@ void main() {
     'payslip_requests',
     // Ticket VC-1 — encaissements de créances (envoyés, jamais tirés : la créance soldée redescend dans `receivables`).
     'receivable_payments',
+    // Ticket AC-1 — lignes des bons de commande : elles descendent DANS l'entrée `purchase_orders` du tirage (pas de clé propre).
+    'purchase_order_lines',
     'sync_conflicts',
     'app_settings',
     'sync_state',

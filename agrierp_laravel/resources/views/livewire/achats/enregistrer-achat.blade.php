@@ -120,7 +120,7 @@
             <div>
                 <label class="block text-[10px] text-outline font-bold uppercase mb-xs">Pièce Justificative</label>
                 <label class="border-2 border-dashed border-outline-variant rounded-lg p-lg text-center block cursor-pointer hover:border-brand-emerald">
-                    <input wire:model="receiptFile" type="file" accept="image/*" class="hidden">
+                    <input wire:model="receiptFile" type="file" accept="image/*,application/pdf" class="hidden">
                     <span class="material-symbols-outlined text-outline-variant" style="font-size:36px;">add_a_photo</span>
                     <p class="text-xs text-outline mt-xs font-semibold">{{ $receiptFile ? $receiptFile->getClientOriginalName() : 'Associer une photo du reçu' }}</p>
                     <p class="text-[10px] text-outline">Format JPG, PNG (Max 5Mo)</p>

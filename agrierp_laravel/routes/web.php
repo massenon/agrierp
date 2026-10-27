@@ -241,6 +241,16 @@ Route::get('/parametres-integrations', \App\Livewire\Parametres\Integrations::cl
     ->name('parametres.integrations')
     ->middleware(['auth', 'can:view-parametres']);
 
+// Ticket AC-3 — LECTURE d'une pièce justificative (achat ou dépense), sur le disque privé : jamais d'URL publique.
+Route::get('/justificatifs/{type}/{id}', function (string $type, string $id) {
+    abort_unless(in_array($type, ['achat', 'depense'], true), 404);
+
+    $reponse = app(\App\Services\JustificatifService::class)->lire($type, $id);
+    abort_if($reponse === null, 404, 'Aucune pièce justificative pour cet enregistrement.');
+
+    return $reponse;
+})->name('justificatifs.show')->middleware(['auth', 'can:view-achats']);
+
 // Sprint 5, ticket 5.2 : achats-commandes.html → Livewire\Achats\AchatsCommandesHub
 Route::get('/achats-commandes', \App\Livewire\Achats\AchatsCommandesHub::class)
     ->name('achats.commandes-hub')

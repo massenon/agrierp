@@ -123,9 +123,16 @@ class DettesFournisseurs extends Component
         return TreasuryAccount::where('is_active', true)->orderBy('label')->get();
     }
 
-    public function openPaymentModal(): void
+    /**
+     * Ticket AC-4 — la colonne « Actions » : « Régler » ouvre la même modale avec le fournisseur de la ligne déjà choisi
+     * (le bouton d'en-tête l'ouvre sans fournisseur). Même point de passage (`SupplierSettlementService`), même poste.
+     */
+    public function openPaymentModal(?string $supplierId = null): void
     {
         $this->reset(['paymentSupplierId', 'paymentAmount']);
+        if ($supplierId !== null && Supplier::whereKey($supplierId)->exists()) {
+            $this->paymentSupplierId = $supplierId;
+        }
         $this->paymentDate = now()->format('Y-m-d');
         $this->dispatch('open-modal', name: 'modal-create-dettes-fournisseurs');
     }

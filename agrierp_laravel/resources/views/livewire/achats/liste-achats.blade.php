@@ -70,6 +70,10 @@
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="view('{{ $purchase->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Voir"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+                                @if($purchase->receipt_path)
+                                    {{-- Ticket AC-3 — la pièce justificative (rattachée par le web ou envoyée par le poste). --}}
+                                    <a href="{{ route('justificatifs.show', ['type' => 'achat', 'id' => $purchase->id]) }}" target="_blank" rel="noopener" class="text-brand-emerald hover:text-brand-forest p-1 inline-block align-middle" title="Pièce justificative"><span class="material-symbols-outlined text-[18px]">attach_file</span></a>
+                                @endif
                                 @unless($purchase->returned_at)
                                     <button @lectureSeule type="button" wire:click="openReturnModal('{{ $purchase->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retour fournisseur"><span class="material-symbols-outlined text-[18px]">cancel</span></button>
                                 @endunless

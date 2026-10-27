@@ -39,6 +39,7 @@ class AuditToutesLesRoutesTest extends TestCase
         'password.reset' => 'redirige un utilisateur déjà authentifié (middleware guest)',
         'logout' => 'POST uniquement',
         'health-check' => 'sonde JSON, pas un écran',
+        'justificatifs.show' => 'flux d\'un fichier (404 sans pièce), pas un écran : couverte par JustificatifsSynchronisesTest (ticket AC-3)',
     ];
 
     /**
@@ -174,7 +175,7 @@ class AuditToutesLesRoutesTest extends TestCase
                 continue;
             }
 
-            if ($this->estRouteDeFramework($route->getName())) {
+            if ($this->estRouteDeFramework($route->getName()) || isset(self::EXCLUES[$route->getName()])) {
                 continue;
             }
 

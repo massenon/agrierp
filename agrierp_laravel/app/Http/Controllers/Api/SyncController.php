@@ -946,6 +946,13 @@ class SyncController extends Controller
                     'estimated_total' => $bon->lines->sum(
                         fn ($ligne) => (float) $ligne->qty * (float) $ligne->estimated_unit_price
                     ),
+                    // Ticket AC-1 — les lignes descendent : « Valider la réception » du poste en refait la facture.
+                    'lines' => $bon->lines->map(fn ($ligne) => [
+                        'id' => $ligne->id,
+                        'product_id' => $ligne->product_id,
+                        'qty' => (float) $ligne->qty,
+                        'estimated_unit_price' => (float) $ligne->estimated_unit_price,
+                    ])->values(),
                 ]),
 
             // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
@@ -2103,6 +2110,8 @@ class SyncController extends Controller
             'infirmary_records' => ['accepted' => [], 'rejected' => []],
             'veterinary_calendar_events' => ['accepted' => [], 'rejected' => []],
             'purchases' => ['accepted' => [], 'rejected' => []],
+            // Ticket AC-1 — bons de commande saisis au poste.
+            'purchase_orders' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
@@ -2147,7 +2156,7 @@ class SyncController extends Controller
             'product_categories',
             'receivables',
             // Ticket VC-2 : `customer_reminders` s'écrit au poste (`pushCustomerReminders`).
-            'purchase_orders',
+            // Ticket AC-1 : `purchase_orders` s'écrit au poste (`pushPurchaseOrders`).
             'payables',
             // Tickets RH-1 / RH-2 : `employees` et `internships` s'écrivent au poste depuis RH-1 (tables mixtes).
             'chart_of_accounts',
@@ -2320,6 +2329,15 @@ class SyncController extends Controller
 
         if ($request->has('expenses')) {
             $result['expenses'] = $this->pushExpenses($request->input('expenses'));
+        }
+
+        // Ticket AC-1 — AVANT les achats : la réception d'un bon (achat qui porte `purchase_order_id`) vise un bon que le même
+        // envoi vient peut-être de créer.
+        if ($request->has('purchase_orders')) {
+            $result['purchase_orders'] = $this->pushPurchaseOrders(
+                $this->envoiTraduit($request, 'purchase_orders'),
+                $request->user(),
+            );
         }
 
         if ($request->has('purchases')) {
@@ -2532,6 +2550,8 @@ class SyncController extends Controller
         'veterinary_records' => 'manage-elevage',
         'expenses' => 'manage-achats',
         'purchases' => 'manage-achats',
+        // Ticket AC-1 — le droit de `BonsCommande` du web.
+        'purchase_orders' => 'manage-achats',
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
@@ -3584,6 +3604,85 @@ class SyncController extends Controller
      * silencieux, pas une seconde sortie de caisse.
      */
     /**
+     * Ticket AC-3 — JUSTIFICATIF (le fichier) d'un achat ou d'une dépense déjà acceptés par `/sync/push`.
+     *
+     * Multipart : `table` (`purchases` | `expenses`), `id` (UUID du poste, celui de l'enregistrement), `file` (jpg, png ou pdf,
+     * 5 Mo au plus). Même droit que l'écriture de la table (`manage-achats`), même service que le web
+     * (`JustificatifService`). ⚠️ Idempotent : renvoyer le fichier REMPLACE le précédent. 404 : l'enregistrement n'est pas (encore)
+     * connu du serveur — le poste réessaiera après son prochain envoi.
+     */
+    public function receipt(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('manage-achats'), 403, 'Votre rôle ne permet pas de joindre un justificatif.');
+
+        $valides = $request->validate([
+            'table' => ['required', 'in:purchases,expenses'],
+            'id' => ['required', 'uuid'],
+            'file' => ['required', 'file', 'mimes:'.\App\Services\JustificatifService::FORMATS, 'max:'.\App\Services\JustificatifService::TAILLE_MAX_KO],
+        ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['file' => 'fichier', 'table' => 'table']);
+
+        $type = \App\Services\JustificatifService::typeDeTable($valides['table']);
+        $chemin = app(\App\Services\JustificatifService::class)->rattacher($type, $valides['id'], $request->file('file'));
+
+        if ($chemin === null) {
+            return response()->json(['message' => 'Enregistrement inconnu du serveur : envoyez-le d\'abord.'], 404);
+        }
+
+        return response()->json(['stored' => true]);
+    }
+
+    /**
+     * Ticket AC-1 — BONS DE COMMANDE saisis au poste (« Générer le Bon »).
+     *
+     * ⚠️ Le poste envoie le bon et ses lignes ; `SaisieBonCommandeAction` — partagée avec `BonsCommande::generateBc` du web —
+     * le crée au statut `envoye`. ⚠️ IDEMPOTENCE par l'UUID du poste : un bon déjà reçu est acquitté sans rien recréer.
+     * La RÉCEPTION d'un bon n'est pas envoyée ici : c'est un achat qui porte `purchase_order_id` (voir `pushPurchases`).
+     */
+    private function pushPurchaseOrders(array $bons, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieBonCommandeAction::class);
+
+        foreach ($bons as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-achats')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de saisir un bon de commande.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'supplier_id' => ['required', 'uuid', 'exists:suppliers,id'],
+                    'expected_delivery_date' => ['nullable', 'date'],
+                    'lines' => ['required', 'array', 'min:1'],
+                    'lines.*.id' => ['nullable', 'uuid'],
+                    'lines.*.product_id' => ['required', 'uuid', 'exists:products,id'],
+                    'lines.*.qty' => ['required', 'numeric', 'min:1'],
+                    'lines.*.estimated_unit_price' => ['required', 'numeric', 'min:0'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $action->execute(
+                    $valides['supplier_id'],
+                    $valides['expected_delivery_date'] ?? null,
+                    $valides['lines'],
+                    $valides['id'],
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
      * Achats saisis hors ligne — ticket 14.78.
      *
      * ⚠️⚠️ CREATION SEULEMENT, JAMAIS DE MISE A JOUR. Un achat porte cinq
@@ -3607,7 +3706,9 @@ class SyncController extends Controller
                     'id' => ['required', 'uuid'],
                     'supplier_id' => ['required', 'uuid', 'exists:suppliers,id'],
                     'payment_mode' => ['required', 'in:especes,mobile_money,virement,credit'],
-                    'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
+                    // Ticket AC-1 — la réception d'un bon ne règle rien : pas de compte à désigner.
+                    'treasury_account_id' => ['required_without:purchase_order_id', 'nullable', 'uuid', 'exists:treasury_accounts,id'],
+                    'purchase_order_id' => ['nullable', 'uuid', 'exists:purchase_orders,id'],
                     'amount_paid' => ['nullable', 'numeric', 'min:0'],
                     // ⚠️ La date de l'achat vient du POSTE : une livraison recue
                     // mardi et synchronisee jeudi appartient a mardi.
@@ -3621,6 +3722,27 @@ class SyncController extends Controller
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 if (Purchase::find($validated['id']) !== null) {
+                    $accepted[] = $validated['id'];
+
+                    continue;
+                }
+
+                // Ticket AC-1 — RÉCEPTION D'UN BON DE COMMANDE : `ReceptionBonCommandeService`, celui de `BonsCommande` du web.
+                // Les lignes sont celles du BON, pas celles du poste ; un bon déjà reçu rejette CET achat avec son motif.
+                if (! empty($validated['purchase_order_id'])) {
+                    $recu = app(\App\Services\ReceptionBonCommandeService::class)->recevoir(
+                        $validated['purchase_order_id'],
+                        $validated['id'],
+                        $validated['purchase_date'] ?? null,
+                        $this->instantDeLAchat($validated),
+                    );
+
+                    if ($recu === null) {
+                        $rejected[] = ['id' => $validated['id'], 'reason' => 'Ce bon de commande est déjà reçu : une seule réception est possible.'];
+
+                        continue;
+                    }
+
                     $accepted[] = $validated['id'];
 
                     continue;

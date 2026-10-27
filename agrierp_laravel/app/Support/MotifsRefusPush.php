@@ -85,6 +85,9 @@ class MotifsRefusPush
             'customer_id' => 'client', 'receivable_id' => 'créance', 'treasury_account_id' => 'compte de trésorerie',
             'amount' => 'montant', 'payment_date' => 'date du règlement',
             'channel' => 'canal', 'message' => 'message', 'reminder_date' => 'date de la relance',
+            // Ticket AC-1 — bons de commande.
+            'expected_delivery_date' => 'date de livraison attendue', 'purchase_order_id' => 'bon de commande',
+            'lines.*.estimated_unit_price' => 'prix unitaire estimé de la ligne',
             // Ticket UT-1 — comptes utilisateurs.
             'name' => 'nom complet', 'username' => "nom d'utilisateur", 'role' => 'rôle',
             'password' => 'mot de passe',

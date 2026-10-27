@@ -41,11 +41,11 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 
 | Écran web | Fonction web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
-| `BonsCommande` | generateBc, confirmReceiveOrder | ABSENT : P `achats/achats_commandes_screen.dart:1380` (inerte), mention l. 1385-1394 | `purchase_orders` (refusé) | AC-1 |
-| `EnregistrerAchat` | saveNewSupplier, saveNewProduct (boutons « + ») | ABSENT **sans mention** dans le formulaire (l. ~765-830) ; créables ailleurs (`FournisseursRepository.creerFournisseur`, `ProduitsRepository.creer`) | — | AC-2 |
-| `EnregistrerAchat` | pièce justificative (fichier) | ABSENT : mention l. 959-965 | — | AC-3 (avec DEP justificatifs) |
-| `DettesFournisseurs` | colonne Actions | inerte (`fournisseurs_screen.dart:475`) ; le règlement existe (`enregistrerReglement`) | `supplier_payments` | AC-4 |
-| `SaisieDepenses` | justificatif | copié en local, **jamais synchronisé** (`modale_depense.dart:35,456`) | — | AC-3 |
+| `BonsCommande` | generateBc, confirmReceiveOrder | **PRÉSENT depuis AC-1 (28/10/2026)** : `AchatsRepository.creerBon` / `recevoirBon` ; serveur `SaisieBonCommandeAction`, `ReceptionBonCommandeService` | `purchase_orders` (v71, envoyée), `purchase_order_lines` | AC-1 ✅ |
+| `EnregistrerAchat` | saveNewSupplier, saveNewProduct (boutons « + ») | **PRÉSENT depuis AC-2** : `achats_creation_rapide.dart` | `suppliers`, `products` | AC-2 ✅ |
+| `EnregistrerAchat` | pièce justificative (fichier) | **PRÉSENT depuis AC-3** : sélecteur + envoi `POST /api/sync/receipts` | `purchases.receipt_path` | AC-3 ✅ |
+| `DettesFournisseurs` | colonne Actions | **PRÉSENT depuis AC-4** : « Régler » par ligne (web et poste) | `supplier_payments` | AC-4 ✅ |
+| `SaisieDepenses` | justificatif | **PRÉSENT depuis AC-3** : le fichier part au serveur (`receipt_sent`) | `expenses.receipt_path` | AC-3 ✅ |
 | `EnregistrerAchat`, `ListeAchats`, `AjouterFournisseur`, `ProfileFournisseur` | submitAchat, retours, remboursements, fournisseurs, règlements | PRÉSENT | `purchases`, `purchase_returns`, `supplier_refunds`, `suppliers`, `supplier_payments` | — |
 
 ## 4. Ventes, clients, facturation

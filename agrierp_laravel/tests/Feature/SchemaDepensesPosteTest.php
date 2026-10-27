@@ -33,7 +33,8 @@ class SchemaDepensesPosteTest extends TestCase
             'device_id' => 'poste d\'origine de la saisie (SyncColumns)',
             'sync_status' => 'file d\'envoi : pending, synced, conflict (SyncColumns)',
             'ecriture_refus' => 'refus de la pièce par le serveur, affiché sous la dépense (le web dit le refus tout de suite)',
-            'receipt_local_path' => 'justificatif copié sur le poste (ticket #48) : chemin local, jamais synchronisé',
+            'receipt_local_path' => 'justificatif copié sur le poste (ticket #48) : chemin local ; le FICHIER part par POST /api/sync/receipts (ticket AC-3)',
+            'receipt_sent' => 'ticket AC-3 : vrai quand le serveur a reçu le fichier du justificatif (propre au poste)',
         ],
         'expense_lines' => [],
         'cost_centers' => [],
@@ -43,7 +44,7 @@ class SchemaDepensesPosteTest extends TestCase
     private const SERVEUR_SEUL = [
         'expenses' => [
             'created_at' => 'horodatage technique du serveur (le poste garde `updated_at`)',
-            'receipt_path' => 'le justificatif ne voyage pas : la synchronisation ne transporte aucun fichier',
+            'receipt_path' => 'chemin du justificatif sur le disque privé du serveur (ticket AC-3) : le fichier arrive par POST /api/sync/receipts, jamais par /sync/push'
         ],
         'expense_lines' => [
             'created_at' => 'horodatage technique : une ligne suit son en-tête, sans curseur propre',

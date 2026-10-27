@@ -8721,6 +8721,42 @@ class $PurchaseOrdersTable extends PurchaseOrders
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($PurchaseOrdersTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _supplierIdMeta = const VerificationMeta(
     'supplierId',
   );
@@ -8789,6 +8825,9 @@ class $PurchaseOrdersTable extends PurchaseOrders
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     supplierId,
     supplierName,
     expectedDeliveryDate,
@@ -8812,6 +8851,22 @@ class $PurchaseOrdersTable extends PurchaseOrders
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('supplier_id')) {
       context.handle(
@@ -8871,6 +8926,20 @@ class $PurchaseOrdersTable extends PurchaseOrders
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $PurchaseOrdersTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       supplierId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}supplier_id'],
@@ -8902,10 +8971,16 @@ class $PurchaseOrdersTable extends PurchaseOrders
   $PurchaseOrdersTable createAlias(String alias) {
     return $PurchaseOrdersTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String? supplierId;
   final String? supplierName;
   final DateTime? expectedDeliveryDate;
@@ -8916,6 +8991,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   final double estimatedTotal;
   const PurchaseOrder({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     this.supplierId,
     this.supplierName,
     this.expectedDeliveryDate,
@@ -8927,6 +9005,13 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $PurchaseOrdersTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || supplierId != null) {
       map['supplier_id'] = Variable<String>(supplierId);
     }
@@ -8949,6 +9034,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   PurchaseOrdersCompanion toCompanion(bool nullToAbsent) {
     return PurchaseOrdersCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       supplierId: supplierId == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierId),
@@ -8975,6 +9063,11 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return PurchaseOrder(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $PurchaseOrdersTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       supplierId: serializer.fromJson<String?>(json['supplierId']),
       supplierName: serializer.fromJson<String?>(json['supplierName']),
       expectedDeliveryDate: serializer.fromJson<DateTime?>(
@@ -8990,6 +9083,11 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $PurchaseOrdersTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'supplierId': serializer.toJson<String?>(supplierId),
       'supplierName': serializer.toJson<String?>(supplierName),
       'expectedDeliveryDate': serializer.toJson<DateTime?>(
@@ -9003,6 +9101,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
 
   PurchaseOrder copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     Value<String?> supplierId = const Value.absent(),
     Value<String?> supplierName = const Value.absent(),
     Value<DateTime?> expectedDeliveryDate = const Value.absent(),
@@ -9011,6 +9112,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     double? estimatedTotal,
   }) => PurchaseOrder(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     supplierId: supplierId.present ? supplierId.value : this.supplierId,
     supplierName: supplierName.present ? supplierName.value : this.supplierName,
     expectedDeliveryDate: expectedDeliveryDate.present
@@ -9023,6 +9127,11 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   PurchaseOrder copyWithCompanion(PurchaseOrdersCompanion data) {
     return PurchaseOrder(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       supplierId: data.supplierId.present
           ? data.supplierId.value
           : this.supplierId,
@@ -9044,6 +9153,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   String toString() {
     return (StringBuffer('PurchaseOrder(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
           ..write('expectedDeliveryDate: $expectedDeliveryDate, ')
@@ -9057,6 +9169,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   @override
   int get hashCode => Object.hash(
     id,
+    deviceId,
+    syncStatus,
+    updatedAt,
     supplierId,
     supplierName,
     expectedDeliveryDate,
@@ -9069,6 +9184,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
       identical(this, other) ||
       (other is PurchaseOrder &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.supplierId == this.supplierId &&
           other.supplierName == this.supplierName &&
           other.expectedDeliveryDate == this.expectedDeliveryDate &&
@@ -9079,6 +9197,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
 
 class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String?> supplierId;
   final Value<String?> supplierName;
   final Value<DateTime?> expectedDeliveryDate;
@@ -9088,6 +9209,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   final Value<int> rowid;
   const PurchaseOrdersCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.supplierId = const Value.absent(),
     this.supplierName = const Value.absent(),
     this.expectedDeliveryDate = const Value.absent(),
@@ -9098,6 +9222,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   });
   PurchaseOrdersCompanion.insert({
     required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
     this.supplierId = const Value.absent(),
     this.supplierName = const Value.absent(),
     this.expectedDeliveryDate = const Value.absent(),
@@ -9105,9 +9232,14 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     this.createdAt = const Value.absent(),
     this.estimatedTotal = const Value.absent(),
     this.rowid = const Value.absent(),
-  }) : id = Value(id);
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt);
   static Insertable<PurchaseOrder> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? supplierId,
     Expression<String>? supplierName,
     Expression<DateTime>? expectedDeliveryDate,
@@ -9118,6 +9250,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (supplierId != null) 'supplier_id': supplierId,
       if (supplierName != null) 'supplier_name': supplierName,
       if (expectedDeliveryDate != null)
@@ -9131,6 +9266,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
 
   PurchaseOrdersCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String?>? supplierId,
     Value<String?>? supplierName,
     Value<DateTime?>? expectedDeliveryDate,
@@ -9141,6 +9279,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   }) {
     return PurchaseOrdersCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       supplierId: supplierId ?? this.supplierId,
       supplierName: supplierName ?? this.supplierName,
       expectedDeliveryDate: expectedDeliveryDate ?? this.expectedDeliveryDate,
@@ -9156,6 +9297,17 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $PurchaseOrdersTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (supplierId.present) {
       map['supplier_id'] = Variable<String>(supplierId.value);
@@ -9187,12 +9339,461 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   String toString() {
     return (StringBuffer('PurchaseOrdersCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
           ..write('expectedDeliveryDate: $expectedDeliveryDate, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
           ..write('estimatedTotal: $estimatedTotal, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PurchaseOrderLinesTable extends PurchaseOrderLines
+    with TableInfo<$PurchaseOrderLinesTable, PurchaseOrderLine> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PurchaseOrderLinesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _purchaseOrderIdMeta = const VerificationMeta(
+    'purchaseOrderId',
+  );
+  @override
+  late final GeneratedColumn<String> purchaseOrderId = GeneratedColumn<String>(
+    'purchase_order_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productNameMeta = const VerificationMeta(
+    'productName',
+  );
+  @override
+  late final GeneratedColumn<String> productName = GeneratedColumn<String>(
+    'product_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
+  @override
+  late final GeneratedColumn<double> qty = GeneratedColumn<double>(
+    'qty',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _estimatedUnitPriceMeta =
+      const VerificationMeta('estimatedUnitPrice');
+  @override
+  late final GeneratedColumn<double> estimatedUnitPrice =
+      GeneratedColumn<double>(
+        'estimated_unit_price',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    purchaseOrderId,
+    productId,
+    productName,
+    qty,
+    estimatedUnitPrice,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'purchase_order_lines';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PurchaseOrderLine> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('purchase_order_id')) {
+      context.handle(
+        _purchaseOrderIdMeta,
+        purchaseOrderId.isAcceptableOrUnknown(
+          data['purchase_order_id']!,
+          _purchaseOrderIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_purchaseOrderIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('product_name')) {
+      context.handle(
+        _productNameMeta,
+        productName.isAcceptableOrUnknown(
+          data['product_name']!,
+          _productNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('qty')) {
+      context.handle(
+        _qtyMeta,
+        qty.isAcceptableOrUnknown(data['qty']!, _qtyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_qtyMeta);
+    }
+    if (data.containsKey('estimated_unit_price')) {
+      context.handle(
+        _estimatedUnitPriceMeta,
+        estimatedUnitPrice.isAcceptableOrUnknown(
+          data['estimated_unit_price']!,
+          _estimatedUnitPriceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_estimatedUnitPriceMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PurchaseOrderLine map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PurchaseOrderLine(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      purchaseOrderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}purchase_order_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      productName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_name'],
+      ),
+      qty: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}qty'],
+      )!,
+      estimatedUnitPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}estimated_unit_price'],
+      )!,
+    );
+  }
+
+  @override
+  $PurchaseOrderLinesTable createAlias(String alias) {
+    return $PurchaseOrderLinesTable(attachedDatabase, alias);
+  }
+}
+
+class PurchaseOrderLine extends DataClass
+    implements Insertable<PurchaseOrderLine> {
+  final String id;
+  final String purchaseOrderId;
+  final String productId;
+  final String? productName;
+  final double qty;
+  final double estimatedUnitPrice;
+  const PurchaseOrderLine({
+    required this.id,
+    required this.purchaseOrderId,
+    required this.productId,
+    this.productName,
+    required this.qty,
+    required this.estimatedUnitPrice,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['purchase_order_id'] = Variable<String>(purchaseOrderId);
+    map['product_id'] = Variable<String>(productId);
+    if (!nullToAbsent || productName != null) {
+      map['product_name'] = Variable<String>(productName);
+    }
+    map['qty'] = Variable<double>(qty);
+    map['estimated_unit_price'] = Variable<double>(estimatedUnitPrice);
+    return map;
+  }
+
+  PurchaseOrderLinesCompanion toCompanion(bool nullToAbsent) {
+    return PurchaseOrderLinesCompanion(
+      id: Value(id),
+      purchaseOrderId: Value(purchaseOrderId),
+      productId: Value(productId),
+      productName: productName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productName),
+      qty: Value(qty),
+      estimatedUnitPrice: Value(estimatedUnitPrice),
+    );
+  }
+
+  factory PurchaseOrderLine.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PurchaseOrderLine(
+      id: serializer.fromJson<String>(json['id']),
+      purchaseOrderId: serializer.fromJson<String>(json['purchaseOrderId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      productName: serializer.fromJson<String?>(json['productName']),
+      qty: serializer.fromJson<double>(json['qty']),
+      estimatedUnitPrice: serializer.fromJson<double>(
+        json['estimatedUnitPrice'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'purchaseOrderId': serializer.toJson<String>(purchaseOrderId),
+      'productId': serializer.toJson<String>(productId),
+      'productName': serializer.toJson<String?>(productName),
+      'qty': serializer.toJson<double>(qty),
+      'estimatedUnitPrice': serializer.toJson<double>(estimatedUnitPrice),
+    };
+  }
+
+  PurchaseOrderLine copyWith({
+    String? id,
+    String? purchaseOrderId,
+    String? productId,
+    Value<String?> productName = const Value.absent(),
+    double? qty,
+    double? estimatedUnitPrice,
+  }) => PurchaseOrderLine(
+    id: id ?? this.id,
+    purchaseOrderId: purchaseOrderId ?? this.purchaseOrderId,
+    productId: productId ?? this.productId,
+    productName: productName.present ? productName.value : this.productName,
+    qty: qty ?? this.qty,
+    estimatedUnitPrice: estimatedUnitPrice ?? this.estimatedUnitPrice,
+  );
+  PurchaseOrderLine copyWithCompanion(PurchaseOrderLinesCompanion data) {
+    return PurchaseOrderLine(
+      id: data.id.present ? data.id.value : this.id,
+      purchaseOrderId: data.purchaseOrderId.present
+          ? data.purchaseOrderId.value
+          : this.purchaseOrderId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      productName: data.productName.present
+          ? data.productName.value
+          : this.productName,
+      qty: data.qty.present ? data.qty.value : this.qty,
+      estimatedUnitPrice: data.estimatedUnitPrice.present
+          ? data.estimatedUnitPrice.value
+          : this.estimatedUnitPrice,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PurchaseOrderLine(')
+          ..write('id: $id, ')
+          ..write('purchaseOrderId: $purchaseOrderId, ')
+          ..write('productId: $productId, ')
+          ..write('productName: $productName, ')
+          ..write('qty: $qty, ')
+          ..write('estimatedUnitPrice: $estimatedUnitPrice')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    purchaseOrderId,
+    productId,
+    productName,
+    qty,
+    estimatedUnitPrice,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PurchaseOrderLine &&
+          other.id == this.id &&
+          other.purchaseOrderId == this.purchaseOrderId &&
+          other.productId == this.productId &&
+          other.productName == this.productName &&
+          other.qty == this.qty &&
+          other.estimatedUnitPrice == this.estimatedUnitPrice);
+}
+
+class PurchaseOrderLinesCompanion extends UpdateCompanion<PurchaseOrderLine> {
+  final Value<String> id;
+  final Value<String> purchaseOrderId;
+  final Value<String> productId;
+  final Value<String?> productName;
+  final Value<double> qty;
+  final Value<double> estimatedUnitPrice;
+  final Value<int> rowid;
+  const PurchaseOrderLinesCompanion({
+    this.id = const Value.absent(),
+    this.purchaseOrderId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.productName = const Value.absent(),
+    this.qty = const Value.absent(),
+    this.estimatedUnitPrice = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PurchaseOrderLinesCompanion.insert({
+    required String id,
+    required String purchaseOrderId,
+    required String productId,
+    this.productName = const Value.absent(),
+    required double qty,
+    required double estimatedUnitPrice,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       purchaseOrderId = Value(purchaseOrderId),
+       productId = Value(productId),
+       qty = Value(qty),
+       estimatedUnitPrice = Value(estimatedUnitPrice);
+  static Insertable<PurchaseOrderLine> custom({
+    Expression<String>? id,
+    Expression<String>? purchaseOrderId,
+    Expression<String>? productId,
+    Expression<String>? productName,
+    Expression<double>? qty,
+    Expression<double>? estimatedUnitPrice,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (purchaseOrderId != null) 'purchase_order_id': purchaseOrderId,
+      if (productId != null) 'product_id': productId,
+      if (productName != null) 'product_name': productName,
+      if (qty != null) 'qty': qty,
+      if (estimatedUnitPrice != null)
+        'estimated_unit_price': estimatedUnitPrice,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PurchaseOrderLinesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? purchaseOrderId,
+    Value<String>? productId,
+    Value<String?>? productName,
+    Value<double>? qty,
+    Value<double>? estimatedUnitPrice,
+    Value<int>? rowid,
+  }) {
+    return PurchaseOrderLinesCompanion(
+      id: id ?? this.id,
+      purchaseOrderId: purchaseOrderId ?? this.purchaseOrderId,
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      qty: qty ?? this.qty,
+      estimatedUnitPrice: estimatedUnitPrice ?? this.estimatedUnitPrice,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (purchaseOrderId.present) {
+      map['purchase_order_id'] = Variable<String>(purchaseOrderId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (productName.present) {
+      map['product_name'] = Variable<String>(productName.value);
+    }
+    if (qty.present) {
+      map['qty'] = Variable<double>(qty.value);
+    }
+    if (estimatedUnitPrice.present) {
+      map['estimated_unit_price'] = Variable<double>(estimatedUnitPrice.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PurchaseOrderLinesCompanion(')
+          ..write('id: $id, ')
+          ..write('purchaseOrderId: $purchaseOrderId, ')
+          ..write('productId: $productId, ')
+          ..write('productName: $productName, ')
+          ..write('qty: $qty, ')
+          ..write('estimatedUnitPrice: $estimatedUnitPrice, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -25916,6 +26517,17 @@ class $PurchasesTable extends Purchases
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _purchaseOrderIdMeta = const VerificationMeta(
+    'purchaseOrderId',
+  );
+  @override
+  late final GeneratedColumn<String> purchaseOrderId = GeneratedColumn<String>(
+    'purchase_order_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _paymentModeMeta = const VerificationMeta(
     'paymentMode',
   );
@@ -26019,6 +26631,21 @@ class $PurchasesTable extends Purchases
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receiptSentMeta = const VerificationMeta(
+    'receiptSent',
+  );
+  @override
+  late final GeneratedColumn<bool> receiptSent = GeneratedColumn<bool>(
+    'receipt_sent',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("receipt_sent" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -26028,6 +26655,7 @@ class $PurchasesTable extends Purchases
     supplierId,
     supplierName,
     supplierCategory,
+    purchaseOrderId,
     paymentMode,
     treasuryAccountId,
     total,
@@ -26037,6 +26665,7 @@ class $PurchasesTable extends Purchases
     returnedAt,
     supplierCredit,
     receiptLocalPath,
+    receiptSent,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -26094,6 +26723,15 @@ class $PurchasesTable extends Purchases
         supplierCategory.isAcceptableOrUnknown(
           data['supplier_category']!,
           _supplierCategoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('purchase_order_id')) {
+      context.handle(
+        _purchaseOrderIdMeta,
+        purchaseOrderId.isAcceptableOrUnknown(
+          data['purchase_order_id']!,
+          _purchaseOrderIdMeta,
         ),
       );
     }
@@ -26172,6 +26810,15 @@ class $PurchasesTable extends Purchases
         ),
       );
     }
+    if (data.containsKey('receipt_sent')) {
+      context.handle(
+        _receiptSentMeta,
+        receiptSent.isAcceptableOrUnknown(
+          data['receipt_sent']!,
+          _receiptSentMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -26211,6 +26858,10 @@ class $PurchasesTable extends Purchases
         DriftSqlType.string,
         data['${effectivePrefix}supplier_category'],
       ),
+      purchaseOrderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}purchase_order_id'],
+      ),
       paymentMode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}payment_mode'],
@@ -26247,6 +26898,10 @@ class $PurchasesTable extends Purchases
         DriftSqlType.string,
         data['${effectivePrefix}receipt_local_path'],
       ),
+      receiptSent: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}receipt_sent'],
+      )!,
     );
   }
 
@@ -26270,6 +26925,10 @@ class Purchase extends DataClass implements Insertable<Purchase> {
   /// même si le fournisseur a été archivé depuis.
   final String? supplierName;
   final String? supplierCategory;
+
+  /// Ticket AC-1 — bon de commande que cet achat RÉCEPTIONNE (`purchase_order_id`), nul pour un achat direct. Le serveur
+  /// reçoit alors le bon (lignes du bon, dette entière) ; le poste n'écrit jamais le statut du bon.
+  final String? purchaseOrderId;
   final String paymentMode;
   final String? treasuryAccountId;
   final double total;
@@ -26290,8 +26949,13 @@ class Purchase extends DataClass implements Insertable<Purchase> {
   final double? supplierCredit;
 
   /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
-  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
   final String? receiptLocalPath;
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  final bool receiptSent;
   const Purchase({
     required this.id,
     required this.deviceId,
@@ -26300,6 +26964,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     required this.supplierId,
     this.supplierName,
     this.supplierCategory,
+    this.purchaseOrderId,
     required this.paymentMode,
     this.treasuryAccountId,
     required this.total,
@@ -26309,6 +26974,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     this.returnedAt,
     this.supplierCredit,
     this.receiptLocalPath,
+    required this.receiptSent,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -26328,6 +26994,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     if (!nullToAbsent || supplierCategory != null) {
       map['supplier_category'] = Variable<String>(supplierCategory);
     }
+    if (!nullToAbsent || purchaseOrderId != null) {
+      map['purchase_order_id'] = Variable<String>(purchaseOrderId);
+    }
     map['payment_mode'] = Variable<String>(paymentMode);
     if (!nullToAbsent || treasuryAccountId != null) {
       map['treasury_account_id'] = Variable<String>(treasuryAccountId);
@@ -26345,6 +27014,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     if (!nullToAbsent || receiptLocalPath != null) {
       map['receipt_local_path'] = Variable<String>(receiptLocalPath);
     }
+    map['receipt_sent'] = Variable<bool>(receiptSent);
     return map;
   }
 
@@ -26361,6 +27031,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       supplierCategory: supplierCategory == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierCategory),
+      purchaseOrderId: purchaseOrderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(purchaseOrderId),
       paymentMode: Value(paymentMode),
       treasuryAccountId: treasuryAccountId == null && nullToAbsent
           ? const Value.absent()
@@ -26378,6 +27051,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       receiptLocalPath: receiptLocalPath == null && nullToAbsent
           ? const Value.absent()
           : Value(receiptLocalPath),
+      receiptSent: Value(receiptSent),
     );
   }
 
@@ -26396,6 +27070,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       supplierId: serializer.fromJson<String>(json['supplierId']),
       supplierName: serializer.fromJson<String?>(json['supplierName']),
       supplierCategory: serializer.fromJson<String?>(json['supplierCategory']),
+      purchaseOrderId: serializer.fromJson<String?>(json['purchaseOrderId']),
       paymentMode: serializer.fromJson<String>(json['paymentMode']),
       treasuryAccountId: serializer.fromJson<String?>(
         json['treasuryAccountId'],
@@ -26407,6 +27082,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       returnedAt: serializer.fromJson<DateTime?>(json['returnedAt']),
       supplierCredit: serializer.fromJson<double?>(json['supplierCredit']),
       receiptLocalPath: serializer.fromJson<String?>(json['receiptLocalPath']),
+      receiptSent: serializer.fromJson<bool>(json['receiptSent']),
     );
   }
   @override
@@ -26422,6 +27098,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       'supplierId': serializer.toJson<String>(supplierId),
       'supplierName': serializer.toJson<String?>(supplierName),
       'supplierCategory': serializer.toJson<String?>(supplierCategory),
+      'purchaseOrderId': serializer.toJson<String?>(purchaseOrderId),
       'paymentMode': serializer.toJson<String>(paymentMode),
       'treasuryAccountId': serializer.toJson<String?>(treasuryAccountId),
       'total': serializer.toJson<double>(total),
@@ -26431,6 +27108,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       'returnedAt': serializer.toJson<DateTime?>(returnedAt),
       'supplierCredit': serializer.toJson<double?>(supplierCredit),
       'receiptLocalPath': serializer.toJson<String?>(receiptLocalPath),
+      'receiptSent': serializer.toJson<bool>(receiptSent),
     };
   }
 
@@ -26442,6 +27120,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     String? supplierId,
     Value<String?> supplierName = const Value.absent(),
     Value<String?> supplierCategory = const Value.absent(),
+    Value<String?> purchaseOrderId = const Value.absent(),
     String? paymentMode,
     Value<String?> treasuryAccountId = const Value.absent(),
     double? total,
@@ -26451,6 +27130,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     Value<DateTime?> returnedAt = const Value.absent(),
     Value<double?> supplierCredit = const Value.absent(),
     Value<String?> receiptLocalPath = const Value.absent(),
+    bool? receiptSent,
   }) => Purchase(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -26461,6 +27141,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     supplierCategory: supplierCategory.present
         ? supplierCategory.value
         : this.supplierCategory,
+    purchaseOrderId: purchaseOrderId.present
+        ? purchaseOrderId.value
+        : this.purchaseOrderId,
     paymentMode: paymentMode ?? this.paymentMode,
     treasuryAccountId: treasuryAccountId.present
         ? treasuryAccountId.value
@@ -26476,6 +27159,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     receiptLocalPath: receiptLocalPath.present
         ? receiptLocalPath.value
         : this.receiptLocalPath,
+    receiptSent: receiptSent ?? this.receiptSent,
   );
   Purchase copyWithCompanion(PurchasesCompanion data) {
     return Purchase(
@@ -26494,6 +27178,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       supplierCategory: data.supplierCategory.present
           ? data.supplierCategory.value
           : this.supplierCategory,
+      purchaseOrderId: data.purchaseOrderId.present
+          ? data.purchaseOrderId.value
+          : this.purchaseOrderId,
       paymentMode: data.paymentMode.present
           ? data.paymentMode.value
           : this.paymentMode,
@@ -26517,6 +27204,9 @@ class Purchase extends DataClass implements Insertable<Purchase> {
       receiptLocalPath: data.receiptLocalPath.present
           ? data.receiptLocalPath.value
           : this.receiptLocalPath,
+      receiptSent: data.receiptSent.present
+          ? data.receiptSent.value
+          : this.receiptSent,
     );
   }
 
@@ -26530,6 +27220,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
           ..write('supplierCategory: $supplierCategory, ')
+          ..write('purchaseOrderId: $purchaseOrderId, ')
           ..write('paymentMode: $paymentMode, ')
           ..write('treasuryAccountId: $treasuryAccountId, ')
           ..write('total: $total, ')
@@ -26538,7 +27229,8 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           ..write('purchaseDate: $purchaseDate, ')
           ..write('returnedAt: $returnedAt, ')
           ..write('supplierCredit: $supplierCredit, ')
-          ..write('receiptLocalPath: $receiptLocalPath')
+          ..write('receiptLocalPath: $receiptLocalPath, ')
+          ..write('receiptSent: $receiptSent')
           ..write(')'))
         .toString();
   }
@@ -26552,6 +27244,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     supplierId,
     supplierName,
     supplierCategory,
+    purchaseOrderId,
     paymentMode,
     treasuryAccountId,
     total,
@@ -26561,6 +27254,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
     returnedAt,
     supplierCredit,
     receiptLocalPath,
+    receiptSent,
   );
   @override
   bool operator ==(Object other) =>
@@ -26573,6 +27267,7 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           other.supplierId == this.supplierId &&
           other.supplierName == this.supplierName &&
           other.supplierCategory == this.supplierCategory &&
+          other.purchaseOrderId == this.purchaseOrderId &&
           other.paymentMode == this.paymentMode &&
           other.treasuryAccountId == this.treasuryAccountId &&
           other.total == this.total &&
@@ -26581,7 +27276,8 @@ class Purchase extends DataClass implements Insertable<Purchase> {
           other.purchaseDate == this.purchaseDate &&
           other.returnedAt == this.returnedAt &&
           other.supplierCredit == this.supplierCredit &&
-          other.receiptLocalPath == this.receiptLocalPath);
+          other.receiptLocalPath == this.receiptLocalPath &&
+          other.receiptSent == this.receiptSent);
 }
 
 class PurchasesCompanion extends UpdateCompanion<Purchase> {
@@ -26592,6 +27288,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
   final Value<String> supplierId;
   final Value<String?> supplierName;
   final Value<String?> supplierCategory;
+  final Value<String?> purchaseOrderId;
   final Value<String> paymentMode;
   final Value<String?> treasuryAccountId;
   final Value<double> total;
@@ -26601,6 +27298,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
   final Value<DateTime?> returnedAt;
   final Value<double?> supplierCredit;
   final Value<String?> receiptLocalPath;
+  final Value<bool> receiptSent;
   final Value<int> rowid;
   const PurchasesCompanion({
     this.id = const Value.absent(),
@@ -26610,6 +27308,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     this.supplierId = const Value.absent(),
     this.supplierName = const Value.absent(),
     this.supplierCategory = const Value.absent(),
+    this.purchaseOrderId = const Value.absent(),
     this.paymentMode = const Value.absent(),
     this.treasuryAccountId = const Value.absent(),
     this.total = const Value.absent(),
@@ -26619,6 +27318,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     this.returnedAt = const Value.absent(),
     this.supplierCredit = const Value.absent(),
     this.receiptLocalPath = const Value.absent(),
+    this.receiptSent = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PurchasesCompanion.insert({
@@ -26629,6 +27329,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     required String supplierId,
     this.supplierName = const Value.absent(),
     this.supplierCategory = const Value.absent(),
+    this.purchaseOrderId = const Value.absent(),
     required String paymentMode,
     this.treasuryAccountId = const Value.absent(),
     required double total,
@@ -26638,6 +27339,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     this.returnedAt = const Value.absent(),
     this.supplierCredit = const Value.absent(),
     this.receiptLocalPath = const Value.absent(),
+    this.receiptSent = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -26654,6 +27356,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Expression<String>? supplierId,
     Expression<String>? supplierName,
     Expression<String>? supplierCategory,
+    Expression<String>? purchaseOrderId,
     Expression<String>? paymentMode,
     Expression<String>? treasuryAccountId,
     Expression<double>? total,
@@ -26663,6 +27366,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Expression<DateTime>? returnedAt,
     Expression<double>? supplierCredit,
     Expression<String>? receiptLocalPath,
+    Expression<bool>? receiptSent,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -26673,6 +27377,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       if (supplierId != null) 'supplier_id': supplierId,
       if (supplierName != null) 'supplier_name': supplierName,
       if (supplierCategory != null) 'supplier_category': supplierCategory,
+      if (purchaseOrderId != null) 'purchase_order_id': purchaseOrderId,
       if (paymentMode != null) 'payment_mode': paymentMode,
       if (treasuryAccountId != null) 'treasury_account_id': treasuryAccountId,
       if (total != null) 'total': total,
@@ -26682,6 +27387,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       if (returnedAt != null) 'returned_at': returnedAt,
       if (supplierCredit != null) 'supplier_credit': supplierCredit,
       if (receiptLocalPath != null) 'receipt_local_path': receiptLocalPath,
+      if (receiptSent != null) 'receipt_sent': receiptSent,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -26694,6 +27400,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Value<String>? supplierId,
     Value<String?>? supplierName,
     Value<String?>? supplierCategory,
+    Value<String?>? purchaseOrderId,
     Value<String>? paymentMode,
     Value<String?>? treasuryAccountId,
     Value<double>? total,
@@ -26703,6 +27410,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     Value<DateTime?>? returnedAt,
     Value<double?>? supplierCredit,
     Value<String?>? receiptLocalPath,
+    Value<bool>? receiptSent,
     Value<int>? rowid,
   }) {
     return PurchasesCompanion(
@@ -26713,6 +27421,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       supplierId: supplierId ?? this.supplierId,
       supplierName: supplierName ?? this.supplierName,
       supplierCategory: supplierCategory ?? this.supplierCategory,
+      purchaseOrderId: purchaseOrderId ?? this.purchaseOrderId,
       paymentMode: paymentMode ?? this.paymentMode,
       treasuryAccountId: treasuryAccountId ?? this.treasuryAccountId,
       total: total ?? this.total,
@@ -26722,6 +27431,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
       returnedAt: returnedAt ?? this.returnedAt,
       supplierCredit: supplierCredit ?? this.supplierCredit,
       receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
+      receiptSent: receiptSent ?? this.receiptSent,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -26752,6 +27462,9 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     if (supplierCategory.present) {
       map['supplier_category'] = Variable<String>(supplierCategory.value);
     }
+    if (purchaseOrderId.present) {
+      map['purchase_order_id'] = Variable<String>(purchaseOrderId.value);
+    }
     if (paymentMode.present) {
       map['payment_mode'] = Variable<String>(paymentMode.value);
     }
@@ -26779,6 +27492,9 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
     if (receiptLocalPath.present) {
       map['receipt_local_path'] = Variable<String>(receiptLocalPath.value);
     }
+    if (receiptSent.present) {
+      map['receipt_sent'] = Variable<bool>(receiptSent.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -26795,6 +27511,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
           ..write('supplierCategory: $supplierCategory, ')
+          ..write('purchaseOrderId: $purchaseOrderId, ')
           ..write('paymentMode: $paymentMode, ')
           ..write('treasuryAccountId: $treasuryAccountId, ')
           ..write('total: $total, ')
@@ -26804,6 +27521,7 @@ class PurchasesCompanion extends UpdateCompanion<Purchase> {
           ..write('returnedAt: $returnedAt, ')
           ..write('supplierCredit: $supplierCredit, ')
           ..write('receiptLocalPath: $receiptLocalPath, ')
+          ..write('receiptSent: $receiptSent, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -39373,6 +40091,21 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receiptSentMeta = const VerificationMeta(
+    'receiptSent',
+  );
+  @override
+  late final GeneratedColumn<bool> receiptSent = GeneratedColumn<bool>(
+    'receipt_sent',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("receipt_sent" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -39395,6 +40128,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     onCredit,
     ecritureRefus,
     receiptLocalPath,
+    receiptSent,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -39557,6 +40291,15 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         ),
       );
     }
+    if (data.containsKey('receipt_sent')) {
+      context.handle(
+        _receiptSentMeta,
+        receiptSent.isAcceptableOrUnknown(
+          data['receipt_sent']!,
+          _receiptSentMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -39648,6 +40391,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}receipt_local_path'],
       ),
+      receiptSent: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}receipt_sent'],
+      )!,
     );
   }
 
@@ -39715,8 +40462,13 @@ class Expense extends DataClass implements Insertable<Expense> {
   final String? ecritureRefus;
 
   /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
-  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
   final String? receiptLocalPath;
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  final bool receiptSent;
   const Expense({
     required this.id,
     required this.deviceId,
@@ -39738,6 +40490,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.onCredit,
     this.ecritureRefus,
     this.receiptLocalPath,
+    required this.receiptSent,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -39784,6 +40537,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     if (!nullToAbsent || receiptLocalPath != null) {
       map['receipt_local_path'] = Variable<String>(receiptLocalPath);
     }
+    map['receipt_sent'] = Variable<bool>(receiptSent);
     return map;
   }
 
@@ -39827,6 +40581,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       receiptLocalPath: receiptLocalPath == null && nullToAbsent
           ? const Value.absent()
           : Value(receiptLocalPath),
+      receiptSent: Value(receiptSent),
     );
   }
 
@@ -39862,6 +40617,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       onCredit: serializer.fromJson<bool>(json['onCredit']),
       ecritureRefus: serializer.fromJson<String?>(json['ecritureRefus']),
       receiptLocalPath: serializer.fromJson<String?>(json['receiptLocalPath']),
+      receiptSent: serializer.fromJson<bool>(json['receiptSent']),
     );
   }
   @override
@@ -39890,6 +40646,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       'onCredit': serializer.toJson<bool>(onCredit),
       'ecritureRefus': serializer.toJson<String?>(ecritureRefus),
       'receiptLocalPath': serializer.toJson<String?>(receiptLocalPath),
+      'receiptSent': serializer.toJson<bool>(receiptSent),
     };
   }
 
@@ -39914,6 +40671,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     bool? onCredit,
     Value<String?> ecritureRefus = const Value.absent(),
     Value<String?> receiptLocalPath = const Value.absent(),
+    bool? receiptSent,
   }) => Expense(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -39943,6 +40701,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     receiptLocalPath: receiptLocalPath.present
         ? receiptLocalPath.value
         : this.receiptLocalPath,
+    receiptSent: receiptSent ?? this.receiptSent,
   );
   Expense copyWithCompanion(ExpensesCompanion data) {
     return Expense(
@@ -39986,6 +40745,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       receiptLocalPath: data.receiptLocalPath.present
           ? data.receiptLocalPath.value
           : this.receiptLocalPath,
+      receiptSent: data.receiptSent.present
+          ? data.receiptSent.value
+          : this.receiptSent,
     );
   }
 
@@ -40011,13 +40773,14 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('createdBy: $createdBy, ')
           ..write('onCredit: $onCredit, ')
           ..write('ecritureRefus: $ecritureRefus, ')
-          ..write('receiptLocalPath: $receiptLocalPath')
+          ..write('receiptLocalPath: $receiptLocalPath, ')
+          ..write('receiptSent: $receiptSent')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     deviceId,
     syncStatus,
@@ -40038,7 +40801,8 @@ class Expense extends DataClass implements Insertable<Expense> {
     onCredit,
     ecritureRefus,
     receiptLocalPath,
-  );
+    receiptSent,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -40062,7 +40826,8 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.createdBy == this.createdBy &&
           other.onCredit == this.onCredit &&
           other.ecritureRefus == this.ecritureRefus &&
-          other.receiptLocalPath == this.receiptLocalPath);
+          other.receiptLocalPath == this.receiptLocalPath &&
+          other.receiptSent == this.receiptSent);
 }
 
 class ExpensesCompanion extends UpdateCompanion<Expense> {
@@ -40086,6 +40851,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<bool> onCredit;
   final Value<String?> ecritureRefus;
   final Value<String?> receiptLocalPath;
+  final Value<bool> receiptSent;
   final Value<int> rowid;
   const ExpensesCompanion({
     this.id = const Value.absent(),
@@ -40108,6 +40874,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.onCredit = const Value.absent(),
     this.ecritureRefus = const Value.absent(),
     this.receiptLocalPath = const Value.absent(),
+    this.receiptSent = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ExpensesCompanion.insert({
@@ -40131,6 +40898,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.onCredit = const Value.absent(),
     this.ecritureRefus = const Value.absent(),
     this.receiptLocalPath = const Value.absent(),
+    this.receiptSent = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -40160,6 +40928,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<bool>? onCredit,
     Expression<String>? ecritureRefus,
     Expression<String>? receiptLocalPath,
+    Expression<bool>? receiptSent,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -40183,6 +40952,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (onCredit != null) 'on_credit': onCredit,
       if (ecritureRefus != null) 'ecriture_refus': ecritureRefus,
       if (receiptLocalPath != null) 'receipt_local_path': receiptLocalPath,
+      if (receiptSent != null) 'receipt_sent': receiptSent,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -40208,6 +40978,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<bool>? onCredit,
     Value<String?>? ecritureRefus,
     Value<String?>? receiptLocalPath,
+    Value<bool>? receiptSent,
     Value<int>? rowid,
   }) {
     return ExpensesCompanion(
@@ -40231,6 +41002,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       onCredit: onCredit ?? this.onCredit,
       ecritureRefus: ecritureRefus ?? this.ecritureRefus,
       receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
+      receiptSent: receiptSent ?? this.receiptSent,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -40300,6 +41072,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (receiptLocalPath.present) {
       map['receipt_local_path'] = Variable<String>(receiptLocalPath.value);
     }
+    if (receiptSent.present) {
+      map['receipt_sent'] = Variable<bool>(receiptSent.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -40329,6 +41104,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('onCredit: $onCredit, ')
           ..write('ecritureRefus: $ecritureRefus, ')
           ..write('receiptLocalPath: $receiptLocalPath, ')
+          ..write('receiptSent: $receiptSent, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -43427,6 +44203,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ElevageNumberingSettingsTable(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
   late final $PurchaseOrdersTable purchaseOrders = $PurchaseOrdersTable(this);
+  late final $PurchaseOrderLinesTable purchaseOrderLines =
+      $PurchaseOrderLinesTable(this);
   late final $PayablesTable payables = $PayablesTable(this);
   late final $EmployeesTable employees = $EmployeesTable(this);
   late final $InternshipsTable internships = $InternshipsTable(this);
@@ -43544,6 +44322,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     elevageNumberingSettings,
     suppliers,
     purchaseOrders,
+    purchaseOrderLines,
     payables,
     employees,
     internships,
@@ -47823,6 +48602,9 @@ typedef $$SuppliersTableProcessedTableManager =
 typedef $$PurchaseOrdersTableCreateCompanionBuilder =
     PurchaseOrdersCompanion Function({
       required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
       Value<String?> supplierId,
       Value<String?> supplierName,
       Value<DateTime?> expectedDeliveryDate,
@@ -47834,6 +48616,9 @@ typedef $$PurchaseOrdersTableCreateCompanionBuilder =
 typedef $$PurchaseOrdersTableUpdateCompanionBuilder =
     PurchaseOrdersCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String?> supplierId,
       Value<String?> supplierName,
       Value<DateTime?> expectedDeliveryDate,
@@ -47854,6 +48639,22 @@ class $$PurchaseOrdersTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -47902,6 +48703,21 @@ class $$PurchaseOrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get supplierId => $composableBuilder(
     column: $table.supplierId,
     builder: (column) => ColumnOrderings(column),
@@ -47944,6 +48760,18 @@ class $$PurchaseOrdersTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<String> get supplierId => $composableBuilder(
     column: $table.supplierId,
@@ -48006,6 +48834,9 @@ class $$PurchaseOrdersTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String?> supplierId = const Value.absent(),
                 Value<String?> supplierName = const Value.absent(),
                 Value<DateTime?> expectedDeliveryDate = const Value.absent(),
@@ -48015,6 +48846,9 @@ class $$PurchaseOrdersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => PurchaseOrdersCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 supplierId: supplierId,
                 supplierName: supplierName,
                 expectedDeliveryDate: expectedDeliveryDate,
@@ -48026,6 +48860,9 @@ class $$PurchaseOrdersTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
                 Value<String?> supplierId = const Value.absent(),
                 Value<String?> supplierName = const Value.absent(),
                 Value<DateTime?> expectedDeliveryDate = const Value.absent(),
@@ -48035,6 +48872,9 @@ class $$PurchaseOrdersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => PurchaseOrdersCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 supplierId: supplierId,
                 supplierName: supplierName,
                 expectedDeliveryDate: expectedDeliveryDate,
@@ -48066,6 +48906,244 @@ typedef $$PurchaseOrdersTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $PurchaseOrdersTable, PurchaseOrder>,
       ),
       PurchaseOrder,
+      PrefetchHooks Function()
+    >;
+typedef $$PurchaseOrderLinesTableCreateCompanionBuilder =
+    PurchaseOrderLinesCompanion Function({
+      required String id,
+      required String purchaseOrderId,
+      required String productId,
+      Value<String?> productName,
+      required double qty,
+      required double estimatedUnitPrice,
+      Value<int> rowid,
+    });
+typedef $$PurchaseOrderLinesTableUpdateCompanionBuilder =
+    PurchaseOrderLinesCompanion Function({
+      Value<String> id,
+      Value<String> purchaseOrderId,
+      Value<String> productId,
+      Value<String?> productName,
+      Value<double> qty,
+      Value<double> estimatedUnitPrice,
+      Value<int> rowid,
+    });
+
+class $$PurchaseOrderLinesTableFilterComposer
+    extends Composer<_$AppDatabase, $PurchaseOrderLinesTable> {
+  $$PurchaseOrderLinesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get estimatedUnitPrice => $composableBuilder(
+    column: $table.estimatedUnitPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PurchaseOrderLinesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PurchaseOrderLinesTable> {
+  $$PurchaseOrderLinesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get estimatedUnitPrice => $composableBuilder(
+    column: $table.estimatedUnitPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PurchaseOrderLinesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PurchaseOrderLinesTable> {
+  $$PurchaseOrderLinesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get qty =>
+      $composableBuilder(column: $table.qty, builder: (column) => column);
+
+  GeneratedColumn<double> get estimatedUnitPrice => $composableBuilder(
+    column: $table.estimatedUnitPrice,
+    builder: (column) => column,
+  );
+}
+
+class $$PurchaseOrderLinesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PurchaseOrderLinesTable,
+          PurchaseOrderLine,
+          $$PurchaseOrderLinesTableFilterComposer,
+          $$PurchaseOrderLinesTableOrderingComposer,
+          $$PurchaseOrderLinesTableAnnotationComposer,
+          $$PurchaseOrderLinesTableCreateCompanionBuilder,
+          $$PurchaseOrderLinesTableUpdateCompanionBuilder,
+          (
+            PurchaseOrderLine,
+            BaseReferences<
+              _$AppDatabase,
+              $PurchaseOrderLinesTable,
+              PurchaseOrderLine
+            >,
+          ),
+          PurchaseOrderLine,
+          PrefetchHooks Function()
+        > {
+  $$PurchaseOrderLinesTableTableManager(
+    _$AppDatabase db,
+    $PurchaseOrderLinesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PurchaseOrderLinesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PurchaseOrderLinesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PurchaseOrderLinesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> purchaseOrderId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String?> productName = const Value.absent(),
+                Value<double> qty = const Value.absent(),
+                Value<double> estimatedUnitPrice = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PurchaseOrderLinesCompanion(
+                id: id,
+                purchaseOrderId: purchaseOrderId,
+                productId: productId,
+                productName: productName,
+                qty: qty,
+                estimatedUnitPrice: estimatedUnitPrice,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String purchaseOrderId,
+                required String productId,
+                Value<String?> productName = const Value.absent(),
+                required double qty,
+                required double estimatedUnitPrice,
+                Value<int> rowid = const Value.absent(),
+              }) => PurchaseOrderLinesCompanion.insert(
+                id: id,
+                purchaseOrderId: purchaseOrderId,
+                productId: productId,
+                productName: productName,
+                qty: qty,
+                estimatedUnitPrice: estimatedUnitPrice,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PurchaseOrderLinesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PurchaseOrderLinesTable,
+      PurchaseOrderLine,
+      $$PurchaseOrderLinesTableFilterComposer,
+      $$PurchaseOrderLinesTableOrderingComposer,
+      $$PurchaseOrderLinesTableAnnotationComposer,
+      $$PurchaseOrderLinesTableCreateCompanionBuilder,
+      $$PurchaseOrderLinesTableUpdateCompanionBuilder,
+      (
+        PurchaseOrderLine,
+        BaseReferences<
+          _$AppDatabase,
+          $PurchaseOrderLinesTable,
+          PurchaseOrderLine
+        >,
+      ),
+      PurchaseOrderLine,
       PrefetchHooks Function()
     >;
 typedef $$PayablesTableCreateCompanionBuilder =
@@ -56392,6 +57470,7 @@ typedef $$PurchasesTableCreateCompanionBuilder =
       required String supplierId,
       Value<String?> supplierName,
       Value<String?> supplierCategory,
+      Value<String?> purchaseOrderId,
       required String paymentMode,
       Value<String?> treasuryAccountId,
       required double total,
@@ -56401,6 +57480,7 @@ typedef $$PurchasesTableCreateCompanionBuilder =
       Value<DateTime?> returnedAt,
       Value<double?> supplierCredit,
       Value<String?> receiptLocalPath,
+      Value<bool> receiptSent,
       Value<int> rowid,
     });
 typedef $$PurchasesTableUpdateCompanionBuilder =
@@ -56412,6 +57492,7 @@ typedef $$PurchasesTableUpdateCompanionBuilder =
       Value<String> supplierId,
       Value<String?> supplierName,
       Value<String?> supplierCategory,
+      Value<String?> purchaseOrderId,
       Value<String> paymentMode,
       Value<String?> treasuryAccountId,
       Value<double> total,
@@ -56421,6 +57502,7 @@ typedef $$PurchasesTableUpdateCompanionBuilder =
       Value<DateTime?> returnedAt,
       Value<double?> supplierCredit,
       Value<String?> receiptLocalPath,
+      Value<bool> receiptSent,
       Value<int> rowid,
     });
 
@@ -56469,6 +57551,11 @@ class $$PurchasesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get paymentMode => $composableBuilder(
     column: $table.paymentMode,
     builder: (column) => ColumnFilters(column),
@@ -56511,6 +57598,11 @@ class $$PurchasesTableFilterComposer
 
   ColumnFilters<String> get receiptLocalPath => $composableBuilder(
     column: $table.receiptLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -56559,6 +57651,11 @@ class $$PurchasesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get paymentMode => $composableBuilder(
     column: $table.paymentMode,
     builder: (column) => ColumnOrderings(column),
@@ -56603,6 +57700,11 @@ class $$PurchasesTableOrderingComposer
     column: $table.receiptLocalPath,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PurchasesTableAnnotationComposer
@@ -56641,6 +57743,11 @@ class $$PurchasesTableAnnotationComposer
 
   GeneratedColumn<String> get supplierCategory => $composableBuilder(
     column: $table.supplierCategory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get purchaseOrderId => $composableBuilder(
+    column: $table.purchaseOrderId,
     builder: (column) => column,
   );
 
@@ -56684,6 +57791,11 @@ class $$PurchasesTableAnnotationComposer
     column: $table.receiptLocalPath,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
+    builder: (column) => column,
+  );
 }
 
 class $$PurchasesTableTableManager
@@ -56721,6 +57833,7 @@ class $$PurchasesTableTableManager
                 Value<String> supplierId = const Value.absent(),
                 Value<String?> supplierName = const Value.absent(),
                 Value<String?> supplierCategory = const Value.absent(),
+                Value<String?> purchaseOrderId = const Value.absent(),
                 Value<String> paymentMode = const Value.absent(),
                 Value<String?> treasuryAccountId = const Value.absent(),
                 Value<double> total = const Value.absent(),
@@ -56730,6 +57843,7 @@ class $$PurchasesTableTableManager
                 Value<DateTime?> returnedAt = const Value.absent(),
                 Value<double?> supplierCredit = const Value.absent(),
                 Value<String?> receiptLocalPath = const Value.absent(),
+                Value<bool> receiptSent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchasesCompanion(
                 id: id,
@@ -56739,6 +57853,7 @@ class $$PurchasesTableTableManager
                 supplierId: supplierId,
                 supplierName: supplierName,
                 supplierCategory: supplierCategory,
+                purchaseOrderId: purchaseOrderId,
                 paymentMode: paymentMode,
                 treasuryAccountId: treasuryAccountId,
                 total: total,
@@ -56748,6 +57863,7 @@ class $$PurchasesTableTableManager
                 returnedAt: returnedAt,
                 supplierCredit: supplierCredit,
                 receiptLocalPath: receiptLocalPath,
+                receiptSent: receiptSent,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -56759,6 +57875,7 @@ class $$PurchasesTableTableManager
                 required String supplierId,
                 Value<String?> supplierName = const Value.absent(),
                 Value<String?> supplierCategory = const Value.absent(),
+                Value<String?> purchaseOrderId = const Value.absent(),
                 required String paymentMode,
                 Value<String?> treasuryAccountId = const Value.absent(),
                 required double total,
@@ -56768,6 +57885,7 @@ class $$PurchasesTableTableManager
                 Value<DateTime?> returnedAt = const Value.absent(),
                 Value<double?> supplierCredit = const Value.absent(),
                 Value<String?> receiptLocalPath = const Value.absent(),
+                Value<bool> receiptSent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchasesCompanion.insert(
                 id: id,
@@ -56777,6 +57895,7 @@ class $$PurchasesTableTableManager
                 supplierId: supplierId,
                 supplierName: supplierName,
                 supplierCategory: supplierCategory,
+                purchaseOrderId: purchaseOrderId,
                 paymentMode: paymentMode,
                 treasuryAccountId: treasuryAccountId,
                 total: total,
@@ -56786,6 +57905,7 @@ class $$PurchasesTableTableManager
                 returnedAt: returnedAt,
                 supplierCredit: supplierCredit,
                 receiptLocalPath: receiptLocalPath,
+                receiptSent: receiptSent,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -62671,6 +63791,7 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       Value<bool> onCredit,
       Value<String?> ecritureRefus,
       Value<String?> receiptLocalPath,
+      Value<bool> receiptSent,
       Value<int> rowid,
     });
 typedef $$ExpensesTableUpdateCompanionBuilder =
@@ -62695,6 +63816,7 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<bool> onCredit,
       Value<String?> ecritureRefus,
       Value<String?> receiptLocalPath,
+      Value<bool> receiptSent,
       Value<int> rowid,
     });
 
@@ -62807,6 +63929,11 @@ class $$ExpensesTableFilterComposer
     column: $table.receiptLocalPath,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$ExpensesTableOrderingComposer
@@ -62917,6 +64044,11 @@ class $$ExpensesTableOrderingComposer
     column: $table.receiptLocalPath,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ExpensesTableAnnotationComposer
@@ -63008,6 +64140,11 @@ class $$ExpensesTableAnnotationComposer
     column: $table.receiptLocalPath,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get receiptSent => $composableBuilder(
+    column: $table.receiptSent,
+    builder: (column) => column,
+  );
 }
 
 class $$ExpensesTableTableManager
@@ -63058,6 +64195,7 @@ class $$ExpensesTableTableManager
                 Value<bool> onCredit = const Value.absent(),
                 Value<String?> ecritureRefus = const Value.absent(),
                 Value<String?> receiptLocalPath = const Value.absent(),
+                Value<bool> receiptSent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion(
                 id: id,
@@ -63080,6 +64218,7 @@ class $$ExpensesTableTableManager
                 onCredit: onCredit,
                 ecritureRefus: ecritureRefus,
                 receiptLocalPath: receiptLocalPath,
+                receiptSent: receiptSent,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -63104,6 +64243,7 @@ class $$ExpensesTableTableManager
                 Value<bool> onCredit = const Value.absent(),
                 Value<String?> ecritureRefus = const Value.absent(),
                 Value<String?> receiptLocalPath = const Value.absent(),
+                Value<bool> receiptSent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion.insert(
                 id: id,
@@ -63126,6 +64266,7 @@ class $$ExpensesTableTableManager
                 onCredit: onCredit,
                 ecritureRefus: ecritureRefus,
                 receiptLocalPath: receiptLocalPath,
+                receiptSent: receiptSent,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -64702,6 +65843,8 @@ class $AppDatabaseManager {
       $$SuppliersTableTableManager(_db, _db.suppliers);
   $$PurchaseOrdersTableTableManager get purchaseOrders =>
       $$PurchaseOrdersTableTableManager(_db, _db.purchaseOrders);
+  $$PurchaseOrderLinesTableTableManager get purchaseOrderLines =>
+      $$PurchaseOrderLinesTableTableManager(_db, _db.purchaseOrderLines);
   $$PayablesTableTableManager get payables =>
       $$PayablesTableTableManager(_db, _db.payables);
   $$EmployeesTableTableManager get employees =>

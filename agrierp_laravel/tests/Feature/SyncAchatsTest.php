@@ -338,13 +338,9 @@ class SyncAchatsTest extends TestCase
     }
 
     /**
-     * ⚠️⚠️ LES BONS DE COMMANDE RESTENT EN LECTURE SEULE : un envoi les concernant doit
-     * être ignoré ET COMPTÉ — un rejet muet passerait pour un succès.
-     *
-     * ⚠️ TICKET 15.17 — LES FOURNISSEURS NE LE SONT PLUS : le poste peut créer, modifier
-     * et archiver une fiche (voir `SyncFournisseurTest`). Mais seulement avec le droit
-     * `manage-achats` : l'utilisateur de ce test n'a aucun rôle, son envoi est donc
-     * REFUSÉ AVEC UN MOTIF (et non ignoré en silence), et la fiche n'est pas touchée.
+     * ⚠️ TICKET 15.17 — LES FOURNISSEURS S'ÉCRIVENT AU POSTE, mais seulement avec le droit `manage-achats`.
+     * ⚠️ TICKET AC-1 — IL EN VA DE MÊME DES BONS DE COMMANDE (voir `SyncBonsCommandeTest`) : l'utilisateur de ce test n'a
+     * aucun rôle, son envoi est donc REFUSÉ AVEC UN MOTIF (et non ignoré en silence), et rien n'est créé ni touché.
      */
     public function test_orders_cannot_be_written_and_suppliers_need_the_right(): void
     {
@@ -354,9 +350,10 @@ class SyncAchatsTest extends TestCase
         ]);
 
         $reponse->assertOk();
-        $this->assertGreaterThanOrEqual(1, $reponse->json('referentiels_ignored'));
         $this->assertSame([], $reponse->json('suppliers.accepted'));
         $this->assertCount(1, $reponse->json('suppliers.rejected'));
+        $this->assertSame([], $reponse->json('purchase_orders.accepted'));
+        $this->assertCount(1, $reponse->json('purchase_orders.rejected'));
         $this->assertSame('Provenderie du Plateau', $this->fournisseur->fresh()->name);
         $this->assertSame(0, PurchaseOrder::count());
     }

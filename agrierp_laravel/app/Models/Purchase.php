@@ -11,7 +11,7 @@ class Purchase extends Model
 
     protected $fillable = [
         'supplier_id', 'purchase_order_id', 'payment_mode', 'total',
-        'accounting_entry_id', 'purchase_date',
+        'accounting_entry_id', 'purchase_date', 'receipt_path',
     ];
 
     // ⚠️ `returned_at` et `supplier_credit` ne sont PAS remplissables : seul `PurchaseReturnService` les pose

@@ -460,7 +460,7 @@ class DepensesRepository {
     String beneficiaire = '',
     String? idEnModification,
     bool aCredit = false,
-    /// Ticket #48 — chemin absolu local du justificatif copié. Jamais synchronisé.
+    /// Ticket #48 — chemin absolu local du justificatif copié ; ticket AC-3 : envoyé au serveur une fois la dépense acceptée.
     String? receiptLocalPath,
   }) async {
     final existante = idEnModification == null
@@ -569,6 +569,8 @@ class DepensesRepository {
             syncStatus: const Value(SyncStatus.pending),
             updatedAt: Value(maintenant),
             receiptLocalPath: Value(receiptLocalPath),
+            // Ticket AC-3 — un NOUVEAU fichier est à envoyer ; le même fichier, déjà reçu du serveur, n'est pas renvoyé.
+            receiptSent: Value(receiptLocalPath == existante.receiptLocalPath && existante.receiptSent),
           ),
         );
         await ecrireLesLignes(existante.id);

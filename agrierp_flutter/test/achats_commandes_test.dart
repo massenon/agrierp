@@ -136,6 +136,9 @@ void main() {
       .insert(
         PurchaseOrdersCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime.now(),
+          syncStatus: const Value(SyncStatus.synced),
           supplierName: const Value('Provenderie du Plateau'),
           expectedDeliveryDate: Value(
             DateTime.now().add(const Duration(days: 7)),
@@ -726,7 +729,8 @@ void main() {
           'STATUT',
           'ACTIONS',
         ]) {
-          expect(find.text(colonne), findsOneWidget, reason: colonne);
+          // Ticket AC-1 : « FOURNISSEUR » est aussi l'étiquette du formulaire de saisie du bon (Blade) — au moins un.
+          expect(find.text(colonne), findsWidgets, reason: colonne);
         }
       },
     );
@@ -743,22 +747,22 @@ void main() {
       await ouvrir(tester, 'Bons de Commande');
 
       expect(find.text('405 000'), findsOneWidget);
-      expect(find.text('envoye'), findsOneWidget);
+      expect(find.text('ENVOYÉ / EN COURS'), findsOneWidget);
     });
 
-    /// ⚠️⚠️ La saisie d'un bon engage la ferme : le serveur le sert en lecture
-    /// seule et effacerait un bon saisi ici au tirage suivant.
-    testWidgets('⚠️⚠️ les bons disent pourquoi ils ne se saisissent pas ici', (
+    /// Ticket AC-1 — la saisie d'un bon n'est plus réservée au web : le formulaire du Blade est là, et le rappel Stocks
+    /// (Classe 3) aussi ; l'ancienne mention « lecture seule » a disparu.
+    testWidgets('⚠️ les bons se saisissent ici : formulaire du Blade, plus de mention « lecture seule »', (
       tester,
     ) async {
       await afficher(tester);
       await ouvrir(tester, 'Bons de Commande');
 
-      expect(find.byKey(const Key('mention-poste')), findsOneWidget);
-      expect(
-        find.textContaining('le serveur sert les bons en lecture seule'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('mention-poste')), findsNothing);
+      expect(find.textContaining('le serveur sert les bons en lecture seule'), findsNothing);
+      expect(find.text("Saisie d'un Bon de Commande"), findsOneWidget);
+      expect(find.byKey(const Key('bon-generer')), findsOneWidget);
+      expect(find.byKey(const Key('bon-rappel')), findsOneWidget);
     });
 
     testWidgets('sans donnée, chaque tableau le dit', (tester) async {
@@ -770,7 +774,7 @@ void main() {
 
       await ouvrir(tester, 'Bons de Commande');
       expect(
-        find.text('— Aucun bon de commande synchronisé —'),
+        find.text('Aucun bon de commande émis pour le moment.'),
         findsOneWidget,
       );
     });

@@ -1,12 +1,9 @@
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
+import '../../core/systeme/justificatif_local.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -100,7 +97,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   bool _enregistrement = false;
   Map<String, String> _erreurs = const {};
 
-  /// Ticket #48 — chemin absolu du justificatif copié localement (jamais synchronisé).
+  /// Ticket #48 — chemin absolu du justificatif copié localement (envoyé au serveur ensuite : ticket AC-3).
   String? _receiptLocalPath;
 
   @override
@@ -427,7 +424,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
   );
 
   /// « Reçu / Facture (Photo) » — cadre pointillé du Blade (`border-2 border-dashed … h-11`).
-  /// Ticket #48 : le fichier est copié localement (jamais synchronisé) ; ouvrez-le depuis la visionneuse Windows.
+  /// Ticket #48 : le fichier est copié localement ; ticket AC-3 : il part ensuite au serveur (`receipt_sent`).
   Widget _recu() {
     final chemin = _receiptLocalPath;
     return _champ(
@@ -453,7 +450,7 @@ class _ModaleDepenseState extends State<ModaleDepense> {
                     SizedBox(width: AgriSpacing.xs),
                     Flexible(
                       child: Text(
-                        'Joindre un justificatif (JPG, PNG, PDF) — copié localement, non synchronisé',
+                        'Joindre un justificatif (JPG, PNG, PDF) — envoyé à la ferme à la prochaine synchronisation',
                         key: Key('depense-recu-limite'),
                         style: TextStyle(fontSize: 10, color: AgriColors.outline),
                       ),
@@ -505,20 +502,9 @@ class _ModaleDepenseState extends State<ModaleDepense> {
 
   /// Ouvre le sélecteur de fichier et copie le fichier choisi dans le dossier local de l'application.
   Future<void> _choisirJustificatif() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-      dialogTitle: 'Joindre un justificatif',
-    );
-    if (result == null || result.files.isEmpty) return;
-    final source = File(result.files.first.path!);
-    final dir = await getApplicationDocumentsDirectory();
-    final nomFichier = '${DateTime.now().millisecondsSinceEpoch}_${result.files.first.name}';
-    final destination = File('${dir.path}/agrierp_justificatifs/$nomFichier');
-    await destination.parent.create(recursive: true);
-    final copie = await source.copy(destination.path);
-    if (!mounted) return;
-    setState(() => _receiptLocalPath = copie.path);
+    final chemin = await choisirEtCopierJustificatif();
+    if (chemin == null || !mounted) return;
+    setState(() => _receiptLocalPath = chemin);
   }
 
   // ── Lignes ───────────────────────────────────────────────────────────────────────────────────────────────────────

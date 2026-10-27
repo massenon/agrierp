@@ -60,6 +60,8 @@ class FusionReferentiels {
     'products': [
       ('sale_lines', 'product_id'),
       ('purchase_lines', 'product_id'),
+      // Ticket AC-1 — le produit d'une ligne de bon de commande (saisi au poste, avant l'envoi).
+      ('purchase_order_lines', 'product_id'),
       ('stock_adjustments', 'product_id'),
       ('stock_movements', 'product_id'),
       ('livestock_lots', 'product_id'),

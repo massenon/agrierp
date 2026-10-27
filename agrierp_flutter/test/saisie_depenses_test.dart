@@ -1235,8 +1235,9 @@ void main() {
       await ouvrirModale(tester);
 
       expect(find.byKey(const Key('depense-recu-limite')), findsOneWidget);
-      // Ticket #48 : le justificatif est COPIÉ LOCALEMENT (jamais synchronisé) ; la limite reste annoncée.
-      expect(find.textContaining('non synchronisé'), findsOneWidget);
+      // Ticket AC-3 : le justificatif est copié localement PUIS ENVOYÉ au serveur à la prochaine synchronisation.
+      expect(find.textContaining('prochaine synchronisation'), findsOneWidget);
+      expect(find.textContaining('non synchronisé'), findsNothing);
     });
   });
 

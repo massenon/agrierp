@@ -1168,12 +1168,16 @@ class Payables extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Bon de commande — référentiel en lecture seule au poste.
+/// Bon de commande — saisi au poste (ticket AC-1) ou servi par le serveur.
 ///
-/// ⚠️ **LE MONTANT ESTIMÉ EST CALCULÉ PAR LE SERVEUR**, sur les lignes du bon
-/// (`estimated_unit_price`, pas `unit_price` — la commande n'est pas livrée).
-/// Le recomposer ici ferait afficher deux estimations pour un même bon.
-class PurchaseOrders extends Table {
+/// ⚠️ **LE MONTANT ESTIMÉ EST CALCULÉ**, sur les lignes du bon (`estimated_unit_price`, pas `unit_price` — la commande
+/// n'est pas livrée) : le serveur le sert pour les bons de la ferme, le poste le somme pour ceux qu'il vient de saisir.
+///
+/// Ticket AC-1 — table MIXTE : un bon généré au poste est `pending` jusqu'à l'acquittement ; le tirage ne l'écrase jamais.
+/// ⚠️ **LA RÉCEPTION N'ÉCRIT PAS SUR LE BON** : elle écrit un ACHAT qui porte `purchase_order_id` ; le statut `recu` ne
+/// vient que du serveur, qui seul reçoit un bon (`ReceptionBonCommandeService`).
+class PurchaseOrders extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get supplierId => text().nullable()();
   TextColumn get supplierName => text().nullable()();
@@ -1183,6 +1187,19 @@ class PurchaseOrders extends Table {
   TextColumn get status => text().nullable()();
   DateTimeColumn get createdAt => dateTime().nullable()();
   RealColumn get estimatedTotal => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket AC-1 — ligne d'un bon de commande (`purchase_order_lines`) : produit, quantité, PRIX ESTIMÉ.
+class PurchaseOrderLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get purchaseOrderId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+  TextColumn get productName => text().nullable()();
+  RealColumn get qty => real()();
+  RealColumn get estimatedUnitPrice => real()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1396,6 +1413,10 @@ class Purchases extends Table with SyncColumns {
   TextColumn get supplierName => text().nullable()();
   TextColumn get supplierCategory => text().nullable()();
 
+  /// Ticket AC-1 — bon de commande que cet achat RÉCEPTIONNE (`purchase_order_id`), nul pour un achat direct. Le serveur
+  /// reçoit alors le bon (lignes du bon, dette entière) ; le poste n'écrit jamais le statut du bon.
+  TextColumn get purchaseOrderId => text().nullable()();
+
   TextColumn get paymentMode => text()();
   TextColumn get treasuryAccountId => text().nullable()();
   RealColumn get total => real()();
@@ -1417,8 +1438,13 @@ class Purchases extends Table with SyncColumns {
   RealColumn get supplierCredit => real().nullable()();
 
   /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
-  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
   TextColumn get receiptLocalPath => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  BoolColumn get receiptSent => boolean().withDefault(const Constant(false))();
 }
 
 /// Pointage d'un employé, saisi au poste ou reçu du serveur.
@@ -1830,8 +1856,13 @@ class Expenses extends Table with SyncColumns {
   TextColumn get ecritureRefus => text().nullable()();
 
   /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
-  /// Jamais synchronisé ; s'ouvre en visionneuse Windows. `null` = aucun fichier joint.
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
   TextColumn get receiptLocalPath => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  BoolColumn get receiptSent => boolean().withDefault(const Constant(false))();
 }
 
 /// Ticket DEP4 — une LIGNE de dépense : libellé, COMPTE DE CHARGE du plan (classe 6) et montant. Elle suit son en-tête :
@@ -2008,6 +2039,7 @@ class SyncState extends Table {
     ElevageNumberingSettings,
     Suppliers,
     PurchaseOrders,
+    PurchaseOrderLines,
     Payables,
     Employees,
     Internships,
@@ -2082,7 +2114,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 70;
+  int get schemaVersion => 72;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2745,6 +2777,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 70) {
         await _relancesMixtes(m);
       }
+      // v71 — ticket AC-1 : `purchase_orders` devient MIXTE (reconstruction), `purchase_order_lines` est créée, `purchases`
+      // reçoit `purchase_order_id` (réconciliation finale).
+      if (from < 71) {
+        await _bonsCommandeMixtes(m);
+        if (!await _tableExiste(m, purchaseOrderLines)) await m.createTable(purchaseOrderLines);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -2830,6 +2868,24 @@ class AppDatabase extends _$AppDatabase {
           customerReminders.deviceId: const Constant<String>('serveur'),
           customerReminders.syncStatus: const Constant<String>('synced'),
           customerReminders.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket AC-1 — `purchase_orders` reçoit [SyncColumns] par RECONSTRUCTION : les bons déjà tirés sont `synced`,
+  /// `device_id` = 'serveur'. Idempotent.
+  Future<void> _bonsCommandeMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${purchaseOrders.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        purchaseOrders,
+        newColumns: [for (final c in purchaseOrders.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          purchaseOrders.deviceId: const Constant<String>('serveur'),
+          purchaseOrders.syncStatus: const Constant<String>('synced'),
+          purchaseOrders.updatedAt: currentDateAndTime,
         },
       ),
     );
@@ -3081,6 +3137,8 @@ class AppDatabase extends _$AppDatabase {
     // Ticket DEV — devis saisis au poste.
     'quotes',
     'livestock_reproduction_events',
+    // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
+    'purchase_orders',
     'purchases',
     'attendance_records',
     // Tickets RH-1, RH-2, RH-4 — registres RH, absences de stagiaire, demandes de règlement de paie.
@@ -3171,7 +3229,7 @@ class AppDatabase extends _$AppDatabase {
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
     'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
     'corbeille_elements', 'corbeille_demandes', // ARC3
-    'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
+    'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expense_lines', 'expenses', 'stock_adjustments', 'stock_movements', // U9, DEP4
     'quotes', // DEV

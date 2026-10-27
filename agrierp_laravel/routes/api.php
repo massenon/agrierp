@@ -71,6 +71,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     // page 1 et ne finirait jamais. Compteur PROPRE, à 120 pages par minute (120 000 lignes au plus).
     Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:120,1,sync-pull');
     Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
+    // Ticket AC-3 — le FICHIER d'un justificatif (achat ou dépense), envoyé par le poste APRÈS que l'enregistrement a été
+    // accepté par `/sync/push` : le contrat de push ne transporte aucun fichier.
+    Route::post('/sync/receipts', [SyncController::class, 'receipt'])->middleware('throttle:60,1');
 
     // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du
     // serveur pour le contrôle de cohérence. Compteurs de débit PROPRES (3e paramètre) : sans préfixe, tous les

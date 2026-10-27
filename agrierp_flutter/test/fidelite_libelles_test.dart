@@ -392,7 +392,6 @@ void main() {
     // ── Colonnes et libellés du détail d'une vente, non embarqué.
     // Ticket AV2 : « P.U » et « Désignation » (détail de la vente de la maquette) n'ont plus de page qui les attende :
     // `historique-ventes.html` est contrôlée contre son Blade ; exemptions globales retirées.
-    'Qté': 'module non embarqué au poste',
     'Modifier': 'référentiel en lecture seule au poste',
 
     // ── Hub Clients et Créances (ticket F0.43) : les fiches clients s'écrivent
@@ -494,20 +493,10 @@ void main() {
     'ACH-2026-099': 'valeur de démonstration de la maquette',
     'ACH-2026-098': 'valeur de démonstration de la maquette',
 
-    // ⚠️⚠️ SAISIR UN BON DE COMMANDE ENGAGE LA FERME auprès d'un fournisseur,
-    //    et le serveur sert les bons en LECTURE SEULE : un bon saisi au poste
-    //    serait effacé au tirage suivant — après que le fournisseur ait été
-    //    appelé. Le poste les affiche, il ne les crée pas.
-    'Bons de commande émis': 'bons servis en lecture seule au poste',
-    'Ajouter au bon de commande': 'bons servis en lecture seule au poste',
-    'Générer le Bon': 'bons servis en lecture seule au poste',
-    'Date de Livraison Attendue': 'bons servis en lecture seule au poste',
-    "Produit / Article d'Approvisionnement":
-        'bons servis en lecture seule au poste',
-    'Quantité': 'bons servis en lecture seule au poste',
-    'P.U Estimé (FCFA)': 'bons servis en lecture seule au poste',
-    'Valider la réception': 'réception de commande réservée au web',
-    'Confirmer la Réception': 'réception de commande réservée au web',
+    // Ticket AC-1 — la saisie d'un bon est PORTÉE au poste d'après le Blade (le maître) : « Produit / Article ». La maquette
+    //    dit « Produit / Article d'Approvisionnement » ; le web ne reprend pas ce libellé.
+    "Produit / Article d'Approvisionnement": "libellé de la maquette — le web dit « Produit / Article »",
+    'Quantité': 'libellé de la maquette — la page du bon porte « Quantité » en capitales dans le formulaire',
     'Exporter le Bon (PDF)': "chaîne d'édition non embarquée",
 
     // ── Hub Fournisseurs (ticket F0.46, révisé F0.71). Depuis F0.71 une fiche se
@@ -1010,11 +999,6 @@ void main() {
     'bons-commande.html': {
       'Nouveau Fournisseur':
           'création à la volée non portée ici : elle se fait dans Fournisseurs',
-      // « Un bon engage la ferme auprès d'un fournisseur : le serveur le sert
-      // en LECTURE SEULE et ignore tout envoi le concernant. »
-      'Bon de Commande': 'saisie non portée — bon servi en lecture seule',
-      "Saisie d'un Bon de Commande":
-          'saisie non portée — bon servi en lecture seule',
       // ⚠️ F0.67 : l'exemption globale « référentiel en lecture seule » est
       // retirée — créer un produit EXISTE désormais, au Catalogue. Ce
       // formulaire-ci n'offre pas la création à la volée.
@@ -1137,7 +1121,7 @@ void main() {
   /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 170;
+  const plafondManquesMasques = 159;
 
   for (final entree in portages.entries) {
     final page = entree.key;

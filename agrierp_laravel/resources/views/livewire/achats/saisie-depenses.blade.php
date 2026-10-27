@@ -60,6 +60,10 @@
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @if($expense->receipt_path)
+                                    {{-- Ticket AC-3 — la pièce justificative (saisie au web ou envoyée par le poste). --}}
+                                    <a href="{{ route('justificatifs.show', ['type' => 'depense', 'id' => $expense->id]) }}" target="_blank" rel="noopener" class="text-brand-emerald hover:text-brand-forest p-1 inline-block align-middle" title="Pièce justificative"><span class="material-symbols-outlined text-[18px]">attach_file</span></a>
+                                @endif
                                 @unless($comptabilisee)
                                     <button @lectureSeule type="button" wire:click="editExpense('{{ $expense->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 @endunless
@@ -186,7 +190,7 @@
             <div class="md:col-span-2">
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Reçu / Facture (Photo)</label>
                 <label class="border-2 border-dashed border-outline-variant rounded-lg p-md text-center h-11 flex items-center justify-center gap-xs cursor-pointer hover:border-brand-emerald">
-                    <input wire:model="receiptFile" type="file" accept="image/*" class="hidden">
+                    <input wire:model="receiptFile" type="file" accept="image/*,application/pdf" class="hidden">
                     <span class="material-symbols-outlined text-outline-variant text-[18px]">add_a_photo</span>
                     <p class="text-[10px] text-outline">{{ $receiptFile ? $receiptFile->getClientOriginalName() : 'Associer le justificatif (JPG/PNG, max 5Mo)' }}</p>
                 </label>

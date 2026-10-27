@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io' show File;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -326,6 +327,9 @@ class SyncEngine {
         // L'affichage reste celui du tirage précédent jusqu'à la prochaine synchronisation.
       }
     }
+
+    // Ticket AC-3 — les FICHIERS des justificatifs partent APRÈS les enregistrements acceptés. Ne lève jamais.
+    await _envoyerJustificatifs();
 
     // Ticket H2 — la liaison a abouti (refus compris) : « Dernière synchronisation réussie » prend l'heure
     // du SERVEUR, celle du tirage qui vient d'avoir lieu (`server_time`), jamais l'horloge du poste.
@@ -4180,33 +4184,70 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Bons de commande — référentiel remplacé à chaque tirage.
+  /// Bons de commande — fusion STRICTE (ticket AC-1).
+  ///
+  /// ⚠️⚠️ **UN BON `pending` / `conflict` N'EST JAMAIS ÉCRASÉ** : il n'existe que sur ce poste (fournisseur appelé, livraison
+  /// attendue) et le tirage ne le connaît pas encore. Les bons ACQUITTÉS sont remplacés par ce que sert le serveur — lignes
+  /// comprises —, et ceux que le serveur ne sert plus (réinitialisation, base restaurée) sont retirés, comme avant.
   Future<int> _absorberBonsCommande(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    final vus = <String>{};
+    final recus = <PurchaseOrdersCompanion>[];
+    final lignesDe = <String, List<PurchaseOrderLinesCompanion>>{};
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Bon de commande');
+      recus.add(
+        PurchaseOrdersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _maintenant(),
+          supplierId: Value(l['supplier_id'] as String?),
+          supplierName: Value(l['supplier_name'] as String?),
+          expectedDeliveryDate: Value(_date(l['expected_delivery_date'])),
+          status: Value(l['status'] as String?),
+          createdAt: Value(_date(l['created_at'])),
+          estimatedTotal: Value(_reel(l['estimated_total']) ?? 0),
+        ),
+      );
+      final vuesLignes = <String>{};
+      lignesDe[id] = [
+        for (final ligne in _lignes(l['lines'] ?? const []))
+          PurchaseOrderLinesCompanion.insert(
+            id: _identifiantStrict(ligne, vuesLignes, 'Ligne de bon de commande'),
+            purchaseOrderId: id,
+            productId: (ligne['product_id'] ?? '') as String,
+            productName: Value(ligne['product_name'] as String?),
+            qty: _reel(ligne['qty']) ?? 0,
+            estimatedUnitPrice: _reel(ligne['estimated_unit_price']) ?? 0,
+          ),
+      ];
+    }
 
     await _db.transaction(() async {
-      await _db.delete(_db.purchaseOrders).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.purchaseOrders)
-            .insert(
-              PurchaseOrdersCompanion.insert(
-                id: l['id'] as String,
-                supplierId: Value(l['supplier_id'] as String?),
-                supplierName: Value(l['supplier_name'] as String?),
-                expectedDeliveryDate: Value(_date(l['expected_delivery_date'])),
-                status: Value(l['status'] as String?),
-                createdAt: Value(_date(l['created_at'])),
-                estimatedTotal: Value(_reel(l['estimated_total']) ?? 0),
-              ),
-            );
+      final locaux = {
+        for (final b in await _db.select(_db.purchaseOrders).get()) b.id: b.syncStatus,
+      };
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.purchaseOrderLines)..where((t) => t.purchaseOrderId.isIn(disparus))).go();
+        await (_db.delete(_db.purchaseOrders)..where((t) => t.id.isIn(disparus))).go();
+      }
+      for (final r in recus) {
+        final statut = locaux[r.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        await _db.into(_db.purchaseOrders).insert(r, onConflict: DoUpdate((_) => r.copyWith(deviceId: const Value.absent())));
+        await (_db.delete(_db.purchaseOrderLines)..where((t) => t.purchaseOrderId.equals(r.id.value))).go();
+        await _db.batch((b) => b.insertAll(_db.purchaseOrderLines, lignesDe[r.id.value]!));
       }
     });
 
-    return lignes.length;
+    return recus.length;
   }
 
   /// Achats — fusion, et JAMAIS un remplacement.
@@ -5143,6 +5184,11 @@ class SyncEngine {
       _db.customerReminders,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
+    final bonsCommande = await (_db.select(
+      _db.purchaseOrders,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final retours = await (_db.select(
       _db.purchaseReturns,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -5230,6 +5276,7 @@ class SyncEngine {
         imputations.isEmpty &&
         encaissements.isEmpty &&
         relances.isEmpty &&
+        bonsCommande.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
         fournisseurs.isEmpty &&
@@ -5256,6 +5303,14 @@ class SyncEngine {
       lignesDAchat[a.id] = await (_db.select(
         _db.purchaseLines,
       )..where((t) => t.purchaseId.equals(a.id))).get();
+    }
+
+    // Ticket AC-1 — lignes des bons à envoyer (lues ici, avec les autres lignes : les TABLES ENVOYÉES sont celles du bon).
+    final lignesDeBon = <String, List<PurchaseOrderLine>>{};
+    for (final b in bonsCommande) {
+      lignesDeBon[b.id] = await (_db.select(
+        _db.purchaseOrderLines,
+      )..where((t) => t.purchaseOrderId.equals(b.id))).get();
     }
 
     final lignesDeVente = <String, List<SaleLine>>{};
@@ -5411,6 +5466,8 @@ class SyncEngine {
         'receivable_payments': encaissements.map(_encaissementEnJson).toList(),
         // Ticket VC-2 — après les encaissements, comme au serveur.
         'customer_reminders': relances.map(_relanceEnJson).toList(),
+        // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
+        'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
 
     var accepte = 0;
@@ -5815,6 +5872,16 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket AC-1 — acquitté quand le serveur a créé le bon (statut `envoye`) avec ses lignes.
+    accepte += await _acquitter(
+      'purchase_orders',
+      corps['purchase_orders'],
+      (ids, statut) => (_db.update(_db.purchaseOrders)..where((t) => t.id.isIn(ids)))
+          .write(PurchaseOrdersCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     accepte += await _acquitter(
       'purchases',
       corps['purchases'],
@@ -6171,6 +6238,8 @@ class SyncEngine {
     'livestock_daily_entries',
     'livestock_transfers',
     'expenses',
+    // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
+    'purchase_orders',
     'purchases',
     'supplier_payments',
     'purchase_returns',
@@ -6281,6 +6350,64 @@ class SyncEngine {
       (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
     }
     return lot;
+  }
+
+  /// Ticket AC-3 — ENVOI DES JUSTIFICATIFS (`POST /api/sync/receipts`) : le contrat de `/sync/push` ne transporte aucun fichier.
+  ///
+  /// Pour chaque achat et chaque dépense ACQUITTÉS dont le fichier local n'est pas encore parti (`receipt_sent` faux) :
+  ///  - fichier envoyé (multipart `table`, `id`, `file`) → `receipt_sent` vrai ;
+  ///  - fichier disparu du disque → marqué envoyé (rien ne pourra jamais partir) et signalé ;
+  ///  - 422 (format ou taille refusés) → marqué envoyé et signalé AVEC LE MOTIF du serveur (le réessayer serait vain) ;
+  ///  - 404 (enregistrement pas encore connu) ou toute autre erreur (réseau, 401, 5xx) → on réessaiera à la prochaine
+  ///    synchronisation, sans bruit.
+  /// ⚠️ NE LÈVE JAMAIS : l'enregistrement est déjà accepté, un fichier qui tarde ne doit pas faire échouer la synchronisation.
+  Future<void> _envoyerJustificatifs() async {
+    try {
+      final achats = await (_db.select(_db.purchases)
+            ..where((t) => t.syncStatus.equalsValue(SyncStatus.synced) & t.receiptLocalPath.isNotNull() & t.receiptSent.equals(false)))
+          .get();
+      for (final a in achats) {
+        final ok = await _envoyerUnJustificatif('purchases', a.id, a.receiptLocalPath!, "l'achat du ${_jour(a.purchaseDate)}");
+        if (ok == null) continue;
+        await (_db.update(_db.purchases)..where((t) => t.id.equals(a.id))).write(PurchasesCompanion(receiptSent: Value(ok)));
+      }
+
+      final depenses = await (_db.select(_db.expenses)
+            ..where((t) => t.syncStatus.equalsValue(SyncStatus.synced) & t.receiptLocalPath.isNotNull() & t.receiptSent.equals(false)))
+          .get();
+      for (final d in depenses) {
+        final ok = await _envoyerUnJustificatif('expenses', d.id, d.receiptLocalPath!, 'la dépense « ${d.label} »');
+        if (ok == null) continue;
+        await (_db.update(_db.expenses)..where((t) => t.id.equals(d.id))).write(ExpensesCompanion(receiptSent: Value(ok)));
+      }
+    } on Object catch (e) {
+      debugPrint('Justificatifs non envoyés (détail technique) : $e');
+    }
+  }
+
+  /// `true` : fini (envoyé, ou impossible à jamais) ; `null` : à réessayer plus tard.
+  Future<bool?> _envoyerUnJustificatif(String table, String id, String chemin, String quoi) async {
+    final fichier = File(chemin);
+    if (!fichier.existsSync()) {
+      _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
+      return true;
+    }
+    try {
+      final nom = chemin.split(RegExp(r'[\\/]')).last;
+      await _client.post<Map<String, dynamic>>(
+        '/api/sync/receipts',
+        data: FormData.fromMap({'table': table, 'id': id, 'file': await MultipartFile.fromFile(chemin, filename: nom)}),
+      );
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        final donnees = e.response?.data;
+        final motif = donnees is Map && donnees['message'] is String ? donnees['message'] as String : 'format ou taille refusés';
+        _avertissements.add('Justificatif de $quoi refusé par le serveur : $motif');
+        return true;
+      }
+      return null;
+    }
   }
 
   /// Réponses des lots fusionnées table par table (acceptés et refusés mis bout à bout, compteurs additionnés),
@@ -6806,6 +6933,14 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket AC-1 — un bon refusé (fournisseur ou produit inconnu du serveur) se corrige puis se relance.
+      'purchase_orders' =>
+        () =>
+            (_db.update(
+              _db.purchaseOrders,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const PurchaseOrdersCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       // ⚠️ F0.77 : sans cette entrée, « Relancer » d'un achat refusé (compte absent du
       // plan, total nul) ne faisait RIEN — le bouton s'affichait, l'achat restait en
       // `conflict` pour toujours.
@@ -7136,6 +7271,18 @@ class SyncEngine {
     'imputation_date': _jour(i.imputationDate),
   };
 
+  /// Ticket AC-1 — bon de commande tel que `SyncController::pushPurchaseOrders` le valide : fournisseur, livraison attendue,
+  /// lignes (produit, quantité, PRIX ESTIMÉ). Ni statut ni total ne partent : le serveur crée le bon `envoye` et somme.
+  Map<String, dynamic> _bonCommandeEnJson(PurchaseOrder b, List<PurchaseOrderLine> lignes) => {
+    'id': b.id,
+    'supplier_id': b.supplierId,
+    'expected_delivery_date': b.expectedDeliveryDate == null ? null : _jour(b.expectedDeliveryDate!),
+    'lines': [
+      for (final l in lignes)
+        {'id': l.id, 'product_id': l.productId, 'qty': l.qty, 'estimated_unit_price': l.estimatedUnitPrice},
+    ],
+  };
+
   /// Ticket VC-2 — relance : le fait « ce client / cette créance, ce canal, ce message, ce jour ». Pour l'e-mail et le SMS,
   /// c'est une DEMANDE d'envoi : le serveur envoie, tient la trace, et refuse avec son motif s'il ne peut pas.
   Map<String, dynamic> _relanceEnJson(CustomerReminder r) => {
@@ -7291,6 +7438,8 @@ class SyncEngine {
   /// ventes (ticket 14.71).
   Map<String, dynamic> _achatEnJson(Purchase a, List<PurchaseLine> lignes) => {
     'id': a.id,
+    // Ticket AC-1 — réception d'un bon de commande : le serveur reçoit le BON (ses lignes, sa dette entière).
+    if (a.purchaseOrderId != null) 'purchase_order_id': a.purchaseOrderId,
     'supplier_id': a.supplierId,
     'payment_mode': a.paymentMode,
     'treasury_account_id': a.treasuryAccountId,

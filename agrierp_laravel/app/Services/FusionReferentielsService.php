@@ -88,6 +88,8 @@ class FusionReferentielsService
         // Ticket DEV — le client d'un devis du poste.
         'quotes' => ['customer_id' => 'customers'],
         'supplier_payments' => ['supplier_id' => 'suppliers'],
+        // Ticket AC-1 — le fournisseur et les produits d'un bon de commande du poste.
+        'purchase_orders' => ['supplier_id' => 'suppliers', 'lines.*.product_id' => 'products'],
         // Ticket VC-1 — le client d'un encaissement de créance.
         'receivable_payments' => ['customer_id' => 'customers'],
         // Ticket VC-2 — le client d'une relance du poste.

@@ -472,7 +472,27 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
                   ),
                   3,
                 ),
-                (_actionInerte(), 2),
+                (
+                  // Ticket AC-4 — « Régler » (web : `openPaymentModal($supplierId)`) : la modale s'ouvre sur CE fournisseur.
+                  d.dettes[i].montantDu > 0
+                      ? Align(
+                          alignment: Alignment.centerLeft,
+                          child: InkWell(
+                            key: Key('regler-dette-$i'),
+                            onTap: () => _ouvrirReglement(d, fournisseurId: d.dettes[i].dette.supplierId),
+                            child: const Text(
+                              'Régler',
+                              style: TextStyle(
+                                fontSize: AgriTypography.xs,
+                                fontWeight: AgriTypography.gras,
+                                color: AgriColors.brandEmerald,
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  2,
+                ),
               ]),
           ],
         ),
@@ -488,10 +508,10 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     );
   }
 
-  Future<void> _ouvrirReglement(DonneesFournisseurs d) async {
+  Future<void> _ouvrirReglement(DonneesFournisseurs d, {String? fournisseurId}) async {
     final enregistre = await afficherModale<bool>(
       context: context,
-      constructeur: (_) => _ModaleReglement(depot: widget.depot, donnees: d),
+      constructeur: (_) => _ModaleReglement(depot: widget.depot, donnees: d, fournisseurDepart: fournisseurId),
     );
     if (enregistre == true) await _charger();
   }
@@ -719,14 +739,6 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     ),
   );
 
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
-    ),
-  );
-
   Widget _mentionPoste(String texte) => Container(
     key: const Key('mention-poste'),
     padding: const EdgeInsets.all(AgriSpacing.sm),
@@ -778,10 +790,13 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
 /// ⚠️ La saisie est refusée AVANT d'être écrite (montant, plafond du dû) : le
 /// message reste dans la modale, rien n'est effacé.
 class _ModaleReglement extends StatefulWidget {
-  const _ModaleReglement({required this.depot, required this.donnees});
+  const _ModaleReglement({required this.depot, required this.donnees, this.fournisseurDepart});
 
   final FournisseursRepository depot;
   final DonneesFournisseurs donnees;
+
+  /// Ticket AC-4 — fournisseur de la ligne « Régler » ; absent : le bouton d'en-tête, rien de choisi.
+  final String? fournisseurDepart;
 
   @override
   State<_ModaleReglement> createState() => _ModaleReglementState();
@@ -789,7 +804,7 @@ class _ModaleReglement extends StatefulWidget {
 
 class _ModaleReglementState extends State<_ModaleReglement> {
   final _montant = TextEditingController();
-  String _fournisseur = '';
+  late String _fournisseur = widget.fournisseurDepart ?? '';
   String _compte = '';
   DateTime _date = HeureBenin.aujourdhui();
   String? _erreur;

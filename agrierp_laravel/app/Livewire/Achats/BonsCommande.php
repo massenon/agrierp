@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Achats;
 
-use App\Actions\RecordPurchaseAction;
+use App\Actions\SaisieBonCommandeAction;
 use App\Exceptions\AchatNonComptabilisableException;
 use App\Exceptions\ClosedFiscalYearException;
 use App\Exceptions\NoOpenFiscalYearException;
@@ -13,6 +13,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\Supplier;
 use App\Services\PdfExportService;
+use App\Services\ReceptionBonCommandeService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -130,24 +131,16 @@ class BonsCommande extends Component
             'expectedDeliveryDate' => ['nullable', 'date'],
         ]);
 
-        DB::transaction(function () {
-            $order = PurchaseOrder::create([
-                'supplier_id' => $this->supplierId,
-                'expected_delivery_date' => $this->expectedDeliveryDate ?: null,
-                'status' => 'envoye',
-            ]);
-
-            foreach ($this->cart as $item) {
-                PurchaseOrderLine::create([
-                    'purchase_order_id' => $order->id,
-                    'product_id' => $item['product_id'],
-                    'qty' => $item['qty'],
-                    'estimated_unit_price' => $item['unit_price'],
-                ]);
-            }
-
-            AuditLog::record('purchase_order.created', 'achats');
-        });
+        // Ticket AC-1 — `SaisieBonCommandeAction`, partagée avec le push du poste.
+        app(SaisieBonCommandeAction::class)->execute(
+            $this->supplierId,
+            $this->expectedDeliveryDate ?: null,
+            array_map(fn ($l) => [
+                'product_id' => $l['product_id'],
+                'qty' => $l['qty'],
+                'estimated_unit_price' => $l['unit_price'],
+            ], $this->cart),
+        );
 
         $this->dispatch('toast', message: 'Bon de commande généré avec succès.', type: 'success');
         $this->reset(['cart', 'supplierId', 'expectedDeliveryDate']);
@@ -169,35 +162,9 @@ class BonsCommande extends Component
         // comptabilisation des achats : l'écriture est datée du jour de la RÉCEPTION (`purchase_date` = aujourd'hui),
         // et tout (achat, lignes, stock, dette, écriture, statut du bon) tient dans UNE transaction — un exercice
         // clos/absent ou un compte manquant annule l'ensemble, sans résidu.
+        // Ticket AC-1 — `ReceptionBonCommandeService`, partagé avec le push des achats du poste : une seule réception.
         try {
-            $recu = DB::transaction(function () {
-                // Verrou + relecture du statut DANS la transaction : un second écran / double clic ne reçoit pas deux fois.
-                $order = PurchaseOrder::with('lines')->lockForUpdate()->findOrFail($this->receivingOrderId);
-
-                if ($order->status === 'recu' || Purchase::where('purchase_order_id', $order->id)->exists()) {
-                    return false;
-                }
-
-                app(RecordPurchaseAction::class)->execute(
-                    supplierId: $order->supplier_id,
-                    lignes: $order->lines->map(fn ($l) => [
-                        'product_id' => $l->product_id,
-                        'qty' => $l->qty,
-                        // Le prix estimé devient le prix réel : aucun autre prix n'est capturé à la réception.
-                        'unit_price' => $l->estimated_unit_price,
-                    ])->all(),
-                    paymentMode: 'credit',
-                    treasuryAccountId: '',     // aucun règlement à la réception : la dette porte tout le total
-                    montantRegle: 0.0,
-                    purchaseOrderId: $order->id,
-                );
-
-                $order->update(['status' => 'recu']);
-
-                AuditLog::record('purchase_order.received', 'achats');
-
-                return true;
-            });
+            $recu = app(ReceptionBonCommandeService::class)->recevoir($this->receivingOrderId) !== null;
         } catch (NoOpenFiscalYearException|ClosedFiscalYearException|AchatNonComptabilisableException $e) {
             $this->dispatch('toast', message: 'Réception refusée : '.$e->getMessage(), type: 'error');
 

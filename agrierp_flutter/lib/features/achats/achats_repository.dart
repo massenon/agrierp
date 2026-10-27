@@ -22,6 +22,45 @@ class LigneSaisieAchat {
   double get total => quantite * prixUnitaire;
 }
 
+/// Ticket AC-1 — une ligne du bon de commande en cours de saisie : produit, quantité ENTIÈRE, prix unitaire ESTIMÉ.
+class LigneSaisieBon {
+  const LigneSaisieBon({required this.produit, required this.quantite, required this.prixEstime});
+
+  final Product produit;
+  final int quantite;
+  final double prixEstime;
+
+  double get total => quantite * prixEstime;
+}
+
+/// Ticket AC-1 — une ligne de « Bons de commande émis » : le bon, son statut effectif et ce qui reste à confirmer.
+class LigneBon {
+  const LigneBon({required this.bon, required this.lignes, required this.receptionEnAttente, this.motifRefus, this.motifRefusReception});
+
+  final PurchaseOrder bon;
+  final List<PurchaseOrderLine> lignes;
+
+  /// Une réception saisie sur CE poste (achat qui porte `purchase_order_id`), pas encore refusée : le bon s'affiche reçu.
+  final bool receptionEnAttente;
+
+  /// Motif du serveur quand le bon lui-même a été refusé (`conflict`).
+  final String? motifRefus;
+
+  /// Motif du serveur quand la RÉCEPTION a été refusée (achat en `conflict`, ex. bon déjà reçu au web).
+  final String? motifRefusReception;
+
+  bool get enAttente => bon.syncStatus == SyncStatus.pending;
+  bool get refuse => bon.syncStatus == SyncStatus.conflict;
+
+  /// Statut affiché : celui du serveur, sauf réception saisie ici (le serveur seul pose `recu`).
+  String get statut => receptionEnAttente ? 'recu' : (bon.status ?? 'envoye');
+
+  /// « Valider la réception » : ni bon reçu ou annulé, ni réception déjà saisie, ni bon refusé.
+  bool get receptionPossible => statut != 'recu' && statut != 'annule' && !refuse;
+
+  double get total => lignes.fold<double>(0, (t, l) => t + l.qty * l.estimatedUnitPrice);
+}
+
 /// Une ligne de « Liste d'Achats » et de « Achats Recemment Enregistres ».
 class LigneAchat {
   const LigneAchat({
@@ -129,6 +168,45 @@ class DocumentsAchats {
   /// Tiret affiché pour toute information que le poste ne détient pas.
   static const inconnu = '—';
 
+  /// Ticket AC-1 — `BonsCommande::exportPdf` du web (`exports.bon-commande`) : « Bon de Commande — RÉF », bloc fournisseur
+  /// et références, tableau Produit · Quantité · P.U. Estimé · Total, « TOTAL ESTIMÉ », mention de prévisionnel.
+  static DocumentOfficiel bonCommande(LigneBon l, {Supplier? fournisseur, Map<String, Product> produits = const {}}) {
+    final ref = l.bon.id.substring(0, 8).toUpperCase();
+    final statut = switch (l.statut) {
+      'brouillon' => 'Brouillon',
+      'recu' => 'Reçu / Validé',
+      'annule' => 'Annulé',
+      _ => 'Envoyé / En cours',
+    };
+    final contact = [
+      if ((fournisseur?.phone ?? '').isNotEmpty) 'Tél : ${fournisseur!.phone}',
+      if ((fournisseur?.email ?? '').isNotEmpty) fournisseur!.email!,
+    ].join(' · ');
+
+    return DocumentOfficiel(
+      titre: 'Bon de Commande — $ref',
+      fichier: 'bon-commande-$ref.pdf',
+      sousTitre: 'Émis le ${AchatsRepository.jour(l.bon.createdAt)}',
+      entetes: const ['Produit / Article', 'Quantité', 'P.U. Estimé (FCFA)', 'Total (FCFA)'],
+      lignes: [
+        for (final ligne in l.lignes)
+          DonneesDocument([
+            produits[ligne.productId]?.name ?? ligne.productName ?? inconnu,
+            '${ligne.qty == ligne.qty.roundToDouble() ? ligne.qty.round() : ligne.qty} ${produits[ligne.productId]?.unit ?? ''}'.trim(),
+            AchatsRepository.montant(ligne.estimatedUnitPrice),
+            AchatsRepository.montant(ligne.qty * ligne.estimatedUnitPrice),
+          ]),
+        TotalDocument(['', '', 'TOTAL ESTIMÉ', '${AchatsRepository.montant(l.total)} FCFA'], premiere: true),
+      ],
+      noteDePied: [
+        'Fournisseur : ${fournisseur?.name ?? l.bon.supplierName ?? inconnu}${contact.isEmpty ? '' : ' ($contact)'}.',
+        'Référence : $ref · Livraison attendue : ${AchatsRepository.jour(l.bon.expectedDeliveryDate)} · Statut : $statut.',
+        "Ce bon de commande est un ordre d'achat prévisionnel — les montants sont estimatifs et seront confirmés à la "
+            'réception effective des marchandises.',
+      ].join(' '),
+    );
+  }
+
   /// `exportAchatsPDF()` de la maquette : titre, sous-titre et cinq colonnes
   /// repris mot pour mot (`liste-achats.html` l.592-597).
   static DocumentOfficiel liste(List<LigneAchat> achats) {
@@ -231,7 +309,7 @@ class DonneesAchats {
   final List<Product> produits;
   final List<TreasuryAccount> comptes;
   final List<LigneAchat> achats;
-  final List<PurchaseOrder> bonsCommande;
+  final List<LigneBon> bonsCommande;
 
   /// Créance ouverte par fournisseur, telle que le SERVEUR l'a servie au dernier tirage.
   final List<CreanceFournisseur> creances;
@@ -455,6 +533,23 @@ class AchatsRepository {
     final comptes = await database.select(database.treasuryAccounts).get();
     final achats = await database.select(database.purchases).get();
     final bons = await database.select(database.purchaseOrders).get();
+    // Ticket AC-1 — lignes des bons, et RÉCEPTIONS saisies au poste (achats qui portent `purchase_order_id`) : un bon
+    // s'affiche reçu dès qu'une réception est en attente ou acquittée, pas quand elle est refusée.
+    final lignesDeBons = <String, List<PurchaseOrderLine>>{};
+    for (final l in await database.select(database.purchaseOrderLines).get()) {
+      (lignesDeBons[l.purchaseOrderId] ??= []).add(l);
+    }
+    final receptions = <String, SyncStatus>{};
+    final receptionsAchat = <String, String>{};
+    for (final a in achats) {
+      final bonId = a.purchaseOrderId;
+      if (bonId == null) continue;
+      final courant = receptions[bonId];
+      if (courant == null || (courant == SyncStatus.conflict && a.syncStatus != SyncStatus.conflict)) {
+        receptions[bonId] = a.syncStatus;
+        receptionsAchat[bonId] = a.id;
+      }
+    }
     final retours = await database.select(database.purchaseReturns).get();
     final creances = await database.select(database.supplierCredits).get();
     final refus = {
@@ -541,12 +636,17 @@ class AchatsRepository {
                 ),
               )
               .toList(),
-      bonsCommande: bons.toList()
-        ..sort(
-          (a, b) => (b.createdAt ?? DateTime(1970)).compareTo(
-            a.createdAt ?? DateTime(1970),
+      bonsCommande: [
+        for (final b in bons.toList()
+          ..sort((a, b) => (b.createdAt ?? b.updatedAt).compareTo(a.createdAt ?? a.updatedAt)))
+          LigneBon(
+            bon: b,
+            lignes: lignesDeBons[b.id] ?? const [],
+            receptionEnAttente: receptions.containsKey(b.id) && receptions[b.id] != SyncStatus.conflict,
+            motifRefus: b.syncStatus == SyncStatus.conflict ? refus['purchase_orders:${b.id}'] : null,
+            motifRefusReception: receptions[b.id] == SyncStatus.conflict ? refus['purchases:${receptionsAchat[b.id]}'] : null,
           ),
-        ),
+      ],
     );
   }
 
@@ -566,6 +666,8 @@ class AchatsRepository {
     required String compteId,
     required double montantPaye,
     DateTime? date,
+    // Ticket AC-3 — chemin local du justificatif joint (copié par `choisirEtCopierJustificatif`) ; envoyé au serveur ensuite.
+    String? receiptLocalPath,
   }) async {
     if (lignes.isEmpty) {
       throw ArgumentError('Un achat sans ligne ne veut rien dire.');
@@ -603,6 +705,7 @@ class AchatsRepository {
               // achat rejeté pour rien.
               amountPaid: Value(montantPaye > total ? total : montantPaye),
               purchaseDate: jour,
+              receiptLocalPath: Value(receiptLocalPath),
             ),
           );
 
@@ -619,6 +722,132 @@ class AchatsRepository {
                 unitPrice: ligne.prixUnitaire,
               ),
             );
+      }
+    });
+
+    return id;
+  }
+
+  // ── Bons de commande (ticket AC-1) ────────────────────────────────────────
+
+  /// « Générer le Bon » : écrit le bon et ses lignes LOCALEMENT, `pending` ; le serveur crée le bon au statut `envoye`
+  /// (`SaisieBonCommandeAction`, celle de `BonsCommande::generateBc`).
+  ///
+  /// ⚠️ **REFUSER AVANT D'ÉCRIRE**, mêmes messages que le web : au moins un article, un fournisseur connu.
+  Future<String> creerBon({
+    required String fournisseurId,
+    DateTime? livraisonAttendue,
+    required List<LigneSaisieBon> lignes,
+    DateTime? date,
+  }) async {
+    if (lignes.isEmpty) {
+      throw const SaisieAchatRefusee('Ajoutez au moins un article au bon de commande.');
+    }
+    final fournisseur = await (database.select(database.suppliers)..where((t) => t.id.equals(fournisseurId))).getSingleOrNull();
+    if (fournisseur == null) {
+      throw const SaisieAchatRefusee('Le champ fournisseur est obligatoire.');
+    }
+
+    final jour = date ?? HeureBenin.maintenant();
+    final id = _uuid.v4();
+    final total = lignes.fold<double>(0, (t, l) => t + l.total);
+
+    await database.transaction(() async {
+      await database.into(database.purchaseOrders).insert(
+        PurchaseOrdersCompanion.insert(
+          id: id,
+          deviceId: identifiantPoste,
+          updatedAt: HeureBenin.versInstant(jour),
+          supplierId: Value(fournisseurId),
+          supplierName: Value(fournisseur.name),
+          expectedDeliveryDate: Value(livraisonAttendue),
+          status: const Value('envoye'),
+          createdAt: Value(jour),
+          estimatedTotal: Value(total),
+        ),
+      );
+      for (final l in lignes) {
+        await database.into(database.purchaseOrderLines).insert(
+          PurchaseOrderLinesCompanion.insert(
+            id: _uuid.v4(),
+            purchaseOrderId: id,
+            productId: l.produit.id,
+            productName: Value(l.produit.name),
+            qty: l.quantite.toDouble(),
+            estimatedUnitPrice: l.prixEstime,
+          ),
+        );
+      }
+    });
+
+    return id;
+  }
+
+  /// « Confirmer la Réception » : écrit l'ACHAT de la réception LOCALEMENT, `pending`, relié au bon
+  /// (`purchase_order_id`) — jamais le statut du bon.
+  ///
+  /// ⚠️⚠️ **LE POSTE N'ÉCRIT QUE LE FAIT** : le serveur reçoit le bon (`ReceptionBonCommandeService`, celui de
+  /// `confirmReceiveOrder`) avec les LIGNES DU BON, le prix estimé devenu prix réel, aucun règlement (dette entière), le
+  /// stock, la dette et l'écriture D 601 + 445 / C 401. Les lignes écrites ici reproduisent celles du bon pour l'affichage.
+  ///
+  /// ⚠️ **REFUSER AVANT D'ÉCRIRE** : bon inconnu, déjà reçu (serveur ou réception en attente), annulé, refusé par le
+  /// serveur (il n'existe pas côté ferme), sans ligne, exercice clos ou absent.
+  Future<String> recevoirBon(String bonId, {DateTime? date}) async {
+    final bon = await (database.select(database.purchaseOrders)..where((t) => t.id.equals(bonId))).getSingleOrNull();
+    if (bon == null) {
+      throw const SaisieAchatRefusee('Bon de commande inconnu — synchronisez le poste.');
+    }
+    if (bon.syncStatus == SyncStatus.conflict) {
+      throw const SaisieAchatRefusee('Ce bon a été refusé par le serveur : il n\'existe pas côté ferme, il ne peut pas être reçu.');
+    }
+    if (bon.status == 'recu' ||
+        await (database.select(database.purchases)
+              ..where((t) => t.purchaseOrderId.equals(bonId) & t.syncStatus.equalsValue(SyncStatus.conflict).not()))
+            .getSingleOrNull() !=
+            null) {
+      throw const SaisieAchatRefusee('Ce bon de commande est déjà reçu : une seule réception est possible.');
+    }
+    if (bon.status == 'annule') {
+      throw const SaisieAchatRefusee('Ce bon de commande est annulé : il ne peut pas être reçu.');
+    }
+    final lignes = await (database.select(database.purchaseOrderLines)..where((t) => t.purchaseOrderId.equals(bonId))).get();
+    if (lignes.isEmpty || bon.supplierId == null) {
+      throw const SaisieAchatRefusee('Ce bon de commande est incomplet (fournisseur ou lignes absents) : synchronisez le poste.');
+    }
+
+    final jour = date ?? HeureBenin.maintenant();
+    await _exercice.refuser(jour);
+
+    final fournisseur = await (database.select(database.suppliers)..where((t) => t.id.equals(bon.supplierId!))).getSingleOrNull();
+    final total = lignes.fold<double>(0, (t, l) => t + l.qty * l.estimatedUnitPrice);
+    final id = _uuid.v4();
+
+    await database.transaction(() async {
+      await database.into(database.purchases).insert(
+        PurchasesCompanion.insert(
+          id: id,
+          deviceId: identifiantPoste,
+          updatedAt: HeureBenin.versInstant(jour),
+          supplierId: bon.supplierId!,
+          supplierName: Value(fournisseur?.name ?? bon.supplierName),
+          supplierCategory: Value(fournisseur?.category),
+          purchaseOrderId: Value(bonId),
+          paymentMode: 'credit',
+          total: total,
+          purchaseDate: jour,
+        ),
+      );
+      for (final l in lignes) {
+        await database.into(database.purchaseLines).insert(
+          PurchaseLinesCompanion.insert(
+            id: _uuid.v4(),
+            purchaseId: id,
+            productId: l.productId,
+            productName: Value(l.productName),
+            qty: l.qty,
+            unitPrice: l.estimatedUnitPrice,
+          ),
+        );
       }
     });
 

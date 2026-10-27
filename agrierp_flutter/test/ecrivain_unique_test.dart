@@ -35,6 +35,8 @@ void main() {
     'quotes': 'lib/features/ventes/devis_repository.dart',
     'livestock_reproduction_events': 'lib/features/elevage/suivi_reproduction_repository.dart',
     'purchases': 'lib/features/achats/achats_repository.dart',
+    // Ticket AC-1 — « Bons de Commande » : « Générer le Bon » et la réception s'écrivent par ce dépôt.
+    'purchase_orders': 'lib/features/achats/achats_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
     // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
     'employees': 'lib/features/rh/personnel_repository.dart',

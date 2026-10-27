@@ -175,6 +175,10 @@ PRD : `docs/prd/rh-crud-poste.md`. **Trois points de passage uniques, partagés 
 
 `App\Services\RelanceClientService` (`relancer` : e-mail via la configuration SMTP des paramètres ou SMS via `SmsService`, puis journal ; `journaliser` : trace seule, WhatsApp et courrier) est le point de passage unique de `RelancesClients`, `SuiviDettes::sendReminder` ET de `SyncController::pushCustomerReminders` (clé `customer_reminders`, droit `manage-ventes`, idempotent par UUID du poste, `referentiels_ignored` si le client ou la créance est inconnu). Garde : `tests/Feature/SyncRelancesClientsTest.php`.
 
+### Bons de commande et justificatifs au poste (AC-1, AC-3 — 28/10/2026)
+
+`App\Actions\SaisieBonCommandeAction` (saisie, idempotente) et `App\Services\ReceptionBonCommandeService` (réception : lignes du bon, crédit, dette entière, écriture, bon `recu`) sont les points de passage uniques de `BonsCommande` ET du push : `purchase_orders` (avec ses `lines`, `manage-achats`, traité AVANT `purchases`) et, dans `pushPurchases`, tout achat qui porte `purchase_order_id` (le bon est le maître, un bon déjà reçu rejette l'achat). Le tirage sert les `lines` de chaque bon. `App\Services\JustificatifService` range (disque privé `local`, `achats-recus` / `depenses-recus`), rattache (`receipt_path`, achats ET dépenses) et lit (route `justificatifs.show`, `view-achats`) ; `POST /api/sync/receipts` y dépose le fichier envoyé par un poste (un renvoi remplace). Gardes : `SyncBonsCommandeTest`, `JustificatifsSynchronisesTest`, `DettesFournisseursActionsTest`.
+
 ### Scheduling
 
 `routes/console.php` holds all 5 scheduled tasks (daily `agrierp:backup` at 02:00, `DailyProphylaxyReminderJob` at 06:00 Africa/Porto-Novo, weekly session GC / notification purge / failed-job prune, weekly backup-download reminder). Production uses **one** cPanel cron entry running `php artisan schedule:run` every minute — never one cron per task.

@@ -32,6 +32,8 @@ abstract final class SymbolesAgri {
   static const IconData assessment = IconData(0xe24b, fontFamily: famille);
   static const IconData assignment = IconData(0xe85d, fontFamily: famille);
   static const IconData assignment_return = IconData(0xe860, fontFamily: famille);
+  static const IconData assignment_turned_in = IconData(0xe862, fontFamily: famille);
+  static const IconData attach_file = IconData(0xe226, fontFamily: famille);
   static const IconData auto_stories = IconData(0xe666, fontFamily: famille);
   static const IconData backup = IconData(0xe864, fontFamily: famille);
   static const IconData badge = IconData(0xea67, fontFamily: famille);
@@ -164,6 +166,7 @@ abstract final class SymbolesAgri {
   static const IconData settings_applications = IconData(0xe8b9, fontFamily: famille);
   static const IconData settings_backup_restore = IconData(0xe8ba, fontFamily: famille);
   static const IconData shield = IconData(0xe75b, fontFamily: famille);
+  static const IconData shopping_basket = IconData(0xe8cb, fontFamily: famille);
   static const IconData shopping_cart = IconData(0xe547, fontFamily: famille);
   static const IconData show_chart = IconData(0xe6e1, fontFamily: famille);
   static const IconData skull = IconData(0xf89a, fontFamily: famille);

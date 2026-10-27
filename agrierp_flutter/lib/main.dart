@@ -1319,6 +1319,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.achatsEtCommandes => AchatsCommandesScreen(
           depot: widget.achats,
           depotFournisseurs: widget.fournisseurs,
+          depotProduits: widget.produits,
           imprimer: EditeursRapports.imprimer,
         ),
         EcranPoste.saisieDepenses => SaisieDepensesScreen(

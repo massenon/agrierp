@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/systeme/ouvreur_url.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -43,9 +44,12 @@ import 'modale_depense.dart';
 ///
 /// ⚠️ « Charges Fixes / Variables » : arbitrage client en attente (aucun champ Fixe/Variable, ni au web ni ici).
 class SaisieDepensesScreen extends StatefulWidget {
-  const SaisieDepensesScreen({super.key, required this.depot});
+  const SaisieDepensesScreen({super.key, required this.depot, this.ouvrirFichier = ouvrirUrlSysteme});
 
   final DepensesRepository depot;
+
+  /// Ticket AC-3 — ouvre le justificatif local dans la visionneuse du système ; un espion en test.
+  final OuvreurUrl ouvrirFichier;
 
   /// `wire:model.live.debounce.300ms` du champ « Rechercher... ».
   static const delaiRecherche = Duration(milliseconds: 300);
@@ -544,6 +548,15 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    // Ticket AC-3 — « Pièce justificative » (icône trombone du Blade) : le fichier joint à cette dépense.
+                    if (d.receiptLocalPath != null)
+                      _action(
+                        cle: 'depense-justificatif-${d.id}',
+                        infobulle: 'Pièce justificative',
+                        icone: SymbolesAgri.attach_file,
+                        couleur: AgriColors.brandEmerald,
+                        surAppui: () => widget.ouvrirFichier(d.receiptLocalPath!),
+                      ),
                     // Une dépense comptabilisée est IMMUABLE : pas de crayon (le web ne l'affiche pas non plus).
                     if (!l.comptabilisee)
                       _action(
