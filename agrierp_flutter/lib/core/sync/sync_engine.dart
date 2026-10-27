@@ -7352,6 +7352,8 @@ class SyncEngine {
     'tva_rate': p.tvaRate,
     'stock_qty': p.stockQty,
     'alert_threshold': p.alertThreshold ?? 0,
+    // Ticket ST-1 — `false` = archivage depuis le poste ; le serveur n'en déduit jamais une réactivation.
+    'is_active': p.isActive,
     'updated_at': p.updatedAt?.toUtc().toIso8601String(),
   };
 

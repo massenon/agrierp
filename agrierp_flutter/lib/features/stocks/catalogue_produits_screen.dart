@@ -2,8 +2,11 @@ import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 
+import '../../core/database/app_database.dart' show Product;
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/toast_agri.dart';
 import 'ajouter_produit_screen.dart';
 import 'produits_repository.dart';
 import 'stocks_repository.dart';
@@ -18,9 +21,9 @@ import '../../core/theme/symboles_agri.dart';
 /// ⚠️⚠️ **LE CATALOGUE EST EN LECTURE SEULE, SAUF LA CRÉATION ET LA MODIFICATION
 /// D'UN PRODUIT (ticket F0.67, enregistrées localement puis synchronisées).**
 /// `products` s'écrit au poste depuis 15.15 / F0.67 (création, modification par `ProduitsRepository`) ;
-/// `product_categories` reste un **référentiel** du serveur (`referentiels_ignored`). L'archivage d'un produit
-/// et la modification d'un seuil DANS CET ONGLET ne sont pas encore portés (tickets ST-1 / ST-2 de
-/// `docs/INVENTAIRE_LECTURE_SEULE_POSTE.md`) : ces boutons de la maquette sont présents et inertes, avec leur raison.
+/// `product_categories` reste un **référentiel** du serveur (`referentiels_ignored`). Tickets ST-1 / ST-2 : l'archivage
+/// d'un produit (modale « Confirmer l'archivage ») et la modification d'un seuil (modale « Configurer un Seuil ») s'écrivent
+/// au poste, comme au web, par `ProduitsRepository` (`pending`, puis envoyés).
 ///
 /// ⚠️ **CE N'EST PAS LE MÊME DÉPÔT QU'UN SECOND LECTEUR** : l'écran réutilise
 /// `StocksRepository`, déjà lecteur de ces deux tables (ticket F0.38). Deux
@@ -87,6 +90,53 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
     final donnees = await widget.depot.charger();
     if (!mounted) return;
     setState(() => _donnees = donnees);
+  }
+
+  /// Ticket ST-1 — `x-modal-confirm-delete` du web puis `CatalogueProduits::archive` : le produit est marqué inactif.
+  Future<void> _archiver(Product p) async {
+    final depot = widget.produits;
+    if (depot == null) return;
+    final ok = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (contexte) => ModaleConfirmation(
+        titre: "Confirmer l'archivage",
+        message:
+            '${p.name} sera marqué(e) comme archivé(e) (statut inactif). '
+            "Aucune suppression définitive n'est effectuée.",
+        icone: SymbolesAgri.archive,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(contexte).pop(false)),
+          BoutonModalePrimaire(
+            key: const Key('archiver-produit-confirmer'),
+            libelle: 'Archiver',
+            couleur: AgriColors.errorRed,
+            onPressed: () async {
+              await depot.archiver(p.id);
+              if (contexte.mounted) Navigator.of(contexte).pop(true);
+            },
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, '${p.name} archivé avec succès.', type: TypeToast.avertissement);
+  }
+
+  /// Ticket ST-2 — « Configurer un Seuil » (`SeuilsAlerte::editThreshold` / `saveThreshold`).
+  Future<void> _configurerSeuil(Product p) async {
+    final depot = widget.produits;
+    if (depot == null) return;
+    final ok = await afficherModale<bool>(
+      context: context,
+      constructeur: (_) => _ModaleSeuil(depot: depot, produit: p),
+    );
+    if (ok != true) return;
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Seuil configuré avec succès.');
   }
 
   @override
@@ -361,6 +411,25 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Ticket ST-1 — les deux icônes du Blade en haut à droite de la carte : modifier, archiver.
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      key: Key('carte-modifier-$i'),
+                      onTap: widget.produits == null ? null : () => setState(() => _formulaire = lignes[i].produit.id),
+                      child: const Padding(padding: EdgeInsets.all(2), child: Icon(SymbolesAgri.edit, size: 16, color: AgriColors.outline)),
+                    ),
+                    InkWell(
+                      key: Key('carte-archiver-$i'),
+                      onTap: widget.produits == null ? null : () => _archiver(lignes[i].produit),
+                      child: const Padding(padding: EdgeInsets.all(2), child: Icon(SymbolesAgri.archive, size: 16, color: AgriColors.outline)),
+                    ),
+                  ],
+                ),
+              ),
               Text(
                 lignes[i].produit.sku,
                 style: const TextStyle(
@@ -525,16 +594,28 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
                       flex: 2,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          key: Key('modifier-produit-$i'),
-                          tooltip: 'Modifier',
-                          onPressed: widget.produits == null
-                              ? null
-                              : () => setState(
-                                  () => _formulaire = lignes[i].produit.id,
-                                ),
-                          icon: const Icon(SymbolesAgri.edit, size: 16),
-                          color: AgriColors.outline,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              key: Key('modifier-produit-$i'),
+                              tooltip: 'Modifier',
+                              onPressed: widget.produits == null
+                                  ? null
+                                  : () => setState(
+                                      () => _formulaire = lignes[i].produit.id,
+                                    ),
+                              icon: const Icon(SymbolesAgri.edit, size: 16),
+                              color: AgriColors.outline,
+                            ),
+                            IconButton(
+                              key: Key('archiver-produit-$i'),
+                              tooltip: 'Archiver',
+                              onPressed: widget.produits == null ? null : () => _archiver(lignes[i].produit),
+                              icon: const Icon(SymbolesAgri.archive, size: 16),
+                              color: AgriColors.outline,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -585,10 +666,10 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
         const SizedBox(width: AgriSpacing.sm),
         const Expanded(
           child: Text(
-            'Produits, catégories et seuils sont des référentiels tenus par '
-            "le serveur. Un produit créé ou modifié ici est enregistré tout de "
-            "suite, puis envoyé à la synchronisation : le serveur le valide et "
-            "attribue son SKU définitif. Les seuils restent en consultation.",
+            'Les catégories sont un référentiel tenu par le serveur. Un produit '
+            "créé, modifié ou archivé ici, ou dont le seuil change, est "
+            "enregistré tout de suite, puis envoyé à la synchronisation : le "
+            "serveur le valide et attribue son SKU définitif.",
             style: TextStyle(
               fontSize: AgriTypography.xs,
               color: AgriColors.brandForest,
@@ -789,13 +870,15 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
                         ),
                       ),
                       Expanded(flex: 2, child: _pastilleStatut(lignes[i])),
-                      const Expanded(
+                      Expanded(
                         flex: 2,
-                        child: Opacity(
-                          opacity: 0.4,
-                          child: Icon(
-                            SymbolesAgri.edit,
-                            size: 16,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            key: Key('modifier-seuil-$i'),
+                            tooltip: 'Configurer un Seuil',
+                            onPressed: widget.produits == null ? null : () => _configurerSeuil(lignes[i].produit),
+                            icon: const Icon(SymbolesAgri.edit, size: 16),
                             color: AgriColors.outline,
                           ),
                         ),
@@ -901,4 +984,76 @@ class _CatalogueProduitsScreenState extends State<CatalogueProduitsScreen> {
 
   static String _nombre(double v) =>
       v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(2);
+}
+
+/// Ticket ST-2 — la modale « Configurer un Seuil » du Blade (`modal-edit-seuil`) : « Seuil d'Alerte * », entier de 0 ou plus.
+class _ModaleSeuil extends StatefulWidget {
+  const _ModaleSeuil({required this.depot, required this.produit});
+
+  final ProduitsRepository depot;
+  final Product produit;
+
+  @override
+  State<_ModaleSeuil> createState() => _ModaleSeuilState();
+}
+
+class _ModaleSeuilState extends State<_ModaleSeuil> {
+  late final TextEditingController _seuil = TextEditingController(
+    text: widget.produit.alertThreshold == null ? '' : widget.produit.alertThreshold!.round().toString(),
+  );
+  String? _refus;
+
+  @override
+  void dispose() {
+    _seuil.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enregistrer() async {
+    final refus = ProduitsRepository.validerSeuil(_seuil.text);
+    if (refus != null) {
+      setState(() => _refus = refus);
+      return;
+    }
+    await widget.depot.definirSeuil(widget.produit.id, _seuil.text);
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) => ModaleAgri(
+    titre: 'Configurer un Seuil',
+    largeur: LargeurModale.sm,
+    contenu: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          widget.produit.name,
+          key: const Key('seuil-produit'),
+          style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        const Text(
+          "SEUIL D'ALERTE *",
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AgriColors.brandForest),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        TextField(
+          key: const Key('seuil-champ'),
+          controller: _seuil,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+        ),
+        if (_refus != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(_refus!, key: const Key('seuil-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+          ),
+      ],
+    ),
+    actions: [
+      BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+      BoutonModalePrimaire(key: const Key('seuil-enregistrer'), libelle: 'Enregistrer', onPressed: _enregistrer),
+    ],
+  );
 }

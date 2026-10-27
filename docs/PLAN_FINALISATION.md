@@ -799,3 +799,9 @@ Le web ne reliait pas le justificatif d'un achat à l'achat et n'affichait ceux 
 ### AC-4 ✅ (28/10/2026) Colonne « Actions » de « Dettes Fournisseurs »
 Le web n'avait pas de colonne Actions et le poste une icône inerte. Web d'abord : « Régler » par ligne (absent d'une dette soldée), qui ouvre la modale sur le fournisseur de la ligne ; même bouton au poste. Tests : `DettesFournisseursActionsTest`, `fournisseurs_test.dart`.
 
+### ST-1 ✅ (28/10/2026) Archiver un produit au poste
+Web d'abord : `ProductCatalogService::archiver` (inactif, trace `product.archived`, idempotent) devient le point de passage de `CatalogueProduits::archive` ET de l'envoi du poste : `pushProducts` accepte `is_active` (règle propre à l'envoi) et, sur `false`, met la fiche à jour puis l'archive ; `true` ne réactive jamais. Poste : `ProduitsRepository.archiver` (fiche `pending`, rien d'effacé, stock et prix intacts), `is_active` dans l'envoi de la fiche, icônes « modifier / archiver » sur la carte ET la liste, modale « Confirmer l'archivage » du Blade. Tests : `ApiProduitsTest` (3 nouveaux), `produits_archive_seuil_test.dart`.
+
+### ST-2 ✅ (28/10/2026) Seuils d'alerte au poste
+Le crayon inerte de l'onglet « Seuils d'Alerte » ouvre « Configurer un Seuil » (« Seuil d'Alerte * », entier de 0 ou plus, mêmes refus que `SeuilsAlerte::saveThreshold`) ; `ProduitsRepository.definirSeuil` écrit `alert_threshold` (fiche `pending`), le serveur l'applique par la modification d'un produit. Aucun changement de schéma.
+

@@ -289,4 +289,57 @@ class ApiProduitsTest extends TestCase
 
         $this->assertDatabaseCount('products', 0);
     }
+
+    /**
+     * Ticket ST-1 — le poste ARCHIVE un produit en renvoyant sa fiche avec `is_active: false` : même point de passage que
+     * `CatalogueProduits::archive` (`ProductCatalogService::archiver`), trace d'audit comprise, idempotent, sans réactivation.
+     */
+    public function test_le_poste_archive_un_produit_sans_le_supprimer_et_sans_pouvoir_le_reactiver(): void
+    {
+        $corps = $this->corps();
+        $this->pousser('magasin', $corps)->assertOk()->assertJsonPath('products.accepted.0', $corps['id']);
+        $this->assertTrue(Product::findOrFail($corps['id'])->is_active);
+
+        $this->pousser('magasin', array_merge($corps, ['is_active' => false, 'name' => 'Poulet fermier (archivé)']))
+            ->assertOk()->assertJsonPath('products.accepted.0', $corps['id']);
+
+        $produit = Product::findOrFail($corps['id']);
+        $this->assertFalse($produit->is_active);
+        $this->assertSame('Poulet fermier (archivé)', $produit->name, 'les autres champs de la fiche sont appliqués');
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'product.archived')->count());
+
+        // Renvoi (accusé perdu) : acquitté sans seconde trace ; un envoi « actif » ne réactive rien.
+        $this->pousser('magasin', array_merge($corps, ['is_active' => false]))->assertOk();
+        $this->pousser('magasin', array_merge($corps, ['is_active' => true]))->assertOk();
+        $this->assertFalse(Product::findOrFail($corps['id'])->is_active);
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'product.archived')->count());
+    }
+
+    public function test_le_poste_change_un_seuil_d_alerte_par_la_modification_de_la_fiche(): void
+    {
+        $corps = $this->corps(['alert_threshold' => 5]);
+        $this->pousser('magasin', $corps)->assertOk();
+
+        $this->pousser('magasin', array_merge($corps, ['alert_threshold' => 20, 'stock_qty' => 12]))->assertOk()->assertJsonPath('products.accepted.0', $corps['id']);
+
+        $this->assertSame(20.0, (float) Product::findOrFail($corps['id'])->alert_threshold);
+
+        $refus = $this->pousser('magasin', array_merge($corps, ['alert_threshold' => -1]))->assertOk();
+        $this->assertNotEmpty($refus->json('products.rejected.0.reason'));
+        $this->assertSame(20.0, (float) Product::findOrFail($corps['id'])->alert_threshold);
+    }
+
+    public function test_l_archivage_du_web_et_celui_du_poste_laissent_la_meme_trace(): void
+    {
+        $this->actingAs(User::where('username', 'magasin')->firstOrFail());
+        $produit = Product::create([
+            'sku' => 'WEB-1', 'name' => 'Aliment', 'category_id' => $this->categorie->id, 'unit' => 'sac', 'pricing_mode' => 'fourchette',
+            'price_min' => 1, 'price_max' => 2, 'tva_rate' => 0, 'stock_qty' => 1, 'alert_threshold' => 0, 'is_active' => true,
+        ]);
+
+        Livewire::test(\App\Livewire\Stocks\CatalogueProduits::class)->call('archive', $produit->id);
+
+        $this->assertFalse($produit->fresh()->is_active);
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'product.archived')->count());
+    }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Stocks;
 
-use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use Livewire\Attributes\Layout;
@@ -76,10 +75,8 @@ class CatalogueProduits extends Component
     {
         $this->authorize('manage-stocks');
 
-        $product = Product::findOrFail($id);
-        $product->update(['is_active' => false]);
-
-        AuditLog::record('product.archived', 'stocks', null, $product);
+        // Ticket ST-1 — `ProductCatalogService::archiver`, partagé avec l'envoi du poste.
+        $product = app(\App\Services\ProductCatalogService::class)->archiver(Product::findOrFail($id));
 
         $this->dispatch('toast', message: "{$product->name} archivé avec succès.", type: 'warning');
     }

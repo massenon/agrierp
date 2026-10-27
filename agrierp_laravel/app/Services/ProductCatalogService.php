@@ -134,6 +134,24 @@ class ProductCatalogService
         });
     }
 
+    /**
+     * Ticket ST-1 — ARCHIVER un produit (`is_active = false`, rien n'est supprimé). Point de passage unique de
+     * `CatalogueProduits::archive` (le web) ET de l'envoi du poste (`is_active: false` dans `pushProducts`).
+     * Idempotent : un produit déjà archivé n'est ni retouché ni retracé.
+     */
+    public function archiver(Product $produit): Product
+    {
+        if (! $produit->is_active) {
+            return $produit;
+        }
+
+        $produit->update(['is_active' => false]);
+
+        AuditLog::record('product.archived', 'stocks', null, $produit);
+
+        return $produit->fresh();
+    }
+
     /** @param array<string, mixed> $v */
     public function modifier(Product $produit, array $v, bool $avecStock): Product
     {

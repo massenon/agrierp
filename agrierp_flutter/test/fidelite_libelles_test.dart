@@ -331,7 +331,6 @@ void main() {
     // Ticket U10 — « Ajouter Stock » est porté (modale du Blade, envoi rejoué par le serveur) : exemption retirée.
     'Confirmer la Suppression ?': 'référentiel en lecture seule au poste',
     'Oui, Supprimer définitivement': 'référentiel en lecture seule au poste',
-    'Configurer un Seuil': 'référentiel en lecture seule au poste',
     '+ Configurer un Seuil': 'référentiel en lecture seule au poste',
 
     // ── Import / export : ni sélecteur de fichier, ni analyseur de tableur,
@@ -756,10 +755,6 @@ void main() {
     //    le motif vrai : le bouton existe dans la maquette, l'écran n'appelle
     //    pas encore ExportOfficiel.
     'seuils-alerte.html': {
-      "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
     'plan-comptable.html': {
@@ -1121,7 +1116,7 @@ void main() {
   /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 159;
+  const plafondManquesMasques = 156;
 
   for (final entree in portages.entries) {
     final page = entree.key;

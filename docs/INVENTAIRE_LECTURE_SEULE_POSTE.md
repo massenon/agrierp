@@ -64,8 +64,8 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 
 | Écran web | Fonction web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
-| `CatalogueProduits` | archive | ABSENT **sans mention** (le Blade a l'archivage `catalogue-produits.blade.php:57,67,94`) ; docblock `stocks/catalogue_produits_screen.dart:18-26` périmé | `products` (à vérifier : `pushProducts` et `is_active`) | ST-1 |
-| `SeuilsAlerte` | saveThreshold | ABSENT dans l'onglet : crayon inerte `catalogue_produits_screen.dart:795-803`, mention l. 591-594 ; le seuil se change par la fiche produit | `products` | ST-2 |
+| `CatalogueProduits` | archive | **PRÉSENT depuis ST-1 (28/10/2026)** : `ProduitsRepository.archiver` ; serveur `ProductCatalogService::archiver` | `products` (`is_active` envoyé) | ST-1 ✅ |
+| `SeuilsAlerte` | saveThreshold | **PRÉSENT depuis ST-2** : `ProduitsRepository.definirSeuil`, modale « Configurer un Seuil » | `products` | ST-2 ✅ |
 | `AjouterProduit`, `GestionStocks` | save, submitAjouterStock, validateAdjustment | PRÉSENT | `products`, `stock_adjustments` | — |
 
 ## 6. Élevage — tout est présent sauf Transformation

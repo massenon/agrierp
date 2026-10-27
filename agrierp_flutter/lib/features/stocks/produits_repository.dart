@@ -160,6 +160,50 @@ class ProduitsRepository {
     return (await produit(id))!;
   }
 
+  /// Ticket ST-1 — ARCHIVE un produit (`CatalogueProduits::archive` du web) : `is_active = false`, rien n'est supprimé. La fiche
+  /// repasse `pending` (le serveur archive via `ProductCatalogService::archiver`, avec sa trace d'audit). Inconnu ou déjà
+  /// archivé : rien. Un produit archivé ne se propose plus (catalogue, caisse, achats).
+  Future<void> archiver(String id) async {
+    final p = await produit(id);
+    if (p == null || !p.isActive) return;
+
+    await (database.update(database.products)..where((t) => t.id.equals(id))).write(
+      ProductsCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Ticket ST-2 — règle de saisie du « Seuil d'Alerte * » (`SeuilsAlerte::saveThreshold` : entier, 0 ou plus). `null` : recevable.
+  static String? validerSeuil(String saisie) {
+    final texte = saisie.trim();
+    if (texte.isEmpty) return "Le champ seuil d'alerte est obligatoire.";
+    final n = int.tryParse(texte);
+    if (n == null) return "Le champ seuil d'alerte doit être un nombre entier.";
+    if (n < 0) return "Le champ seuil d'alerte doit être au moins 0.";
+    return null;
+  }
+
+  /// Ticket ST-2 — « Configurer un Seuil » : écrit `alert_threshold` du produit (la fiche repasse `pending` ; le serveur
+  /// l'applique par la modification d'un produit). Refuse une saisie invalide ([validerSeuil]) et un produit inconnu.
+  Future<Product> definirSeuil(String id, String saisie) async {
+    final refus = validerSeuil(saisie);
+    if (refus != null) throw ArgumentError(refus);
+    if (await produit(id) == null) throw ArgumentError('Produit inconnu — synchronisez le poste.');
+
+    await (database.update(database.products)..where((t) => t.id.equals(id))).write(
+      ProductsCompanion(
+        alertThreshold: Value(int.parse(saisie.trim()).toDouble()),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    return (await produit(id))!;
+  }
+
   /// ⚠️ Ni le SKU ni la quantité ne changent ici.
   Future<Product> modifier(String id, FormulaireProduit f) async {
     await (database.update(

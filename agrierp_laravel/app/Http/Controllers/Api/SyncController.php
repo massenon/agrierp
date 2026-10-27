@@ -3878,7 +3878,9 @@ class SyncController extends Controller
 
                 $valides = validator(
                     $data,
-                    $service->regles((string) ($data['pricing_mode'] ?? ''), $existant === null),
+                    // Ticket ST-1 — `is_active: false` = archivage depuis le poste (règle propre à l'envoi : la page web, qui
+                    // valide ces mêmes règles sur ses propriétés, n'a pas ce champ).
+                    $service->regles((string) ($data['pricing_mode'] ?? ''), $existant === null) + ['is_active' => ['nullable', 'boolean']],
                     $service->messages() + MotifsRefusPush::messages(),
                     MotifsRefusPush::attributs(),
                 )->validate();
@@ -3891,9 +3893,15 @@ class SyncController extends Controller
                     continue;
                 }
 
-                $existant === null
+                $produit = $existant === null
                     ? $service->creer($valides, $id)
                     : $service->modifier($existant, $valides, false);
+
+                // Ticket ST-1 — ARCHIVAGE depuis le poste : la fiche revient avec `is_active: false`. Le produit est d'abord mis à
+                // jour (les autres champs de la fiche), puis archivé par le point de passage du web. `true` ne réactive rien.
+                if (array_key_exists('is_active', $valides) && filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($produit);
+                }
 
                 $accepted[] = $id;
             } catch (ValidationException $e) {
