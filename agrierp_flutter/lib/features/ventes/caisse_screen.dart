@@ -572,7 +572,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: AgriSpacing.sm),
+                const SizedBox(width: AgriSpacing.md),
                 Expanded(child: _champDateVente()),
               ],
             ),
@@ -829,69 +829,125 @@ class _CaisseScreenState extends State<CaisseScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ligneTotal('Sous-total', '${_nombre(_sousTotal)} FCFA'),
-          const SizedBox(height: AgriSpacing.xs),
+          // Ticket #47 (suite) : DEUX rangées de deux colonnes, comme le web —
+          // Sous-total + Remise, puis Total à Payer + Mode de Règlement.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Text(
-                  'Remise (FCFA)',
-                  style: TextStyle(
-                    fontSize: AgriTypography.xs,
-                    color: AgriColors.outline,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sous-total',
+                      style: TextStyle(
+                        fontSize: AgriTypography.xs,
+                        color: AgriColors.outline,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 36,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_nombre(_sousTotal)} FCFA',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: AgriTypography.sm,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(
-                width: 96,
-                child: TextField(
-                  key: const Key('remise'),
-                  textAlign: TextAlign.right,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontSize: AgriTypography.xs),
-                  onChanged: (v) =>
-                      setState(() => _remise = double.tryParse(v) ?? 0),
+              const SizedBox(width: AgriSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Remise (FCFA)',
+                      style: TextStyle(
+                        fontSize: AgriTypography.xs,
+                        color: AgriColors.outline,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 36,
+                      child: TextField(
+                        key: const Key('remise'),
+                        textAlign: TextAlign.right,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: AgriTypography.xs),
+                        decoration: const InputDecoration(isDense: true),
+                        onChanged: (v) =>
+                            setState(() => _remise = double.tryParse(v) ?? 0),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const Divider(),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Expanded(
-                child: Text(
-                  'Total à Payer',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Total à Payer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AgriColors.brandForest,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 40,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${_nombre(_total)} FCFA',
+                            key: const Key('total-a-payer'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AgriColors.brandEmerald,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AgriSpacing.md),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const Key('mode-reglement'),
+                  initialValue: _modePaiement,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Mode de Règlement'),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.onSurface,
                   ),
-                ),
-              ),
-              Text(
-                '${_nombre(_total)} FCFA',
-                key: const Key('total-a-payer'),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AgriColors.brandEmerald,
+                  items: [
+                    for (final e in _modes.entries)
+                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  ],
+                  onChanged: (v) => setState(() => _modePaiement = v ?? 'especes'),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: AgriSpacing.sm),
-          DropdownButtonFormField<String>(
-            key: const Key('mode-reglement'),
-            initialValue: _modePaiement,
-            decoration: const InputDecoration(labelText: 'Mode de Règlement'),
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.onSurface,
-            ),
-            items: [
-              for (final e in _modes.entries)
-                DropdownMenuItem(value: e.key, child: Text(e.value)),
-            ],
-            onChanged: (v) => setState(() => _modePaiement = v ?? 'especes'),
           ),
           const SizedBox(height: AgriSpacing.sm),
           Row(
@@ -956,29 +1012,6 @@ class _CaisseScreenState extends State<CaisseScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _ligneTotal(String libelle, String valeur) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            libelle,
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
-            ),
-          ),
-        ),
-        Text(
-          valeur,
-          style: const TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
     );
   }
 

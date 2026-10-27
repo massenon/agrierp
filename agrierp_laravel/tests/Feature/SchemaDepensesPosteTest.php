@@ -33,6 +33,7 @@ class SchemaDepensesPosteTest extends TestCase
             'device_id' => 'poste d\'origine de la saisie (SyncColumns)',
             'sync_status' => 'file d\'envoi : pending, synced, conflict (SyncColumns)',
             'ecriture_refus' => 'refus de la pièce par le serveur, affiché sous la dépense (le web dit le refus tout de suite)',
+            'receipt_local_path' => 'justificatif copié sur le poste (ticket #48) : chemin local, jamais synchronisé',
         ],
         'expense_lines' => [],
         'cost_centers' => [],

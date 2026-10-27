@@ -51,11 +51,11 @@
             <span class="w-6 h-6 rounded-full bg-brand-emerald text-white text-xs font-bold flex items-center justify-center">{{ count($cart) }}</span>
         </div>
         <div class="p-md border-b border-outline-variant flex-shrink-0">
-            <div class="grid grid-cols-2 gap-sm items-start">
-                <div>
+            <div class="grid grid-cols-2 gap-md items-start">
+                <div class="min-w-0">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Client</label>
                     <div class="flex items-center gap-xs">
-                        <select wire:model="customerId" class="flex-1 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                        <select wire:model="customerId" class="flex-1 min-w-0 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
                             <option value="">Client Anonyme</option>
                             @foreach($this->customers as $customer)
                                 <option value="{{ $customer->id }}">{{ $customer->name }}</option>
@@ -66,7 +66,7 @@
                     {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
                     @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
                 </div>
-                <div>
+                <div class="min-w-0">
                     {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
                          décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
                     <label for="date-vente" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la vente</label>
@@ -98,18 +98,32 @@
         </div>
 
         <div class="p-md border-t border-outline-variant space-y-sm flex-shrink-0">
-            <div class="flex justify-between text-xs"><span class="text-outline">Sous-total</span><span class="font-bold">{{ number_format($this->subtotal, 0, ',', ' ') }} FCFA</span></div>
-            <div class="flex justify-between items-center text-xs"><span class="text-outline">Remise (FCFA)</span><input wire:model.live="discount" type="number" min="0" class="w-24 h-8 px-sm border border-outline-variant rounded-lg text-right text-xs"></div>
-            <div class="flex justify-between items-center border-t border-outline-variant pt-sm"><span class="font-bold text-brand-forest">Total à Payer</span><span class="text-lg font-extrabold text-brand-emerald">{{ number_format($this->total, 0, ',', ' ') }} FCFA</span></div>
-            <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Règlement</label>
-                <select wire:model.live="paymentMode" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="virement">Virement bancaire</option>
-                    <option value="credit">Crédit / À terme</option>
-                    <option value="avance">Déduire de l'avance</option>
-                </select>
+            {{-- Ticket #47 (suite) : DEUX rangées de deux colonnes — Sous-total + Remise, puis Total à Payer + Mode de Règlement. --}}
+            <div class="grid grid-cols-2 gap-md items-end">
+                <div class="min-w-0">
+                    <span class="block text-xs text-outline mb-xs">Sous-total</span>
+                    <span class="block h-9 leading-9 text-sm font-bold">{{ number_format($this->subtotal, 0, ',', ' ') }} FCFA</span>
+                </div>
+                <div class="min-w-0">
+                    <label class="block text-xs text-outline mb-xs">Remise (FCFA)</label>
+                    <input wire:model.live="discount" type="number" min="0" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-right text-xs">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-md items-end border-t border-outline-variant pt-sm">
+                <div class="min-w-0">
+                    <span class="block font-bold text-brand-forest mb-xs">Total à Payer</span>
+                    <span class="block h-10 leading-10 text-lg font-extrabold text-brand-emerald">{{ number_format($this->total, 0, ',', ' ') }} FCFA</span>
+                </div>
+                <div class="min-w-0">
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Règlement</label>
+                    <select wire:model.live="paymentMode" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                        <option value="especes">Espèces</option>
+                        <option value="mobile_money">Mobile Money</option>
+                        <option value="virement">Virement bancaire</option>
+                        <option value="credit">Crédit / À terme</option>
+                        <option value="avance">Déduire de l'avance</option>
+                    </select>
+                </div>
             </div>
             @if($paymentMode === 'especes')
                 <div class="grid grid-cols-2 gap-xs">
