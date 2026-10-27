@@ -177,7 +177,7 @@ void main() {
   );
 
   test(
-    "⚠️ une bande en reproduction SANS saillie connue reste indéterminée, jamais calculée sur la mise en lot",
+    "⚠️ une bande en reproduction SANS saillie connue reste indéterminée (aucun jour de cycle), jamais calculée sur la mise en lot ; ses traitements restent proposés (#45)",
     () async {
       await standard(
         id: '11111111-1111-4111-8111-111111111111',
@@ -194,11 +194,10 @@ void main() {
 
       expect(resultat.determinable, isFalse);
       expect(resultat.jourDeCycle, isNull);
-      expect(
-        resultat.traitements,
-        isEmpty,
-        reason: 'aucune liste calculée sur une base de calcul erronée',
-      );
+      // Ticket #45 : la bande indéterminée expose TOUS les traitements du barème, sans jour de cycle (le motif est dit) :
+      // l'exploitant peut traiter sans saillie enregistrée, mais aucun jour de cycle n'est inventé.
+      expect(resultat.traitements.map((t) => t.standard.treatment), ['Vitamines']);
+      expect(resultat.traitements.single.dejaAdministre, isFalse);
       expect(resultat.motifIndetermine, contains('saillie'));
       expect(
         resultat.motifIndetermine,

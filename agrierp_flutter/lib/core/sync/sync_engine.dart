@@ -903,17 +903,21 @@ class SyncEngine {
       }
     });
 
-    // Ticket #44 — un migrate:fresh --seed sur le serveur recrée chaque catégorie
-    // avec un UUID différent. Le DoUpdate ci-dessus traite les conflits de PRIMARY KEY
-    // (même UUID) mais ne supprime pas les anciennes lignes d'UUID différent portant
-    // le même libellé. On conserve pour chaque libellé la ligne avec l'updatedAt le
-    // plus récent, et on supprime les doublons obsolètes.
+    // Ticket #44 — un migrate:fresh --seed sur le serveur recrée chaque catégorie avec un UUID différent. Le DoUpdate
+    // ci-dessus traite les conflits de PRIMARY KEY (même UUID) mais ne supprime pas les anciennes lignes d'UUID différent
+    // portant le même libellé. Le serveur fait autorité : pour chaque libellé tiré, les lignes locales d'AUTRE identifiant
+    // sont des doublons obsolètes.
+    //
+    // ⚠️ Jamais « garder la plus récente par `updated_at` » (version d'origine, `HAVING MAX(updated_at)`) : sans
+    // `updated_at` sur les lignes tirées, la condition est fausse pour tous les groupes, la sous-requête est vide et
+    // `id NOT IN (vide)` SUPPRIMAIT TOUTES LES CATÉGORIES du poste (test_le tirage précède l'envoi).
     if (lignes.isNotEmpty) {
-      await _db.customStatement(
-        'DELETE FROM product_categories WHERE id NOT IN ('
-        '  SELECT id FROM (SELECT id FROM product_categories GROUP BY label HAVING MAX(updated_at))'
-        ')',
-      );
+      final ids = [for (final l in lignes) l['id'] as String];
+      final libelles = {for (final l in lignes) (l['label'] ?? '') as String};
+      await (_db.delete(_db.productCategories)..where(
+            (t) => Expression.and([t.label.isIn(libelles), t.id.isNotIn(ids)]),
+          ))
+          .go();
     }
 
     return lignes.length;

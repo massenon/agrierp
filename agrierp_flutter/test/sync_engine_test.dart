@@ -337,6 +337,38 @@ void main() {
     expect(await db.select(db.productCategories).get(), hasLength(1));
   });
 
+  /// Ticket #44 — un `migrate:fresh --seed` du serveur recrée chaque catégorie avec un UUID NEUF : le poste ne garde
+  /// que les lignes tirées pour un libellé. ⚠️ Et il ne SUPPRIME JAMAIS tout : la version d'origine (`HAVING MAX(updated_at)`)
+  /// effaçait toutes les catégories dès qu'une ligne tirée n'avait pas d'`updated_at`.
+  test('⚠️ une catégorie recréée sous un nouvel UUID remplace l\'ancienne ; les autres libellés sont intacts', () async {
+    Future<void> categorie(String id, String libelle) => db.into(db.productCategories).insert(
+      ProductCategoriesCompanion.insert(id: id, label: libelle),
+    );
+    await categorie('aaaaaaaa-0000-4000-8000-000000000001', 'Volailles');
+    await categorie('aaaaaaaa-0000-4000-8000-000000000002', 'Lapins');
+
+    final serveur = _ServeurFeint(
+      pull: {
+        'server_time': '2026-10-27T12:00:00+00:00',
+        // Sans `updated_at`, comme un serveur qui ne le sert pas.
+        'product_categories': [
+          {'id': 'bbbbbbbb-0000-4000-8000-000000000003', 'label': 'Volailles', 'is_active': true},
+        ],
+        'products': <dynamic>[],
+        'livestock_lots': <dynamic>[],
+      },
+      push: {},
+    );
+
+    await moteur(serveur).synchroniser();
+
+    final lignes = await db.select(db.productCategories).get();
+    expect({for (final c in lignes) c.label: c.id}, {
+      'Volailles': 'bbbbbbbb-0000-4000-8000-000000000003',
+      'Lapins': 'aaaaaaaa-0000-4000-8000-000000000002',
+    });
+  });
+
   /// ⚠️ L'HORODATAGE DU TIRAGE VIENT DU SERVEUR, jamais de l'appareil : une
   /// horloge locale décalée ferait sauter ou rejouer des changements.
   test('l horodatage retenu est celui du serveur', () async {
