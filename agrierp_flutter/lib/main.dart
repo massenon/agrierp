@@ -76,6 +76,7 @@ import 'features/ventes/caisse_repository.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
 import 'features/comptabilite/immobilisations_repository.dart';
+import 'features/parametres/reglages_ferme_repository.dart';
 import 'features/parametres/parametres_generaux_repository.dart';
 import 'features/parametres/parametres_generaux_screen.dart';
 import 'features/rapports/rapports_exports_screen.dart';
@@ -776,6 +777,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   /// Ticket CFG-2 — réglages SMTP de ce poste (mot de passe au coffre du système, jamais en base) et e-mail de test.
   late final _smtp = ParametresSmtp(database: widget.database);
+  late final _reglages = ReglagesFermeRepository(database: widget.database, deviceId: widget.identifiantPoste);
   late final _envoiEmail = EnvoiEmailTest(parametres: _smtp);
 
   /// Ticket CFG-2 — onglet « Appairage » : réglages du poste, session, état du jeton (S-T1 : synchronisation
@@ -800,6 +802,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
     corbeille: widget.corbeille,
     ongletInitial: ongletInitial,
     idUtilisateurConnecte: widget.auth.utilisateur?.id,
+    reglages: _reglages,
+    estAdmin: widget.auth.utilisateur?.role == 'admin',
   );
 
   /// Ticket EX7 (EF8) — l'exercice AFFICHÉ, un seul pour la session, diffusé par [PorteeExerciceChoisi] : sélecteur de

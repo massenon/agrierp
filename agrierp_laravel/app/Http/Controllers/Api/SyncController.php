@@ -151,6 +151,8 @@ class SyncController extends Controller
         'manual_entry_requests',
         // Ticket CP-3 — immobilisations (registre mixte) et demandes de dotation aux amortissements.
         'fixed_assets', 'depreciation_requests',
+        // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS).
+        'settings_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -241,6 +243,8 @@ class SyncController extends Controller
         'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
         // Ticket CP-3 — le registre des immobilisations (écran `view-comptabilite`).
         'fixed_assets' => ['view-comptabilite'],
+        // Ticket PA-2 — la liste des droits sert l'écran « Rôles & Permissions » (administrateur).
+        'permissions' => ['manage-users'],
         // Ticket DEP3 — centres de coût (filières) de l'en-tête d'une dépense : petit référentiel, lecture seule.
         'cost_centers' => ['view-achats', 'view-comptabilite'],
         'fiscal_years' => null,
@@ -1193,6 +1197,9 @@ class SyncController extends Controller
                     'is_active' => (bool) $b->is_active,
                 ]),
 
+            // Ticket PA-2 — les droits existants, pour la modale « Nouveau Rôle » / « Modifier le Rôle » (administrateur).
+            'permissions' => fn () => \App\Models\Permission::query()->orderBy('name')->get(['id', 'name']),
+
             'fiscal_years' => fn () => FiscalYear::query()
                 ->orderByDesc('year')
                 ->get(['id', 'year', 'start_date', 'end_date', 'status'])
@@ -1212,7 +1219,7 @@ class SyncController extends Controller
             // compte SMS et a la boite mail de la ferme. Seule l'IDENTITE de
             // l'entreprise et ses TAUX descendent — jamais un identifiant de
             // service, meme chiffre.
-            'company_settings' => function () {
+            'company_settings' => function () use ($request) {
                 $entreprise = CompanySetting::query()->first();
 
                 return $entreprise === null ? null : [
@@ -1233,7 +1240,17 @@ class SyncController extends Controller
                     'cnss_employer_risk_rate' => $entreprise->cnss_employer_risk_rate,
                     // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
                     'rappel_soins_jours' => $entreprise->rappel_soins_jours,
-                ];
+                    // Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté ? (seul un administrateur le modifie alors)
+                    'payroll_locked' => $entreprise->payrollSettingsLocked(),
+                    'payroll_edited_at' => $entreprise->payroll_settings_edited_at?->format('d/m/Y à H:i'),
+                ] + ($request->user()?->can('manage-parametres') ? [
+                    // Ticket PA-8 — configuration SMS SANS SECRET (le jeton et le secret ne quittent jamais le serveur).
+                    'sms_provider' => $entreprise->sms_provider,
+                    'twilio_account_sid' => $entreprise->twilio_account_sid,
+                    'twilio_from_number' => $entreprise->twilio_from_number,
+                    'vonage_from_name' => $entreprise->vonage_from_name,
+                    'sms_secret_set' => ! empty($entreprise->twilio_auth_token_encrypted) || ! empty($entreprise->vonage_api_secret_encrypted),
+                ] : []);
             },
 
             // ⚠️⚠️ UN MODULE DESACTIVE DOIT DISPARAITRE DE L'ECRAN, PAS SEULEMENT
@@ -1430,10 +1447,13 @@ class SyncController extends Controller
             // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
             // QUI paie ; sans la liste des comptes de charge, il devrait la
             // recopier et les deux listes divergeraient au premier ajout.
+            // Ticket PA-4 — RIB, IBAN, titulaire, téléphone : seulement pour qui gère les paramètres (jamais au caissier).
             'treasury_accounts' => fn () => \App\Models\TreasuryAccount::query()
                 ->where('is_active', true)
                 ->orderBy('label')
-                ->get(['id', 'label', 'account_code', 'type', 'balance']),
+                ->get($request->user()?->can('manage-parametres')
+                    ? ['id', 'label', 'account_code', 'type', 'balance', 'bank_name', 'holder_name', 'rib', 'iban', 'operator_name', 'phone_number', 'sim_serial']
+                    : ['id', 'label', 'account_code', 'type', 'balance']),
             // Ticket DEP3 — N'EST PLUS LU PAR LE POSTE MIGRÉ (le compte de charge d'une ligne se choisit dans le plan
             // comptable, classe 6) ; CONSERVÉ pour les postes non migrés, qui l'attendent (le serveur est déployé avant eux).
             'expense_categories' => fn () => \App\Models\Expense::CATEGORIES,
@@ -2145,6 +2165,7 @@ class SyncController extends Controller
             'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
             'fixed_assets' => ['accepted' => [], 'rejected' => []],
             'depreciation_requests' => ['accepted' => [], 'rejected' => []],
+            'settings_requests' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
@@ -2391,6 +2412,14 @@ class SyncController extends Controller
             );
         }
 
+        // Tickets PA-* — AVANT tout le reste de la comptabilité : un compte de trésorerie créé ici peut être visé plus bas.
+        if ($request->has('settings_requests')) {
+            $result['settings_requests'] = $this->pushSettingsRequests(
+                $this->envoiTraduit($request, 'settings_requests'),
+                $request->user(),
+            );
+        }
+
         if ($request->has('expenses')) {
             $result['expenses'] = $this->pushExpenses($request->input('expenses'));
         }
@@ -2623,6 +2652,8 @@ class SyncController extends Controller
         // Ticket CP-3 — le droit de `Immobilisations` du web.
         'fixed_assets' => 'manage-comptabilite',
         'depreciation_requests' => 'manage-comptabilite',
+        // Tickets PA-* — le droit exact dépend du type de la demande (jugé dans `pushSettingsRequests`) ; `view-parametres` est le plancher.
+        'settings_requests' => 'view-parametres',
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
@@ -3757,6 +3788,141 @@ class SyncController extends Controller
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — DEMANDES DE RÉGLAGE de la ferme saisies au poste.
+     *
+     * Un envoi = {id, kind, payload}. Chaque type passe par le service du web (mêmes règles, mêmes messages, mêmes audits) :
+     *  - `entreprise` → EntrepriseService (`manage-parametres`, taux de paie arrêtés = administrateur) ;
+     *  - `bareme_its` → BaremeItsService (`view-parametres`, barème arrêté = administrateur) ;
+     *  - `mode_paiement` → ModesPaiementService (banque, Mobile Money : `manage-parametres` ; virement : `manage-comptabilite`) ;
+     *  - `role` → RoleService (administrateur) ;
+     *  - `sms` → SmsConfigService (`manage-parametres`).
+     * Idempotence : l'UUID de la demande est celui du compte créé et le `source_id` du virement ; les autres types remplacent
+     * un état, donc rejouer donne le même état.
+     */
+    private function pushSettingsRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+            $kind = $data['kind'] ?? null;
+            $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+
+            $droit = match ($kind) {
+                'entreprise', 'sms' => 'manage-parametres',
+                'bareme_its' => 'view-parametres',
+                'mode_paiement' => ($payload['geste'] ?? '') === 'virement' ? 'manage-comptabilite' : 'manage-parametres',
+                'role' => 'manage-users',
+                default => null,
+            };
+
+            if ($droit === null || ! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Demande de réglage illisible.'];
+
+                continue;
+            }
+
+            if (! $utilisateur || ! $utilisateur->can($droit)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas ce réglage.'];
+
+                continue;
+            }
+
+            try {
+                $this->jouerReglage($kind, $id, $payload, $utilisateur);
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    private function jouerReglage(string $kind, string $id, array $p, $utilisateur): void
+    {
+        $attributs = MotifsRefusPush::attributs();
+
+        match ($kind) {
+            'entreprise' => (function () use ($p, $utilisateur, $attributs) {
+                $service = app(\App\Services\EntrepriseService::class);
+                $v = validator($p, $service->regles(), \App\Services\EntrepriseService::MESSAGES + MotifsRefusPush::messages(), $attributs)->validate();
+                $service->enregistrer($p + $v, $utilisateur);
+            })(),
+            'bareme_its' => app(\App\Services\BaremeItsService::class)->remplacer(array_values($p['tranches'] ?? []), $utilisateur),
+            'mode_paiement' => $this->jouerModePaiement($id, $p),
+            'role' => $this->jouerRole($p, $utilisateur),
+            'sms' => (function () use ($p, $attributs) {
+                $v = validator($p, ['smsProvider' => ['required', 'in:twilio,vonage']], MotifsRefusPush::messages(), $attributs + ['smsProvider' => 'fournisseur SMS'])->validate();
+                app(\App\Services\SmsConfigService::class)->enregistrer($p + $v);
+            })(),
+        };
+    }
+
+    private function jouerModePaiement(string $id, array $p): void
+    {
+        $service = app(\App\Services\ModesPaiementService::class);
+        $messages = MotifsRefusPush::messages();
+        $attributs = MotifsRefusPush::attributs() + ['bankName' => 'banque', 'phoneNumber' => 'numéro de téléphone', 'operatorName' => 'opérateur'];
+
+        match ($p['geste'] ?? null) {
+            'banque' => (function () use ($service, $p, $id, $messages, $attributs) {
+                validator($p, \App\Services\ModesPaiementService::REGLES_BANQUE, $messages, $attributs)->validate();
+                $service->creerBanque($p, $id);
+            })(),
+            'momo' => (function () use ($service, $p, $id, $messages, $attributs) {
+                validator($p, \App\Services\ModesPaiementService::REGLES_MOMO, $messages, $attributs)->validate();
+                $service->creerMomo($p, $id);
+            })(),
+            'virement' => (function () use ($service, $p, $id, $messages) {
+                $v = validator($p, [
+                    'transferFromId' => ['required', 'exists:treasury_accounts,id'],
+                    'transferToId' => ['required', 'exists:treasury_accounts,id', 'different:transferFromId'],
+                    'transferAmount' => ['required', 'numeric', 'min:1'],
+                    'transferReason' => ['nullable', 'string', 'max:150'],
+                ], ['transferToId.different' => 'Le compte destinataire doit être différent du compte source.'] + $messages, [
+                    'transferFromId' => 'compte source', 'transferToId' => 'compte destinataire', 'transferAmount' => 'montant',
+                ])->validate();
+
+                try {
+                    $service->virer(
+                        \App\Models\TreasuryAccount::findOrFail($v['transferFromId']),
+                        \App\Models\TreasuryAccount::findOrFail($v['transferToId']),
+                        (float) $v['transferAmount'],
+                        $v['transferReason'] ?? null,
+                        $id,
+                    );
+                } catch (\InvalidArgumentException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException $e) {
+                    throw ValidationException::withMessages(['transferAmount' => $e->getMessage()]);
+                }
+            })(),
+            default => throw ValidationException::withMessages(['geste' => 'Geste de paiement inconnu.']),
+        };
+    }
+
+    private function jouerRole(array $p, $utilisateur): void
+    {
+        $service = app(\App\Services\RoleService::class);
+
+        if (($p['geste'] ?? null) === 'supprimer') {
+            $motif = $service->supprimer((string) ($p['roleName'] ?? ''), $utilisateur);
+
+            if ($motif !== null) {
+                throw ValidationException::withMessages(['roleName' => $motif]);
+            }
+
+            return;
+        }
+
+        validator($p, $service->regles($p['ancienNom'] ?? null), ['roleName.regex' => \App\Services\RoleService::MESSAGE_NOM] + MotifsRefusPush::messages(), ['roleName' => 'nom du rôle'])->validate();
+        $service->enregistrer($p['ancienNom'] ?? null, $p['roleName'], array_values(array_filter($p['permissions'] ?? [], 'is_string')), $utilisateur);
     }
 
     /**

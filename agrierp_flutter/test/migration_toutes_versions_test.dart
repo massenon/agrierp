@@ -86,6 +86,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   74: [d.manualEntryRequests],
   // v75 — ticket CP-3 : registre des immobilisations (mixte) et demandes de dotation aux amortissements.
   75: [d.fixedAssets, d.depreciationRequests],
+  // v76 — tickets PA-2/3/4/7/8 : demandes de réglage, droits tirés, entreprise (verrou de paie, SMS), comptes de trésorerie.
+  76: [d.settingsRequests, d.permissionsApplicatives],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -362,6 +364,23 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.chartOfAccounts, d.chartOfAccounts.updatedAt),
     (d.chartOfAccounts, d.chartOfAccounts.isActive),
   ],
+  // v76 — tickets PA-* : verrou de paie et SMS sans secret (entreprise), coordonnées des comptes de trésorerie.
+  76: [
+    (d.companySettings, d.companySettings.payrollLocked),
+    (d.companySettings, d.companySettings.payrollEditedAt),
+    (d.companySettings, d.companySettings.smsProvider),
+    (d.companySettings, d.companySettings.twilioAccountSid),
+    (d.companySettings, d.companySettings.twilioFromNumber),
+    (d.companySettings, d.companySettings.vonageFromName),
+    (d.companySettings, d.companySettings.smsIdentifiantsPoses),
+    (d.treasuryAccounts, d.treasuryAccounts.bankName),
+    (d.treasuryAccounts, d.treasuryAccounts.holderName),
+    (d.treasuryAccounts, d.treasuryAccounts.rib),
+    (d.treasuryAccounts, d.treasuryAccounts.iban),
+    (d.treasuryAccounts, d.treasuryAccounts.operatorName),
+    (d.treasuryAccounts, d.treasuryAccounts.phoneNumber),
+    (d.treasuryAccounts, d.treasuryAccounts.simSerial),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -459,7 +478,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 75, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2');
+    expect(d.schemaVersion, 76, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

@@ -20,6 +20,8 @@ import 'onglet_appairage.dart';
 import 'onglet_corbeille.dart';
 import 'onglet_email_smtp.dart';
 import 'onglet_reinitialisation.dart';
+import 'reglages_ferme_repository.dart';
+import 'reglages_ferme_ui.dart';
 import 'parametres_generaux_repository.dart';
 import 'reinitialisation_poste.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -69,9 +71,18 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.corbeille,
     this.ongletInitial,
     this.idUtilisateurConnecte,
+    this.reglages,
+    this.estAdmin = false,
   });
 
   final ParametresGenerauxRepository depot;
+
+  /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS) écrits en
+  /// DEMANDES ; `null` : les onglets restent en consultation (vues du châssis sans session).
+  final ReglagesFermeRepository? reglages;
+
+  /// Le compte connecté est administrateur (rôles, taux de paie et barème arrêtés).
+  final bool estAdmin;
 
   /// Ticket UT-1 — le compte connecté sur ce poste : il ne peut pas s'archiver lui-même (règle du web).
   final String? idUtilisateurConnecte;
@@ -167,6 +178,11 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
   DonneesParametresGeneraux? _donnees;
 
+  /// Sous-page de l'onglet « Données de l'Entreprise » : `bareme` (PA-7) ou `sms` (PA-8).
+  String? _sousPage;
+  List<String> _droits = const [];
+  String? _message;
+
   /// Ticket U14 — « Rechercher... » de l'onglet Audit Logs (`wire:model.live.debounce.300ms="search"`).
   final _rechercheAudit = TextEditingController();
   String _filtreAudit = '';
@@ -187,8 +203,12 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   Future<void> _charger() async {
     final donnees = await widget.depot.charger();
+    final droits = await widget.reglages?.droits() ?? const <String>[];
     if (!mounted) return;
-    setState(() => _donnees = donnees);
+    setState(() {
+      _donnees = donnees;
+      _droits = droits;
+    });
   }
 
   @override
@@ -213,6 +233,10 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
+                        "Données de l'Entreprise" when _sousPage == 'bareme' && widget.reglages != null =>
+                          PageBaremeIts(depot: widget.reglages!, estAdmin: widget.estAdmin, surRetour: () => setState(() => _sousPage = null)),
+                        "Données de l'Entreprise" when _sousPage == 'sms' && widget.reglages != null =>
+                          PageIntegrationsSms(depot: widget.reglages!, surRetour: () => setState(() => _sousPage = null)),
                         "Données de l'Entreprise" => _ongletEntreprise(
                           d,
                           large,
@@ -341,7 +365,19 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
-      _sousTitre("Matrice des Droits d'Accès"),
+      Row(
+        children: [
+          Expanded(child: _sousTitre("Matrice des Droits d'Accès")),
+          if (widget.reglages != null && widget.estAdmin)
+            ElevatedButton.icon(
+              key: const Key('role-nouveau'),
+              onPressed: () => _ouvrirRole(null),
+              icon: const Icon(SymbolesAgri.add, size: 18),
+              style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white, shape: const StadiumBorder()),
+              label: const Text('Nouveau Rôle', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
       const SizedBox(height: AgriSpacing.sm),
       _tableau(
         largeur: 1180,
@@ -365,26 +401,56 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               for (final permission
                   in ParametresGenerauxScreen.permissionsMatrice)
                 (_droit(_accorde(d.roles[i], permission)), 2),
-              (_actionInerte(), 2),
+              (_actionsRole(d.roles[i]), 2),
             ]),
         ],
       ),
       const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ LE NOMBRE DE RÔLES EST UNE CONTRADICTION CONNUE DU PROJET : le CDC
-      // en annonce 7, l'énumération 6, la matrice du CDC 5, la maquette en
-      // affiche 5 nommés (Directeur Général, Comptable, Caissière POS, Chef
-      // d'élevage, Support Technique) et le serveur en porte 4. Le poste montre
-      // CE QUE LE SERVEUR APPLIQUE — le reste est un arbitrage client ouvert
-      // qu'il n'appartient pas à un écran de trancher.
+      // ⚠️⚠️ LE NOMBRE DE RÔLES EST UNE CONTRADICTION CONNUE DU PROJET (CDC 7, énumération 6, matrice 5, serveur 4). Le poste montre
+      // CE QUE LE SERVEUR APPLIQUE. Créer, modifier ou supprimer un rôle est une DEMANDE réservée à l'administrateur ; les
+      // sauvegardes se génèrent et se téléchargent en ligne (ticket PA-6).
       _mentionPoste(
-        'La matrice montre les rôles que le SERVEUR applique réellement, avec '
-        'leurs permissions — la maquette, elle, en dessine cinq nommés. Cet '
-        'écart est un arbitrage client ouvert. Créer ou modifier un rôle, comme '
-        'générer une sauvegarde, se fait sur la surface web.',
+        'La matrice montre les rôles que le SERVEUR applique réellement, avec leurs permissions — la maquette, elle, en dessine '
+        'cinq nommés. Cet écart est un arbitrage client ouvert. Créer, modifier ou supprimer un rôle est réservé à '
+        "l'administrateur et s'applique à la prochaine synchronisation.",
         cle: 'roles',
       ),
     ],
   );
+
+  Widget _actionsRole(RolesApplicatif r) {
+    if (widget.reglages == null || !widget.estAdmin) return _actionInerte();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: Key('role-modifier-${r.name}'),
+          tooltip: 'Modifier',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _ouvrirRole(r),
+          icon: const Icon(SymbolesAgri.edit, size: 16, color: AgriColors.brandEmerald),
+        ),
+        if (!ReglagesFermeRepository.rolesFondamentaux.contains(r.name))
+          IconButton(
+            key: Key('role-supprimer-${r.name}'),
+            tooltip: 'Supprimer',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              final motif = await widget.reglages!.supprimerRole(r.name, estAdmin: widget.estAdmin);
+              if (!mounted) return;
+              setState(() => _message = motif ?? 'Suppression demandée au serveur : elle sera appliquée à la prochaine synchronisation.');
+            },
+            icon: const Icon(SymbolesAgri.delete, size: 16, color: AgriColors.errorDeep),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _ouvrirRole(RolesApplicatif? role) async {
+    if (await ouvrirRole(context: context, depot: widget.reglages!, droits: _droits, existant: role, estAdmin: widget.estAdmin)) {
+      setState(() => _message = 'Rôle demandé au serveur : il sera appliqué à la prochaine synchronisation.');
+    }
+  }
 
   /// Un rôle accorde-t-il ce module ?
   ///
@@ -460,18 +526,48 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ),
         ],
         const SizedBox(height: AgriSpacing.md),
-        // ⚠️⚠️ LE SMTP DU SITE NE DESCEND PAS : il porte un mot de passe, et le
-        // descendre ferait d'un poste volé une clé d'accès à la messagerie de la
-        // ferme. Comme au web depuis CFG-1, la configuration SMTP a son onglet ;
-        // celle du poste est LOCALE, mot de passe au coffre du système (CFG-2).
-        // Le logo et le favicon se téléversent — le poste n'a pas de canal pour
-        // remonter un fichier.
+        if (widget.reglages != null) ...[
+          Wrap(
+            spacing: AgriSpacing.sm,
+            runSpacing: AgriSpacing.sm,
+            children: [
+              ElevatedButton.icon(
+                key: const Key('entreprise-modifier'),
+                onPressed: () async {
+                  if (await ouvrirEntreprise(context: context, depot: widget.reglages!, existante: e, estAdmin: widget.estAdmin)) {
+                    setState(() => _message = 'Modifications demandées au serveur : elles seront appliquées à la prochaine synchronisation.');
+                  }
+                },
+                icon: const Icon(SymbolesAgri.edit, size: 18),
+                style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white, shape: const StadiumBorder()),
+                label: const Text('Enregistrer les Modifications', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+              OutlinedButton.icon(
+                key: const Key('entreprise-bareme'),
+                onPressed: () => setState(() => _sousPage = 'bareme'),
+                icon: const Icon(SymbolesAgri.functions, size: 18),
+                label: const Text('Barème IR-PTS / ITS — tranches d\'imposition', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+              OutlinedButton.icon(
+                key: const Key('entreprise-sms'),
+                onPressed: () => setState(() => _sousPage = 'sms'),
+                icon: const Icon(SymbolesAgri.sms, size: 18),
+                label: const Text('Intégrations & Notifications (SMS)', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          if (_message != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AgriSpacing.sm),
+              child: Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+            ),
+          const SizedBox(height: AgriSpacing.md),
+        ],
+        // Le SMTP du site ne descend pas (mot de passe) : celui du poste est local, son onglet a son coffre (CFG-2). Logo et
+        // favicon se téléversent : ils se règlent sur la surface web.
         _mentionPoste(
-          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email "
-          '(SMTP) ; son mot de passe reste dans le coffre du système. Celui du '
-          'site, le logo et le favicon ne descendent pas au poste : le premier '
-          'porte un mot de passe, les deux autres se téléversent. Ils se règlent '
-          'sur la surface web.',
+          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email (SMTP) ; son mot de passe reste dans le coffre du "
+          'système. Le logo et le favicon se téléversent : ils se règlent sur la surface web.',
           cle: 'entreprise-technique',
         ),
       ],
@@ -1140,19 +1236,51 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           for (final compte in d.comptesDe(type)) _carteCompte(compte),
         const SizedBox(height: AgriSpacing.md),
       ],
-      // ⚠️⚠️ UN VIREMENT ENTRE COMPTES PASSE UNE ÉCRITURE. La maquette permet
-      // d'ajouter un compte bancaire ou une ligne mobile money : c'est ouvrir
-      // un compte du plan SYSCOHADA, pas cocher une case — et le poste n'a
-      // aucun canal pour le remonter.
+      if (widget.reglages != null) ...[
+        Wrap(
+          spacing: AgriSpacing.sm,
+          runSpacing: AgriSpacing.sm,
+          children: [
+            for (final (cle, libelle, icone, geste) in [
+              ('paiement-banque', 'Ajouter un Compte Bancaire', SymbolesAgri.account_balance, 'banque'),
+              ('paiement-momo', 'Ajouter une Ligne Mobile Money', SymbolesAgri.smartphone, 'momo'),
+              ('paiement-virement', 'Virement Interne', SymbolesAgri.swap_horiz, 'virement'),
+            ])
+              OutlinedButton.icon(
+                key: Key(cle),
+                onPressed: () => _gestePaiement(geste, d),
+                icon: Icon(icone, size: 18),
+                label: Text(libelle, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.sm),
+            child: Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+          ),
+        const SizedBox(height: AgriSpacing.md),
+      ],
       _mentionPoste(
-        'Les soldes sont ceux du dernier tirage. Ajouter un compte bancaire ou '
-        'une ligne mobile money ouvre un compte du plan SYSCOHADA, et un '
-        'virement entre comptes passe une écriture : les deux se font sur la '
-        'surface web.',
+        'Les soldes sont ceux du dernier tirage. Un compte ajouté ou un virement est une DEMANDE : le serveur ouvre le compte, '
+        'déplace les soldes et passe l\'écriture à la prochaine synchronisation.',
         cle: 'paiement',
       ),
     ],
   );
+
+  Future<void> _gestePaiement(String geste, DonneesParametresGeneraux d) async {
+    final depot = widget.reglages!;
+    final bool fait;
+    if (geste == 'banque') {
+      fait = await ouvrirBanque(context: context, depot: depot);
+    } else if (geste == 'momo') {
+      fait = await ouvrirMomo(context: context, depot: depot);
+    } else {
+      fait = await ouvrirVirement(context: context, depot: depot, comptes: d.comptes);
+    }
+    if (fait && mounted) setState(() => _message = 'Demande envoyée : elle sera appliquée à la prochaine synchronisation.');
+  }
 
   Widget _carteCompte(TreasuryAccount compte) => Padding(
     padding: const EdgeInsets.only(bottom: AgriSpacing.sm),

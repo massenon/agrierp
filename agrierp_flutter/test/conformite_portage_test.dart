@@ -122,6 +122,8 @@ void main() {
     'chart_of_accounts',
     // Ticket CP-3 — registre des immobilisations (table mixte).
     'fixed_assets',
+    // Ticket PA-2 — les droits existants (administrateur).
+    'permissions',
     'fiscal_years',
     'accounting_entries',
     'accounting_entry_lines',

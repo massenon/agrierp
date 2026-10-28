@@ -647,6 +647,20 @@ class CompanySettings extends Table {
   RealColumn get cnssEmployerFamilyRate => real().nullable()();
   RealColumn get cnssEmployerRiskRate => real().nullable()();
 
+  /// Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté (seul un administrateur le modifie alors) ? Tiré.
+  BoolColumn get payrollLocked => boolean().withDefault(const Constant(false))();
+
+  /// Instant de l'arrêt du paramétrage de paie, déjà formaté comme le web (`d/m/Y à H:i`), pour reproduire son message de refus.
+  TextColumn get payrollEditedAt => text().nullable()();
+
+  /// Ticket PA-8 — configuration SMS SANS SECRET (tirée pour les comptes qui gèrent les paramètres). Le jeton et le secret
+  /// ne quittent jamais le serveur ; `smsIdentifiantsPoses` dit seulement s'il en existe un.
+  TextColumn get smsProvider => text().nullable()();
+  TextColumn get twilioAccountSid => text().nullable()();
+  TextColumn get twilioFromNumber => text().nullable()();
+  TextColumn get vonageFromName => text().nullable()();
+  BoolColumn get smsIdentifiantsPoses => boolean().withDefault(const Constant(false))();
+
   /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
   /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
   TextColumn get syncStatus =>
@@ -1058,6 +1072,33 @@ class DepreciationRequests extends Table with SyncColumns {
   TextColumn get id => text().withLength(min: 36, max: 36)();
 
   DateTimeColumn get dateArrete => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — DEMANDE de réglage de la ferme : une ligne par geste (`kind` : `entreprise`,
+/// `bareme_its`, `mode_paiement`, `role`, `sms`), son contenu en JSON dans [payload].
+///
+/// ⚠️ Le poste écrit la DEMANDE ; le serveur la joue avec les services du web (mêmes règles, mêmes verrous administrateur) et
+/// l'état redescend au tirage. Un secret (jeton SMS) n'est JAMAIS ici : il attend au coffre du système et part une fois.
+class SettingsRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get kind => text()();
+
+  /// JSON du geste (sans secret).
+  TextColumn get payload => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket PA-2 — les droits existants (noms), tirés pour l'administrateur : la modale « Rôle » les liste.
+class PermissionsApplicatives extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1868,6 +1909,15 @@ class TreasuryAccounts extends Table {
   TextColumn get type => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0))();
 
+  /// Ticket PA-4 — coordonnées (tirées pour qui gère les paramètres seulement).
+  TextColumn get bankName => text().nullable()();
+  TextColumn get holderName => text().nullable()();
+  TextColumn get rib => text().nullable()();
+  TextColumn get iban => text().nullable()();
+  TextColumn get operatorName => text().nullable()();
+  TextColumn get phoneNumber => text().nullable()();
+  TextColumn get simSerial => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -2138,6 +2188,8 @@ class SyncState extends Table {
     ManualEntryRequests,
     FixedAssets,
     DepreciationRequests,
+    SettingsRequests,
+    PermissionsApplicatives,
     Payables,
     Employees,
     Internships,
@@ -2212,7 +2264,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 75;
+  int get schemaVersion => 76;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2894,6 +2946,21 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
+      // v76 — tickets PA-2/3/4/7/8 : demandes de réglage, droits tirés, entreprise (verrou de paie, SMS), comptes de trésorerie.
+      if (from < 76) {
+        if (!await _tableExiste(m, settingsRequests)) await m.createTable(settingsRequests);
+        if (!await _tableExiste(m, permissionsApplicatives)) await m.createTable(permissionsApplicatives);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.payrollLocked);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.payrollEditedAt);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.smsProvider);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.twilioAccountSid);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.twilioFromNumber);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.vonageFromName);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.smsIdentifiantsPoses);
+        for (final c in [treasuryAccounts.bankName, treasuryAccounts.holderName, treasuryAccounts.rib, treasuryAccounts.iban, treasuryAccounts.operatorName, treasuryAccounts.phoneNumber, treasuryAccounts.simSerial]) {
+          await _ajouterColonneSiAbsente(m, treasuryAccounts, c);
+        }
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -3273,6 +3340,8 @@ class AppDatabase extends _$AppDatabase {
     // Ticket CP-3 — immobilisations saisies au poste et demandes de dotation aux amortissements.
     'fixed_assets',
     'depreciation_requests',
+    // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme.
+    'settings_requests',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
     'purchase_orders',
     'purchases',
@@ -3366,6 +3435,7 @@ class AppDatabase extends _$AppDatabase {
     'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
     'manual_entry_requests', // CP-2
     'depreciation_requests', // CP-3
+    'settings_requests', // PA-*
     'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
@@ -3389,7 +3459,7 @@ class AppDatabase extends _$AppDatabase {
     'company_settings', 'modules_config', 'attestation_templates',
     // Ticket RH-4 — barème ITS (référentiel, préservé au serveur).
     'income_tax_brackets',
-    'roles_applicatifs', 'utilisateurs', 'audit_logs',
+    'roles_applicatifs', 'permissions_applicatives', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',
   ];
 

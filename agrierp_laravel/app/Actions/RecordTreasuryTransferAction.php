@@ -52,6 +52,7 @@ class RecordTreasuryTransferAction
         float $montant,
         ?string $motif = null,
         ?string $date = null,
+        ?string $sourceId = null,
     ): ?AccountingEntry {
         $montant = round($montant, 2);
 
@@ -78,7 +79,7 @@ class RecordTreasuryTransferAction
         }
 
         return DB::transaction(function () use (
-            $source, $destination, $montant, $motif, $date, $compteSource, $compteDestination
+            $source, $destination, $montant, $motif, $date, $compteSource, $compteDestination, $sourceId
         ) {
             // ⚠️ Les deux soldes bougent DANS LA MÊME TRANSACTION que
             // l'écriture : un virement à moitié appliqué ferait disparaître de
@@ -105,7 +106,7 @@ class RecordTreasuryTransferAction
                     0, 100
                 ),
                 sourceType: 'treasury_transfer',
-                sourceId: $destination->id,
+                sourceId: $sourceId ?? $destination->id,
             );
         });
     }

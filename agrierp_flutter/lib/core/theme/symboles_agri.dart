@@ -90,6 +90,7 @@ abstract final class SymbolesAgri {
   static const IconData flag = IconData(0xe153, fontFamily: famille);
   static const IconData folder = IconData(0xe2c7, fontFamily: famille);
   static const IconData folder_shared = IconData(0xe2c9, fontFamily: famille);
+  static const IconData functions = IconData(0xe24a, fontFamily: famille);
   static const IconData grid_view = IconData(0xe9b0, fontFamily: famille);
   static const IconData group = IconData(0xe7ef, fontFamily: famille);
   static const IconData groups = IconData(0xf233, fontFamily: famille);

@@ -75,6 +75,8 @@ void main() {
     'chart_of_accounts': 'chart_of_accounts',
     // Ticket CP-3 — le registre des immobilisations (table mixte : saisie au poste ET tirée).
     'fixed_assets': 'fixed_assets',
+    // Ticket PA-2 — les droits existants (administrateur), pour la modale « Rôle ».
+    'permissions': 'permissions_applicatives',
     'fiscal_years': 'fiscal_years',
     'accounting_entries': 'accounting_entries',
     'accounting_entry_lines': 'accounting_entry_lines',
@@ -124,6 +126,8 @@ void main() {
     'manual_entry_requests',
     // Ticket CP-3 — demandes de dotation aux amortissements (envoyées, jamais tirées : l'écriture redescend dans `accounting_entries`).
     'depreciation_requests',
+    // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme (envoyées, jamais tirées : l'état redescend dans leurs tables).
+    'settings_requests',
     'sync_conflicts',
     'app_settings',
     'sync_state',

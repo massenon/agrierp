@@ -72,28 +72,14 @@ class Integrations extends Component
             'smsProvider' => ['required', 'in:twilio,vonage'],
         ]);
 
-        $settings = CompanySetting::current();
-        $payload = ['sms_provider' => $this->smsProvider];
-
-        if ($this->smsProvider === 'twilio') {
-            $payload['twilio_account_sid'] = $this->twilioSid ?: null;
-            $payload['twilio_from_number'] = $this->twilioFrom ?: null;
-            if ($this->twilioToken) {
-                $payload['twilio_auth_token_encrypted'] = $this->twilioToken;
-            }
-        } else {
-            $payload['vonage_api_key'] = $this->vonageKey ?: null;
-            $payload['vonage_from_name'] = $this->vonageFrom ?: null;
-            if ($this->vonageSecret) {
-                $payload['vonage_api_secret_encrypted'] = $this->vonageSecret;
-            }
-        }
-
-        $settings->update($payload);
+        app(\App\Services\SmsConfigService::class)->enregistrer([
+            'smsProvider' => $this->smsProvider, 'twilioSid' => $this->twilioSid, 'twilioFrom' => $this->twilioFrom,
+            'twilioToken' => $this->twilioToken, 'vonageKey' => $this->vonageKey, 'vonageFrom' => $this->vonageFrom,
+            'vonageSecret' => $this->vonageSecret,
+        ]);
         $this->twilioToken = '';
         $this->vonageSecret = '';
 
-        AuditLog::record('company_settings.sms_updated', 'parametres');
         $this->dispatch('toast', message: 'Configuration SMS enregistrée avec succès.', type: 'success');
     }
 

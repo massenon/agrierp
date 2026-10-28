@@ -109,25 +109,13 @@ class ModesPaiement extends Component
     public function saveBank(): void
     {
         $this->authorize('manage-comptabilite');
-        $this->validate([
-            'bankName' => ['required', 'string'],
-            'rib' => ['required', 'string', 'max:100'],
-            'iban' => ['required', 'string', 'max:40'],
+        $this->validate(\App\Services\ModesPaiementService::REGLES_BANQUE + ['rib' => ['required', 'string', 'max:100']]);
+
+        app(\App\Services\ModesPaiementService::class)->creerBanque([
+            'bankName' => $this->bankName, 'holderName' => $this->holderName, 'rib' => $this->rib,
+            'iban' => $this->iban, 'accountCode' => $this->accountCode,
         ]);
 
-        TreasuryAccount::create([
-            'type' => 'banque',
-            'label' => $this->bankName.($this->accountCode ? ' - '.$this->accountCode : ''),
-            'account_code' => $this->accountCode ?: '521',
-            'bank_name' => $this->bankName,
-            'holder_name' => $this->holderName ?: null,
-            'rib' => $this->rib,
-            'iban' => $this->iban,
-            'balance' => 0,
-            'is_active' => true,
-        ]);
-
-        AuditLog::record('treasury_account.bank_created', 'parametres');
         $this->dispatch('close-modal', name: 'modal-add-bank');
         $this->dispatch('toast', message: 'Compte bancaire ajouté avec succès.', type: 'success');
     }
@@ -141,24 +129,13 @@ class ModesPaiement extends Component
     public function saveMomo(): void
     {
         $this->authorize('manage-comptabilite');
-        $this->validate([
-            'operatorName' => ['required', 'string'],
-            'phoneNumber' => ['required', 'string', 'max:30'],
+        $this->validate(\App\Services\ModesPaiementService::REGLES_MOMO);
+
+        app(\App\Services\ModesPaiementService::class)->creerMomo([
+            'operatorName' => $this->operatorName, 'phoneNumber' => $this->phoneNumber, 'holderName' => $this->holderName,
+            'simSerial' => $this->simSerial, 'accountCode' => $this->accountCode,
         ]);
 
-        TreasuryAccount::create([
-            'type' => 'mobile_money',
-            'label' => $this->operatorName.($this->accountCode ? ' - '.$this->accountCode : ''),
-            'account_code' => $this->accountCode ?: '5212',
-            'operator_name' => $this->operatorName,
-            'holder_name' => $this->holderName ?: null,
-            'phone_number' => $this->phoneNumber,
-            'sim_serial' => $this->simSerial ?: null,
-            'balance' => 0,
-            'is_active' => true,
-        ]);
-
-        AuditLog::record('treasury_account.momo_created', 'parametres');
         $this->dispatch('close-modal', name: 'modal-add-momo');
         $this->dispatch('toast', message: 'Ligne Mobile Money ajoutée avec succès.', type: 'success');
     }
@@ -214,7 +191,7 @@ class ModesPaiement extends Component
         $destination = TreasuryAccount::findOrFail($this->transferToId);
 
         try {
-            $ecriture = app(RecordTreasuryTransferAction::class)->execute(
+            $ecriture = app(\App\Services\ModesPaiementService::class)->virer(
                 $source, $destination, (float) $this->transferAmount, $this->transferReason ?: null
             );
         } catch (\InvalidArgumentException $e) {
@@ -231,7 +208,6 @@ class ModesPaiement extends Component
             return;
         }
 
-        AuditLog::record('treasury.transfer', 'parametres');
         $this->dispatch('close-modal', name: 'modal-virement-interne');
 
         $this->dispatch('toast', message: $ecriture

@@ -113,100 +113,19 @@ class BaremeIts extends Component
         // publique, donc modifiable côté client (leçon des tickets 12.4, 14.27).
         $this->authorize('view-parametres');
 
-        if (! $this->editable) {
-            $this->addError('tranches', "Le barème a déjà été arrêté le "
-                .$this->settings->payroll_settings_edited_at?->format('d/m/Y à H:i')
-                .". Seul un administrateur peut le modifier.");
+        try {
+            app(\App\Services\BaremeItsService::class)->remplacer($this->tranches, auth()->user());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->addError('tranches', $e->validator->errors()->first('tranches'));
 
             return;
         }
 
-        $erreur = $this->verifierCoherence();
-
-        if ($erreur !== null) {
-            $this->addError('tranches', $erreur);
-
-            return;
-        }
-
-        IncomeTaxBracket::query()->delete();
-
-        foreach ($this->tranches as $tranche) {
-            IncomeTaxBracket::create([
-                'from_amount' => (float) $tranche['from'],
-                'to_amount' => $tranche['to'] === null || $tranche['to'] === '' ? null : (float) $tranche['to'],
-                'rate' => (float) $tranche['rate'],
-                'is_active' => true,
-            ]);
-        }
-
-        $this->settings->markPayrollSettingsEdited(auth()->user());
-
-        AuditLog::record('payroll.brackets_updated', 'parametres');
         $this->chargerTranches();
 
         $this->dispatch('toast',
             message: 'Barème enregistré — les bulletins non encore réglés sont recalculés automatiquement. Toute modification ultérieure exigera le rôle administrateur.',
             type: 'success');
-    }
-
-    /**
-     * Un barème troué ou chevauchant produit un impôt faux SANS lever
-     * d'erreur : chaque contrôle ci-dessous correspond à une manière réelle de
-     * se tromper.
-     */
-    private function verifierCoherence(): ?string
-    {
-        if (empty($this->tranches)) {
-            return 'Le barème doit comporter au moins une tranche.';
-        }
-
-        $tranches = collect($this->tranches)
-            ->map(fn ($t) => [
-                'from' => (float) $t['from'],
-                'to' => $t['to'] === null || $t['to'] === '' ? null : (float) $t['to'],
-                'rate' => (float) $t['rate'],
-            ])
-            ->sortBy('from')
-            ->values();
-
-        if ($tranches->first()['from'] != 0.0) {
-            return 'La première tranche doit partir de 0 : sans elle, les revenus les plus bas ne seraient couverts par aucune tranche.';
-        }
-
-        foreach ($tranches as $i => $tranche) {
-            if ($tranche['rate'] < 0 || $tranche['rate'] > 100) {
-                return 'Un taux doit être compris entre 0 et 100 %.';
-            }
-
-            $derniere = $i === $tranches->count() - 1;
-
-            if ($derniere) {
-                if ($tranche['to'] !== null) {
-                    return 'La dernière tranche doit être ouverte (sans plafond) : sinon les revenus au-delà ne seraient pas imposés du tout.';
-                }
-
-                continue;
-            }
-
-            if ($tranche['to'] === null) {
-                return 'Seule la dernière tranche peut être sans plafond.';
-            }
-
-            if ($tranche['to'] <= $tranche['from']) {
-                return 'Le plafond d\'une tranche doit être supérieur à son plancher.';
-            }
-
-            // ⚠️ Continuité stricte : un trou laisse une portion de revenu non
-            // imposée, un chevauchement la taxe deux fois. Ni l'un ni l'autre
-            // ne lèverait d'erreur au calcul.
-            if ((float) $tranches[$i + 1]['from'] !== (float) $tranche['to']) {
-                return 'Les tranches doivent se suivre sans trou ni chevauchement : la tranche suivante doit commencer exactement à '
-                    .number_format($tranche['to'], 0, ',', ' ').' FCFA.';
-            }
-        }
-
-        return null;
     }
 
     public function render()

@@ -95,80 +95,37 @@ class DonneesEntreprise extends Component
     {
         $this->authorize('manage-parametres');
 
-        $this->validate([
-            'companyName' => ['required', 'string', 'max:150'],
-            'ifu' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:50'],
-            'email' => ['nullable', 'email'],
+        $service = app(\App\Services\EntrepriseService::class);
+
+        $this->validate($service->regles() + [
             'logoFile' => ['nullable', 'image', 'max:2048'],
             'faviconFile' => ['nullable', 'image', 'max:500'],
-            // ⚠️ Bornes issues du droit béninois : VPS 2 % (enseignement privé)
-            // ou 4 % (autres) ; risques professionnels 1 à 4 % selon le niveau
-            // de risque de l'entreprise. Les laisser libres inviterait à saisir
-            // un taux hors barème sans que rien ne le signale.
-            'vpsRate' => ['required', 'numeric', 'min:0', 'max:10'],
-            'cnssEmployeeRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerPensionRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerFamilyRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerRiskRate' => ['required', 'numeric', 'min:1', 'max:4'],
-        ], [
-            'ifu.regex' => "L'IFU doit contenir uniquement des chiffres.",
-        ]);
+        ], \App\Services\EntrepriseService::MESSAGES);
 
-        $settings = CompanySetting::current();
+        $fichiers = [];
 
-        // ⚠️ TICKET 14.39 — VERROU SUR LES TAUX DE PAIE. La première
-        // configuration est ouverte (elle entre les valeurs validées par le
-        // client) ; toute modification ultérieure exige le rôle
-        // administrateur. Les taux déterminent le net versé à chaque salarié et
-        // les montants déclarés aux organismes.
-        $tauxModifies = $settings->payrollSettingsLocked() && (
-            (float) $settings->vps_rate !== (float) $this->vpsRate
-            || (float) $settings->cnss_employee_rate !== (float) $this->cnssEmployeeRate
-            || (float) $settings->cnss_employer_pension_rate !== (float) $this->cnssEmployerPensionRate
-            || (float) $settings->cnss_employer_family_rate !== (float) $this->cnssEmployerFamilyRate
-            || (float) $settings->cnss_employer_risk_rate !== (float) $this->cnssEmployerRiskRate
-        );
+        if ($this->logoFile) {
+            $fichiers['logo_path'] = $this->logoFile->store('company', 'public');
+        }
 
-        if ($tauxModifies && ! $settings->payrollSettingsEditableBy(auth()->user())) {
-            $this->addError('vpsRate', "Les taux de charges sociales ont été arrêtés le "
-                .$settings->payroll_settings_edited_at?->format('d/m/Y à H:i')
-                .". Seul un administrateur peut les modifier.");
+        if ($this->faviconFile) {
+            $fichiers['favicon_path'] = $this->faviconFile->store('company', 'public');
+        }
+
+        try {
+            $service->enregistrer([
+                'companyName' => $this->companyName, 'promoterName' => $this->promoterName, 'address' => $this->address,
+                'phone' => $this->phone, 'email' => $this->email, 'ifu' => $this->ifu, 'rccm' => $this->rccm,
+                'tvaEnabled' => $this->tvaEnabled, 'vpsRate' => $this->vpsRate, 'cnssEmployeeRate' => $this->cnssEmployeeRate,
+                'cnssEmployerPensionRate' => $this->cnssEmployerPensionRate, 'cnssEmployerFamilyRate' => $this->cnssEmployerFamilyRate,
+                'cnssEmployerRiskRate' => $this->cnssEmployerRiskRate,
+            ], auth()->user(), $fichiers);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->addError('vpsRate', $e->validator->errors()->first('vpsRate'));
 
             return;
         }
 
-        $payload = [
-            'company_name' => $this->companyName,
-            'promoter_name' => $this->promoterName ?: null,
-            'address' => $this->address ?: null,
-            'phone' => $this->phone ?: null,
-            'email' => $this->email ?: null,
-            'ifu' => $this->ifu,
-            'rccm' => $this->rccm ?: null,
-            'tva_enabled' => $this->tvaEnabled,
-            'vps_rate' => $this->vpsRate,
-            'cnss_employee_rate' => $this->cnssEmployeeRate,
-            'cnss_employer_pension_rate' => $this->cnssEmployerPensionRate,
-            'cnss_employer_family_rate' => $this->cnssEmployerFamilyRate,
-            'cnss_employer_risk_rate' => $this->cnssEmployerRiskRate,
-        ];
-
-        if ($this->logoFile) {
-            $payload['logo_path'] = $this->logoFile->store('company', 'public');
-        }
-
-        if ($this->faviconFile) {
-            $payload['favicon_path'] = $this->faviconFile->store('company', 'public');
-        }
-
-        $settings->update($payload);
-
-        // Première saisie des taux : le paramétrage est désormais arrêté.
-        if ($tauxModifies || ! $settings->payrollSettingsLocked()) {
-            $settings->fresh()->markPayrollSettingsEdited(auth()->user());
-        }
-
-        AuditLog::record('company_settings.updated', 'parametres');
         $this->reset(['logoFile', 'faviconFile']);
         $this->dispatch('toast', message: 'Modifications enregistrées avec succès.', type: 'success');
     }

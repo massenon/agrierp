@@ -174,31 +174,16 @@ class RolesPermissions extends Component
     {
         $this->authorizeAdmin();
 
-        $this->validate([
-            'roleName' => [
-                'required', 'string', 'max:50', 'regex:/^[a-z0-9\-]+$/',
-                $this->editingRoleName
-                    ? 'unique:roles,name,'.Role::where('name', $this->editingRoleName)->value('id')
-                    : 'unique:roles,name',
-            ],
-        ], [
-            'roleName.regex' => 'Le nom du rôle ne doit contenir que des lettres minuscules, chiffres et tirets (ex : responsable-achats).',
+        $service = app(\App\Services\RoleService::class);
+
+        $this->validate($service->regles($this->editingRoleName), [
+            'roleName.regex' => \App\Services\RoleService::MESSAGE_NOM,
         ]);
 
-        $toGrant = array_keys(array_filter($this->editingPermissions));
-
-        if ($this->editingRoleName) {
-            $role = Role::where('name', $this->editingRoleName)->firstOrFail();
-            $role->update(['name' => $this->roleName]);
-            $role->syncPermissions($toGrant);
-            AuditLog::record('role.updated', 'parametres');
-            $message = "Rôle « {$role->name} » modifié avec succès.";
-        } else {
-            $role = Role::create(['name' => $this->roleName, 'guard_name' => 'web']);
-            $role->syncPermissions($toGrant);
-            AuditLog::record('role.created', 'parametres');
-            $message = "Rôle « {$role->name} » créé avec succès.";
-        }
+        $role = $service->enregistrer($this->editingRoleName, $this->roleName, array_keys(array_filter($this->editingPermissions)), Auth::user());
+        $message = $this->editingRoleName
+            ? "Rôle « {$role->name} » modifié avec succès."
+            : "Rôle « {$role->name} » créé avec succès.";
 
         $this->dispatch('close-modal', name: 'modal-edit-role');
         $this->dispatch('toast', message: $message, type: 'success');
@@ -210,40 +195,15 @@ class RolesPermissions extends Component
     {
         $this->authorizeAdmin();
 
-        // Ticket audit RBAC : protection étendue aux 4 rôles fondamentaux
-        // (Document 01 §3.3), pas seulement admin — un admin ne doit
-        // jamais pouvoir supprimer accidentellement comptable/caissier/
-        // animalier même s'ils comptent 0 utilisateur au moment précis de
-        // la suppression (rôles de démonstration temporairement
-        // réassignés, etc.). La création de rôles ADDITIONNELS
-        // au-delà de ces 4 reste pleinement permise et fonctionnelle —
-        // seule la suppression des 4 rôles de base est bloquée.
-        if (in_array($roleName, ['admin', 'comptable', 'caissier', 'animalier'], true)) {
-            $this->dispatch('toast', message: "Le rôle « {$roleName} » fait partie des 4 rôles fondamentaux du système et ne peut jamais être supprimé.", type: 'error');
+        $motif = app(\App\Services\RoleService::class)->supprimer($roleName, Auth::user());
+
+        if ($motif !== null) {
+            $this->dispatch('toast', message: $motif, type: 'error');
 
             return;
         }
 
-        $role = Role::where('name', $roleName)->first();
-
-        if (! $role) {
-            return;
-        }
-
-        // ⚠️ User::role() plutôt que Role::withCount('users') — même
-        // apprentissage déjà documenté que dans getRolesProperty().
-        $usersCount = \App\Models\User::role($role->name)->where('is_active', true)->count();   // compte archivé exclu
-
-        if ($usersCount > 0) {
-            $this->dispatch('toast', message: "Impossible de supprimer « {$role->name} » : {$usersCount} utilisateur(s) porte(nt) encore ce rôle.", type: 'error');
-
-            return;
-        }
-
-        $roleLabel = $role->name;
-        $role->delete();
-
-        AuditLog::record('role.deleted', 'parametres');
+        $roleLabel = $roleName;
         $this->dispatch('toast', message: "Rôle « {$roleLabel} » supprimé avec succès.", type: 'warning');
     }
 
