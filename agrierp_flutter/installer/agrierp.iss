@@ -85,15 +85,11 @@ Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags:
 
 ; Tickets DES-1 / DES-2 : la desinstallation retire TOUT ce que le poste a pose hors du dossier d'installation :
 ; la base locale, demarrage.log, le logo, les sauvegardes (dossier des donnees), les archives et exports PDF/Excel
-; (Documents\AgriERP) et les justificatifs copies (Documents\agrierp_justificatifs). Le dossier des donnees s'appelait
-; bj.olouwachegoun avant DES-2 : les deux noms sont retires. Une SAUVEGARDE AUTOMATIQUE est proposee avant
+; (Documents\AgriERP) et les justificatifs copies (Documents\agrierp_justificatifs). Une SAUVEGARDE AUTOMATIQUE est proposee avant
 ; (Documents\AgriERP-Sauvegarde-AAAA-MM-JJ_HHMM, jamais supprimee par la desinstallation).
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\donnees"
-Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\agrierp"
 Type: dirifempty; Name: "{userappdata}\OLOUWACHEGOUN"
-Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"
-Type: dirifempty; Name: "{userappdata}\bj.olouwachegoun"
 Type: filesandordirs; Name: "{userdocs}\AgriERP"
 Type: filesandordirs; Name: "{userdocs}\agrierp_justificatifs"
 
@@ -124,8 +120,6 @@ begin
   Dossier := ExpandConstant('{userdocs}\AgriERP-Sauvegarde-') + GetDateTimeString('yyyy/mm/dd_hhnn', '-', #0);
   Result := ForceDirectories(Dossier)
     and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees'), Dossier + '\donnees-du-poste')
-    and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp'), Dossier + '\donnees-du-poste-premier-renommage')
-    and CopierDossier(ExpandConstant('{userappdata}\bj.olouwachegoun\agrierp'), Dossier + '\donnees-du-poste-ancien-dossier')
     and CopierDossier(ExpandConstant('{userdocs}\AgriERP'), Dossier + '\archives-et-exports')
     and CopierDossier(ExpandConstant('{userdocs}\agrierp_justificatifs'), Dossier + '\justificatifs');
 end;

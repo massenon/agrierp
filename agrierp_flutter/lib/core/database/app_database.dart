@@ -5,7 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 
 import '../config/domaine_email.dart';
-import '../demarrage/migration_dossier_donnees.dart';
+import '../demarrage/dossier_donnees.dart';
 import 'identifiant_ligne_depense.dart';
 import 'sync_columns.dart';
 

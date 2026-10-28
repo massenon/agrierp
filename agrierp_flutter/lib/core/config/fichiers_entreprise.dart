@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
-import '../demarrage/migration_dossier_donnees.dart';
+import '../demarrage/dossier_donnees.dart';
 
 /// Ticket AUT-2 — LOGO ET FAVICON DE L'ENTREPRISE, gardés sur le poste (hors base, hors réseau).
 ///

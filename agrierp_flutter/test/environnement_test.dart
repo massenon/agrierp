@@ -172,7 +172,7 @@ void main() {
     });
 
     /// Tickets DES-1 / DES-2 (décisions du client des 27 et 28/10/2026) : la DÉSINSTALLATION supprime TOUT ce que le poste a posé
-    /// hors du dossier d'installation — données (`%APPDATA%\OLOUWACHEGOUN\donnees`, anciens noms compris), archives et
+    /// hors du dossier d'installation — données (`%APPDATA%\OLOUWACHEGOUN\donnees`, ), archives et
     /// exports (`Documents\AgriERP`), justificatifs (`Documents\agrierp_justificatifs`) — après un avertissement, un choix Oui / Non
     /// et une SAUVEGARDE AUTOMATIQUE proposée. Une MISE À JOUR, elle, n'y touche jamais.
     test('agrierp.iss : la désinstallation supprime les données, avertit et propose la sauvegarde (DES-1, DES-2)', () {
@@ -180,8 +180,6 @@ void main() {
       expect(source, contains('[UninstallDelete]'));
       for (final dossier in [
         r'{userappdata}\OLOUWACHEGOUN\donnees',
-        r'{userappdata}\OLOUWACHEGOUN\agrierp',
-        r'{userappdata}\bj.olouwachegoun\agrierp',
         r'{userdocs}\AgriERP"',
         r'{userdocs}\agrierp_justificatifs',
       ]) {

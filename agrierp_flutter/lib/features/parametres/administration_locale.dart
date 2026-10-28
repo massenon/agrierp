@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
-import '../../core/demarrage/migration_dossier_donnees.dart';
+import '../../core/demarrage/dossier_donnees.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';

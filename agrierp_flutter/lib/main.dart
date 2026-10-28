@@ -13,7 +13,6 @@ import 'core/auth/permissions_poste.dart';
 import 'core/config/envoi_email_test.dart';
 import 'core/config/parametres_poste.dart';
 import 'core/config/envoi_email.dart';
-import 'core/demarrage/migration_dossier_donnees.dart';
 import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
@@ -145,9 +144,7 @@ Future<void> main() async {
   runApp(
     await DemarragePoste.preparer(
       construire: () async {
-        // Ticket DES-2 — un ancien dossier de données (bj.olouwachegoun) est repris sous OLOUWACHEGOUN, puis (AUT-4) une
-        // restauration programmée s'installe, TOUJOURS avant l'ouverture de la base.
-        await MigrationDossierDonnees.migrer();
+        // Ticket AUT-4 — une restauration programmée s'installe AVANT l'ouverture de la base.
         await AdministrationLocale.appliquerRestaurationEnAttente();
         final db = AppDatabase();
         final parametres = ParametresPoste(database: db);
