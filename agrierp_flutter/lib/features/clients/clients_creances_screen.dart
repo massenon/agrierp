@@ -7,6 +7,7 @@ import '../../core/systeme/ouvreur_url.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/toast_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'avances_modales.dart';
 import 'clients_creances_repository.dart';
@@ -31,7 +32,9 @@ import '../../core/theme/symboles_agri.dart';
 /// Avance » et « Imputer » écrivent le FAIT en local, `pending` ; le serveur fait entrer
 /// l'argent en trésorerie, passe D 5xx / C 419 puis D 419 / C 411. Le poste ne modifie
 /// aucun solde : il AFFICHE les soldes nets de ce qu'il a saisi et que le serveur n'a pas
-/// encore appliqué. Pas de « Modifier » (D4) ni d'archivage au poste (D5).
+/// encore appliqué. **VC-4 (décision du client : « OUI LE POSTE DOIT LE FAIRE »)** : « Modifier » (crayon) et « Archiver » sont
+/// au poste comme au web, mêmes règles (`CustomerAdvanceService::modifier` / `archiver` : montant et client figés pour une avance
+/// entamée ou comptabilisée, pas d'archivage tant qu'il reste un reste), écrits en local `pending` puis envoyés.
 class ClientsCreancesScreen extends StatefulWidget {
   const ClientsCreancesScreen({
     super.key,
@@ -1274,7 +1277,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ('Solde Restant', 3),
           ('Date', 3),
           ('Statut', 4),
-          ('Actions', 2),
+          ('Actions', 3),
         ],
         vide: '— Aucune avance en cours —',
         lignes: [
@@ -1298,7 +1301,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 3,
               ),
               (_statutAvance(d.avances[i]), 4),
-              (_actionsAvance(d, d.avances[i]), 2),
+              (_actionsAvance(d, d.avances[i]), 3),
             ]),
         ],
       ),
@@ -1307,8 +1310,9 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         'Les soldes sont NETS des imputations saisies sur ce poste et pas encore '
         'envoyées : le poste ne modifie jamais le solde d\'une avance ni d\'une '
         'créance, le serveur les applique à la synchronisation. Une avance '
-        '« En attente » n\'est pas encore reçue par la ferme : ni la trésorerie ni '
-        'la comptabilité n\'ont bougé.',
+        '« En attente » n\'est pas encore reçue par la ferme (ou sa modification, son '
+        'archivage, n\'est pas encore appliqué) : ni la trésorerie ni la '
+        'comptabilité n\'ont bougé.',
       ),
     ],
   );
@@ -1397,15 +1401,24 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     ],
   );
 
-  /// ⚠️ **PAS DE « MODIFIER » NI D'« ARCHIVER »** (D4, D5) : le montant d'une avance
-  /// entamée ou comptabilisée est figé, et une avance qui a un reste ne s'archive pas.
-  /// L'œil de la maquette reste inerte ; « Imputer » ouvre « Imputer un Acompte ».
+  /// Les actions du Blade `historique-avances`, dans son ordre : « Modifier » (crayon `edit`), « Imputer » (`sync`, tant qu'il y a un
+  /// reste) et « Archiver » (`archive`) — VC-4. Les règles qui les refusent sont celles du web, rendues AVANT d'écrire.
+  /// ⚠️ L'œil de la maquette n'existe pas au Blade (le web est le maître) : il reste inerte, comme avant.
   Widget _actionsAvance(DonneesClients d, LigneAvance l) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       const Opacity(
         opacity: 0.4,
         child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
+      ),
+      IconButton(
+        key: Key('modifier-avance-${l.avance.id}'),
+        tooltip: 'Modifier',
+        onPressed: () => _modifierAvance(d, l),
+        icon: const Icon(SymbolesAgri.edit, size: 16),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(),
+        color: AgriColors.brandEmerald,
       ),
       if (!l.soldee && !l.refusee)
         IconButton(
@@ -1417,8 +1430,41 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           constraints: const BoxConstraints(),
           color: AgriColors.brandForest,
         ),
+      IconButton(
+        key: Key('archiver-avance-${l.avance.id}'),
+        tooltip: 'Archiver',
+        onPressed: () => _archiverAvance(l),
+        icon: const Icon(SymbolesAgri.archive, size: 16),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(),
+        color: AgriColors.outline,
+      ),
     ],
   );
+
+  /// `editAdvance` + `saveAdvance` : la modale « Modifier l'Avance » ; succès = « Avance modifiée avec succès. ».
+  Future<void> _modifierAvance(DonneesClients d, LigneAvance l) async {
+    final ecrit = await ouvrirModificationAvance(context: context, depot: widget.depot, donnees: d, ligne: l);
+    if (!ecrit) return;
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Avance modifiée avec succès.');
+  }
+
+  /// `archiveAdvance` : confirmation, puis l'archivage ; un refus (reste à imputer) est un toast d'erreur, comme au web.
+  Future<void> _archiverAvance(LigneAvance l) async {
+    if (!await confirmerArchivageAvance(context: context, ligne: l)) return;
+    try {
+      await widget.depot.archiverAvance(l.avance.id);
+    } on SaisieAvanceRefusee catch (e) {
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Avance archivée avec succès.', type: TypeToast.avertissement);
+  }
 
   Future<void> _nouvelAcompte(DonneesClients d) async {
     final saisi = await ouvrirNouvelAcompte(

@@ -432,7 +432,9 @@ class ClientsCreancesRepository {
               )
               .toList(),
       avances:
-          (avances.toList()..sort(
+          // VC-4 : une avance archivée (ici, en attente d'acquittement, ou acquittée et pas encore retirée par le tirage)
+          // ne se liste plus, comme au web (`where('is_active', true)`).
+          (avances.where((a) => a.isActive).toList()..sort(
                 (a, b) => (b.advanceDate ?? DateTime(1970)).compareTo(
                   a.advanceDate ?? DateTime(1970),
                 ),
@@ -746,6 +748,122 @@ class ClientsCreancesRepository {
       database.customerAdvances,
     )..where((a) => a.id.equals(id))).getSingle();
   }
+
+  // ── Modifier / archiver une avance (ticket VC-4) ─────────────────────────────────────────────────────────────────
+
+  /// Motifs de `CustomerAdvanceService` (`modifier`, `archiver`), mot pour mot — le poste ne dit rien que le web ne dise.
+  static const motifAvanceIntrouvable = 'Avance introuvable.';
+  static const motifAvanceArchivee = 'Cette avance est archivée : elle ne peut plus être modifiée.';
+
+  static String motifMontantFige(String raison) => "Le montant d'une avance $raison ne peut plus être modifié.";
+
+  static String motifClientFige(String raison) => "Le client d'une avance $raison ne peut plus être modifié.";
+
+  static const motifDateFigee =
+      "La date d'une avance comptabilisée ne peut plus être modifiée : l'écriture est datée du jour de l'encaissement.";
+
+  static String motifResteAImputer(double reste) =>
+      "Cette avance a encore un reste de ${DocumentsAvances.formaterMontant(reste)} FCFA : imputez-la avant de l'archiver.";
+
+  /// Modifie une avance (`HistoriqueAvances::editAdvance` + `saveAdvance` → `CustomerAdvanceService::modifier`), EN ATTENTE d'envoi.
+  ///
+  /// ⚠️ **MÊMES RÈGLES QUE LE WEB (D4, revues par VC-4).** Montant et client d'une avance ENTAMÉE ou COMPTABILISÉE sont figés ; la date
+  /// d'une avance comptabilisée aussi (l'écriture est datée du jour de l'encaissement). Comptabilisée = elle porte un compte de
+  /// trésorerie, ce que toute avance saisie depuis 15.19 fait : seules les avances d'avant le ticket, jamais entamées, changent encore.
+  /// ⚠️ Entamée = `amount_used` servi OU une imputation en attente sur ce poste (le serveur traite l'avance avant l'imputation : sans
+  /// cela, le poste enverrait une modification que le web aurait refusée une seconde plus tard).
+  ///
+  /// Refus AVANT d'écrire. Une saisie identique à la ligne n'est PAS réécrite (rien ne repart). La ligne repasse en `pending` : le
+  /// moteur envoie la ligne entière et le serveur la reconnaît (modification), jamais une réception rejouée.
+  /// Retourne `true` si quelque chose a été écrit.
+  Future<bool> modifierAvance(
+    String id, {
+    required String clientId,
+    required String montant,
+    required DateTime? date,
+  }) async {
+    final saisi = montant.trim().replaceAll(',', '.');
+    final valeur = saisi.isEmpty ? null : double.tryParse(saisi);
+
+    // Les règles du formulaire (`saveAdvance`), champ par champ, avec les phrases de `lang/fr/validation.php`.
+    final erreurs = <String, String>{};
+    if (clientId.isEmpty) {
+      erreurs['customerId'] = 'Le champ client est obligatoire.';
+    } else if (!await _clientExiste(clientId)) {
+      erreurs['customerId'] = "La valeur sélectionnée pour le champ client n'existe pas.";
+    }
+    if (saisi.isEmpty) {
+      erreurs['amount'] = 'Le champ montant est obligatoire.';
+    } else if (valeur == null || valeur.isNaN || valeur.isInfinite) {
+      erreurs['amount'] = 'Le champ montant doit être un nombre.';
+    } else if (valeur < 1) {
+      erreurs['amount'] = 'Le champ montant doit être au moins égal à 1.';
+    }
+    if (date == null) erreurs['advanceDate'] = 'Le champ date est obligatoire.';
+    if (erreurs.isNotEmpty) throw SaisieAvanceRefusee(erreurs, deFormulaire: true);
+
+    final avance = await _avance(id);
+    if (avance == null) throw const SaisieAvanceRefusee({'advance': motifAvanceIntrouvable});
+    if (!avance.isActive) throw const SaisieAvanceRefusee({'advance': motifAvanceArchivee});
+
+    final nouveau = (valeur! * 100).round() / 100;
+    final jour = DateTime(date!.year, date.month, date.day);
+    final entamee = avance.amountUsed > 0 || await _enAttenteDe(avanceId: id) > 0;
+    final comptabilisee = avance.treasuryAccountId != null;
+    final figee = entamee || comptabilisee;
+    final raison = entamee ? 'déjà entamée' : 'déjà comptabilisée';
+
+    if (figee && (nouveau - avance.amount).abs() >= 0.01) {
+      throw SaisieAvanceRefusee({'amount': motifMontantFige(raison)});
+    }
+    if (figee && clientId != avance.customerId) {
+      throw SaisieAvanceRefusee({'customerId': motifClientFige(raison)});
+    }
+    final ancien = avance.advanceDate;
+    final memeJour = ancien != null && ancien.year == jour.year && ancien.month == jour.month && ancien.day == jour.day;
+    if (comptabilisee && !memeJour) throw const SaisieAvanceRefusee({'advanceDate': motifDateFigee});
+
+    final identique = clientId == avance.customerId && (nouveau - avance.amount).abs() < 0.01 && memeJour;
+    if (identique) return false;
+
+    await (database.update(database.customerAdvances)..where((a) => a.id.equals(id))).write(
+      CustomerAdvancesCompanion(
+        customerId: Value(clientId),
+        amount: Value(nouveau),
+        advanceDate: Value(jour),
+        syncStatus: const Value(SyncStatus.pending),
+      ),
+    );
+    return true;
+  }
+
+  /// Archive une avance (`HistoriqueAvances::archiveAdvance` → `CustomerAdvanceService::archiver`), EN ATTENTE d'envoi : archivage
+  /// logique (`is_active = false`), jamais une suppression, jamais une réactivation.
+  ///
+  /// ⚠️ **D5 revue par VC-4 : refusé tant qu'il reste quelque chose à imputer** — archiver une avance non soldée la ferait disparaître
+  /// alors que la ferme doit encore ce montant au client (419 le porte au passif). Le reste est NET des imputations en attente.
+  /// Une avance absente ou déjà archivée : rien n'est fait. Retourne `true` si l'archivage a été écrit.
+  Future<bool> archiverAvance(String id) async {
+    final avance = await _avance(id);
+    if (avance == null || !avance.isActive) return false;
+
+    final reste = await resteAvance(avance);
+    if (reste > 0) throw SaisieAvanceRefusee({'advance': motifResteAImputer(reste)});
+
+    await (database.update(database.customerAdvances)..where((a) => a.id.equals(id))).write(
+      const CustomerAdvancesCompanion(isActive: Value(false), syncStatus: Value(SyncStatus.pending)),
+    );
+    return true;
+  }
+
+  /// Première date que le calendrier de « Modifier l'Avance » propose (`dateMinSaisie` du web) ; `null` : aucune borne connue.
+  Future<DateTime?> premierJourSaisissable() => ExerciceDeSaisie(database).premierJour();
+
+  Future<CustomerAdvance?> _avance(String id) =>
+      (database.select(database.customerAdvances)..where((a) => a.id.equals(id))).getSingleOrNull();
+
+  Future<bool> _clientExiste(String id) async =>
+      await (database.select(database.customers)..where((c) => c.id.equals(id))).getSingleOrNull() != null;
 
   /// Impute un acompte sur une créance, EN ATTENTE d'envoi.
   ///
@@ -1086,6 +1204,24 @@ class ProfilClient {
   /// Part du crédit autorisé utilisée, 0–100 (`null` : pas de plafond).
   int? get pourcentageCredit =>
       client.creditLimit > 0 ? (soldeGlobal / client.creditLimit * 100).round().clamp(0, 100) : null;
+}
+
+/// Ticket VC-4 — modification ou archivage d'une avance refusé AVANT d'être écrit : les motifs sont ceux du web, rangés par champ
+/// (`customerId`, `amount`, `advanceDate`) ou `advance` (l'avance entière), comme les `@error` du Blade et le toast d'erreur.
+class SaisieAvanceRefusee implements Exception {
+  const SaisieAvanceRefusee(this.erreurs, {this.deFormulaire = false});
+
+  final Map<String, String> erreurs;
+
+  /// Vrai pour les règles du formulaire (`validate()` : obligatoire, minimum), montrées SOUS leur champ ; faux pour les refus du
+  /// service (montant figé, reste à imputer…), que le web rend en TOAST d'erreur, la modale restant ouverte.
+  final bool deFormulaire;
+
+  /// Tous les motifs d'une phrase, comme `collect($e->errors())->flatten()->implode(' ')` du composant.
+  String get motif => erreurs.values.join(' ');
+
+  @override
+  String toString() => motif;
 }
 
 /// Saisie d'avance ou d'imputation refusée AVANT d'être écrite — le motif est montré

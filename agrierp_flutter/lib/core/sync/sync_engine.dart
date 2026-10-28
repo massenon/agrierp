@@ -7631,7 +7631,8 @@ class SyncEngine {
         }
       : {'id': d.id, 'is_active': false};
 
-  /// Avance reçue au poste : « tant, de ce client, dans ce compte, ce jour ». Ni solde de
+  /// Avance reçue au poste : « tant, de ce client, dans ce compte, ce jour » ; renvoyée entière quand le poste la MODIFIE
+  /// ou l'ARCHIVE (VC-4). Ni solde de
   /// trésorerie ni écriture ne partent — le serveur entre l'argent dans les DEUX livres
   /// et passe D 5xx / C 419. `amount_used` ne part jamais. `device_id` voyage à la racine.
   Map<String, dynamic> _avanceEnJson(CustomerAdvance a) => {
@@ -7642,6 +7643,10 @@ class SyncEngine {
     'advance_date': a.advanceDate == null ? null : _jour(a.advanceDate!),
     'payment_mode': a.paymentMode,
     'motif': a.motif,
+    // Ticket VC-4 — `false` = archivage d'une avance connue du serveur (jamais de réactivation : le poste n'envoie `true`
+    // que pour une ligne active). Le serveur reconnaît une ligne connue (modification : client, montant, date ; ou archivage)
+    // et acquitte sans rejeu une ligne identique ; une ligne inconnue est une réception.
+    'is_active': a.isActive,
   };
 
   /// Imputation : « tant de cette avance sur cette créance ». Ni plafond, ni reste, ni

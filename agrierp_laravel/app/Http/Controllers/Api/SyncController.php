@@ -4884,15 +4884,37 @@ class SyncController extends Controller
             }
 
             try {
+                // VC-4 : une ligne DÉJÀ CONNUE est une modification (client, montant, date) ou un
+                // archivage (`is_active: false`), jamais une réception rejouée ni une réactivation.
+                $connue = is_array($data) && is_string($id) && Str::isUuid($id)
+                    && CustomerAdvance::whereKey($id)->exists();
+
                 $valides = validator(is_array($data) ? $data : [], [
                     'id' => ['required', 'uuid'],
                     'customer_id' => ['required', 'uuid'],
-                    'treasury_account_id' => ['required', 'uuid'],
+                    'treasury_account_id' => [$connue ? 'nullable' : 'required', 'uuid'],
                     'amount' => ['required', 'numeric', 'min:1'],
                     'advance_date' => ['required', 'date'],
                     'payment_mode' => ['nullable', 'string', 'max:20'],
                     'motif' => ['nullable', 'string', 'max:255'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if ($connue) {
+                    $service->appliquerDuPoste(
+                        $valides['id'],
+                        $valides['customer_id'],
+                        (float) $valides['amount'],
+                        \Carbon\Carbon::parse($valides['advance_date'])->format('Y-m-d'),
+                        ! $this->veutRetirer($data),
+                    );
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                if ($this->veutRetirer($data)) {
+                    throw ValidationException::withMessages(['advance' => "Avance inconnue du serveur : rien à archiver. Une avance jamais reçue par le serveur n'a pas d'écriture à retirer."]);
+                }
 
                 $service->recevoir(
                     $valides['customer_id'],

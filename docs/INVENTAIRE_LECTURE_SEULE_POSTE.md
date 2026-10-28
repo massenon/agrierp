@@ -56,9 +56,9 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | `SuiviDettes` | sendReminder | **PRÉSENT depuis VC-2 (28/10/2026)** : `ClientsCreancesRepository.relancer`, serveur `RelanceClientService` | `customer_reminders` (v70, envoyée) | VC-2 ✅ |
 | `RelancesClients` | sendMailReminder, sendWhatsappReminder, sendSmsReminder, exportCourrierPdf | **PRÉSENT depuis VC-2** : e-mail/SMS envoyés par le serveur au push, WhatsApp via `wa.me`, courrier PDF existant | `customer_reminders` | VC-2 ✅ |
 | `ProfileClient` | confirmRegularisation, sendQuickReminder | **PRÉSENT depuis VC-3 (28/10/2026)** : `profil_client_page.dart`, `encaisserSolde`, `relancer(clientId:)` | `receivable_payments`, `customer_reminders` | VC-3 ✅ |
-| `HistoriqueAvances` | editAdvance, archiveAdvance | ABSENT, voulu (D4/D5) : `clients_creances_screen.dart:31`, l. 1224-1226 | — | VC-4 (décision à revoir : « toutes les fonctions ») |
+| `HistoriqueAvances` | editAdvance, archiveAdvance | **PRÉSENT depuis VC-4 (28/10/2026)** : `ClientsCreancesRepository.modifierAvance` / `archiverAvance`, modale « Modifier l'Avance » et confirmation d'archivage (`avances_modales.dart`) ; serveur `CustomerAdvanceService::appliquerDuPoste` + `pushCustomerAdvances` (D4/D5 revues sur décision du client) | `customer_advances` (`is_active`, pas de nouveau palier) | VC-4 ✅ |
 | `Facturation` | retryMecef | ABSENT (QR : mention `ventes/facturation_screen.dart:466-471`) | `sales` | VC-5 (en ligne) |
-| `PosInterface`, `HistoriqueVentes`, `RetoursAvoirs`, `Devis`, `ListeClients`, `HistoriqueAvances` (création, imputation) | — | PRÉSENT | — | — |
+| `PosInterface`, `HistoriqueVentes`, `RetoursAvoirs`, `Devis`, `ListeClients`, `HistoriqueAvances` (création, imputation, modification, archivage) | — | PRÉSENT | — | — |
 
 ## 5. Stocks
 
@@ -101,6 +101,6 @@ RH (RH-1 à RH-4) ; modèles et réglages d'attestation (**en ligne** : `PUT /ap
 
 ## 10. Ordre de conversion proposé (Sprint CRUD-P)
 
-Chaque ticket = un PRD court (skill `prd`), le web d'abord quand le point de passage unique manque, puis le poste, parité exécutée, docs. Ordre par valeur terrain : **VC-1** (encaisser une créance au comptoir), **AC-1** (bons de commande), **ST-1 / ST-2** (archiver un produit, seuils), **CP-1 / CP-2** (plan comptable, journal manuel), **PA-3 / PA-4** (entreprise, modes de paiement), **CP-3** (immobilisations), **VC-2 / VC-3** (relances, profil client), **PA-2 / PA-7** (rôles, barème ITS), **AC-2 / AC-3 / AC-4**, **VC-4 / VC-5**, **CP-4 / CP-5**, **PA-1 / PA-5 / PA-6 / PA-8**, **EL-1**. Points à trancher avec le client : VC-4 (D4/D5 avaient décidé l'inverse), EL-1 (route web orpheline), CP-4 (clôture par le poste, en ligne seulement).
+Chaque ticket = un PRD court (skill `prd`), le web d'abord quand le point de passage unique manque, puis le poste, parité exécutée, docs. Ordre par valeur terrain : **VC-1** (encaisser une créance au comptoir), **AC-1** (bons de commande), **ST-1 / ST-2** (archiver un produit, seuils), **CP-1 / CP-2** (plan comptable, journal manuel), **PA-3 / PA-4** (entreprise, modes de paiement), **CP-3** (immobilisations), **VC-2 / VC-3** (relances, profil client), **PA-2 / PA-7** (rôles, barème ITS), **AC-2 / AC-3 / AC-4**, **~~VC-4~~ ✅ / VC-5**, **CP-4 / CP-5**, **PA-1 / PA-5 / PA-6 / PA-8**, **EL-1**. Points à trancher avec le client : EL-1 (route web orpheline), CP-4 (clôture par le poste, en ligne seulement).
 
 **Incertitudes de l'inventaire :** `pushProducts` et `is_active` d'un produit envoyé par le poste n'ont pas été vérifiés ; les cartes « — » n'ont pas été relues une à une, écran par écran.

@@ -195,6 +195,8 @@ return [
         'address' => 'adresse',
         'adjPhysical' => 'stock physique constaté',
         'adjProductId' => 'produit',
+        // Ticket VC-4 — « Modifier l'Avance » (Historique des Avances) : la date de l'avance.
+        'advanceDate' => 'date',
         'amount' => 'montant',
         'amountPaid' => 'montant payé',
         'articlesDescription' => 'description des articles',
