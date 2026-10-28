@@ -920,10 +920,10 @@ void main() {
       // Et `flutter_test` échoue d'office si une minuterie survit au démontage.
     });
 
-    test('U14 — 30 s, la période de `wire:poll.30s` du Blade', () {
+    test('U14 — 30 s, la période de relève du Blade (minuterie de 30 000 ms, en pause pendant le verrou)', () {
       final blade = File('$dossierLaravel/resources/views/livewire/shared/notification-bell.blade.php');
       if (!blade.existsSync()) return markTestSkipped('dépôt Laravel absent ($dossierLaravel)');
-      expect(blade.readAsStringSync(), contains('wire:poll.30s'));
+      expect(blade.readAsStringSync(), contains('}, 30000);'));
       expect(blade.readAsStringSync(), contains(r'{{ $notif->title }}'));
       expect(BarreSuperieure.rafraichissementCloche, const Duration(seconds: 30));
     });
