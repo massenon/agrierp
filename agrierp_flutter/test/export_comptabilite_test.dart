@@ -440,14 +440,14 @@ void main() {
 
   // ── Valeurs CALCULÉES À LA MAIN ─────────────────────────────────────────────
 
-  /// Plan, trié par code en CHAÎNES : « 401 » < « 47 » (« 0 » < « 7 »). Classe absente : « — ».
+  /// Plan, trié par code en CHAÎNES : « 401 » < « 47 » (« 0 » < « 7 »). Classe en toutes lettres comme le PDF du web (ticket CP-1), absente : « — ».
   const planAttendu = [
-    ['101', 'Capital', '1'],
-    ['401', 'Fournisseurs', '4'],
+    ['101', 'Capital', '1 - Ressources'],
+    ['401', 'Fournisseurs', '4 - Tiers'],
     ['47', 'Compte d’attente', '—'],
-    ['531', 'Caisse', '5'],
-    ['601', 'Achats', '6'],
-    ['701', 'Ventes', '7'],
+    ['531', 'Caisse', '5 - Trésorerie'],
+    ['601', 'Achats', '6 - Charges'],
+    ['701', 'Ventes', '7 - Produits'],
   ];
 
   /// Journal : date DÉCROISSANTE ; N° Pièce = avant le premier « — », Libellé = après (« — » s'il

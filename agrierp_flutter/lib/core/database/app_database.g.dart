@@ -15609,6 +15609,44 @@ class $ChartOfAccountsTable extends ChartOfAccounts
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('serveur'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($ChartOfAccountsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
   static const VerificationMeta _codeMeta = const VerificationMeta('code');
   @override
   late final GeneratedColumn<String> code = GeneratedColumn<String>(
@@ -15638,8 +15676,32 @@ class $ChartOfAccountsTable extends ChartOfAccounts
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, code, label, accountClass];
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    code,
+    label,
+    accountClass,
+    isActive,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -15656,6 +15718,18 @@ class $ChartOfAccountsTable extends ChartOfAccounts
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
     }
     if (data.containsKey('code')) {
       context.handle(
@@ -15682,6 +15756,12 @@ class $ChartOfAccountsTable extends ChartOfAccounts
         ),
       );
     }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     return context;
   }
 
@@ -15695,6 +15775,20 @@ class $ChartOfAccountsTable extends ChartOfAccounts
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $ChartOfAccountsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       code: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}code'],
@@ -15707,6 +15801,10 @@ class $ChartOfAccountsTable extends ChartOfAccounts
         DriftSqlType.int,
         data['${effectivePrefix}account_class'],
       ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
     );
   }
 
@@ -15714,41 +15812,69 @@ class $ChartOfAccountsTable extends ChartOfAccounts
   $ChartOfAccountsTable createAlias(String alias) {
     return $ChartOfAccountsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
 }
 
 class ChartOfAccount extends DataClass implements Insertable<ChartOfAccount> {
   final String id;
+
+  /// Ticket CP-1 — DÉFAUTS du serveur : tout compte qui descend du serveur est `synced`, d'origine 'serveur' (comme `products`).
+  /// Un compte saisi au poste pose ses trois valeurs explicitement (`pending`, ce poste, l'instant de la saisie).
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
   final String code;
   final String label;
 
   /// Classe SYSCOHADA — 1 à 9 (la classe 9, comptabilité analytique, figure au plan officiel).
   final int? accountClass;
+
+  /// Ticket CP-1 — faux : compte archivé (au poste, en attente d'envoi). Le serveur ne sert que les comptes actifs.
+  final bool isActive;
   const ChartOfAccount({
     required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
     required this.code,
     required this.label,
     this.accountClass,
+    required this.isActive,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $ChartOfAccountsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     map['code'] = Variable<String>(code);
     map['label'] = Variable<String>(label);
     if (!nullToAbsent || accountClass != null) {
       map['account_class'] = Variable<int>(accountClass);
     }
+    map['is_active'] = Variable<bool>(isActive);
     return map;
   }
 
   ChartOfAccountsCompanion toCompanion(bool nullToAbsent) {
     return ChartOfAccountsCompanion(
       id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
       code: Value(code),
       label: Value(label),
       accountClass: accountClass == null && nullToAbsent
           ? const Value.absent()
           : Value(accountClass),
+      isActive: Value(isActive),
     );
   }
 
@@ -15759,9 +15885,15 @@ class ChartOfAccount extends DataClass implements Insertable<ChartOfAccount> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChartOfAccount(
       id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $ChartOfAccountsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       code: serializer.fromJson<String>(json['code']),
       label: serializer.fromJson<String>(json['label']),
       accountClass: serializer.fromJson<int?>(json['accountClass']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
   @override
@@ -15769,31 +15901,51 @@ class ChartOfAccount extends DataClass implements Insertable<ChartOfAccount> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $ChartOfAccountsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'code': serializer.toJson<String>(code),
       'label': serializer.toJson<String>(label),
       'accountClass': serializer.toJson<int?>(accountClass),
+      'isActive': serializer.toJson<bool>(isActive),
     };
   }
 
   ChartOfAccount copyWith({
     String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
     String? code,
     String? label,
     Value<int?> accountClass = const Value.absent(),
+    bool? isActive,
   }) => ChartOfAccount(
     id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
     code: code ?? this.code,
     label: label ?? this.label,
     accountClass: accountClass.present ? accountClass.value : this.accountClass,
+    isActive: isActive ?? this.isActive,
   );
   ChartOfAccount copyWithCompanion(ChartOfAccountsCompanion data) {
     return ChartOfAccount(
       id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       code: data.code.present ? data.code.value : this.code,
       label: data.label.present ? data.label.value : this.label,
       accountClass: data.accountClass.present
           ? data.accountClass.value
           : this.accountClass,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
 
@@ -15801,75 +15953,120 @@ class ChartOfAccount extends DataClass implements Insertable<ChartOfAccount> {
   String toString() {
     return (StringBuffer('ChartOfAccount(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('code: $code, ')
           ..write('label: $label, ')
-          ..write('accountClass: $accountClass')
+          ..write('accountClass: $accountClass, ')
+          ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, code, label, accountClass);
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    code,
+    label,
+    accountClass,
+    isActive,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChartOfAccount &&
           other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
           other.code == this.code &&
           other.label == this.label &&
-          other.accountClass == this.accountClass);
+          other.accountClass == this.accountClass &&
+          other.isActive == this.isActive);
 }
 
 class ChartOfAccountsCompanion extends UpdateCompanion<ChartOfAccount> {
   final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
   final Value<String> code;
   final Value<String> label;
   final Value<int?> accountClass;
+  final Value<bool> isActive;
   final Value<int> rowid;
   const ChartOfAccountsCompanion({
     this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.code = const Value.absent(),
     this.label = const Value.absent(),
     this.accountClass = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChartOfAccountsCompanion.insert({
     required String id,
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     required String code,
     required String label,
     this.accountClass = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        code = Value(code),
        label = Value(label);
   static Insertable<ChartOfAccount> custom({
     Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
     Expression<String>? code,
     Expression<String>? label,
     Expression<int>? accountClass,
+    Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (code != null) 'code': code,
       if (label != null) 'label': label,
       if (accountClass != null) 'account_class': accountClass,
+      if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   ChartOfAccountsCompanion copyWith({
     Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
     Value<String>? code,
     Value<String>? label,
     Value<int?>? accountClass,
+    Value<bool>? isActive,
     Value<int>? rowid,
   }) {
     return ChartOfAccountsCompanion(
       id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
       code: code ?? this.code,
       label: label ?? this.label,
       accountClass: accountClass ?? this.accountClass,
+      isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15880,6 +16077,17 @@ class ChartOfAccountsCompanion extends UpdateCompanion<ChartOfAccount> {
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $ChartOfAccountsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (code.present) {
       map['code'] = Variable<String>(code.value);
     }
@@ -15888,6 +16096,9 @@ class ChartOfAccountsCompanion extends UpdateCompanion<ChartOfAccount> {
     }
     if (accountClass.present) {
       map['account_class'] = Variable<int>(accountClass.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -15899,9 +16110,13 @@ class ChartOfAccountsCompanion extends UpdateCompanion<ChartOfAccount> {
   String toString() {
     return (StringBuffer('ChartOfAccountsCompanion(')
           ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('code: $code, ')
           ..write('label: $label, ')
           ..write('accountClass: $accountClass, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -52003,17 +52218,25 @@ typedef $$ArchivedDocumentsTableProcessedTableManager =
 typedef $$ChartOfAccountsTableCreateCompanionBuilder =
     ChartOfAccountsCompanion Function({
       required String id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       required String code,
       required String label,
       Value<int?> accountClass,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 typedef $$ChartOfAccountsTableUpdateCompanionBuilder =
     ChartOfAccountsCompanion Function({
       Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
       Value<String> code,
       Value<String> label,
       Value<int?> accountClass,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 
@@ -52031,6 +52254,22 @@ class $$ChartOfAccountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get code => $composableBuilder(
     column: $table.code,
     builder: (column) => ColumnFilters(column),
@@ -52043,6 +52282,11 @@ class $$ChartOfAccountsTableFilterComposer
 
   ColumnFilters<int> get accountClass => $composableBuilder(
     column: $table.accountClass,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -52061,6 +52305,21 @@ class $$ChartOfAccountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get code => $composableBuilder(
     column: $table.code,
     builder: (column) => ColumnOrderings(column),
@@ -52073,6 +52332,11 @@ class $$ChartOfAccountsTableOrderingComposer
 
   ColumnOrderings<int> get accountClass => $composableBuilder(
     column: $table.accountClass,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -52089,6 +52353,18 @@ class $$ChartOfAccountsTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   GeneratedColumn<String> get code =>
       $composableBuilder(column: $table.code, builder: (column) => column);
 
@@ -52099,6 +52375,9 @@ class $$ChartOfAccountsTableAnnotationComposer
     column: $table.accountClass,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
 }
 
 class $$ChartOfAccountsTableTableManager
@@ -52139,29 +52418,45 @@ class $$ChartOfAccountsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> code = const Value.absent(),
                 Value<String> label = const Value.absent(),
                 Value<int?> accountClass = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChartOfAccountsCompanion(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 code: code,
                 label: label,
                 accountClass: accountClass,
+                isActive: isActive,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 required String code,
                 required String label,
                 Value<int?> accountClass = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChartOfAccountsCompanion.insert(
                 id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
                 code: code,
                 label: label,
                 accountClass: accountClass,
+                isActive: isActive,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

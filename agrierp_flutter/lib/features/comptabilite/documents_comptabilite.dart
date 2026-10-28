@@ -126,7 +126,8 @@ class DocumentsComptabilite {
         entetes: const ['N° Compte', 'Intitulé', 'Classe'],
         lignes: [
           for (final c in d.comptes)
-            DonneesDocument([c.code, c.label, '${c.accountClass ?? inconnu}']),
+            // Ticket CP-1 — « 6 - Charges » comme l'écran et le PDF du web (`$classLabels[$account->class]`).
+            DonneesDocument([c.code, c.label, libelleClasse(c.accountClass, inconnu: inconnu)]),
         ],
       );
 

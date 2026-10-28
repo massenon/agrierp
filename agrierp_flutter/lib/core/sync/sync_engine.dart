@@ -2346,26 +2346,45 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Plan comptable — référentiel remplacé à chaque tirage.
+  /// Plan comptable — fusion STRICTE (ticket CP-1).
+  ///
+  /// ⚠️⚠️ **UN COMPTE `pending` / `conflict` N'EST JAMAIS ÉCRASÉ NI RETIRÉ** : créé, modifié ou archivé au poste, il n'est pas
+  /// encore connu du serveur. Les comptes ACQUITTÉS sont remplacés par ce que sert le serveur (qui ne sert que les comptes
+  /// actifs) ; ceux qu'il ne sert plus (archivés ailleurs) sont retirés, comme avant.
   Future<int> _absorberPlanComptable(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // ⚠️ STRICT : un identifiant servi deux fois (ou invalide) refuse TOUT le tirage — deux comptes différents ne se fusionnent
+    // pas en silence, et le plan précédent reste.
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Compte');
+    }
 
     await _db.transaction(() async {
-      await _db.delete(_db.chartOfAccounts).go();
+      final locaux = {
+        for (final c in await _db.select(_db.chartOfAccounts).get()) c.id: c.syncStatus,
+      };
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.chartOfAccounts)..where((t) => t.id.isIn(disparus))).go();
+      }
 
       for (final l in lignes) {
-        await _db
-            .into(_db.chartOfAccounts)
-            .insert(
-              ChartOfAccountsCompanion.insert(
-                id: l['id'] as String,
-                code: (l['code'] ?? '') as String,
-                label: (l['label'] ?? '') as String,
-                accountClass: Value(_entier(l['class'])),
-              ),
-            );
+        final id = l['id'] as String;
+        final statut = locaux[id];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        final compte = ChartOfAccountsCompanion.insert(
+          id: id,
+          code: (l['code'] ?? '') as String,
+          label: (l['label'] ?? '') as String,
+          accountClass: Value(_entier(l['class'])),
+        );
+        await _db.into(_db.chartOfAccounts).insert(compte, onConflict: DoUpdate((_) => compte));
       }
     });
 
@@ -5184,6 +5203,11 @@ class SyncEngine {
       _db.customerReminders,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste (le serveur les traite AVANT les dépenses).
+    final comptes = await (_db.select(
+      _db.chartOfAccounts,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
     final bonsCommande = await (_db.select(
       _db.purchaseOrders,
@@ -5277,6 +5301,7 @@ class SyncEngine {
         encaissements.isEmpty &&
         relances.isEmpty &&
         bonsCommande.isEmpty &&
+        comptes.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
         fournisseurs.isEmpty &&
@@ -5466,6 +5491,8 @@ class SyncEngine {
         'receivable_payments': encaissements.map(_encaissementEnJson).toList(),
         // Ticket VC-2 — après les encaissements, comme au serveur.
         'customer_reminders': relances.map(_relanceEnJson).toList(),
+        // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
+        'chart_of_accounts': comptes.map(_compteEnJson).toList(),
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
         'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
@@ -5872,6 +5899,16 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket CP-1 — acquitté quand le serveur a créé, modifié ou archivé le compte (numéro unique, compte non utilisé).
+    accepte += await _acquitter(
+      'chart_of_accounts',
+      corps['chart_of_accounts'],
+      (ids, statut) => (_db.update(_db.chartOfAccounts)..where((t) => t.id.isIn(ids)))
+          .write(ChartOfAccountsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // Ticket AC-1 — acquitté quand le serveur a créé le bon (statut `envoye`) avec ses lignes.
     accepte += await _acquitter(
       'purchase_orders',
@@ -6237,6 +6274,8 @@ class SyncEngine {
     'animals',
     'livestock_daily_entries',
     'livestock_transfers',
+    // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
+    'chart_of_accounts',
     'expenses',
     // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
     'purchase_orders',
@@ -6933,6 +6972,14 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket CP-1 — un compte refusé (numéro déjà pris, compte utilisé à l'archivage) se corrige puis se relance.
+      'chart_of_accounts' =>
+        () =>
+            (_db.update(
+              _db.chartOfAccounts,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ChartOfAccountsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       // Ticket AC-1 — un bon refusé (fournisseur ou produit inconnu du serveur) se corrige puis se relance.
       'purchase_orders' =>
         () =>
@@ -7269,6 +7316,16 @@ class SyncEngine {
     if (i.saleId != null) 'sale_id': i.saleId,
     'amount': i.amount,
     'imputation_date': _jour(i.imputationDate),
+  };
+
+  /// Ticket CP-1 — compte tel que `SyncController::pushChartOfAccounts` le valide : numéro, intitulé, classe, et `is_active`
+  /// (faux = archivage ; le serveur n'en déduit jamais une réactivation).
+  Map<String, dynamic> _compteEnJson(ChartOfAccount c) => {
+    'id': c.id,
+    'code': c.code,
+    'label': c.label,
+    'class': c.accountClass,
+    'is_active': c.isActive,
   };
 
   /// Ticket AC-1 — bon de commande tel que `SyncController::pushPurchaseOrders` le valide : fournisseur, livraison attendue,

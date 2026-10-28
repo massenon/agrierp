@@ -229,7 +229,7 @@ class RechercheGlobaleRepository {
     if (peut(role, 'view-comptabilite')) {
       // Ticket 15.27 du web : codes courts (plus généraux) d'abord, puis par code.
       final comptes = [
-        for (final a in await database.select(database.chartOfAccounts).get())
+        for (final a in await (database.select(database.chartOfAccounts)..where((c) => c.isActive.equals(true))).get())
           if (_contient(a.code, q) || _contient(a.label, q)) a,
       ]..sort((a, b) => a.code.length != b.code.length ? a.code.length.compareTo(b.code.length) : a.code.compareTo(b.code));
       resultats.addAll([

@@ -577,7 +577,6 @@ void main() {
     'Libellé *': 'ecriture generee par une operation, jamais saisie',
 
     // ⚠️ Le plan comptable est un referentiel du serveur.
-    'Nouveau Compte': 'référentiel en lecture seule au poste',
     '+ Nouveau Compte': 'référentiel en lecture seule au poste',
     'Numéro de compte *': 'référentiel en lecture seule au poste',
     'Intitulé *': 'référentiel en lecture seule au poste',
@@ -1116,7 +1115,7 @@ void main() {
   /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 156;
+  const plafondManquesMasques = 155;
 
   for (final entree in portages.entries) {
     final page = entree.key;

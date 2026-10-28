@@ -218,6 +218,8 @@ class AccountingEntryService
         string $entryDate,
         ?string $reference = null,
         ?string $costCenterId = null,
+        // Ticket CP-2 — UUID de la demande du poste : posé en `source_id`, il rend la création idempotente.
+        ?string $sourceId = null,
     ): AccountingEntry {
         if ($debitAccountId === $creditAccountId) {
             throw new \InvalidArgumentException('Le compte débité doit être différent du compte crédité.');
@@ -231,6 +233,7 @@ class AccountingEntryService
             entryDate: $entryDate,
             reference: $reference,
             sourceType: 'manual',
+            sourceId: $sourceId,
         );
     }
 

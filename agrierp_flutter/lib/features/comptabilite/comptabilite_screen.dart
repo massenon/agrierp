@@ -3,7 +3,7 @@ import 'dart:math' show max;
 import 'package:flutter/material.dart';
 
 import '../../core/comptabilite/exercice_choisi.dart';
-import '../../core/database/app_database.dart' show FiscalYear;
+import '../../core/database/app_database.dart' show ChartOfAccount, FiscalYear;
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -15,6 +15,7 @@ import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
 import 'mention_anouveaux.dart';
+import 'plan_comptable_modales.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/comptabilite-hub.html` → Comptabilité.
@@ -390,12 +391,30 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _enTete(
         _titre('Plan Comptable SYSCOHADA', large),
-        _boutonExport(
-          'exporter-pdf-plan',
-          () => _exporter(
-            DocumentsComptabilite.plan(d, le: widget.maintenant()),
-            'Aucun compte à exporter.',
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _boutonExport(
+              'exporter-pdf-plan',
+              () => _exporter(
+                DocumentsComptabilite.plan(d, le: widget.maintenant()),
+                'Aucun compte à exporter.',
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            // Ticket CP-1 — « Nouveau Compte » (`newAccount` du web) : écrit le compte en local, le serveur le valide.
+            ElevatedButton.icon(
+              key: const Key('plan-nouveau-compte'),
+              onPressed: () => _ouvrirCompte(null),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AgriColors.brandEmerald,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+              ),
+              label: const Text('Nouveau Compte', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -452,22 +471,45 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 ),
                 7,
               ),
-              (Text('${d.comptes[i].accountClass ?? '—'}', style: _cellule), 2),
-              (_actionInerte(), 2),
+              (Text(libelleClasse(d.comptes[i].accountClass), style: _cellule), 2),
+              (
+                // Ticket CP-1 — « Modifier » (`editAccount`) et « Archiver » (`archiveAccount`) du Blade.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      key: Key('plan-modifier-$i'),
+                      onTap: () => _ouvrirCompte(d.comptes[i]),
+                      child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue)),
+                    ),
+                    InkWell(
+                      key: Key('plan-archiver-$i'),
+                      onTap: () => _archiverCompte(d.comptes[i]),
+                      child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorDeep)),
+                    ),
+                  ],
+                ),
+                2,
+              ),
             ]),
         ],
       ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️ (Ticket F0.83, 10 oct. 2026) Le serveur sert désormais le plan SYSCOHADA révisé
-      // officiel (1 332 comptes + ceux de la ferme absents du CSV) : l'étroitesse du plan,
-      // arbitrage ouvert depuis le Sprint 14, est levée pour l'AJOUT de comptes. Le REMAPPAGE
-      // des comptes de la ferme au sens divergent reste la phase B (cabinet FAGUEZ).
-      _mentionPoste(
-        "Le plan comptable se modifie sur la surface web : ajouter un compte "
-        "depuis le poste donnerait une saisie effacée au tirage suivant.",
-      ),
     ],
   );
+
+  Future<void> _ouvrirCompte(ChartOfAccount? existant) async {
+    final ecrit = await ouvrirCompte(context: context, depot: widget.depot, existant: existant);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer(existant == null ? 'Compte créé avec succès.' : 'Modification enregistrée avec succès.');
+  }
+
+  Future<void> _archiverCompte(ChartOfAccount compte) async {
+    final ecrit = await confirmerArchivageCompte(context: context, depot: widget.depot, compte: compte);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer('Compte archivé avec succès.');
+  }
 
   // ── Journal Comptable ─────────────────────────────────────────────────────
 

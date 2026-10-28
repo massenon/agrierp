@@ -887,13 +887,29 @@ class Animals extends Table {
 ///
 /// ⚠️ Sans lui, une ligne d'écriture n'a qu'un UUID à montrer : ni numéro de
 /// compte, ni intitulé, ni classe.
-class ChartOfAccounts extends Table {
+class ChartOfAccounts extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// Ticket CP-1 — DÉFAUTS du serveur : tout compte qui descend du serveur est `synced`, d'origine 'serveur' (comme `products`).
+  /// Un compte saisi au poste pose ses trois valeurs explicitement (`pending`, ce poste, l'instant de la saisie).
+  @override
+  TextColumn get deviceId => text().withLength(min: 1, max: 64).withDefault(const Constant('serveur'))();
+
+  @override
+  TextColumn get syncStatus => textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  @override
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   TextColumn get code => text()();
   TextColumn get label => text()();
 
   /// Classe SYSCOHADA — 1 à 9 (la classe 9, comptabilité analytique, figure au plan officiel).
   IntColumn get accountClass => integer().nullable()();
+
+  /// Ticket CP-1 — faux : compte archivé (au poste, en attente d'envoi). Le serveur ne sert que les comptes actifs.
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -2114,7 +2130,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 72;
+  int get schemaVersion => 73;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2783,6 +2799,10 @@ class AppDatabase extends _$AppDatabase {
         await _bonsCommandeMixtes(m);
         if (!await _tableExiste(m, purchaseOrderLines)) await m.createTable(purchaseOrderLines);
       }
+      // v73 — ticket CP-1 : `chart_of_accounts` devient MIXTE (reconstruction) et reçoit `is_active`. (v72 : `receipt_sent`, AC-3.)
+      if (from < 73) {
+        await _planComptableMixte(m);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -2886,6 +2906,24 @@ class AppDatabase extends _$AppDatabase {
           purchaseOrders.deviceId: const Constant<String>('serveur'),
           purchaseOrders.syncStatus: const Constant<String>('synced'),
           purchaseOrders.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket CP-1 — `chart_of_accounts` reçoit [SyncColumns] et `is_active` par RECONSTRUCTION : les comptes déjà tirés sont
+  /// `synced`, `device_id` = 'serveur', actifs. Idempotent.
+  Future<void> _planComptableMixte(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${chartOfAccounts.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        chartOfAccounts,
+        newColumns: [for (final c in chartOfAccounts.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          chartOfAccounts.deviceId: const Constant<String>('serveur'),
+          chartOfAccounts.syncStatus: const Constant<String>('synced'),
+          chartOfAccounts.updatedAt: currentDateAndTime,
         },
       ),
     );
@@ -3137,6 +3175,8 @@ class AppDatabase extends _$AppDatabase {
     // Ticket DEV — devis saisis au poste.
     'quotes',
     'livestock_reproduction_events',
+    // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste (avant les dépenses et achats qui les citent).
+    'chart_of_accounts',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
     'purchase_orders',
     'purchases',

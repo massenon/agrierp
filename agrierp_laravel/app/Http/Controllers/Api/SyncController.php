@@ -147,6 +147,8 @@ class SyncController extends Controller
         'corbeille_demandes',
         // Ticket RH-2 / RH-4 — absences de stagiaire et demandes de règlement de paie du poste.
         'internship_absences', 'payslip_requests',
+        // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
+        'manual_entry_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -2112,6 +2114,10 @@ class SyncController extends Controller
             'purchases' => ['accepted' => [], 'rejected' => []],
             // Ticket AC-1 — bons de commande saisis au poste.
             'purchase_orders' => ['accepted' => [], 'rejected' => []],
+            // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste.
+            'chart_of_accounts' => ['accepted' => [], 'rejected' => []],
+            // Ticket CP-2 — demandes d'écriture manuelle (créer, modifier, archiver) saisies au poste.
+            'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
@@ -2159,7 +2165,7 @@ class SyncController extends Controller
             // Ticket AC-1 : `purchase_orders` s'écrit au poste (`pushPurchaseOrders`).
             'payables',
             // Tickets RH-1 / RH-2 : `employees` et `internships` s'écrivent au poste depuis RH-1 (tables mixtes).
-            'chart_of_accounts',
+            // Ticket CP-1 : `chart_of_accounts` s'écrit au poste (`pushChartOfAccounts`, `manage-comptabilite`).
             'fiscal_years',
             'accounting_entries',
             'accounting_entry_lines',
@@ -2324,6 +2330,22 @@ class SyncController extends Controller
                 $request->input('livestock_transfers'),
                 $request->user(),
                 $request->input('device_id'),
+            );
+        }
+
+        // Ticket CP-1 — AVANT les dépenses et les achats : une ligne de dépense peut viser un compte créé dans le même envoi.
+        if ($request->has('chart_of_accounts')) {
+            $result['chart_of_accounts'] = $this->pushChartOfAccounts(
+                $this->envoiTraduit($request, 'chart_of_accounts'),
+                $request->user(),
+            );
+        }
+
+        // Ticket CP-2 — APRÈS le plan comptable (une écriture peut viser un compte créé dans le même envoi).
+        if ($request->has('manual_entry_requests')) {
+            $result['manual_entry_requests'] = $this->pushManualEntryRequests(
+                $this->envoiTraduit($request, 'manual_entry_requests'),
+                $request->user(),
             );
         }
 
@@ -2552,6 +2574,10 @@ class SyncController extends Controller
         'purchases' => 'manage-achats',
         // Ticket AC-1 — le droit de `BonsCommande` du web.
         'purchase_orders' => 'manage-achats',
+        // Ticket CP-1 — le droit de `PlanComptable` du web.
+        'chart_of_accounts' => 'manage-comptabilite',
+        // Ticket CP-2 — le droit de `JournalComptable` du web.
+        'manual_entry_requests' => 'manage-comptabilite',
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
@@ -3629,6 +3655,115 @@ class SyncController extends Controller
         }
 
         return response()->json(['stored' => true]);
+    }
+
+    /**
+     * Ticket CP-2 — DEMANDES D'ÉCRITURE MANUELLE saisies au poste (créer, modifier, archiver une opération diverse).
+     *
+     * ⚠️ Le poste n'écrit jamais une écriture : il envoie la demande (« débiter tel compte, créditer tel compte, de tant, tel
+     * jour, avec ce libellé »). `SaisieEcritureManuelleAction` — partagée avec `JournalComptable` — la joue : mêmes refus, mêmes
+     * messages (débit ≠ crédit, mois clôturé, écriture verrouillée, exercice clos). Le numéro `OD-AAAA-NNNN` est attribué ICI ;
+     * l'écriture descend au tirage suivant. Idempotence : l'UUID de la demande est le `source_id` de l'écriture créée.
+     */
+    private function pushManualEntryRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieEcritureManuelleAction::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de saisir une écriture comptable.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'action' => ['required', 'in:creer,modifier,archiver'],
+                    'entry_id' => ['required_if:action,modifier,archiver', 'nullable', 'uuid', 'exists:accounting_entries,id'],
+                    'entry_date' => ['required_unless:action,archiver', 'nullable', 'date'],
+                    'label' => ['required_unless:action,archiver', 'nullable', 'string', 'max:255'],
+                    'debit_account_id' => ['required_unless:action,archiver', 'nullable', 'uuid', 'exists:chart_of_accounts,id'],
+                    'credit_account_id' => ['required_unless:action,archiver', 'nullable', 'uuid', 'exists:chart_of_accounts,id'],
+                    'amount' => ['required_unless:action,archiver', 'nullable', 'numeric', 'min:1'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + [
+                    'action' => 'geste', 'entry_id' => 'écriture', 'entry_date' => 'date de l\'écriture', 'debit_account_id' => 'compte à débiter',
+                    'credit_account_id' => 'compte à créditer', 'label' => 'libellé',
+                ])->validate();
+
+                match ($valides['action']) {
+                    'creer' => $action->creer($valides['debit_account_id'], $valides['credit_account_id'], (float) $valides['amount'], $valides['entry_date'], $valides['label'], $valides['id']),
+                    'modifier' => $action->modifier(\App\Models\AccountingEntry::findOrFail($valides['entry_id']), $valides['debit_account_id'], $valides['credit_account_id'], (float) $valides['amount'], $valides['entry_date'], $valides['label']),
+                    'archiver' => $action->archiver(\App\Models\AccountingEntry::findOrFail($valides['entry_id'])),
+                };
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
+                // Exercice clos ou absent, écriture verrouillée, écriture déséquilibrée… : le motif français, jamais une erreur technique.
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-1 — COMPTES du plan comptable créés, modifiés ou archivés au poste.
+     *
+     * ⚠️ `PlanComptableService` — partagé avec `Comptabilite\PlanComptable` — porte les règles du web : numéro unique (un numéro
+     * déjà pris par un autre compte est REFUSÉ avec son motif), intitulé, classe 1 à 9, archivage refusé si le compte est utilisé
+     * par une écriture. `is_active: false` = archivage ; `true` ne réactive rien. Idempotence par l'UUID du poste.
+     */
+    private function pushChartOfAccounts(array $comptes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\PlanComptableService::class);
+
+        foreach ($comptes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de modifier le plan comptable.'];
+
+                continue;
+            }
+
+            try {
+                if (! is_string($id) || ! Str::isUuid($id)) {
+                    throw ValidationException::withMessages(['id' => 'Identifiant de compte invalide.']);
+                }
+
+                $existant = \App\Models\ChartOfAccount::find($id);
+
+                $valides = validator(
+                    $data,
+                    $service->regles($existant?->id) + ['is_active' => ['nullable', 'boolean']],
+                    MotifsRefusPush::messages(),
+                    MotifsRefusPush::attributs() + ['class' => 'classe', 'label' => 'intitulé', 'code' => 'numéro de compte'],
+                )->validate();
+
+                $compte = $existant === null ? $service->creer($valides, $id) : $service->modifier($existant, $valides);
+
+                if (array_key_exists('is_active', $valides) && filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($compte);
+                }
+
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
     /**

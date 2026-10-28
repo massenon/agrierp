@@ -2,8 +2,6 @@
 
 namespace App\Livewire\Comptabilite;
 
-use App\Models\AccountingEntryLine;
-use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -173,22 +171,17 @@ class PlanComptable extends Component
     {
         $this->authorize('manage-comptabilite');
 
-        $this->validate([
-            'code' => ['required', 'string', 'max:20', 'unique:chart_of_accounts,code,'.$this->editingId],
-            'label' => ['required', 'string', 'max:255'],
-            'class' => ['required', 'integer', 'between:1,9'],
-        ]);
+        // Ticket CP-1 — `PlanComptableService`, partagé avec l'envoi du poste.
+        $service = app(\App\Services\PlanComptableService::class);
+        $this->validate($service->regles($this->editingId));
 
         $payload = ['code' => $this->code, 'label' => $this->label, 'class' => (int) $this->class];
 
         if ($this->editingId) {
-            ChartOfAccount::findOrFail($this->editingId)->update($payload);
-            AuditLog::record('chart_of_account.updated', 'comptabilite');
+            $service->modifier(ChartOfAccount::findOrFail($this->editingId), $payload);
             $message = 'Modification enregistrée avec succès.';
         } else {
-            $payload['is_active'] = true;
-            ChartOfAccount::create($payload);
-            AuditLog::record('chart_of_account.created', 'comptabilite');
+            $service->creer($payload);
             $message = 'Compte créé avec succès.';
         }
 
@@ -200,17 +193,14 @@ class PlanComptable extends Component
     {
         $this->authorize('manage-comptabilite');
 
-        $isUsed = AccountingEntryLine::where('account_id', $id)->exists();
-
-        if ($isUsed) {
-            $this->dispatch('toast', message: 'Impossible d\'archiver : ce compte est déjà utilisé dans au moins une écriture comptable.', type: 'error');
+        try {
+            app(\App\Services\PlanComptableService::class)->archiver(ChartOfAccount::findOrFail($id));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
             return;
         }
 
-        $compte = ChartOfAccount::findOrFail($id);
-        $compte->update(['is_active' => false]);
-        AuditLog::record('chart_of_account.archived', 'comptabilite', null, $compte);
         $this->dispatch('toast', message: 'Compte archivé avec succès.', type: 'warning');
     }
 

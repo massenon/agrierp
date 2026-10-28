@@ -189,7 +189,7 @@ class DepensesRepository {
   /// (`getChargeAccountsProperty()` du web). Jamais codés en dur ici : le plan descend par la synchronisation.
   Future<List<ChartOfAccount>> comptesDeCharge() {
     return (_db.select(_db.chartOfAccounts)
-          ..where((t) => t.accountClass.equals(6))
+          ..where((t) => t.accountClass.equals(6) & t.isActive.equals(true))
           ..orderBy([(t) => OrderingTerm(expression: t.code)]))
         .get();
   }

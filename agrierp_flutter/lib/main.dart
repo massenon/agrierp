@@ -364,6 +364,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   );
 
   late final ComptabiliteRepository _comptabilite = ComptabiliteRepository(
+    deviceId: widget.identifiantPoste,
     database: _db,
   );
 

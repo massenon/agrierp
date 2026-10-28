@@ -35,8 +35,8 @@ void main() {
     // Ticket ARC3 : + `corbeille_demandes`, restaurer / supprimer définitivement (demandes).
     // Ticket MOD1 (21/10/2026) : + `modules_config`, les bascules des Modules Actifs faites au poste.
     // Tickets RH-1, RH-2, RH-4 (27/10/2026) : + `employees`, `internships`, `internship_absences`, `payslip_requests`.
-    // Ticket UT-1 (27/10/2026) : + `utilisateurs` (clé `users` du serveur). Ticket VC-1 (28/10/2026) : + `receivable_payments`. Ticket VC-2 : + `customer_reminders`. Ticket AC-1 : + `purchase_orders` (leurs lignes partent avec eux).
-    expect(lues, hasLength(41), reason: 'quarante et une tables envoyées (ARC3 : les demandes de la corbeille ; BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis ; MOD1 : les modules ; RH-1 à RH-4 : les registres RH ; UT-1 : les comptes ; VC-1 : les encaissements de créances ; VC-2 : les relances ; AC-1 : les bons de commande) : $lues');
+    // Ticket UT-1 (27/10/2026) : + `utilisateurs` (clé `users` du serveur). Ticket VC-1 (28/10/2026) : + `receivable_payments`. Ticket VC-2 : + `customer_reminders`. Ticket AC-1 : + `purchase_orders` (leurs lignes partent avec eux). Ticket CP-1 : + `chart_of_accounts` (plan comptable).
+    expect(lues, hasLength(42), reason: 'quarante-deux tables envoyées (ARC3 : les demandes de la corbeille ; BS1 : les bandes ; BS3 : les reproducteurs ; AV1 : les avoirs ; DEV : les devis ; MOD1 : les modules ; RH-1 à RH-4 : les registres RH ; UT-1 : les comptes ; VC-1 : les encaissements de créances ; VC-2 : les relances ; AC-1 : les bons de commande ; CP-1 : le plan comptable) : $lues');
     expect(AppDatabase.tablesEnvoyees.toSet(), lues);
   });
 }

@@ -37,6 +37,8 @@ void main() {
     'purchases': 'lib/features/achats/achats_repository.dart',
     // Ticket AC-1 — « Bons de Commande » : « Générer le Bon » et la réception s'écrivent par ce dépôt.
     'purchase_orders': 'lib/features/achats/achats_repository.dart',
+    // Ticket CP-1 — « Plan Comptable » : « Nouveau Compte », « Modifier » et « Archiver » s'écrivent par ce dépôt.
+    'chart_of_accounts': 'lib/features/comptabilite/comptabilite_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
     // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
     'employees': 'lib/features/rh/personnel_repository.dart',

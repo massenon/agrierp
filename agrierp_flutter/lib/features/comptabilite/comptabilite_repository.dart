@@ -1,5 +1,10 @@
+import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import 'etats_comparatifs.dart';
 import 'nature_compte.dart';
 import 'soldes_exercice.dart';
@@ -17,6 +22,24 @@ import 'soldes_exercice.dart';
   if (i < 0) return (brute.trim(), '');
   return (brute.substring(0, i).trim(), brute.substring(i + 1).trim());
 }
+
+/// Les neuf classes SYSCOHADA, libellés EXACTS du Blade (`PlanComptable::classLabels`) — un seul endroit pour le sélecteur de
+/// « Nouveau Compte », la colonne « Classe » de l'écran et le PDF du plan.
+const classesSyscohada = <(String, String)>[
+  ('1', '1 - Ressources'),
+  ('2', '2 - Immobilisations'),
+  ('3', '3 - Stocks'),
+  ('4', '4 - Tiers'),
+  ('5', '5 - Trésorerie'),
+  ('6', '6 - Charges'),
+  ('7', '7 - Produits'),
+  ('8', '8 - Autres'),
+  ('9', '9 - Hors bilan et analytique'),
+];
+
+/// « 6 - Charges » ; la classe seule si elle est hors 1 à 9 ; [inconnu] si elle est absente.
+String libelleClasse(int? classe, {String inconnu = '—'}) =>
+    classe == null ? inconnu : classesSyscohada.where((c) => c.$1 == '$classe').map((c) => c.$2).firstOrNull ?? '$classe';
 
 /// Une écriture du journal, avec ses lignes.
 class LigneJournal {
@@ -696,12 +719,115 @@ class DonneesComptabilite {
 /// la génère lui-même. C'est ce qui garantit qu'aucun mouvement ne pèse sur les
 /// comptes sans avoir pesé sur le stock ou la caisse.
 class ComptabiliteRepository {
-  ComptabiliteRepository({required this.database});
+  ComptabiliteRepository({required this.database, this.deviceId = 'poste', Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
 
+  /// Ticket CP-1 — identifiant du poste, posé sur les comptes saisis ici.
+  final String deviceId;
+  final Uuid _uuid;
+
+  // ── Plan comptable (ticket CP-1) ──────────────────────────────────────────
+
+  /// Motif du serveur (`PlanComptableService::MOTIF_COMPTE_UTILISE`), reproduit tel quel.
+  static const motifCompteUtilise = "Impossible d'archiver : ce compte est déjà utilisé dans au moins une écriture comptable.";
+
+  /// Règles de saisie de `PlanComptable::saveAccount` (via `PlanComptableService::regles`), un message par champ ; vide si
+  /// recevable. [idModifie] : le compte en cours de modification (son numéro ne compte pas comme doublon).
+  Future<Map<String, String>> validerCompte({
+    required String code,
+    required String libelle,
+    required String classe,
+    String? idModifie,
+  }) async {
+    final e = <String, String>{};
+    final numero = code.trim();
+    if (numero.isEmpty) {
+      e['code'] = 'Le champ numéro de compte est obligatoire.';
+    } else if (numero.length > 20) {
+      e['code'] = 'Le champ numéro de compte ne doit pas dépasser 20 caractères.';
+    } else {
+      final pris = await (database.select(database.chartOfAccounts)
+            ..where((c) => c.code.equals(numero) & (idModifie == null ? const Constant(true) : c.id.equals(idModifie).not())))
+          .get();
+      if (pris.isNotEmpty) e['code'] = 'La valeur du champ numéro de compte existe déjà.';
+    }
+    if (libelle.trim().isEmpty) {
+      e['label'] = 'Le champ intitulé est obligatoire.';
+    } else if (libelle.trim().length > 255) {
+      e['label'] = 'Le champ intitulé ne doit pas dépasser 255 caractères.';
+    }
+    final n = int.tryParse(classe.trim());
+    if (classe.trim().isEmpty) {
+      e['class'] = 'Le champ classe est obligatoire.';
+    } else if (n == null || n < 1 || n > 9) {
+      e['class'] = 'Le champ classe doit être compris entre 1 et 9.';
+    }
+    return e;
+  }
+
+  /// « Nouveau Compte » : écrit le compte LOCALEMENT (`pending`) ; le serveur le crée (`PlanComptableService::creer`).
+  /// Refuse AVANT d'écrire ([validerCompte]).
+  Future<ChartOfAccount> creerCompte({required String code, required String libelle, required String classe}) async {
+    final refus = await validerCompte(code: code, libelle: libelle, classe: classe);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    final id = _uuid.v4();
+    await database.into(database.chartOfAccounts).insert(
+      ChartOfAccountsCompanion.insert(
+        id: id,
+        deviceId: Value(deviceId),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+        code: code.trim(),
+        label: libelle.trim(),
+        accountClass: Value(int.parse(classe.trim())),
+      ),
+    );
+    return (await compte(id))!;
+  }
+
+  /// « Modifier le Compte » : numéro, intitulé, classe (la fiche repasse `pending`).
+  Future<ChartOfAccount> modifierCompte(String id, {required String code, required String libelle, required String classe}) async {
+    if (await compte(id) == null) throw const SaisieCompteRefusee({'formulaire': 'Compte inconnu — synchronisez le poste.'});
+    final refus = await validerCompte(code: code, libelle: libelle, classe: classe, idModifie: id);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    await (database.update(database.chartOfAccounts)..where((c) => c.id.equals(id))).write(
+      ChartOfAccountsCompanion(
+        code: Value(code.trim()),
+        label: Value(libelle.trim()),
+        accountClass: Value(int.parse(classe.trim())),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+      ),
+    );
+    return (await compte(id))!;
+  }
+
+  /// « Archiver » : refusé si une écriture cite le compte (motif du web), sinon `is_active = false` et la fiche repasse `pending`.
+  Future<void> archiverCompte(String id) async {
+    final c = await compte(id);
+    if (c == null || !c.isActive) return;
+
+    final utilise = await (database.select(database.accountingEntryLines)..where((l) => l.accountId.equals(id))..limit(1)).get();
+    if (utilise.isNotEmpty) throw const SaisieCompteRefusee({'formulaire': motifCompteUtilise});
+
+    await (database.update(database.chartOfAccounts)..where((x) => x.id.equals(id))).write(
+      ChartOfAccountsCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+      ),
+    );
+  }
+
+  Future<ChartOfAccount?> compte(String id) =>
+      (database.select(database.chartOfAccounts)..where((c) => c.id.equals(id))).getSingleOrNull();
+
   Future<DonneesComptabilite> charger() async {
     final comptes = await database.select(database.chartOfAccounts).get();
+    final comptesActifs = comptes.where((c) => c.isActive).toList();
     final exercices = await database.select(database.fiscalYears).get();
     final ecritures = await database.select(database.accountingEntries).get();
     final lignes = await database.select(database.accountingEntryLines).get();
@@ -714,7 +840,7 @@ class ComptabiliteRepository {
     }
 
     return DonneesComptabilite(
-      comptes: comptes.toList()..sort((a, b) => a.code.compareTo(b.code)),
+      comptes: comptesActifs..sort((a, b) => a.code.compareTo(b.code)),
       exercices: exercices.toList()..sort((a, b) => b.year.compareTo(a.year)),
       lignesParEcriture: parEcriture,
       journal:
@@ -730,4 +856,15 @@ class ComptabiliteRepository {
               .toList(),
     );
   }
+}
+
+/// Ticket CP-1 — saisie d'un compte refusée AVANT d'être écrite : un message par champ (`code`, `label`, `class`) ou un
+/// message général (`formulaire`), ceux du web.
+class SaisieCompteRefusee implements Exception {
+  const SaisieCompteRefusee(this.erreurs);
+
+  final Map<String, String> erreurs;
+
+  @override
+  String toString() => erreurs.values.join(' ');
 }

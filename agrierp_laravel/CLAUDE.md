@@ -179,6 +179,10 @@ PRD : `docs/prd/rh-crud-poste.md`. **Trois points de passage uniques, partagés 
 
 `App\Actions\SaisieBonCommandeAction` (saisie, idempotente) et `App\Services\ReceptionBonCommandeService` (réception : lignes du bon, crédit, dette entière, écriture, bon `recu`) sont les points de passage uniques de `BonsCommande` ET du push : `purchase_orders` (avec ses `lines`, `manage-achats`, traité AVANT `purchases`) et, dans `pushPurchases`, tout achat qui porte `purchase_order_id` (le bon est le maître, un bon déjà reçu rejette l'achat). Le tirage sert les `lines` de chaque bon. `App\Services\JustificatifService` range (disque privé `local`, `achats-recus` / `depenses-recus`), rattache (`receipt_path`, achats ET dépenses) et lit (route `justificatifs.show`, `view-achats`) ; `POST /api/sync/receipts` y dépose le fichier envoyé par un poste (un renvoi remplace). Gardes : `SyncBonsCommandeTest`, `JustificatifsSynchronisesTest`, `DettesFournisseursActionsTest`.
 
+### Plan comptable et écritures manuelles au poste (CP-1, CP-2 — 28/10/2026)
+
+`App\Services\PlanComptableService` (créer, modifier, archiver un compte) et `App\Actions\SaisieEcritureManuelleAction` (créer, modifier, archiver une opération diverse : débit ≠ crédit, mois non clôturé, écriture non verrouillée, exercice ouvert) sont les points de passage uniques des écrans `PlanComptable` / `JournalComptable` ET du push : `chart_of_accounts` (`is_active: false` = archivage, jamais de réactivation) et `manual_entry_requests` (une DEMANDE : `creer` / `modifier` / `archiver` ; le numéro `OD-AAAA-NNNN` est attribué par le serveur, l'UUID de la demande est le `source_id` de l'écriture créée = idempotence). Gardes : `SyncPlanComptableTest`, `SyncEcrituresManuellesTest`.
+
 ### Scheduling
 
 `routes/console.php` holds all 5 scheduled tasks (daily `agrierp:backup` at 02:00, `DailyProphylaxyReminderJob` at 06:00 Africa/Porto-Novo, weekly session GC / notification purge / failed-job prune, weekly backup-download reminder). Production uses **one** cPanel cron entry running `php artisan schedule:run` every minute — never one cron per task.
