@@ -320,7 +320,9 @@ class SyncVenteDateeSocleTest extends TestCase
 
         foreach (['Http/Controllers/Api/SyncController.php', 'Livewire/Ventes/PosInterface.php', 'Actions/VerifySaleDateAction.php'] as $fichier) {
             $source = file_get_contents(app_path($fichier));
-            $this->assertStringNotContainsString("periodic_closures", $source, $fichier);
+            // CP-4 : le tirage SERT `periodic_closures` au poste (clé de réponse) ; ce qui reste interdit, c'est de LIRE la table
+            // pour juger un verrou (une seconde règle) : seule `PeriodicClosure::isDateLocked` le fait.
+            $this->assertDoesNotMatchRegularExpression("/table\\('periodic_closures'\\)|from\\s+periodic_closures/i", $source, $fichier);
             $this->assertStringNotContainsString('PeriodicClosure::where', $source, $fichier);
             $this->assertStringNotContainsString('PeriodicClosure::query', $source, $fichier);
         }
