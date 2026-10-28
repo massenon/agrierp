@@ -885,6 +885,8 @@ class SyncEngine {
     // Ticket CP-3 — registre des immobilisations (table mixte : un bien saisi au poste en attente n'est jamais écrasé).
     recus += await _absorberImmobilisations(corps['fixed_assets']);
     recus += await _absorberExercices(corps['fiscal_years']);
+    // Ticket CP-4 — clôtures de mois (remplacées à chaque tirage ; clé servie à `view-comptabilite`).
+    recus += await _absorberClotures(corps['periodic_closures']);
     recus += await _absorberJournal(
       corps['accounting_entries'],
       corps['accounting_entry_ids'],
@@ -2520,9 +2522,42 @@ class SyncEngine {
                 startDate: Value(_date(l['start_date'])),
                 endDate: Value(_date(l['end_date'])),
                 status: Value(l['status'] as String?),
+                // Ticket CP-4 — l'étape 1 de la clôture et la date de clôture (heure murale du Bénin).
+                step1ConfirmedAt: Value(_date(l['step1_confirmed_at'])),
+                closedAt: Value(_date(l['closed_at'])),
               ),
             );
       }
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket CP-4 — clôtures de mois : référentiel remplacé à chaque tirage (les demandes en attente restent dans leur table).
+  Future<int> _absorberClotures(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Clôture de mois');
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.periodicClosures).go();
+      await _db.batch((b) {
+        for (final l in lignes) {
+          b.insert(
+            _db.periodicClosures,
+            PeriodicClosuresCompanion.insert(
+              id: l['id'] as String,
+              period: (l['period'] ?? '') as String,
+              closedAt: Value(_date(l['closed_at'])),
+              reopenedAt: Value(_date(l['reopened_at'])),
+            ),
+          );
+        }
+      });
     });
 
     return lignes.length;
@@ -5406,6 +5441,13 @@ class SyncEngine {
     // Tickets PA-2/3/4/7/8 — demandes de réglage.
     final reglages = await (_db.select(_db.settingsRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : dans l'ordre où elles ont été demandées (le serveur les
+    // joue dans l'ordre reçu : étape 1, puis solde, puis clôture).
+    final demandesCloture = await (_db.select(_db.fiscalClosureRequests)
+          ..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))
+          ..orderBy([(t) => OrderingTerm.asc(CustomExpression<int>('rowid'))]))
+        .get();
+
     // Ticket CP-5 — relevés bancaires à importer (le texte du fichier part tel quel, le serveur le lit).
     final releves = await (_db.select(_db.bankStatementImports)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
@@ -5531,6 +5573,7 @@ class SyncEngine {
         reglages.isEmpty &&
         releves.isEmpty &&
         demandesDotation.isEmpty &&
+        demandesCloture.isEmpty &&
         utilisateurs.isEmpty) {
       return (0, 0, <String>[]);
     }
@@ -5716,6 +5759,8 @@ class SyncEngine {
         'settings_requests': [for (final r in reglages) _reglageEnJson(r, await _fichiersEntreprise(r))],
         // Ticket CP-5 — après les réglages, avant les dépenses.
         'bank_statement_imports': [for (final r in releves) {'id': r.id, 'account_id': r.accountId, 'content': r.content}],
+        // Ticket CP-4 — le serveur les joue APRÈS tout le reste de l'envoi (une clôture juge le journal que le paquet vient de remplir).
+        'fiscal_closure_requests': demandesCloture.map(_demandeClotureEnJson).toList(),
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
         'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
@@ -6174,6 +6219,16 @@ class SyncEngine {
       (n) => rejete += n,
     );
     accepte += relevesAcceptes;
+    // Ticket CP-4 — acquittée quand le serveur a joué la demande : les exercices et les mois clôturés descendent au tirage de confirmation.
+    final cloturesAcceptees = await _acquitter(
+      'fiscal_closure_requests',
+      corps['fiscal_closure_requests'],
+      (ids, statut) => (_db.update(_db.fiscalClosureRequests)..where((t) => t.id.isIn(ids)))
+          .write(FiscalClosureRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += cloturesAcceptees;
     final dotationsAcceptees = await _acquitter(
       'depreciation_requests',
       corps['depreciation_requests'],
@@ -6517,7 +6572,8 @@ class SyncEngine {
         dotationsAcceptees +
         transformationsAcceptees +
         reglagesAcceptes +
-        relevesAcceptes;
+        relevesAcceptes +
+        cloturesAcceptees;
 
     // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
     // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
@@ -6599,6 +6655,8 @@ class SyncEngine {
     'veterinary_calendar_events',
     'stock_adjustments',
     'veterinary_records',
+    // Ticket CP-4 — après tout le reste, comme au serveur : une clôture juge le journal que l'envoi vient de remplir.
+    'fiscal_closure_requests',
     // Ticket ARC3 — EN DERNIER, comme au serveur : une demande vise ce que le même envoi vient d'archiver.
     'corbeille_demandes',
   ];
@@ -7308,6 +7366,15 @@ class SyncEngine {
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const FixedAssetsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
+      // Ticket CP-4 — une demande de clôture refusée (balance déséquilibrée, étape manquante, échéance…) se relance une fois la
+      // cause levée.
+      'fiscal_closure_requests' =>
+        () =>
+            (_db.update(
+              _db.fiscalClosureRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FiscalClosureRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       // Ticket CP-3 — une dotation refusée (exercice clos) se relance une fois la cause levée.
       'depreciation_requests' =>
         () =>
@@ -7707,6 +7774,13 @@ class SyncEngine {
     'id': r.id,
     'kind': r.kind,
     'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...fichiers},
+  };
+
+  /// Ticket CP-4 — demande de clôture telle que `SyncController::pushFiscalClosureRequests` la lit : {id, kind, payload}.
+  Map<String, dynamic> _demandeClotureEnJson(FiscalClosureRequest r) => {
+    'id': r.id,
+    'kind': r.kind,
+    'payload': jsonDecode(r.payload) as Map<String, dynamic>,
   };
 
   /// Ticket AUT-2 — octets du logo / du favicon pour une demande « entreprise » qui en annonce un (`logoNom`, `faviconNom`) :

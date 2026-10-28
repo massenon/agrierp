@@ -2,16 +2,10 @@
 
 namespace App\Livewire\Comptabilite;
 
-use App\Actions\ReopenFiscalYearAction;
-use App\Models\AccountingEntry;
-use App\Models\AccountingEntryLine;
-use App\Models\AuditLog;
-use App\Models\ChartOfAccount;
 use App\Models\FiscalYear;
 use App\Models\PeriodicClosure;
-use App\Services\AccountingEntryService;
+use App\Services\ClotureExerciceService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use App\Services\BankReconciliationService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -118,32 +112,15 @@ class ClotureExercice extends Component
         unset($this->fiscalYear, $this->kpis);
     }
 
-    /** Solde de chaque compte de classe 6/7 sur l'exercice sélectionné — un seul point de calcul. */
+    /** Solde de chaque compte de classe 6/7 sur l'exercice sélectionné — un seul point de calcul (`ClotureExerciceService`). */
     private function gestionBalances(): array
     {
-        if (! $this->fiscalYear) {
-            return [];
-        }
-
-        return AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-            ->where('accounting_entries.is_active', true)
-            ->where('accounting_entries.fiscal_year_id', $this->fiscalYear->id)
-            ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
-            ->whereIn('chart_of_accounts.class', [6, 7])
-            ->selectRaw('chart_of_accounts.id as account_id, chart_of_accounts.class, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-            ->groupBy('chart_of_accounts.id', 'chart_of_accounts.class')
-            ->havingRaw('SUM(accounting_entry_lines.debit) <> SUM(accounting_entry_lines.credit)')
-            ->get()
-            ->map(fn ($l) => ['account_id' => $l->account_id, 'class' => (int) $l->class, 'balance' => round((float) $l->total_debit - (float) $l->total_credit, 2)])
-            ->all();
+        return app(ClotureExerciceService::class)->soldesDeGestion($this->fiscalYear);
     }
 
     public function getKpisProperty(): array
     {
-        $balances = $this->gestionBalances();
-        $charges = array_sum(array_map(fn ($b) => $b['class'] === 6 ? $b['balance'] : 0, $balances));
-        $produits = array_sum(array_map(fn ($b) => $b['class'] === 7 ? -$b['balance'] : 0, $balances));
+        $indicateurs = app(ClotureExerciceService::class)->indicateurs($this->fiscalYear);
 
         $lettrage = $this->fiscalYear
             ? app(BankReconciliationService::class)->tauxDeLettrage(
@@ -153,8 +130,8 @@ class ClotureExercice extends Component
             : ['taux' => null, 'lignes' => 0, 'lettrees' => 0, 'comptes_sans_releve' => 0];
 
         return [
-            'resultat' => round($produits - $charges, 2),
-            'comptes_a_solder' => count($balances),
+            'resultat' => $indicateurs['resultat'],
+            'comptes_a_solder' => $indicateurs['comptes_a_solder'],
             'lettrage' => $lettrage,
         ];
     }
@@ -227,47 +204,26 @@ class ClotureExercice extends Component
      */
     public function getPeriodeBalanceProperty(): array
     {
-        $debut = \Carbon\Carbon::createFromFormat('Y-m-d', $this->periodeACloturer.'-01')->startOfMonth();
-
-        $balance = app(\App\Services\FinancialReportService::class)->balanceGenerale(
-            $debut->format('Y-m-d'),
-            $debut->copy()->endOfMonth()->format('Y-m-d')
-        );
-
-        return [
-            'is_balanced' => $balance['is_balanced'],
-            'ecart' => $balance['ecart'],
-        ];
+        return app(ClotureExerciceService::class)->balanceDePeriode($this->periodeACloturer);
     }
 
     public function getPeriodeDejaClotureeProperty(): bool
     {
-        return PeriodicClosure::where('period', $this->periodeACloturer)->whereNull('reopened_at')->exists();
+        return app(ClotureExerciceService::class)->periodeDejaCloturee($this->periodeACloturer);
     }
 
     public function cloturerPeriode(): void
     {
         $this->authorize('close-fiscal-year');
 
-        if ($this->periodeDejaCloturee) {
-            $this->dispatch('toast', message: 'Ce mois est déjà clôturé.', type: 'error');
+        try {
+            app(ClotureExerciceService::class)->cloturerPeriode($this->periodeACloturer, Auth::id());
+        } catch (\DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        // Contrôle serveur RÉEL : une balance déséquilibrée bloque la clôture.
-        if (! $this->periodeBalance['is_balanced']) {
-            $this->dispatch('toast', message: "Balance déséquilibrée (écart de {$this->periodeBalance['ecart']} FCFA) — corrigez l'écart avant de clôturer ce mois.", type: 'error');
-
-            return;
-        }
-
-        PeriodicClosure::updateOrCreate(
-            ['period' => $this->periodeACloturer],
-            ['closed_at' => now(), 'closed_by' => Auth::id(), 'reopened_at' => null, 'reopened_by' => null],
-        );
-
-        AuditLog::record('periodic_closure.closed', 'comptabilite');
         $this->dispatch('close-modal', name: 'modal-confirm-cloture-periodique');
         $this->dispatch('toast', message: 'Mois clôturé — les écritures de cette période sont désormais verrouillées.', type: 'success');
         unset($this->closures, $this->periodeDejaCloturee);
@@ -285,15 +241,14 @@ class ClotureExercice extends Component
 
         $closure = PeriodicClosure::findOrFail($id);
 
-        if (! $closure->isLocked()) {
-            $this->dispatch('toast', message: "Ce mois n'est pas clôturé.", type: 'error');
+        try {
+            app(ClotureExerciceService::class)->decloturerPeriode($closure, Auth::id());
+        } catch (\DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        $closure->update(['reopened_at' => now(), 'reopened_by' => Auth::id()]);
-
-        AuditLog::record('periodic_closure.reopened', 'comptabilite');
         $this->dispatch('close-modal', name: 'modal-confirm-decloture');
         $this->dispatch('toast', message: "Mois déclôturé — action exceptionnelle journalisée dans les Logs d'Audit.", type: 'warning');
         unset($this->closures, $this->periodeDejaCloturee);
@@ -313,7 +268,7 @@ class ClotureExercice extends Component
         }
 
         try {
-            app(ReopenFiscalYearAction::class)->execute($year);
+            app(ClotureExerciceService::class)->rouvrirExercice($year);
         } catch (\DomainException $e) {
             $this->dispatch('close-modal', name: 'modal-confirm-reouverture');
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
@@ -334,8 +289,7 @@ class ClotureExercice extends Component
             return;
         }
 
-        $year->update(['step1_confirmed_at' => now()]);
-        AuditLog::record('fiscal_year.step1_confirmed', 'comptabilite');
+        app(ClotureExerciceService::class)->confirmerEtape1($year);
         $this->dispatch('toast', message: 'Étape 1 validée — rapprochements et régularisations confirmés.', type: 'success');
     }
 
@@ -362,7 +316,7 @@ class ClotureExercice extends Component
         $annee = (int) $this->selectedYear + 1;
 
         try {
-            app(\App\Services\OuvertureExerciceService::class)->ouvrir($annee, \App\Services\OuvertureExerciceService::BOUTON);
+            app(ClotureExerciceService::class)->ouvrirExerciceSuivant($annee);
         } catch (\DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
@@ -375,88 +329,10 @@ class ClotureExercice extends Component
 
     /* ==================== GARDES DE LA CLÔTURE (ticket EX4) ==================== */
 
-    /**
-     * Soldes des comptes de bilan (classes 1 à 5) de l'exercice, tels que l'à-nouveau de N+1 les reportera.
-     *
-     * @return array<int, array{account_id: string, debit: float, credit: float}>
-     */
-    private function lignesDAnouveau(FiscalYear $year): array
-    {
-        return AccountingEntryLine::query()
-            ->join('accounting_entries', 'accounting_entries.id', '=', 'accounting_entry_lines.entry_id')
-            ->where('accounting_entries.is_active', true)
-            ->where('accounting_entries.fiscal_year_id', $year->id)
-            ->join('chart_of_accounts', 'chart_of_accounts.id', '=', 'accounting_entry_lines.account_id')
-            ->whereIn('chart_of_accounts.class', [1, 2, 3, 4, 5])
-            ->selectRaw('chart_of_accounts.id as account_id, SUM(accounting_entry_lines.debit) as total_debit, SUM(accounting_entry_lines.credit) as total_credit')
-            ->groupBy('chart_of_accounts.id')
-            ->havingRaw('SUM(accounting_entry_lines.debit) <> SUM(accounting_entry_lines.credit)')
-            ->get()
-            ->map(function ($b) {
-                $balance = round((float) $b->total_debit - (float) $b->total_credit, 2);
-
-                return $balance > 0
-                    ? ['account_id' => $b->account_id, 'debit' => $balance, 'credit' => 0.0]
-                    : ['account_id' => $b->account_id, 'debit' => 0.0, 'credit' => abs($balance)];
-            })
-            ->filter(fn ($l) => $l['debit'] > 0 || $l['credit'] > 0)
-            ->values()
-            ->all();
-    }
-
-    /**
-     * 🔴→✅ TICKET EX4 (EF4) — POURQUOI L'ÉTAPE 3 EST REFUSÉE, ou `null` si la clôture est admise.
-     *
-     * L'étape 3 n'avait AUCUN garde : elle clôturait un exercice avant son échéance (décision Q2 du 20/10/2026 : refusé —
-     * une clôture anticipée bloque la fin de l'année), sans les étapes 1 et 2, avec N-1 encore ouvert (l'à-nouveau de N
-     * serait faux), et finissait en erreur 500 sur un à-nouveau déséquilibré. Dans l'ordre :
-     *  1. l'échéance (`end_date`) doit être passée ;
-     *  2. N-1, s'il existe, doit être clos ;
-     *  3. l'étape 1 doit être confirmée ;
-     *  4. l'étape 2 doit être faite : plus aucun compte de classe 6 ou 7 ne porte de solde (une charge passée APRÈS
-     *     l'étape 2 la rend à refaire) ;
-     *  5. l'à-nouveau calculé doit être équilibré (un compte hors des classes 1 à 7 — classe 8, HAO — porte un solde que
-     *     l'étape 2 ne solde pas).
-     * Le même motif grise le bouton à l'écran et refuse l'appel au serveur.
-     */
+    /** Pourquoi l'étape 3 est refusée, ou `null` (`ClotureExerciceService`, EX4 : le même motif grise le bouton et refuse l'appel). */
     public function motifRefusCloture(?FiscalYear $year): ?string
     {
-        if (! $year || $year->status !== 'ouvert') {
-            return 'Cet exercice ne peut pas être clôturé (déjà clos ou introuvable).';
-        }
-
-        $echeance = $year->end_date->copy()->endOfDay();
-        if (now()->lte($echeance)) {
-            return "L'exercice {$year->year} ne peut être clôturé qu'après son échéance du {$year->end_date->format('d/m/Y')}, à partir du "
-                .$year->end_date->copy()->addDay()->format('d/m/Y').'.';
-        }
-
-        $precedent = FiscalYear::where('year', $year->year - 1)->first();
-        if ($precedent !== null && $precedent->status === 'ouvert') {
-            return "L'exercice {$precedent->year} est encore ouvert : clôturez-le avant l'exercice {$year->year}.";
-        }
-
-        if (! $year->step1_confirmed_at) {
-            return "Étape 1 non confirmée : marquez les travaux d'inventaire de {$year->year} comme terminés avant de clôturer.";
-        }
-
-        $aSolder = count($this->gestionBalances());
-        if ($aSolder > 0) {
-            return "Étape 2 non faite : {$aSolder} compte(s) de charges ou de produits de {$year->year} restent à solder. "
-                .'Lancez « Calculer et Solder » avant de clôturer.';
-        }
-
-        $lignes = $this->lignesDAnouveau($year);
-        $debit = round(array_sum(array_column($lignes, 'debit')), 2);
-        $credit = round(array_sum(array_column($lignes, 'credit')), 2);
-        if (abs($debit - $credit) >= 0.01) {
-            $f = fn (float $m) => number_format($m, 0, ',', ' ').' F';
-
-            return "L'à-nouveau de l'exercice ".($year->year + 1)." serait déséquilibré (débit {$f($debit)}, crédit {$f($credit)}) : "
-                ."les comptes de bilan de {$year->year} ne s'équilibrent pas. Corrigez l'écart au Journal Comptable avant de clôturer.";
-        }
-
-        return null;
+        return app(ClotureExerciceService::class)->motifRefusCloture($year);
     }
 
     public function getMotifRefusClotureProperty(): ?string
@@ -470,58 +346,26 @@ class ClotureExercice extends Component
         $this->authorize('close-fiscal-year');
 
         $year = $this->fiscalYear;
-        $balances = $this->gestionBalances();
+        $service = app(ClotureExerciceService::class);
 
-        if (! $year || empty($balances)) {
-            $this->dispatch('toast', message: 'Aucun compte de charges/produits à solder pour cet exercice.', type: 'warning');
-
-            return;
-        }
-
-        $resultat = $this->kpis['resultat'];
-        $resultAccount = ChartOfAccount::where('code', $resultat >= 0 ? '131' : '139')->first();
-
-        if (! $resultAccount) {
-            $this->dispatch('toast', message: "Compte 131/139 introuvable dans le plan comptable — créez-le avant de solder.", type: 'error');
+        if (! $year || empty($service->soldesDeGestion($year))) {
+            $this->dispatch('toast', message: ClotureExerciceService::MOTIF_RIEN_A_SOLDER, type: 'warning');
 
             return;
         }
-
-        // Chaque compte 6/7 est ramené à zéro (contrepartie inverse de son
-        // solde), la ligne finale sur 131/139 absorbe le résultat net —
-        // équilibre garanti par construction (la somme des soldes fermés = résultat).
-        $lines = [];
-        foreach ($balances as $b) {
-            if ($b['balance'] > 0) {
-                $lines[] = ['account_id' => $b['account_id'], 'debit' => 0, 'credit' => $b['balance']];
-            } else {
-                $lines[] = ['account_id' => $b['account_id'], 'debit' => abs($b['balance']), 'credit' => 0];
-            }
-        }
-        $lines[] = $resultat >= 0
-            ? ['account_id' => $resultAccount->id, 'debit' => 0, 'credit' => $resultat]
-            : ['account_id' => $resultAccount->id, 'debit' => abs($resultat), 'credit' => 0];
 
         try {
-            app(AccountingEntryService::class)->record(
-                lines: $lines,
-                entryDate: $year->end_date->format('Y-m-d'),
-                reference: "Solde des comptes de gestion {$year->year}",
-                sourceType: 'closing',
-                sourceId: $year->id,
-            );
+            $resultat = $service->soldeComptesGestion($year);
+        } catch (\DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
-            AuditLog::record('fiscal_year.gestion_accounts_closed', 'comptabilite');
-
-            // Les comptes 6/7 viennent d'être soldés : `kpis` a été lu plus
-            // haut (résultat net) et porte encore l'état d'avant l'écriture.
-            $this->refreshComputed();
-
-            $this->dispatch('toast', message: 'Comptes de charges et produits soldés — résultat net calculé : '.number_format($resultat, 0, ',', ' ').' FCFA.', type: 'success');
-        } catch (\Throwable $e) {
-            // Ticket U5 : le motif d'une exception du framework (SQL…) n'est pas montré en anglais.
-            $this->dispatch('toast', message: \App\Support\MessagesErreurFr::pourUtilisateur($e), type: 'error');
+            return;
         }
+
+        // Les comptes 6/7 viennent d'être soldés : `kpis` porte encore l'état d'avant l'écriture.
+        $this->refreshComputed();
+
+        $this->dispatch('toast', message: 'Comptes de charges et produits soldés — résultat net calculé : '.number_format($resultat, 0, ',', ' ').' FCFA.', type: 'success');
     }
 
     public function confirmCloture(): void
@@ -529,19 +373,11 @@ class ClotureExercice extends Component
         $this->authorize('close-fiscal-year');
         $year = $this->fiscalYear;
 
-        // 🔴→✅ Ticket EX4 — les gardes de l'étape 3 (échéance, N-1, étapes 1 et 2, à-nouveau équilibré).
-        $refus = $this->motifRefusCloture($year);
-        if ($refus !== null) {
-            $this->dispatch('close-modal', name: 'modal-confirm-cloture');
-            $this->dispatch('toast', message: $refus, type: 'error');
-
-            return;
-        }
-
+        // Tickets EX4/EX5 — les gardes de l'étape 3 et la transaction vivent dans `ClotureExerciceService` ; un refus ne
+        // laisse rien d'écrit et se dit en clair (jamais une erreur 500).
         try {
-            DB::transaction(fn () => $this->cloturer($year));
-        } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\UnbalancedAccountingEntryException $e) {
-            // Ticket EX5 (EF6) — jamais une erreur 500 : rien n'est écrit (transaction annulée), le motif est dit.
+            app(ClotureExerciceService::class)->cloturerExercice($year, Auth::id());
+        } catch (\DomainException $e) {
             $this->dispatch('close-modal', name: 'modal-confirm-cloture');
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
@@ -552,56 +388,9 @@ class ClotureExercice extends Component
         $this->dispatch('toast', message: "Exercice {$year->year} clôturé avec succès — exercice ".($year->year + 1).' ouvert.', type: 'success');
         $this->selectedYear = (string) ($year->year + 1);
 
-        // 🔴→✅ TICKET 14.2 — 2e occurrence du MÊME défaut, cherchée
-        // systématiquement plutôt que corrigée au cas par cas : `fiscalYear`
-        // a été lu en début de méthode pour l'exercice N et resterait
-        // mémoïsé, si bien que l'écran affichait encore l'exercice qui vient
-        // d'être CLÔTURÉ au lieu du nouvel exercice N+1 qu'il annonce
-        // pourtant dans son propre message de succès.
+        // 🔴→✅ TICKET 14.2 — `fiscalYear` a été lu pour l'exercice N et resterait mémoïsé : l'écran afficherait l'exercice
+        // qui vient d'être CLÔTURÉ au lieu du nouvel exercice N+1 annoncé par son propre message de succès.
         $this->refreshComputed();
-    }
-
-    /** Étape 3, une fois les gardes passées : N+1 (repris s'il existe), à-nouveau, verrouillage, statut. */
-    private function cloturer(FiscalYear $year): void
-    {
-        $newYearNumber = $year->year + 1;
-        // Ticket EX3 — N+1 a d'ordinaire déjà été ouvert (tâche du 1er janvier, filet ou bouton) : il est repris, jamais
-        // recréé (`year` est unique).
-        $newYear = FiscalYear::firstOrCreate(
-            ['year' => $newYearNumber],
-            [
-                'start_date' => "{$newYearNumber}-01-01",
-                'end_date' => "{$newYearNumber}-12-31",
-                'status' => 'ouvert',
-            ]
-        );
-
-        // Report à nouveaux (RAN) — comptes de bilan (classes 1 à 5)
-        // uniquement, reportés avec leur solde exact au 1er janvier N+1.
-        $ranLines = $this->lignesDAnouveau($year);
-
-        if ($ranLines !== []) {
-            // Équilibré : vérifié par `motifRefusCloture` avant d'arriver ici (EX4), et revérifié par `record()`.
-            app(AccountingEntryService::class)->record(
-                lines: $ranLines,
-                entryDate: $newYear->start_date->format('Y-m-d'),
-                reference: "Report à nouveaux — exercice {$newYear->year}",
-                sourceType: 'ran',
-                sourceId: $year->id,
-            );
-        }
-
-        // Verrouillage définitif de l'exercice clôturé — TOUTES ses
-        // écritures actives (🔁 15.53 : réversible par la réouverture).
-        AccountingEntry::where('fiscal_year_id', $year->id)->update(['is_locked' => true]);
-
-        $year->update([
-            'status' => 'cloture',
-            'closed_at' => now(),
-            'closed_by' => Auth::id(),
-        ]);
-
-        AuditLog::record('fiscal_year.closed', 'comptabilite');
     }
 
     public function render()

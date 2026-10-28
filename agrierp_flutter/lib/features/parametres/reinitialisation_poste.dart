@@ -176,6 +176,7 @@ class ReinitialisationPoste {
     'settings_requests': 'Demandes de réglages',
     'bank_statement_imports': 'Imports de relevés bancaires',
     'depreciation_requests': 'Demandes de dotation aux amortissements',
+    'fiscal_closure_requests': 'Demandes de clôture (périodes et exercice)',
     'customer_reminders': 'Relances de clients',
     'suppliers': 'Fournisseurs',
     'supplier_payments': 'Règlements fournisseurs',

@@ -13,10 +13,10 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | `Comptabilite\PlanComptable` | newAccount, editAccount, saveAccount, archiveAccount | **PRÉSENT depuis CP-1 (28/10/2026)** : `ComptabiliteRepository.creerCompte` / `modifierCompte` / `archiverCompte` ; serveur `PlanComptableService` | `chart_of_accounts` (v73, envoyée) | CP-1 ✅ |
 | `JournalComptable` | newEntry, editEntry, saveEntry, archiveEntry (écriture manuelle) | **PRÉSENT depuis CP-2 (28/10/2026)** : `ComptabiliteRepository.creerEcriture` / `modifierEcriture` / `archiverEcriture` (demandes) ; serveur `SaisieEcritureManuelleAction` | `manual_entry_requests` (v74, envoyée) | CP-2 ✅ |
 | `Immobilisations` | nouveau, editer, enregistrer, ouvrirCession, confirmerCession, passerDotation | **PRÉSENT depuis CP-3 (28/10/2026)** : carte « Immobilisations » du hub (`immobilisations_page.dart`), `ImmobilisationsRepository` (enregistrer, modifier, sortir, demander la dotation) ; serveur `ImmobilisationService` | `fixed_assets` (v75, mixte), `depreciation_requests` (v75, envoyée) | CP-3 ✅ |
-| `ClotureExercice` | cloturerPeriode, decloturerPeriode, rouvrirExercice, ouvrirExerciceSuivant, soldeComptesGestion, confirmCloture | ABSENT : page de texte seul (`motifs[cloture]` l. 110-114) | `fiscal_years` — « jamais synchronisée » (en-tête du `SyncController`) | CP-4 (en ligne, par API) |
+| `ClotureExercice` | cloturerPeriode, decloturerPeriode, rouvrirExercice, ouvrirExerciceSuivant, soldeComptesGestion, confirmCloture | ✅ P `comptabilite/cloture_exercice_page.dart` + `cloture_exercice_repository.dart` (demandes `fiscal_closure_requests`, rejouées par `ClotureExerciceService`) | `fiscal_years`, `periodic_closures` — plus jamais d'écriture directe par le poste | CP-4 ✅ |
 | `RapprochementBancaire` | importReleve | ABSENT : `motifs[rapprochement]` l. 123-125 | aucune | CP-5 ✅ (28/10/2026) |
 | `DeclarationTva`, `ComptabiliteAnalytique` | aucune écriture (exports) | pages absentes, l. 115-122 | — | aucune écriture perdue |
-| `Parametres\AssistantDemarrage` | ouvrirExercice (premier exercice), terminer | ABSENT : P `demarrage/premier_demarrage_screen.dart` ne fait que constater | `fiscal_years` | CP-4 |
+| `Parametres\AssistantDemarrage` | ouvrirExercice (premier exercice), terminer | ouvrirExercice ✅ (étape « Exercice comptable » de `premier_demarrage_screen.dart`, demande `ouvrir_exercice`) ; terminer : reste au web | `fiscal_years` | CP-4 ✅ |
 
 ## 2. Paramètres
 

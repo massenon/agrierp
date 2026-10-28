@@ -99,7 +99,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * | Fiches élevage journalières | Dernier écrivain gagne (upsert par id) |
  * | Ventes POS | Jamais fusionnées — chaque vente hors-ligne insérée comme transaction indépendante, jamais de mise à jour d'une vente existante par push |
  * | Mouvements de stock | Jamais acceptés tels quels — réappliqués via `AdjustStockAction`, seul point d'entrée réel de toute mutation de stock (ticket 6.1), pour garantir un recalcul serveur complet |
- * | Clôture d'exercice | Jamais synchronisée — l'API ne l'accepte sous aucune forme, cohérent avec "bloqué explicitement côté Flutter si pas de connexion" déjà documenté |
+ * | Clôture d'exercice | Ticket CP-4 (décision du client : « le poste doit le faire ») — DEMANDES rejouées par le serveur (`fiscal_closure_requests` → `ClotureExerciceService`, le point de passage du web) ; jamais d'écriture directe de `fiscal_years` ni de `periodic_closures` par le poste, qui les reçoit au tirage |
  *
  * ⚠️ PORTÉE HONNÊTE DE CE TICKET : implémente le mécanisme réel et
  * DÉMONTRE chaque règle sur un jeu de tables représentatif
@@ -157,6 +157,8 @@ class SyncController extends Controller
         'settings_requests',
         // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
         'bank_statement_imports',
+        // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : le serveur les rejoue par `ClotureExerciceService`.
+        'fiscal_closure_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -248,6 +250,8 @@ class SyncController extends Controller
         'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
         // Ticket CP-3 — le registre des immobilisations (écran `view-comptabilite`).
         'fixed_assets' => ['view-comptabilite'],
+        // Ticket CP-4 — les mois clôturés (écran Clôture d'exercice, `view-comptabilite`) ; `fiscal_years` reste de base.
+        'periodic_closures' => ['view-comptabilite'],
         // Ticket CP-5 — lignes de relevé bancaire importées (rapprochement).
         'bank_statement_lines' => ['view-comptabilite'],
         // Ticket PA-2 — la liste des droits sert l'écran « Rôles & Permissions » (administrateur).
@@ -1221,13 +1225,27 @@ class SyncController extends Controller
 
             'fiscal_years' => fn () => FiscalYear::query()
                 ->orderByDesc('year')
-                ->get(['id', 'year', 'start_date', 'end_date', 'status'])
+                ->get(['id', 'year', 'start_date', 'end_date', 'status', 'step1_confirmed_at', 'closed_at'])
                 ->map(fn (FiscalYear $e) => [
                     'id' => $e->id,
                     'year' => $e->year,
                     'start_date' => $e->start_date?->format('Y-m-d'),
                     'end_date' => $e->end_date?->format('Y-m-d'),
                     'status' => $e->status,
+                    // Ticket CP-4 — l'assistant de clôture du poste affiche l'étape 1 confirmée et la date de clôture.
+                    'step1_confirmed_at' => $e->step1_confirmed_at?->format('Y-m-d H:i:s'),
+                    'closed_at' => $e->closed_at?->format('Y-m-d H:i:s'),
+                ]),
+
+            // Ticket CP-4 — l'historique des clôtures de mois (une ligne par mois, déclôtures comprises).
+            'periodic_closures' => fn () => \App\Models\PeriodicClosure::query()
+                ->orderByDesc('period')
+                ->get()
+                ->map(fn (\App\Models\PeriodicClosure $c) => [
+                    'id' => $c->id,
+                    'period' => $c->period,
+                    'closed_at' => $c->closed_at?->format('Y-m-d H:i:s'),
+                    'reopened_at' => $c->reopened_at?->format('Y-m-d H:i:s'),
                 ]),
 
             // 🔴→✅ TICKET 14.84 — LES PARAMETRES GENERAUX DESCENDENT.
@@ -2203,6 +2221,7 @@ class SyncController extends Controller
             'transformations' => ['accepted' => [], 'rejected' => []],
             'fixed_assets' => ['accepted' => [], 'rejected' => []],
             'depreciation_requests' => ['accepted' => [], 'rejected' => []],
+            'fiscal_closure_requests' => ['accepted' => [], 'rejected' => []],
             'settings_requests' => ['accepted' => [], 'rejected' => []],
             'bank_statement_imports' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
@@ -2603,6 +2622,14 @@ class SyncController extends Controller
             $result['veterinary_records'] = $this->pushVeterinaryRecords($request->input('veterinary_records'));
         }
 
+        // Ticket CP-4 — demandes de clôture, APRÈS tout le reste de l'envoi : une clôture juge le journal que les ventes, achats et écritures du même paquet viennent de remplir.
+        if ($request->has('fiscal_closure_requests')) {
+            $result['fiscal_closure_requests'] = $this->pushFiscalClosureRequests(
+                $this->envoiTraduit($request, 'fiscal_closure_requests'),
+                $request->user(),
+            );
+        }
+
         // 🔴→✅ TICKET ARC2 — EN DERNIER : une demande de restauration ou de suppression porte sur ce que le même envoi
         // vient d'archiver (le client archivé au poste puis supprimé dans le même paquet). Le POSTE N'ENVOIE QUE LA
         // DEMANDE ; les effets (et leurs refus) sont ceux de `CorbeilleService`, comme la page web.
@@ -2714,6 +2741,8 @@ class SyncController extends Controller
         // Ticket CP-3 — le droit de `Immobilisations` du web.
         'fixed_assets' => 'manage-comptabilite',
         'depreciation_requests' => 'manage-comptabilite',
+        // Ticket CP-4 — plancher ; le droit exact dépend du geste (`close-fiscal-year`, `manage-modules`, `manage-comptabilite`).
+        'fiscal_closure_requests' => 'view-comptabilite',
         // Tickets PA-* — le droit exact dépend du type de la demande (jugé dans `pushSettingsRequests`) ; `view-parametres` est le plancher.
         'settings_requests' => 'view-parametres',
         // Ticket CP-5 — le droit de `RapprochementBancaire::importReleve`.
@@ -4163,6 +4192,111 @@ class SyncController extends Controller
         }
 
         return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-4 — DEMANDES DE CLÔTURE saisies au poste (« le poste doit le faire », décision du client).
+     *
+     * Un envoi = {id, kind, payload}. Chaque geste passe par `ClotureExerciceService`, le point de passage du web
+     * (`ClotureExercice`, `AssistantDemarrage`) : mêmes gardes, mêmes écritures, mêmes messages, mêmes audits. Le droit est celui
+     * du geste au web :
+     *  - `cloturer_periode`, `confirmer_etape1`, `solder_comptes_gestion`, `cloturer_exercice`, `ouvrir_exercice_suivant`
+     *    → `close-fiscal-year` ;
+     *  - `decloturer_periode`, `rouvrir_exercice` → `manage-modules` (l'administrateur) ;
+     *  - `ouvrir_exercice` (le premier, assistant de démarrage) → `manage-comptabilite`.
+     * Idempotence : l'UUID de la demande est consigné (`fiscal_closure_requests`) quand elle est ACCEPTÉE ; renvoyée, elle est
+     * acquittée sans être rejouée (une clôture renvoyée après une réouverture faite entre-temps ne reclôture pas). « Rien à
+     * solder » est un succès (l'état voulu est atteint). Une demande refusée n'écrit rien (transaction annulée).
+     */
+    private function pushFiscalClosureRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ClotureExerciceService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+            $kind = $data['kind'] ?? null;
+            $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+
+            $droit = match ($kind) {
+                'cloturer_periode', 'confirmer_etape1', 'solder_comptes_gestion', 'cloturer_exercice', 'ouvrir_exercice_suivant' => 'close-fiscal-year',
+                'decloturer_periode', 'rouvrir_exercice' => 'manage-modules',
+                'ouvrir_exercice' => 'manage-comptabilite',
+                default => null,
+            };
+
+            if ($droit === null || ! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Demande de clôture illisible.'];
+
+                continue;
+            }
+
+            if (! $utilisateur || ! $utilisateur->can($droit)) {
+                $rejected[] = ['id' => $id, 'reason' => match ($droit) {
+                    'manage-modules' => "Cette action exceptionnelle est réservée à l'Administrateur.",
+                    'manage-comptabilite' => "Votre rôle ne permet pas d'ouvrir un exercice.",
+                    default => 'Votre rôle ne permet pas de clôturer une période ou un exercice.',
+                }];
+
+                continue;
+            }
+
+            if (\App\Models\FiscalClosureRequest::whereKey($id)->exists()) {
+                $accepted[] = $id;   // déjà jouée : acquittée sans être rejouée
+
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($service, $kind, $payload, $id, $utilisateur) {
+                    $annee = isset($payload['year']) && is_numeric($payload['year']) ? (int) $payload['year'] : null;
+                    $exercice = fn () => $service->exercice($annee ?? 0);
+
+                    match ($kind) {
+                        'cloturer_periode' => $service->cloturerPeriode((string) ($payload['period'] ?? ''), $utilisateur->id),
+                        'decloturer_periode' => $service->decloturerPeriode(
+                            (isset($payload['closure_id']) && is_string($payload['closure_id'])
+                                ? \App\Models\PeriodicClosure::find($payload['closure_id'])
+                                : \App\Models\PeriodicClosure::where('period', (string) ($payload['period'] ?? ''))->first())
+                                ?? throw new \DomainException("Ce mois n'est pas clôturé."),
+                            $utilisateur->id,
+                        ),
+                        'confirmer_etape1' => $service->confirmerEtape1($exercice()),
+                        'solder_comptes_gestion' => $this->solderSiBesoin($service, $exercice()),
+                        'cloturer_exercice' => $service->cloturerExercice($exercice(), $utilisateur->id),
+                        'rouvrir_exercice' => $service->rouvrirExercice($exercice()),
+                        'ouvrir_exercice_suivant' => $service->ouvrirExerciceSuivant($annee ?? 0),
+                        'ouvrir_exercice' => $service->ouvrirPremierExercice($annee),
+                    };
+
+                    \App\Models\FiscalClosureRequest::create([
+                        'id' => $id, 'kind' => $kind, 'payload' => $payload, 'user_id' => $utilisateur->id, 'handled_at' => now(),
+                    ]);
+                });
+
+                $accepted[] = $id;
+            } catch (\DomainException $e) {
+                $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /** Ticket CP-4 — l'étape 2 rejouée : « rien à solder » est un succès (l'état voulu est déjà atteint). */
+    private function solderSiBesoin(\App\Services\ClotureExerciceService $service, \App\Models\FiscalYear $exercice): void
+    {
+        try {
+            $service->soldeComptesGestion($exercice);
+        } catch (\DomainException $e) {
+            if ($e->getMessage() !== \App\Services\ClotureExerciceService::MOTIF_RIEN_A_SOLDER) {
+                throw $e;
+            }
+        }
     }
 
     /**

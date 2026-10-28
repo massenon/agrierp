@@ -78,6 +78,7 @@ import 'features/elevage/fiche_lapins_screen.dart';
 import 'features/ventes/caisse_repository.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
+import 'features/comptabilite/cloture_exercice_repository.dart';
 import 'features/comptabilite/immobilisations_repository.dart';
 import 'features/comptabilite/rapprochement_repository.dart';
 import 'features/parametres/reglages_ferme_repository.dart';
@@ -394,6 +395,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
   );
 
+  late final ClotureExerciceRepository _cloture = ClotureExerciceRepository(
+    deviceId: widget.identifiantPoste,
+    database: _db,
+  );
+
   late final ParametresGenerauxRepository _parametresGeneraux =
       ParametresGenerauxRepository(database: _db, identifiantPoste: widget.identifiantPoste);
 
@@ -531,6 +537,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
                 depot: _demarrage,
                 engine: _engine,
                 utilisateur: _auth.utilisateur?.nom ?? '—',
+                depotCloture: _cloture,
+                peutOuvrirExercice: PermissionsPoste.peut(_auth.utilisateur?.role ?? '', 'manage-comptabilite'),
                 onTermine: () => setState(() {
                   _premierDemarrage = false;
                   _synchroniserALOuverture = false;
@@ -554,6 +562,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           administration: _administration,
           comptabilite: _comptabilite,
           immobilisations: _immobilisations,
+          cloture: _cloture,
           rapprochement: _rapprochement,
           parametresGeneraux: _parametresGeneraux,
           rapports: _rapports,
@@ -621,6 +630,7 @@ class SocleAccueil extends StatefulWidget {
     required this.administration,
     required this.comptabilite,
     required this.immobilisations,
+    required this.cloture,
     required this.rapprochement,
     required this.parametresGeneraux,
     required this.rapports,
@@ -712,6 +722,7 @@ class SocleAccueil extends StatefulWidget {
   final AdministrationRepository administration;
   final ComptabiliteRepository comptabilite;
   final ImmobilisationsRepository immobilisations;
+  final ClotureExerciceRepository cloture;
   final RapprochementRepository rapprochement;
   final ParametresGenerauxRepository parametresGeneraux;
   final RapportsRepository rapports;
@@ -1339,6 +1350,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
           depotImmobilisations: widget.immobilisations,
+          depotCloture: widget.cloture,
+          peutCloturer: PermissionsPoste.peut(_role, 'close-fiscal-year'),
+          peutAdministrer: PermissionsPoste.peut(_role, 'manage-modules'),
           depotRapprochement: widget.rapprochement,
           imprimer: EditeursRapports.imprimer,
           // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.

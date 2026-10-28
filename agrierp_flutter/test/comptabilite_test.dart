@@ -630,7 +630,7 @@ void main() {
 /// Financiers sont embarqués (`comparatif_n_moins_un_parite_test.dart`).
 class _ComptabiliteMotifs {
   static const attendus = <PageComptable, String>{
-    PageComptable.cloture: "hors du contrat de synchronisation",
+    PageComptable.cloture: "le poste en écrit la demande",
     PageComptable.analytique: 'centres de coût',
     PageComptable.tva: 'pièce fiscale',
     // Ticket CP-5 : le rapprochement bancaire est embarqué (page `RapprochementPage`).

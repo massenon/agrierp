@@ -20457,8 +20457,39 @@ class $FiscalYearsTable extends FiscalYears
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _step1ConfirmedAtMeta = const VerificationMeta(
+    'step1ConfirmedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, year, startDate, endDate, status];
+  late final GeneratedColumn<DateTime> step1ConfirmedAt =
+      GeneratedColumn<DateTime>(
+        'step1_confirmed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _closedAtMeta = const VerificationMeta(
+    'closedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+    'closed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    year,
+    startDate,
+    endDate,
+    status,
+    step1ConfirmedAt,
+    closedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -20502,6 +20533,21 @@ class $FiscalYearsTable extends FiscalYears
         status.isAcceptableOrUnknown(data['status']!, _statusMeta),
       );
     }
+    if (data.containsKey('step1_confirmed_at')) {
+      context.handle(
+        _step1ConfirmedAtMeta,
+        step1ConfirmedAt.isAcceptableOrUnknown(
+          data['step1_confirmed_at']!,
+          _step1ConfirmedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(
+        _closedAtMeta,
+        closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -20531,6 +20577,14 @@ class $FiscalYearsTable extends FiscalYears
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       ),
+      step1ConfirmedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}step1_confirmed_at'],
+      ),
+      closedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}closed_at'],
+      ),
     );
   }
 
@@ -20548,12 +20602,20 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
 
   /// `ouvert` · `cloture`.
   final String? status;
+
+  /// Ticket CP-4 — étape 1 de la clôture (« travaux d'inventaire terminés ») confirmée le… (tirée du serveur).
+  final DateTime? step1ConfirmedAt;
+
+  /// Ticket CP-4 — date de clôture de l'exercice (tirée du serveur, jamais écrite ici).
+  final DateTime? closedAt;
   const FiscalYear({
     required this.id,
     required this.year,
     this.startDate,
     this.endDate,
     this.status,
+    this.step1ConfirmedAt,
+    this.closedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -20568,6 +20630,12 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
     }
     if (!nullToAbsent || status != null) {
       map['status'] = Variable<String>(status);
+    }
+    if (!nullToAbsent || step1ConfirmedAt != null) {
+      map['step1_confirmed_at'] = Variable<DateTime>(step1ConfirmedAt);
+    }
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
     }
     return map;
   }
@@ -20585,6 +20653,12 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
       status: status == null && nullToAbsent
           ? const Value.absent()
           : Value(status),
+      step1ConfirmedAt: step1ConfirmedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(step1ConfirmedAt),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
     );
   }
 
@@ -20599,6 +20673,10 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
       startDate: serializer.fromJson<DateTime?>(json['startDate']),
       endDate: serializer.fromJson<DateTime?>(json['endDate']),
       status: serializer.fromJson<String?>(json['status']),
+      step1ConfirmedAt: serializer.fromJson<DateTime?>(
+        json['step1ConfirmedAt'],
+      ),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
     );
   }
   @override
@@ -20610,6 +20688,8 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
       'startDate': serializer.toJson<DateTime?>(startDate),
       'endDate': serializer.toJson<DateTime?>(endDate),
       'status': serializer.toJson<String?>(status),
+      'step1ConfirmedAt': serializer.toJson<DateTime?>(step1ConfirmedAt),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
     };
   }
 
@@ -20619,12 +20699,18 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
     Value<DateTime?> startDate = const Value.absent(),
     Value<DateTime?> endDate = const Value.absent(),
     Value<String?> status = const Value.absent(),
+    Value<DateTime?> step1ConfirmedAt = const Value.absent(),
+    Value<DateTime?> closedAt = const Value.absent(),
   }) => FiscalYear(
     id: id ?? this.id,
     year: year ?? this.year,
     startDate: startDate.present ? startDate.value : this.startDate,
     endDate: endDate.present ? endDate.value : this.endDate,
     status: status.present ? status.value : this.status,
+    step1ConfirmedAt: step1ConfirmedAt.present
+        ? step1ConfirmedAt.value
+        : this.step1ConfirmedAt,
+    closedAt: closedAt.present ? closedAt.value : this.closedAt,
   );
   FiscalYear copyWithCompanion(FiscalYearsCompanion data) {
     return FiscalYear(
@@ -20633,6 +20719,10 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
       startDate: data.startDate.present ? data.startDate.value : this.startDate,
       endDate: data.endDate.present ? data.endDate.value : this.endDate,
       status: data.status.present ? data.status.value : this.status,
+      step1ConfirmedAt: data.step1ConfirmedAt.present
+          ? data.step1ConfirmedAt.value
+          : this.step1ConfirmedAt,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
     );
   }
 
@@ -20643,13 +20733,23 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
           ..write('year: $year, ')
           ..write('startDate: $startDate, ')
           ..write('endDate: $endDate, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('step1ConfirmedAt: $step1ConfirmedAt, ')
+          ..write('closedAt: $closedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, year, startDate, endDate, status);
+  int get hashCode => Object.hash(
+    id,
+    year,
+    startDate,
+    endDate,
+    status,
+    step1ConfirmedAt,
+    closedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -20658,7 +20758,9 @@ class FiscalYear extends DataClass implements Insertable<FiscalYear> {
           other.year == this.year &&
           other.startDate == this.startDate &&
           other.endDate == this.endDate &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.step1ConfirmedAt == this.step1ConfirmedAt &&
+          other.closedAt == this.closedAt);
 }
 
 class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
@@ -20667,6 +20769,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
   final Value<DateTime?> startDate;
   final Value<DateTime?> endDate;
   final Value<String?> status;
+  final Value<DateTime?> step1ConfirmedAt;
+  final Value<DateTime?> closedAt;
   final Value<int> rowid;
   const FiscalYearsCompanion({
     this.id = const Value.absent(),
@@ -20674,6 +20778,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
     this.startDate = const Value.absent(),
     this.endDate = const Value.absent(),
     this.status = const Value.absent(),
+    this.step1ConfirmedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FiscalYearsCompanion.insert({
@@ -20682,6 +20788,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
     this.startDate = const Value.absent(),
     this.endDate = const Value.absent(),
     this.status = const Value.absent(),
+    this.step1ConfirmedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        year = Value(year);
@@ -20691,6 +20799,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
     Expression<DateTime>? startDate,
     Expression<DateTime>? endDate,
     Expression<String>? status,
+    Expression<DateTime>? step1ConfirmedAt,
+    Expression<DateTime>? closedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -20699,6 +20809,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
       if (startDate != null) 'start_date': startDate,
       if (endDate != null) 'end_date': endDate,
       if (status != null) 'status': status,
+      if (step1ConfirmedAt != null) 'step1_confirmed_at': step1ConfirmedAt,
+      if (closedAt != null) 'closed_at': closedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -20709,6 +20821,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
     Value<DateTime?>? startDate,
     Value<DateTime?>? endDate,
     Value<String?>? status,
+    Value<DateTime?>? step1ConfirmedAt,
+    Value<DateTime?>? closedAt,
     Value<int>? rowid,
   }) {
     return FiscalYearsCompanion(
@@ -20717,6 +20831,8 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       status: status ?? this.status,
+      step1ConfirmedAt: step1ConfirmedAt ?? this.step1ConfirmedAt,
+      closedAt: closedAt ?? this.closedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -20739,6 +20855,12 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (step1ConfirmedAt.present) {
+      map['step1_confirmed_at'] = Variable<DateTime>(step1ConfirmedAt.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -20753,6 +20875,757 @@ class FiscalYearsCompanion extends UpdateCompanion<FiscalYear> {
           ..write('startDate: $startDate, ')
           ..write('endDate: $endDate, ')
           ..write('status: $status, ')
+          ..write('step1ConfirmedAt: $step1ConfirmedAt, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FiscalClosureRequestsTable extends FiscalClosureRequests
+    with TableInfo<$FiscalClosureRequestsTable, FiscalClosureRequest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FiscalClosureRequestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $FiscalClosureRequestsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    kind,
+    payload,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fiscal_closure_requests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FiscalClosureRequest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FiscalClosureRequest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FiscalClosureRequest(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $FiscalClosureRequestsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+    );
+  }
+
+  @override
+  $FiscalClosureRequestsTable createAlias(String alias) {
+    return $FiscalClosureRequestsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class FiscalClosureRequest extends DataClass
+    implements Insertable<FiscalClosureRequest> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String kind;
+
+  /// JSON du geste.
+  final String payload;
+  const FiscalClosureRequest({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.kind,
+    required this.payload,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $FiscalClosureRequestsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['kind'] = Variable<String>(kind);
+    map['payload'] = Variable<String>(payload);
+    return map;
+  }
+
+  FiscalClosureRequestsCompanion toCompanion(bool nullToAbsent) {
+    return FiscalClosureRequestsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      kind: Value(kind),
+      payload: Value(payload),
+    );
+  }
+
+  factory FiscalClosureRequest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FiscalClosureRequest(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $FiscalClosureRequestsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      kind: serializer.fromJson<String>(json['kind']),
+      payload: serializer.fromJson<String>(json['payload']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $FiscalClosureRequestsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'kind': serializer.toJson<String>(kind),
+      'payload': serializer.toJson<String>(payload),
+    };
+  }
+
+  FiscalClosureRequest copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? kind,
+    String? payload,
+  }) => FiscalClosureRequest(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    kind: kind ?? this.kind,
+    payload: payload ?? this.payload,
+  );
+  FiscalClosureRequest copyWithCompanion(FiscalClosureRequestsCompanion data) {
+    return FiscalClosureRequest(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      payload: data.payload.present ? data.payload.value : this.payload,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FiscalClosureRequest(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('kind: $kind, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, deviceId, syncStatus, updatedAt, kind, payload);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FiscalClosureRequest &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.kind == this.kind &&
+          other.payload == this.payload);
+}
+
+class FiscalClosureRequestsCompanion
+    extends UpdateCompanion<FiscalClosureRequest> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> kind;
+  final Value<String> payload;
+  final Value<int> rowid;
+  const FiscalClosureRequestsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FiscalClosureRequestsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String kind,
+    required String payload,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       kind = Value(kind),
+       payload = Value(payload);
+  static Insertable<FiscalClosureRequest> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? kind,
+    Expression<String>? payload,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (kind != null) 'kind': kind,
+      if (payload != null) 'payload': payload,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FiscalClosureRequestsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? kind,
+    Value<String>? payload,
+    Value<int>? rowid,
+  }) {
+    return FiscalClosureRequestsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      kind: kind ?? this.kind,
+      payload: payload ?? this.payload,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $FiscalClosureRequestsTable.$convertersyncStatus.toSql(
+          syncStatus.value,
+        ),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FiscalClosureRequestsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('kind: $kind, ')
+          ..write('payload: $payload, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PeriodicClosuresTable extends PeriodicClosures
+    with TableInfo<$PeriodicClosuresTable, PeriodicClosure> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PeriodicClosuresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodMeta = const VerificationMeta('period');
+  @override
+  late final GeneratedColumn<String> period = GeneratedColumn<String>(
+    'period',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _closedAtMeta = const VerificationMeta(
+    'closedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+    'closed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reopenedAtMeta = const VerificationMeta(
+    'reopenedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> reopenedAt = GeneratedColumn<DateTime>(
+    'reopened_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, period, closedAt, reopenedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'periodic_closures';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PeriodicClosure> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('period')) {
+      context.handle(
+        _periodMeta,
+        period.isAcceptableOrUnknown(data['period']!, _periodMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_periodMeta);
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(
+        _closedAtMeta,
+        closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta),
+      );
+    }
+    if (data.containsKey('reopened_at')) {
+      context.handle(
+        _reopenedAtMeta,
+        reopenedAt.isAcceptableOrUnknown(data['reopened_at']!, _reopenedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PeriodicClosure map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PeriodicClosure(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      period: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period'],
+      )!,
+      closedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}closed_at'],
+      ),
+      reopenedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}reopened_at'],
+      ),
+    );
+  }
+
+  @override
+  $PeriodicClosuresTable createAlias(String alias) {
+    return $PeriodicClosuresTable(attachedDatabase, alias);
+  }
+}
+
+class PeriodicClosure extends DataClass implements Insertable<PeriodicClosure> {
+  final String id;
+
+  /// `AAAA-MM`.
+  final String period;
+  final DateTime? closedAt;
+  final DateTime? reopenedAt;
+  const PeriodicClosure({
+    required this.id,
+    required this.period,
+    this.closedAt,
+    this.reopenedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['period'] = Variable<String>(period);
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
+    }
+    if (!nullToAbsent || reopenedAt != null) {
+      map['reopened_at'] = Variable<DateTime>(reopenedAt);
+    }
+    return map;
+  }
+
+  PeriodicClosuresCompanion toCompanion(bool nullToAbsent) {
+    return PeriodicClosuresCompanion(
+      id: Value(id),
+      period: Value(period),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
+      reopenedAt: reopenedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reopenedAt),
+    );
+  }
+
+  factory PeriodicClosure.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PeriodicClosure(
+      id: serializer.fromJson<String>(json['id']),
+      period: serializer.fromJson<String>(json['period']),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
+      reopenedAt: serializer.fromJson<DateTime?>(json['reopenedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'period': serializer.toJson<String>(period),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
+      'reopenedAt': serializer.toJson<DateTime?>(reopenedAt),
+    };
+  }
+
+  PeriodicClosure copyWith({
+    String? id,
+    String? period,
+    Value<DateTime?> closedAt = const Value.absent(),
+    Value<DateTime?> reopenedAt = const Value.absent(),
+  }) => PeriodicClosure(
+    id: id ?? this.id,
+    period: period ?? this.period,
+    closedAt: closedAt.present ? closedAt.value : this.closedAt,
+    reopenedAt: reopenedAt.present ? reopenedAt.value : this.reopenedAt,
+  );
+  PeriodicClosure copyWithCompanion(PeriodicClosuresCompanion data) {
+    return PeriodicClosure(
+      id: data.id.present ? data.id.value : this.id,
+      period: data.period.present ? data.period.value : this.period,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
+      reopenedAt: data.reopenedAt.present
+          ? data.reopenedAt.value
+          : this.reopenedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodicClosure(')
+          ..write('id: $id, ')
+          ..write('period: $period, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('reopenedAt: $reopenedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, period, closedAt, reopenedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PeriodicClosure &&
+          other.id == this.id &&
+          other.period == this.period &&
+          other.closedAt == this.closedAt &&
+          other.reopenedAt == this.reopenedAt);
+}
+
+class PeriodicClosuresCompanion extends UpdateCompanion<PeriodicClosure> {
+  final Value<String> id;
+  final Value<String> period;
+  final Value<DateTime?> closedAt;
+  final Value<DateTime?> reopenedAt;
+  final Value<int> rowid;
+  const PeriodicClosuresCompanion({
+    this.id = const Value.absent(),
+    this.period = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.reopenedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PeriodicClosuresCompanion.insert({
+    required String id,
+    required String period,
+    this.closedAt = const Value.absent(),
+    this.reopenedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       period = Value(period);
+  static Insertable<PeriodicClosure> custom({
+    Expression<String>? id,
+    Expression<String>? period,
+    Expression<DateTime>? closedAt,
+    Expression<DateTime>? reopenedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (period != null) 'period': period,
+      if (closedAt != null) 'closed_at': closedAt,
+      if (reopenedAt != null) 'reopened_at': reopenedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PeriodicClosuresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? period,
+    Value<DateTime?>? closedAt,
+    Value<DateTime?>? reopenedAt,
+    Value<int>? rowid,
+  }) {
+    return PeriodicClosuresCompanion(
+      id: id ?? this.id,
+      period: period ?? this.period,
+      closedAt: closedAt ?? this.closedAt,
+      reopenedAt: reopenedAt ?? this.reopenedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (period.present) {
+      map['period'] = Variable<String>(period.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
+    if (reopenedAt.present) {
+      map['reopened_at'] = Variable<DateTime>(reopenedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodicClosuresCompanion(')
+          ..write('id: $id, ')
+          ..write('period: $period, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('reopenedAt: $reopenedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -49491,6 +50364,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $FiscalYearsTable fiscalYears = $FiscalYearsTable(this);
+  late final $FiscalClosureRequestsTable fiscalClosureRequests =
+      $FiscalClosureRequestsTable(this);
+  late final $PeriodicClosuresTable periodicClosures = $PeriodicClosuresTable(
+    this,
+  );
   late final $AccountingEntriesTable accountingEntries =
       $AccountingEntriesTable(this);
   late final $AccountingEntryLinesTable accountingEntryLines =
@@ -49608,6 +50486,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     archivedDocuments,
     chartOfAccounts,
     fiscalYears,
+    fiscalClosureRequests,
+    periodicClosures,
     accountingEntries,
     accountingEntryLines,
     companySettings,
@@ -59757,6 +60637,8 @@ typedef $$FiscalYearsTableCreateCompanionBuilder =
       Value<DateTime?> startDate,
       Value<DateTime?> endDate,
       Value<String?> status,
+      Value<DateTime?> step1ConfirmedAt,
+      Value<DateTime?> closedAt,
       Value<int> rowid,
     });
 typedef $$FiscalYearsTableUpdateCompanionBuilder =
@@ -59766,6 +60648,8 @@ typedef $$FiscalYearsTableUpdateCompanionBuilder =
       Value<DateTime?> startDate,
       Value<DateTime?> endDate,
       Value<String?> status,
+      Value<DateTime?> step1ConfirmedAt,
+      Value<DateTime?> closedAt,
       Value<int> rowid,
     });
 
@@ -59800,6 +60684,16 @@ class $$FiscalYearsTableFilterComposer
 
   ColumnFilters<String> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get step1ConfirmedAt => $composableBuilder(
+    column: $table.step1ConfirmedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -59837,6 +60731,16 @@ class $$FiscalYearsTableOrderingComposer
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get step1ConfirmedAt => $composableBuilder(
+    column: $table.step1ConfirmedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FiscalYearsTableAnnotationComposer
@@ -59862,6 +60766,14 @@ class $$FiscalYearsTableAnnotationComposer
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get step1ConfirmedAt => $composableBuilder(
+    column: $table.step1ConfirmedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
 }
 
 class $$FiscalYearsTableTableManager
@@ -59900,6 +60812,8 @@ class $$FiscalYearsTableTableManager
                 Value<DateTime?> startDate = const Value.absent(),
                 Value<DateTime?> endDate = const Value.absent(),
                 Value<String?> status = const Value.absent(),
+                Value<DateTime?> step1ConfirmedAt = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FiscalYearsCompanion(
                 id: id,
@@ -59907,6 +60821,8 @@ class $$FiscalYearsTableTableManager
                 startDate: startDate,
                 endDate: endDate,
                 status: status,
+                step1ConfirmedAt: step1ConfirmedAt,
+                closedAt: closedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -59916,6 +60832,8 @@ class $$FiscalYearsTableTableManager
                 Value<DateTime?> startDate = const Value.absent(),
                 Value<DateTime?> endDate = const Value.absent(),
                 Value<String?> status = const Value.absent(),
+                Value<DateTime?> step1ConfirmedAt = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FiscalYearsCompanion.insert(
                 id: id,
@@ -59923,6 +60841,8 @@ class $$FiscalYearsTableTableManager
                 startDate: startDate,
                 endDate: endDate,
                 status: status,
+                step1ConfirmedAt: step1ConfirmedAt,
+                closedAt: closedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -59948,6 +60868,437 @@ typedef $$FiscalYearsTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $FiscalYearsTable, FiscalYear>,
       ),
       FiscalYear,
+      PrefetchHooks Function()
+    >;
+typedef $$FiscalClosureRequestsTableCreateCompanionBuilder =
+    FiscalClosureRequestsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String kind,
+      required String payload,
+      Value<int> rowid,
+    });
+typedef $$FiscalClosureRequestsTableUpdateCompanionBuilder =
+    FiscalClosureRequestsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> kind,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+
+class $$FiscalClosureRequestsTableFilterComposer
+    extends Composer<_$AppDatabase, $FiscalClosureRequestsTable> {
+  $$FiscalClosureRequestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FiscalClosureRequestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FiscalClosureRequestsTable> {
+  $$FiscalClosureRequestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FiscalClosureRequestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FiscalClosureRequestsTable> {
+  $$FiscalClosureRequestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+}
+
+class $$FiscalClosureRequestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FiscalClosureRequestsTable,
+          FiscalClosureRequest,
+          $$FiscalClosureRequestsTableFilterComposer,
+          $$FiscalClosureRequestsTableOrderingComposer,
+          $$FiscalClosureRequestsTableAnnotationComposer,
+          $$FiscalClosureRequestsTableCreateCompanionBuilder,
+          $$FiscalClosureRequestsTableUpdateCompanionBuilder,
+          (
+            FiscalClosureRequest,
+            BaseReferences<
+              _$AppDatabase,
+              $FiscalClosureRequestsTable,
+              FiscalClosureRequest
+            >,
+          ),
+          FiscalClosureRequest,
+          PrefetchHooks Function()
+        > {
+  $$FiscalClosureRequestsTableTableManager(
+    _$AppDatabase db,
+    $FiscalClosureRequestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FiscalClosureRequestsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$FiscalClosureRequestsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$FiscalClosureRequestsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FiscalClosureRequestsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                kind: kind,
+                payload: payload,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String kind,
+                required String payload,
+                Value<int> rowid = const Value.absent(),
+              }) => FiscalClosureRequestsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                kind: kind,
+                payload: payload,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FiscalClosureRequestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FiscalClosureRequestsTable,
+      FiscalClosureRequest,
+      $$FiscalClosureRequestsTableFilterComposer,
+      $$FiscalClosureRequestsTableOrderingComposer,
+      $$FiscalClosureRequestsTableAnnotationComposer,
+      $$FiscalClosureRequestsTableCreateCompanionBuilder,
+      $$FiscalClosureRequestsTableUpdateCompanionBuilder,
+      (
+        FiscalClosureRequest,
+        BaseReferences<
+          _$AppDatabase,
+          $FiscalClosureRequestsTable,
+          FiscalClosureRequest
+        >,
+      ),
+      FiscalClosureRequest,
+      PrefetchHooks Function()
+    >;
+typedef $$PeriodicClosuresTableCreateCompanionBuilder =
+    PeriodicClosuresCompanion Function({
+      required String id,
+      required String period,
+      Value<DateTime?> closedAt,
+      Value<DateTime?> reopenedAt,
+      Value<int> rowid,
+    });
+typedef $$PeriodicClosuresTableUpdateCompanionBuilder =
+    PeriodicClosuresCompanion Function({
+      Value<String> id,
+      Value<String> period,
+      Value<DateTime?> closedAt,
+      Value<DateTime?> reopenedAt,
+      Value<int> rowid,
+    });
+
+class $$PeriodicClosuresTableFilterComposer
+    extends Composer<_$AppDatabase, $PeriodicClosuresTable> {
+  $$PeriodicClosuresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get period => $composableBuilder(
+    column: $table.period,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get reopenedAt => $composableBuilder(
+    column: $table.reopenedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PeriodicClosuresTableOrderingComposer
+    extends Composer<_$AppDatabase, $PeriodicClosuresTable> {
+  $$PeriodicClosuresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get period => $composableBuilder(
+    column: $table.period,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get reopenedAt => $composableBuilder(
+    column: $table.reopenedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PeriodicClosuresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PeriodicClosuresTable> {
+  $$PeriodicClosuresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get period =>
+      $composableBuilder(column: $table.period, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get reopenedAt => $composableBuilder(
+    column: $table.reopenedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$PeriodicClosuresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PeriodicClosuresTable,
+          PeriodicClosure,
+          $$PeriodicClosuresTableFilterComposer,
+          $$PeriodicClosuresTableOrderingComposer,
+          $$PeriodicClosuresTableAnnotationComposer,
+          $$PeriodicClosuresTableCreateCompanionBuilder,
+          $$PeriodicClosuresTableUpdateCompanionBuilder,
+          (
+            PeriodicClosure,
+            BaseReferences<
+              _$AppDatabase,
+              $PeriodicClosuresTable,
+              PeriodicClosure
+            >,
+          ),
+          PeriodicClosure,
+          PrefetchHooks Function()
+        > {
+  $$PeriodicClosuresTableTableManager(
+    _$AppDatabase db,
+    $PeriodicClosuresTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PeriodicClosuresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PeriodicClosuresTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PeriodicClosuresTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> period = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<DateTime?> reopenedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PeriodicClosuresCompanion(
+                id: id,
+                period: period,
+                closedAt: closedAt,
+                reopenedAt: reopenedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String period,
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<DateTime?> reopenedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PeriodicClosuresCompanion.insert(
+                id: id,
+                period: period,
+                closedAt: closedAt,
+                reopenedAt: reopenedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PeriodicClosuresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PeriodicClosuresTable,
+      PeriodicClosure,
+      $$PeriodicClosuresTableFilterComposer,
+      $$PeriodicClosuresTableOrderingComposer,
+      $$PeriodicClosuresTableAnnotationComposer,
+      $$PeriodicClosuresTableCreateCompanionBuilder,
+      $$PeriodicClosuresTableUpdateCompanionBuilder,
+      (
+        PeriodicClosure,
+        BaseReferences<_$AppDatabase, $PeriodicClosuresTable, PeriodicClosure>,
+      ),
+      PeriodicClosure,
       PrefetchHooks Function()
     >;
 typedef $$AccountingEntriesTableCreateCompanionBuilder =
@@ -73738,6 +75089,10 @@ class $AppDatabaseManager {
       $$ChartOfAccountsTableTableManager(_db, _db.chartOfAccounts);
   $$FiscalYearsTableTableManager get fiscalYears =>
       $$FiscalYearsTableTableManager(_db, _db.fiscalYears);
+  $$FiscalClosureRequestsTableTableManager get fiscalClosureRequests =>
+      $$FiscalClosureRequestsTableTableManager(_db, _db.fiscalClosureRequests);
+  $$PeriodicClosuresTableTableManager get periodicClosures =>
+      $$PeriodicClosuresTableTableManager(_db, _db.periodicClosures);
   $$AccountingEntriesTableTableManager get accountingEntries =>
       $$AccountingEntriesTableTableManager(_db, _db.accountingEntries);
   $$AccountingEntryLinesTableTableManager get accountingEntryLines =>

@@ -50,6 +50,8 @@ void main() {
     'settings_requests': 'lib/features/parametres/reglages_ferme_repository.dart',
     // Ticket CP-5 — « Rapprochement Bancaire » : l'import d'un relevé s'écrit (en demande) par ce dépôt.
     'bank_statement_imports': 'lib/features/comptabilite/rapprochement_repository.dart',
+    // Ticket CP-4 — « Clôture d'exercice » : périodes, exercice et premier exercice se DEMANDENT (le serveur les joue) par ce dépôt.
+    'fiscal_closure_requests': 'lib/features/comptabilite/cloture_exercice_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
     // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
     'employees': 'lib/features/rh/personnel_repository.dart',

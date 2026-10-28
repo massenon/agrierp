@@ -148,7 +148,7 @@ class ReinitialisationDonneesService
             'payslips', 'attendance_records', 'internship_absences',
             'internships', 'employees',
             // Comptabilité
-            'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
+            'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures', 'fiscal_closure_requests',
             'bank_statement_lines',
             // Administration — 🔴 Ticket 15.50 : la liste nommait `correspondences`, table qui n'existe pas :
             // les courriers s'appellent `mails`, et n'étaient JAMAIS vidés.

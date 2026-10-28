@@ -75,7 +75,7 @@ class SauvegardeService
                 // Ticket 15.20b : le compteur de numéros voyage AVEC les écritures (exporté, vidé, restauré).
                 // Avant : absent, il survivait au remplacement — orphelin, et sa clé étrangère vers `fiscal_years`
                 // faisait même échouer le vidage. Enfant de `fiscal_years` : donc listé AVANT elle.
-                'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
+                'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures', 'fiscal_closure_requests',
                 'bank_statement_lines', 'fixed_assets', 'cost_centers',
                 'treasury_accounts', 'fiscal_years', 'chart_of_accounts',
             ]],

@@ -128,6 +128,8 @@ void main() {
     'permissions',
     // Ticket CP-5 — lignes de relevé bancaire.
     'bank_statement_lines',
+    // Ticket CP-4 — les mois clôturés (`view-comptabilite`).
+    'periodic_closures',
     'fiscal_years',
     'accounting_entries',
     'accounting_entry_lines',

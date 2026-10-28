@@ -4,7 +4,7 @@ namespace App\Livewire\Parametres;
 
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
-use App\Models\FiscalYear;
+use App\Services\ClotureExerciceService;
 use App\Services\DemarrageService;
 use Livewire\Component;
 
@@ -45,25 +45,15 @@ class AssistantDemarrage extends Component
     {
         $this->authorize('manage-comptabilite');
 
-        $annee = (int) now()->format('Y');
-        $existant = FiscalYear::where('year', $annee)->first();
-
-        if ($existant !== null) {
-            $this->dispatch('toast', type: 'error', message: $existant->status === 'cloture'
-                ? "L'exercice {$annee} est clôturé : une clôture est définitive."
-                : "L'exercice {$annee} existe déjà.");
+        try {
+            $exercice = app(ClotureExerciceService::class)->ouvrirPremierExercice();
+        } catch (\DomainException $e) {
+            $this->dispatch('toast', type: 'error', message: $e->getMessage());
 
             return;
         }
 
-        FiscalYear::create([
-            'year' => $annee,
-            'start_date' => "{$annee}-01-01",
-            'end_date' => "{$annee}-12-31",
-            'status' => 'ouvert',
-        ]);
-        AuditLog::record('fiscal_year.opened', 'comptabilite');
-
+        $annee = $exercice->year;
         $this->dispatch('toast', type: 'success', message: "Exercice {$annee} ouvert (du 01/01/{$annee} au 31/12/{$annee}).");
     }
 

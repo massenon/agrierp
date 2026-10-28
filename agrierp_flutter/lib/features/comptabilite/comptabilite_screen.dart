@@ -14,6 +14,8 @@ import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
+import 'cloture_exercice_page.dart';
+import 'cloture_exercice_repository.dart';
 import 'immobilisations_page.dart';
 import 'immobilisations_repository.dart';
 import 'rapprochement_page.dart';
@@ -38,6 +40,9 @@ class ComptabiliteScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.depotImmobilisations,
+    this.depotCloture,
+    this.peutCloturer = true,
+    this.peutAdministrer = true,
     this.depotRapprochement,
     this.maintenant = HeureBenin.maintenant,
     this.imprimer,
@@ -49,6 +54,14 @@ class ComptabiliteScreen extends StatefulWidget {
   /// Ticket CP-3 — le registre des immobilisations (carte « Immobilisations » du hub web). Sans lui (tests anciens du châssis), la
   /// carte n'est pas proposée.
   final ImmobilisationsRepository? depotImmobilisations;
+
+  /// Ticket CP-4 — la clôture d'exercice (carte « Clôture Périodique & Annuelle »). Sans lui (tests anciens du châssis), la carte
+  /// garde le motif d'avant.
+  final ClotureExerciceRepository? depotCloture;
+
+  /// `close-fiscal-year` et `manage-modules` du compte (le serveur re-juge chaque demande).
+  final bool peutCloturer;
+  final bool peutAdministrer;
 
   /// Ticket CP-5 — le rapprochement bancaire (carte « Rapprochement Bancaire » du hub). Sans lui (tests anciens du châssis),
   /// la carte garde son motif « non embarquée ».
@@ -123,11 +136,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   /// pourrait être faux de structure ») est levé par cette preuve. Leurs onglets Flux de Trésorerie et Notes Annexes
   /// restent sur le web ([motifsOngletsWeb]).
   static const motifs = <PageComptable, String>{
+    // Ticket CP-4 — la clôture d'exercice se DEMANDE au poste (décision du client) : cette entrée ne sert plus qu'aux écrans
+    // construits sans dépôt de clôture.
     PageComptable.cloture:
-        "La clôture d'exercice est explicitement hors du contrat de "
-        'synchronisation : elle fige les comptes de toute la ferme. La lancer '
-        "depuis un poste qui n'a pas encore reçu les dernières pièces "
-        "clôturerait un exercice incomplet.",
+        "La clôture d'exercice s'ouvre depuis le menu Comptabilité, une fois "
+        'la session ouverte : le poste en écrit la demande et le serveur la joue.',
     PageComptable.analytique:
         "La ventilation analytique s'appuie sur les centres de coût, qui ne "
         'descendent pas au poste : les lignes reçues portent leur identifiant, '
@@ -262,6 +275,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                           depot: widget.depotImmobilisations!,
                           maintenant: widget.maintenant,
                         ),
+                        PageComptable.cloture when widget.depotCloture != null => ClotureExercicePage(
+                          key: const Key('page-cloture'),
+                          depot: widget.depotCloture!,
+                          imprimer: widget.imprimer,
+                          maintenant: widget.maintenant,
+                          peutCloturer: widget.peutCloturer,
+                          peutAdministrer: widget.peutAdministrer,
+                        ),
                         PageComptable.hub => _pageHub(d, large),
                         _ => _pageNonEmbarquee(_page, large),
                       },
@@ -359,7 +380,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   );
 
   Widget _carteNavigation(PageComptable page) {
-    final embarquee = !motifs.containsKey(page);
+    final embarquee = !motifs.containsKey(page) || (page == PageComptable.cloture && widget.depotCloture != null);
 
     return InkWell(
       key: Key('carte-${page.name}'),

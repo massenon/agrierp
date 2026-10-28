@@ -8,6 +8,7 @@ import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/comptabilite/cloture_exercice_repository.dart';
 import 'package:agrierp/features/comptabilite/immobilisations_repository.dart';
 import 'package:agrierp/features/comptabilite/rapprochement_repository.dart';
 import 'package:agrierp/features/elevage/bandes_repository.dart';
@@ -79,6 +80,7 @@ SocleAccueil coqueDeTest(
     administration: AdministrationRepository(database: db),
     comptabilite: ComptabiliteRepository(database: db),
     immobilisations: ImmobilisationsRepository(database: db),
+    cloture: ClotureExerciceRepository(database: db),
     rapprochement: RapprochementRepository(database: db),
     parametresGeneraux: ParametresGenerauxRepository(database: db),
     rapports: RapportsRepository(database: db),

@@ -81,6 +81,8 @@ void main() {
     'permissions': 'permissions_applicatives',
     // Ticket CP-5 — lignes de relevé bancaire importées (rapprochement).
     'bank_statement_lines': 'bank_statement_lines',
+    // Ticket CP-4 — les mois clôturés.
+    'periodic_closures': 'periodic_closures',
     'fiscal_years': 'fiscal_years',
     'accounting_entries': 'accounting_entries',
     'accounting_entry_lines': 'accounting_entry_lines',
@@ -134,6 +136,8 @@ void main() {
     'settings_requests',
     // Ticket CP-5 — demandes d'import de relevé bancaire (envoyées, jamais tirées : les lignes redescendent dans `bank_statement_lines`).
     'bank_statement_imports',
+    // Ticket CP-4 — demandes de clôture (envoyées, jamais tirées : l'exercice et les mois clos redescendent dans `fiscal_years` et `periodic_closures`).
+    'fiscal_closure_requests',
     'sync_conflicts',
     'app_settings',
     'sync_state',

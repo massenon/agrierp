@@ -943,6 +943,48 @@ class FiscalYears extends Table {
   /// `ouvert` · `cloture`.
   TextColumn get status => text().nullable()();
 
+  /// Ticket CP-4 — étape 1 de la clôture (« travaux d'inventaire terminés ») confirmée le… (tirée du serveur).
+  DateTimeColumn get step1ConfirmedAt => dateTime().nullable()();
+
+  /// Ticket CP-4 — date de clôture de l'exercice (tirée du serveur, jamais écrite ici).
+  DateTimeColumn get closedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-4 — DEMANDE de clôture saisie au poste : une ligne par geste (`kind` : `cloturer_periode`, `decloturer_periode`,
+/// `confirmer_etape1`, `solder_comptes_gestion`, `cloturer_exercice`, `rouvrir_exercice`, `ouvrir_exercice_suivant`,
+/// `ouvrir_exercice`), son contenu en JSON dans [payload] (`period`, `closure_id`, `year`…).
+///
+/// ⚠️ **LE POSTE N'ÉCRIT JAMAIS `fiscal_years` NI `periodic_closures`.** Une clôture est destructive et se juge au serveur : il
+/// rejoue la demande avec `ClotureExerciceService` (le point de passage du web), la consigne par son UUID (rejeu sans effet) et
+/// l'état redescend au tirage de confirmation. Refusée, la demande reste en conflit avec son motif.
+class FiscalClosureRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get kind => text()();
+
+  /// JSON du geste.
+  TextColumn get payload => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-4 — clôture de MOIS (clôture périodique), tirée du serveur (lecture seule au poste : une clôture se DEMANDE dans
+/// [FiscalClosureRequests]). Une ligne par mois, déclôtures comprises (`reopenedAt`).
+class PeriodicClosures extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `AAAA-MM`.
+  TextColumn get period => text()();
+
+  DateTimeColumn get closedAt => dateTime().nullable()();
+
+  DateTimeColumn get reopenedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -2256,6 +2298,8 @@ class SyncState extends Table {
     ArchivedDocuments,
     ChartOfAccounts,
     FiscalYears,
+    FiscalClosureRequests,
+    PeriodicClosures,
     AccountingEntries,
     AccountingEntryLines,
     CompanySettings,
@@ -2318,7 +2362,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 79;
+  int get schemaVersion => 80;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3000,6 +3044,13 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
+      // v80 — ticket CP-4 : demandes de clôture, clôtures de mois tirées, étape 1 et date de clôture de l'exercice.
+      if (from < 80) {
+        if (!await _tableExiste(m, fiscalClosureRequests)) await m.createTable(fiscalClosureRequests);
+        if (!await _tableExiste(m, periodicClosures)) await m.createTable(periodicClosures);
+        await _ajouterColonneSiAbsente(m, fiscalYears, fiscalYears.step1ConfirmedAt);
+        await _ajouterColonneSiAbsente(m, fiscalYears, fiscalYears.closedAt);
+      }
       // v79 — ticket EL-1 : transformations (mixte : saisies au poste ET tirées du serveur).
       if (from < 79) {
         if (!await _tableExiste(m, transformations)) await m.createTable(transformations);
@@ -3409,6 +3460,8 @@ class AppDatabase extends _$AppDatabase {
     'depreciation_requests',
     // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme.
     'settings_requests',
+    // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : jouées par le serveur.
+    'fiscal_closure_requests',
     // Ticket CP-5 — relevés bancaires à importer (CSV).
     'bank_statement_imports',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
@@ -3507,6 +3560,7 @@ class AppDatabase extends _$AppDatabase {
     'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
     'manual_entry_requests', // CP-2
     'depreciation_requests', // CP-3
+    'fiscal_closure_requests', 'periodic_closures', // CP-4
     'settings_requests', // PA-*
     'bank_statement_lines', 'bank_statement_imports', // CP-5
     'corbeille_elements', 'corbeille_demandes', // ARC3

@@ -252,6 +252,28 @@ class DocumentsComptabilite {
     );
   }
 
+  // ── Clôture d'exercice ────────────────────────────────────────────────────
+
+  /// Ticket CP-4 — `exports.cloture-exercice` du web : l'exercice, le résultat provisoire, le nombre de comptes de gestion à
+  /// solder, puis le tableau Compte / Intitulé / Classe / Solde (`exportClotureExercicePdf`).
+  static DocumentOfficiel cloture({
+    required int? exercice,
+    required double resultat,
+    required List<({String code, String libelle, int classe, double solde})> comptes,
+  }) => DocumentOfficiel(
+    titre: "Bascule & Clôture d'Exercice Comptable",
+    sousTitre: exercice == null ? '' : 'Exercice $exercice',
+    fichier: 'cloture-exercice-{jour}.pdf',
+    entetes: const ['Compte', 'Intitulé', 'Classe', 'Solde'],
+    lignes: [
+      BandeDocument('Exercice : ${exercice ?? '—'} — Résultat Provisoire : ${montant(resultat)} FCFA — Comptes de Gestion à Solder : ${comptes.length}'),
+      if (comptes.isEmpty)
+        const DonneesDocument(['Aucun compte de gestion à solder.', '', '', ''])
+      else
+        for (final c in comptes) DonneesDocument([c.code, c.libelle, '${c.classe}', '${montant(c.solde)} FCFA']),
+    ],
+  );
+
   // ── Rapprochement bancaire ────────────────────────────────────────────────
 
   /// Ticket AUT-1 — `exports.rapprochement-bancaire` du web : les trois soldes, le GRAND LIVRE du compte, le RELEVÉ

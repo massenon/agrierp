@@ -3,6 +3,7 @@ import 'package:agrierp/core/config/parametres_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/auth/login_screen.dart';
+import 'package:agrierp/features/comptabilite/cloture_exercice_repository.dart';
 import 'package:agrierp/features/demarrage/premier_demarrage_repository.dart';
 import 'package:agrierp/features/demarrage/premier_demarrage_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -156,6 +157,34 @@ void main() {
 
       expect(find.byKey(const Key('premier-echec')), findsOneWidget);
       expect(find.byKey(const Key('premier-continuer')), findsNothing);
+    });
+
+    testWidgets('⚠️ CP-4 : sans exercice reçu, « Ouvrir l\'exercice AAAA » écrit la DEMANDE d\'ouverture (jamais fiscal_years)', (tester) async {
+      final cloture = ClotureExerciceRepository(database: db, deviceId: 'poste-test', horloge: () => DateTime(2031, 10, 28, 9));
+      await afficher(
+        tester,
+        PremierDemarrageScreen(
+          depot: depot,
+          engine: moteur(),
+          utilisateur: 'Directeur',
+          onTermine: () {},
+          depotCloture: cloture,
+          peutOuvrirExercice: true,
+        ),
+      );
+      expect(find.byKey(const Key('premier-etape-exercice')), findsOneWidget);
+      expect(find.byKey(const Key('premier-ouvrir-exercice')), findsNothing, reason: 'rien n\'est proposé avant la première synchronisation');
+
+      await tester.tap(find.byKey(const Key('premier-synchroniser')));
+      await tester.pumpAndSettle();
+      expect(find.text("Ouvrir l'exercice 2031"), findsOneWidget, reason: 'l\'année du poste (heure du Bénin)');
+      await tester.tap(find.byKey(const Key('premier-ouvrir-exercice')));
+      await tester.pumpAndSettle();
+
+      final d = (await db.select(db.fiscalClosureRequests).get()).single;
+      expect((d.kind, d.payload), ('ouvrir_exercice', '{"year":2031}'));
+      expect(await db.select(db.fiscalYears).get(), isEmpty);
+      expect(find.byKey(const Key('premier-ouvrir-exercice')), findsNothing);
     });
 
     testWidgets('« Plus tard » ouvre l\'application sans synchroniser', (tester) async {

@@ -92,6 +92,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   77: [d.bankStatementLines, d.bankStatementImports],
   // v79 — ticket EL-1 : transformations (mixte : saisies au poste ET tirées du serveur).
   79: [d.transformations],
+  // v80 — ticket CP-4 : demandes de clôture saisies au poste, clôtures de mois tirées.
+  80: [d.fiscalClosureRequests, d.periodicClosures],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -370,6 +372,8 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   ],
   // v78 — ticket AUT-3 : la relance par e-mail partie du SMTP du poste.
   78: [(d.customerReminders, d.customerReminders.alreadySent)],
+  // v80 — ticket CP-4 : l'étape 1 de la clôture et la date de clôture de l'exercice, tirées du serveur.
+  80: [(d.fiscalYears, d.fiscalYears.step1ConfirmedAt), (d.fiscalYears, d.fiscalYears.closedAt)],
   // v76 — tickets PA-* : verrou de paie et SMS sans secret (entreprise), coordonnées des comptes de trésorerie.
   76: [
     (d.companySettings, d.companySettings.payrollLocked),
@@ -484,7 +488,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 79, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1');
+    expect(d.schemaVersion, 80, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);
