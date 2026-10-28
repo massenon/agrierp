@@ -14,7 +14,7 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | `JournalComptable` | newEntry, editEntry, saveEntry, archiveEntry (écriture manuelle) | **PRÉSENT depuis CP-2 (28/10/2026)** : `ComptabiliteRepository.creerEcriture` / `modifierEcriture` / `archiverEcriture` (demandes) ; serveur `SaisieEcritureManuelleAction` | `manual_entry_requests` (v74, envoyée) | CP-2 ✅ |
 | `Immobilisations` | nouveau, editer, enregistrer, ouvrirCession, confirmerCession, passerDotation | **PRÉSENT depuis CP-3 (28/10/2026)** : carte « Immobilisations » du hub (`immobilisations_page.dart`), `ImmobilisationsRepository` (enregistrer, modifier, sortir, demander la dotation) ; serveur `ImmobilisationService` | `fixed_assets` (v75, mixte), `depreciation_requests` (v75, envoyée) | CP-3 ✅ |
 | `ClotureExercice` | cloturerPeriode, decloturerPeriode, rouvrirExercice, ouvrirExerciceSuivant, soldeComptesGestion, confirmCloture | ABSENT : page de texte seul (`motifs[cloture]` l. 110-114) | `fiscal_years` — « jamais synchronisée » (en-tête du `SyncController`) | CP-4 (en ligne, par API) |
-| `RapprochementBancaire` | importReleve | ABSENT : `motifs[rapprochement]` l. 123-125 | aucune | CP-5 |
+| `RapprochementBancaire` | importReleve | ABSENT : `motifs[rapprochement]` l. 123-125 | aucune | CP-5 ✅ (28/10/2026) |
 | `DeclarationTva`, `ComptabiliteAnalytique` | aucune écriture (exports) | pages absentes, l. 115-122 | — | aucune écriture perdue |
 | `Parametres\AssistantDemarrage` | ouvrirExercice (premier exercice), terminer | ABSENT : P `demarrage/premier_demarrage_screen.dart` ne fait que constater | `fiscal_years` | CP-4 |
 
@@ -23,19 +23,19 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | Écran web | Fonction web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
 | `GestionUtilisateurs` | newUser, editUser, saveUser (rôle, mot de passe), archiveUser, reactivateUser | **PRÉSENT depuis UT-1 (27/10/2026)** : `ParametresGenerauxRepository.enregistrerUtilisateur` / `archiverUtilisateur` / `reactiverUtilisateur` ; serveur `SaisieUtilisateurAction` + `pushUsers` | `users` (mixte, Drift v68) | UT-1 ✅ |
-| `GestionUtilisateurs` | viderSessions | ABSENT (geste en ligne : sessions web et jetons des postes) | API | PA-1 |
-| `RolesPermissions` | newRole, editRole, saveRole, deleteRole, generateBackup, downloadBackup | ABSENT : l. 362 (inerte), mention l. 373-378 | `roles` (refusé) | PA-2 |
-| `DonneesEntreprise` | save (identité, IFU, RCCM, logo, favicon) | ABSENT : « consultation pure » l. 56-58, mention l. 463-469 | `company_settings` (seul `rappel_soins_jours` accepté : `RecordParametresElevageFromDeviceAction`) | PA-3 |
+| `GestionUtilisateurs` | viderSessions | ABSENT (geste en ligne : sessions web et jetons des postes) | API | PA-1 ✅ (28/10/2026, en ligne) |
+| `RolesPermissions` | newRole, editRole, saveRole, deleteRole, generateBackup, downloadBackup | ABSENT : l. 362 (inerte), mention l. 373-378 | `roles` (refusé) | PA-2 ✅ (28/10/2026) |
+| `DonneesEntreprise` | save (identité, IFU, RCCM, logo, favicon) | ABSENT : « consultation pure » l. 56-58, mention l. 463-469 | `company_settings` (seul `rappel_soins_jours` accepté : `RecordParametresElevageFromDeviceAction`) | PA-3 ✅ (28/10/2026, hors logo/favicon) |
 | `EmailSmtp` | save, effacerMotDePasse, sendTestEmail | PARTIEL : SMTP **local** du poste (`onglet_email_smtp.dart`) ; celui du site reste au web | aucune | écart de plateforme assumé (CFG-2) |
 | `ModulesActifs` | toggleModule | PRÉSENT : `definirModule` | `modules_config` | — |
-| `ModesPaiement` | saveBank, saveMomo, openTransfer, submitTransfer (virement) | ABSENT : mention l. 917-921 | `treasury_accounts` (non envoyée) | PA-4 |
+| `ModesPaiement` | saveBank, saveMomo, openTransfer, submitTransfer (virement) | ABSENT : mention l. 917-921 | `treasury_accounts` (non envoyée) | PA-4 ✅ (28/10/2026) |
 | `AuditLogs` | export | ABSENT : mention l. 1065-1067 | `audit_logs` | hors périmètre (export) |
-| `PostesAppairage` | demander, revoquer (autres postes) | ABSENT : `onglet_appairage.dart:20-21` — le poste ne voit que lui-même | — | PA-5 |
-| `Sauvegardes` | genererComplete, genererModule, telecharger, importerModule | ABSENT : pas d'onglet (le hub web en a 11, le poste 9) ; carte « Dernière sauvegarde » = « — » | — | PA-6 (en ligne) |
+| `PostesAppairage` | demander, revoquer (autres postes) | ABSENT : `onglet_appairage.dart:20-21` — le poste ne voit que lui-même | — | PA-5 ✅ (28/10/2026, en ligne) |
+| `Sauvegardes` | genererComplete, genererModule, telecharger, importerModule | ABSENT : pas d'onglet (le hub web en a 11, le poste 9) ; carte « Dernière sauvegarde » = « — » | — | PA-6 ✅ (28/10/2026, en ligne) |
 | `Corbeille` | restaurer, demanderSuppression, supprimerDefinitivement | PRÉSENT : `CorbeilleRepository` | `corbeille_demandes` | — |
 | `ReinitialisationDonnees` | basculerModeDemo, reinitialiser | PRÉSENT (en ligne) | API | — |
-| `BaremeIts` (`/bareme-its`) | ajouterTranche, retirerTranche, enregistrer | ABSENT, aucun écran (seule mention : « barème non renseigné », RH) | `income_tax_brackets` (tirage seul) | PA-7 |
-| `Integrations` (`/parametres-integrations`) | saveSms, sendTestSms | ABSENT, aucun écran | — | PA-8 |
+| `BaremeIts` (`/bareme-its`) | ajouterTranche, retirerTranche, enregistrer | ABSENT, aucun écran (seule mention : « barème non renseigné », RH) | `income_tax_brackets` (tirage seul) | PA-7 ✅ (28/10/2026) |
+| `Integrations` (`/parametres-integrations`) | saveSms, sendTestSms | ABSENT, aucun écran | — | PA-8 ✅ (28/10/2026, test SMS en ligne) |
 
 ## 3. Achats et fournisseurs
 

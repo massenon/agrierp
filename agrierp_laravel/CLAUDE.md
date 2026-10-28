@@ -316,3 +316,8 @@ A full narrative of every session since `/init` — what was asked, what was fou
 
 `App\Services\RappelsDuJourService` est le **point de passage unique** de la règle R-RAPPELS-01 (PRD `docs/prd/popup-rappels.md`) : il APPELLE `AlertesElevageService::soinsAVenir()` / `joursRappelSoins()` (R-SOINS-01) et `ProtocoleDuJourService::pourBande()` — ne rien recopier. Le poste le reprend en local (`rappels_du_jour_repository.dart`, parité exécutée). `Livewire\Shared\RappelsDuJour` (monté dans `layouts/app.blade.php` sous `@can('view-elevage')`) décide côté serveur : `ouvrir($dejaVuSession, $masqueLe)` ; le navigateur ne fait que transmettre `sessionStorage` (une fois par session de navigateur) et `localStorage` (« Ne plus afficher aujourd'hui », par utilisateur). Un événement `Login` pose `rappels_forcer` (réouverture à chaque connexion). Aucune fenêtre vide, erreur journalisée et silencieuse. Tests : `RappelsDuJourTest`.
 
+
+## PA-1…PA-8 et CP-5 (28/10/2026)
+- Services uniques partagés Livewire/sync : `BaremeItsService`, `EntrepriseService`, `ModesPaiementService`, `RoleService`, `SmsConfigService`, `ImmobilisationService`. `SyncController::pushSettingsRequests` contrôle les droits par kind.
+- `AdministrationEnLigneController` (préfixe `/api/parametres`) : sessions, postes, sauvegardes, test SMS.
+- `BankReconciliationService::importCsv(..., ?string $importId)` est idempotent ; clé de push `bank_statement_imports`.

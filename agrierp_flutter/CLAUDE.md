@@ -336,3 +336,8 @@ Done means: `flutter analyze` clean, `flutter test` green, and the ticket append
 **Write the test that would have caught the defect.** Every guardrail that exists locks a defect that emits no error at all.
 
 Numeric data (accounting balances, stock totals, headcounts) is **never** verified by reading — write an independent recomputation and compare it against what the screen displays.
+
+## PA-1…PA-8 et CP-5 (28/10/2026)
+- Réglages : `reglages_ferme_repository.dart` écrit une requête `settings_requests` (kinds entreprise, bareme_its, mode_paiement, role, sms) ; le serveur la rejoue et la rejette en `conflict` avec sa raison. Secrets SMS : `FlutterSecureStorage` (`agrierp.sms.secret.<id>`), jamais en base ; aucune colonne Drift de `company_settings` ne contient password/secret/token/api_key.
+- Gestes en ligne (sessions, postes, sauvegardes, test SMS) : `administration_en_ligne.dart`.
+- CP-5 : `rapprochement_repository.dart` / `rapprochement_page.dart`, import de relevé idempotent par `import_id`. Schéma Drift v77.
