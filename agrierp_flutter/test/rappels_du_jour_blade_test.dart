@@ -66,7 +66,7 @@ void main() {
     final titre = decode(RegExp(r'<h3[^>]*>.*?</span>([^<]+)</h3>').firstMatch(b)!.group(1)!);
     final intitule = decode(RegExp(r'tracking-wider text-outline">([^<]+)</p>').firstMatch(b)!.group(1)!);
     final colonnes = [for (final m in RegExp(r'<th[^>]*>([^<]+)</th>').allMatches(b)) decode(m.group(1)!)];
-    final lien = decode(RegExp(r'<a href="/soins-vaccins-hub"[^>]*>([^<]+)<span').firstMatch(b)!.group(1)!);
+    final lien = decode(RegExp(r'<a (?:wire:navigate )?href="/soins-vaccins-hub"[^>]*>([^<]+)<span').firstMatch(b)!.group(1)!);
     final boutons = [
       for (final m in RegExp(r'<button type="button"[^>]*(?:masquer\(\)|wire:click="fermer" class="px-md)[^>]*>([^<]+)</button>').allMatches(b)) decode(m.group(1)!),
     ];

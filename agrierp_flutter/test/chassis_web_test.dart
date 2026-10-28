@@ -77,7 +77,9 @@ void main() {
       final fichier = '$dossierLaravel/app/${m.group(1)!.replaceFirst(RegExp(r'^\\?App\\'), '').replaceAll(r'\', '/')}.php';
       final source = File(fichier).readAsStringSync();
       // Le `$title` passé au layout par `render()` (le dernier du fichier : les premiers peuvent être des cartes).
-      final titres = RegExp(r"'title' => '((?:[^'\\]|\\.)*)'\]").allMatches(source).toList();
+      // VC-5 : le titre de la facturation suit le module (`$this->mecefActif ? 'Facturation & MeCeF' : 'Facturation'`) : c'est
+      // la forme module ACTIVÉ qui est comparée.
+      final titres = RegExp(r"'title' => (?:\$this->mecefActif \? )?'((?:[^'\\]|\\.)*)'(?: : '[^']*')?\]").allMatches(source).toList();
       return titres.isEmpty ? 'Ferme École Olouwachegoun' : titres.last.group(1)!.replaceAll(r"\'", "'");
     }
 

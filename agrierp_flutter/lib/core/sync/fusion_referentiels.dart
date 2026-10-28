@@ -65,6 +65,8 @@ class FusionReferentiels {
       ('stock_adjustments', 'product_id'),
       ('stock_movements', 'product_id'),
       ('livestock_lots', 'product_id'),
+      // Ticket EL-1 — le produit fini d'une transformation saisie au poste (avant l'envoi).
+      ('transformations', 'product_id'),
       ('lot_revenues', 'product_id'),
       // Tickets AV1 / AV2 — un avoir en attente désigne son produit.
       ('credit_notes', 'product_id'),
