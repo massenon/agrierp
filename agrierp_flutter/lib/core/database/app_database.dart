@@ -1393,8 +1393,11 @@ class CustomerReminders extends Table with SyncColumns {
   TextColumn get customerId => text().withLength(min: 36, max: 36)();
   TextColumn get receivableId => text().nullable()();
 
-  /// `whatsapp` · `email` · `sms` · `courrier`.
+  /// `whatsapp` · `email` · `appel` · `courrier` (`sms` : anciennes relances, jamais plus créées — ticket AUT-3).
   TextColumn get channel => text()();
+
+  /// Ticket AUT-3 — l'e-mail est DÉJÀ parti du SMTP du poste : le serveur n'en renvoie pas un second, il tient la trace.
+  BoolColumn get alreadySent => boolean().withDefault(const Constant(false))();
 
   DateTimeColumn get reminderDate => dateTime().nullable()();
   TextColumn get message => text().nullable()();
@@ -2298,7 +2301,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 77;
+  int get schemaVersion => 78;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2979,6 +2982,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v78 — ticket AUT-3 : relance par e-mail partie du poste lui-même.
+      if (from < 78) {
+        await _ajouterColonneSiAbsente(m, customerReminders, customerReminders.alreadySent);
       }
       // v77 — ticket CP-5 : lignes de relevé bancaire tirées, demandes d'import de relevé.
       if (from < 77) {

@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Ticket VC-2 — RELANCE D'UN CLIENT : UNE SEULE IMPLÉMENTATION.
  *
- * Elle vivait dans quatre écrans web (`RelancesClients` : WhatsApp, e-mail, SMS, courrier ; `SuiviDettes` et
+ * Elle vivait dans quatre écrans web (`RelancesClients` : WhatsApp, e-mail, appel, courrier ; `SuiviDettes` et
  * `ProfileClient` : relance « rapide »). Le web ET l'envoi des postes (`SyncController::pushCustomerReminders`) passent
  * désormais ici : mêmes canaux, mêmes messages d'erreur, même trace (`customer_reminders` + audit).
  *
@@ -22,15 +22,16 @@ use Illuminate\Validation\ValidationException;
  *  - `whatsapp` : l'APPAREIL ouvre le lien `wa.me` (navigateur du web, système du poste) ; le serveur ne fait que TENIR LA TRACE ;
  *  - `courrier` : l'appareil produit la lettre PDF ; le serveur tient la trace ;
  *  - `email` : le SERVEUR envoie (SMTP de l'entreprise) — un poste hors ligne demande l'envoi, qui part à la synchronisation ;
- *  - `sms` : le SERVEUR envoie (fournisseur SMS configuré) — même principe.
+ *  - `appel` : le numéro est composé depuis l'appareil (lien `tel:`) ; le serveur tient seulement la trace (ticket AUT-3,
+ *    qui remplace le SMS).
  *
- * ⚠️ La trace n'est écrite QU'APRÈS un envoi réussi (e-mail, SMS) : un envoi refusé ne compte pas comme une relance faite
+ * ⚠️ La trace n'est écrite QU'APRÈS un envoi réussi (e-mail) : un envoi refusé ne compte pas comme une relance faite
  * (le client serait sinon considéré comme relancé aujourd'hui sans l'avoir été). Un rejeu du même identifiant ne renvoie
  * RIEN (idempotence par l'UUID de l'appareil).
  */
 class RelanceClientService
 {
-    public const CANAUX = ['whatsapp', 'email', 'sms', 'courrier'];
+    public const CANAUX = ['whatsapp', 'email', 'appel', 'courrier'];
 
     /**
      * Fait la relance (envoi si le canal l'exige) puis la journalise.
@@ -44,15 +45,17 @@ class RelanceClientService
         string $message,
         ?string $date = null,
         ?string $reminderId = null,
+        bool $dejaEnvoye = false,
     ): CustomerReminder {
         if (! in_array($canal, self::CANAUX, true)) {
             throw ValidationException::withMessages(['channel' => 'Canal de relance inconnu.']);
         }
 
         match ($canal) {
-            'email' => $this->envoyerEmail($client, $message),
-            'sms' => $this->envoyerSms($client, $message),
-            'whatsapp' => $this->exigerTelephone($client),
+            // Ticket AUT-3 — un e-mail déjà parti du poste (son propre SMTP) n'est pas renvoyé : le serveur ne fait que la trace.
+            'email' => $dejaEnvoye ? $this->exigerAdresse($client) : $this->envoyerEmail($client, $message),
+            // « appel » : le numéro est composé depuis l'appareil (`tel:`) ; le serveur n'envoie rien, il tient la trace.
+            'whatsapp', 'appel' => $this->exigerTelephone($client),
             default => null,
         };
 
@@ -80,15 +83,11 @@ class RelanceClientService
         Mail::to($client->email)->send(new CustomerReminderMail($client->name, $message));
     }
 
-    public function envoyerSms(Customer $client, string $message): void
+    /** Adresse e-mail exigée : même message que le web. */
+    public function exigerAdresse(Customer $client): void
     {
-        if (! $client->phone) {
-            throw ValidationException::withMessages(['customer_id' => "Ce client n'a pas de numéro de téléphone enregistré."]);
-        }
-
-        $resultat = app(SmsService::class)->send($client->phone, $message);
-        if (! $resultat['success']) {
-            throw ValidationException::withMessages(['channel' => $resultat['message']]);
+        if (! $client->email) {
+            throw ValidationException::withMessages(['customer_id' => "Ce client n'a pas d'adresse email enregistrée."]);
         }
     }
 

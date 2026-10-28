@@ -318,6 +318,6 @@ A full narrative of every session since `/init` — what was asked, what was fou
 
 
 ## PA-1…PA-8 et CP-5 (28/10/2026)
-- Services uniques partagés Livewire/sync : `BaremeItsService`, `EntrepriseService`, `ModesPaiementService`, `RoleService`, `SmsConfigService`, `ImmobilisationService`. `SyncController::pushSettingsRequests` contrôle les droits par kind.
-- `AdministrationEnLigneController` (préfixe `/api/parametres`) : sessions, postes, sauvegardes, test SMS.
+- Services uniques partagés Livewire/sync : `BaremeItsService`, `EntrepriseService`, `ModesPaiementService`, `RoleService`, `SmsConfigService`, `ImmobilisationService`. `SyncController::pushSettingsRequests` contrôle les droits par kind (entreprise, bareme_its, mode_paiement, role). AUT-3 : plus de SMS (`SmsService`, `SmsConfigService`, `Integrations` supprimés) ; canal de relance `appel` ; `already_sent` d'un e-mail parti du poste ; AUT-2 : `EntrepriseService::fichiersDepuisBase64` et `GET /api/sync/company-file/{genre}`.
+- `AdministrationEnLigneController` (préfixe `/api/parametres`) : sessions, postes, sauvegardes du SERVEUR (le poste a les siennes, AUT-4).
 - `BankReconciliationService::importCsv(..., ?string $importId)` est idempotent ; clé de push `bank_statement_imports`.

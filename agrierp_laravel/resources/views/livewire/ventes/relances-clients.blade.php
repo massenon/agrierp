@@ -6,8 +6,8 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Moteur de relance des créances clients échues.</p>
         </div>
-        <a href="{{ route('parametres.integrations') }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
-            <span class="material-symbols-outlined text-[16px]">settings_input_antenna</span>Configurer Email &amp; SMS
+        <a href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
+            <span class="material-symbols-outlined text-[16px]">mail</span>Configurer l'Email (SMTP)
         </a>
     </div>
 
@@ -57,7 +57,11 @@
                             <button type="button" wire:click="sendWhatsappReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 bg-brand-emerald hover:bg-brand-forest text-white text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">chat</span>Relancer WhatsApp</button>
                             <button type="button" wire:click="sendMailReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 bg-info-blue hover:bg-blue-800 text-white text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">mail</span>Relancer par Mail</button>
                             <button type="button" wire:click="exportCourrierPdf('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>Exporter Courrier</button>
-                            <button type="button" wire:click="sendSmsReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">sms</span>Relancer par SMS</button>
+                            @if($receivable->customer?->phone)
+                                <a href="tel:{{ preg_replace('/[^0-9+]/', '', $receivable->customer->phone) }}" wire:click="callReminder('{{ $receivable->id }}')" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full"><span class="material-symbols-outlined text-[14px]">call</span>Appeler</a>
+                            @else
+                                <button type="button" wire:click="callReminder('{{ $receivable->id }}')" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full"><span class="material-symbols-outlined text-[14px]">call</span>Appeler</button>
+                            @endif
                         </div>
                     </div>
                 @empty

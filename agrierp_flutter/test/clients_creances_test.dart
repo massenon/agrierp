@@ -123,7 +123,7 @@ void main() {
           syncStatus: const Value(SyncStatus.synced),
           id: uuid(cle),
           customerId: uuid(cleClient),
-          channel: 'sms',
+          channel: 'appel',
           reminderDate: Value(DateTime(aujourdhui.year - 1, 3, 12)),
         ),
       );
@@ -480,14 +480,14 @@ void main() {
       );
     });
 
-    /// Ticket VC-2 : les relances se font (WhatsApp, courrier) ou se demandent (e-mail, SMS) au poste ; l'écran dit qui
+    /// Ticket VC-2 : les relances se font (WhatsApp, appel, courrier, e-mail par le SMTP du poste) au poste ; l'écran dit qui
     /// fait quoi — et la trace est tenue, donc le client n'est pas rappelé deux fois.
     testWidgets('⚠️⚠️ l écran dit qui envoie quoi', (tester) async {
       await afficher(tester);
       await ouvrir(tester, 'Relances Clients');
 
       expect(
-        find.textContaining('part du serveur à la prochaine synchronisation'),
+        find.textContaining('l\'e-mail part du SMTP de ce poste'),
         findsOneWidget,
       );
     });

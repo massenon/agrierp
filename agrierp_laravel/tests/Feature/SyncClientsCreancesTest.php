@@ -192,7 +192,7 @@ class SyncClientsCreancesTest extends TestCase
         $relance = CustomerReminder::create([
             'customer_id' => $this->client->id,
             'receivable_id' => $this->creance()->id,
-            'channel' => 'sms',
+            'channel' => 'appel',
             'reminder_date' => now()->subWeeks(3)->toDateString(),
             'message' => 'Rappel ferme.',
         ]);

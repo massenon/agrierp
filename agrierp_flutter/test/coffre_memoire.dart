@@ -37,6 +37,16 @@ class CoffreMemoire extends FlutterSecureStorage {
   }
 
   @override
+  Future<Map<String, String>> readAll({
+    IOSOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    MacOsOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => Map<String, String>.of(contenu);
+
+  @override
   Future<void> delete({
     required String key,
     IOSOptions? iOptions,

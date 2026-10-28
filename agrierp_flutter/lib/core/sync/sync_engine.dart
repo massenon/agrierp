@@ -2815,14 +2815,9 @@ class SyncEngine {
         cnssEmployerPensionRate: Value(_reel(l['cnss_employer_pension_rate'])),
         cnssEmployerFamilyRate: Value(_reel(l['cnss_employer_family_rate'])),
         cnssEmployerRiskRate: Value(_reel(l['cnss_employer_risk_rate'])),
-        // Tickets PA-3 / PA-7 / PA-8 — verrou de paie et configuration SMS sans secret (clés absentes : valeurs neutres).
+        // Tickets PA-3 / PA-7 / PA-8 — verrou de paie (clés absentes : valeurs neutres).
         payrollLocked: Value(l['payroll_locked'] == true),
         payrollEditedAt: Value(l['payroll_edited_at'] as String?),
-        smsProvider: Value(l['sms_provider'] as String?),
-        twilioAccountSid: Value(l['twilio_account_sid'] as String?),
-        twilioFromNumber: Value(l['twilio_from_number'] as String?),
-        vonageFromName: Value(l['vonage_from_name'] as String?),
-        smsIdentifiantsPoses: Value(l['sms_secret_set'] == true),
         rappelSoinsJours: delaiServi && !protege
             ? Value(delai as int?)
             : const Value.absent(),
@@ -5350,14 +5345,8 @@ class SyncEngine {
       _db.depreciationRequests,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
-    // Tickets PA-2/3/4/7/8 — demandes de réglage ; le secret SMS en attente est lu au coffre, jamais en base.
+    // Tickets PA-2/3/4/7/8 — demandes de réglage.
     final reglages = await (_db.select(_db.settingsRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
-    final secretsSms = <String, Map<String, String>>{};
-    for (final r in reglages) {
-      if (r.kind != 'sms') continue;
-      final brut = await _coffre.read(key: cleSecretSms(r.id));
-      if (brut != null) secretsSms[r.id] = Map<String, String>.from(jsonDecode(brut) as Map);
-    }
 
     // Ticket CP-5 — relevés bancaires à importer (le texte du fichier part tel quel, le serveur le lit).
     final releves = await (_db.select(_db.bankStatementImports)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -5658,7 +5647,7 @@ class SyncEngine {
         'fixed_assets': immobilisations.map(_immobilisationEnJson).toList(),
         'depreciation_requests': demandesDotation.map(_demandeDotationEnJson).toList(),
         // Tickets PA-* — AVANT les achats et les dépenses : un compte de trésorerie créé ici peut être cité plus bas.
-        'settings_requests': [for (final r in reglages) _reglageEnJson(r, secretsSms[r.id], await _fichiersEntreprise(r))],
+        'settings_requests': [for (final r in reglages) _reglageEnJson(r, await _fichiersEntreprise(r))],
         // Ticket CP-5 — après les réglages, avant les dépenses.
         'bank_statement_imports': [for (final r in releves) {'id': r.id, 'account_id': r.accountId, 'content': r.content}],
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
@@ -6096,9 +6085,6 @@ class SyncEngine {
       motifs,
       (n) => rejete += n,
     );
-    for (final r in reglages) {
-      if (_acquittes(corps['settings_requests']).contains(r.id)) await _coffre.delete(key: cleSecretSms(r.id));
-    }
     accepte += reglagesAcceptes;
     // Ticket CP-5 — acquitté quand le serveur a lu le relevé ; les lignes descendent au tirage de confirmation.
     final relevesAcceptes = await _acquitter(
@@ -7627,10 +7613,10 @@ class SyncEngine {
 
   /// Tickets PA-* — demande de réglage telle que `SyncController::pushSettingsRequests` la lit : {id, kind, payload}. Le secret
   /// SMS (lu au coffre) rejoint le contenu au dernier moment.
-  Map<String, dynamic> _reglageEnJson(SettingsRequest r, Map<String, String>? secret, [Map<String, String> fichiers = const {}]) => {
+  Map<String, dynamic> _reglageEnJson(SettingsRequest r, [Map<String, String> fichiers = const {}]) => {
     'id': r.id,
     'kind': r.kind,
-    'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...?secret, ...fichiers},
+    'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...fichiers},
   };
 
   /// Ticket AUT-2 — octets du logo / du favicon pour une demande « entreprise » qui en annonce un (`logoNom`, `faviconNom`) :
@@ -7662,8 +7648,6 @@ class SyncEngine {
       } catch (_) {}
     }
   }
-
-  static String cleSecretSms(String idDemande) => 'agrierp.sms.secret.$idDemande';
 
   /// Ticket CP-3 — demande de dotation : la date d'arrêté seule, le serveur recalcule le montant.
   Map<String, dynamic> _demandeDotationEnJson(DepreciationRequest d) => {
@@ -7702,6 +7686,8 @@ class SyncEngine {
     'channel': r.channel,
     'message': r.message ?? '',
     'reminder_date': r.reminderDate == null ? _jour(HeureBenin.aujourdhui()) : _jour(r.reminderDate!),
+    // Ticket AUT-3 — un e-mail déjà parti du poste n'est pas renvoyé par le serveur.
+    'already_sent': r.alreadySent,
   };
 
   /// Ticket VC-1 — encaissement de créance : ni solde, ni écriture, ni imputation ne partent, seulement le fait.

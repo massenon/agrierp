@@ -211,30 +211,17 @@ class SyncReglagesTest extends TestCase
         $this->assertNull(Role::where('name', 'responsable-achats')->first());
     }
 
-    public function test_la_configuration_sms_garde_le_secret_existant_s_il_est_laisse_vide(): void
-    {
-        $this->envoyer($this->gestionnaire, 'sms', ['smsProvider' => 'twilio', 'twilioSid' => 'AC1', 'twilioFrom' => '+229', 'twilioToken' => 'secret-1']);
-        $this->envoyer($this->gestionnaire, 'sms', ['smsProvider' => 'twilio', 'twilioSid' => 'AC2', 'twilioFrom' => '+229', 'twilioToken' => '']);
-
-        $c = CompanySetting::current()->fresh();
-        $this->assertSame('AC2', $c->twilio_account_sid);
-        $this->assertSame('secret-1', $c->twilio_auth_token_encrypted);
-
-        [, $r] = $this->envoyer($this->gestionnaire, 'sms', ['smsProvider' => 'autre']);
-        $this->assertNotEmpty($r->json('settings_requests.rejected.0.reason'));
-    }
-
-    public function test_un_lecteur_ne_peut_rien_regler_et_le_tirage_ne_sert_jamais_un_secret(): void
+    public function test_un_lecteur_ne_peut_rien_regler_et_le_type_sms_n_existe_plus(): void
     {
         [, $r] = $this->envoyer($this->lecteur, 'entreprise', $this->entreprise());
         $this->assertSame([], $r->json('settings_requests.accepted'));
         [, $r] = $this->envoyer($this->lecteur, 'type-inconnu', []);
         $this->assertSame([], $r->json('settings_requests.accepted'));
 
-        CompanySetting::current()->update(['sms_provider' => 'twilio', 'twilio_account_sid' => 'AC9', 'twilio_auth_token_encrypted' => 'TOP-SECRET']);
+        // Ticket AUT-3 : plus de configuration SMS — le type est inconnu et le tirage n'en sert plus aucune trace.
+        [, $r] = $this->envoyer($this->gestionnaire, 'sms', ['smsProvider' => 'twilio']);
+        $this->assertSame([], $r->json('settings_requests.accepted'));
         $json = $this->actingAs($this->gestionnaire, 'sanctum')->getJson('/api/sync/pull')->assertOk();
-        $this->assertStringNotContainsString('TOP-SECRET', $json->getContent());
-        $this->assertTrue($json->json('company_settings.sms_secret_set'));
-        $this->assertArrayNotHasKey('twilio_account_sid', $this->actingAs($this->lecteur, 'sanctum')->getJson('/api/sync/pull')->json('company_settings') ?? []);
+        $this->assertArrayNotHasKey('sms_secret_set', $json->json('company_settings') ?? []);
     }
 }

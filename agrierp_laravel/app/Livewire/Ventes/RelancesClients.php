@@ -29,7 +29,7 @@ use Livewire\Component;
  *   avec le message pré-rempli. Le clic est capturé côté serveur
  *   (traçabilité `CustomerReminder` réelle) puis l'ouverture du lien est
  *   déclenchée côté client via `$this->js()`.
- * - SMS : réel via `App\Services\SmsService`, appel direct aux API REST
+ * - Appel : lien `tel:` (ticket AUT-3, remplace le SMS) ; la relance est journalisée.
  *   Twilio/Vonage (pas de SDK Composer — packagist.org non accessible
  *   dans ce sandbox de développement ; fonctionnera normalement en
  *   déploiement réel). Fournisseur et clés API configurés en
@@ -186,19 +186,23 @@ class RelancesClients extends Component
         $this->js("window.open(".json_encode($url).", '_blank')");
     }
 
-    public function sendSmsReminder(string $receivableId): void
+    /**
+     * Ticket AUT-3 (remplace le SMS) — « Appeler » : le numéro est composé depuis l'appareil par le lien `tel:` de la vue ;
+     * ici, la trace de la relance. Même refus que WhatsApp : un client sans numéro ne s'appelle pas.
+     */
+    public function callReminder(string $receivableId): void
     {
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
 
         try {
-            app(RelanceClientService::class)->relancer($receivable->customer, $receivable, 'sms', $this->renderTemplate($receivable));
+            app(RelanceClientService::class)->relancer($receivable->customer, $receivable, 'appel', $this->renderTemplate($receivable));
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
             return;
         }
 
-        $this->dispatch('toast', message: 'SMS envoyé.', type: 'success');
+        $this->dispatch('toast', message: 'Appel enregistré dans l\'historique des relances.', type: 'success');
     }
 
     private function logReminder(Receivable $receivable, string $channel, string $message): void

@@ -8,7 +8,6 @@ use App\Services\DemandeSynchronisationService;
 use App\Services\ImportModuleService;
 use App\Services\JournalSynchronisationService;
 use App\Services\SauvegardeService;
-use App\Services\SmsService;
 use App\Services\ViderSessionsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,10 +15,10 @@ use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Tickets PA-1, PA-5, PA-6, PA-8 (test SMS) — GESTES D'ADMINISTRATION EN LIGNE, depuis le poste.
+ * Tickets PA-1, PA-5, PA-6 — GESTES D'ADMINISTRATION EN LIGNE, depuis le poste.
  *
  * Ces gestes agissent sur le SERVEUR (fermer des sessions, révoquer un appairage, générer ou lire une sauvegarde, appeler le
- * fournisseur SMS) : ils n'ont pas de version hors ligne. Mêmes services, mêmes droits (`manage-users` / `manage-parametres`)
+ * SMTP) : ils n'ont pas de version hors ligne. Mêmes services, mêmes droits (`manage-users` / `manage-parametres`)
  * et mêmes traces d'audit que les composants web correspondants. Précédent : `ReinitialisationDonneesController` (R-1).
  */
 class AdministrationEnLigneController extends Controller
@@ -198,24 +197,5 @@ class AdministrationEnLigneController extends Controller
                 ? "{$resultat['inserees']} ligne(s) importée(s), {$resultat['rejetees']} instruction(s) refusée(s) — ".implode(' · ', $resultat['motifs'])
                 : "{$resultat['inserees']} ligne(s) importée(s).",
         ]);
-    }
-
-    // ── PA-8 · SMS de test ───────────────────────────────────────────────────
-
-    public function testerSms(Request $request): JsonResponse
-    {
-        if ($r = $this->exiger($request, 'manage-parametres', 'Votre rôle ne permet pas de tester les SMS.')) {
-            return $r;
-        }
-
-        $destinataire = trim((string) $request->input('destinataire', ''));
-
-        if ($destinataire === '') {
-            return response()->json(['message' => 'Le champ destinataire est obligatoire.'], 422);
-        }
-
-        $resultat = app(SmsService::class)->send($destinataire, 'Ceci est un SMS de test envoyé depuis AgriERP.');
-
-        return response()->json(['type' => $resultat['success'] ? 'success' : 'error', 'message' => $resultat['message']]);
     }
 }

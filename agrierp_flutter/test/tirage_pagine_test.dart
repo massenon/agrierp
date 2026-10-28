@@ -425,7 +425,7 @@ void main() {
               syncStatus: const Value(SyncStatus.synced),
               id: 'e1e2e3e4-4444-4000-8000-000000000001',
               customerId: 'e1e2e3e4-5555-4000-8000-000000000001',
-              channel: 'sms',
+              channel: 'appel',
             ),
           );
       final servies = ['products', 'sales', 'sale_lines'];

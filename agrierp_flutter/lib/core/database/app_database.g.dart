@@ -6230,6 +6230,21 @@ class $CustomerRemindersTable extends CustomerReminders
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _alreadySentMeta = const VerificationMeta(
+    'alreadySent',
+  );
+  @override
+  late final GeneratedColumn<bool> alreadySent = GeneratedColumn<bool>(
+    'already_sent',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("already_sent" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _reminderDateMeta = const VerificationMeta(
     'reminderDate',
   );
@@ -6261,6 +6276,7 @@ class $CustomerRemindersTable extends CustomerReminders
     customerId,
     receivableId,
     channel,
+    alreadySent,
     reminderDate,
     message,
   ];
@@ -6322,6 +6338,15 @@ class $CustomerRemindersTable extends CustomerReminders
     } else if (isInserting) {
       context.missing(_channelMeta);
     }
+    if (data.containsKey('already_sent')) {
+      context.handle(
+        _alreadySentMeta,
+        alreadySent.isAcceptableOrUnknown(
+          data['already_sent']!,
+          _alreadySentMeta,
+        ),
+      );
+    }
     if (data.containsKey('reminder_date')) {
       context.handle(
         _reminderDateMeta,
@@ -6376,6 +6401,10 @@ class $CustomerRemindersTable extends CustomerReminders
         DriftSqlType.string,
         data['${effectivePrefix}channel'],
       )!,
+      alreadySent: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}already_sent'],
+      )!,
       reminderDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}reminder_date'],
@@ -6405,8 +6434,11 @@ class CustomerReminder extends DataClass
   final String customerId;
   final String? receivableId;
 
-  /// `whatsapp` · `email` · `sms` · `courrier`.
+  /// `whatsapp` · `email` · `appel` · `courrier` (`sms` : anciennes relances, jamais plus créées — ticket AUT-3).
   final String channel;
+
+  /// Ticket AUT-3 — l'e-mail est DÉJÀ parti du SMTP du poste : le serveur n'en renvoie pas un second, il tient la trace.
+  final bool alreadySent;
   final DateTime? reminderDate;
   final String? message;
   const CustomerReminder({
@@ -6417,6 +6449,7 @@ class CustomerReminder extends DataClass
     required this.customerId,
     this.receivableId,
     required this.channel,
+    required this.alreadySent,
     this.reminderDate,
     this.message,
   });
@@ -6436,6 +6469,7 @@ class CustomerReminder extends DataClass
       map['receivable_id'] = Variable<String>(receivableId);
     }
     map['channel'] = Variable<String>(channel);
+    map['already_sent'] = Variable<bool>(alreadySent);
     if (!nullToAbsent || reminderDate != null) {
       map['reminder_date'] = Variable<DateTime>(reminderDate);
     }
@@ -6456,6 +6490,7 @@ class CustomerReminder extends DataClass
           ? const Value.absent()
           : Value(receivableId),
       channel: Value(channel),
+      alreadySent: Value(alreadySent),
       reminderDate: reminderDate == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderDate),
@@ -6480,6 +6515,7 @@ class CustomerReminder extends DataClass
       customerId: serializer.fromJson<String>(json['customerId']),
       receivableId: serializer.fromJson<String?>(json['receivableId']),
       channel: serializer.fromJson<String>(json['channel']),
+      alreadySent: serializer.fromJson<bool>(json['alreadySent']),
       reminderDate: serializer.fromJson<DateTime?>(json['reminderDate']),
       message: serializer.fromJson<String?>(json['message']),
     );
@@ -6497,6 +6533,7 @@ class CustomerReminder extends DataClass
       'customerId': serializer.toJson<String>(customerId),
       'receivableId': serializer.toJson<String?>(receivableId),
       'channel': serializer.toJson<String>(channel),
+      'alreadySent': serializer.toJson<bool>(alreadySent),
       'reminderDate': serializer.toJson<DateTime?>(reminderDate),
       'message': serializer.toJson<String?>(message),
     };
@@ -6510,6 +6547,7 @@ class CustomerReminder extends DataClass
     String? customerId,
     Value<String?> receivableId = const Value.absent(),
     String? channel,
+    bool? alreadySent,
     Value<DateTime?> reminderDate = const Value.absent(),
     Value<String?> message = const Value.absent(),
   }) => CustomerReminder(
@@ -6520,6 +6558,7 @@ class CustomerReminder extends DataClass
     customerId: customerId ?? this.customerId,
     receivableId: receivableId.present ? receivableId.value : this.receivableId,
     channel: channel ?? this.channel,
+    alreadySent: alreadySent ?? this.alreadySent,
     reminderDate: reminderDate.present ? reminderDate.value : this.reminderDate,
     message: message.present ? message.value : this.message,
   );
@@ -6538,6 +6577,9 @@ class CustomerReminder extends DataClass
           ? data.receivableId.value
           : this.receivableId,
       channel: data.channel.present ? data.channel.value : this.channel,
+      alreadySent: data.alreadySent.present
+          ? data.alreadySent.value
+          : this.alreadySent,
       reminderDate: data.reminderDate.present
           ? data.reminderDate.value
           : this.reminderDate,
@@ -6555,6 +6597,7 @@ class CustomerReminder extends DataClass
           ..write('customerId: $customerId, ')
           ..write('receivableId: $receivableId, ')
           ..write('channel: $channel, ')
+          ..write('alreadySent: $alreadySent, ')
           ..write('reminderDate: $reminderDate, ')
           ..write('message: $message')
           ..write(')'))
@@ -6570,6 +6613,7 @@ class CustomerReminder extends DataClass
     customerId,
     receivableId,
     channel,
+    alreadySent,
     reminderDate,
     message,
   );
@@ -6584,6 +6628,7 @@ class CustomerReminder extends DataClass
           other.customerId == this.customerId &&
           other.receivableId == this.receivableId &&
           other.channel == this.channel &&
+          other.alreadySent == this.alreadySent &&
           other.reminderDate == this.reminderDate &&
           other.message == this.message);
 }
@@ -6596,6 +6641,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
   final Value<String> customerId;
   final Value<String?> receivableId;
   final Value<String> channel;
+  final Value<bool> alreadySent;
   final Value<DateTime?> reminderDate;
   final Value<String?> message;
   final Value<int> rowid;
@@ -6607,6 +6653,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     this.customerId = const Value.absent(),
     this.receivableId = const Value.absent(),
     this.channel = const Value.absent(),
+    this.alreadySent = const Value.absent(),
     this.reminderDate = const Value.absent(),
     this.message = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -6619,6 +6666,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     required String customerId,
     this.receivableId = const Value.absent(),
     required String channel,
+    this.alreadySent = const Value.absent(),
     this.reminderDate = const Value.absent(),
     this.message = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -6635,6 +6683,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     Expression<String>? customerId,
     Expression<String>? receivableId,
     Expression<String>? channel,
+    Expression<bool>? alreadySent,
     Expression<DateTime>? reminderDate,
     Expression<String>? message,
     Expression<int>? rowid,
@@ -6647,6 +6696,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
       if (customerId != null) 'customer_id': customerId,
       if (receivableId != null) 'receivable_id': receivableId,
       if (channel != null) 'channel': channel,
+      if (alreadySent != null) 'already_sent': alreadySent,
       if (reminderDate != null) 'reminder_date': reminderDate,
       if (message != null) 'message': message,
       if (rowid != null) 'rowid': rowid,
@@ -6661,6 +6711,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     Value<String>? customerId,
     Value<String?>? receivableId,
     Value<String>? channel,
+    Value<bool>? alreadySent,
     Value<DateTime?>? reminderDate,
     Value<String?>? message,
     Value<int>? rowid,
@@ -6673,6 +6724,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
       customerId: customerId ?? this.customerId,
       receivableId: receivableId ?? this.receivableId,
       channel: channel ?? this.channel,
+      alreadySent: alreadySent ?? this.alreadySent,
       reminderDate: reminderDate ?? this.reminderDate,
       message: message ?? this.message,
       rowid: rowid ?? this.rowid,
@@ -6705,6 +6757,9 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
     if (channel.present) {
       map['channel'] = Variable<String>(channel.value);
     }
+    if (alreadySent.present) {
+      map['already_sent'] = Variable<bool>(alreadySent.value);
+    }
     if (reminderDate.present) {
       map['reminder_date'] = Variable<DateTime>(reminderDate.value);
     }
@@ -6727,6 +6782,7 @@ class CustomerRemindersCompanion extends UpdateCompanion<CustomerReminder> {
           ..write('customerId: $customerId, ')
           ..write('receivableId: $receivableId, ')
           ..write('channel: $channel, ')
+          ..write('alreadySent: $alreadySent, ')
           ..write('reminderDate: $reminderDate, ')
           ..write('message: $message, ')
           ..write('rowid: $rowid')
@@ -51944,6 +52000,7 @@ typedef $$CustomerRemindersTableCreateCompanionBuilder =
       required String customerId,
       Value<String?> receivableId,
       required String channel,
+      Value<bool> alreadySent,
       Value<DateTime?> reminderDate,
       Value<String?> message,
       Value<int> rowid,
@@ -51957,6 +52014,7 @@ typedef $$CustomerRemindersTableUpdateCompanionBuilder =
       Value<String> customerId,
       Value<String?> receivableId,
       Value<String> channel,
+      Value<bool> alreadySent,
       Value<DateTime?> reminderDate,
       Value<String?> message,
       Value<int> rowid,
@@ -52004,6 +52062,11 @@ class $$CustomerRemindersTableFilterComposer
 
   ColumnFilters<String> get channel => $composableBuilder(
     column: $table.channel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get alreadySent => $composableBuilder(
+    column: $table.alreadySent,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -52062,6 +52125,11 @@ class $$CustomerRemindersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get alreadySent => $composableBuilder(
+    column: $table.alreadySent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get reminderDate => $composableBuilder(
     column: $table.reminderDate,
     builder: (column) => ColumnOrderings(column),
@@ -52109,6 +52177,11 @@ class $$CustomerRemindersTableAnnotationComposer
 
   GeneratedColumn<String> get channel =>
       $composableBuilder(column: $table.channel, builder: (column) => column);
+
+  GeneratedColumn<bool> get alreadySent => $composableBuilder(
+    column: $table.alreadySent,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get reminderDate => $composableBuilder(
     column: $table.reminderDate,
@@ -52166,6 +52239,7 @@ class $$CustomerRemindersTableTableManager
                 Value<String> customerId = const Value.absent(),
                 Value<String?> receivableId = const Value.absent(),
                 Value<String> channel = const Value.absent(),
+                Value<bool> alreadySent = const Value.absent(),
                 Value<DateTime?> reminderDate = const Value.absent(),
                 Value<String?> message = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -52177,6 +52251,7 @@ class $$CustomerRemindersTableTableManager
                 customerId: customerId,
                 receivableId: receivableId,
                 channel: channel,
+                alreadySent: alreadySent,
                 reminderDate: reminderDate,
                 message: message,
                 rowid: rowid,
@@ -52190,6 +52265,7 @@ class $$CustomerRemindersTableTableManager
                 required String customerId,
                 Value<String?> receivableId = const Value.absent(),
                 required String channel,
+                Value<bool> alreadySent = const Value.absent(),
                 Value<DateTime?> reminderDate = const Value.absent(),
                 Value<String?> message = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -52201,6 +52277,7 @@ class $$CustomerRemindersTableTableManager
                 customerId: customerId,
                 receivableId: receivableId,
                 channel: channel,
+                alreadySent: alreadySent,
                 reminderDate: reminderDate,
                 message: message,
                 rowid: rowid,

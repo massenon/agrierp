@@ -835,7 +835,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             libelle: 'Relances Effectuées',
             valeur: '${d.relancesDuMois(jour)}',
             unite: 'env.',
-            legende: 'WhatsApp, SMS & Mail',
+            legende: 'WhatsApp, Appel & Mail',
             couleurLisere: AgriColors.infoBlue,
             icone: SymbolesAgri.campaign,
             couleurIcone: AgriColors.infoBlue,
@@ -927,8 +927,8 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             const SizedBox(height: AgriSpacing.sm),
           ],
         _mentionPoste(
-          'WhatsApp et le courrier se font ici, tout de suite ; un e-mail ou un SMS demandé ici part du serveur à la '
-          'prochaine synchronisation, qui dit pourquoi si le client n\'a pas d\'adresse ou si le SMS n\'est pas configuré.',
+          'WhatsApp, l\'appel et le courrier se font ici, tout de suite ; l\'e-mail part du SMTP de ce poste '
+          '(Paramètres > Email (SMTP)) et demande le réseau.',
         ),
       ],
     ),
@@ -995,7 +995,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 ],
               ),
               const SizedBox(height: AgriSpacing.xs),
-              // Ticket VC-2 — les quatre canaux du Blade : WhatsApp, e-mail, courrier, SMS.
+              // Ticket VC-2 / AUT-3 — les quatre canaux du Blade : WhatsApp, e-mail, courrier, appel (remplace le SMS).
               Wrap(
                 spacing: AgriSpacing.xs,
                 runSpacing: AgriSpacing.xs,
@@ -1003,7 +1003,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   _boutonRelance('relancer-whatsapp', l, 'whatsapp', 'Relancer WhatsApp', SymbolesAgri.chat, rempli: AgriColors.brandEmerald),
                   _boutonRelance('relancer-email', l, 'email', 'Relancer par Mail', SymbolesAgri.mail, rempli: AgriColors.infoBlue),
                   _boutonRelance('exporter-courrier', l, 'courrier', 'Exporter Courrier', SymbolesAgri.picture_as_pdf),
-                  _boutonRelance('relancer-sms', l, 'sms', 'Relancer par SMS', SymbolesAgri.sms),
+                  _boutonRelance('relancer-appel', l, 'appel', 'Appeler', SymbolesAgri.call),
                 ],
               ),
             ],
@@ -1034,7 +1034,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   /// Ticket VC-2 — écrit la relance en local, PUIS fait ce que l'appareil peut faire : ouvrir WhatsApp, éditer la lettre.
-  /// L'e-mail et le SMS sont des DEMANDES : le serveur envoie à la prochaine synchronisation.
+  /// L'e-mail part du SMTP du poste (sans SMTP, c'est une DEMANDE : le serveur l'envoie à la synchronisation) ; l'appel est composé par `tel:`.
   Future<void> _relancer(LigneCreance l, String canal, {String? message}) async {
     final texte = message ?? ClientsCreancesRepository.rendreModele(_texteModele.text, l);
     final CustomerReminder relance;
@@ -1063,11 +1063,15 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           widget.maintenant(),
         );
         _annoncer(erreur ?? 'Lettre de relance éditée — la relance partira à la prochaine synchronisation.');
+      case 'appel':
+        final telephone = await widget.depot.telephoneDe(relance.customerId);
+        _annoncer('Appel en cours — numérotation par l\'application téléphone du poste.');
+        await widget.ouvrirUrl('tel:${ClientsCreancesRepository.lienAppel(telephone ?? '')}');
       default:
         _annoncer(
-          canal == 'email'
-              ? 'Relance par e-mail demandée — le serveur l\'envoie à la prochaine synchronisation.'
-              : 'Relance par SMS demandée — le serveur l\'envoie à la prochaine synchronisation.',
+          relance.alreadySent
+              ? 'E-mail envoyé au client.'
+              : 'Relance par e-mail demandée — le serveur l\'envoie à la prochaine synchronisation.',
         );
     }
   }

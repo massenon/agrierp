@@ -106,6 +106,5 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         Route::post('/sauvegardes/generer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'genererSauvegarde']);
         Route::get('/sauvegardes/telecharger/{fichier}', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'telechargerSauvegarde']);
         Route::post('/sauvegardes/importer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'importerModule']);
-        Route::post('/sms/tester', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'testerSms']);
     });
 });

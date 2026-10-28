@@ -16,7 +16,7 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'appairage_poste.dart';
 import 'corbeille_repository.dart';
-import 'administration_en_ligne.dart';
+import 'administration_locale.dart';
 import 'onglet_appairage.dart';
 import 'onglet_corbeille.dart';
 import 'onglet_email_smtp.dart';
@@ -79,12 +79,12 @@ class ParametresGenerauxScreen extends StatefulWidget {
 
   final ParametresGenerauxRepository depot;
 
-  /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS) écrits en
+  /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles) écrits en
   /// DEMANDES ; `null` : les onglets restent en consultation (vues du châssis sans session).
   final ReglagesFermeRepository? reglages;
 
   /// Tickets PA-1/5/6/8 — gestes d'administration EN LIGNE (sessions, postes appairés, sauvegardes) ; `null` : indisponibles.
-  final AdministrationEnLigne? admin;
+  final AdministrationLocale? admin;
 
   /// Le compte connecté est administrateur (rôles, taux de paie et barème arrêtés).
   final bool estAdmin;
@@ -185,7 +185,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
   DonneesParametresGeneraux? _donnees;
 
-  /// Sous-page de l'onglet « Données de l'Entreprise » : `bareme` (PA-7) ou `sms` (PA-8).
+  /// Sous-page de l'onglet « Données de l'Entreprise » : `bareme` (PA-7).
   String? _sousPage;
   List<String> _droits = const [];
   String? _message;
@@ -242,8 +242,6 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                       switch (_onglet) {
                         "Données de l'Entreprise" when _sousPage == 'bareme' && widget.reglages != null =>
                           PageBaremeIts(depot: widget.reglages!, estAdmin: widget.estAdmin, surRetour: () => setState(() => _sousPage = null)),
-                        "Données de l'Entreprise" when _sousPage == 'sms' && widget.reglages != null =>
-                          PageIntegrationsSms(depot: widget.reglages!, admin: widget.admin, surRetour: () => setState(() => _sousPage = null)),
                         "Données de l'Entreprise" => _ongletEntreprise(
                           d,
                           large,
@@ -556,12 +554,6 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                 icon: const Icon(SymbolesAgri.functions, size: 18),
                 label: const Text('Barème IR-PTS / ITS — tranches d\'imposition', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
               ),
-              OutlinedButton.icon(
-                key: const Key('entreprise-sms'),
-                onPressed: () => setState(() => _sousPage = 'sms'),
-                icon: const Icon(SymbolesAgri.sms, size: 18),
-                label: const Text('Intégrations & Notifications (SMS)', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
-              ),
             ],
           ),
           if (_message != null)
@@ -663,7 +655,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     final admin = widget.admin;
     if (admin == null || !admin.peut('manage-parametres')) {
       return _mentionPoste(
-        'Les sauvegardes sont gardées sur le serveur : elles se gèrent en ligne, avec le droit de gérer les paramètres.',
+        'Les sauvegardes de ce poste se gèrent avec le droit de gérer les paramètres.',
         cle: 'sauvegardes-indisponibles',
       );
     }
@@ -686,7 +678,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         OngletAppairage(appairage: appairage),
         if (admin != null && admin.peut('manage-users')) ...[
           const SizedBox(height: AgriSpacing.lg),
-          SectionPostesAppaires(key: const Key('postes-appaires'), admin: admin),
+          SectionCePoste(key: const Key('ce-poste-section'), admin: admin, identifiant: appairage.identifiant),
         ],
       ],
     );

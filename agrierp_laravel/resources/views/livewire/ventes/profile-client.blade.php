@@ -110,6 +110,8 @@
                                         <span class="inline-flex items-center gap-1 text-brand-emerald font-bold"><span class="material-symbols-outlined text-[14px]">chat</span>WhatsApp</span>
                                     @elseif($reminder->channel === 'email')
                                         <span class="inline-flex items-center gap-1 text-info-blue font-bold"><span class="material-symbols-outlined text-[14px]">mail</span>Email</span>
+                                    @elseif($reminder->channel === 'appel')
+                                        <span class="inline-flex items-center gap-1 text-brand-forest font-bold"><span class="material-symbols-outlined text-[14px]">call</span>Appel</span>
                                     @else
                                         <span class="inline-flex items-center gap-1 text-outline font-bold"><span class="material-symbols-outlined text-[14px]">sms</span>SMS</span>
                                     @endif

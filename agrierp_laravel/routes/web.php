@@ -235,12 +235,6 @@ Route::get('/clients/{customer}/profil', \App\Livewire\Ventes\ProfileClient::cla
     ->name('ventes.profile-client')
     ->middleware(['auth', 'can:view-ventes']);
 
-// Correction ticket 4.7 : Paramètres > Intégrations & Notifications (SMTP + SMS réels)
-// Pas un écran du prototype — construit suite à une demande explicite, admin uniquement.
-Route::get('/parametres-integrations', \App\Livewire\Parametres\Integrations::class)
-    ->name('parametres.integrations')
-    ->middleware(['auth', 'can:view-parametres']);
-
 // Ticket AC-3 — LECTURE d'une pièce justificative (achat ou dépense), sur le disque privé : jamais d'URL publique.
 Route::get('/justificatifs/{type}/{id}', function (string $type, string $id) {
     abort_unless(in_array($type, ['achat', 'depense'], true), 404);

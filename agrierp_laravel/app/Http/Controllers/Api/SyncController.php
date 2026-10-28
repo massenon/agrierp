@@ -151,7 +151,7 @@ class SyncController extends Controller
         'manual_entry_requests',
         // Ticket CP-3 — immobilisations (registre mixte) et demandes de dotation aux amortissements.
         'fixed_assets', 'depreciation_requests',
-        // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS).
+        // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles).
         'settings_requests',
         // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
         'bank_statement_imports',
@@ -1262,14 +1262,7 @@ class SyncController extends Controller
                     // Ticket AUT-2 — chemins du logo et du favicon : le poste télécharge le fichier quand le chemin change.
                     'logo_path' => $entreprise->logo_path,
                     'favicon_path' => $entreprise->favicon_path,
-                ] + ($request->user()?->can('manage-parametres') ? [
-                    // Ticket PA-8 — configuration SMS SANS SECRET (le jeton et le secret ne quittent jamais le serveur).
-                    'sms_provider' => $entreprise->sms_provider,
-                    'twilio_account_sid' => $entreprise->twilio_account_sid,
-                    'twilio_from_number' => $entreprise->twilio_from_number,
-                    'vonage_from_name' => $entreprise->vonage_from_name,
-                    'sms_secret_set' => ! empty($entreprise->twilio_auth_token_encrypted) || ! empty($entreprise->vonage_api_secret_encrypted),
-                ] : []);
+                ];
             },
 
             // ⚠️⚠️ UN MODULE DESACTIVE DOIT DISPARAITRE DE L'ECRAN, PAS SEULEMENT
@@ -3839,7 +3832,6 @@ class SyncController extends Controller
      *  - `bareme_its` → BaremeItsService (`view-parametres`, barème arrêté = administrateur) ;
      *  - `mode_paiement` → ModesPaiementService (banque, Mobile Money : `manage-parametres` ; virement : `manage-comptabilite`) ;
      *  - `role` → RoleService (administrateur) ;
-     *  - `sms` → SmsConfigService (`manage-parametres`).
      * Idempotence : l'UUID de la demande est celui du compte créé et le `source_id` du virement ; les autres types remplacent
      * un état, donc rejouer donne le même état.
      */
@@ -3855,7 +3847,7 @@ class SyncController extends Controller
             $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
 
             $droit = match ($kind) {
-                'entreprise', 'sms' => 'manage-parametres',
+                'entreprise' => 'manage-parametres',
                 'bareme_its' => 'view-parametres',
                 'mode_paiement' => ($payload['geste'] ?? '') === 'virement' ? 'manage-comptabilite' : 'manage-parametres',
                 'role' => 'manage-users',
@@ -3900,10 +3892,6 @@ class SyncController extends Controller
             'bareme_its' => app(\App\Services\BaremeItsService::class)->remplacer(array_values($p['tranches'] ?? []), $utilisateur),
             'mode_paiement' => $this->jouerModePaiement($id, $p),
             'role' => $this->jouerRole($p, $utilisateur),
-            'sms' => (function () use ($p, $attributs) {
-                $v = validator($p, ['smsProvider' => ['required', 'in:twilio,vonage']], MotifsRefusPush::messages(), $attributs + ['smsProvider' => 'fournisseur SMS'])->validate();
-                app(\App\Services\SmsConfigService::class)->enregistrer($p + $v);
-            })(),
         };
     }
 
@@ -5022,12 +5010,12 @@ class SyncController extends Controller
     }
 
     /**
-     * Ticket VC-2 — RELANCES DE CLIENTS faites (WhatsApp, courrier) ou DEMANDÉES (e-mail, SMS) au poste.
+     * Ticket VC-2 — RELANCES DE CLIENTS faites (WhatsApp, appel, courrier, e-mail déjà parti du SMTP du poste) ou DEMANDÉES (e-mail) au poste.
      *
      * ⚠️ Le poste envoie le fait « relance de ce client / cette créance, par ce canal, avec ce message, tel jour » ;
-     * `RelanceClientService` — partagé avec `RelancesClients` — fait l'envoi que le canal exige (e-mail, SMS : le SERVEUR
-     * envoie) puis tient la trace. Un envoi refusé (client sans adresse, SMS non configuré) est rendu AVEC SON MOTIF et ne
-     * laisse AUCUNE trace. ⚠️ Idempotence par l'UUID du poste : un rejeu ne renvoie ni mail ni SMS.
+     * `RelanceClientService` — partagé avec `RelancesClients` — fait l'envoi que le canal exige (e-mail non encore parti : le SERVEUR
+     * envoie) puis tient la trace. Un envoi refusé (client sans adresse ou sans numéro) est rendu AVEC SON MOTIF et ne
+     * laisse AUCUNE trace. ⚠️ Idempotence par l'UUID du poste : un rejeu ne renvoie aucun mail.
      */
     private function pushCustomerReminders(array $relances, $utilisateur): array
     {
@@ -5053,6 +5041,8 @@ class SyncController extends Controller
                     'channel' => ['required', 'in:'.implode(',', \App\Services\RelanceClientService::CANAUX)],
                     'message' => ['required', 'string', 'max:5000'],
                     'reminder_date' => ['required', 'date', 'before_or_equal:today'],
+                    // Ticket AUT-3 — l'e-mail est déjà parti du SMTP du poste : le serveur ne l'envoie pas une seconde fois.
+                    'already_sent' => ['nullable', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 if (\App\Models\CustomerReminder::find($valides['id']) !== null) {
@@ -5068,6 +5058,7 @@ class SyncController extends Controller
                     $valides['message'],
                     $valides['reminder_date'],
                     $valides['id'],
+                    (bool) ($valides['already_sent'] ?? false),
                 );
 
                 $accepted[] = $valides['id'];

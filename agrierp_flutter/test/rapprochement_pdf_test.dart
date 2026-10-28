@@ -44,7 +44,7 @@ void main() {
   });
 
   test('les libellés fixes sont ceux du Blade d\'export', () {
-    final blade = File('${dossierLaravel}/resources/views/exports/rapprochement-bancaire.blade.php');
+    final blade = File('$dossierLaravel/resources/views/exports/rapprochement-bancaire.blade.php');
     if (!blade.existsSync()) return;
     final src = blade.readAsStringSync();
     for (final mot in ['GRAND LIVRE', 'RELEVÉ BANCAIRE IMPORTÉ', 'Nouveau — à saisir', 'En instance', 'Pointé', 'Rapprochement équilibré — écart nul.']) {

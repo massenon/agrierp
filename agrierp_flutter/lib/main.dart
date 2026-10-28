@@ -12,6 +12,7 @@ import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
 import 'core/config/envoi_email_test.dart';
 import 'core/config/parametres_poste.dart';
+import 'core/config/envoi_email.dart';
 import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
@@ -78,7 +79,7 @@ import 'features/comptabilite/comptabilite_repository.dart';
 import 'features/comptabilite/immobilisations_repository.dart';
 import 'features/comptabilite/rapprochement_repository.dart';
 import 'features/parametres/reglages_ferme_repository.dart';
-import 'features/parametres/administration_en_ligne.dart';
+import 'features/parametres/administration_locale.dart';
 import 'features/parametres/parametres_generaux_repository.dart';
 import 'features/parametres/parametres_generaux_screen.dart';
 import 'features/rapports/rapports_exports_screen.dart';
@@ -143,6 +144,8 @@ Future<void> main() async {
   runApp(
     await DemarragePoste.preparer(
       construire: () async {
+        // Ticket AUT-4 — une restauration programmée s'installe AVANT l'ouverture de la base.
+        await AdministrationLocale.appliquerRestaurationEnAttente();
         final db = AppDatabase();
         final parametres = ParametresPoste(database: db);
 
@@ -218,7 +221,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres : la route du serveur (même service que le web), par
   /// le client partagé (il porte le jeton), puis la purge immédiate de ce poste par le moteur (mécanisme 15.50)
   /// et un tirage complet. Le droit est celui du rôle de la session ouverte.
-  late final _adminEnLigne = AdministrationEnLigne(client: _client, engine: _engine, role: () => _auth.utilisateur?.role ?? '');
+  late final _adminLocale = AdministrationLocale(database: _db, role: () => _auth.utilisateur?.role ?? '', idUtilisateur: () => _auth.utilisateur?.id ?? '');
 
   late final ReinitialisationPoste _reinitialisation = ReinitialisationPoste(
     database: _db,
@@ -256,6 +259,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final ClientsCreancesRepository _clients = ClientsCreancesRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    // Ticket AUT-3 — la relance par e-mail part du SMTP de ce poste (remplace le SMS).
+    envoyerEmail: EnvoiEmail(parametres: ParametresSmtp(database: _db)).envoyer,
   );
 
   /// ⚠️ Le même client HTTP : il porte le jeton de la session, que le serveur
@@ -527,7 +532,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           engine: _engine,
           auth: _auth,
           reinitialisation: _reinitialisation,
-          adminEnLigne: _adminEnLigne,
+          adminLocale: _adminLocale,
           fiches: _fiches,
           caisse: _caisse,
           soins: _soins,
@@ -633,7 +638,7 @@ class SocleAccueil extends StatefulWidget {
     required this.parametres,
     required this.identifiantPoste,
     this.reinitialisation,
-    this.adminEnLigne,
+    this.adminLocale,
     this.onDeconnecte,
     this.verrou,
     this.demandeEcran,
@@ -667,7 +672,7 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
-  final AdministrationEnLigne? adminEnLigne;
+  final AdministrationLocale? adminLocale;
 
   /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
   /// châssis, qui n'ont pas de plateforme native pour la connectivité).
@@ -815,7 +820,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     ongletInitial: ongletInitial,
     idUtilisateurConnecte: widget.auth.utilisateur?.id,
     reglages: _reglages,
-    admin: widget.adminEnLigne,
+    admin: widget.adminLocale,
     estAdmin: widget.auth.utilisateur?.role == 'admin',
   );
 

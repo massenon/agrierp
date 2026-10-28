@@ -478,6 +478,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
                 switch (r.channel) {
                   'whatsapp' => 'WhatsApp',
                   'email' => 'Email',
+                  'appel' => 'Appel',
                   _ => 'SMS',
                 },
                 key: Key('profil-relance-canal-$i'),

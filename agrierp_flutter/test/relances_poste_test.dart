@@ -1,3 +1,4 @@
+import 'package:agrierp/core/config/envoi_email_test.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/export/document_officiel.dart';
@@ -14,8 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket VC-2 — LES RELANCES DE CLIENTS SE FONT (ET SE DEMANDENT) AU POSTE (`relances-clients.blade.php`).
 ///
-/// WhatsApp (lien `wa.me`) et le courrier (PDF) se font sur l'appareil ; l'e-mail et le SMS sont des DEMANDES que le
-/// serveur exécute (SMTP, fournisseur SMS) à la synchronisation. Dans tous les cas la relance est écrite `pending` (UUID
+/// WhatsApp (lien `wa.me`) et le courrier (PDF) se font sur l'appareil ; l'appel se compose par `tel:` et l'e-mail part du SMTP du
+/// poste (AUT-3, remplace le SMS) ; sans envoyeur, c'est une DEMANDE que le serveur exécute à la synchronisation. Dans tous les cas la relance est écrite `pending` (UUID
 /// du poste) : le client n'est pas rappelé deux fois, et un refus du serveur est lu à l'écran Synchronisation.
 class _Serveur extends Interceptor {
   Map<String, dynamic> tirage = {'server_time': '2026-10-28T12:00:00Z'};
@@ -140,10 +141,10 @@ void main() {
       }
 
       expect(await refuse(uuid('r2'), 'whatsapp'), "Ce client n'a pas de numéro de téléphone enregistré.");
-      expect(await refuse(uuid('r2'), 'sms'), "Ce client n'a pas de numéro de téléphone enregistré.");
+      expect(await refuse(uuid('r2'), 'appel'), "Ce client n'a pas de numéro de téléphone enregistré.");
       expect(await refuse(uuid('r2'), 'email'), "Ce client n'a pas d'adresse email enregistrée.");
       expect(await refuse(uuid('abcd1234r1'), 'pigeon'), 'Canal de relance inconnu.');
-      expect(await refuse(uuid('abcd1234r1'), 'sms', message: '  '), 'Le champ message est obligatoire.');
+      expect(await refuse(uuid('abcd1234r1'), 'appel', message: '  '), 'Le champ message est obligatoire.');
       expect(await refuse(uuid('inconnue'), 'courrier'), 'Créance introuvable — synchronisez le poste.');
       expect(await relances(), isEmpty);
 
@@ -165,29 +166,64 @@ void main() {
     });
   });
 
+  group('AUT-3 · e-mail par le SMTP du poste', () {
+    test('⚠️ l\'e-mail PART D\'ABORD (objet du web), puis la relance est écrite « déjà envoyée » et part avec already_sent', () async {
+      final envoyes = <Map<String, String>>[];
+      final direct = ClientsCreancesRepository(
+        database: db, deviceId: 'poste-test',
+        envoyerEmail: ({required destinataire, required sujet, required corps}) async => envoyes.add({'a': destinataire, 'objet': sujet, 'corps': corps}),
+      );
+
+      final r = await direct.relancer(creanceId: uuid('abcd1234r1'), canal: 'email', message: 'Bonjour');
+
+      expect(envoyes.single['objet'], 'Ferme École OLOUWACHEGOUN — Rappel de règlement');
+      expect(envoyes.single['corps'], 'Bonjour');
+      expect(r.alreadySent, isTrue);
+      await moteur.synchroniser();
+      expect(((serveur.envois.single['customer_reminders'] as List).single as Map)['already_sent'], true);
+    });
+
+    test('⚠️ un envoi refusé (hors ligne, SMTP) lève le motif du SMTP et n\'écrit AUCUNE relance', () async {
+      final direct = ClientsCreancesRepository(
+        database: db, deviceId: 'poste-test',
+        envoyerEmail: ({required destinataire, required sujet, required corps}) async => throw const EchecEnvoiEmail("Poste hors ligne : l'e-mail exige le réseau. Réessayez une fois le poste connecté."),
+      );
+
+      await expectLater(
+        direct.relancer(creanceId: uuid('abcd1234r1'), canal: 'email', message: 'Bonjour'),
+        throwsA(isA<SaisieRefusee>().having((e) => e.motif, 'motif', contains('hors ligne'))),
+      );
+      expect(await relances(), isEmpty);
+    });
+
+    test('le lien d\'appel garde chiffres et plus', () {
+      expect(ClientsCreancesRepository.lienAppel('+229 97 20-20.20'), '+229972020' '20');
+    });
+  });
+
   group('moteur', () {
     test('⚠️⚠️ l\'envoi ne porte que le fait, sous les clés de `pushCustomerReminders`, et est acquitté', () async {
-      final r = await depot.relancer(creanceId: uuid('abcd1234r1'), canal: 'sms', message: 'Bonjour', date: DateTime(2026, 10, 28));
+      final r = await depot.relancer(creanceId: uuid('abcd1234r1'), canal: 'appel', message: 'Bonjour', date: DateTime(2026, 10, 28));
 
       await moteur.synchroniser();
 
       final envoye = (serveur.envois.single['customer_reminders'] as List).single as Map;
       expect(envoye, {
-        'id': r.id, 'customer_id': uuid('c1'), 'receivable_id': uuid('abcd1234r1'), 'channel': 'sms',
-        'message': 'Bonjour', 'reminder_date': '2026-10-28',
+        'id': r.id, 'customer_id': uuid('c1'), 'receivable_id': uuid('abcd1234r1'), 'channel': 'appel',
+        'message': 'Bonjour', 'reminder_date': '2026-10-28', 'already_sent': false,
       });
       expect((await relances()).single.syncStatus, SyncStatus.synced);
     });
 
-    test('un refus (SMS non configuré) devient conflict avec son motif et se relance', () async {
-      final r = await depot.relancer(creanceId: uuid('abcd1234r1'), canal: 'sms', message: 'Bonjour');
-      serveur.refus['customer_reminders'] = {r.id: "Aucun fournisseur SMS n'est configuré (Paramètres > Intégrations)."};
+    test('un refus du serveur devient conflict avec son motif et se relance', () async {
+      final r = await depot.relancer(creanceId: uuid('abcd1234r1'), canal: 'appel', message: 'Bonjour');
+      serveur.refus['customer_reminders'] = {r.id: "Ce client n'a pas de numéro de téléphone enregistré."};
 
       await moteur.synchroniser();
 
       expect((await relances()).single.syncStatus, SyncStatus.conflict);
       final conflit = (await db.select(db.syncConflicts).get()).firstWhere((c) => c.sourceTable == 'customer_reminders');
-      expect(conflit.reason, contains('Aucun fournisseur SMS'));
+      expect(conflit.reason, contains('pas de numéro'));
       await moteur.relancer(conflit);
       expect((await relances()).single.syncStatus, SyncStatus.pending);
     });
@@ -198,7 +234,7 @@ void main() {
       serveur.tirage = {
         'server_time': '2026-10-28T13:00:00Z',
         'customer_reminders': [
-          {'id': locale.id, 'customer_id': uuid('c1'), 'receivable_id': null, 'channel': 'sms', 'reminder_date': '2026-10-01', 'message': 'ÉCRASÉE'},
+          {'id': locale.id, 'customer_id': uuid('c1'), 'receivable_id': null, 'channel': 'appel', 'reminder_date': '2026-10-01', 'message': 'ÉCRASÉE'},
           {'id': uuid('web1'), 'customer_id': uuid('c1'), 'receivable_id': uuid('abcd1234r1'), 'channel': 'whatsapp', 'reminder_date': '2026-10-02', 'message': 'Du web'},
         ],
       };
@@ -266,7 +302,7 @@ void main() {
       expect(documents.single.titre, 'Lettre de Relance');
     });
 
-    testWidgets('e-mail et SMS sont des DEMANDES : écrites, rien ouvert, et le refus est dit sans trace', (tester) async {
+    testWidgets('sans envoyeur, l\'e-mail est une DEMANDE (rien ouvert) ; un appel sans numéro est refusé sans trace', (tester) async {
       await afficher(tester);
 
       await tester.ensureVisible(find.byKey(Key('relancer-email-${uuid('abcd1234r1')}')));
@@ -275,11 +311,23 @@ void main() {
       expect((await relances()).single.channel, 'email');
       expect(urls, isEmpty);
 
-      await tester.ensureVisible(find.byKey(Key('relancer-sms-${uuid('r2')}')));
-      await tester.tap(find.byKey(Key('relancer-sms-${uuid('r2')}')));
+      await tester.ensureVisible(find.byKey(Key('relancer-appel-${uuid('r2')}')));
+      await tester.tap(find.byKey(Key('relancer-appel-${uuid('r2')}')));
       await tester.pumpAndSettle();
       expect(find.text("Ce client n'a pas de numéro de téléphone enregistré."), findsOneWidget);
       expect((await relances()).length, 1, reason: 'refus : aucune relance écrite');
+    });
+
+    testWidgets('« Appeler » tient la trace puis compose le numéro par tel: (chiffres et +)', (tester) async {
+      await afficher(tester);
+
+      await tester.ensureVisible(find.byKey(Key('relancer-appel-${uuid('abcd1234r1')}')));
+      await tester.tap(find.byKey(Key('relancer-appel-${uuid('abcd1234r1')}')));
+      await tester.pumpAndSettle();
+
+      expect((await relances()).single.channel, 'appel');
+      expect(urls.single, startsWith('tel:'));
+      expect(urls.single, isNot(contains(' ')));
     });
 
     testWidgets('le modèle est MODIFIABLE : balise ajoutée, niveau changé = texte du niveau rechargé', (tester) async {

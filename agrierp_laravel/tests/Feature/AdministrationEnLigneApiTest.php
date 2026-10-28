@@ -51,7 +51,6 @@ class AdministrationEnLigneApiTest extends TestCase
         $this->postJson('/api/parametres/postes/revoquer', ['poste' => 'x'])->assertForbidden();
         $this->getJson('/api/parametres/sauvegardes')->assertForbidden();
         $this->postJson('/api/parametres/sauvegardes/generer')->assertForbidden();
-        $this->postJson('/api/parametres/sms/tester', ['destinataire' => '+229'])->assertForbidden();
     }
 
     public function test_vider_les_sessions_conserve_le_jeton_de_l_auteur_et_deconnecte_les_autres_postes(): void
@@ -91,12 +90,5 @@ class AdministrationEnLigneApiTest extends TestCase
         $this->assertNotEmpty($this->getJson('/api/parametres/sauvegardes')->json('fichiers'));
         $this->getJson('/api/parametres/sauvegardes/telecharger/introuvable.sql')->assertNotFound();
         $this->postJson('/api/parametres/sauvegardes/importer', [])->assertStatus(422);
-    }
-
-    public function test_le_test_sms_exige_un_destinataire(): void
-    {
-        $this->actingAs($this->admin, 'sanctum');
-
-        $this->postJson('/api/parametres/sms/tester', [])->assertStatus(422);
     }
 }

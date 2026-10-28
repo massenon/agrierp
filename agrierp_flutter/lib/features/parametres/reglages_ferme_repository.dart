@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/config/fichiers_entreprise.dart';
@@ -35,29 +34,25 @@ class TrancheSaisie {
 /// UN SEUL ÉCRIVAIN de cette table.
 ///
 /// ⚠️ Le poste écrit la DEMANDE (`pending`) ; le serveur la joue par les services du web (`EntrepriseService`, `BaremeItsService`,
-/// `ModesPaiementService`, `RoleService`, `SmsConfigService`) avec les mêmes règles, les mêmes messages et les mêmes verrous
+/// `ModesPaiementService`, `RoleService`) avec les mêmes règles, les mêmes messages et les mêmes verrous
 /// administrateur ; l'état redescend au tirage. Ce dépôt REPRODUIT les refus du web avant d'écrire, pour que la saisie soit
-/// refusée tout de suite, mais le serveur reste le juge. ⚠️ Un secret (jeton SMS) n'est JAMAIS en base : il attend au coffre.
+/// refusée tout de suite, mais le serveur reste le juge. 
 class ReglagesFermeRepository {
-  ReglagesFermeRepository({required this.database, this.deviceId = 'poste', Uuid? uuid, FlutterSecureStorage? coffre, this.horloge, FichiersEntreprise? fichiersEntreprise})
+  ReglagesFermeRepository({required this.database, this.deviceId = 'poste', Uuid? uuid, this.horloge, FichiersEntreprise? fichiersEntreprise})
     : _uuid = uuid ?? const Uuid(),
-      fichiersEntreprise = fichiersEntreprise ?? FichiersEntreprise.courant,
-      _coffre = coffre ?? const FlutterSecureStorage();
+      fichiersEntreprise = fichiersEntreprise ?? FichiersEntreprise.courant;
 
   final AppDatabase database;
   final String deviceId;
   final Uuid _uuid;
-  final FlutterSecureStorage _coffre;
   final DateTime Function()? horloge;
   final FichiersEntreprise fichiersEntreprise;
 
   DateTime _maintenant() => (horloge ?? HeureBenin.maintenant)();
 
-  static String cleSecretSms(String idDemande) => 'agrierp.sms.secret.$idDemande';
-
   static const rolesFondamentaux = ['admin', 'comptable', 'caissier', 'animalier'];
 
-  Future<String> _ecrire(String kind, Map<String, Object?> contenu, {String? id, Map<String, String>? secret}) async {
+  Future<String> _ecrire(String kind, Map<String, Object?> contenu, {String? id}) async {
     final cle = id ?? _uuid.v4();
     await database.into(database.settingsRequests).insert(
       SettingsRequestsCompanion.insert(
@@ -69,7 +64,6 @@ class ReglagesFermeRepository {
         payload: jsonEncode(contenu),
       ),
     );
-    if (secret != null && secret.isNotEmpty) await _coffre.write(key: cleSecretSms(cle), value: jsonEncode(secret));
     return cle;
   }
 
@@ -354,33 +348,5 @@ class ReglagesFermeRepository {
 
     await _ecrire('role', {'geste': 'supprimer', 'roleName': nom});
     return null;
-  }
-
-  // ── PA-8 · Intégrations SMS ──────────────────────────────────────────────
-
-  /// Le jeton (Twilio) ou le secret (Vonage) attend au coffre et part UNE fois ; vide = l'existant est conservé.
-  Future<void> enregistrerSms({
-    required String fournisseur,
-    String twilioSid = '',
-    String twilioDe = '',
-    String twilioJeton = '',
-    String vonageCle = '',
-    String vonageDe = '',
-    String vonageSecret = '',
-  }) async {
-    if (fournisseur != 'twilio' && fournisseur != 'vonage') {
-      throw const ReglageRefuse({'smsProvider': "La valeur sélectionnée pour le champ fournisseur SMS n'est pas valide."});
-    }
-    await _ecrire(
-      'sms',
-      {
-        'smsProvider': fournisseur,
-        'twilioSid': twilioSid.trim(), 'twilioFrom': twilioDe.trim(), if (vonageCle.trim().isNotEmpty) 'vonageKey': vonageCle.trim(), 'vonageFrom': vonageDe.trim(),
-      },
-      secret: {
-        if (fournisseur == 'twilio' && twilioJeton.isNotEmpty) 'twilioToken': twilioJeton,
-        if (fournisseur == 'vonage' && vonageSecret.isNotEmpty) 'vonageSecret': vonageSecret,
-      },
-    );
   }
 }

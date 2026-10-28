@@ -37,8 +37,8 @@ class EnvoiEmailTest {
   }) : // `prefer_initializing_formals` suggère `this._parametres` : Dart l'interdit sur un paramètre NOMMÉ privé.
        // ignore: prefer_initializing_formals
        _parametres = parametres,
-       _envoyeur = envoyeur ?? _envoyerReellement,
-       _enLigne = enLigne ?? _connectiviteDuSysteme;
+       _envoyeur = envoyeur ?? envoyerReellement,
+       _enLigne = enLigne ?? connectiviteDuSysteme;
 
   final ParametresSmtp _parametres;
   final EnvoyeurSmtp _envoyeur;
@@ -52,10 +52,10 @@ class EnvoiEmailTest {
       'Ceci est un e-mail de test envoyé depuis un poste AgriERP (Paramètres > Email (SMTP)) — configuration '
       'SMTP validée avec succès.';
 
-  static Future<void> _envoyerReellement(Message message, SmtpServer serveur) =>
+  static Future<void> envoyerReellement(Message message, SmtpServer serveur) =>
       send(message, serveur, timeout: delai);
 
-  static Future<bool> _connectiviteDuSysteme() async {
+  static Future<bool> connectiviteDuSysteme() async {
     try {
       final liens = await Connectivity().checkConnectivity();
       return liens.any((l) => l != ConnectivityResult.none);

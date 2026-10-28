@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:agrierp/core/config/fichiers_entreprise.dart';
 import 'package:agrierp/core/database/app_database.dart';
@@ -21,7 +20,7 @@ import 'coffre_memoire.dart';
 /// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — LES RÉGLAGES DE LA FERME S'ÉCRIVENT AU POSTE, EN DEMANDES (`settings_requests`).
 ///
 /// Le poste reproduit les refus du web AVANT d'écrire ; le serveur (services du web) reste le juge et applique les verrous
-/// administrateur. Un secret SMS n'est jamais en base : il attend au coffre et part une fois.
+/// administrateur.
 class _Serveur extends Interceptor {
   final List<Map<String, dynamic>> envois = [];
   final refus = <String, String>{};
@@ -76,7 +75,7 @@ void main() {
       database: db, client: Dio()..interceptors.add(serveur), deviceId: 'poste-test', connectivity: _Connectivite(),
       maintenant: () => DateTime(2026, 10, 28, 14), coffre: coffre,
     );
-    depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', coffre: coffre, horloge: () => DateTime(2026, 10, 28, 10));
+    depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', horloge: () => DateTime(2026, 10, 28, 10));
   });
   tearDown(() async => db.close());
 
@@ -215,40 +214,11 @@ void main() {
     });
   });
 
-  group('PA-8 · SMS et moteur', () {
-    test('⚠️⚠️ le jeton n\'est JAMAIS en base : au coffre, il part avec la demande puis est effacé à l\'acquittement', () async {
-      await depot.enregistrerSms(fournisseur: 'twilio', twilioSid: 'AC1', twilioDe: '+229', twilioJeton: 'JETON-SECRET');
-      final d = (await demandes()).single;
-
-      expect(d.payload, isNot(contains('JETON-SECRET')));
-      expect(coffre.contenu[ReglagesFermeRepository.cleSecretSms(d.id)], contains('JETON-SECRET'));
-
-      await moteur.synchroniser();
-
-      final envoyee = (serveur.envois.single['settings_requests'] as List).single as Map;
-      expect(envoyee['payload'], containsPair('twilioToken', 'JETON-SECRET'));
-      expect(coffre.contenu.containsKey(ReglagesFermeRepository.cleSecretSms(d.id)), isFalse);
-      expect((await demandes()).single.syncStatus, SyncStatus.synced);
-    });
-
-    test('un refus du serveur devient conflict avec son motif, le secret reste pour la relance', () async {
-      await depot.enregistrerSms(fournisseur: 'vonage', vonageCle: 'K', vonageSecret: 'S');
-      final d = (await demandes()).single;
-      serveur.refus[d.id] = 'Votre rôle ne permet pas ce réglage.';
-
-      await moteur.synchroniser();
-
-      expect((await demandes()).single.syncStatus, SyncStatus.conflict);
-      expect(coffre.contenu.containsKey(ReglagesFermeRepository.cleSecretSms(d.id)), isTrue);
-      final conflit = (await db.select(db.syncConflicts).get()).firstWhere((x) => x.sourceTable == 'settings_requests');
-      expect(conflit.reason, contains('ne permet pas'));
-      await moteur.relancer(conflit);
-      expect((await demandes()).single.syncStatus, SyncStatus.pending);
-    });
-
-    test('un fournisseur inconnu est refusé avant d\'écrire', () async {
-      expect((await refus(() => depot.enregistrerSms(fournisseur: 'autre')))['smsProvider'], isNotNull);
-      expect(await demandes(), isEmpty);
+  group('AUT-3 · plus de SMS', () {
+    test('⚠️ aucune configuration SMS n\'existe plus au dépôt : le canal est l\'e-mail (SMTP) et l\'appel (tel:)', () {
+      final source = File('lib/features/parametres/reglages_ferme_repository.dart').readAsStringSync();
+      expect(source, isNot(contains('enregistrerSms')));
+      expect(source, isNot(contains("'sms'")));
     });
   });
 
@@ -259,7 +229,7 @@ void main() {
     setUp(() async {
       dossier = await Directory.systemTemp.createTemp('entreprise_test');
       FichiersEntreprise.courant = FichiersEntreprise(dossier: () async => dossier);
-      depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', coffre: coffre, horloge: () => DateTime(2026, 10, 28, 10));
+      depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', horloge: () => DateTime(2026, 10, 28, 10));
     });
     tearDown(() async {
       FichiersEntreprise.courant = FichiersEntreprise();
@@ -347,11 +317,7 @@ void main() {
       await tester.tap(find.byKey(const Key('bareme-retour')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('entreprise-sms')));
-      await tester.pumpAndSettle();
-      expect(find.text('Intégrations & Notifications'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('sms-retour')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('entreprise-sms')), findsNothing);
 
       await tester.tap(find.byKey(const Key('entreprise-modifier')));
       await tester.pumpAndSettle();

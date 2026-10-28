@@ -11,7 +11,6 @@ use App\Models\Permission;
 use App\Models\Receivable;
 use App\Models\Role;
 use App\Models\User;
-use App\Services\SmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -121,7 +120,7 @@ class SyncRelancesClientsTest extends TestCase
 
         $cas = [
             'email sans adresse' => [$this->relance(['channel' => 'email', 'customer_id' => $sansMail->id, 'receivable_id' => null]), "pas d'adresse email"],
-            'sms sans numéro' => [$this->relance(['channel' => 'sms', 'customer_id' => $sansTel->id, 'receivable_id' => null]), "pas de numéro de téléphone"],
+            'appel sans numéro' => [$this->relance(['channel' => 'appel', 'customer_id' => $sansTel->id, 'receivable_id' => null]), "pas de numéro de téléphone"],
             'whatsapp sans numéro' => [$this->relance(['channel' => 'whatsapp', 'customer_id' => $sansTel->id, 'receivable_id' => null]), "pas de numéro de téléphone"],
             'canal inconnu' => [$this->relance(['channel' => 'pigeon']), 'canal'],
             'message vide' => [$this->relance(['message' => '']), 'message'],
@@ -137,21 +136,31 @@ class SyncRelancesClientsTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_un_sms_est_envoye_par_le_serveur_et_son_echec_est_rendu_sans_trace(): void
+    public function test_un_appel_ne_fait_que_tenir_la_trace_et_un_sms_n_existe_plus(): void
     {
-        $this->mock(SmsService::class, function ($mock) {
-            $mock->shouldReceive('send')->once()->andReturn(['success' => true, 'message' => 'SMS envoyé via Twilio.']);
-            $mock->shouldReceive('send')->once()->andReturn(['success' => false, 'message' => "Aucun fournisseur SMS n'est configuré (Paramètres > Intégrations)."]);
-        });
+        $r = $this->relance(['channel' => 'appel']);
+        $this->pousser([$r])->assertOk()->assertJsonPath('customer_reminders.accepted.0', $r['id']);
+        $this->assertSame('appel', CustomerReminder::find($r['id'])->channel);
 
-        $ok = $this->relance(['channel' => 'sms']);
-        $ko = $this->relance(['channel' => 'sms']);
-        $this->pousser([$ok])->assertOk()->assertJsonPath('customer_reminders.accepted.0', $ok['id']);
+        $sms = $this->relance(['channel' => 'sms']);
+        $reponse = $this->pousser([$sms])->assertOk();
+        $this->assertSame([], $reponse->json('customer_reminders.accepted'));
+        $this->assertNull(CustomerReminder::find($sms['id']));
+    }
+
+    public function test_un_e_mail_deja_parti_du_poste_n_est_pas_renvoye_mais_exige_une_adresse(): void
+    {
+        Mail::fake();
+
+        $r = $this->relance(['channel' => 'email', 'already_sent' => true]);
+        $this->pousser([$r])->assertOk()->assertJsonPath('customer_reminders.accepted.0', $r['id']);
+        $this->assertNotNull(CustomerReminder::find($r['id']));
+        Mail::assertNothingSent();
+
+        $sansMail = \App\Models\Customer::create(['name' => 'Sans Mail', 'phone' => '+22997000000', 'is_active' => true]);
+        $ko = $this->relance(['channel' => 'email', 'already_sent' => true, 'customer_id' => $sansMail->id, 'receivable_id' => null]);
         $reponse = $this->pousser([$ko])->assertOk();
-
-        $this->assertStringContainsString('Aucun fournisseur SMS', $reponse->json('customer_reminders.rejected.0.reason'));
-        $this->assertNotNull(CustomerReminder::find($ok['id']));
-        $this->assertNull(CustomerReminder::find($ko['id']), 'envoi refusé : pas une relance faite');
+        $this->assertStringContainsString("pas d'adresse email", $reponse->json('customer_reminders.rejected.0.reason'));
     }
 
     public function test_sans_le_droit_manage_ventes_la_relance_est_refusee(): void

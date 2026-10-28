@@ -2,10 +2,14 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/config/envoi_email_test.dart' show EchecEnvoiEmail;
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
 import '../../core/temps/heure_benin.dart';
+
+/// Ticket AUT-3 — envoi d'un e-mail par le SMTP du poste (`EnvoiEmail.envoyer`), injectable.
+typedef EnvoyeurEmailRelance = Future<void> Function({required String destinataire, required String sujet, required String corps});
 
 /// Une ligne de « Liste des Clients ».
 class LigneClient {
@@ -218,9 +222,14 @@ class ClientsCreancesRepository {
     required this.database,
     required this.deviceId,
     Uuid? uuid,
+    this.envoyerEmail,
   }) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase database;
+
+  /// Ticket AUT-3 — envoi d'un e-mail par le SMTP du poste (remplace le SMS). Absent : la relance par e-mail est écrite en
+  /// attente et c'est le serveur qui l'envoie à la synchronisation (anciens appels, tests).
+  final EnvoyeurEmailRelance? envoyerEmail;
 
   /// Identifiant du poste, posé sur chaque avance et imputation (`SyncColumns`).
   final String deviceId;
@@ -924,7 +933,10 @@ class ClientsCreancesRepository {
   Future<Customer?> clientDe(String clientId) => (database.select(database.customers)..where((c) => c.id.equals(clientId))).getSingleOrNull();
 
   /// Les quatre canaux (`RelanceClientService::CANAUX`).
-  static const canauxRelance = ['whatsapp', 'email', 'sms', 'courrier'];
+  static const canauxRelance = ['whatsapp', 'email', 'appel', 'courrier'];
+
+  /// Objet du mail de relance : celui du web (`CustomerReminderMail`).
+  static const objetEmailRelance = 'Ferme École OLOUWACHEGOUN — Rappel de règlement';
 
   /// Les trois modèles du WEB (`RelancesClients::defaultTemplates`) — le web est le maître, au caractère près.
   static const modelesRelance = <String, String>{
@@ -948,6 +960,9 @@ class ClientsCreancesRepository {
         .replaceAll('[DATE_ECHEANCE]', echeance == null ? '' : DocumentsAvances.formaterJour(echeance));
   }
 
+  /// Numéro du lien `tel:` : chiffres et « + » seulement, comme le web (`preg_replace('/[^0-9+]/', …)`).
+  static String lienAppel(String telephone) => telephone.replaceAll(RegExp(r'[^0-9+]'), '');
+
   /// Le lien `wa.me` du web : numéro réduit à ses chiffres, message encodé.
   static String lienWhatsapp(String telephone, String message) =>
       'https://wa.me/${telephone.replaceAll(RegExp(r'[^0-9]'), '')}?text=${Uri.encodeComponent(message)}';
@@ -967,12 +982,12 @@ class ClientsCreancesRepository {
     );
   }
 
-  /// « Relancer WhatsApp » / « par Mail » / « par SMS » / « Exporter Courrier » : écrit la relance, EN ATTENTE d'envoi.
+  /// « Relancer WhatsApp » / « par Mail » / « Appeler » / « Exporter Courrier » : écrit la relance, EN ATTENTE d'envoi.
   ///
   /// ⚠️⚠️ **LE POSTE FAIT CE QUE L'APPAREIL PEUT FAIRE, ET DEMANDE LE RESTE.** WhatsApp (lien `wa.me`) et le courrier
-  /// (PDF) se font ICI — l'écran les déclenche APRÈS cette écriture ; l'e-mail et le SMS partent du SERVEUR (SMTP et
-  /// fournisseur SMS de l'entreprise) : la demande attend la synchronisation, qui l'acquitte ou la refuse avec son motif.
-  /// Les refus du serveur sont reproduits AVANT d'écrire, mêmes messages : numéro (WhatsApp, SMS), adresse (e-mail),
+  /// (PDF) se font ICI — l'écran les déclenche APRÈS cette écriture ; l'e-mail part du SMTP du POSTE (AUT-3 ; sans envoyeur, du SERVEUR à la synchronisation) et l'appel est composé
+  /// par `tel:` (AUT-3, remplace le SMS) : la demande attend la synchronisation, qui l'acquitte ou la refuse avec son motif.
+  /// Les refus du serveur sont reproduits AVANT d'écrire, mêmes messages : numéro (WhatsApp, appel), adresse (e-mail),
   /// message obligatoire.
   Future<CustomerReminder> relancer({
     String? creanceId,
@@ -996,11 +1011,22 @@ class ClientsCreancesRepository {
     if (client == null) throw const SaisieRefusee('Client inconnu — synchronisez le poste.');
 
     final telephone = (client.phone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    if ((canal == 'whatsapp' || canal == 'sms') && telephone.isEmpty) {
+    if ((canal == 'whatsapp' || canal == 'appel') && telephone.isEmpty) {
       throw const SaisieRefusee("Ce client n'a pas de numéro de téléphone enregistré.");
     }
     if (canal == 'email' && (client.email ?? '').trim().isEmpty) {
       throw const SaisieRefusee("Ce client n'a pas d'adresse email enregistrée.");
+    }
+
+    // Ticket AUT-3 — l'e-mail PART D'ABORD (refus = aucune trace, comme au web), puis la relance est écrite « déjà envoyée ».
+    var dejaEnvoye = false;
+    if (canal == 'email' && envoyerEmail != null) {
+      try {
+        await envoyerEmail!(destinataire: client.email!.trim(), sujet: objetEmailRelance, corps: message);
+      } on EchecEnvoiEmail catch (e) {
+        throw SaisieRefusee(e.message);
+      }
+      dejaEnvoye = true;
     }
 
     final jour = date ?? HeureBenin.maintenant();
@@ -1019,6 +1045,7 @@ class ClientsCreancesRepository {
             channel: canal,
             reminderDate: Value(DateTime(jour.year, jour.month, jour.day)),
             message: Value(message),
+            alreadySent: Value(dejaEnvoye),
           ),
         );
 
