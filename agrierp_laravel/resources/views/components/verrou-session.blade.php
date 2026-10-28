@@ -60,12 +60,12 @@
                         <span class="text-[9px] uppercase tracking-widest text-brand-emerald font-extrabold mt-0.5">Ferme Olouwachegoun</span>
                     </div>
                 </div>
-                <p class="text-[10px] text-brand-emerald font-bold uppercase tracking-[0.15em] border-t border-brand-emerald/10 pt-1 w-full">Votre logiciel de gestion intégrée</p>
+                <p class="text-[10px] text-brand-emerald font-bold uppercase tracking-[0.15em] border-t border-brand-emerald/10 pt-2 mt-1 w-full">Votre logiciel de gestion intégrée</p>
             </div>
 
-            <div>
+            <div class="space-y-2">
                 <h2 class="text-brand-forest text-xl font-bold leading-tight flex items-center gap-2"><span class="material-symbols-outlined text-brand-emerald">lock</span>Application verrouillée</h2>
-                <p class="text-outline text-xs">Session de {{ $nom }}. Saisissez votre mot de passe pour reprendre votre travail.</p>
+                <p class="text-outline text-xs leading-relaxed">Session de {{ $nom }}. Saisissez votre mot de passe pour reprendre votre travail.</p>
             </div>
 
             <div x-show="erreur" x-cloak dusk="verrou-message" role="alert"

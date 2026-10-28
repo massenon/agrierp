@@ -171,20 +171,32 @@ void main() {
       expect(si, fin);
     });
 
-    /// Ticket DES-1 (décision du client du 27/10/2026) : la DÉSINSTALLATION supprime la base locale — le dossier des
-    /// données du poste (`%APPDATA%\bj.olouwachegoun\agrierp`, CompanyName / ProductName de Runner.rc) — après une
-    /// confirmation qui dit que les saisies non synchronisées seront perdues. Une MISE À JOUR, elle, n'y touche jamais.
-    test('agrierp.iss : la désinstallation supprime la base locale, après confirmation (DES-1)', () {
+    /// Tickets DES-1 / DES-2 (décisions du client des 27 et 28/10/2026) : la DÉSINSTALLATION supprime TOUT ce que le poste a posé
+    /// hors du dossier d'installation — données (`%APPDATA%\OLOUWACHEGOUN\agrierp`, ancien nom `bj.olouwachegoun` compris), archives et
+    /// exports (`Documents\AgriERP`), justificatifs (`Documents\agrierp_justificatifs`) — après un avertissement, un choix Oui / Non
+    /// et une SAUVEGARDE AUTOMATIQUE proposée. Une MISE À JOUR, elle, n'y touche jamais.
+    test('agrierp.iss : la désinstallation supprime les données, avertit et propose la sauvegarde (DES-1, DES-2)', () {
       final source = iss.readAsStringSync();
       expect(source, contains('[UninstallDelete]'));
-      expect(source, contains(r'Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"'));
+      for (final dossier in [
+        r'{userappdata}\OLOUWACHEGOUN\agrierp',
+        r'{userappdata}\bj.olouwachegoun\agrierp',
+        r'{userdocs}\AgriERP"',
+        r'{userdocs}\agrierp_justificatifs',
+      ]) {
+        expect(source, contains('Type: filesandordirs; Name: "$dossier'), reason: dossier);
+      }
       expect(source, contains('function InitializeUninstall(): Boolean;'));
       expect(source, contains('PERDUES'));
       expect(source, contains('MB_YESNO'));
+      expect(source, contains('SAUVEGARDE AUTOMATIQUE'));
+      expect(source, contains('function SauvegarderAvantSuppression(var Dossier: String): Boolean;'));
+      expect(source, contains(r"ExpandConstant('{userdocs}\AgriERP-Sauvegarde-')"), reason: 'sauvegarde hors des dossiers supprimés');
       expect(source, isNot(contains('[InstallDelete]')), reason: 'une mise à jour ne touche pas aux données');
 
       final rc = File('windows/runner/Runner.rc').readAsStringSync();
-      expect(rc, contains('"CompanyName", "bj.olouwachegoun"'));
+      expect(rc, contains('"CompanyName", "OLOUWACHEGOUN"'));
+      expect(rc, isNot(contains('bj.olouwachegoun')));
       expect(rc, contains('"ProductName", "agrierp"'));
     });
   });

@@ -3,7 +3,7 @@
 ; /DAppEnv=dev|recette|production /DNomInstallateur=... installer\agrierp.iss).
 ;
 ; La base locale (Drift/SQLite) vit dans le profil Windows de l'utilisateur
-; (path_provider : %APPDATA%\bj.olouwachegoun\agrierp, CompanyName et
+; (path_provider : %APPDATA%\OLOUWACHEGOUN\agrierp, CompanyName et
 ; ProductName de Runner.rc), JAMAIS dans le dossier d'installation : une MISE A
 ; JOUR ne touche pas aux ventes et fiches non synchronisees.
 ;
@@ -83,21 +83,79 @@ Name: "{autodesktop}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{ap
 [Run]
 Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags: nowait postinstall skipifsilent
 
-; Ticket DES-1 : la base locale, demarrage.log et les justificatifs copies en local partent avec le programme.
+; Tickets DES-1 / DES-2 : la desinstallation retire TOUT ce que le poste a pose hors du dossier d'installation :
+; la base locale, demarrage.log, le logo, les sauvegardes (dossier des donnees), les archives et exports PDF/Excel
+; (Documents\AgriERP) et les justificatifs copies (Documents\agrierp_justificatifs). Le dossier des donnees s'appelait
+; bj.olouwachegoun avant DES-2 : les deux noms sont retires. Une SAUVEGARDE AUTOMATIQUE est proposee avant
+; (Documents\AgriERP-Sauvegarde-AAAA-MM-JJ_HHMM, jamais supprimee par la desinstallation).
 [UninstallDelete]
+Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\agrierp"
+Type: dirifempty; Name: "{userappdata}\OLOUWACHEGOUN"
 Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"
 Type: dirifempty; Name: "{userappdata}\bj.olouwachegoun"
+Type: filesandordirs; Name: "{userdocs}\AgriERP"
+Type: filesandordirs; Name: "{userdocs}\agrierp_justificatifs"
 
 [Code]
-// Ticket DES-1 : la desinstallation supprime la base locale ; ce qui n'est pas parti au serveur est perdu.
-// L'utilisateur le lit et confirme ; « Non » annule la desinstallation entiere.
+// Copie un dossier (sous-dossiers compris) ; un dossier source absent n'est pas une erreur (rien a sauvegarder).
+function CopierDossier(Source, Cible: String): Boolean;
+var
+  Code: Integer;
+begin
+  if not DirExists(Source) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  Result := Exec(ExpandConstant('{cmd}'),
+    '/C xcopy "' + Source + '" "' + Cible + '\" /E /I /H /Y /Q', '', SW_HIDE, ewWaitUntilTerminated, Code)
+    and (Code = 0);
+end;
+
+// Sauvegarde automatique : donnees du poste, archives/exports et justificatifs, dans un dossier horodate de Documents.
+function SauvegarderAvantSuppression(var Dossier: String): Boolean;
+var
+  Code: Integer;
+begin
+  // Le poste est ferme d'abord : une base ouverte ne se copie pas de facon coherente.
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM agrierp.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  Dossier := ExpandConstant('{userdocs}\AgriERP-Sauvegarde-') + GetDateTimeString('yyyy/mm/dd_hhnn', '-', #0);
+  Result := ForceDirectories(Dossier)
+    and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp'), Dossier + '\donnees-du-poste')
+    and CopierDossier(ExpandConstant('{userappdata}\bj.olouwachegoun\agrierp'), Dossier + '\donnees-du-poste-ancien-dossier')
+    and CopierDossier(ExpandConstant('{userdocs}\AgriERP'), Dossier + '\archives-et-exports')
+    and CopierDossier(ExpandConstant('{userdocs}\agrierp_justificatifs'), Dossier + '\justificatifs');
+end;
+
+// Avertissement, choix Oui / Non, puis sauvegarde automatique si l'utilisateur la veut. « Non » annule la desinstallation.
 function InitializeUninstall(): Boolean;
+var
+  Dossier: String;
 begin
   Result := MsgBox(
-    'La desinstallation d''AgriERP supprime aussi la base locale de ce poste' + #13#10 +
-    '(' + ExpandConstant('{userappdata}\bj.olouwachegoun\agrierp') + ').' + #13#10#13#10 +
+    'ATTENTION - la desinstallation d''AgriERP supprime DEFINITIVEMENT, sur ce poste :' + #13#10#13#10 +
+    '  - la base locale et les journaux (' + ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp') + ')' + #13#10 +
+    '  - les archives et documents exportes (' + ExpandConstant('{userdocs}\AgriERP') + ')' + #13#10 +
+    '  - les justificatifs et recus (' + ExpandConstant('{userdocs}\agrierp_justificatifs') + ')' + #13#10#13#10 +
     'Les ventes, fiches, depenses et autres saisies faites HORS LIGNE et pas encore' + #13#10 +
     'synchronisees seront PERDUES. Synchronisez le poste avant de continuer.' + #13#10#13#10 +
-    'Desinstaller AgriERP et supprimer ses donnees locales ?',
+    'Continuer la desinstallation ?',
     mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+  if not Result then
+    Exit;
+
+  if MsgBox(
+    'Voulez-vous faire une SAUVEGARDE AUTOMATIQUE avant la suppression ?' + #13#10#13#10 +
+    'Elle sera enregistree dans votre dossier Documents (AgriERP-Sauvegarde-...) et ne sera pas supprimee.',
+    mbConfirmation, MB_YESNO or MB_DEFBUTTON1) = IDYES then
+  begin
+    if SauvegarderAvantSuppression(Dossier) then
+      MsgBox('Sauvegarde terminee :' + #13#10 + Dossier, mbInformation, MB_OK)
+    else
+      Result := MsgBox(
+        'La sauvegarde a echoue (espace disque ou acces refuse).' + #13#10#13#10 +
+        'Desinstaller QUAND MEME et supprimer les donnees de ce poste ?',
+        mbError, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+  end;
 end;
