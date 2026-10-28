@@ -1009,6 +1009,60 @@ class ManualEntryRequests extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket CP-3 — IMMOBILISATION du registre (mixte : tirée du serveur ET saisie au poste).
+///
+/// ⚠️ Les colonnes sont celles de `FixedAsset` : le poste calcule l'amortissement cumulé avec la même formule (prorata mensuel
+/// plafonné à la base amortissable, arrêt à la date de sortie), jamais avec un montant servi. `isCapitalized` n'est JAMAIS posé
+/// au poste : seul le serveur écrit l'acquisition au grand livre (`RecordAssetAcquisitionEntryAction`) et le rend au tirage.
+/// `counterpart` ne sert qu'à la création : '' (reprise d'antériorité), 'credit' ou l'UUID du compte de trésorerie qui paie.
+class FixedAssets extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// Défauts du serveur (comme `chart_of_accounts`) : tout bien qui descend du serveur est `synced`.
+  @override
+  TextColumn get deviceId => text().withLength(min: 1, max: 64).withDefault(const Constant('serveur'))();
+
+  @override
+  TextColumn get syncStatus => textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  @override
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  TextColumn get code => text()();
+  TextColumn get label => text()();
+  TextColumn get accountCode => text()();
+  DateTimeColumn get acquisitionDate => dateTime()();
+  RealColumn get acquisitionValue => real()();
+  RealColumn get residualValue => real().withDefault(const Constant(0))();
+  IntColumn get durationYears => integer()();
+
+  /// `en_service` · `cede` · `reforme`.
+  TextColumn get status => text().withDefault(const Constant('en_service'))();
+  DateTimeColumn get disposalDate => dateTime().nullable()();
+  TextColumn get disposalReason => text().nullable()();
+  BoolColumn get isCapitalized => boolean().withDefault(const Constant(false))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Contrepartie de l'acquisition, à la création seulement (voir l'en-tête).
+  TextColumn get counterpart => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-3 — DEMANDE de dotation aux amortissements (« Passer la Dotation ») : la date d'arrêté seule. Le serveur recalcule
+/// l'écart entre le cumul du registre et le grand livre (`RecordDepreciationEntryAction`) : rejouer la demande ne double rien.
+class DepreciationRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  DateTimeColumn get dateArrete => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Courrier reçu ou envoyé — saisi au poste, validé par le serveur (ticket F0.78).
 ///
 /// ⚠️ **LA RÉFÉRENCE `CR-AAAA-NNN` N'EST JAMAIS INVENTÉE PAR LE POSTE** : le serveur
@@ -2082,6 +2136,8 @@ class SyncState extends Table {
     PurchaseOrders,
     PurchaseOrderLines,
     ManualEntryRequests,
+    FixedAssets,
+    DepreciationRequests,
     Payables,
     Employees,
     Internships,
@@ -2156,7 +2212,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 74;
+  int get schemaVersion => 75;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2833,6 +2889,11 @@ class AppDatabase extends _$AppDatabase {
       if (from < 74) {
         if (!await _tableExiste(m, manualEntryRequests)) await m.createTable(manualEntryRequests);
       }
+      // v75 — ticket CP-3 : registre des immobilisations (mixte) et demandes de dotation aux amortissements.
+      if (from < 75) {
+        if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
+        if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -3209,6 +3270,9 @@ class AppDatabase extends _$AppDatabase {
     'chart_of_accounts',
     // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
     'manual_entry_requests',
+    // Ticket CP-3 — immobilisations saisies au poste et demandes de dotation aux amortissements.
+    'fixed_assets',
+    'depreciation_requests',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
     'purchase_orders',
     'purchases',
@@ -3301,6 +3365,7 @@ class AppDatabase extends _$AppDatabase {
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
     'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
     'manual_entry_requests', // CP-2
+    'depreciation_requests', // CP-3
     'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
@@ -3320,7 +3385,7 @@ class AppDatabase extends _$AppDatabase {
   static const tablesConservees = [
     'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
     'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
-    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers',
+    'chart_of_accounts', 'fixed_assets', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers', // CP-3 : fixed_assets
     'company_settings', 'modules_config', 'attestation_templates',
     // Ticket RH-4 — barème ITS (référentiel, préservé au serveur).
     'income_tax_brackets',

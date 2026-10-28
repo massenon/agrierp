@@ -183,6 +183,10 @@ PRD : `docs/prd/rh-crud-poste.md`. **Trois points de passage uniques, partagés 
 
 `App\Services\PlanComptableService` (créer, modifier, archiver un compte) et `App\Actions\SaisieEcritureManuelleAction` (créer, modifier, archiver une opération diverse : débit ≠ crédit, mois non clôturé, écriture non verrouillée, exercice ouvert) sont les points de passage uniques des écrans `PlanComptable` / `JournalComptable` ET du push : `chart_of_accounts` (`is_active: false` = archivage, jamais de réactivation) et `manual_entry_requests` (une DEMANDE : `creer` / `modifier` / `archiver` ; le numéro `OD-AAAA-NNNN` est attribué par le serveur, l'UUID de la demande est le `source_id` de l'écriture créée = idempotence). Gardes : `SyncPlanComptableTest`, `SyncEcrituresManuellesTest`.
 
+### Immobilisations au poste (CP-3 — 28/10/2026)
+
+`App\Services\ImmobilisationService` (enregistrer + capitalisation, modifier avec valeur figée si comptabilisé, sortir, archiver, passer la dotation) est le point de passage unique de `Comptabilite\Immobilisations` ET du push : `fixed_assets` (la ligne entière ; inconnue = enregistrement avec `counterpart` '' / `credit` / UUID de trésorerie ; connue = modification puis sortie si le poste en porte une ; archivé ou déjà sorti = non rouvert) et `depreciation_requests` (la date d'arrêté seule : `RecordDepreciationEntryAction` recalcule l'écart contre le grand livre, idempotente). Droit `manage-comptabilite`, traités après le plan comptable ; le tirage sert `fixed_assets` (`view-comptabilite`). ⚠️ `FixedAsset::cumulAmortissement` s'appuie sur `Carbon::diffInMonths`, qui rend des mois À VIRGULE depuis Carbon 3 : le poste le reproduit (`CalculAmortissement`). Garde : `SyncImmobilisationsTest`.
+
 ### Scheduling
 
 `routes/console.php` holds all 5 scheduled tasks (daily `agrierp:backup` at 02:00, `DailyProphylaxyReminderJob` at 06:00 Africa/Porto-Novo, weekly session GC / notification purge / failed-job prune, weekly backup-download reminder). Production uses **one** cPanel cron entry running `php artisan schedule:run` every minute — never one cron per task.

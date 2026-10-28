@@ -149,6 +149,8 @@ class SyncController extends Controller
         'internship_absences', 'payslip_requests',
         // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
         'manual_entry_requests',
+        // Ticket CP-3 — immobilisations (registre mixte) et demandes de dotation aux amortissements.
+        'fixed_assets', 'depreciation_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -237,6 +239,8 @@ class SyncController extends Controller
         // Ticket DEP3 — les comptes de CHARGE (classe 6) de la modale « Nouvelle Dépense » : l'écran est celui de
         // `view-achats`, qui n'a pas le journal. Le plan comptable n'a rien de confidentiel (numéros et intitulés).
         'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
+        // Ticket CP-3 — le registre des immobilisations (écran `view-comptabilite`).
+        'fixed_assets' => ['view-comptabilite'],
         // Ticket DEP3 — centres de coût (filières) de l'en-tête d'une dépense : petit référentiel, lecture seule.
         'cost_centers' => ['view-achats', 'view-comptabilite'],
         'fiscal_years' => null,
@@ -1167,6 +1171,27 @@ class SyncController extends Controller
                 ->where('is_active', true)
                 ->orderBy('code')
                 ->get(['id', 'code', 'label', 'class']),
+
+            // Ticket CP-3 — le registre entier, archivés compris (`is_active`) : le poste calcule ses amortissements avec les
+            // MÊMES colonnes que `FixedAsset::cumulAmortissement`, jamais avec un montant servi.
+            'fixed_assets' => fn () => \App\Models\FixedAsset::query()
+                ->orderBy('acquisition_date')->orderBy('code')
+                ->get()
+                ->map(fn (\App\Models\FixedAsset $b) => [
+                    'id' => $b->id,
+                    'code' => $b->code,
+                    'label' => $b->label,
+                    'account_code' => $b->account_code,
+                    'acquisition_date' => $b->acquisition_date?->format('Y-m-d'),
+                    'acquisition_value' => (float) $b->acquisition_value,
+                    'residual_value' => (float) $b->residual_value,
+                    'duration_years' => (int) $b->duration_years,
+                    'status' => $b->status,
+                    'disposal_date' => $b->disposal_date?->format('Y-m-d'),
+                    'disposal_reason' => $b->disposal_reason,
+                    'is_capitalized' => (bool) $b->is_capitalized,
+                    'is_active' => (bool) $b->is_active,
+                ]),
 
             'fiscal_years' => fn () => FiscalYear::query()
                 ->orderByDesc('year')
@@ -2118,6 +2143,8 @@ class SyncController extends Controller
             'chart_of_accounts' => ['accepted' => [], 'rejected' => []],
             // Ticket CP-2 — demandes d'écriture manuelle (créer, modifier, archiver) saisies au poste.
             'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
+            'fixed_assets' => ['accepted' => [], 'rejected' => []],
+            'depreciation_requests' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
@@ -2345,6 +2372,21 @@ class SyncController extends Controller
         if ($request->has('manual_entry_requests')) {
             $result['manual_entry_requests'] = $this->pushManualEntryRequests(
                 $this->envoiTraduit($request, 'manual_entry_requests'),
+                $request->user(),
+            );
+        }
+
+        // Ticket CP-3 — registre des immobilisations, puis dotation (qui amortit ce que le registre vient de recevoir).
+        if ($request->has('fixed_assets')) {
+            $result['fixed_assets'] = $this->pushFixedAssets(
+                $this->envoiTraduit($request, 'fixed_assets'),
+                $request->user(),
+            );
+        }
+
+        if ($request->has('depreciation_requests')) {
+            $result['depreciation_requests'] = $this->pushDepreciationRequests(
+                $this->envoiTraduit($request, 'depreciation_requests'),
                 $request->user(),
             );
         }
@@ -2578,6 +2620,9 @@ class SyncController extends Controller
         'chart_of_accounts' => 'manage-comptabilite',
         // Ticket CP-2 — le droit de `JournalComptable` du web.
         'manual_entry_requests' => 'manage-comptabilite',
+        // Ticket CP-3 — le droit de `Immobilisations` du web.
+        'fixed_assets' => 'manage-comptabilite',
+        'depreciation_requests' => 'manage-comptabilite',
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
@@ -3707,6 +3752,134 @@ class SyncController extends Controller
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
             } catch (\Throwable $e) {
                 // Exercice clos ou absent, écriture verrouillée, écriture déséquilibrée… : le motif français, jamais une erreur technique.
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-3 — IMMOBILISATIONS saisies au poste (enregistrer, modifier, sortir, archiver).
+     *
+     * ⚠️ `ImmobilisationService` — partagé avec `Comptabilite\Immobilisations` — porte les règles du web : code unique, nature
+     * du plan, valeur résiduelle < valeur d'acquisition, valeur figée d'un bien comptabilisé, sortie après l'acquisition.
+     * Le poste envoie la LIGNE entière : inconnue du serveur = enregistrement (avec `counterpart` : '' reprise d'antériorité,
+     * 'credit', ou le compte de trésorerie qui paie) ; connue = modification, puis sortie si le poste en porte une et que le
+     * bien est encore en service. Un bien déjà sorti n'est plus modifié par le poste (le serveur l'emporte).
+     */
+    private function pushFixedAssets(array $biens, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ImmobilisationService::class);
+
+        foreach ($biens as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de modifier le registre des immobilisations.'];
+
+                continue;
+            }
+
+            try {
+                if (! is_string($id) || ! Str::isUuid($id)) {
+                    throw ValidationException::withMessages(['id' => 'Identifiant d\'immobilisation invalide.']);
+                }
+
+                $existant = \App\Models\FixedAsset::find($id);
+
+                if ($existant !== null && ! $existant->is_active) {
+                    $accepted[] = $id;   // archivé : rien ne le ressuscite
+
+                    continue;
+                }
+
+                $saisie = [
+                    'code' => $data['code'] ?? null,
+                    'label' => $data['label'] ?? null,
+                    'accountCode' => $data['account_code'] ?? null,
+                    'acquisitionDate' => $data['acquisition_date'] ?? null,
+                    'acquisitionValue' => $data['acquisition_value'] ?? null,
+                    'residualValue' => $data['residual_value'] ?? 0,
+                    'durationYears' => $data['duration_years'] ?? null,
+                    'contrepartie' => $data['counterpart'] ?? '',
+                ];
+
+                $attributs = \App\Services\ImmobilisationService::ATTRIBUTS + ['code' => 'code', 'label' => 'désignation'];
+
+                // Un bien déjà connu : la nature, la date et la contrepartie ne se rejugent pas (déjà acceptées, ou rangées
+                // depuis dans le plan) — seules les règles de saisie courantes s'appliquent, celles du web.
+                $valides = validator($saisie, $service->regles($existant?->id), MotifsRefusPush::messages(), MotifsRefusPush::attributs() + $attributs)->validate();
+
+                if ($existant === null) {
+                    $bien = $service->enregistrer($valides, $id)['bien'];
+                } else {
+                    $bien = $service->modifier($existant, $valides);
+                }
+
+                $sortie = in_array($data['status'] ?? 'en_service', ['cede', 'reforme'], true);
+
+                if ($sortie && $bien->status === 'en_service') {
+                    $v = validator([
+                        'cessionDate' => $data['disposal_date'] ?? null,
+                        'cessionStatus' => $data['status'],
+                        'cessionReason' => $data['disposal_reason'] ?? null,
+                    ], $service->reglesSortie($bien), \App\Services\ImmobilisationService::MESSAGES_SORTIE + MotifsRefusPush::messages(), \App\Services\ImmobilisationService::ATTRIBUTS_SORTIE)->validate();
+
+                    $service->sortir($bien, $v['cessionDate'], $v['cessionStatus'], $v['cessionReason']);
+                }
+
+                if (array_key_exists('is_active', $data) && filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($bien);
+                }
+
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-3 — DEMANDES DE DOTATION aux amortissements (« Passer la Dotation »).
+     *
+     * ⚠️ Le poste n'envoie que la date d'arrêté : le montant est recalculé ICI par `RecordDepreciationEntryAction` (écart entre
+     * le cumul du registre et le grand livre), donc rejouer une demande ne double jamais la charge. « Rien à doter » est un
+     * succès, pas un refus. Exercice clos ou absent : refusé avec son motif.
+     */
+    private function pushDepreciationRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ImmobilisationService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de passer une dotation aux amortissements.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'date_arrete' => ['required', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['date_arrete' => "date d'arrêté"])->validate();
+
+                $service->passerDotation(\Carbon\Carbon::parse($valides['date_arrete'])->format('Y-m-d'));
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
                 $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
             }
         }

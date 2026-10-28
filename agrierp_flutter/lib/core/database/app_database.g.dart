@@ -10492,6 +10492,1394 @@ class ManualEntryRequestsCompanion extends UpdateCompanion<ManualEntryRequest> {
   }
 }
 
+class $FixedAssetsTable extends FixedAssets
+    with TableInfo<$FixedAssetsTable, FixedAsset> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FixedAssetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('serveur'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>($FixedAssetsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _accountCodeMeta = const VerificationMeta(
+    'accountCode',
+  );
+  @override
+  late final GeneratedColumn<String> accountCode = GeneratedColumn<String>(
+    'account_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _acquisitionDateMeta = const VerificationMeta(
+    'acquisitionDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> acquisitionDate =
+      GeneratedColumn<DateTime>(
+        'acquisition_date',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _acquisitionValueMeta = const VerificationMeta(
+    'acquisitionValue',
+  );
+  @override
+  late final GeneratedColumn<double> acquisitionValue = GeneratedColumn<double>(
+    'acquisition_value',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _residualValueMeta = const VerificationMeta(
+    'residualValue',
+  );
+  @override
+  late final GeneratedColumn<double> residualValue = GeneratedColumn<double>(
+    'residual_value',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _durationYearsMeta = const VerificationMeta(
+    'durationYears',
+  );
+  @override
+  late final GeneratedColumn<int> durationYears = GeneratedColumn<int>(
+    'duration_years',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('en_service'),
+  );
+  static const VerificationMeta _disposalDateMeta = const VerificationMeta(
+    'disposalDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> disposalDate = GeneratedColumn<DateTime>(
+    'disposal_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _disposalReasonMeta = const VerificationMeta(
+    'disposalReason',
+  );
+  @override
+  late final GeneratedColumn<String> disposalReason = GeneratedColumn<String>(
+    'disposal_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isCapitalizedMeta = const VerificationMeta(
+    'isCapitalized',
+  );
+  @override
+  late final GeneratedColumn<bool> isCapitalized = GeneratedColumn<bool>(
+    'is_capitalized',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_capitalized" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _counterpartMeta = const VerificationMeta(
+    'counterpart',
+  );
+  @override
+  late final GeneratedColumn<String> counterpart = GeneratedColumn<String>(
+    'counterpart',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    code,
+    label,
+    accountCode,
+    acquisitionDate,
+    acquisitionValue,
+    residualValue,
+    durationYears,
+    status,
+    disposalDate,
+    disposalReason,
+    isCapitalized,
+    isActive,
+    counterpart,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fixed_assets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FixedAsset> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_codeMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('account_code')) {
+      context.handle(
+        _accountCodeMeta,
+        accountCode.isAcceptableOrUnknown(
+          data['account_code']!,
+          _accountCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_accountCodeMeta);
+    }
+    if (data.containsKey('acquisition_date')) {
+      context.handle(
+        _acquisitionDateMeta,
+        acquisitionDate.isAcceptableOrUnknown(
+          data['acquisition_date']!,
+          _acquisitionDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_acquisitionDateMeta);
+    }
+    if (data.containsKey('acquisition_value')) {
+      context.handle(
+        _acquisitionValueMeta,
+        acquisitionValue.isAcceptableOrUnknown(
+          data['acquisition_value']!,
+          _acquisitionValueMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_acquisitionValueMeta);
+    }
+    if (data.containsKey('residual_value')) {
+      context.handle(
+        _residualValueMeta,
+        residualValue.isAcceptableOrUnknown(
+          data['residual_value']!,
+          _residualValueMeta,
+        ),
+      );
+    }
+    if (data.containsKey('duration_years')) {
+      context.handle(
+        _durationYearsMeta,
+        durationYears.isAcceptableOrUnknown(
+          data['duration_years']!,
+          _durationYearsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_durationYearsMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('disposal_date')) {
+      context.handle(
+        _disposalDateMeta,
+        disposalDate.isAcceptableOrUnknown(
+          data['disposal_date']!,
+          _disposalDateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('disposal_reason')) {
+      context.handle(
+        _disposalReasonMeta,
+        disposalReason.isAcceptableOrUnknown(
+          data['disposal_reason']!,
+          _disposalReasonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_capitalized')) {
+      context.handle(
+        _isCapitalizedMeta,
+        isCapitalized.isAcceptableOrUnknown(
+          data['is_capitalized']!,
+          _isCapitalizedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('counterpart')) {
+      context.handle(
+        _counterpartMeta,
+        counterpart.isAcceptableOrUnknown(
+          data['counterpart']!,
+          _counterpartMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FixedAsset map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FixedAsset(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $FixedAssetsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      accountCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}account_code'],
+      )!,
+      acquisitionDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}acquisition_date'],
+      )!,
+      acquisitionValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}acquisition_value'],
+      )!,
+      residualValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}residual_value'],
+      )!,
+      durationYears: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_years'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      disposalDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}disposal_date'],
+      ),
+      disposalReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}disposal_reason'],
+      ),
+      isCapitalized: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_capitalized'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      counterpart: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}counterpart'],
+      ),
+    );
+  }
+
+  @override
+  $FixedAssetsTable createAlias(String alias) {
+    return $FixedAssetsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class FixedAsset extends DataClass implements Insertable<FixedAsset> {
+  final String id;
+
+  /// Défauts du serveur (comme `chart_of_accounts`) : tout bien qui descend du serveur est `synced`.
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String code;
+  final String label;
+  final String accountCode;
+  final DateTime acquisitionDate;
+  final double acquisitionValue;
+  final double residualValue;
+  final int durationYears;
+
+  /// `en_service` · `cede` · `reforme`.
+  final String status;
+  final DateTime? disposalDate;
+  final String? disposalReason;
+  final bool isCapitalized;
+  final bool isActive;
+
+  /// Contrepartie de l'acquisition, à la création seulement (voir l'en-tête).
+  final String? counterpart;
+  const FixedAsset({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.code,
+    required this.label,
+    required this.accountCode,
+    required this.acquisitionDate,
+    required this.acquisitionValue,
+    required this.residualValue,
+    required this.durationYears,
+    required this.status,
+    this.disposalDate,
+    this.disposalReason,
+    required this.isCapitalized,
+    required this.isActive,
+    this.counterpart,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $FixedAssetsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['code'] = Variable<String>(code);
+    map['label'] = Variable<String>(label);
+    map['account_code'] = Variable<String>(accountCode);
+    map['acquisition_date'] = Variable<DateTime>(acquisitionDate);
+    map['acquisition_value'] = Variable<double>(acquisitionValue);
+    map['residual_value'] = Variable<double>(residualValue);
+    map['duration_years'] = Variable<int>(durationYears);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || disposalDate != null) {
+      map['disposal_date'] = Variable<DateTime>(disposalDate);
+    }
+    if (!nullToAbsent || disposalReason != null) {
+      map['disposal_reason'] = Variable<String>(disposalReason);
+    }
+    map['is_capitalized'] = Variable<bool>(isCapitalized);
+    map['is_active'] = Variable<bool>(isActive);
+    if (!nullToAbsent || counterpart != null) {
+      map['counterpart'] = Variable<String>(counterpart);
+    }
+    return map;
+  }
+
+  FixedAssetsCompanion toCompanion(bool nullToAbsent) {
+    return FixedAssetsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      code: Value(code),
+      label: Value(label),
+      accountCode: Value(accountCode),
+      acquisitionDate: Value(acquisitionDate),
+      acquisitionValue: Value(acquisitionValue),
+      residualValue: Value(residualValue),
+      durationYears: Value(durationYears),
+      status: Value(status),
+      disposalDate: disposalDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(disposalDate),
+      disposalReason: disposalReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(disposalReason),
+      isCapitalized: Value(isCapitalized),
+      isActive: Value(isActive),
+      counterpart: counterpart == null && nullToAbsent
+          ? const Value.absent()
+          : Value(counterpart),
+    );
+  }
+
+  factory FixedAsset.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FixedAsset(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $FixedAssetsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      code: serializer.fromJson<String>(json['code']),
+      label: serializer.fromJson<String>(json['label']),
+      accountCode: serializer.fromJson<String>(json['accountCode']),
+      acquisitionDate: serializer.fromJson<DateTime>(json['acquisitionDate']),
+      acquisitionValue: serializer.fromJson<double>(json['acquisitionValue']),
+      residualValue: serializer.fromJson<double>(json['residualValue']),
+      durationYears: serializer.fromJson<int>(json['durationYears']),
+      status: serializer.fromJson<String>(json['status']),
+      disposalDate: serializer.fromJson<DateTime?>(json['disposalDate']),
+      disposalReason: serializer.fromJson<String?>(json['disposalReason']),
+      isCapitalized: serializer.fromJson<bool>(json['isCapitalized']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      counterpart: serializer.fromJson<String?>(json['counterpart']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $FixedAssetsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'code': serializer.toJson<String>(code),
+      'label': serializer.toJson<String>(label),
+      'accountCode': serializer.toJson<String>(accountCode),
+      'acquisitionDate': serializer.toJson<DateTime>(acquisitionDate),
+      'acquisitionValue': serializer.toJson<double>(acquisitionValue),
+      'residualValue': serializer.toJson<double>(residualValue),
+      'durationYears': serializer.toJson<int>(durationYears),
+      'status': serializer.toJson<String>(status),
+      'disposalDate': serializer.toJson<DateTime?>(disposalDate),
+      'disposalReason': serializer.toJson<String?>(disposalReason),
+      'isCapitalized': serializer.toJson<bool>(isCapitalized),
+      'isActive': serializer.toJson<bool>(isActive),
+      'counterpart': serializer.toJson<String?>(counterpart),
+    };
+  }
+
+  FixedAsset copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? code,
+    String? label,
+    String? accountCode,
+    DateTime? acquisitionDate,
+    double? acquisitionValue,
+    double? residualValue,
+    int? durationYears,
+    String? status,
+    Value<DateTime?> disposalDate = const Value.absent(),
+    Value<String?> disposalReason = const Value.absent(),
+    bool? isCapitalized,
+    bool? isActive,
+    Value<String?> counterpart = const Value.absent(),
+  }) => FixedAsset(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    code: code ?? this.code,
+    label: label ?? this.label,
+    accountCode: accountCode ?? this.accountCode,
+    acquisitionDate: acquisitionDate ?? this.acquisitionDate,
+    acquisitionValue: acquisitionValue ?? this.acquisitionValue,
+    residualValue: residualValue ?? this.residualValue,
+    durationYears: durationYears ?? this.durationYears,
+    status: status ?? this.status,
+    disposalDate: disposalDate.present ? disposalDate.value : this.disposalDate,
+    disposalReason: disposalReason.present
+        ? disposalReason.value
+        : this.disposalReason,
+    isCapitalized: isCapitalized ?? this.isCapitalized,
+    isActive: isActive ?? this.isActive,
+    counterpart: counterpart.present ? counterpart.value : this.counterpart,
+  );
+  FixedAsset copyWithCompanion(FixedAssetsCompanion data) {
+    return FixedAsset(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      code: data.code.present ? data.code.value : this.code,
+      label: data.label.present ? data.label.value : this.label,
+      accountCode: data.accountCode.present
+          ? data.accountCode.value
+          : this.accountCode,
+      acquisitionDate: data.acquisitionDate.present
+          ? data.acquisitionDate.value
+          : this.acquisitionDate,
+      acquisitionValue: data.acquisitionValue.present
+          ? data.acquisitionValue.value
+          : this.acquisitionValue,
+      residualValue: data.residualValue.present
+          ? data.residualValue.value
+          : this.residualValue,
+      durationYears: data.durationYears.present
+          ? data.durationYears.value
+          : this.durationYears,
+      status: data.status.present ? data.status.value : this.status,
+      disposalDate: data.disposalDate.present
+          ? data.disposalDate.value
+          : this.disposalDate,
+      disposalReason: data.disposalReason.present
+          ? data.disposalReason.value
+          : this.disposalReason,
+      isCapitalized: data.isCapitalized.present
+          ? data.isCapitalized.value
+          : this.isCapitalized,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      counterpart: data.counterpart.present
+          ? data.counterpart.value
+          : this.counterpart,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FixedAsset(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('code: $code, ')
+          ..write('label: $label, ')
+          ..write('accountCode: $accountCode, ')
+          ..write('acquisitionDate: $acquisitionDate, ')
+          ..write('acquisitionValue: $acquisitionValue, ')
+          ..write('residualValue: $residualValue, ')
+          ..write('durationYears: $durationYears, ')
+          ..write('status: $status, ')
+          ..write('disposalDate: $disposalDate, ')
+          ..write('disposalReason: $disposalReason, ')
+          ..write('isCapitalized: $isCapitalized, ')
+          ..write('isActive: $isActive, ')
+          ..write('counterpart: $counterpart')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    code,
+    label,
+    accountCode,
+    acquisitionDate,
+    acquisitionValue,
+    residualValue,
+    durationYears,
+    status,
+    disposalDate,
+    disposalReason,
+    isCapitalized,
+    isActive,
+    counterpart,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FixedAsset &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.code == this.code &&
+          other.label == this.label &&
+          other.accountCode == this.accountCode &&
+          other.acquisitionDate == this.acquisitionDate &&
+          other.acquisitionValue == this.acquisitionValue &&
+          other.residualValue == this.residualValue &&
+          other.durationYears == this.durationYears &&
+          other.status == this.status &&
+          other.disposalDate == this.disposalDate &&
+          other.disposalReason == this.disposalReason &&
+          other.isCapitalized == this.isCapitalized &&
+          other.isActive == this.isActive &&
+          other.counterpart == this.counterpart);
+}
+
+class FixedAssetsCompanion extends UpdateCompanion<FixedAsset> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> code;
+  final Value<String> label;
+  final Value<String> accountCode;
+  final Value<DateTime> acquisitionDate;
+  final Value<double> acquisitionValue;
+  final Value<double> residualValue;
+  final Value<int> durationYears;
+  final Value<String> status;
+  final Value<DateTime?> disposalDate;
+  final Value<String?> disposalReason;
+  final Value<bool> isCapitalized;
+  final Value<bool> isActive;
+  final Value<String?> counterpart;
+  final Value<int> rowid;
+  const FixedAssetsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.code = const Value.absent(),
+    this.label = const Value.absent(),
+    this.accountCode = const Value.absent(),
+    this.acquisitionDate = const Value.absent(),
+    this.acquisitionValue = const Value.absent(),
+    this.residualValue = const Value.absent(),
+    this.durationYears = const Value.absent(),
+    this.status = const Value.absent(),
+    this.disposalDate = const Value.absent(),
+    this.disposalReason = const Value.absent(),
+    this.isCapitalized = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.counterpart = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FixedAssetsCompanion.insert({
+    required String id,
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    required String code,
+    required String label,
+    required String accountCode,
+    required DateTime acquisitionDate,
+    required double acquisitionValue,
+    this.residualValue = const Value.absent(),
+    required int durationYears,
+    this.status = const Value.absent(),
+    this.disposalDate = const Value.absent(),
+    this.disposalReason = const Value.absent(),
+    this.isCapitalized = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.counterpart = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       code = Value(code),
+       label = Value(label),
+       accountCode = Value(accountCode),
+       acquisitionDate = Value(acquisitionDate),
+       acquisitionValue = Value(acquisitionValue),
+       durationYears = Value(durationYears);
+  static Insertable<FixedAsset> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? code,
+    Expression<String>? label,
+    Expression<String>? accountCode,
+    Expression<DateTime>? acquisitionDate,
+    Expression<double>? acquisitionValue,
+    Expression<double>? residualValue,
+    Expression<int>? durationYears,
+    Expression<String>? status,
+    Expression<DateTime>? disposalDate,
+    Expression<String>? disposalReason,
+    Expression<bool>? isCapitalized,
+    Expression<bool>? isActive,
+    Expression<String>? counterpart,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (code != null) 'code': code,
+      if (label != null) 'label': label,
+      if (accountCode != null) 'account_code': accountCode,
+      if (acquisitionDate != null) 'acquisition_date': acquisitionDate,
+      if (acquisitionValue != null) 'acquisition_value': acquisitionValue,
+      if (residualValue != null) 'residual_value': residualValue,
+      if (durationYears != null) 'duration_years': durationYears,
+      if (status != null) 'status': status,
+      if (disposalDate != null) 'disposal_date': disposalDate,
+      if (disposalReason != null) 'disposal_reason': disposalReason,
+      if (isCapitalized != null) 'is_capitalized': isCapitalized,
+      if (isActive != null) 'is_active': isActive,
+      if (counterpart != null) 'counterpart': counterpart,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FixedAssetsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? code,
+    Value<String>? label,
+    Value<String>? accountCode,
+    Value<DateTime>? acquisitionDate,
+    Value<double>? acquisitionValue,
+    Value<double>? residualValue,
+    Value<int>? durationYears,
+    Value<String>? status,
+    Value<DateTime?>? disposalDate,
+    Value<String?>? disposalReason,
+    Value<bool>? isCapitalized,
+    Value<bool>? isActive,
+    Value<String?>? counterpart,
+    Value<int>? rowid,
+  }) {
+    return FixedAssetsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      code: code ?? this.code,
+      label: label ?? this.label,
+      accountCode: accountCode ?? this.accountCode,
+      acquisitionDate: acquisitionDate ?? this.acquisitionDate,
+      acquisitionValue: acquisitionValue ?? this.acquisitionValue,
+      residualValue: residualValue ?? this.residualValue,
+      durationYears: durationYears ?? this.durationYears,
+      status: status ?? this.status,
+      disposalDate: disposalDate ?? this.disposalDate,
+      disposalReason: disposalReason ?? this.disposalReason,
+      isCapitalized: isCapitalized ?? this.isCapitalized,
+      isActive: isActive ?? this.isActive,
+      counterpart: counterpart ?? this.counterpart,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $FixedAssetsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (accountCode.present) {
+      map['account_code'] = Variable<String>(accountCode.value);
+    }
+    if (acquisitionDate.present) {
+      map['acquisition_date'] = Variable<DateTime>(acquisitionDate.value);
+    }
+    if (acquisitionValue.present) {
+      map['acquisition_value'] = Variable<double>(acquisitionValue.value);
+    }
+    if (residualValue.present) {
+      map['residual_value'] = Variable<double>(residualValue.value);
+    }
+    if (durationYears.present) {
+      map['duration_years'] = Variable<int>(durationYears.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (disposalDate.present) {
+      map['disposal_date'] = Variable<DateTime>(disposalDate.value);
+    }
+    if (disposalReason.present) {
+      map['disposal_reason'] = Variable<String>(disposalReason.value);
+    }
+    if (isCapitalized.present) {
+      map['is_capitalized'] = Variable<bool>(isCapitalized.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (counterpart.present) {
+      map['counterpart'] = Variable<String>(counterpart.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FixedAssetsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('code: $code, ')
+          ..write('label: $label, ')
+          ..write('accountCode: $accountCode, ')
+          ..write('acquisitionDate: $acquisitionDate, ')
+          ..write('acquisitionValue: $acquisitionValue, ')
+          ..write('residualValue: $residualValue, ')
+          ..write('durationYears: $durationYears, ')
+          ..write('status: $status, ')
+          ..write('disposalDate: $disposalDate, ')
+          ..write('disposalReason: $disposalReason, ')
+          ..write('isCapitalized: $isCapitalized, ')
+          ..write('isActive: $isActive, ')
+          ..write('counterpart: $counterpart, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DepreciationRequestsTable extends DepreciationRequests
+    with TableInfo<$DepreciationRequestsTable, DepreciationRequest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DepreciationRequestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $DepreciationRequestsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dateArreteMeta = const VerificationMeta(
+    'dateArrete',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dateArrete = GeneratedColumn<DateTime>(
+    'date_arrete',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    dateArrete,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'depreciation_requests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DepreciationRequest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('date_arrete')) {
+      context.handle(
+        _dateArreteMeta,
+        dateArrete.isAcceptableOrUnknown(data['date_arrete']!, _dateArreteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateArreteMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DepreciationRequest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DepreciationRequest(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $DepreciationRequestsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      dateArrete: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date_arrete'],
+      )!,
+    );
+  }
+
+  @override
+  $DepreciationRequestsTable createAlias(String alias) {
+    return $DepreciationRequestsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class DepreciationRequest extends DataClass
+    implements Insertable<DepreciationRequest> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final DateTime dateArrete;
+  const DepreciationRequest({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.dateArrete,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $DepreciationRequestsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['date_arrete'] = Variable<DateTime>(dateArrete);
+    return map;
+  }
+
+  DepreciationRequestsCompanion toCompanion(bool nullToAbsent) {
+    return DepreciationRequestsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      dateArrete: Value(dateArrete),
+    );
+  }
+
+  factory DepreciationRequest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DepreciationRequest(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $DepreciationRequestsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      dateArrete: serializer.fromJson<DateTime>(json['dateArrete']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $DepreciationRequestsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'dateArrete': serializer.toJson<DateTime>(dateArrete),
+    };
+  }
+
+  DepreciationRequest copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    DateTime? dateArrete,
+  }) => DepreciationRequest(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    dateArrete: dateArrete ?? this.dateArrete,
+  );
+  DepreciationRequest copyWithCompanion(DepreciationRequestsCompanion data) {
+    return DepreciationRequest(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      dateArrete: data.dateArrete.present
+          ? data.dateArrete.value
+          : this.dateArrete,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DepreciationRequest(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('dateArrete: $dateArrete')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, deviceId, syncStatus, updatedAt, dateArrete);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DepreciationRequest &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.dateArrete == this.dateArrete);
+}
+
+class DepreciationRequestsCompanion
+    extends UpdateCompanion<DepreciationRequest> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime> dateArrete;
+  final Value<int> rowid;
+  const DepreciationRequestsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.dateArrete = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DepreciationRequestsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required DateTime dateArrete,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       dateArrete = Value(dateArrete);
+  static Insertable<DepreciationRequest> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? dateArrete,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (dateArrete != null) 'date_arrete': dateArrete,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DepreciationRequestsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<DateTime>? dateArrete,
+    Value<int>? rowid,
+  }) {
+    return DepreciationRequestsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      dateArrete: dateArrete ?? this.dateArrete,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $DepreciationRequestsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (dateArrete.present) {
+      map['date_arrete'] = Variable<DateTime>(dateArrete.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DepreciationRequestsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('dateArrete: $dateArrete, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PayablesTable extends Payables with TableInfo<$PayablesTable, Payable> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -45114,6 +46502,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PurchaseOrderLinesTable(this);
   late final $ManualEntryRequestsTable manualEntryRequests =
       $ManualEntryRequestsTable(this);
+  late final $FixedAssetsTable fixedAssets = $FixedAssetsTable(this);
+  late final $DepreciationRequestsTable depreciationRequests =
+      $DepreciationRequestsTable(this);
   late final $PayablesTable payables = $PayablesTable(this);
   late final $EmployeesTable employees = $EmployeesTable(this);
   late final $InternshipsTable internships = $InternshipsTable(this);
@@ -45233,6 +46624,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     purchaseOrders,
     purchaseOrderLines,
     manualEntryRequests,
+    fixedAssets,
+    depreciationRequests,
     payables,
     employees,
     internships,
@@ -50392,6 +51785,678 @@ typedef $$ManualEntryRequestsTableProcessedTableManager =
         >,
       ),
       ManualEntryRequest,
+      PrefetchHooks Function()
+    >;
+typedef $$FixedAssetsTableCreateCompanionBuilder =
+    FixedAssetsCompanion Function({
+      required String id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      required String code,
+      required String label,
+      required String accountCode,
+      required DateTime acquisitionDate,
+      required double acquisitionValue,
+      Value<double> residualValue,
+      required int durationYears,
+      Value<String> status,
+      Value<DateTime?> disposalDate,
+      Value<String?> disposalReason,
+      Value<bool> isCapitalized,
+      Value<bool> isActive,
+      Value<String?> counterpart,
+      Value<int> rowid,
+    });
+typedef $$FixedAssetsTableUpdateCompanionBuilder =
+    FixedAssetsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> code,
+      Value<String> label,
+      Value<String> accountCode,
+      Value<DateTime> acquisitionDate,
+      Value<double> acquisitionValue,
+      Value<double> residualValue,
+      Value<int> durationYears,
+      Value<String> status,
+      Value<DateTime?> disposalDate,
+      Value<String?> disposalReason,
+      Value<bool> isCapitalized,
+      Value<bool> isActive,
+      Value<String?> counterpart,
+      Value<int> rowid,
+    });
+
+class $$FixedAssetsTableFilterComposer
+    extends Composer<_$AppDatabase, $FixedAssetsTable> {
+  $$FixedAssetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountCode => $composableBuilder(
+    column: $table.accountCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get acquisitionDate => $composableBuilder(
+    column: $table.acquisitionDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get acquisitionValue => $composableBuilder(
+    column: $table.acquisitionValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get residualValue => $composableBuilder(
+    column: $table.residualValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationYears => $composableBuilder(
+    column: $table.durationYears,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get disposalDate => $composableBuilder(
+    column: $table.disposalDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get disposalReason => $composableBuilder(
+    column: $table.disposalReason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCapitalized => $composableBuilder(
+    column: $table.isCapitalized,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get counterpart => $composableBuilder(
+    column: $table.counterpart,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FixedAssetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FixedAssetsTable> {
+  $$FixedAssetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountCode => $composableBuilder(
+    column: $table.accountCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get acquisitionDate => $composableBuilder(
+    column: $table.acquisitionDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get acquisitionValue => $composableBuilder(
+    column: $table.acquisitionValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get residualValue => $composableBuilder(
+    column: $table.residualValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationYears => $composableBuilder(
+    column: $table.durationYears,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get disposalDate => $composableBuilder(
+    column: $table.disposalDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get disposalReason => $composableBuilder(
+    column: $table.disposalReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isCapitalized => $composableBuilder(
+    column: $table.isCapitalized,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get counterpart => $composableBuilder(
+    column: $table.counterpart,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FixedAssetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FixedAssetsTable> {
+  $$FixedAssetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get accountCode => $composableBuilder(
+    column: $table.accountCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get acquisitionDate => $composableBuilder(
+    column: $table.acquisitionDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get acquisitionValue => $composableBuilder(
+    column: $table.acquisitionValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get residualValue => $composableBuilder(
+    column: $table.residualValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationYears => $composableBuilder(
+    column: $table.durationYears,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get disposalDate => $composableBuilder(
+    column: $table.disposalDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get disposalReason => $composableBuilder(
+    column: $table.disposalReason,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isCapitalized => $composableBuilder(
+    column: $table.isCapitalized,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get counterpart => $composableBuilder(
+    column: $table.counterpart,
+    builder: (column) => column,
+  );
+}
+
+class $$FixedAssetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FixedAssetsTable,
+          FixedAsset,
+          $$FixedAssetsTableFilterComposer,
+          $$FixedAssetsTableOrderingComposer,
+          $$FixedAssetsTableAnnotationComposer,
+          $$FixedAssetsTableCreateCompanionBuilder,
+          $$FixedAssetsTableUpdateCompanionBuilder,
+          (
+            FixedAsset,
+            BaseReferences<_$AppDatabase, $FixedAssetsTable, FixedAsset>,
+          ),
+          FixedAsset,
+          PrefetchHooks Function()
+        > {
+  $$FixedAssetsTableTableManager(_$AppDatabase db, $FixedAssetsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FixedAssetsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FixedAssetsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FixedAssetsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> accountCode = const Value.absent(),
+                Value<DateTime> acquisitionDate = const Value.absent(),
+                Value<double> acquisitionValue = const Value.absent(),
+                Value<double> residualValue = const Value.absent(),
+                Value<int> durationYears = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> disposalDate = const Value.absent(),
+                Value<String?> disposalReason = const Value.absent(),
+                Value<bool> isCapitalized = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<String?> counterpart = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FixedAssetsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                code: code,
+                label: label,
+                accountCode: accountCode,
+                acquisitionDate: acquisitionDate,
+                acquisitionValue: acquisitionValue,
+                residualValue: residualValue,
+                durationYears: durationYears,
+                status: status,
+                disposalDate: disposalDate,
+                disposalReason: disposalReason,
+                isCapitalized: isCapitalized,
+                isActive: isActive,
+                counterpart: counterpart,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                required String code,
+                required String label,
+                required String accountCode,
+                required DateTime acquisitionDate,
+                required double acquisitionValue,
+                Value<double> residualValue = const Value.absent(),
+                required int durationYears,
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> disposalDate = const Value.absent(),
+                Value<String?> disposalReason = const Value.absent(),
+                Value<bool> isCapitalized = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<String?> counterpart = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FixedAssetsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                code: code,
+                label: label,
+                accountCode: accountCode,
+                acquisitionDate: acquisitionDate,
+                acquisitionValue: acquisitionValue,
+                residualValue: residualValue,
+                durationYears: durationYears,
+                status: status,
+                disposalDate: disposalDate,
+                disposalReason: disposalReason,
+                isCapitalized: isCapitalized,
+                isActive: isActive,
+                counterpart: counterpart,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FixedAssetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FixedAssetsTable,
+      FixedAsset,
+      $$FixedAssetsTableFilterComposer,
+      $$FixedAssetsTableOrderingComposer,
+      $$FixedAssetsTableAnnotationComposer,
+      $$FixedAssetsTableCreateCompanionBuilder,
+      $$FixedAssetsTableUpdateCompanionBuilder,
+      (
+        FixedAsset,
+        BaseReferences<_$AppDatabase, $FixedAssetsTable, FixedAsset>,
+      ),
+      FixedAsset,
+      PrefetchHooks Function()
+    >;
+typedef $$DepreciationRequestsTableCreateCompanionBuilder =
+    DepreciationRequestsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required DateTime dateArrete,
+      Value<int> rowid,
+    });
+typedef $$DepreciationRequestsTableUpdateCompanionBuilder =
+    DepreciationRequestsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<DateTime> dateArrete,
+      Value<int> rowid,
+    });
+
+class $$DepreciationRequestsTableFilterComposer
+    extends Composer<_$AppDatabase, $DepreciationRequestsTable> {
+  $$DepreciationRequestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dateArrete => $composableBuilder(
+    column: $table.dateArrete,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DepreciationRequestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DepreciationRequestsTable> {
+  $$DepreciationRequestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dateArrete => $composableBuilder(
+    column: $table.dateArrete,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DepreciationRequestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DepreciationRequestsTable> {
+  $$DepreciationRequestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateArrete => $composableBuilder(
+    column: $table.dateArrete,
+    builder: (column) => column,
+  );
+}
+
+class $$DepreciationRequestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DepreciationRequestsTable,
+          DepreciationRequest,
+          $$DepreciationRequestsTableFilterComposer,
+          $$DepreciationRequestsTableOrderingComposer,
+          $$DepreciationRequestsTableAnnotationComposer,
+          $$DepreciationRequestsTableCreateCompanionBuilder,
+          $$DepreciationRequestsTableUpdateCompanionBuilder,
+          (
+            DepreciationRequest,
+            BaseReferences<
+              _$AppDatabase,
+              $DepreciationRequestsTable,
+              DepreciationRequest
+            >,
+          ),
+          DepreciationRequest,
+          PrefetchHooks Function()
+        > {
+  $$DepreciationRequestsTableTableManager(
+    _$AppDatabase db,
+    $DepreciationRequestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DepreciationRequestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DepreciationRequestsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DepreciationRequestsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime> dateArrete = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DepreciationRequestsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                dateArrete: dateArrete,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required DateTime dateArrete,
+                Value<int> rowid = const Value.absent(),
+              }) => DepreciationRequestsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                dateArrete: dateArrete,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DepreciationRequestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DepreciationRequestsTable,
+      DepreciationRequest,
+      $$DepreciationRequestsTableFilterComposer,
+      $$DepreciationRequestsTableOrderingComposer,
+      $$DepreciationRequestsTableAnnotationComposer,
+      $$DepreciationRequestsTableCreateCompanionBuilder,
+      $$DepreciationRequestsTableUpdateCompanionBuilder,
+      (
+        DepreciationRequest,
+        BaseReferences<
+          _$AppDatabase,
+          $DepreciationRequestsTable,
+          DepreciationRequest
+        >,
+      ),
+      DepreciationRequest,
       PrefetchHooks Function()
     >;
 typedef $$PayablesTableCreateCompanionBuilder =
@@ -67175,6 +69240,10 @@ class $AppDatabaseManager {
       $$PurchaseOrderLinesTableTableManager(_db, _db.purchaseOrderLines);
   $$ManualEntryRequestsTableTableManager get manualEntryRequests =>
       $$ManualEntryRequestsTableTableManager(_db, _db.manualEntryRequests);
+  $$FixedAssetsTableTableManager get fixedAssets =>
+      $$FixedAssetsTableTableManager(_db, _db.fixedAssets);
+  $$DepreciationRequestsTableTableManager get depreciationRequests =>
+      $$DepreciationRequestsTableTableManager(_db, _db.depreciationRequests);
   $$PayablesTableTableManager get payables =>
       $$PayablesTableTableManager(_db, _db.payables);
   $$EmployeesTableTableManager get employees =>

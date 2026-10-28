@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Comptabilite;
 
-use App\Actions\RecordAssetAcquisitionEntryAction;
 use App\Actions\RecordDepreciationEntryAction;
 use App\Models\ChartOfAccount;
 use App\Models\FixedAsset;
@@ -97,7 +96,7 @@ class Immobilisations extends Component
     }
 
     /** Natures de la ferme proposées d'origine (tickets 14.26 et 15.27). */
-    public const NATURES_FERME = ['221', '241', '244'];
+    public const NATURES_FERME = \App\Services\ImmobilisationService::NATURES_FERME;
 
     /**
      * Comptes de classe 2 hors amortissements (28x) : les biens eux-mêmes.
@@ -109,14 +108,7 @@ class Immobilisations extends Component
      */
     public function getNaturesProperty()
     {
-        $utilisees = FixedAsset::query()->pluck('account_code')->filter()->unique()->all();
-
-        return ChartOfAccount::where('class', 2)
-            ->where('is_active', true)
-            ->where('code', 'not like', '28%')
-            ->whereIn('code', array_merge(self::NATURES_FERME, $utilisees))
-            ->orderBy('code')
-            ->get();
+        return app(\App\Services\ImmobilisationService::class)->natures();
     }
 
     public function getComptesTresorerieProperty()
@@ -235,72 +227,21 @@ class Immobilisations extends Component
         // donc modifiable côté client (leçon du ticket 12.4).
         $this->authorize('manage-comptabilite');
 
-        $valide = $this->validate([
-            'code' => ['required', 'string', 'max:50',
-                \Illuminate\Validation\Rule::unique('fixed_assets', 'code')->ignore($this->editingId)],
-            'label' => ['required', 'string', 'max:150'],
-            'accountCode' => ['required', 'string',
-                \Illuminate\Validation\Rule::in($this->natures->pluck('code')->all())],
-            'acquisitionDate' => ['required', 'date', 'before_or_equal:today'],
-            'acquisitionValue' => ['required', 'numeric', 'min:1'],
-            'residualValue' => ['required', 'numeric', 'min:0', 'lt:acquisitionValue'],
-            'durationYears' => ['required', 'integer', 'min:1', 'max:50'],
-            'contrepartie' => ['nullable', 'string',
-                \Illuminate\Validation\Rule::in(array_merge([''], ['credit'], $this->comptesTresorerie->pluck('id')->all()))],
-        ], [], [
-            'accountCode' => 'nature', 'acquisitionDate' => "date d'acquisition",
-            'acquisitionValue' => "valeur d'acquisition", 'residualValue' => 'valeur résiduelle',
-            'durationYears' => "durée d'amortissement",
-        ]);
+        $service = app(\App\Services\ImmobilisationService::class);
 
-        $donnees = [
-            'code' => $valide['code'],
-            'label' => $valide['label'],
-            'account_code' => $valide['accountCode'],
-            'acquisition_date' => $valide['acquisitionDate'],
-            'acquisition_value' => $valide['acquisitionValue'],
-            'residual_value' => $valide['residualValue'],
-            'duration_years' => $valide['durationYears'],
-            'method' => 'lineaire',
-        ];
+        $valide = $this->validate($service->regles($this->editingId), [], \App\Services\ImmobilisationService::ATTRIBUTS);
 
         if ($this->editingId) {
-            // ⚠️ Un bien DÉJÀ CAPITALISÉ ne voit pas sa valeur d'acquisition
-            // modifiée en silence : l'écriture de classe 2 est déjà passée et
-            // le registre divergerait du grand livre. La correction d'un
-            // montant erroné passe par une écriture au Journal Comptable, pas
-            // par une réécriture discrète du registre.
-            $bien = FixedAsset::findOrFail($this->editingId);
-
-            if ($bien->is_capitalized && round((float) $donnees['acquisition_value'], 2) !== round((float) $bien->acquisition_value, 2)) {
-                $this->addError('acquisitionValue', "Ce bien est déjà comptabilisé : sa valeur d'acquisition ne peut plus être modifiée ici. Passez une écriture de correction au Journal Comptable.");
+            try {
+                $service->modifier(FixedAsset::findOrFail($this->editingId), $valide);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->addError('acquisitionValue', $e->validator->errors()->first());
 
                 return;
             }
-
-            $bien->update($donnees);
             $message = 'Immobilisation modifiée.';
         } else {
-            $bien = FixedAsset::create($donnees + ['status' => 'en_service', 'is_active' => true, 'is_capitalized' => false]);
-            $message = 'Immobilisation enregistrée.';
-
-            // Capitalisation immédiate, sauf reprise d'antériorité.
-            if ($this->contrepartie !== '') {
-                try {
-                    $ecriture = app(RecordAssetAcquisitionEntryAction::class)->execute(
-                        $bien,
-                        $this->contrepartie === 'credit' ? null : $this->contrepartie,
-                    );
-
-                    $message = $ecriture
-                        ? "Immobilisation enregistrée et portée à l'actif (débit {$bien->account_code})."
-                        : "Immobilisation enregistrée, mais son écriture d'acquisition n'a pas pu être générée — plan comptable incomplet.";
-                } catch (\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException $e) {
-                    // Le bien reste au registre (il existe réellement), mais
-                    // hors comptabilité : l'écran le signale, rien n'est masqué.
-                    $message = 'Immobilisation enregistrée SANS écriture : '.$e->getMessage();
-                }
-            }
+            $message = $service->enregistrer($valide)['message'];
         }
 
         $this->showForm = false;
@@ -328,19 +269,11 @@ class Immobilisations extends Component
 
         $bien = FixedAsset::findOrFail($this->cessionId);
 
-        $valide = $this->validate([
-            'cessionDate' => ['required', 'date', 'after_or_equal:'.$bien->acquisition_date->format('Y-m-d')],
-            'cessionStatus' => ['required', 'in:cede,reforme'],
-            'cessionReason' => ['required', 'string', 'max:150'],
-        ], [
-            'cessionDate.after_or_equal' => "La date de sortie ne peut pas précéder l'acquisition.",
-        ], ['cessionDate' => 'date de sortie', 'cessionReason' => 'motif']);
+        $service = app(\App\Services\ImmobilisationService::class);
 
-        $bien->update([
-            'status' => $valide['cessionStatus'],
-            'disposal_date' => $valide['cessionDate'],
-            'disposal_reason' => $valide['cessionReason'],
-        ]);
+        $valide = $this->validate($service->reglesSortie($bien), \App\Services\ImmobilisationService::MESSAGES_SORTIE, \App\Services\ImmobilisationService::ATTRIBUTS_SORTIE);
+
+        $service->sortir($bien, $valide['cessionDate'], $valide['cessionStatus'], $valide['cessionReason']);
 
         $this->showCession = false;
         $this->cessionId = null;
@@ -361,7 +294,7 @@ class Immobilisations extends Component
         $this->authorize('manage-comptabilite');
 
         try {
-            $ecriture = app(RecordDepreciationEntryAction::class)->execute($this->dateArrete);
+            $ecriture = app(\App\Services\ImmobilisationService::class)->passerDotation($this->dateArrete);
         } catch (\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException $e) {
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 

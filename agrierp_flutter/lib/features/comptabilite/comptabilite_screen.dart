@@ -14,6 +14,8 @@ import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
+import 'immobilisations_page.dart';
+import 'immobilisations_repository.dart';
 import 'mention_anouveaux.dart';
 import 'plan_comptable_modales.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -33,12 +35,17 @@ class ComptabiliteScreen extends StatefulWidget {
   const ComptabiliteScreen({
     super.key,
     required this.depot,
+    this.depotImmobilisations,
     this.maintenant = HeureBenin.maintenant,
     this.imprimer,
     this.exercice,
   });
 
   final ComptabiliteRepository depot;
+
+  /// Ticket CP-3 — le registre des immobilisations (carte « Immobilisations » du hub web). Sans lui (tests anciens du châssis), la
+  /// carte n'est pas proposée.
+  final ImmobilisationsRepository? depotImmobilisations;
 
   /// Ticket EX8 (EF11) — L'EXERCICE AFFICHÉ, paramètre explicite (`exercice` du composant web). Fusion EX7 + EX8 : le
   /// socle y passe l'exercice choisi au sélecteur (`ExerciceChoisi`) ; c'est un CHOIX, jamais une seconde vérité —
@@ -86,6 +93,7 @@ enum PageComptable {
   grandLivre('Grand Livre', SymbolesAgri.auto_stories),
   balance('Balance Générale', SymbolesAgri.balance),
   etatsFinanciers('États Financiers', SymbolesAgri.assessment),
+  immobilisations('Immobilisations', SymbolesAgri.domain),
   cloture('Clôture Périodique & Annuelle', SymbolesAgri.lock_clock),
   analytique('Comptabilité Analytique', SymbolesAgri.pie_chart),
   tva('Déclaration TVA', SymbolesAgri.receipt_long),
@@ -239,6 +247,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                         PageComptable.grandLivre => _pageGrandLivre(d, large),
                         PageComptable.balance => _pageBalance(d, large),
                         PageComptable.etatsFinanciers => _pageEtatsFinanciers(d, large),
+                        PageComptable.immobilisations => ImmobilisationsPage(
+                          key: const Key('page-immobilisations'),
+                          depot: widget.depotImmobilisations!,
+                          maintenant: widget.maintenant,
+                        ),
                         PageComptable.hub => _pageHub(d, large),
                         _ => _pageNonEmbarquee(_page, large),
                       },
@@ -329,7 +342,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         childAspectRatio: large ? 3.2 : 4.5,
         children: [
           for (final page in PageComptable.values)
-            if (page != PageComptable.hub) _carteNavigation(page),
+            if (page != PageComptable.hub && (page != PageComptable.immobilisations || widget.depotImmobilisations != null)) _carteNavigation(page),
         ],
       ),
     ],

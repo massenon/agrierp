@@ -140,6 +140,7 @@ abstract final class SymbolesAgri {
   static const IconData picture_as_pdf = IconData(0xe415, fontFamily: famille);
   static const IconData pie_chart = IconData(0xe6c4, fontFamily: famille);
   static const IconData point_of_sale = IconData(0xf17e, fontFamily: famille);
+  static const IconData post_add = IconData(0xea20, fontFamily: famille);
   static const IconData print = IconData(0xe555, fontFamily: famille);
   static const IconData priority_high = IconData(0xe645, fontFamily: famille);
   static const IconData qr_code_2 = IconData(0xe00a, fontFamily: famille);
@@ -148,6 +149,7 @@ abstract final class SymbolesAgri {
   static const IconData receipt_long = IconData(0xef6e, fontFamily: famille);
   static const IconData redeem = IconData(0xe8b1, fontFamily: famille);
   static const IconData remove = IconData(0xe15b, fontFamily: famille);
+  static const IconData remove_circle_outline = IconData(0xe15c, fontFamily: famille);
   static const IconData request_page = IconData(0xf22c, fontFamily: famille);
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restart_alt = IconData(0xf053, fontFamily: famille);

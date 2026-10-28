@@ -120,6 +120,8 @@ void main() {
     'administrative_documents',
     'archived_documents',
     'chart_of_accounts',
+    // Ticket CP-3 — registre des immobilisations (table mixte).
+    'fixed_assets',
     'fiscal_years',
     'accounting_entries',
     'accounting_entry_lines',

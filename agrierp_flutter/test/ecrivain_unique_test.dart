@@ -41,6 +41,9 @@ void main() {
     'chart_of_accounts': 'lib/features/comptabilite/comptabilite_repository.dart',
     // Ticket CP-2 — « Journal Comptable » : « Saisie d'Écriture », « Modifier » et « Archiver » s'écrivent (en demandes) par ce dépôt.
     'manual_entry_requests': 'lib/features/comptabilite/comptabilite_repository.dart',
+    // Ticket CP-3 — « Immobilisations » : le bien s'enregistre, se modifie et sort du registre ; la dotation se demande, par ce dépôt.
+    'fixed_assets': 'lib/features/comptabilite/immobilisations_repository.dart',
+    'depreciation_requests': 'lib/features/comptabilite/immobilisations_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
     // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
     'employees': 'lib/features/rh/personnel_repository.dart',

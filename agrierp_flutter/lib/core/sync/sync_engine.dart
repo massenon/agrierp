@@ -879,6 +879,8 @@ class SyncEngine {
     recus += await _absorberDocuments(corps['administrative_documents']);
     recus += await _absorberArchives(corps['archived_documents']);
     recus += await _absorberPlanComptable(corps['chart_of_accounts']);
+    // Ticket CP-3 — registre des immobilisations (table mixte : un bien saisi au poste en attente n'est jamais écrasé).
+    recus += await _absorberImmobilisations(corps['fixed_assets']);
     recus += await _absorberExercices(corps['fiscal_years']);
     recus += await _absorberJournal(
       corps['accounting_entries'],
@@ -2385,6 +2387,57 @@ class SyncEngine {
           accountClass: Value(_entier(l['class'])),
         );
         await _db.into(_db.chartOfAccounts).insert(compte, onConflict: DoUpdate((_) => compte));
+      }
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket CP-3 — registre des immobilisations du serveur (table MIXTE). STRICT : un identifiant servi deux fois refuse TOUT
+  /// le tirage. Un bien `pending` / `conflict` n'est jamais écrasé ; un bien acquitté qui n'est plus servi (réinitialisation)
+  /// disparaît.
+  Future<int> _absorberImmobilisations(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Immobilisation');
+    }
+
+    await _db.transaction(() async {
+      final locaux = {for (final b in await _db.select(_db.fixedAssets).get()) b.id: b.syncStatus};
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.fixedAssets)..where((t) => t.id.isIn(disparus))).go();
+      }
+
+      for (final l in lignes) {
+        final id = l['id'] as String;
+        final statut = locaux[id];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        final date = _date(l['acquisition_date']);
+        if (date == null) throw FormatException('Immobilisation $id refusée : date d\'acquisition absente.');
+        final bien = FixedAssetsCompanion.insert(
+          id: id,
+          code: (l['code'] ?? '') as String,
+          label: (l['label'] ?? '') as String,
+          accountCode: (l['account_code'] ?? '') as String,
+          acquisitionDate: date,
+          acquisitionValue: _reel(l['acquisition_value']) ?? 0,
+          durationYears: _entier(l['duration_years']) ?? 1,
+          residualValue: Value(_reel(l['residual_value']) ?? 0),
+          status: Value((l['status'] ?? 'en_service') as String),
+          disposalDate: Value(_date(l['disposal_date'])),
+          disposalReason: Value(l['disposal_reason'] as String?),
+          isCapitalized: Value(l['is_capitalized'] == true),
+          isActive: Value(l['is_active'] != false),
+          counterpart: const Value(null),
+        );
+        await _db.into(_db.fixedAssets).insert(bien, onConflict: DoUpdate((_) => bien));
       }
     });
 
@@ -5213,6 +5266,14 @@ class SyncEngine {
       _db.manualEntryRequests,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket CP-3 — immobilisations saisies au poste (la ligne entière) et demandes de dotation (la date d'arrêté seule).
+    final immobilisations = await (_db.select(
+      _db.fixedAssets,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final demandesDotation = await (_db.select(
+      _db.depreciationRequests,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
     final bonsCommande = await (_db.select(
       _db.purchaseOrders,
@@ -5325,6 +5386,8 @@ class SyncEngine {
         stagiaires.isEmpty &&
         absencesStagiaires.isEmpty &&
         demandesPaie.isEmpty &&
+        immobilisations.isEmpty &&
+        demandesDotation.isEmpty &&
         utilisateurs.isEmpty) {
       return (0, 0, <String>[]);
     }
@@ -5501,6 +5564,9 @@ class SyncEngine {
         'chart_of_accounts': comptes.map(_compteEnJson).toList(),
         // Ticket CP-2 — après le plan comptable (une demande peut viser un compte créé dans le même envoi).
         'manual_entry_requests': demandesEcriture.map(_demandeEcritureEnJson).toList(),
+        // Ticket CP-3 — après le plan comptable ; la dotation après le registre qu'elle amortit.
+        'fixed_assets': immobilisations.map(_immobilisationEnJson).toList(),
+        'depreciation_requests': demandesDotation.map(_demandeDotationEnJson).toList(),
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
         'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
@@ -5918,6 +5984,26 @@ class SyncEngine {
     );
     accepte += demandesAcceptees;
 
+    // Ticket CP-3 — acquittés quand le serveur a enregistré le bien (et, payé ou à crédit, son écriture d'acquisition) ou passé la
+    // dotation : les écritures descendent au tirage de confirmation.
+    final immobilisationsAcceptees = await _acquitter(
+      'fixed_assets',
+      corps['fixed_assets'],
+      (ids, statut) => (_db.update(_db.fixedAssets)..where((t) => t.id.isIn(ids)))
+          .write(FixedAssetsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    final dotationsAcceptees = await _acquitter(
+      'depreciation_requests',
+      corps['depreciation_requests'],
+      (ids, statut) => (_db.update(_db.depreciationRequests)..where((t) => t.id.isIn(ids)))
+          .write(DepreciationRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += immobilisationsAcceptees + dotationsAcceptees;
+
     // Ticket CP-1 — acquitté quand le serveur a créé, modifié ou archivé le compte (numéro unique, compte non utilisé).
     accepte += await _acquitter(
       'chart_of_accounts',
@@ -6246,7 +6332,9 @@ class SyncEngine {
         imputationsAcceptees +
         retoursAcceptes +
         remboursementsAcceptes +
-        demandesAcceptees;
+        demandesAcceptees +
+        immobilisationsAcceptees +
+        dotationsAcceptees;
 
     // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
     // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
@@ -6298,6 +6386,9 @@ class SyncEngine {
     'chart_of_accounts',
     // Ticket CP-2 — après le plan comptable, comme au serveur.
     'manual_entry_requests',
+    // Ticket CP-3 — le registre, puis la dotation qui l'amortit, comme au serveur.
+    'fixed_assets',
+    'depreciation_requests',
     'expenses',
     // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
     'purchase_orders',
@@ -7002,6 +7093,22 @@ class SyncEngine {
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const ManualEntryRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
+      // Ticket CP-3 — un bien refusé (code déjà pris, valeur figée, sortie avant l'acquisition) se corrige puis se relance.
+      'fixed_assets' =>
+        () =>
+            (_db.update(
+              _db.fixedAssets,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FixedAssetsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-3 — une dotation refusée (exercice clos) se relance une fois la cause levée.
+      'depreciation_requests' =>
+        () =>
+            (_db.update(
+              _db.depreciationRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const DepreciationRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       // Ticket CP-1 — un compte refusé (numéro déjà pris, compte utilisé à l'archivage) se corrige puis se relance.
       'chart_of_accounts' =>
         () =>
@@ -7361,6 +7468,31 @@ class SyncEngine {
       'credit_account_id': d.creditAccountId,
       'amount': d.amount,
     },
+  };
+
+  /// Ticket CP-3 — immobilisation telle que `SyncController::pushFixedAssets` la valide : la ligne entière (le serveur
+  /// distingue création, modification, sortie et archivage), `counterpart` pour la capitalisation d'un bien NOUVEAU. Ni
+  /// `is_capitalized` ni écriture ne partent : seul le serveur écrit au grand livre.
+  Map<String, dynamic> _immobilisationEnJson(FixedAsset b) => {
+    'id': b.id,
+    'code': b.code,
+    'label': b.label,
+    'account_code': b.accountCode,
+    'acquisition_date': _jour(b.acquisitionDate),
+    'acquisition_value': b.acquisitionValue,
+    'residual_value': b.residualValue,
+    'duration_years': b.durationYears,
+    'status': b.status,
+    'disposal_date': b.disposalDate == null ? null : _jour(b.disposalDate!),
+    'disposal_reason': b.disposalReason,
+    'is_active': b.isActive,
+    'counterpart': b.counterpart ?? '',
+  };
+
+  /// Ticket CP-3 — demande de dotation : la date d'arrêté seule, le serveur recalcule le montant.
+  Map<String, dynamic> _demandeDotationEnJson(DepreciationRequest d) => {
+    'id': d.id,
+    'date_arrete': _jour(d.dateArrete),
   };
 
   /// Ticket CP-1 — compte tel que `SyncController::pushChartOfAccounts` le valide : numéro, intitulé, classe, et `is_active`

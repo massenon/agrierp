@@ -75,6 +75,7 @@ import 'features/elevage/fiche_lapins_screen.dart';
 import 'features/ventes/caisse_repository.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
+import 'features/comptabilite/immobilisations_repository.dart';
 import 'features/parametres/parametres_generaux_repository.dart';
 import 'features/parametres/parametres_generaux_screen.dart';
 import 'features/rapports/rapports_exports_screen.dart';
@@ -368,6 +369,11 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
   );
 
+  late final ImmobilisationsRepository _immobilisations = ImmobilisationsRepository(
+    deviceId: widget.identifiantPoste,
+    database: _db,
+  );
+
   late final ParametresGenerauxRepository _parametresGeneraux =
       ParametresGenerauxRepository(database: _db, identifiantPoste: widget.identifiantPoste);
 
@@ -525,6 +531,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           personnel: _personnel,
           administration: _administration,
           comptabilite: _comptabilite,
+          immobilisations: _immobilisations,
           parametresGeneraux: _parametresGeneraux,
           rapports: _rapports,
           tableauDeBord: _tableauDeBord,
@@ -589,6 +596,7 @@ class SocleAccueil extends StatefulWidget {
     required this.personnel,
     required this.administration,
     required this.comptabilite,
+    required this.immobilisations,
     required this.parametresGeneraux,
     required this.rapports,
     required this.tableauDeBord,
@@ -675,6 +683,7 @@ class SocleAccueil extends StatefulWidget {
   final PersonnelRepository personnel;
   final AdministrationRepository administration;
   final ComptabiliteRepository comptabilite;
+  final ImmobilisationsRepository immobilisations;
   final ParametresGenerauxRepository parametresGeneraux;
   final RapportsRepository rapports;
   final TableauDeBordRepository tableauDeBord;
@@ -1290,6 +1299,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
+          depotImmobilisations: widget.immobilisations,
           imprimer: EditeursRapports.imprimer,
           // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.
           exercice: _exercice.etat?.annee,

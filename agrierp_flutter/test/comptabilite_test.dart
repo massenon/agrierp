@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/comptabilite/immobilisations_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -139,6 +140,7 @@ void main() {
       MaterialApp(
         home: ComptabiliteScreen(
           depot: depot,
+          depotImmobilisations: ImmobilisationsRepository(database: db),
           maintenant: maintenant == null ? DateTime.now : () => maintenant,
         ),
       ),
