@@ -323,8 +323,12 @@ class SyncVenteDateeSocleTest extends TestCase
             // CP-4 : le tirage SERT `periodic_closures` au poste (clé de réponse) ; ce qui reste interdit, c'est de LIRE la table
             // pour juger un verrou (une seconde règle) : seule `PeriodicClosure::isDateLocked` le fait.
             $this->assertDoesNotMatchRegularExpression("/table\\('periodic_closures'\\)|from\\s+periodic_closures/i", $source, $fichier);
-            $this->assertStringNotContainsString('PeriodicClosure::where', $source, $fichier);
-            $this->assertStringNotContainsString('PeriodicClosure::query', $source, $fichier);
+            // CP-4 : le contrôleur SERT les clôtures au tirage et retrouve celle qu'une demande de déclôture vise ; ces lectures ne
+            // jugent aucune date. Les deux autres fichiers, eux, ne lisent jamais la table.
+            if ($fichier !== 'Http/Controllers/Api/SyncController.php') {
+                $this->assertStringNotContainsString('PeriodicClosure::where', $source, $fichier);
+                $this->assertStringNotContainsString('PeriodicClosure::query', $source, $fichier);
+            }
         }
     }
 
