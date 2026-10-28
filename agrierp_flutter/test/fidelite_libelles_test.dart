@@ -344,7 +344,6 @@ void main() {
     //    les 28 exemptions qui ne concernaient que `suivi-reproduction.html` (corrections de
     //    cycle, panneaux Volailles / Escargots, accordéon des KPI) sont retirées avec la page.
     //    « Enregistrer les Modifications » reste : d'autres pages portées la contiennent.
-    'Enregistrer les Modifications': 'correction de cycle réservée au web',
 
     // ── Accordéon des KPI : repli propre au mobile ; le poste est un écran de
     //    bureau, où le panneau est toujours déplié.
@@ -651,8 +650,6 @@ void main() {
     //    descendent pas davantage : ce sont les coordonnées bancaires de la
     //    ferme, et le poste n'a aucun besoin de les porter pour afficher un
     //    solde.
-    'Ajouter un Compte Bancaire': 'ouverture de compte réservée au web',
-    'Ajouter une Ligne Mobile Money': 'ouverture de compte réservée au web',
     'Banque *': 'ouverture de compte réservée au web',
     'Titulaire du Compte': 'coordonnées bancaires non descendues au poste',
     'RIB *': 'coordonnées bancaires non descendues au poste',
@@ -1114,7 +1111,7 @@ void main() {
   /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 154;
+  const plafondManquesMasques = 150;
 
   for (final entree in portages.entries) {
     final page = entree.key;

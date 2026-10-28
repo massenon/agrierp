@@ -16,6 +16,8 @@ import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
 import 'immobilisations_page.dart';
 import 'immobilisations_repository.dart';
+import 'rapprochement_page.dart';
+import 'rapprochement_repository.dart';
 import 'mention_anouveaux.dart';
 import 'plan_comptable_modales.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -36,6 +38,7 @@ class ComptabiliteScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.depotImmobilisations,
+    this.depotRapprochement,
     this.maintenant = HeureBenin.maintenant,
     this.imprimer,
     this.exercice,
@@ -46,6 +49,10 @@ class ComptabiliteScreen extends StatefulWidget {
   /// Ticket CP-3 — le registre des immobilisations (carte « Immobilisations » du hub web). Sans lui (tests anciens du châssis), la
   /// carte n'est pas proposée.
   final ImmobilisationsRepository? depotImmobilisations;
+
+  /// Ticket CP-5 — le rapprochement bancaire (carte « Rapprochement Bancaire » du hub). Sans lui (tests anciens du châssis),
+  /// la carte garde son motif « non embarquée ».
+  final RapprochementRepository? depotRapprochement;
 
   /// Ticket EX8 (EF11) — L'EXERCICE AFFICHÉ, paramètre explicite (`exercice` du composant web). Fusion EX7 + EX8 : le
   /// socle y passe l'exercice choisi au sélecteur (`ExerciceChoisi`) ; c'est un CHOIX, jamais une seconde vérité —
@@ -129,9 +136,6 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         "La déclaration de TVA est une pièce fiscale : elle s'établit et se "
         'télédéclare depuis la surface web, avec le régime et les taux en '
         'vigueur.',
-    PageComptable.rapprochement:
-        "Le rapprochement pointe le Grand Livre contre un RELEVÉ de banque ou "
-        "de Mobile Money — un document que le poste ne reçoit pas.",
   };
 
   /// Onglet actif des États Financiers (`#[Url] public string $tab = 'bilan'`).
@@ -247,6 +251,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                         PageComptable.grandLivre => _pageGrandLivre(d, large),
                         PageComptable.balance => _pageBalance(d, large),
                         PageComptable.etatsFinanciers => _pageEtatsFinanciers(d, large),
+                        PageComptable.rapprochement when widget.depotRapprochement != null => RapprochementPage(
+                          key: const Key('page-rapprochement'),
+                          depot: widget.depotRapprochement!,
+                          maintenant: widget.maintenant,
+                        ),
                         PageComptable.immobilisations => ImmobilisationsPage(
                           key: const Key('page-immobilisations'),
                           depot: widget.depotImmobilisations!,
@@ -1929,7 +1938,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _titre(page.libelle, large),
       const SizedBox(height: AgriSpacing.md),
-      _mentionPoste(motifs[page] ?? ''),
+      _mentionPoste(motifs[page] ?? "Le rapprochement bancaire n'est pas disponible dans cette vue : il s'ouvre depuis le menu Comptabilité, une fois la session ouverte."),
     ],
   );
 

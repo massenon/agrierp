@@ -1104,6 +1104,38 @@ class PermissionsApplicatives extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket CP-5 — ligne de relevé bancaire importée (rapprochement), tirée du serveur (lecture seule au poste : un relevé
+/// s'importe en DEMANDE, voir [BankStatementImports]).
+class BankStatementLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get accountId => text()();
+  DateTimeColumn get statementDate => dateTime()();
+  TextColumn get label => text()();
+  RealColumn get amount => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-5 — DEMANDE d'import d'un relevé bancaire (CSV `date;libellé;montant`) : le texte du fichier et le compte visé.
+/// Le serveur lit le CSV (`BankReconciliationService::importCsv`, lignes illisibles ignorées), pose l'UUID de la demande sur
+/// chaque ligne (rejeu sans doublon) ; les lignes redescendent dans [BankStatementLines] au tirage de confirmation.
+class BankStatementImports extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get accountId => text()();
+
+  /// Nom du fichier choisi (affichage).
+  TextColumn get fileName => text().nullable()();
+
+  /// Contenu du fichier, tel quel.
+  TextColumn get content => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Courrier reçu ou envoyé — saisi au poste, validé par le serveur (ticket F0.78).
 ///
 /// ⚠️ **LA RÉFÉRENCE `CR-AAAA-NNN` N'EST JAMAIS INVENTÉE PAR LE POSTE** : le serveur
@@ -2190,6 +2222,8 @@ class SyncState extends Table {
     DepreciationRequests,
     SettingsRequests,
     PermissionsApplicatives,
+    BankStatementLines,
+    BankStatementImports,
     Payables,
     Employees,
     Internships,
@@ -2264,7 +2298,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 76;
+  int get schemaVersion => 77;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2946,6 +2980,11 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
+      // v77 — ticket CP-5 : lignes de relevé bancaire tirées, demandes d'import de relevé.
+      if (from < 77) {
+        if (!await _tableExiste(m, bankStatementLines)) await m.createTable(bankStatementLines);
+        if (!await _tableExiste(m, bankStatementImports)) await m.createTable(bankStatementImports);
+      }
       // v76 — tickets PA-2/3/4/7/8 : demandes de réglage, droits tirés, entreprise (verrou de paie, SMS), comptes de trésorerie.
       if (from < 76) {
         if (!await _tableExiste(m, settingsRequests)) await m.createTable(settingsRequests);
@@ -3342,6 +3381,8 @@ class AppDatabase extends _$AppDatabase {
     'depreciation_requests',
     // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme.
     'settings_requests',
+    // Ticket CP-5 — relevés bancaires à importer (CSV).
+    'bank_statement_imports',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
     'purchase_orders',
     'purchases',
@@ -3436,6 +3477,7 @@ class AppDatabase extends _$AppDatabase {
     'manual_entry_requests', // CP-2
     'depreciation_requests', // CP-3
     'settings_requests', // PA-*
+    'bank_statement_lines', 'bank_statement_imports', // CP-5
     'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',

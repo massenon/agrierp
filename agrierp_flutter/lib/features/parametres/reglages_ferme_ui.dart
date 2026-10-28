@@ -6,6 +6,7 @@ import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../comptabilite/documents_comptabilite.dart';
 import '../rh/calcul_paie.dart';
+import 'administration_en_ligne.dart';
 import 'reglages_ferme_repository.dart';
 
 /// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — modales et sous-pages des réglages de la ferme. Les libellés sont ceux des Blade
@@ -372,10 +373,13 @@ class _PageBaremeItsState extends State<PageBaremeIts> {
 // ── PA-8 · Intégrations & Notifications (SMS) ──────────────────────────────
 
 class PageIntegrationsSms extends StatefulWidget {
-  const PageIntegrationsSms({super.key, required this.depot, required this.surRetour});
+  const PageIntegrationsSms({super.key, required this.depot, required this.surRetour, this.admin});
 
   final ReglagesFermeRepository depot;
   final VoidCallback surRetour;
+
+  /// Gestes en ligne : l'envoi d'un SMS de test appelle le fournisseur depuis le serveur.
+  final AdministrationEnLigne? admin;
 
   @override
   State<PageIntegrationsSms> createState() => _PageIntegrationsSmsState();
@@ -392,6 +396,8 @@ class _PageIntegrationsSmsState extends State<PageIntegrationsSms> {
   final _secret = TextEditingController();
   Map<String, String> _erreurs = const {};
   bool _demande = false;
+  final _testDest = TextEditingController();
+  String? _resultatTest;
 
   @override
   void initState() {
@@ -486,9 +492,30 @@ class _PageIntegrationsSmsState extends State<PageIntegrationsSms> {
             child: Text('Configuration demandée au serveur : elle sera appliquée à la prochaine synchronisation. Le jeton part une seule fois.', key: Key('sms-demande'), style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
           ),
         const SizedBox(height: AgriSpacing.md),
+        if (widget.admin != null && widget.admin!.peut('manage-parametres')) ...[
+          TextField(
+            key: const Key('sms-test-destinataire'),
+            controller: _testDest,
+            decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), hintText: 'Envoyer un SMS de test à... (ex : +22996456789)'),
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          OutlinedButton(
+            key: const Key('sms-tester'),
+            onPressed: () async {
+              try {
+                final r = await widget.admin!.testerSms(_testDest.text);
+                setState(() => _resultatTest = r.message);
+              } on RefusAdministration catch (e) {
+                setState(() => _resultatTest = e.message);
+              }
+            },
+            child: const Text('Tester'),
+          ),
+          if (_resultatTest != null) Text(_resultatTest!, key: const Key('sms-test-resultat'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+        ],
+        const SizedBox(height: AgriSpacing.sm),
         const Text(
-          "L'envoi d'un SMS de test se fait en ligne depuis la surface web : il appelle le fournisseur et attend sa réponse. "
-          'WhatsApp ne nécessite aucune configuration ici : les relances WhatsApp s\'ouvrent directement via un lien wa.me vers le numéro du client, sans passerelle tierce.',
+          "WhatsApp ne nécessite aucune configuration ici : les relances WhatsApp s'ouvrent directement via un lien wa.me vers le numéro du client, sans passerelle tierce.",
           style: TextStyle(fontSize: 11, color: AgriColors.outline),
         ),
       ],

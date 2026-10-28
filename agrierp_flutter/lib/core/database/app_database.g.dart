@@ -12514,6 +12514,863 @@ class PermissionsApplicativesCompanion
   }
 }
 
+class $BankStatementLinesTable extends BankStatementLines
+    with TableInfo<$BankStatementLinesTable, BankStatementLine> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BankStatementLinesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _accountIdMeta = const VerificationMeta(
+    'accountId',
+  );
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+    'account_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statementDateMeta = const VerificationMeta(
+    'statementDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> statementDate =
+      GeneratedColumn<DateTime>(
+        'statement_date',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    accountId,
+    statementDate,
+    label,
+    amount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bank_statement_lines';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BankStatementLine> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('account_id')) {
+      context.handle(
+        _accountIdMeta,
+        accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('statement_date')) {
+      context.handle(
+        _statementDateMeta,
+        statementDate.isAcceptableOrUnknown(
+          data['statement_date']!,
+          _statementDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_statementDateMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BankStatementLine map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BankStatementLine(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      accountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}account_id'],
+      )!,
+      statementDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}statement_date'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
+    );
+  }
+
+  @override
+  $BankStatementLinesTable createAlias(String alias) {
+    return $BankStatementLinesTable(attachedDatabase, alias);
+  }
+}
+
+class BankStatementLine extends DataClass
+    implements Insertable<BankStatementLine> {
+  final String id;
+  final String accountId;
+  final DateTime statementDate;
+  final String label;
+  final double amount;
+  const BankStatementLine({
+    required this.id,
+    required this.accountId,
+    required this.statementDate,
+    required this.label,
+    required this.amount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['account_id'] = Variable<String>(accountId);
+    map['statement_date'] = Variable<DateTime>(statementDate);
+    map['label'] = Variable<String>(label);
+    map['amount'] = Variable<double>(amount);
+    return map;
+  }
+
+  BankStatementLinesCompanion toCompanion(bool nullToAbsent) {
+    return BankStatementLinesCompanion(
+      id: Value(id),
+      accountId: Value(accountId),
+      statementDate: Value(statementDate),
+      label: Value(label),
+      amount: Value(amount),
+    );
+  }
+
+  factory BankStatementLine.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BankStatementLine(
+      id: serializer.fromJson<String>(json['id']),
+      accountId: serializer.fromJson<String>(json['accountId']),
+      statementDate: serializer.fromJson<DateTime>(json['statementDate']),
+      label: serializer.fromJson<String>(json['label']),
+      amount: serializer.fromJson<double>(json['amount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'accountId': serializer.toJson<String>(accountId),
+      'statementDate': serializer.toJson<DateTime>(statementDate),
+      'label': serializer.toJson<String>(label),
+      'amount': serializer.toJson<double>(amount),
+    };
+  }
+
+  BankStatementLine copyWith({
+    String? id,
+    String? accountId,
+    DateTime? statementDate,
+    String? label,
+    double? amount,
+  }) => BankStatementLine(
+    id: id ?? this.id,
+    accountId: accountId ?? this.accountId,
+    statementDate: statementDate ?? this.statementDate,
+    label: label ?? this.label,
+    amount: amount ?? this.amount,
+  );
+  BankStatementLine copyWithCompanion(BankStatementLinesCompanion data) {
+    return BankStatementLine(
+      id: data.id.present ? data.id.value : this.id,
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      statementDate: data.statementDate.present
+          ? data.statementDate.value
+          : this.statementDate,
+      label: data.label.present ? data.label.value : this.label,
+      amount: data.amount.present ? data.amount.value : this.amount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankStatementLine(')
+          ..write('id: $id, ')
+          ..write('accountId: $accountId, ')
+          ..write('statementDate: $statementDate, ')
+          ..write('label: $label, ')
+          ..write('amount: $amount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, accountId, statementDate, label, amount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BankStatementLine &&
+          other.id == this.id &&
+          other.accountId == this.accountId &&
+          other.statementDate == this.statementDate &&
+          other.label == this.label &&
+          other.amount == this.amount);
+}
+
+class BankStatementLinesCompanion extends UpdateCompanion<BankStatementLine> {
+  final Value<String> id;
+  final Value<String> accountId;
+  final Value<DateTime> statementDate;
+  final Value<String> label;
+  final Value<double> amount;
+  final Value<int> rowid;
+  const BankStatementLinesCompanion({
+    this.id = const Value.absent(),
+    this.accountId = const Value.absent(),
+    this.statementDate = const Value.absent(),
+    this.label = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BankStatementLinesCompanion.insert({
+    required String id,
+    required String accountId,
+    required DateTime statementDate,
+    required String label,
+    required double amount,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       accountId = Value(accountId),
+       statementDate = Value(statementDate),
+       label = Value(label),
+       amount = Value(amount);
+  static Insertable<BankStatementLine> custom({
+    Expression<String>? id,
+    Expression<String>? accountId,
+    Expression<DateTime>? statementDate,
+    Expression<String>? label,
+    Expression<double>? amount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (accountId != null) 'account_id': accountId,
+      if (statementDate != null) 'statement_date': statementDate,
+      if (label != null) 'label': label,
+      if (amount != null) 'amount': amount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BankStatementLinesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? accountId,
+    Value<DateTime>? statementDate,
+    Value<String>? label,
+    Value<double>? amount,
+    Value<int>? rowid,
+  }) {
+    return BankStatementLinesCompanion(
+      id: id ?? this.id,
+      accountId: accountId ?? this.accountId,
+      statementDate: statementDate ?? this.statementDate,
+      label: label ?? this.label,
+      amount: amount ?? this.amount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (statementDate.present) {
+      map['statement_date'] = Variable<DateTime>(statementDate.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankStatementLinesCompanion(')
+          ..write('id: $id, ')
+          ..write('accountId: $accountId, ')
+          ..write('statementDate: $statementDate, ')
+          ..write('label: $label, ')
+          ..write('amount: $amount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BankStatementImportsTable extends BankStatementImports
+    with TableInfo<$BankStatementImportsTable, BankStatementImport> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BankStatementImportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $BankStatementImportsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _accountIdMeta = const VerificationMeta(
+    'accountId',
+  );
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+    'account_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  @override
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    accountId,
+    fileName,
+    content,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bank_statement_imports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BankStatementImport> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('account_id')) {
+      context.handle(
+        _accountIdMeta,
+        accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BankStatementImport map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BankStatementImport(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $BankStatementImportsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      accountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}account_id'],
+      )!,
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      ),
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+    );
+  }
+
+  @override
+  $BankStatementImportsTable createAlias(String alias) {
+    return $BankStatementImportsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class BankStatementImport extends DataClass
+    implements Insertable<BankStatementImport> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String accountId;
+
+  /// Nom du fichier choisi (affichage).
+  final String? fileName;
+
+  /// Contenu du fichier, tel quel.
+  final String content;
+  const BankStatementImport({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.accountId,
+    this.fileName,
+    required this.content,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $BankStatementImportsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['account_id'] = Variable<String>(accountId);
+    if (!nullToAbsent || fileName != null) {
+      map['file_name'] = Variable<String>(fileName);
+    }
+    map['content'] = Variable<String>(content);
+    return map;
+  }
+
+  BankStatementImportsCompanion toCompanion(bool nullToAbsent) {
+    return BankStatementImportsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      accountId: Value(accountId),
+      fileName: fileName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fileName),
+      content: Value(content),
+    );
+  }
+
+  factory BankStatementImport.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BankStatementImport(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $BankStatementImportsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      accountId: serializer.fromJson<String>(json['accountId']),
+      fileName: serializer.fromJson<String?>(json['fileName']),
+      content: serializer.fromJson<String>(json['content']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $BankStatementImportsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'accountId': serializer.toJson<String>(accountId),
+      'fileName': serializer.toJson<String?>(fileName),
+      'content': serializer.toJson<String>(content),
+    };
+  }
+
+  BankStatementImport copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? accountId,
+    Value<String?> fileName = const Value.absent(),
+    String? content,
+  }) => BankStatementImport(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    accountId: accountId ?? this.accountId,
+    fileName: fileName.present ? fileName.value : this.fileName,
+    content: content ?? this.content,
+  );
+  BankStatementImport copyWithCompanion(BankStatementImportsCompanion data) {
+    return BankStatementImport(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      content: data.content.present ? data.content.value : this.content,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankStatementImport(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('accountId: $accountId, ')
+          ..write('fileName: $fileName, ')
+          ..write('content: $content')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    accountId,
+    fileName,
+    content,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BankStatementImport &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.accountId == this.accountId &&
+          other.fileName == this.fileName &&
+          other.content == this.content);
+}
+
+class BankStatementImportsCompanion
+    extends UpdateCompanion<BankStatementImport> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> accountId;
+  final Value<String?> fileName;
+  final Value<String> content;
+  final Value<int> rowid;
+  const BankStatementImportsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.accountId = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.content = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BankStatementImportsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String accountId,
+    this.fileName = const Value.absent(),
+    required String content,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       accountId = Value(accountId),
+       content = Value(content);
+  static Insertable<BankStatementImport> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? accountId,
+    Expression<String>? fileName,
+    Expression<String>? content,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (accountId != null) 'account_id': accountId,
+      if (fileName != null) 'file_name': fileName,
+      if (content != null) 'content': content,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BankStatementImportsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? accountId,
+    Value<String?>? fileName,
+    Value<String>? content,
+    Value<int>? rowid,
+  }) {
+    return BankStatementImportsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      accountId: accountId ?? this.accountId,
+      fileName: fileName ?? this.fileName,
+      content: content ?? this.content,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $BankStatementImportsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankStatementImportsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('accountId: $accountId, ')
+          ..write('fileName: $fileName, ')
+          ..write('content: $content, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PayablesTable extends Payables with TableInfo<$PayablesTable, Payable> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -47902,6 +48759,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $PermissionsApplicativesTable permissionsApplicatives =
       $PermissionsApplicativesTable(this);
+  late final $BankStatementLinesTable bankStatementLines =
+      $BankStatementLinesTable(this);
+  late final $BankStatementImportsTable bankStatementImports =
+      $BankStatementImportsTable(this);
   late final $PayablesTable payables = $PayablesTable(this);
   late final $EmployeesTable employees = $EmployeesTable(this);
   late final $InternshipsTable internships = $InternshipsTable(this);
@@ -48025,6 +48886,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     depreciationRequests,
     settingsRequests,
     permissionsApplicatives,
+    bankStatementLines,
+    bankStatementImports,
     payables,
     employees,
     internships,
@@ -54247,6 +55110,479 @@ typedef $$PermissionsApplicativesTableProcessedTableManager =
         >,
       ),
       PermissionsApplicative,
+      PrefetchHooks Function()
+    >;
+typedef $$BankStatementLinesTableCreateCompanionBuilder =
+    BankStatementLinesCompanion Function({
+      required String id,
+      required String accountId,
+      required DateTime statementDate,
+      required String label,
+      required double amount,
+      Value<int> rowid,
+    });
+typedef $$BankStatementLinesTableUpdateCompanionBuilder =
+    BankStatementLinesCompanion Function({
+      Value<String> id,
+      Value<String> accountId,
+      Value<DateTime> statementDate,
+      Value<String> label,
+      Value<double> amount,
+      Value<int> rowid,
+    });
+
+class $$BankStatementLinesTableFilterComposer
+    extends Composer<_$AppDatabase, $BankStatementLinesTable> {
+  $$BankStatementLinesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get statementDate => $composableBuilder(
+    column: $table.statementDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BankStatementLinesTableOrderingComposer
+    extends Composer<_$AppDatabase, $BankStatementLinesTable> {
+  $$BankStatementLinesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get statementDate => $composableBuilder(
+    column: $table.statementDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BankStatementLinesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BankStatementLinesTable> {
+  $$BankStatementLinesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get statementDate => $composableBuilder(
+    column: $table.statementDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+}
+
+class $$BankStatementLinesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BankStatementLinesTable,
+          BankStatementLine,
+          $$BankStatementLinesTableFilterComposer,
+          $$BankStatementLinesTableOrderingComposer,
+          $$BankStatementLinesTableAnnotationComposer,
+          $$BankStatementLinesTableCreateCompanionBuilder,
+          $$BankStatementLinesTableUpdateCompanionBuilder,
+          (
+            BankStatementLine,
+            BaseReferences<
+              _$AppDatabase,
+              $BankStatementLinesTable,
+              BankStatementLine
+            >,
+          ),
+          BankStatementLine,
+          PrefetchHooks Function()
+        > {
+  $$BankStatementLinesTableTableManager(
+    _$AppDatabase db,
+    $BankStatementLinesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BankStatementLinesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BankStatementLinesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BankStatementLinesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> accountId = const Value.absent(),
+                Value<DateTime> statementDate = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<double> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BankStatementLinesCompanion(
+                id: id,
+                accountId: accountId,
+                statementDate: statementDate,
+                label: label,
+                amount: amount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String accountId,
+                required DateTime statementDate,
+                required String label,
+                required double amount,
+                Value<int> rowid = const Value.absent(),
+              }) => BankStatementLinesCompanion.insert(
+                id: id,
+                accountId: accountId,
+                statementDate: statementDate,
+                label: label,
+                amount: amount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BankStatementLinesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BankStatementLinesTable,
+      BankStatementLine,
+      $$BankStatementLinesTableFilterComposer,
+      $$BankStatementLinesTableOrderingComposer,
+      $$BankStatementLinesTableAnnotationComposer,
+      $$BankStatementLinesTableCreateCompanionBuilder,
+      $$BankStatementLinesTableUpdateCompanionBuilder,
+      (
+        BankStatementLine,
+        BaseReferences<
+          _$AppDatabase,
+          $BankStatementLinesTable,
+          BankStatementLine
+        >,
+      ),
+      BankStatementLine,
+      PrefetchHooks Function()
+    >;
+typedef $$BankStatementImportsTableCreateCompanionBuilder =
+    BankStatementImportsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String accountId,
+      Value<String?> fileName,
+      required String content,
+      Value<int> rowid,
+    });
+typedef $$BankStatementImportsTableUpdateCompanionBuilder =
+    BankStatementImportsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> accountId,
+      Value<String?> fileName,
+      Value<String> content,
+      Value<int> rowid,
+    });
+
+class $$BankStatementImportsTableFilterComposer
+    extends Composer<_$AppDatabase, $BankStatementImportsTable> {
+  $$BankStatementImportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BankStatementImportsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BankStatementImportsTable> {
+  $$BankStatementImportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BankStatementImportsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BankStatementImportsTable> {
+  $$BankStatementImportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+}
+
+class $$BankStatementImportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BankStatementImportsTable,
+          BankStatementImport,
+          $$BankStatementImportsTableFilterComposer,
+          $$BankStatementImportsTableOrderingComposer,
+          $$BankStatementImportsTableAnnotationComposer,
+          $$BankStatementImportsTableCreateCompanionBuilder,
+          $$BankStatementImportsTableUpdateCompanionBuilder,
+          (
+            BankStatementImport,
+            BaseReferences<
+              _$AppDatabase,
+              $BankStatementImportsTable,
+              BankStatementImport
+            >,
+          ),
+          BankStatementImport,
+          PrefetchHooks Function()
+        > {
+  $$BankStatementImportsTableTableManager(
+    _$AppDatabase db,
+    $BankStatementImportsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BankStatementImportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BankStatementImportsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$BankStatementImportsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> accountId = const Value.absent(),
+                Value<String?> fileName = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BankStatementImportsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                accountId: accountId,
+                fileName: fileName,
+                content: content,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String accountId,
+                Value<String?> fileName = const Value.absent(),
+                required String content,
+                Value<int> rowid = const Value.absent(),
+              }) => BankStatementImportsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                accountId: accountId,
+                fileName: fileName,
+                content: content,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BankStatementImportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BankStatementImportsTable,
+      BankStatementImport,
+      $$BankStatementImportsTableFilterComposer,
+      $$BankStatementImportsTableOrderingComposer,
+      $$BankStatementImportsTableAnnotationComposer,
+      $$BankStatementImportsTableCreateCompanionBuilder,
+      $$BankStatementImportsTableUpdateCompanionBuilder,
+      (
+        BankStatementImport,
+        BaseReferences<
+          _$AppDatabase,
+          $BankStatementImportsTable,
+          BankStatementImport
+        >,
+      ),
+      BankStatementImport,
       PrefetchHooks Function()
     >;
 typedef $$PayablesTableCreateCompanionBuilder =
@@ -71327,6 +72663,10 @@ class $AppDatabaseManager {
         _db,
         _db.permissionsApplicatives,
       );
+  $$BankStatementLinesTableTableManager get bankStatementLines =>
+      $$BankStatementLinesTableTableManager(_db, _db.bankStatementLines);
+  $$BankStatementImportsTableTableManager get bankStatementImports =>
+      $$BankStatementImportsTableTableManager(_db, _db.bankStatementImports);
   $$PayablesTableTableManager get payables =>
       $$PayablesTableTableManager(_db, _db.payables);
   $$EmployeesTableTableManager get employees =>

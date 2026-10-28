@@ -153,6 +153,8 @@ class SyncController extends Controller
         'fixed_assets', 'depreciation_requests',
         // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS).
         'settings_requests',
+        // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
+        'bank_statement_imports',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -243,6 +245,8 @@ class SyncController extends Controller
         'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
         // Ticket CP-3 — le registre des immobilisations (écran `view-comptabilite`).
         'fixed_assets' => ['view-comptabilite'],
+        // Ticket CP-5 — lignes de relevé bancaire importées (rapprochement).
+        'bank_statement_lines' => ['view-comptabilite'],
         // Ticket PA-2 — la liste des droits sert l'écran « Rôles & Permissions » (administrateur).
         'permissions' => ['manage-users'],
         // Ticket DEP3 — centres de coût (filières) de l'en-tête d'une dépense : petit référentiel, lecture seule.
@@ -1199,6 +1203,18 @@ class SyncController extends Controller
 
             // Ticket PA-2 — les droits existants, pour la modale « Nouveau Rôle » / « Modifier le Rôle » (administrateur).
             'permissions' => fn () => \App\Models\Permission::query()->orderBy('name')->get(['id', 'name']),
+
+            // Ticket CP-5 — les lignes de relevé importées : le rapprochement se calcule au poste comme au web.
+            'bank_statement_lines' => fn () => \App\Models\BankStatementLine::query()
+                ->orderBy('statement_date')
+                ->get(['id', 'account_id', 'statement_date', 'label', 'amount'])
+                ->map(fn (\App\Models\BankStatementLine $l) => [
+                    'id' => $l->id,
+                    'account_id' => $l->account_id,
+                    'statement_date' => $l->statement_date?->format('Y-m-d'),
+                    'label' => $l->label,
+                    'amount' => (float) $l->amount,
+                ]),
 
             'fiscal_years' => fn () => FiscalYear::query()
                 ->orderByDesc('year')
@@ -2166,6 +2182,7 @@ class SyncController extends Controller
             'fixed_assets' => ['accepted' => [], 'rejected' => []],
             'depreciation_requests' => ['accepted' => [], 'rejected' => []],
             'settings_requests' => ['accepted' => [], 'rejected' => []],
+            'bank_statement_imports' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
             // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
             'employees' => ['accepted' => [], 'rejected' => []],
@@ -2420,6 +2437,14 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket CP-5 — après le plan comptable et les réglages : le compte visé peut être créé dans le même envoi.
+        if ($request->has('bank_statement_imports')) {
+            $result['bank_statement_imports'] = $this->pushBankStatementImports(
+                $this->envoiTraduit($request, 'bank_statement_imports'),
+                $request->user(),
+            );
+        }
+
         if ($request->has('expenses')) {
             $result['expenses'] = $this->pushExpenses($request->input('expenses'));
         }
@@ -2654,6 +2679,8 @@ class SyncController extends Controller
         'depreciation_requests' => 'manage-comptabilite',
         // Tickets PA-* — le droit exact dépend du type de la demande (jugé dans `pushSettingsRequests`) ; `view-parametres` est le plancher.
         'settings_requests' => 'view-parametres',
+        // Ticket CP-5 — le droit de `RapprochementBancaire::importReleve`.
+        'bank_statement_imports' => 'manage-comptabilite',
         'attendance_records' => 'manage-rh',
         // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
         'employees' => 'manage-rh',
@@ -3923,6 +3950,48 @@ class SyncController extends Controller
 
         validator($p, $service->regles($p['ancienNom'] ?? null), ['roleName.regex' => \App\Services\RoleService::MESSAGE_NOM] + MotifsRefusPush::messages(), ['roleName' => 'nom du rôle'])->validate();
         $service->enregistrer($p['ancienNom'] ?? null, $p['roleName'], array_values(array_filter($p['permissions'] ?? [], 'is_string')), $utilisateur);
+    }
+
+    /**
+     * Ticket CP-5 — RELEVÉS BANCAIRES (CSV `date;libellé;montant`) importés au poste.
+     *
+     * ⚠️ `BankReconciliationService::importCsv` — partagé avec `RapprochementBancaire::importReleve` — lit le texte : lignes
+     * illisibles comptées et ignorées, séparateur `;` ou `,`, montant signé. L'UUID de l'import est posé sur chaque ligne :
+     * rejouer l'envoi ne duplique rien. Un compte inconnu est refusé.
+     */
+    private function pushBankStatementImports(array $imports, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\BankReconciliationService::class);
+
+        foreach ($imports as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'importer un relevé bancaire.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'account_id' => ['required', 'uuid', 'exists:chart_of_accounts,id'],
+                    'content' => ['required', 'string', 'max:2097152'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['account_id' => 'compte', 'content' => 'relevé'])->validate();
+
+                $service->importCsv($valides['account_id'], $valides['content'], $valides['id']);
+                \App\Models\AuditLog::record('bank_statement.imported', 'comptabilite');
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
     /**

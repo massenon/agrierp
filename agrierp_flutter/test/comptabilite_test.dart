@@ -2,6 +2,7 @@ import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
 import 'package:agrierp/features/comptabilite/immobilisations_repository.dart';
+import 'package:agrierp/features/comptabilite/rapprochement_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -141,6 +142,7 @@ void main() {
         home: ComptabiliteScreen(
           depot: depot,
           depotImmobilisations: ImmobilisationsRepository(database: db),
+          depotRapprochement: RapprochementRepository(database: db),
           maintenant: maintenant == null ? DateTime.now : () => maintenant,
         ),
       ),
@@ -584,7 +586,7 @@ void main() {
       );
     });
 
-    /// ⚠️⚠️ QUATRE PAGES RESTENT SUR LE WEB, chacune avec SA raison (cinq avant EX8 : les États Financiers sont
+    /// ⚠️⚠️ TROIS PAGES RESTENT SUR LE WEB, chacune avec SA raison (quatre avant CP-5, cinq avant EX8 : les États Financiers sont
     /// embarqués).
     testWidgets('⚠️⚠️ chaque page non embarquée porte son propre motif', (
       tester,
@@ -631,6 +633,6 @@ class _ComptabiliteMotifs {
     PageComptable.cloture: "hors du contrat de synchronisation",
     PageComptable.analytique: 'centres de coût',
     PageComptable.tva: 'pièce fiscale',
-    PageComptable.rapprochement: 'RELEVÉ de banque',
+    // Ticket CP-5 : le rapprochement bancaire est embarqué (page `RapprochementPage`).
   };
 }

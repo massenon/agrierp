@@ -76,7 +76,9 @@ import 'features/ventes/caisse_repository.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
 import 'features/comptabilite/immobilisations_repository.dart';
+import 'features/comptabilite/rapprochement_repository.dart';
 import 'features/parametres/reglages_ferme_repository.dart';
+import 'features/parametres/administration_en_ligne.dart';
 import 'features/parametres/parametres_generaux_repository.dart';
 import 'features/parametres/parametres_generaux_screen.dart';
 import 'features/rapports/rapports_exports_screen.dart';
@@ -216,6 +218,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres : la route du serveur (même service que le web), par
   /// le client partagé (il porte le jeton), puis la purge immédiate de ce poste par le moteur (mécanisme 15.50)
   /// et un tirage complet. Le droit est celui du rôle de la session ouverte.
+  late final _adminEnLigne = AdministrationEnLigne(client: _client, engine: _engine, role: () => _auth.utilisateur?.role ?? '');
+
   late final ReinitialisationPoste _reinitialisation = ReinitialisationPoste(
     database: _db,
     client: _client,
@@ -370,6 +374,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
   );
 
+  late final RapprochementRepository _rapprochement = RapprochementRepository(database: _db, deviceId: widget.identifiantPoste);
+
   late final ImmobilisationsRepository _immobilisations = ImmobilisationsRepository(
     deviceId: widget.identifiantPoste,
     database: _db,
@@ -521,6 +527,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           engine: _engine,
           auth: _auth,
           reinitialisation: _reinitialisation,
+          adminEnLigne: _adminEnLigne,
           fiches: _fiches,
           caisse: _caisse,
           soins: _soins,
@@ -533,6 +540,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           administration: _administration,
           comptabilite: _comptabilite,
           immobilisations: _immobilisations,
+          rapprochement: _rapprochement,
           parametresGeneraux: _parametresGeneraux,
           rapports: _rapports,
           tableauDeBord: _tableauDeBord,
@@ -598,6 +606,7 @@ class SocleAccueil extends StatefulWidget {
     required this.administration,
     required this.comptabilite,
     required this.immobilisations,
+    required this.rapprochement,
     required this.parametresGeneraux,
     required this.rapports,
     required this.tableauDeBord,
@@ -624,6 +633,7 @@ class SocleAccueil extends StatefulWidget {
     required this.parametres,
     required this.identifiantPoste,
     this.reinitialisation,
+    this.adminEnLigne,
     this.onDeconnecte,
     this.verrou,
     this.demandeEcran,
@@ -657,6 +667,7 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
+  final AdministrationEnLigne? adminEnLigne;
 
   /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
   /// châssis, qui n'ont pas de plateforme native pour la connectivité).
@@ -685,6 +696,7 @@ class SocleAccueil extends StatefulWidget {
   final AdministrationRepository administration;
   final ComptabiliteRepository comptabilite;
   final ImmobilisationsRepository immobilisations;
+  final RapprochementRepository rapprochement;
   final ParametresGenerauxRepository parametresGeneraux;
   final RapportsRepository rapports;
   final TableauDeBordRepository tableauDeBord;
@@ -803,6 +815,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     ongletInitial: ongletInitial,
     idUtilisateurConnecte: widget.auth.utilisateur?.id,
     reglages: _reglages,
+    admin: widget.adminEnLigne,
     estAdmin: widget.auth.utilisateur?.role == 'admin',
   );
 
@@ -1304,6 +1317,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
           depotImmobilisations: widget.immobilisations,
+          depotRapprochement: widget.rapprochement,
           imprimer: EditeursRapports.imprimer,
           // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.
           exercice: _exercice.etat?.annee,

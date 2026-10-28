@@ -215,7 +215,7 @@ class SyncTiragePagineTest extends TestCase
                 'veterinary_withdrawal_periods', 'prophylaxis_schedule_standards', 'veterinary_records', 'infirmary_records',
                 'veterinary_calendar_events', 'feed_types', 'elevage_numbering', 'lot_revenues', 'animals',
                 'livestock_species', 'stock_movements'],
-            'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'fixed_assets', 'accounting_entries', 'accounting_entry_lines',
+            'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'fixed_assets', 'bank_statement_lines', 'accounting_entries', 'accounting_entry_lines',
                 'accounting_entry_ids', 'stock_movements', 'payslips', 'cost_centers'],
             'admin' => array_keys(SyncController::PERMISSIONS_DE_TIRAGE),
         ];

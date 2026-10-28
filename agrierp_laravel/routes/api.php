@@ -94,4 +94,17 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         ->middleware('throttle:10,1,reinitialisation-bascule');
     Route::post('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'reinitialiser'])
         ->middleware('throttle:5,1,reinitialisation-execution');
+
+    // Tickets PA-1, PA-5, PA-6, PA-8 — gestes d'administration EN LIGNE depuis le poste (mêmes services et droits que le web).
+    Route::prefix('/parametres')->middleware('throttle:30,1,administration-en-ligne')->group(function () {
+        Route::post('/sessions/vider', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'viderSessions']);
+        Route::get('/postes', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'postes']);
+        Route::post('/postes/demander', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'demanderSynchronisation']);
+        Route::post('/postes/revoquer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'revoquerAppairage']);
+        Route::get('/sauvegardes', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'sauvegardes']);
+        Route::post('/sauvegardes/generer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'genererSauvegarde']);
+        Route::get('/sauvegardes/telecharger/{fichier}', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'telechargerSauvegarde']);
+        Route::post('/sauvegardes/importer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'importerModule']);
+        Route::post('/sms/tester', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'testerSms']);
+    });
 });

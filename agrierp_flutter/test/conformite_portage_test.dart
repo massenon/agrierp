@@ -124,6 +124,8 @@ void main() {
     'fixed_assets',
     // Ticket PA-2 — les droits existants (administrateur).
     'permissions',
+    // Ticket CP-5 — lignes de relevé bancaire.
+    'bank_statement_lines',
     'fiscal_years',
     'accounting_entries',
     'accounting_entry_lines',

@@ -16,6 +16,7 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'appairage_poste.dart';
 import 'corbeille_repository.dart';
+import 'administration_en_ligne.dart';
 import 'onglet_appairage.dart';
 import 'onglet_corbeille.dart';
 import 'onglet_email_smtp.dart';
@@ -73,6 +74,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.idUtilisateurConnecte,
     this.reglages,
     this.estAdmin = false,
+    this.admin,
   });
 
   final ParametresGenerauxRepository depot;
@@ -80,6 +82,9 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS) écrits en
   /// DEMANDES ; `null` : les onglets restent en consultation (vues du châssis sans session).
   final ReglagesFermeRepository? reglages;
+
+  /// Tickets PA-1/5/6/8 — gestes d'administration EN LIGNE (sessions, postes appairés, sauvegardes) ; `null` : indisponibles.
+  final AdministrationEnLigne? admin;
 
   /// Le compte connecté est administrateur (rôles, taux de paie et barème arrêtés).
   final bool estAdmin;
@@ -107,6 +112,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
   static const ongletAppairage = 'Appairage';
   static const ongletCorbeille = 'Corbeille';
   static const ongletReinitialisation = 'Réinitialisation';
+  static const ongletSauvegardes = 'Sauvegardes';
 
   /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
   /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
@@ -122,6 +128,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     ('Audit Logs', SymbolesAgri.security),
     (ongletCorbeille, SymbolesAgri.restore_from_trash),
     (ongletReinitialisation, SymbolesAgri.restart_alt),
+    (ongletSauvegardes, SymbolesAgri.database),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -236,7 +243,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                         "Données de l'Entreprise" when _sousPage == 'bareme' && widget.reglages != null =>
                           PageBaremeIts(depot: widget.reglages!, estAdmin: widget.estAdmin, surRetour: () => setState(() => _sousPage = null)),
                         "Données de l'Entreprise" when _sousPage == 'sms' && widget.reglages != null =>
-                          PageIntegrationsSms(depot: widget.reglages!, surRetour: () => setState(() => _sousPage = null)),
+                          PageIntegrationsSms(depot: widget.reglages!, admin: widget.admin, surRetour: () => setState(() => _sousPage = null)),
                         "Données de l'Entreprise" => _ongletEntreprise(
                           d,
                           large,
@@ -253,6 +260,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                           _ongletCorbeille(),
                         ParametresGenerauxScreen.ongletReinitialisation =>
                           _ongletReinitialisation(),
+                        ParametresGenerauxScreen.ongletSauvegardes => _ongletSauvegardes(),
                         _ => _ongletRoles(d, large),
                       },
                     ],
@@ -651,6 +659,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   // ── Onglet 6 : Appairage — ticket CFG-2 ──────────────────────────────────
 
+  Widget _ongletSauvegardes() {
+    final admin = widget.admin;
+    if (admin == null || !admin.peut('manage-parametres')) {
+      return _mentionPoste(
+        'Les sauvegardes sont gardées sur le serveur : elles se gèrent en ligne, avec le droit de gérer les paramètres.',
+        cle: 'sauvegardes-indisponibles',
+      );
+    }
+    return OngletSauvegardes(admin: admin);
+  }
+
   Widget _ongletAppairage() {
     final appairage = widget.appairage;
     if (appairage == null) {
@@ -660,7 +679,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         cle: 'appairage-indisponible',
       );
     }
-    return OngletAppairage(appairage: appairage);
+    final admin = widget.admin;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OngletAppairage(appairage: appairage),
+        if (admin != null && admin.peut('manage-users')) ...[
+          const SizedBox(height: AgriSpacing.lg),
+          SectionPostesAppaires(key: const Key('postes-appaires'), admin: admin),
+        ],
+      ],
+    );
   }
 
   // ── Onglet « Corbeille » — ticket ARC4 ────────────────────────────────────
@@ -883,6 +912,21 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           label: const Text('Nouvel Utilisateur', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
         ),
       ),
+      if (widget.admin != null && widget.admin!.peut('manage-users')) ...[
+        const SizedBox(height: AgriSpacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('vider-sessions'),
+            onPressed: () async {
+              if (await confirmerViderSessions(context: context, admin: widget.admin!, surMessage: (m) => _message = m) && mounted) setState(() {});
+            },
+            icon: const Icon(SymbolesAgri.logout, size: 18),
+            label: const Text('Déconnecter Toutes les Sessions', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+          ),
+        ),
+        if (_message != null) Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+      ],
       const SizedBox(height: AgriSpacing.md),
       _tableau(
         largeur: 900,

@@ -65,6 +65,7 @@ abstract final class SymbolesAgri {
   static const IconData cruelty_free = IconData(0xe799, fontFamily: famille);
   static const IconData dark_mode = IconData(0xe51c, fontFamily: famille);
   static const IconData dashboard = IconData(0xe871, fontFamily: famille);
+  static const IconData database = IconData(0xf20e, fontFamily: famille);
   static const IconData delete = IconData(0xe872, fontFamily: famille);
   static const IconData delete_outline = IconData(0xe872, fontFamily: famille);
   static const IconData delete_sweep = IconData(0xe16c, fontFamily: famille);
@@ -149,6 +150,7 @@ abstract final class SymbolesAgri {
   static const IconData receipt = IconData(0xe8b0, fontFamily: famille);
   static const IconData receipt_long = IconData(0xef6e, fontFamily: famille);
   static const IconData redeem = IconData(0xe8b1, fontFamily: famille);
+  static const IconData refresh = IconData(0xe5d5, fontFamily: famille);
   static const IconData remove = IconData(0xe15b, fontFamily: famille);
   static const IconData remove_circle_outline = IconData(0xe15c, fontFamily: famille);
   static const IconData request_page = IconData(0xf22c, fontFamily: famille);
@@ -180,6 +182,7 @@ abstract final class SymbolesAgri {
   static const IconData support_agent = IconData(0xf0e2, fontFamily: famille);
   static const IconData swap_horiz = IconData(0xe8d4, fontFamily: famille);
   static const IconData sync = IconData(0xe627, fontFamily: famille);
+  static const IconData sync_alt = IconData(0xea18, fontFamily: famille);
   static const IconData sync_problem = IconData(0xe629, fontFamily: famille);
   static const IconData table_view = IconData(0xf1be, fontFamily: famille);
   static const IconData tag = IconData(0xe9ef, fontFamily: famille);
@@ -191,6 +194,7 @@ abstract final class SymbolesAgri {
   static const IconData trending_down = IconData(0xe8e3, fontFamily: famille);
   static const IconData trending_up = IconData(0xe8e5, fontFamily: famille);
   static const IconData tune = IconData(0xe429, fontFamily: famille);
+  static const IconData upload = IconData(0xe2c6, fontFamily: famille);
   static const IconData upload_file = IconData(0xe9fc, fontFamily: famille);
   static const IconData vaccines = IconData(0xe138, fontFamily: famille);
   static const IconData verified = IconData(0xe031, fontFamily: famille);

@@ -892,6 +892,8 @@ class SyncEngine {
     recus += await _absorberRoles(corps['roles']);
     // Ticket PA-2 — les droits existants (administrateur), pour la modale « Rôle ».
     recus += await _absorberDroits(corps['permissions']);
+    // Ticket CP-5 — lignes de relevé bancaire importées (remplacées à chaque tirage).
+    recus += await _absorberRelevesBancaires(corps['bank_statement_lines']);
     recus += await _absorberUtilisateurs(corps['users']);
     recus += await _absorberAudit(corps['audit_logs']);
     recus += await _absorberNotifications(corps['notifications']);
@@ -2911,6 +2913,40 @@ class SyncEngine {
               ),
             );
       }
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket CP-5 — lignes de relevé bancaire : référentiel remplacé à chaque tirage (les demandes d'import en attente restent
+  /// dans leur table, jamais touchées).
+  Future<int> _absorberRelevesBancaires(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Ligne de relevé');
+    }
+
+    await _db.transaction(() async {
+      await _db.delete(_db.bankStatementLines).go();
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final date = _date(l['statement_date']);
+          if (date == null) continue;
+          b.insert(
+            _db.bankStatementLines,
+            BankStatementLinesCompanion.insert(
+              id: l['id'] as String,
+              accountId: (l['account_id'] ?? '') as String,
+              statementDate: date,
+              label: (l['label'] ?? '') as String,
+              amount: _reel(l['amount']) ?? 0,
+            ),
+          );
+        }
+      });
     });
 
     return lignes.length;
@@ -5321,6 +5357,9 @@ class SyncEngine {
       if (brut != null) secretsSms[r.id] = Map<String, String>.from(jsonDecode(brut) as Map);
     }
 
+    // Ticket CP-5 — relevés bancaires à importer (le texte du fichier part tel quel, le serveur le lit).
+    final releves = await (_db.select(_db.bankStatementImports)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
     final bonsCommande = await (_db.select(
       _db.purchaseOrders,
@@ -5435,6 +5474,7 @@ class SyncEngine {
         demandesPaie.isEmpty &&
         immobilisations.isEmpty &&
         reglages.isEmpty &&
+        releves.isEmpty &&
         demandesDotation.isEmpty &&
         utilisateurs.isEmpty) {
       return (0, 0, <String>[]);
@@ -5617,6 +5657,8 @@ class SyncEngine {
         'depreciation_requests': demandesDotation.map(_demandeDotationEnJson).toList(),
         // Tickets PA-* — AVANT les achats et les dépenses : un compte de trésorerie créé ici peut être cité plus bas.
         'settings_requests': [for (final r in reglages) _reglageEnJson(r, secretsSms[r.id])],
+        // Ticket CP-5 — après les réglages, avant les dépenses.
+        'bank_statement_imports': [for (final r in releves) {'id': r.id, 'account_id': r.accountId, 'content': r.content}],
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
         'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
@@ -6056,6 +6098,16 @@ class SyncEngine {
       if (_acquittes(corps['settings_requests']).contains(r.id)) await _coffre.delete(key: cleSecretSms(r.id));
     }
     accepte += reglagesAcceptes;
+    // Ticket CP-5 — acquitté quand le serveur a lu le relevé ; les lignes descendent au tirage de confirmation.
+    final relevesAcceptes = await _acquitter(
+      'bank_statement_imports',
+      corps['bank_statement_imports'],
+      (ids, statut) => (_db.update(_db.bankStatementImports)..where((t) => t.id.isIn(ids)))
+          .write(BankStatementImportsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += relevesAcceptes;
     final dotationsAcceptees = await _acquitter(
       'depreciation_requests',
       corps['depreciation_requests'],
@@ -6397,7 +6449,8 @@ class SyncEngine {
         demandesAcceptees +
         immobilisationsAcceptees +
         dotationsAcceptees +
-        reglagesAcceptes;
+        reglagesAcceptes +
+        relevesAcceptes;
 
     // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
     // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
@@ -6453,6 +6506,7 @@ class SyncEngine {
     'fixed_assets',
     'depreciation_requests',
     'settings_requests',
+    'bank_statement_imports',
     'expenses',
     // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
     'purchase_orders',
@@ -7156,6 +7210,14 @@ class SyncEngine {
               _db.manualEntryRequests,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const ManualEntryRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-5 — un relevé refusé (compte inconnu) se corrige puis se relance.
+      'bank_statement_imports' =>
+        () =>
+            (_db.update(
+              _db.bankStatementImports,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const BankStatementImportsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       // Tickets PA-* — un réglage refusé (barème arrêté, rôle porté, solde insuffisant…) se corrige puis se relance.
       'settings_requests' =>
