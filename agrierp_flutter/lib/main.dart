@@ -409,6 +409,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   late final FacturationRepository _facturation = FacturationRepository(
     database: _db,
+    // Ticket VC-5 — module MeCeF désactivé tant que le serveur ne l'a pas activé (comme `config/mecef.php`).
+    mecefParDefaut: false,
   );
 
   late final FournisseursRepository _fournisseurs = FournisseursRepository(
@@ -1360,6 +1362,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.facturation => FacturationScreen(
           depot: widget.facturation,
+          imprimer: EditeursRapports.imprimer,
           onOuvrirCaisse: () => setState(() => _ecran = EcranPoste.caisse),
         ),
         EcranPoste.fournisseurs => FournisseursScreen(

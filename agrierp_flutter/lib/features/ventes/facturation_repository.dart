@@ -1,4 +1,6 @@
+
 import '../../core/database/app_database.dart';
+import '../../core/export/document_officiel.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 
@@ -26,6 +28,10 @@ enum StatutMecef {
 /// Une ligne du tableau des factures.
 class LigneFacture {
   const LigneFacture({required this.vente, required this.envoyee});
+
+  /// Numéro de facture, calculé comme `Sale::numero_facture` du web : `FV-AAAA-XXXXXX` (année de la vente, 6 premiers
+  /// caractères de l'identifiant en majuscules).
+  String get numero => 'FV-${vente.soldAt.year}-${vente.id.substring(0, 6).toUpperCase()}';
 
   final Sale vente;
 
@@ -76,9 +82,36 @@ class DonneesFacturation {
 /// tranché en redirigeant vers la caisse, seul point d'entrée réel ; le poste
 /// applique la même règle.
 class FacturationRepository {
-  FacturationRepository({required this.database});
+  FacturationRepository({required this.database, this.mecefParDefaut = true});
 
   final AppDatabase database;
+
+  /// Valeur du module MeCeF tant que le serveur ne l'a pas dit (`mecef.actif` d'`app_settings`). L'application passe `false` :
+  /// comme au serveur (`config/mecef.php`), le module est désactivé jusqu'à sa configuration.
+  final bool mecefParDefaut;
+
+  static const cleMecefActif = 'mecef.actif';
+
+  /// Ticket VC-5 — le module MeCeF est-il activé ? Servi par le tirage (`company_settings.mecef_actif`), gardé hors schéma.
+  Future<bool> mecefActif() async {
+    final ligne = await (database.select(database.appSettings)..where((s) => s.key.equals(cleMecefActif))).getSingleOrNull();
+    return ligne == null ? mecefParDefaut : ligne.value == '1';
+  }
+
+  Future<void> definirMecefActif(bool actif) => database.into(database.appSettings).insertOnConflictUpdate(
+    AppSettingsCompanion.insert(key: cleMecefActif, value: actif ? '1' : '0'),
+  );
+
+  /// Facture d'une vente, hors ligne, avec ou sans certification MeCeF (`exports.facture-vente` du web).
+  Future<DocumentOfficiel?> documentFacture(String venteId) async {
+    final vente = await (database.select(database.sales)..where((s) => s.id.equals(venteId))).getSingleOrNull();
+    if (vente == null) return null;
+    final lignes = await (database.select(database.saleLines)..where((l) => l.saleId.equals(venteId))).get();
+    final produits = {for (final p in await database.select(database.products).get()) p.id: p.name};
+    return DocumentsFacturation.facture(LigneFacture(vente: vente, envoyee: vente.syncStatus == SyncStatus.synced), [
+      for (final l in lignes) (designation: produits[l.productId] ?? '—', quantite: l.qty, montant: l.manualTotalAmount),
+    ]);
+  }
 
   Future<DonneesFacturation> charger({DateTime? mois}) async {
     final ventes = await database.select(database.sales).get();
@@ -93,6 +126,45 @@ class FacturationRepository {
             ),
           )
           .toList(),
+    );
+  }
+}
+
+/// Ticket VC-5 — le document « Facture » du poste : mêmes mots que `exports.facture-vente` du web.
+class DocumentsFacturation {
+  const DocumentsFacturation._();
+
+  static String _montant(double v) {
+    final entier = v.round().abs().toString();
+    final morceaux = <String>[];
+    for (var i = entier.length; i > 0; i -= 3) {
+      morceaux.insert(0, entier.substring(i - 3 < 0 ? 0 : i - 3, i));
+    }
+    return '${v.round() < 0 ? '-' : ''}${morceaux.join(' ')}';
+  }
+
+  static String _jour(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  static String _quantite(double q) => q == q.roundToDouble() ? q.round().toString() : q.toString().replaceAll('.', ',');
+
+  static DocumentOfficiel facture(LigneFacture f, List<({String designation, double quantite, double montant})> lignes) {
+    final v = f.vente;
+    final certifiee = f.statut == StatutMecef.transmise && v.mecefQrRef != null;
+    return DocumentOfficiel(
+      titre: 'Facture ${f.numero}',
+      sousTitre: 'Du ${_jour(v.soldAt)} — Client : ${f.client}',
+      fichier: 'facture-${f.numero}.pdf',
+      entetes: const ['Désignation', 'Quantité', 'Prix unitaire', 'Montant'],
+      lignes: [
+        if (lignes.isEmpty)
+          const DonneesDocument(['Aucune ligne.', '', '', ''])
+        else
+          for (final l in lignes)
+            DonneesDocument([l.designation, _quantite(l.quantite), _montant(l.quantite > 0 ? l.montant / l.quantite : 0), _montant(l.montant)]),
+        TotalDocument(['Total TTC', '', '', _montant(v.total)], premiere: true),
+      ],
+      noteDePied: certifiee ? 'Facture normalisée MeCeF — référence : ${v.mecefQrRef}' : 'Facture émise sans certification MeCeF.',
     );
   }
 }

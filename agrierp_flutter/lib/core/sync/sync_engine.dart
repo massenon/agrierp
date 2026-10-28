@@ -2832,6 +2832,12 @@ class SyncEngine {
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
     await _tirerFichiersEntreprise(l);
+    // Ticket VC-5 — le serveur dit si le module MeCeF est activé (clé absente d'un serveur antérieur : le poste garde son défaut).
+    if (l['mecef_actif'] is bool) {
+      await _db.into(_db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(key: 'mecef.actif', value: l['mecef_actif'] == true ? '1' : '0'),
+      );
+    }
 
     final delaiServi = l.containsKey('rappel_soins_jours');
     final delai = l['rappel_soins_jours'];

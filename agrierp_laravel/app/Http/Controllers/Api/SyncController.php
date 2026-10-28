@@ -1262,6 +1262,8 @@ class SyncController extends Controller
                     // Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté ? (seul un administrateur le modifie alors)
                     'payroll_locked' => $entreprise->payrollSettingsLocked(),
                     'payroll_edited_at' => $entreprise->payroll_settings_edited_at?->format('d/m/Y à H:i'),
+                    // Ticket VC-5 — le module MeCeF est-il activé ? (`config/mecef.php`) : le poste montre ou masque ses colonnes MeCeF.
+                    'mecef_actif' => (bool) config('mecef.actif'),
                     // Ticket AUT-2 — chemins du logo et du favicon : le poste télécharge le fichier quand le chemin change.
                     'logo_path' => $entreprise->logo_path,
                     'favicon_path' => $entreprise->favicon_path,

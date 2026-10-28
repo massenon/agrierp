@@ -69,4 +69,18 @@ class ModuleMecefDesactiveTest extends TestCase
         $html = view('exports.facture-vente', ['sale' => $vente->fresh()->load(['customer', 'lines.product'])])->render();
         $this->assertStringContainsString('référence : REF-123', $html);
     }
+
+    public function test_le_tirage_dit_au_poste_si_le_module_mecef_est_active(): void
+    {
+        \App\Models\Permission::findOrCreate('view-ventes', 'web');
+        $u = \App\Models\User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'c@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
+        $u->givePermissionTo('view-ventes');
+        \App\Models\CompanySetting::current()->update(['company_name' => 'Ferme']);
+
+        config(['mecef.actif' => false]);
+        $this->actingAs($u, 'sanctum')->getJson('/api/sync/pull')->assertOk()->assertJsonPath('company_settings.mecef_actif', false);
+
+        config(['mecef.actif' => true]);
+        $this->actingAs($u, 'sanctum')->getJson('/api/sync/pull')->assertOk()->assertJsonPath('company_settings.mecef_actif', true);
+    }
 }

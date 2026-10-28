@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
 import 'package:agrierp/features/ventes/facturation_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -306,6 +307,77 @@ void main() {
       await afficher(tester);
 
       expect(find.text('— Aucune facture pour ces critères —'), findsOneWidget);
+    });
+  });
+
+  group('VC-5 · sans MeCeF', () {
+    Future<void> afficherSansMecef(WidgetTester tester, {List<String>? documents}) async {
+      tester.view.physicalSize = const Size(1600, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await depot.definirMecefActif(false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FacturationScreen(
+            depot: depot,
+            imprimer: (doc, maintenant) async {
+              documents?.add(doc.titre);
+              return null;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    test('le module est désactivé par défaut au poste de l\'application, activé pour les tests, et le serveur le dit', () async {
+      expect(await FacturationRepository(database: db, mecefParDefaut: false).mecefActif(), isFalse);
+      expect(await depot.mecefActif(), isTrue);
+      await depot.definirMecefActif(false);
+      expect(await depot.mecefActif(), isFalse);
+      await depot.definirMecefActif(true);
+      expect(await depot.mecefActif(), isTrue);
+    });
+
+    testWidgets('⚠️ la facturation reste utilisable : registre, trois cartes, numéro FV-AAAA-XXXXXX, aucune colonne ni filtre MeCeF', (tester) async {
+      await facture('abcdef12', total: 12500, client: 'AMOUSSOU Régis');
+      await afficherSansMecef(tester);
+
+      expect(find.text('Facturation'), findsOneWidget);
+      expect(find.text('Facturation & MeCeF'), findsNothing);
+      expect(find.text('Montant facturé (mois)'.toUpperCase()), findsOneWidget);
+      expect(find.text('Clients facturés (mois)'.toUpperCase()), findsOneWidget);
+      expect(find.text('Statut MeCeF'.toUpperCase()), findsNothing);
+      expect(find.byKey(const Key('filtre-Transmise')), findsNothing);
+      expect(find.text('FV-${aujourdhui.year}-ABCDEF'), findsOneWidget);
+      expect(find.byKey(const Key('voir-facture-0')), findsNothing);
+    });
+
+    testWidgets('« Imprimer la facture » produit le document au poste, hors ligne', (tester) async {
+      await facture('abcdef12', total: 12500, client: 'AMOUSSOU Régis');
+      final imprimes = <String>[];
+      await afficherSansMecef(tester, documents: imprimes);
+
+      await tester.tap(find.byKey(const Key('imprimer-facture-0')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+
+      expect(imprimes, ['Facture FV-${aujourdhui.year}-ABCDEF']);
+    });
+
+    test('la facture porte lignes, total et la mention du web, avec ou sans référence MeCeF', () async {
+      await facture('abcdef12', total: 8000, client: 'GBAGUIDI Solange');
+      await db.into(db.products).insert(ProductsCompanion.insert(id: uuid('prod'), sku: 'OEUF', name: 'Oeufs de table', unit: 'plateau', pricingMode: 'fixe'));
+      await db.into(db.saleLines).insert(SaleLinesCompanion.insert(id: uuid('ligne'), saleId: uuid('abcdef12'), productId: uuid('prod'), qty: 4, unitPrice: 2000, manualTotalAmount: 8000));
+
+      final doc = (await depot.documentFacture(uuid('abcdef12')))!;
+      expect(doc.noteDePied, 'Facture émise sans certification MeCeF.');
+      final textes = [for (final l in doc.lignes) if (l is DonneesDocument) l.cellules.join('|') else if (l is TotalDocument) l.cellules.join('|')];
+      expect(textes, ['Oeufs de table|4|2 000|8 000', 'Total TTC|||8 000']);
+
+      await (db.update(db.sales)..where((s) => s.id.equals(uuid('abcdef12')))).write(const SalesCompanion(mecefStatus: Value('transmise'), mecefQrRef: Value('REF-9')));
+      expect((await depot.documentFacture(uuid('abcdef12')))!.noteDePied, 'Facture normalisée MeCeF — référence : REF-9');
     });
   });
 }
