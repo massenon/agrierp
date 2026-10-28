@@ -228,7 +228,8 @@ class OrdreDesVerrousTest extends TestCase
     public function test_tout_composant_qui_touche_stock_et_fiche_verrouille_le_stock_d_abord(): void
     {
         $verifies = [];
-        foreach (glob(app_path('Livewire/*/*.php')) as $fichier) {
+        // Ticket EL-1 — la Transformation a quitté son composant : la règle vit dans `SaisieTransformationAction`, partagée avec l'envoi des postes.
+        foreach ([...glob(app_path('Livewire/*/*.php')), app_path('Actions/SaisieTransformationAction.php')] as $fichier) {
             $source = (string) file_get_contents($fichier);
             $stock = preg_match('/(AdjustStockAction|SyncLotProductionStockAction|RecordEggProductionStockAction)::class\)->execute/', $source);
             $fiche = preg_match('/LivestockDailyEntry::updateOrCreate|RecordSaleOnFicheElevageAction::class\)->execute/', $source, $m, PREG_OFFSET_CAPTURE);
@@ -241,9 +242,9 @@ class OrdreDesVerrousTest extends TestCase
             $verifies[] = basename($fichier, '.php');
         }
 
-        // Témoins : les sept composants connus au ticket U14.
+        // Témoins : les sept points d'écriture connus au ticket U14 (la Transformation, depuis EL-1, par son action).
         $this->assertEqualsCanonicalizing(
-            ['FicheEscargots', 'FicheLapins', 'FichePondeuses', 'FichePorcs', 'FicheReproducteurs', 'TransformationForm', 'PosInterface'],
+            ['FicheEscargots', 'FicheLapins', 'FichePondeuses', 'FichePorcs', 'FicheReproducteurs', 'SaisieTransformationAction', 'PosInterface'],
             $verifies,
         );
     }

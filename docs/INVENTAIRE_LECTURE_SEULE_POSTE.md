@@ -68,13 +68,13 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | `SeuilsAlerte` | saveThreshold | **PRÉSENT depuis ST-2** : `ProduitsRepository.definirSeuil`, modale « Configurer un Seuil » | `products` | ST-2 ✅ |
 | `AjouterProduit`, `GestionStocks` | save, submitAjouterStock, validateAdjustment | PRÉSENT | `products`, `stock_adjustments` | — |
 
-## 6. Élevage — tout est présent sauf Transformation
+## 6. Élevage — tout est présent, Transformation comprise (EL-1)
 
 Bandes, sujets, reproducteurs, cinq fiches, prophylaxie du jour, soins / infirmerie / calendrier, reproduction, transferts, paramètres élevage : PRÉSENTS (dépôts `BandesRepository`, `SujetsEntreesRepository`, `ReproducteursRepository`, `FicheJournaliereRepository`, `SoinsRepository`, `SoinsVaccinsRepository`, `SuiviReproductionRepository`, `TransfertsRepository`, `ParametresElevageRepository`).
 
 | Écran web | Fonction web | Poste | Ticket |
 |---|---|---|---|
-| `TransformationForm` (`/transformation`) | validateTransformation | ABSENT, aucun écran ni mention (route sans lien dans les vues web) | EL-1 (décision client : la route n'est reliée nulle part au web) |
+| `TransformationForm` (`/transformation`) | validateTransformation | **PRÉSENT depuis EL-1 (28/10/2026)** : entrée « Transformation » du menu web ET du poste (`transformation_screen.dart`), `TransformationRepository` (le fait seul ; le serveur sort les sujets et entre le stock) ; serveur `SaisieTransformationAction` | `transformations` (v79, mixte) | EL-1 ✅ |
 
 ## 7. RH, Administration, divers — présents
 

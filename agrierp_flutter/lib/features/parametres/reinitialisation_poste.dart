@@ -190,6 +190,7 @@ class ReinitialisationPoste {
     'credit_notes': 'Retours et avoirs clients',
     'corbeille_demandes': 'Demandes de la corbeille',
     'livestock_transfers': 'Transferts entre bandes',
+    'transformations': 'Transformations',
     'livestock_lots': 'Bandes',
     'animals': 'Reproducteurs (registre nominatif)',
     'infirmary_records': 'Infirmerie',

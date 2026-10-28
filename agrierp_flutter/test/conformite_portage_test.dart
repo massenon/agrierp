@@ -88,6 +88,8 @@ void main() {
     'livestock_lots',
     'livestock_daily_entries',
     'livestock_transfers',
+    // Ticket EL-1 — transformations (table mixte : saisie ET tirée).
+    'transformations',
     'feed_ration_standards',
     // Ticket U2 (D-U2) — objectifs de GMQ.
     'growth_standards',

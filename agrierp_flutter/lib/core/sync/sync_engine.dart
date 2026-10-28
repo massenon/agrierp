@@ -821,6 +821,8 @@ class SyncEngine {
     );
     // Ticket 15.46 — APRÈS les bandes : un transfert d'une bande inconnue est refusé.
     recus += await _absorberTransferts(corps['livestock_transfers']);
+    // Ticket EL-1 — transformations (table mixte : une saisie du poste en attente n'est jamais écrasée).
+    recus += await _absorberTransformations(corps['transformations']);
     // Ticket H8b — APRÈS les bandes : une entrée ou une intervention d'une bande inconnue est refusée.
     recus += await _absorberInfirmerie(corps['infirmary_records']);
     recus += await _absorberCalendrierVeterinaire(
@@ -1156,6 +1158,56 @@ class SyncEngine {
     });
 
     return transferts.length;
+  }
+
+  /// Ticket EL-1 — TRANSFORMATIONS du serveur (table MIXTE), fusionnées par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT** : un identifiant servi deux fois, ou une ligne illisible (bande, produit, sujets, quantité, jour), refuse
+  /// TOUT le tirage (le curseur n'avance pas). Une transformation `pending` / `conflict` (saisie ici, pas encore acquittée)
+  /// n'est JAMAIS écrasée. Une bande ou un produit inconnu du poste n'est pas un refus : c'est un historique (la bande a pu
+  /// être archivée côté serveur), l'écran écrit alors « — » comme le web sans relation.
+  Future<int> _absorberTransformations(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recues = <TransformationsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Transformation');
+      final lot = l['lot_id'];
+      final produit = l['product_id'];
+      final sujets = _entier(l['qty_animals']);
+      final produite = _reel(l['qty_produced']);
+      final jour = _date(l['transformation_date']);
+      if (lot is! String || produit is! String || sujets == null || sujets < 1 || produite == null || jour == null) {
+        throw FormatException('Transformation $id refusée : élément incomplet ou illisible.');
+      }
+      recues.add(
+        TransformationsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          productId: produit,
+          qtyAnimals: sujets,
+          qtyProduced: produite,
+          operatorId: Value(l['operator_id'] as String?),
+          transformationDate: DateTime(jour.year, jour.month, jour.day),
+        ),
+      );
+    }
+
+    await _db.transaction(() async {
+      for (final t in recues) {
+        final locale = await (_db.select(_db.transformations)..where((x) => x.id.equals(t.id.value))).getSingleOrNull();
+        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
+        await _db.into(_db.transformations).insert(t, onConflict: DoUpdate((_) => t));
+      }
+    });
+
+    return recues.length;
   }
 
   /// Ticket H8b (D-H8) — ENTRÉES D'INFIRMERIE du serveur, FUSIONNÉES par identifiant.
@@ -5379,6 +5431,11 @@ class SyncEngine {
       _db.livestockTransfers,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket EL-1 — transformations saisies au poste : le fait seul, le serveur sort les sujets et entre le stock.
+    final transformations = await (_db.select(
+      _db.transformations,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket H8b — infirmerie et interventions planifiées saisies au poste.
     final infirmerie = await (_db.select(
       _db.infirmaryRecords,
@@ -5424,6 +5481,7 @@ class SyncEngine {
         bandes.isEmpty &&
         sujets.isEmpty &&
         transferts.isEmpty &&
+        transformations.isEmpty &&
         infirmerie.isEmpty &&
         interventions.isEmpty &&
         rations.isEmpty &&
@@ -5554,6 +5612,8 @@ class SyncEngine {
         ],
         // Ticket 15.46 — traités par le serveur APRÈS les fiches du même envoi.
         'livestock_transfers': transferts.map(_transfertEnJson).toList(),
+        // Ticket EL-1 — après les fiches et les transferts, comme au serveur.
+        'transformations': transformations.map(_transformationEnJson).toList(),
         // Ticket H8b — `pushInfirmerie` / `pushCalendrierVeterinaire` (manage-elevage).
         'infirmary_records': infirmerie.map(_infirmerieEnJson).toList(),
         'veterinary_calendar_events': interventions
@@ -5753,6 +5813,18 @@ class SyncEngine {
       motifs,
       (n) => rejete += n,
     );
+
+    // Ticket EL-1 — acquittée quand le serveur a rejoué la transformation (sujets sortis, stock entré) : l'effectif de la bande
+    // et le stock du produit fini descendent au tirage de confirmation.
+    final transformationsAcceptees = await _acquitter(
+      'transformations',
+      corps['transformations'],
+      (ids, statut) => (_db.update(_db.transformations)..where((t) => t.id.isIn(ids)))
+          .write(TransformationsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += transformationsAcceptees;
 
     // Ticket H8b — n'acquitte que la VERSION partie (voir [_marquerParStatut]).
     accepte += await _acquitter(
@@ -6437,6 +6509,7 @@ class SyncEngine {
         demandesAcceptees +
         immobilisationsAcceptees +
         dotationsAcceptees +
+        transformationsAcceptees +
         reglagesAcceptes +
         relevesAcceptes;
 
@@ -6486,6 +6559,8 @@ class SyncEngine {
     'animals',
     'livestock_daily_entries',
     'livestock_transfers',
+    // Ticket EL-1 — après les fiches et les transferts, comme au serveur.
+    'transformations',
     // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
     'chart_of_accounts',
     // Ticket CP-2 — après le plan comptable, comme au serveur.
@@ -7047,6 +7122,10 @@ class SyncEngine {
             (_db.update(_db.livestockLots)..where((t) => t.id.equals(conflit.recordId))).write(
               const LivestockLotsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
+      // Ticket EL-1 — une transformation refusée (effectif insuffisant, exercice clos) se relance une fois la cause levée.
+      'transformations' =>
+        () => (_db.update(_db.transformations)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const TransformationsCompanion(syncStatus: Value(SyncStatus.pending))),
       // Ticket BS3 — un reproducteur refusé (identifiant déjà pris, date…) se corrige puis se relance.
       'animals' =>
         () =>
@@ -7975,6 +8054,17 @@ class SyncEngine {
     'exit_reason': a.exitReason,
     'is_active': a.isActive,
     'device_id': _deviceId,
+  };
+
+  /// Ticket EL-1 — transformation telle que `SyncController::pushTransformations` la valide : le fait seul (jamais l'effectif
+  /// de la bande, ni la fiche, ni le stock : le serveur les rejoue), identifiée par son UUID (rejeu sans doublon).
+  Map<String, dynamic> _transformationEnJson(Transformation t) => {
+    'id': t.id,
+    'lot_id': t.lotId,
+    'product_id': t.productId,
+    'qty_animals': t.qtyAnimals,
+    'qty_produced': t.qtyProduced,
+    'transformation_date': _jour(t.transformationDate),
   };
 
   Map<String, dynamic> _transfertEnJson(LivestockTransfer t) => {

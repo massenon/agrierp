@@ -40,6 +40,8 @@ void main() {
     'livestock_lots': 'livestock_lots',
     'livestock_daily_entries': 'livestock_daily_entries',
     'livestock_transfers': 'livestock_transfers',
+    // Ticket EL-1 — transformations (table mixte : saisie ET tirée), lues par l'écran « Transformation ».
+    'transformations': 'transformations',
     'feed_ration_standards': 'feed_ration_standards',
     'growth_standards': 'growth_standards',
     'veterinary_withdrawal_periods': 'veterinary_withdrawal_periods',
@@ -145,6 +147,7 @@ void main() {
     EcranPoste.suiviReproduction: 'elevage/suivi_reproduction_screen.dart',
     EcranPoste.ficheSujet: 'elevage/fiche_sujet_screen.dart',
     EcranPoste.soinsEtVaccins: 'elevage/soins_vaccins_screen.dart',
+    EcranPoste.transformation: 'elevage/transformation_screen.dart',
     EcranPoste.parametresElevage: 'elevage/parametres_elevage_screen.dart',
     EcranPoste.ficheElevage: 'elevage/fiche_lapins_screen.dart',
     EcranPoste.fichePondeuses: 'elevage/fiche_pondeuses_screen.dart',

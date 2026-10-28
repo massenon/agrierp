@@ -87,6 +87,7 @@ void main() {
       EcranPoste.dashboardElevage: '/elevage-dashboard',
       EcranPoste.suiviReproduction: '/suivi-reproduction',
       EcranPoste.soinsEtVaccins: '/soins-vaccins-hub',
+      EcranPoste.transformation: '/transformation',
       EcranPoste.parametresElevage: '/parametres-elevage',
       EcranPoste.ficheElevage: '/fiche-lapins',
       EcranPoste.fichePondeuses: '/fiche-volailles-pondeuses',
@@ -138,7 +139,7 @@ void main() {
 
     final blade = layout.readAsStringSync();
     final ruban = blade.substring(blade.indexOf('x-show="sidebarDesktopHidden"'), blade.indexOf('Réafficher le menu'));
-    final titresBlade = RegExp(r'<a href="[^"]+" title="([^"]+)"').allMatches(ruban).map((m) => m.group(1)).toList();
+    final titresBlade = RegExp(r'<a (?:wire:navigate )?href="[^"]+" title="([^"]+)"').allMatches(ruban).map((m) => m.group(1)).toList();
     final infobulles = t.widgetList<IconButton>(find.descendant(of: find.byKey(const Key('ruban-replie')), matching: find.byType(IconButton))).map((b) => b.tooltip).toList();
     expect(infobulles, [...titresBlade, 'Réafficher le menu']);
 

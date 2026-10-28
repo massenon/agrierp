@@ -151,6 +151,8 @@ class SyncController extends Controller
         'manual_entry_requests',
         // Ticket CP-3 — immobilisations (registre mixte) et demandes de dotation aux amortissements.
         'fixed_assets', 'depreciation_requests',
+        // Ticket EL-1 — transformations (« Bon d'Abattage & Transformation ») saisies au poste.
+        'transformations',
         // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles).
         'settings_requests',
         // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
@@ -209,6 +211,7 @@ class SyncController extends Controller
         'livestock_lots' => null,
         'livestock_daily_entries' => null,
         'livestock_transfers' => ['view-elevage'],
+        'transformations' => ['view-elevage'],
         'feed_ration_standards' => ['view-elevage', 'view-ventes'],
         'growth_standards' => ['view-elevage'],
         'veterinary_withdrawal_periods' => ['view-elevage', 'view-ventes'],
@@ -1541,6 +1544,26 @@ class SyncController extends Controller
                         'motif', 'is_active', 'updated_at']),
             ],
             [
+                // Ticket EL-1 — les transformations (« Bon d'Abattage & Transformation ») : l'historique (20 dernières) et le KPI
+                // du mois de l'écran du poste. Le fait seul descend ; l'effectif de la bande et le stock du produit fini, eux,
+                // descendent avec leurs propres tables (bandes, produits).
+                'cle' => 'transformations',
+                'requete' => fn () => \App\Models\Transformation::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+                'historique' => fn ($q) => $q->orderByDesc('transformation_date')->orderBy('id'),
+                'enJson' => fn (\App\Models\Transformation $t) => [
+                    'id' => $t->id,
+                    'lot_id' => $t->lot_id,
+                    'product_id' => $t->product_id,
+                    'qty_animals' => (int) $t->qty_animals,
+                    'qty_produced' => (float) $t->qty_produced,
+                    'operator_id' => $t->operator_id,
+                    // ⚠️ Le jour se sert en 'Y-m-d', jamais en instant (voir `attendance_records`).
+                    'transformation_date' => $t->transformation_date?->format('Y-m-d'),
+                    'updated_at' => $t->updated_at?->toIso8601String(),
+                ],
+            ],
+            [
                 // Ticket U3 (décision D-U3 du 19/10/2026 : archivage d'un soin au poste comme au web) — `is_active` est
                 // servi. Tirage complet : les soins ACTIFS seuls (un poste neuf n'a que faire des archivés). Tirage
                 // incrémental : tout soin modifié depuis `since`, ARCHIVÉS COMPRIS — sans eux, un poste ne saurait jamais
@@ -2175,6 +2198,7 @@ class SyncController extends Controller
             'chart_of_accounts' => ['accepted' => [], 'rejected' => []],
             // Ticket CP-2 — demandes d'écriture manuelle (créer, modifier, archiver) saisies au poste.
             'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
+            'transformations' => ['accepted' => [], 'rejected' => []],
             'fixed_assets' => ['accepted' => [], 'rejected' => []],
             'depreciation_requests' => ['accepted' => [], 'rejected' => []],
             'settings_requests' => ['accepted' => [], 'rejected' => []],
@@ -2391,6 +2415,14 @@ class SyncController extends Controller
                 $request->input('livestock_transfers'),
                 $request->user(),
                 $request->input('device_id'),
+            );
+        }
+
+        // Ticket EL-1 — APRÈS les fiches et les transferts : la transformation sort ses sujets comme une vente de la fiche du jour.
+        if ($request->has('transformations')) {
+            $result['transformations'] = $this->pushTransformations(
+                $request->input('transformations'),
+                $request->user(),
             );
         }
 
@@ -2619,6 +2651,11 @@ class SyncController extends Controller
             $bandes[] = $transfert['source_lot_id'] ?? null;
             $bandes[] = $transfert['target_lot_id'] ?? null;
         }
+        // Ticket EL-1 — une transformation mouvemente son produit fini et la fiche de sa bande.
+        foreach ($liste($request->input('transformations')) as $transformation) {
+            $produits[] = $transformation['product_id'] ?? null;
+            $bandes[] = $transformation['lot_id'] ?? null;
+        }
 
         return [...$produits, ...OrdreDesVerrous::produitsDesFiches($bandes)];
     }
@@ -2658,6 +2695,8 @@ class SyncController extends Controller
         // Ticket BS3 — le droit de l'écran « Registre des Reproducteurs » du web.
         'animals' => 'manage-elevage',
         'livestock_transfers' => 'manage-elevage',
+        // Ticket EL-1 — le droit de `TransformationForm::validateTransformation()` du web.
+        'transformations' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'infirmary_records' => 'manage-elevage',
         'veterinary_calendar_events' => 'manage-elevage',
@@ -6160,6 +6199,59 @@ class SyncController extends Controller
                 $action->execute(Arr::only($valides, [
                     'source_lot_id', 'target_lot_id', 'transfer_date', 'quantity', 'categorie', 'constitution', 'motif',
                 ]), $utilisateur, $deviceId, $valides['id']);
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket EL-1 — TRANSFORMATIONS saisies au poste (« Bon d'Abattage & Transformation »).
+     *
+     * ⚠️ `SaisieTransformationAction` — partagée avec `Elevage\TransformationForm` — porte les règles du web : effectif
+     * disponible de la bande, bande et produit connus, exercice clos. Le poste n'envoie que le FAIT (bande, sujets, produit,
+     * quantité produite, jour) : l'effectif, la fiche du jour et le stock sont rejoués ICI. Idempotent par l'UUID du poste :
+     * une transformation déjà connue est acquittée sans rien rejouer.
+     */
+    private function pushTransformations(array $transformations, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieTransformationAction::class);
+
+        foreach ($transformations as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-elevage')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'enregistrer une transformation.'];
+
+                continue;
+            }
+
+            // Déjà connue (UUID du poste) : acquittée sans rien rejouer, même si la bande ou l'exercice ont changé depuis.
+            if (is_string($id) && Str::isUuid($id) && \App\Models\Transformation::whereKey($id)->exists()) {
+                $accepted[] = $id;
+
+                continue;
+            }
+
+            try {
+                // Sans messages sur mesure : ceux de `lang/fr/validation.php`, les mêmes que le formulaire web.
+                $valides = validator([
+                    'id' => $id,
+                    'lotId' => $data['lot_id'] ?? null,
+                    'qtyAnimals' => $data['qty_animals'] ?? null,
+                    'productId' => $data['product_id'] ?? null,
+                    'qtyProduced' => $data['qty_produced'] ?? null,
+                    'transformationDate' => $data['transformation_date'] ?? null,
+                ], ['id' => ['required', 'uuid']] + \App\Actions\SaisieTransformationAction::REGLES)->validate();
+
+                $action->enregistrer(Arr::except($valides, ['id']), $utilisateur->id, $valides['id']);
 
                 $accepted[] = $valides['id'];
             } catch (ValidationException $e) {

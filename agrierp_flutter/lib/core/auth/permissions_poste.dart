@@ -50,6 +50,11 @@ enum EcranPoste {
   /// liste de l'animalier — contrairement à `suivi-reproduction.html`.
   soinsEtVaccins('soins-vaccins-hub.html'),
 
+  /// Ticket EL-1 — « Bon d'Abattage & Transformation » (`transformation.html`, route web `/transformation`, entrée
+  /// « Transformation » du menu, décision client). Figure dans la liste de l'animalier de `RBAC_PAGE_MAP` ; l'administrateur
+  /// a tout.
+  transformation('transformation.html'),
+
   /// ⚠️⚠️ **QUATRIÈME ÉCRAN PRÉSENT DANS LA MAQUETTE ET ABSENT DE
   /// `RBAC_PAGE_MAP`** — vérifié : `parametres-elevage.html` n'apparaît dans
   /// AUCUNE des quatre listes de `common.js`, comme `suivi-reproduction.html`,

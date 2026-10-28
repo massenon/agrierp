@@ -1428,6 +1428,22 @@ class LivestockTransfers extends Table with SyncColumns {
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
+/// Ticket EL-1 (schéma v79) — TRANSFORMATION (« Bon d'Abattage & Transformation »), miroir de `transformations`.
+///
+/// Table MIXTE : saisie au poste (`pending`, UUID du poste) ET tirée du serveur (`synced`). Le poste n'écrit QUE LE FAIT
+/// (bande, sujets, produit, quantité produite, jour) : ni l'effectif de la bande, ni la fiche du jour, ni le stock du produit
+/// fini — le serveur les rejoue (`SaisieTransformationAction`) et le poste se recale au tirage. Jamais modifiée ni supprimée.
+class Transformations extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+  IntColumn get qtyAnimals => integer()();
+  RealColumn get qtyProduced => real()();
+
+  /// L'opérateur est celui du jeton qui envoie : `null` tant que la ligne n'est pas revenue du serveur.
+  TextColumn get operatorId => text().nullable()();
+  DateTimeColumn get transformationDate => dateTime()();
+}
+
 /// Fiche journalière d'élevage. Règle serveur : **dernier écrivain gagne**,
 /// upsert sur l'UUID client.
 ///
@@ -2223,6 +2239,7 @@ class SyncState extends Table {
     ManualEntryRequests,
     FixedAssets,
     DepreciationRequests,
+    Transformations,
     SettingsRequests,
     PermissionsApplicatives,
     BankStatementLines,
@@ -2301,7 +2318,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 78;
+  int get schemaVersion => 79;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2983,6 +3000,10 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
+      // v79 — ticket EL-1 : transformations (mixte : saisies au poste ET tirées du serveur).
+      if (from < 79) {
+        if (!await _tableExiste(m, transformations)) await m.createTable(transformations);
+      }
       // v78 — ticket AUT-3 : relance par e-mail partie du poste lui-même.
       if (from < 78) {
         await _ajouterColonneSiAbsente(m, customerReminders, customerReminders.alreadySent);
@@ -3417,6 +3438,8 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Ticket EL-1 — transformations (le fait seul : le serveur sort les sujets et entre le stock).
+    'transformations',
     // Tickets AV1 / AV2 — retours et avoirs clients (demandes de retour, « marquer comme traité »).
     'credit_notes',
     // Ticket ARC3 — demandes de la Corbeille (restaurer, supprimer définitivement) : le serveur fait les effets.
@@ -3476,6 +3499,7 @@ class AppDatabase extends _$AppDatabase {
   /// ajoutée ne soit pas oubliée sans bruit.
   static const tablesDActivite = [
     'livestock_lots', 'livestock_daily_entries', 'livestock_transfers',
+    'transformations', // EL-1
     'livestock_reproduction_events', 'veterinary_records', 'veterinary_withdrawal_periods',
     'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',

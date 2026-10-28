@@ -75,6 +75,10 @@
                 <x-sidebar-link href="/elevage-dashboard" icon="dashboard" label="Dashboard Élevage" />
                 <x-sidebar-link href="/suivi-reproduction" icon="favorite" label="Suivi Reproduction" />
                 <x-sidebar-link href="/soins-vaccins-hub" icon="vaccines" label="Soins et vaccins" />
+                {{-- Ticket EL-1 — « Bon d'Abattage & Transformation » (route `elevage.transformation`, droit de la route : view-elevage). --}}
+                @can('view-elevage')
+                <x-sidebar-link href="/transformation" icon="restaurant" label="Transformation" />
+                @endcan
                 <x-sidebar-link href="/parametres-elevage" icon="tune" label="Paramètres Élevage" />
             </div>
             @endhasanyrole

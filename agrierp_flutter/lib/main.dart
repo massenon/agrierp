@@ -55,6 +55,8 @@ import 'features/elevage/reproducteurs_repository.dart';
 import 'features/elevage/sujets_entrees_repository.dart';
 import 'features/elevage/transferts_bandes_screen.dart';
 import 'features/elevage/transferts_repository.dart';
+import 'features/elevage/transformation_repository.dart';
+import 'features/elevage/transformation_screen.dart';
 import 'features/elevage/dashboard_elevage_screen.dart';
 import 'features/elevage/fiche_escargots_screen.dart';
 import 'features/elevage/soins_vaccins_repository.dart';
@@ -352,6 +354,12 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
   );
 
+  /// Ticket EL-1 — « Bon d'Abattage & Transformation » : UN SEUL écrivain de `transformations`.
+  late final TransformationRepository _transformation = TransformationRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+  );
+
   /// Tickets BS1 et BS2 — « Bandes & Sujets » et « Enregistrer des Sujets » : la bande se crée, se modifie et s'archive
   /// par ce dépôt (constitution par les transferts) ; les entrées de sujets passent par l'unique écrivain des fiches.
   late final BandesRepository _bandes = BandesRepository(
@@ -550,6 +558,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           tableauDeBord: _tableauDeBord,
           dashboardElevage: _dashboardElevage,
           transferts: _transferts,
+          transformation: _transformation,
           bandes: _bandes,
           sujetsEntrees: _sujetsEntrees,
           reproducteurs: _reproducteurs,
@@ -616,6 +625,7 @@ class SocleAccueil extends StatefulWidget {
     required this.tableauDeBord,
     required this.dashboardElevage,
     required this.transferts,
+    required this.transformation,
     required this.bandes,
     required this.sujetsEntrees,
     required this.reproducteurs,
@@ -706,6 +716,7 @@ class SocleAccueil extends StatefulWidget {
   final TableauDeBordRepository tableauDeBord;
   final DashboardElevageRepository dashboardElevage;
   final TransfertsRepository transferts;
+  final TransformationRepository transformation;
   final BandesRepository bandes;
   final SujetsEntreesRepository sujetsEntrees;
   final ReproducteursRepository reproducteurs;
@@ -1186,6 +1197,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.transfertsBandes => TransfertsBandesScreen(
           depot: widget.transferts,
         ),
+        // Ticket EL-1 — « Bon d'Abattage & Transformation » : l'opérateur est le compte connecté (`auth()->user()->name`).
+        EcranPoste.transformation => TransformationScreen(
+          depot: widget.transformation,
+          nomOperateur: widget.auth.utilisateur?.nom ?? '',
+        ),
         // Ticket BS1 — « Bandes & Sujets » : droit `manage-elevage` pour créer, modifier, archiver.
         EcranPoste.gestionBandes => GestionBandesScreen(
           depot: widget.bandes,
@@ -1520,6 +1536,8 @@ class _BarreLaterale extends StatelessWidget {
         (SymbolesAgri.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
         (SymbolesAgri.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
         (SymbolesAgri.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
+        // Ticket EL-1 — l'entrée du menu web (`layouts/app.blade.php`), dans le même ordre.
+        (SymbolesAgri.restaurant, 'Transformation', EcranPoste.transformation),
         (SymbolesAgri.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
       ],
     ),
@@ -1855,6 +1873,7 @@ class SocleAccueilTitres {
     EcranPoste.dashboardElevage: 'Élevage > Dashboard Élevage',
     EcranPoste.suiviReproduction: 'Élevage > Suivi Reproduction',
     EcranPoste.soinsEtVaccins: 'Élevage > Soins et Vaccins',
+    EcranPoste.transformation: 'Élevage > Transformation',
     EcranPoste.parametresElevage: 'Paramètres Élevage',
     EcranPoste.ficheElevage: 'Élevage > Fiches Lapins',
     EcranPoste.fichePondeuses: 'Élevage > Fiches Pondeuses',

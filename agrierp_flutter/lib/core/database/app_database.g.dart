@@ -11936,6 +11936,654 @@ class DepreciationRequestsCompanion
   }
 }
 
+class $TransformationsTable extends Transformations
+    with TableInfo<$TransformationsTable, Transformation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransformationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>($TransformationsTable.$convertersyncStatus);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lotIdMeta = const VerificationMeta('lotId');
+  @override
+  late final GeneratedColumn<String> lotId = GeneratedColumn<String>(
+    'lot_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _qtyAnimalsMeta = const VerificationMeta(
+    'qtyAnimals',
+  );
+  @override
+  late final GeneratedColumn<int> qtyAnimals = GeneratedColumn<int>(
+    'qty_animals',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _qtyProducedMeta = const VerificationMeta(
+    'qtyProduced',
+  );
+  @override
+  late final GeneratedColumn<double> qtyProduced = GeneratedColumn<double>(
+    'qty_produced',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _operatorIdMeta = const VerificationMeta(
+    'operatorId',
+  );
+  @override
+  late final GeneratedColumn<String> operatorId = GeneratedColumn<String>(
+    'operator_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _transformationDateMeta =
+      const VerificationMeta('transformationDate');
+  @override
+  late final GeneratedColumn<DateTime> transformationDate =
+      GeneratedColumn<DateTime>(
+        'transformation_date',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    productId,
+    qtyAnimals,
+    qtyProduced,
+    operatorId,
+    transformationDate,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transformations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Transformation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('lot_id')) {
+      context.handle(
+        _lotIdMeta,
+        lotId.isAcceptableOrUnknown(data['lot_id']!, _lotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lotIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('qty_animals')) {
+      context.handle(
+        _qtyAnimalsMeta,
+        qtyAnimals.isAcceptableOrUnknown(data['qty_animals']!, _qtyAnimalsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_qtyAnimalsMeta);
+    }
+    if (data.containsKey('qty_produced')) {
+      context.handle(
+        _qtyProducedMeta,
+        qtyProduced.isAcceptableOrUnknown(
+          data['qty_produced']!,
+          _qtyProducedMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_qtyProducedMeta);
+    }
+    if (data.containsKey('operator_id')) {
+      context.handle(
+        _operatorIdMeta,
+        operatorId.isAcceptableOrUnknown(data['operator_id']!, _operatorIdMeta),
+      );
+    }
+    if (data.containsKey('transformation_date')) {
+      context.handle(
+        _transformationDateMeta,
+        transformationDate.isAcceptableOrUnknown(
+          data['transformation_date']!,
+          _transformationDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_transformationDateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Transformation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Transformation(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $TransformationsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      lotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lot_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      qtyAnimals: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}qty_animals'],
+      )!,
+      qtyProduced: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}qty_produced'],
+      )!,
+      operatorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operator_id'],
+      ),
+      transformationDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}transformation_date'],
+      )!,
+    );
+  }
+
+  @override
+  $TransformationsTable createAlias(String alias) {
+    return $TransformationsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class Transformation extends DataClass implements Insertable<Transformation> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+  final String lotId;
+  final String productId;
+  final int qtyAnimals;
+  final double qtyProduced;
+
+  /// L'opérateur est celui du jeton qui envoie : `null` tant que la ligne n'est pas revenue du serveur.
+  final String? operatorId;
+  final DateTime transformationDate;
+  const Transformation({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.lotId,
+    required this.productId,
+    required this.qtyAnimals,
+    required this.qtyProduced,
+    this.operatorId,
+    required this.transformationDate,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $TransformationsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['lot_id'] = Variable<String>(lotId);
+    map['product_id'] = Variable<String>(productId);
+    map['qty_animals'] = Variable<int>(qtyAnimals);
+    map['qty_produced'] = Variable<double>(qtyProduced);
+    if (!nullToAbsent || operatorId != null) {
+      map['operator_id'] = Variable<String>(operatorId);
+    }
+    map['transformation_date'] = Variable<DateTime>(transformationDate);
+    return map;
+  }
+
+  TransformationsCompanion toCompanion(bool nullToAbsent) {
+    return TransformationsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      lotId: Value(lotId),
+      productId: Value(productId),
+      qtyAnimals: Value(qtyAnimals),
+      qtyProduced: Value(qtyProduced),
+      operatorId: operatorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(operatorId),
+      transformationDate: Value(transformationDate),
+    );
+  }
+
+  factory Transformation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Transformation(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $TransformationsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      lotId: serializer.fromJson<String>(json['lotId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      qtyAnimals: serializer.fromJson<int>(json['qtyAnimals']),
+      qtyProduced: serializer.fromJson<double>(json['qtyProduced']),
+      operatorId: serializer.fromJson<String?>(json['operatorId']),
+      transformationDate: serializer.fromJson<DateTime>(
+        json['transformationDate'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $TransformationsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'lotId': serializer.toJson<String>(lotId),
+      'productId': serializer.toJson<String>(productId),
+      'qtyAnimals': serializer.toJson<int>(qtyAnimals),
+      'qtyProduced': serializer.toJson<double>(qtyProduced),
+      'operatorId': serializer.toJson<String?>(operatorId),
+      'transformationDate': serializer.toJson<DateTime>(transformationDate),
+    };
+  }
+
+  Transformation copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? lotId,
+    String? productId,
+    int? qtyAnimals,
+    double? qtyProduced,
+    Value<String?> operatorId = const Value.absent(),
+    DateTime? transformationDate,
+  }) => Transformation(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    lotId: lotId ?? this.lotId,
+    productId: productId ?? this.productId,
+    qtyAnimals: qtyAnimals ?? this.qtyAnimals,
+    qtyProduced: qtyProduced ?? this.qtyProduced,
+    operatorId: operatorId.present ? operatorId.value : this.operatorId,
+    transformationDate: transformationDate ?? this.transformationDate,
+  );
+  Transformation copyWithCompanion(TransformationsCompanion data) {
+    return Transformation(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lotId: data.lotId.present ? data.lotId.value : this.lotId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      qtyAnimals: data.qtyAnimals.present
+          ? data.qtyAnimals.value
+          : this.qtyAnimals,
+      qtyProduced: data.qtyProduced.present
+          ? data.qtyProduced.value
+          : this.qtyProduced,
+      operatorId: data.operatorId.present
+          ? data.operatorId.value
+          : this.operatorId,
+      transformationDate: data.transformationDate.present
+          ? data.transformationDate.value
+          : this.transformationDate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Transformation(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('productId: $productId, ')
+          ..write('qtyAnimals: $qtyAnimals, ')
+          ..write('qtyProduced: $qtyProduced, ')
+          ..write('operatorId: $operatorId, ')
+          ..write('transformationDate: $transformationDate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    lotId,
+    productId,
+    qtyAnimals,
+    qtyProduced,
+    operatorId,
+    transformationDate,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Transformation &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.lotId == this.lotId &&
+          other.productId == this.productId &&
+          other.qtyAnimals == this.qtyAnimals &&
+          other.qtyProduced == this.qtyProduced &&
+          other.operatorId == this.operatorId &&
+          other.transformationDate == this.transformationDate);
+}
+
+class TransformationsCompanion extends UpdateCompanion<Transformation> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> lotId;
+  final Value<String> productId;
+  final Value<int> qtyAnimals;
+  final Value<double> qtyProduced;
+  final Value<String?> operatorId;
+  final Value<DateTime> transformationDate;
+  final Value<int> rowid;
+  const TransformationsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.lotId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.qtyAnimals = const Value.absent(),
+    this.qtyProduced = const Value.absent(),
+    this.operatorId = const Value.absent(),
+    this.transformationDate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransformationsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String lotId,
+    required String productId,
+    required int qtyAnimals,
+    required double qtyProduced,
+    this.operatorId = const Value.absent(),
+    required DateTime transformationDate,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       lotId = Value(lotId),
+       productId = Value(productId),
+       qtyAnimals = Value(qtyAnimals),
+       qtyProduced = Value(qtyProduced),
+       transformationDate = Value(transformationDate);
+  static Insertable<Transformation> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? lotId,
+    Expression<String>? productId,
+    Expression<int>? qtyAnimals,
+    Expression<double>? qtyProduced,
+    Expression<String>? operatorId,
+    Expression<DateTime>? transformationDate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (lotId != null) 'lot_id': lotId,
+      if (productId != null) 'product_id': productId,
+      if (qtyAnimals != null) 'qty_animals': qtyAnimals,
+      if (qtyProduced != null) 'qty_produced': qtyProduced,
+      if (operatorId != null) 'operator_id': operatorId,
+      if (transformationDate != null) 'transformation_date': transformationDate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransformationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? lotId,
+    Value<String>? productId,
+    Value<int>? qtyAnimals,
+    Value<double>? qtyProduced,
+    Value<String?>? operatorId,
+    Value<DateTime>? transformationDate,
+    Value<int>? rowid,
+  }) {
+    return TransformationsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lotId: lotId ?? this.lotId,
+      productId: productId ?? this.productId,
+      qtyAnimals: qtyAnimals ?? this.qtyAnimals,
+      qtyProduced: qtyProduced ?? this.qtyProduced,
+      operatorId: operatorId ?? this.operatorId,
+      transformationDate: transformationDate ?? this.transformationDate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $TransformationsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (lotId.present) {
+      map['lot_id'] = Variable<String>(lotId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (qtyAnimals.present) {
+      map['qty_animals'] = Variable<int>(qtyAnimals.value);
+    }
+    if (qtyProduced.present) {
+      map['qty_produced'] = Variable<double>(qtyProduced.value);
+    }
+    if (operatorId.present) {
+      map['operator_id'] = Variable<String>(operatorId.value);
+    }
+    if (transformationDate.present) {
+      map['transformation_date'] = Variable<DateTime>(transformationDate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransformationsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lotId: $lotId, ')
+          ..write('productId: $productId, ')
+          ..write('qtyAnimals: $qtyAnimals, ')
+          ..write('qtyProduced: $qtyProduced, ')
+          ..write('operatorId: $operatorId, ')
+          ..write('transformationDate: $transformationDate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SettingsRequestsTable extends SettingsRequests
     with TableInfo<$SettingsRequestsTable, SettingsRequest> {
   @override
@@ -48810,6 +49458,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FixedAssetsTable fixedAssets = $FixedAssetsTable(this);
   late final $DepreciationRequestsTable depreciationRequests =
       $DepreciationRequestsTable(this);
+  late final $TransformationsTable transformations = $TransformationsTable(
+    this,
+  );
   late final $SettingsRequestsTable settingsRequests = $SettingsRequestsTable(
     this,
   );
@@ -48940,6 +49591,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     manualEntryRequests,
     fixedAssets,
     depreciationRequests,
+    transformations,
     settingsRequests,
     permissionsApplicatives,
     bankStatementLines,
@@ -54796,6 +55448,319 @@ typedef $$DepreciationRequestsTableProcessedTableManager =
         >,
       ),
       DepreciationRequest,
+      PrefetchHooks Function()
+    >;
+typedef $$TransformationsTableCreateCompanionBuilder =
+    TransformationsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String lotId,
+      required String productId,
+      required int qtyAnimals,
+      required double qtyProduced,
+      Value<String?> operatorId,
+      required DateTime transformationDate,
+      Value<int> rowid,
+    });
+typedef $$TransformationsTableUpdateCompanionBuilder =
+    TransformationsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> lotId,
+      Value<String> productId,
+      Value<int> qtyAnimals,
+      Value<double> qtyProduced,
+      Value<String?> operatorId,
+      Value<DateTime> transformationDate,
+      Value<int> rowid,
+    });
+
+class $$TransformationsTableFilterComposer
+    extends Composer<_$AppDatabase, $TransformationsTable> {
+  $$TransformationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get qtyAnimals => $composableBuilder(
+    column: $table.qtyAnimals,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get qtyProduced => $composableBuilder(
+    column: $table.qtyProduced,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operatorId => $composableBuilder(
+    column: $table.operatorId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get transformationDate => $composableBuilder(
+    column: $table.transformationDate,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransformationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TransformationsTable> {
+  $$TransformationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lotId => $composableBuilder(
+    column: $table.lotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get qtyAnimals => $composableBuilder(
+    column: $table.qtyAnimals,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get qtyProduced => $composableBuilder(
+    column: $table.qtyProduced,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operatorId => $composableBuilder(
+    column: $table.operatorId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get transformationDate => $composableBuilder(
+    column: $table.transformationDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransformationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TransformationsTable> {
+  $$TransformationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get lotId =>
+      $composableBuilder(column: $table.lotId, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<int> get qtyAnimals => $composableBuilder(
+    column: $table.qtyAnimals,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get qtyProduced => $composableBuilder(
+    column: $table.qtyProduced,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get operatorId => $composableBuilder(
+    column: $table.operatorId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get transformationDate => $composableBuilder(
+    column: $table.transformationDate,
+    builder: (column) => column,
+  );
+}
+
+class $$TransformationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TransformationsTable,
+          Transformation,
+          $$TransformationsTableFilterComposer,
+          $$TransformationsTableOrderingComposer,
+          $$TransformationsTableAnnotationComposer,
+          $$TransformationsTableCreateCompanionBuilder,
+          $$TransformationsTableUpdateCompanionBuilder,
+          (
+            Transformation,
+            BaseReferences<
+              _$AppDatabase,
+              $TransformationsTable,
+              Transformation
+            >,
+          ),
+          Transformation,
+          PrefetchHooks Function()
+        > {
+  $$TransformationsTableTableManager(
+    _$AppDatabase db,
+    $TransformationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransformationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransformationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransformationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> lotId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<int> qtyAnimals = const Value.absent(),
+                Value<double> qtyProduced = const Value.absent(),
+                Value<String?> operatorId = const Value.absent(),
+                Value<DateTime> transformationDate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransformationsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                productId: productId,
+                qtyAnimals: qtyAnimals,
+                qtyProduced: qtyProduced,
+                operatorId: operatorId,
+                transformationDate: transformationDate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String lotId,
+                required String productId,
+                required int qtyAnimals,
+                required double qtyProduced,
+                Value<String?> operatorId = const Value.absent(),
+                required DateTime transformationDate,
+                Value<int> rowid = const Value.absent(),
+              }) => TransformationsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                lotId: lotId,
+                productId: productId,
+                qtyAnimals: qtyAnimals,
+                qtyProduced: qtyProduced,
+                operatorId: operatorId,
+                transformationDate: transformationDate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransformationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TransformationsTable,
+      Transformation,
+      $$TransformationsTableFilterComposer,
+      $$TransformationsTableOrderingComposer,
+      $$TransformationsTableAnnotationComposer,
+      $$TransformationsTableCreateCompanionBuilder,
+      $$TransformationsTableUpdateCompanionBuilder,
+      (
+        Transformation,
+        BaseReferences<_$AppDatabase, $TransformationsTable, Transformation>,
+      ),
+      Transformation,
       PrefetchHooks Function()
     >;
 typedef $$SettingsRequestsTableCreateCompanionBuilder =
@@ -72733,6 +73698,8 @@ class $AppDatabaseManager {
       $$FixedAssetsTableTableManager(_db, _db.fixedAssets);
   $$DepreciationRequestsTableTableManager get depreciationRequests =>
       $$DepreciationRequestsTableTableManager(_db, _db.depreciationRequests);
+  $$TransformationsTableTableManager get transformations =>
+      $$TransformationsTableTableManager(_db, _db.transformations);
   $$SettingsRequestsTableTableManager get settingsRequests =>
       $$SettingsRequestsTableTableManager(_db, _db.settingsRequests);
   $$PermissionsApplicativesTableTableManager get permissionsApplicatives =>

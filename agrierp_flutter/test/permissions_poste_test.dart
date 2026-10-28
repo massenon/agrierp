@@ -127,6 +127,8 @@ void main() {
         EcranPoste.dashboardElevage,
         // Le hub des soins figure, lui, bien dans la liste de l'animalier.
         EcranPoste.soinsEtVaccins,
+        // Ticket EL-1 — `transformation.html` figure dans la liste de l'animalier.
+        EcranPoste.transformation,
 
         // ⚠️ `suivi-reproduction.html` N'EST DANS AUCUNE liste de
         // `RBAC_PAGE_MAP` — verifie dans `common.js`. L'animalier ne l'atteint

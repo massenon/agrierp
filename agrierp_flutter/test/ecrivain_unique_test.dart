@@ -38,6 +38,8 @@ void main() {
     // Ticket AC-1 — « Bons de Commande » : « Générer le Bon » et la réception s'écrivent par ce dépôt.
     'purchase_orders': 'lib/features/achats/achats_repository.dart',
     // Ticket CP-1 — « Plan Comptable » : « Nouveau Compte », « Modifier » et « Archiver » s'écrivent par ce dépôt.
+    // Ticket EL-1 — « Bon d'Abattage & Transformation » : la transformation (le fait seul) s'écrit par ce dépôt.
+    'transformations': 'lib/features/elevage/transformation_repository.dart',
     'chart_of_accounts': 'lib/features/comptabilite/comptabilite_repository.dart',
     // Ticket CP-2 — « Journal Comptable » : « Saisie d'Écriture », « Modifier » et « Archiver » s'écrivent (en demandes) par ce dépôt.
     'manual_entry_requests': 'lib/features/comptabilite/comptabilite_repository.dart',

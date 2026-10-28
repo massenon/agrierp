@@ -14,6 +14,7 @@ import 'package:agrierp/features/elevage/bandes_repository.dart';
 import 'package:agrierp/features/elevage/reproducteurs_repository.dart';
 import 'package:agrierp/features/elevage/sujets_entrees_repository.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
+import 'package:agrierp/features/elevage/transformation_repository.dart';
 import 'package:agrierp/features/elevage/dashboard_elevage_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
@@ -84,6 +85,7 @@ SocleAccueil coqueDeTest(
     tableauDeBord: TableauDeBordRepository(database: db),
     dashboardElevage: DashboardElevageRepository(database: db, soins: soins),
     transferts: TransfertsRepository(database: db, deviceId: poste),
+    transformation: TransformationRepository(database: db, deviceId: poste),
     bandes: BandesRepository(database: db, deviceId: poste),
     reproducteurs: ReproducteursRepository(database: db, deviceId: poste),
     sujetsEntrees: SujetsEntreesRepository(
