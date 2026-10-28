@@ -173,6 +173,8 @@ class ReinitialisationPoste {
     'utilisateurs': 'Comptes utilisateurs',
     'receivable_payments': 'Encaissements de créances',
     'manual_entry_requests': "Demandes d'écriture manuelle",
+    'settings_requests': 'Demandes de réglages',
+    'bank_statement_imports': 'Imports de relevés bancaires',
     'depreciation_requests': 'Demandes de dotation aux amortissements',
     'customer_reminders': 'Relances de clients',
     'suppliers': 'Fournisseurs',

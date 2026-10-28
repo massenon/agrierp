@@ -611,7 +611,7 @@ void main() {
       await nettoyer(tester);
     });
 
-    testWidgets('hub : « Réinitialisation » est le dernier onglet, ouvert sur l onglet du poste', (tester) async {
+    testWidgets('hub : « Réinitialisation » précède « Sauvegardes », ouvert sur l onglet du poste', (tester) async {
       tester.view.physicalSize = const Size(1700, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -626,7 +626,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(ParametresGenerauxScreen.onglets.last.$1, 'Réinitialisation');
+      expect(ParametresGenerauxScreen.onglets[ParametresGenerauxScreen.onglets.length - 2].$1, 'Réinitialisation');
       expect(find.byType(OngletReinitialisation), findsOne);
       expect(find.text('Réinitialisation des Données'), findsOne);
       await nettoyer(tester);
