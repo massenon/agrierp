@@ -150,12 +150,12 @@
     <div x-show="sidebarDesktopHidden" x-cloak
         style="background:rgba(5,46,22,0.95); backdrop-filter:blur(6px);"
         class="fixed right-0 top-0 bottom-0 w-16 z-40 hidden lg:flex flex-col items-center py-md gap-sm">
-        <a href="/dashboard" title="Tableau de Bord" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">dashboard</span></a>
-        <a href="/ventes-devis" title="Caisse POS" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">point_of_sale</span></a>
-        <a href="/gestion-elevage" title="Élevage" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">pets</span></a>
-        <a href="/gestion-stocks" title="Stocks" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">inventory_2</span></a>
-        <a href="/personnel-stages" title="Ressources Humaines" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">badge</span></a>
-        <a href="/comptabilite-hub" title="Comptabilité" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">account_balance</span></a>
+        <a wire:navigate href="/dashboard" title="Tableau de Bord" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">dashboard</span></a>
+        <a wire:navigate href="/ventes-devis" title="Caisse POS" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">point_of_sale</span></a>
+        <a wire:navigate href="/gestion-elevage" title="Élevage" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">pets</span></a>
+        <a wire:navigate href="/gestion-stocks" title="Stocks" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">inventory_2</span></a>
+        <a wire:navigate href="/personnel-stages" title="Ressources Humaines" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">badge</span></a>
+        <a wire:navigate href="/comptabilite-hub" title="Comptabilité" class="text-white/80 hover:text-brand-maize p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">account_balance</span></a>
         <div class="flex-1"></div>
         <button @click="sidebarDesktopHidden = false; localStorage.setItem('agrierp_sidebar_hidden','0')" title="Réafficher le menu" class="text-brand-maize hover:text-white p-2 rounded-lg hover:bg-white/10"><span class="material-symbols-outlined">menu_open</span></button>
     </div>
@@ -187,10 +187,10 @@
                         <span class="material-symbols-outlined">account_circle</span><span class="hidden md:inline">{{ auth()->user()->name }}</span><span class="material-symbols-outlined text-[16px]">expand_more</span>
                     </button>
                     <div id="dd-profile" x-show="open" x-cloak class="absolute right-0 mt-sm w-48 bg-white border border-outline-variant rounded-lg shadow-lg z-50 overflow-hidden">
-                        <a href="/mon-profil" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">person</span>Mon Profil</a>
-                        <a href="/aide-a-propos" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">help</span>Aide &amp; À Propos</a>
-                        <a href="/contact-editeur" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">support_agent</span>Contactez l'Éditeur</a>
-                        <a href="/parametres-hub" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">settings</span>Paramètres</a>
+                        <a wire:navigate href="/mon-profil" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">person</span>Mon Profil</a>
+                        <a wire:navigate href="/aide-a-propos" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">help</span>Aide &amp; À Propos</a>
+                        <a wire:navigate href="/contact-editeur" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">support_agent</span>Contactez l'Éditeur</a>
+                        <a wire:navigate href="/parametres-hub" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">settings</span>Paramètres</a>
                         {{-- Sprint VW : « Verrouiller » (même libellé, même icône et même place que le menu du poste). --}}
                         <button type="button" dusk="verrouiller" @click="open = false; window.agrierpVerrou && window.agrierpVerrou.verrouiller()" class="w-full flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">lock</span>Verrouiller</button>
                         <div class="border-t border-outline-variant"></div>
@@ -211,19 +211,19 @@
     </div>
 
     <nav class="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-outline-variant flex items-stretch z-40 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
-        <a href="/dashboard" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('dashboard') ? 'text-brand-emerald' : 'text-outline' }}">
+        <a wire:navigate href="/dashboard" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('dashboard') ? 'text-brand-emerald' : 'text-outline' }}">
             <span class="material-symbols-outlined text-[22px]" @if(request()->is('dashboard')) style="font-variation-settings: 'FILL' 1;" @endif>dashboard</span>
             <span class="text-[9px] font-bold">Tableau de Bord</span>
         </a>
-        <a href="/ventes-devis" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('ventes-devis') ? 'text-brand-emerald' : 'text-outline' }}">
+        <a wire:navigate href="/ventes-devis" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('ventes-devis') ? 'text-brand-emerald' : 'text-outline' }}">
             <span class="material-symbols-outlined text-[22px]">point_of_sale</span>
             <span class="text-[9px] font-bold">Vente</span>
         </a>
-        <a href="/gestion-elevage" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('gestion-elevage') ? 'text-brand-emerald' : 'text-outline' }}">
+        <a wire:navigate href="/gestion-elevage" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('gestion-elevage') ? 'text-brand-emerald' : 'text-outline' }}">
             <span class="material-symbols-outlined text-[22px]">pets</span>
             <span class="text-[9px] font-bold">Élevage</span>
         </a>
-        <a href="/gestion-stocks" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('gestion-stocks') ? 'text-brand-emerald' : 'text-outline' }}">
+        <a wire:navigate href="/gestion-stocks" class="flex-1 flex flex-col items-center justify-center gap-0.5 {{ request()->is('gestion-stocks') ? 'text-brand-emerald' : 'text-outline' }}">
             <span class="material-symbols-outlined text-[22px]">inventory_2</span>
             <span class="text-[9px] font-bold">Stock</span>
         </a>
@@ -241,21 +241,21 @@
             <button @click="quickNavOpen = false" class="text-white/80 hover:text-white"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div class="flex-1 overflow-y-auto p-sm space-y-xs">
-            <a href="/fiche-lapins" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">cruelty_free</span><span class="text-sm font-semibold">Fiche Lapins</span></a>
-            <a href="/fiche-volailles-pondeuses" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">egg</span><span class="text-sm font-semibold">Fiche Pondeuses</span></a>
-            <a href="/fiche-volailles-reproducteurs" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">egg_alt</span><span class="text-sm font-semibold">Fiche Volailles Reproducteurs</span></a>
-            <a href="/fiche-porcs" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">pets</span><span class="text-sm font-semibold">Fiche Porcs</span></a>
-            <a href="/fiche-escargots" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">bug_report</span><span class="text-sm font-semibold">Fiche Escargots</span></a>
+            <a wire:navigate href="/fiche-lapins" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">cruelty_free</span><span class="text-sm font-semibold">Fiche Lapins</span></a>
+            <a wire:navigate href="/fiche-volailles-pondeuses" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">egg</span><span class="text-sm font-semibold">Fiche Pondeuses</span></a>
+            <a wire:navigate href="/fiche-volailles-reproducteurs" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">egg_alt</span><span class="text-sm font-semibold">Fiche Volailles Reproducteurs</span></a>
+            <a wire:navigate href="/fiche-porcs" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">pets</span><span class="text-sm font-semibold">Fiche Porcs</span></a>
+            <a wire:navigate href="/fiche-escargots" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-emerald text-[22px]">bug_report</span><span class="text-sm font-semibold">Fiche Escargots</span></a>
             <div class="border-t border-outline-variant my-xs"></div>
-            <a href="/suivi-reproduction" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-info-blue text-[22px]">favorite</span><span class="text-sm font-semibold">Suivi Reproduction</span></a>
-            <a href="/soins-vaccins-hub" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-info-blue text-[22px]">vaccines</span><span class="text-sm font-semibold">Calendrier Soins &amp; Vaccins</span></a>
+            <a wire:navigate href="/suivi-reproduction" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-info-blue text-[22px]">favorite</span><span class="text-sm font-semibold">Suivi Reproduction</span></a>
+            <a wire:navigate href="/soins-vaccins-hub" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-info-blue text-[22px]">vaccines</span><span class="text-sm font-semibold">Calendrier Soins &amp; Vaccins</span></a>
             <div class="border-t border-outline-variant my-xs"></div>
-            <a href="/ventes-devis" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">point_of_sale</span><span class="text-sm font-semibold">Ventes &amp; Devis</span></a>
-            <a href="/gestion-stocks" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">inventory_2</span><span class="text-sm font-semibold">Gestion Stocks</span></a>
-            <a href="/dashboard" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">dashboard</span><span class="text-sm font-semibold">Tableau de Bord</span></a>
-            <a href="/saisie-depenses" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">receipt</span><span class="text-sm font-semibold">Saisie Dépenses</span></a>
-            <a href="/comptabilite-hub" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">account_balance</span><span class="text-sm font-semibold">Comptabilité</span></a>
-            <a href="/rapports-exports" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">picture_as_pdf</span><span class="text-sm font-semibold">Rapports et Exports</span></a>
+            <a wire:navigate href="/ventes-devis" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">point_of_sale</span><span class="text-sm font-semibold">Ventes &amp; Devis</span></a>
+            <a wire:navigate href="/gestion-stocks" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">inventory_2</span><span class="text-sm font-semibold">Gestion Stocks</span></a>
+            <a wire:navigate href="/dashboard" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">dashboard</span><span class="text-sm font-semibold">Tableau de Bord</span></a>
+            <a wire:navigate href="/saisie-depenses" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">receipt</span><span class="text-sm font-semibold">Saisie Dépenses</span></a>
+            <a wire:navigate href="/comptabilite-hub" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">account_balance</span><span class="text-sm font-semibold">Comptabilité</span></a>
+            <a wire:navigate href="/rapports-exports" class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface hover:bg-surface-zebra transition-colors"><span class="material-symbols-outlined text-brand-forest text-[22px]">picture_as_pdf</span><span class="text-sm font-semibold">Rapports et Exports</span></a>
         </div>
     </div>
 

@@ -101,7 +101,7 @@ class VerrouSessionBladeTest extends VerrouSessionBase
         $this->assertStringContainsString("route('session.verrouiller')", $this->source('resources/views/components/verrou-session.blade.php'));
         $this->assertStringContainsString("'/verrouiller'", $this->source('routes/web.php'));
         $this->assertStringContainsString('localStorage', $verrou);
-        $this->assertStringContainsString("addEventListener('storage'", $verrou);
+        $this->assertStringContainsString("poser(window, 'storage'", $verrou);
         foreach (['pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'] as $evenement) {
             $this->assertStringContainsString("'$evenement'", $verrou, $evenement);
         }

@@ -28,8 +28,8 @@ body{font-family:'Inter',sans-serif;}
         La solution intégrée pour gérer votre exploitation agricole : ventes, stocks, comptabilité SYSCOHADA et élevage — au comptoir comme au champ.
     </p>
     <div class="fade-up d4 flex flex-col sm:flex-row items-center gap-3 mt-8">
-        <a href="{{ route('public.presentation') }}" class="w-64 sm:w-auto text-center px-8 py-2.5 rounded-full bg-[#065f46] hover:bg-[#054d3a] font-bold text-sm shadow-lg transition-all active:scale-[0.98]">Voir les Fonctionnalités</a>
-        <a href="{{ route('login') }}" class="w-64 sm:w-auto text-center px-8 py-2.5 rounded-full border border-white/40 hover:bg-white/10 font-bold text-sm transition-all active:scale-[0.98]">Se connecter</a>
+        <a wire:navigate href="{{ route('public.presentation') }}" class="w-64 sm:w-auto text-center px-8 py-2.5 rounded-full bg-[#065f46] hover:bg-[#054d3a] font-bold text-sm shadow-lg transition-all active:scale-[0.98]">Voir les Fonctionnalités</a>
+        <a wire:navigate href="{{ route('login') }}" class="w-64 sm:w-auto text-center px-8 py-2.5 rounded-full border border-white/40 hover:bg-white/10 font-bold text-sm transition-all active:scale-[0.98]">Se connecter</a>
     </div>
     <div class="fade-up d4 grid grid-cols-2 md:grid-cols-4 gap-3 mt-12 max-w-2xl w-full">
         <div class="flex flex-col items-center gap-1 bg-white/5 border border-white/10 rounded-lg py-4"><span class="material-symbols-outlined text-[#a6f2d1] text-[22px]">point_of_sale</span><span class="text-[10px] font-bold uppercase tracking-wide text-white/70">POS &amp; Devis</span></div>

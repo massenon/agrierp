@@ -23,8 +23,8 @@ body{font-family:'Inter',sans-serif;}
             <a href="#architecture" class="hover:text-[#065f46]">Architecture</a>
         </nav>
         <div class="flex items-center gap-2">
-            <a href="{{ route('public.welcome') }}" class="hidden sm:inline text-xs font-semibold text-[#6f7973] hover:text-[#065f46] px-3 py-2">Retour</a>
-            <a href="{{ route('login') }}" class="text-xs font-bold bg-[#065f46] hover:bg-[#052e16] text-white px-5 py-2.5 rounded-full transition-colors">Se connecter</a>
+            <a wire:navigate href="{{ route('public.welcome') }}" class="hidden sm:inline text-xs font-semibold text-[#6f7973] hover:text-[#065f46] px-3 py-2">Retour</a>
+            <a wire:navigate href="{{ route('login') }}" class="text-xs font-bold bg-[#065f46] hover:bg-[#052e16] text-white px-5 py-2.5 rounded-full transition-colors">Se connecter</a>
         </div>
     </div>
 </header>
@@ -39,7 +39,7 @@ body{font-family:'Inter',sans-serif;}
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mt-10">
             <a href="#modules" class="w-56 sm:w-auto px-8 py-3 rounded-full bg-[#FFD55F] text-[#052e16] font-bold text-sm hover:bg-yellow-400 transition-colors">Voir les Modules</a>
-            <a href="{{ route('login') }}" class="w-56 sm:w-auto px-8 py-3 rounded-full border border-white/40 text-white font-bold text-sm hover:bg-white/10 transition-colors">Se connecter</a>
+            <a wire:navigate href="{{ route('login') }}" class="w-56 sm:w-auto px-8 py-3 rounded-full border border-white/40 text-white font-bold text-sm hover:bg-white/10 transition-colors">Se connecter</a>
         </div>
     </div>
 </section>
@@ -197,7 +197,7 @@ body{font-family:'Inter',sans-serif;}
 <!-- CTA FINAL -->
 <section class="py-16 text-center px-4">
     <h2 class="text-xl md:text-2xl font-extrabold text-[#052e16]">Prêt à moderniser la gestion de votre ferme ?</h2>
-    <a href="{{ route('login') }}" class="inline-block mt-6 px-8 py-3 rounded-full bg-[#065f46] hover:bg-[#052e16] text-white font-bold text-sm transition-colors">Se connecter à AgriERP</a>
+    <a wire:navigate href="{{ route('login') }}" class="inline-block mt-6 px-8 py-3 rounded-full bg-[#065f46] hover:bg-[#052e16] text-white font-bold text-sm transition-colors">Se connecter à AgriERP</a>
 </section>
 
 <footer class="border-t border-[#bec9c2]/40 py-8 text-center text-[10px] text-[#6f7973]">

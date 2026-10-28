@@ -14,7 +14,7 @@
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
-        <a href="{{ route('comptabilite.plan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.plan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">menu_book</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Plan Comptable</p>
@@ -22,7 +22,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.journal') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.journal') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">account_balance</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Journal Comptable</p>
@@ -30,7 +30,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.grand-livre') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.grand-livre') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">import_contacts</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Grand Livre</p>
@@ -38,7 +38,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.balance') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.balance') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">balance</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Balance Générale</p>
@@ -46,7 +46,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.etats-financiers') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.etats-financiers') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">description</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">États Financiers</p>
@@ -55,7 +55,7 @@
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
 
-        <a href="{{ route('comptabilite.bilan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.bilan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">account_balance_wallet</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Bilan de l'Entreprise</p>
@@ -63,7 +63,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.immobilisations') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.immobilisations') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">domain</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Immobilisations</p>
@@ -72,7 +72,7 @@
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
 
-        <a href="{{ route('comptabilite.cloture') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.cloture') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">event_repeat</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Clôture d'Exercice</p>
@@ -80,7 +80,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.declaration-tva') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.declaration-tva') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">receipt_long</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Declaration TVA</p>
@@ -89,7 +89,7 @@
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
 
-        <a href="{{ route('comptabilite.rapprochement') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.rapprochement') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">sync_alt</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Rapprochement Bancaire</p>
@@ -97,7 +97,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-                <a href="{{ route('comptabilite.analytique') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all sm:col-span-2">
+                <a wire:navigate href="{{ route('comptabilite.analytique') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all sm:col-span-2">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">insights</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Comptabilité Analytique</p>
@@ -105,7 +105,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a href="{{ route('comptabilite.balance-agee') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.balance-agee') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">schedule</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Balance Âgée</p>

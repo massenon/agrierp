@@ -4,7 +4,7 @@
             <span class="material-symbols-outlined text-outline-variant text-[56px]">lock</span>
             <h2 class="text-lg font-bold text-on-surface mt-md">Module Héliciculture non activé</h2>
             <p class="text-sm text-outline mt-xs">Ce module est disponible mais désactivé par défaut. Un administrateur peut l'activer depuis Paramètres &gt; Modules Actifs.</p>
-            <a href="{{ route('elevage.gestion') }}" class="inline-block mt-md text-xs font-bold text-brand-emerald hover:underline">← Retour à Gestion Élevage</a>
+            <a wire:navigate href="{{ route('elevage.gestion') }}" class="inline-block mt-md text-xs font-bold text-brand-emerald hover:underline">← Retour à Gestion Élevage</a>
         </div>
     @else
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
@@ -30,7 +30,7 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-center mb-lg">
             <span class="material-symbols-outlined text-outline-variant text-[44px]">inbox</span>
             <p class="text-sm font-semibold text-on-surface mt-sm">Aucune bande active en héliciculture pour le moment.</p>
-            <a href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
+            <a wire:navigate href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
         </div>
     @else
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm p-md lg:p-lg mb-lg">

@@ -53,7 +53,7 @@
             {{-- Ticket CFG-1 — la configuration SMTP a UNE seule saisie : l'onglet « Email (SMTP) » de ce hub. --}}
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md lg:col-span-2">
                 <p class="text-xs font-bold text-brand-forest uppercase flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">mail</span>Configuration Email (SMTP)</p>
-                <a href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-sm p-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
+                <a wire:navigate href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-sm p-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
                     <span class="material-symbols-outlined text-brand-emerald text-[22px]">settings_input_antenna</span>
                     <span class="flex-1">
                         <span class="block text-xs font-bold text-brand-forest">Serveur d'envoi, mot de passe et e-mail de test</span>
@@ -118,7 +118,7 @@
                 (versées en plus par l'employeur, sans toucher au net).
             </p>
 
-            <a href="{{ route('parametres.bareme-its') }}" class="flex items-center gap-sm p-md mb-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
+            <a wire:navigate href="{{ route('parametres.bareme-its') }}" class="flex items-center gap-sm p-md mb-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
                 <span class="material-symbols-outlined text-brand-emerald text-[22px]">functions</span>
                 <span class="flex-1">
                     <span class="block text-xs font-bold text-brand-forest">Barème IR-PTS / ITS — tranches d'imposition</span>

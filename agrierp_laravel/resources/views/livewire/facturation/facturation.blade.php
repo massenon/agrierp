@@ -6,7 +6,7 @@
             </h2>
             <p class="text-xs lg:text-sm text-outline mt-xs">Émission de factures normalisées et transmission au système MeCeF (DGI Bénin).</p>
         </div>
-        <a href="{{ route('ventes.devis-hub') }}" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+        <a wire:navigate href="{{ route('ventes.devis-hub') }}" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
             <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Facture
         </a>
     </div>

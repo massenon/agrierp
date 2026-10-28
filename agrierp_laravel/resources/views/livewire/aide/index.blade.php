@@ -60,7 +60,7 @@
     </div>
 
     <div class="mt-xl text-center">
-        <a href="/contact-editeur" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline">
+        <a wire:navigate href="/contact-editeur" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline">
             <span class="material-symbols-outlined text-[18px]">support_agent</span>Vous ne trouvez pas de réponse ? Contactez l'éditeur
         </a>
     </div>

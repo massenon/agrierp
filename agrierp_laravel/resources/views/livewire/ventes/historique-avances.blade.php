@@ -59,7 +59,7 @@
                 <tbody>
                     @forelse($this->advances as $i => $advance)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
-                            <td data-label="Client" class="px-md py-sm text-xs"><a href="{{ route('ventes.profile-client', $advance->customer) }}" class="text-brand-forest hover:text-brand-emerald hover:underline font-bold">{{ $advance->customer?->name }}</a></td>
+                            <td data-label="Client" class="px-md py-sm text-xs"><a wire:navigate href="{{ route('ventes.profile-client', $advance->customer) }}" class="text-brand-forest hover:text-brand-emerald hover:underline font-bold">{{ $advance->customer?->name }}</a></td>
                             <td data-label="Montant Avance" class="px-md py-sm text-xs text-right">{{ number_format($advance->amount, 0, ',', ' ') }} FCFA</td>
                             <td data-label="Solde Restant" class="px-md py-sm text-xs text-right font-bold {{ $advance->remaining > 0 ? 'text-brand-emerald' : 'text-outline' }}">{{ number_format($advance->remaining, 0, ',', ' ') }} FCFA</td>
                             <td data-label="Date" class="px-md py-sm text-xs">{{ $advance->advance_date->format('d/m/Y') }}</td>

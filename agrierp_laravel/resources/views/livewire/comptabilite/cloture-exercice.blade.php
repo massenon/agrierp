@@ -33,7 +33,7 @@
             <span class="material-symbols-outlined text-error-deep text-[20px]">warning</span>
             <div>
                 <p class="text-xs font-bold text-error-deep">Balance D&eacute;s&eacute;quilibr&eacute;e &mdash; Cl&ocirc;ture Bloqu&eacute;e</p>
-                <p class="text-[11px] text-error-deep mt-xs">Corrigez l'&eacute;cart de {{ number_format($this->periodeBalance['ecart'], 0, ',', ' ') }} FCFA sur <a href="{{ route('comptabilite.balance') }}" class="underline font-bold">Balance G&eacute;n&eacute;rale</a> avant de pouvoir cl&ocirc;turer ce mois.</p>
+                <p class="text-[11px] text-error-deep mt-xs">Corrigez l'&eacute;cart de {{ number_format($this->periodeBalance['ecart'], 0, ',', ' ') }} FCFA sur <a wire:navigate href="{{ route('comptabilite.balance') }}" class="underline font-bold">Balance G&eacute;n&eacute;rale</a> avant de pouvoir cl&ocirc;turer ce mois.</p>
             </div>
         </div>
     @elseif($this->periodeDejaCloturee)

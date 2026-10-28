@@ -24,7 +24,7 @@
         @if($this->helicoEnabled)
             <x-nav-card href="{{ route('elevage.fiche-escargots') }}" icon="bug_report" title="Fiches Escargots" description="Héliciculture — suivi mensuel du cheptel" />
         @else
-            <a href="{{ route('elevage.fiche-escargots') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+            <a wire:navigate href="{{ route('elevage.fiche-escargots') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
                 <div class="w-12 h-12 rounded-lg bg-outline-variant/20 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-outline text-[24px]">bug_report</span></div>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-bold text-brand-forest">Fiches Escargots</p>

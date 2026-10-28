@@ -5,7 +5,7 @@
                 <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher un produit..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-full text-xs bg-surface-zebra outline-none focus:ring-2 focus:ring-brand-emerald">
             </div>
-            <a href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">
+            <a wire:navigate href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">
                 <span class="material-symbols-outlined text-[16px]">add_box</span>Ajouter Produit Ferme
             </a>
             <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-livraison' })" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">

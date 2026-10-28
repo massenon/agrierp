@@ -63,7 +63,7 @@
                         {{-- Ticket H11 — liste calculée des rappels des 7 prochains jours (ajout du poste), au-dessus du texte et du lien. --}}
                         @include('livewire.elevage.ajouts-poste.dashboard-rappels-vms', ['rappels' => $this->rappelsVms])
                         <p class="text-xs text-outline text-center py-md">Le calendrier complet (réel) est disponible dans Soins et Vaccins.</p>
-                        <a href="{{ route('elevage.soins-vaccins') }}" class="block text-center mt-md text-xs font-bold text-brand-emerald hover:underline">Voir le calendrier complet →</a>
+                        <a wire:navigate href="{{ route('elevage.soins-vaccins') }}" class="block text-center mt-md text-xs font-bold text-brand-emerald hover:underline">Voir le calendrier complet →</a>
                     </div>
                 </div>
 

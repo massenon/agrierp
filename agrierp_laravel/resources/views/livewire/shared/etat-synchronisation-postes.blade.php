@@ -9,10 +9,8 @@
                 <p class="text-[10px] font-bold uppercase tracking-wider text-outline">Postes de la ferme</p>
                 <h3 class="font-bold text-lg text-brand-forest flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">sync</span>Synchronisation</h3>
             </div>
-            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="text-outline hover:text-on-surface"><span class="material-symbols-outlined">close</span></button>
+            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="text-outline hover:text-on-surface -mt-2 -mr-2 w-11 h-11 flex items-center justify-center rounded-full shrink-0" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button>
         </div>
-        <p class="text-xs text-outline mb-sm">Le site est la base de référence : il ne synchronise rien lui-même. Chaque poste envoie ses saisies et reçoit celles du site quand il synchronise. « Demander la synchronisation » dépose une demande que chaque poste connecté lit dans les 30 secondes.</p>
-        <p class="text-xs text-outline mb-sm">Si le site a servi de base (poste en panne), chaque ligne dit ce que le poste n'a pas encore reçu. « Renvoyer vers ce poste » lui fait refaire un tirage complet à son prochain contact.</p>
 
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
@@ -53,7 +51,7 @@
                             <td data-label="Dernier contrôle" class="py-xs pr-sm">{{ $poste['dernier_controle']?->format('d/m/Y H:i') ?? '—' }}</td>
                             <td data-label="État" class="py-xs pr-sm"><span class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] {{ $pastilles[$poste['etat']] }}">{{ $poste['libelle_etat'] }}</span></td>
                             <td data-label="Actions" class="py-xs text-right">
-                                <button type="button" wire:click="demander(@js($poste['poste']))" title="Demander la synchronisation de ce poste" class="text-outline hover:text-brand-emerald"><span class="material-symbols-outlined text-[18px]">sync</span></button>
+                                <button type="button" wire:click="demander(@js($poste['poste']))" title="Demander la synchronisation de ce poste" aria-label="Demander la synchronisation de ce poste" class="text-outline hover:text-brand-emerald w-10 h-10 inline-flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">sync</span></button>
                             </td>
                         </tr>
                         <tr class="bg-surface-zebra">
@@ -68,7 +66,7 @@
                                         @if($retard['resync_demandee_le'])
                                             <span class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] bg-accent-yellow/30 text-brand-forest">Resynchronisation demandée le {{ $retard['resync_demandee_le']->format('d/m/Y H:i') }}</span>
                                         @endif
-                                        <button type="button" wire:click="renvoyer(@js($poste['poste']))" title="Renvoyer vers ce poste" class="px-sm py-xs rounded-lg border border-brand-emerald text-brand-emerald font-semibold flex items-center gap-xs hover:bg-white"><span class="material-symbols-outlined text-[16px]">cloud_download</span>Renvoyer vers ce poste</button>
+                                        <button type="button" wire:click="renvoyer(@js($poste['poste']))" title="Renvoyer vers ce poste" class="min-h-[40px] px-sm py-xs rounded-lg border border-brand-emerald text-brand-emerald font-semibold flex items-center gap-xs hover:bg-white"><span class="material-symbols-outlined text-[16px]">cloud_download</span>Renvoyer vers ce poste</button>
                                     </div>
                                 </div>
                             </td>
@@ -80,11 +78,11 @@
             </table>
         </div>
 
-        <div class="flex justify-end gap-sm mt-lg">
-            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Fermer</button>
-            <button type="button" wire:click="demander" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">sync</span>Demander la synchronisation des postes</button>
-            <button type="button" wire:click="renvoyerATous" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">cloud_download</span>Renvoyer vers tous les postes</button>
-            <button type="button" wire:click="actualiser" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">refresh</span>Actualiser</button>
+        <div class="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-sm mt-lg">
+            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-etat-synchronisation' })" class="w-full sm:w-auto min-h-[44px] justify-center text-center px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Fermer</button>
+            <button type="button" wire:click="demander" class="w-full sm:w-auto min-h-[44px] justify-center text-center px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">sync</span>Demander la synchronisation des postes</button>
+            <button type="button" wire:click="renvoyerATous" class="w-full sm:w-auto min-h-[44px] justify-center text-center px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">cloud_download</span>Renvoyer vers tous les postes</button>
+            <button type="button" wire:click="actualiser" class="w-full sm:w-auto min-h-[44px] justify-center text-center px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">refresh</span>Actualiser</button>
         </div>
     </x-modal>
 </div>

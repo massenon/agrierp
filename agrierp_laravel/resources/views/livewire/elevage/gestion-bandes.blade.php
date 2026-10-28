@@ -7,10 +7,10 @@
             <p class="text-xs text-outline mt-xs">Effectif vivant en temps réel, stade physiologique et statut, par bande.</p>
         </div>
         <div class="flex flex-wrap xl:flex-nowrap items-center gap-sm xl:shrink-0">
-            <a href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+            <a wire:navigate href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
                 <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
             </a>
-            <a href="{{ route('elevage.reproducteurs') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
+            <a wire:navigate href="{{ route('elevage.reproducteurs') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
                 <span class="material-symbols-outlined text-[18px]">badge</span>Registre des Reproducteurs
             </a>
             @can('manage-elevage')

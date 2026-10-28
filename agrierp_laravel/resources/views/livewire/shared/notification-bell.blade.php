@@ -29,6 +29,6 @@
                 <p class="text-[11px] text-outline text-center py-lg">Aucune notification pour le moment.</p>
             @endforelse
         </div>
-        <a href="/notifications" class="block text-center py-sm text-xs font-bold text-brand-emerald hover:bg-surface-zebra border-t border-outline-variant">Voir toutes les notifications</a>
+        <a wire:navigate href="/notifications" class="block text-center py-sm text-xs font-bold text-brand-emerald hover:bg-surface-zebra border-t border-outline-variant">Voir toutes les notifications</a>
     </div>
 </div>

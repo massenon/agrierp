@@ -293,3 +293,23 @@ body.dark-mode .border-outline-variant {
   opacity: 0.5 !important;
   cursor: not-allowed !important;
 }
+
+
+/* Modales — pied de page ergonomique (mobile / tablette étroite).
+   Une rangée « justify-end » de boutons passe en pile pleine largeur (action principale en haut, Fermer/Annuler en bas),
+   chaque bouton garde une cible tactile d'au moins 44 px et son libellé s'enroule au lieu d'être rogné. */
+@media (max-width: 639px) {
+    .modal-panel div.flex.justify-end:has(> button) {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    .modal-panel div.flex.justify-end:has(> button) > button {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+}
+.modal-panel div.flex.justify-end > button,
+.modal-panel div.flex.justify-between > button:not(.material-symbols-outlined) {
+    min-height: 44px;
+}

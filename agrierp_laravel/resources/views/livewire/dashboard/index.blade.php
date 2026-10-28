@@ -9,10 +9,10 @@
                 <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }} · {{ $this->details['exercice'] ? 'Exercice '.$this->details['exercice'].($this->details['exercice_clos'] ? ' clôturé' : ' actif') : 'Aucun exercice ouvert' }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-xs">
-                <a href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+                <a wire:navigate href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">point_of_sale</span>Enregistrer une Vente
                 </a>
-                <a href="/gestion-elevage" class="flex items-center justify-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+                <a wire:navigate href="/gestion-elevage" class="flex items-center justify-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">pets</span>Élevage
                 </a>
             </div>
@@ -224,7 +224,7 @@
         <div x-data="{ tab: 'sale' }" class="bg-white rounded-lg border border-outline-variant shadow-sm p-md">
             <div class="flex items-center justify-between mb-md">
                 <h3 class="text-sm font-bold text-on-surface flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald text-[18px]">receipt_long</span>Transactions Récentes</h3>
-                <a href="/ventes-devis" class="text-[10px] font-bold text-brand-emerald hover:underline">Voir tout</a>
+                <a wire:navigate href="/ventes-devis" class="text-[10px] font-bold text-brand-emerald hover:underline">Voir tout</a>
             </div>
             <div class="flex items-center gap-xs mb-sm border-b border-outline-variant overflow-x-auto">
                 <button type="button" @click="tab = 'sale'" :class="tab === 'sale' ? 'border-brand-emerald text-brand-emerald' : 'border-transparent text-outline'" class="px-sm py-1.5 text-[11px] font-bold border-b-2 whitespace-nowrap">Vente</button>

@@ -6,7 +6,7 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Moteur de relance des créances clients échues.</p>
         </div>
-        <a href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
+        <a wire:navigate href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
             <span class="material-symbols-outlined text-[16px]">mail</span>Configurer l'Email (SMTP)
         </a>
     </div>
@@ -50,7 +50,7 @@
                     <div class="bg-white border border-outline-variant rounded-lg p-md flex flex-col sm:flex-row sm:items-center gap-sm">
                         <div class="w-10 h-10 rounded-full bg-brand-emerald text-white flex items-center justify-center font-bold text-sm flex-shrink-0">{{ strtoupper($initials) }}</div>
                         <div class="flex-1 min-w-0">
-                            <a href="{{ route('ventes.profile-client', $receivable->customer) }}" class="text-brand-forest font-bold text-sm hover:underline hover:text-brand-emerald">{{ $receivable->customer?->name }}</a>
+                            <a wire:navigate href="{{ route('ventes.profile-client', $receivable->customer) }}" class="text-brand-forest font-bold text-sm hover:underline hover:text-brand-emerald">{{ $receivable->customer?->name }}</a>
                             <p class="text-xs"><span class="text-error-deep font-bold">{{ number_format($receivable->balance, 0, ',', ' ') }} FCFA</span> <span class="text-outline">— {{ $receivable->days_overdue }} jours de retard</span></p>
                         </div>
                         <div class="flex items-center gap-xs flex-shrink-0 flex-wrap">

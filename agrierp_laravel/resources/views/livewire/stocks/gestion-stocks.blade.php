@@ -6,7 +6,7 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Espace unifié : inventaire, mouvements et ajustements.</p>
         </div>
-        <a href="{{ route('stocks.seuils') }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
+        <a wire:navigate href="{{ route('stocks.seuils') }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
             <span class="material-symbols-outlined text-[16px]">notification_important</span>Configurer les Seuils d'Alerte
         </a>
     </div>
@@ -95,7 +95,7 @@
                                     </td>
                                     <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                         @can('manage-stocks')
-                                            <a href="{{ route('stocks.produits.modifier', $row['product']->id) }}" class="text-outline hover:text-brand-forest p-1 inline-block" title="Modifier le produit"><span class="material-symbols-outlined text-[16px]">edit</span></a>
+                                            <a wire:navigate href="{{ route('stocks.produits.modifier', $row['product']->id) }}" class="text-outline hover:text-brand-forest p-1 inline-block" title="Modifier le produit"><span class="material-symbols-outlined text-[16px]">edit</span></a>
                                         @endcan
                                     </td>
                                 </tr>

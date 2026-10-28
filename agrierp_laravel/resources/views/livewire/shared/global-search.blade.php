@@ -1,5 +1,6 @@
 <div
     x-data="{
+        mobileOpen: false,
         activeIndex: -1,
         flatItems() {
             return Array.from($refs.resultsPanel ? $refs.resultsPanel.querySelectorAll('[data-search-item]') : []);
@@ -75,9 +76,9 @@
         @endif
     </div>
 
-    <div class="md:hidden" x-data="{ mobileOpen: false }">
+    <div class="md:hidden">
         <button type="button" x-on:click="mobileOpen = true" class="text-outline"><span class="material-symbols-outlined">search</span></button>
-        <div x-show="mobileOpen" x-cloak class="fixed inset-0 bg-white z-[300] p-md flex flex-col">
+        <div x-show="$data.mobileOpen" x-cloak class="fixed inset-0 bg-white z-[300] p-md flex flex-col">
             <div class="flex items-center gap-sm mb-md">
                 <span class="material-symbols-outlined text-outline">search</span>
                 <input

@@ -28,7 +28,7 @@
         </form>
 
         <div class="text-center">
-            <a href="/login" class="text-xs font-semibold text-brand-emerald hover:underline">← Retour à la connexion</a>
+            <a wire:navigate href="/login" class="text-xs font-semibold text-brand-emerald hover:underline">← Retour à la connexion</a>
         </div>
     </div>
 </div>

@@ -15,7 +15,7 @@
 
     <div class="bg-info-blue/10 border border-info-blue/30 rounded-lg p-md mb-lg flex items-start gap-sm text-xs">
         <span class="material-symbols-outlined text-info-blue text-[18px] flex-shrink-0">info</span>
-        <p class="text-on-surface">Enregistrer un reproducteur ici lui donne une <strong>identité</strong> (boucle, race, généalogie) — cela <strong>n'ajoute aucun animal</strong> à l'effectif : le sujet est déjà compté dans sa bande. Les entrées réelles (naissance, achat, don) se saisissent depuis <a href="{{ route('elevage.enregistrer-sujets') }}" class="text-info-blue underline font-semibold">Enregistrer des Sujets</a>.</p>
+        <p class="text-on-surface">Enregistrer un reproducteur ici lui donne une <strong>identité</strong> (boucle, race, généalogie) — cela <strong>n'ajoute aucun animal</strong> à l'effectif : le sujet est déjà compté dans sa bande. Les entrées réelles (naissance, achat, don) se saisissent depuis <a wire:navigate href="{{ route('elevage.enregistrer-sujets') }}" class="text-info-blue underline font-semibold">Enregistrer des Sujets</a>.</p>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
@@ -63,7 +63,7 @@
                     @forelse($this->animals as $i => $animal)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 0 ? 'bg-white' : 'bg-surface-zebra' }}">
                             <td data-label="Identifiant" class="px-md py-sm text-xs font-mono font-bold text-brand-emerald">
-                                <a href="{{ route('elevage.animal-details', $animal) }}" class="hover:underline">{{ $animal->identifier }}</a>
+                                <a wire:navigate href="{{ route('elevage.animal-details', $animal) }}" class="hover:underline">{{ $animal->identifier }}</a>
                             </td>
                             <td data-label="Espèce" class="px-md py-sm text-xs">{{ $animal->species?->label ?? '—' }}</td>
                             <td data-label="Sexe" class="px-md py-sm text-xs">{{ $animal->sex === 'F' ? 'Femelle' : 'Mâle' }}</td>
@@ -78,7 +78,7 @@
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                <a href="{{ route('elevage.animal-details', $animal) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Consulter la fiche"><span class="material-symbols-outlined text-[18px]">visibility</span></a>
+                                <a wire:navigate href="{{ route('elevage.animal-details', $animal) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Consulter la fiche"><span class="material-symbols-outlined text-[18px]">visibility</span></a>
                                 @can('manage-elevage')
                                     <button type="button" wire:click="editAnimal('{{ $animal->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                     @if($animal->isPresent())

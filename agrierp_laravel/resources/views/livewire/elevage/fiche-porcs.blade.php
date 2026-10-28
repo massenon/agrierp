@@ -22,7 +22,7 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-center mb-lg">
             <span class="material-symbols-outlined text-outline-variant text-[44px]">inbox</span>
             <p class="text-sm font-semibold text-on-surface mt-sm">Aucune bande active en porciculture pour le moment.</p>
-            <a href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
+            <a wire:navigate href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
         </div>
     @else
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm p-md lg:p-lg mb-lg">

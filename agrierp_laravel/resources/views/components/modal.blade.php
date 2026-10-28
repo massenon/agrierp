@@ -22,7 +22,7 @@
     x-show="show"
     x-cloak
     class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-md">
-    <div @click.outside="show = false" class="bg-white rounded-lg shadow-xl w-full {{ $widthClass }} p-lg max-h-[85vh] overflow-y-auto">
+    <div @click.outside="show = false" class="modal-panel bg-white rounded-lg shadow-xl w-full {{ $widthClass }} p-md sm:p-lg max-h-[85vh] max-h-[85dvh] overflow-y-auto">
         {{ $slot }}
     </div>
 </div>

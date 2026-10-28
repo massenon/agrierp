@@ -43,6 +43,28 @@ function ecrire(cle, valeur) {
     }
 }
 
+// Navigation sans rechargement (`wire:navigate`) : le composant est réinitialisé à CHAQUE page. Les écouteurs posés sur
+// `window` / `document` et la minuterie de vérification sont donc retirés avant d'être reposés, sinon ils se cumulent
+// (une activité comptée N fois, N minuteries).
+let ecouteursPoses = [];
+let minuterieVerification = null;
+
+function poser(cible, nom, rappel, options) {
+    cible.addEventListener(nom, rappel, options);
+    ecouteursPoses.push([cible, nom, rappel, options]);
+}
+
+function retirerEcouteurs() {
+    for (const [cible, nom, rappel, options] of ecouteursPoses) {
+        cible.removeEventListener(nom, rappel, options);
+    }
+    ecouteursPoses = [];
+    if (minuterieVerification !== null) {
+        window.clearInterval(minuterieVerification);
+        minuterieVerification = null;
+    }
+}
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('verrouSession', (config) => ({
         verrouille: config.verrouille,
@@ -57,12 +79,13 @@ document.addEventListener('alpine:init', () => {
         _derniereEcriture: 0,
 
         init() {
+            retirerEcouteurs();
             instance = this;
             window.agrierpVerrou = this;
             this.$watch('verrouille', (v) => this._appliquerEtat(v));
             this._appliquerEtat(this.verrouille);
 
-            window.addEventListener('storage', (e) => {
+            poser(window, 'storage', (e) => {
                 if (e.key !== CLE_ETAT || !e.newValue) {
                     return;
                 }
@@ -83,26 +106,26 @@ document.addEventListener('alpine:init', () => {
             }
 
             for (const nom of EVENEMENTS_ACTIVITE) {
-                window.addEventListener(nom, () => this._marquerActivite(), { passive: true, capture: true });
+                poser(window, nom, () => this._marquerActivite(), { passive: true, capture: true });
             }
-            document.addEventListener('click', (e) => {
+            poser(document, 'click', (e) => {
                 if (e.target instanceof Element && e.target.closest('a[download], [data-verrou-suspendre]')) {
                     suspenduJusqua = Date.now() + SUSPENSION_TELECHARGEMENT_MS;
                 }
             }, true);
-            document.addEventListener('visibilitychange', () => {
+            poser(document, 'visibilitychange', () => {
                 if (!document.hidden) {
                     this._verifier();
                 }
             });
-            window.addEventListener('verrou-delai-modifie', (e) => {
+            poser(window, 'verrou-delai-modifie', (e) => {
                 const minutes = e.detail?.minutes ?? e.detail?.[0]?.minutes;
                 if (dureeValide(minutes)) {
                     this.minutes = minutes;
                 }
             });
             this._marquerActivite(true);
-            window.setInterval(() => this._verifier(), PERIODE_VERIFICATION_MS);
+            minuterieVerification = window.setInterval(() => this._verifier(), PERIODE_VERIFICATION_MS);
         },
 
         _marquerActivite(forcer = false) {

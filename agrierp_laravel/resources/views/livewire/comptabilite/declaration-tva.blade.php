@@ -86,7 +86,7 @@
                 @endif
             </table>
         </div>
-        <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Factures issues de <a href="{{ route('facturation.index') }}" class="text-brand-emerald underline font-semibold">Facturation &amp; MeCeF</a> — seules les factures au statut « Transmise » sont retenues dans la déclaration. Une facture en erreur MeCeF n'a pas été transmise à la DGI et ne peut donc pas être déclarée.</p>
+        <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Factures issues de <a wire:navigate href="{{ route('facturation.index') }}" class="text-brand-emerald underline font-semibold">Facturation &amp; MeCeF</a> — seules les factures au statut « Transmise » sont retenues dans la déclaration. Une facture en erreur MeCeF n'a pas été transmise à la DGI et ne peut donc pas être déclarée.</p>
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden mb-lg">
@@ -137,7 +137,7 @@
                 @endif
             </table>
         </div>
-        <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Achats issus du module <a href="{{ route('achats.commandes-hub') }}" class="text-info-blue underline font-semibold">Achats &amp; Commandes</a>.</p>
+        <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Achats issus du module <a wire:navigate href="{{ route('achats.commandes-hub') }}" class="text-info-blue underline font-semibold">Achats &amp; Commandes</a>.</p>
     </div>
 
     <div class="bg-info-blue/10 border border-info-blue/30 rounded-lg p-md flex items-start gap-sm text-xs">

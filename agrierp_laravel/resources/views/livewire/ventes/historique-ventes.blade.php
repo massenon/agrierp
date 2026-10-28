@@ -7,7 +7,7 @@
                 </h2>
                 <p class="text-xs text-outline mt-xs">Toutes les ventes enregistrées de l'entreprise.</p>
             </div>
-            <a href="{{ route('ventes.devis-hub') }}" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+            <a wire:navigate href="{{ route('ventes.devis-hub') }}" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Vente
             </a>
         </div>

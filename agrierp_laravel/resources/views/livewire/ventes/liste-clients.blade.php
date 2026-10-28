@@ -75,7 +75,7 @@
                     @forelse($this->customersWithBalance as $i => $row)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                             <td class="px-md py-sm"><input type="checkbox" wire:model.live="selectedIds" value="{{ $row['customer']->id }}"></td>
-                            <td data-label="Nom" class="px-md py-sm text-xs font-bold text-brand-forest"><a href="{{ route('ventes.profile-client', $row['customer']) }}" class="hover:underline hover:text-brand-emerald">{{ $row['customer']->name }}</a></td>
+                            <td data-label="Nom" class="px-md py-sm text-xs font-bold text-brand-forest"><a wire:navigate href="{{ route('ventes.profile-client', $row['customer']) }}" class="hover:underline hover:text-brand-emerald">{{ $row['customer']->name }}</a></td>
                             <td data-label="Téléphone" class="px-md py-sm text-xs">{{ $row['customer']->phone ?? '—' }}</td>
                             <td data-label="Ville" class="px-md py-sm text-xs">{{ $row['customer']->city ?? '—' }}</td>
                             <td data-label="Total Achats" class="px-md py-sm text-xs text-right">{{ number_format($row['total_achats'], 0, ',', ' ') }} FCFA</td>
@@ -89,7 +89,7 @@
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="editCustomer('{{ $row['customer']->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
-                                <a href="{{ route('ventes.devis-hub', ['tab' => 'historique']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Historique d'achat"><span class="material-symbols-outlined text-[18px]">receipt_long</span></a>
+                                <a wire:navigate href="{{ route('ventes.devis-hub', ['tab' => 'historique']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Historique d'achat"><span class="material-symbols-outlined text-[18px]">receipt_long</span></a>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-client-{{ $row['customer']->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                             </td>
                         </tr>

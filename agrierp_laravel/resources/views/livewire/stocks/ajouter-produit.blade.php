@@ -94,7 +94,7 @@
             </div>
 
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <a href="/catalogue-produits" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</a>
+                <a wire:navigate href="/catalogue-produits" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</a>
                 <button type="submit" wire:loading.attr="disabled" wire:target="save" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest disabled:opacity-50">
                     {{ $productId ? 'Enregistrer les modifications' : 'Enregistrer' }}
                 </button>

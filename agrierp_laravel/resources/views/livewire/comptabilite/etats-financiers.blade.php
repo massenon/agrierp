@@ -239,7 +239,7 @@
                         </tbody>
                     </table>
                     <p class="text-[11px] text-outline mt-xs">
-                        Ventilation issue du <a href="{{ route('comptabilite.immobilisations') }}" class="text-brand-emerald font-bold underline">registre des immobilisations</a>, amortissement linéaire au prorata des mois écoulés.
+                        Ventilation issue du <a wire:navigate href="{{ route('comptabilite.immobilisations') }}" class="text-brand-emerald font-bold underline">registre des immobilisations</a>, amortissement linéaire au prorata des mois écoulés.
                     </p>
                     @if(abs($this->registreImmobilisations['net'] - $this->bilan['total_immo']) >= 1)
                         <p class="text-[11px] text-error-deep mt-xs">
@@ -269,7 +269,7 @@
                     </table>
                     <p class="text-[11px] text-outline mt-xs">
                         Aucun bien au registre : la note retombe sur les soldes de classe 2 du grand livre, sans ventilation par nature d'actif.
-                        Renseignez le <a href="{{ route('comptabilite.immobilisations') }}" class="text-brand-emerald font-bold underline">registre des immobilisations</a> pour l'obtenir.
+                        Renseignez le <a wire:navigate href="{{ route('comptabilite.immobilisations') }}" class="text-brand-emerald font-bold underline">registre des immobilisations</a> pour l'obtenir.
                     </p>
                 @endif
             </div>

@@ -70,7 +70,7 @@
                                 <button type="button" wire:click="editInternship('{{ $internship->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 <button type="button" wire:click="openAbsenceModal('{{ $internship->id }}')" class="text-brand-forest hover:text-brand-emerald p-1" title="Absences"><span class="material-symbols-outlined text-[18px]">event_busy</span></button>
                                 @if(!$internship->is_active)
-                                    <a href="{{ route('rh.personnel-stages-hub', ['tab' => 'attestations']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Générer attestation"><span class="material-symbols-outlined text-[18px]">workspace_premium</span></a>
+                                    <a wire:navigate href="{{ route('rh.personnel-stages-hub', ['tab' => 'attestations']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Générer attestation"><span class="material-symbols-outlined text-[18px]">workspace_premium</span></a>
                                 @endif
                             </td>
                         </tr>

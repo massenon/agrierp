@@ -29,10 +29,15 @@
                 this.invite = window.agrierpInviteInstallation;
                 this.afficher();
             }
-            window.addEventListener('agrierp:installable', (e) => {
+            // `wire:navigate` : le composant est réinitialisé à chaque page — l'écouteur précédent est retiré.
+            if (window.agrierpEcouteInstallable) {
+                window.removeEventListener('agrierp:installable', window.agrierpEcouteInstallable);
+            }
+            window.agrierpEcouteInstallable = (e) => {
                 this.invite = e.detail;
                 this.afficher();
-            });
+            };
+            window.addEventListener('agrierp:installable', window.agrierpEcouteInstallable);
         },
 
         afficher() {
