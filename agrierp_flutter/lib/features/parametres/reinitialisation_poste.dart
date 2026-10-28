@@ -172,6 +172,7 @@ class ReinitialisationPoste {
     'payslip_requests': 'Demandes de règlement de paie',
     'utilisateurs': 'Comptes utilisateurs',
     'receivable_payments': 'Encaissements de créances',
+    'manual_entry_requests': "Demandes d'écriture manuelle",
     'customer_reminders': 'Relances de clients',
     'suppliers': 'Fournisseurs',
     'supplier_payments': 'Règlements fournisseurs',

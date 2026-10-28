@@ -9800,6 +9800,698 @@ class PurchaseOrderLinesCompanion extends UpdateCompanion<PurchaseOrderLine> {
   }
 }
 
+class $ManualEntryRequestsTable extends ManualEntryRequests
+    with TableInfo<$ManualEntryRequestsTable, ManualEntryRequest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ManualEntryRequestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('pending'),
+      ).withConverter<SyncStatus>(
+        $ManualEntryRequestsTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actionMeta = const VerificationMeta('action');
+  @override
+  late final GeneratedColumn<String> action = GeneratedColumn<String>(
+    'action',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entryIdMeta = const VerificationMeta(
+    'entryId',
+  );
+  @override
+  late final GeneratedColumn<String> entryId = GeneratedColumn<String>(
+    'entry_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _entryDateMeta = const VerificationMeta(
+    'entryDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> entryDate = GeneratedColumn<DateTime>(
+    'entry_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _debitAccountIdMeta = const VerificationMeta(
+    'debitAccountId',
+  );
+  @override
+  late final GeneratedColumn<String> debitAccountId = GeneratedColumn<String>(
+    'debit_account_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _creditAccountIdMeta = const VerificationMeta(
+    'creditAccountId',
+  );
+  @override
+  late final GeneratedColumn<String> creditAccountId = GeneratedColumn<String>(
+    'credit_account_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    action,
+    entryId,
+    entryDate,
+    label,
+    debitAccountId,
+    creditAccountId,
+    amount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'manual_entry_requests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ManualEntryRequest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('action')) {
+      context.handle(
+        _actionMeta,
+        action.isAcceptableOrUnknown(data['action']!, _actionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_actionMeta);
+    }
+    if (data.containsKey('entry_id')) {
+      context.handle(
+        _entryIdMeta,
+        entryId.isAcceptableOrUnknown(data['entry_id']!, _entryIdMeta),
+      );
+    }
+    if (data.containsKey('entry_date')) {
+      context.handle(
+        _entryDateMeta,
+        entryDate.isAcceptableOrUnknown(data['entry_date']!, _entryDateMeta),
+      );
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('debit_account_id')) {
+      context.handle(
+        _debitAccountIdMeta,
+        debitAccountId.isAcceptableOrUnknown(
+          data['debit_account_id']!,
+          _debitAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('credit_account_id')) {
+      context.handle(
+        _creditAccountIdMeta,
+        creditAccountId.isAcceptableOrUnknown(
+          data['credit_account_id']!,
+          _creditAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ManualEntryRequest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ManualEntryRequest(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      syncStatus: $ManualEntryRequestsTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      action: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action'],
+      )!,
+      entryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entry_id'],
+      ),
+      entryDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}entry_date'],
+      ),
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      debitAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}debit_account_id'],
+      ),
+      creditAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}credit_account_id'],
+      ),
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      ),
+    );
+  }
+
+  @override
+  $ManualEntryRequestsTable createAlias(String alias) {
+    return $ManualEntryRequestsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class ManualEntryRequest extends DataClass
+    implements Insertable<ManualEntryRequest> {
+  final String id;
+  final String deviceId;
+  final SyncStatus syncStatus;
+  final DateTime updatedAt;
+
+  /// `creer` · `modifier` · `archiver`.
+  final String action;
+
+  /// L'écriture visée (modifier, archiver) ; nul pour une création.
+  final String? entryId;
+  final DateTime? entryDate;
+  final String? label;
+  final String? debitAccountId;
+  final String? creditAccountId;
+  final double? amount;
+  const ManualEntryRequest({
+    required this.id,
+    required this.deviceId,
+    required this.syncStatus,
+    required this.updatedAt,
+    required this.action,
+    this.entryId,
+    this.entryDate,
+    this.label,
+    this.debitAccountId,
+    this.creditAccountId,
+    this.amount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    {
+      map['sync_status'] = Variable<String>(
+        $ManualEntryRequestsTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['action'] = Variable<String>(action);
+    if (!nullToAbsent || entryId != null) {
+      map['entry_id'] = Variable<String>(entryId);
+    }
+    if (!nullToAbsent || entryDate != null) {
+      map['entry_date'] = Variable<DateTime>(entryDate);
+    }
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    if (!nullToAbsent || debitAccountId != null) {
+      map['debit_account_id'] = Variable<String>(debitAccountId);
+    }
+    if (!nullToAbsent || creditAccountId != null) {
+      map['credit_account_id'] = Variable<String>(creditAccountId);
+    }
+    if (!nullToAbsent || amount != null) {
+      map['amount'] = Variable<double>(amount);
+    }
+    return map;
+  }
+
+  ManualEntryRequestsCompanion toCompanion(bool nullToAbsent) {
+    return ManualEntryRequestsCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      syncStatus: Value(syncStatus),
+      updatedAt: Value(updatedAt),
+      action: Value(action),
+      entryId: entryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entryId),
+      entryDate: entryDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entryDate),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      debitAccountId: debitAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(debitAccountId),
+      creditAccountId: creditAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(creditAccountId),
+      amount: amount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amount),
+    );
+  }
+
+  factory ManualEntryRequest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ManualEntryRequest(
+      id: serializer.fromJson<String>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      syncStatus: $ManualEntryRequestsTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      action: serializer.fromJson<String>(json['action']),
+      entryId: serializer.fromJson<String?>(json['entryId']),
+      entryDate: serializer.fromJson<DateTime?>(json['entryDate']),
+      label: serializer.fromJson<String?>(json['label']),
+      debitAccountId: serializer.fromJson<String?>(json['debitAccountId']),
+      creditAccountId: serializer.fromJson<String?>(json['creditAccountId']),
+      amount: serializer.fromJson<double?>(json['amount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'syncStatus': serializer.toJson<String>(
+        $ManualEntryRequestsTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'action': serializer.toJson<String>(action),
+      'entryId': serializer.toJson<String?>(entryId),
+      'entryDate': serializer.toJson<DateTime?>(entryDate),
+      'label': serializer.toJson<String?>(label),
+      'debitAccountId': serializer.toJson<String?>(debitAccountId),
+      'creditAccountId': serializer.toJson<String?>(creditAccountId),
+      'amount': serializer.toJson<double?>(amount),
+    };
+  }
+
+  ManualEntryRequest copyWith({
+    String? id,
+    String? deviceId,
+    SyncStatus? syncStatus,
+    DateTime? updatedAt,
+    String? action,
+    Value<String?> entryId = const Value.absent(),
+    Value<DateTime?> entryDate = const Value.absent(),
+    Value<String?> label = const Value.absent(),
+    Value<String?> debitAccountId = const Value.absent(),
+    Value<String?> creditAccountId = const Value.absent(),
+    Value<double?> amount = const Value.absent(),
+  }) => ManualEntryRequest(
+    id: id ?? this.id,
+    deviceId: deviceId ?? this.deviceId,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt ?? this.updatedAt,
+    action: action ?? this.action,
+    entryId: entryId.present ? entryId.value : this.entryId,
+    entryDate: entryDate.present ? entryDate.value : this.entryDate,
+    label: label.present ? label.value : this.label,
+    debitAccountId: debitAccountId.present
+        ? debitAccountId.value
+        : this.debitAccountId,
+    creditAccountId: creditAccountId.present
+        ? creditAccountId.value
+        : this.creditAccountId,
+    amount: amount.present ? amount.value : this.amount,
+  );
+  ManualEntryRequest copyWithCompanion(ManualEntryRequestsCompanion data) {
+    return ManualEntryRequest(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      action: data.action.present ? data.action.value : this.action,
+      entryId: data.entryId.present ? data.entryId.value : this.entryId,
+      entryDate: data.entryDate.present ? data.entryDate.value : this.entryDate,
+      label: data.label.present ? data.label.value : this.label,
+      debitAccountId: data.debitAccountId.present
+          ? data.debitAccountId.value
+          : this.debitAccountId,
+      creditAccountId: data.creditAccountId.present
+          ? data.creditAccountId.value
+          : this.creditAccountId,
+      amount: data.amount.present ? data.amount.value : this.amount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ManualEntryRequest(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('action: $action, ')
+          ..write('entryId: $entryId, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('label: $label, ')
+          ..write('debitAccountId: $debitAccountId, ')
+          ..write('creditAccountId: $creditAccountId, ')
+          ..write('amount: $amount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    deviceId,
+    syncStatus,
+    updatedAt,
+    action,
+    entryId,
+    entryDate,
+    label,
+    debitAccountId,
+    creditAccountId,
+    amount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ManualEntryRequest &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.action == this.action &&
+          other.entryId == this.entryId &&
+          other.entryDate == this.entryDate &&
+          other.label == this.label &&
+          other.debitAccountId == this.debitAccountId &&
+          other.creditAccountId == this.creditAccountId &&
+          other.amount == this.amount);
+}
+
+class ManualEntryRequestsCompanion extends UpdateCompanion<ManualEntryRequest> {
+  final Value<String> id;
+  final Value<String> deviceId;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime> updatedAt;
+  final Value<String> action;
+  final Value<String?> entryId;
+  final Value<DateTime?> entryDate;
+  final Value<String?> label;
+  final Value<String?> debitAccountId;
+  final Value<String?> creditAccountId;
+  final Value<double?> amount;
+  final Value<int> rowid;
+  const ManualEntryRequestsCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.action = const Value.absent(),
+    this.entryId = const Value.absent(),
+    this.entryDate = const Value.absent(),
+    this.label = const Value.absent(),
+    this.debitAccountId = const Value.absent(),
+    this.creditAccountId = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ManualEntryRequestsCompanion.insert({
+    required String id,
+    required String deviceId,
+    this.syncStatus = const Value.absent(),
+    required DateTime updatedAt,
+    required String action,
+    this.entryId = const Value.absent(),
+    this.entryDate = const Value.absent(),
+    this.label = const Value.absent(),
+    this.debitAccountId = const Value.absent(),
+    this.creditAccountId = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt),
+       action = Value(action);
+  static Insertable<ManualEntryRequest> custom({
+    Expression<String>? id,
+    Expression<String>? deviceId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? action,
+    Expression<String>? entryId,
+    Expression<DateTime>? entryDate,
+    Expression<String>? label,
+    Expression<String>? debitAccountId,
+    Expression<String>? creditAccountId,
+    Expression<double>? amount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (action != null) 'action': action,
+      if (entryId != null) 'entry_id': entryId,
+      if (entryDate != null) 'entry_date': entryDate,
+      if (label != null) 'label': label,
+      if (debitAccountId != null) 'debit_account_id': debitAccountId,
+      if (creditAccountId != null) 'credit_account_id': creditAccountId,
+      if (amount != null) 'amount': amount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ManualEntryRequestsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? deviceId,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime>? updatedAt,
+    Value<String>? action,
+    Value<String?>? entryId,
+    Value<DateTime?>? entryDate,
+    Value<String?>? label,
+    Value<String?>? debitAccountId,
+    Value<String?>? creditAccountId,
+    Value<double?>? amount,
+    Value<int>? rowid,
+  }) {
+    return ManualEntryRequestsCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      action: action ?? this.action,
+      entryId: entryId ?? this.entryId,
+      entryDate: entryDate ?? this.entryDate,
+      label: label ?? this.label,
+      debitAccountId: debitAccountId ?? this.debitAccountId,
+      creditAccountId: creditAccountId ?? this.creditAccountId,
+      amount: amount ?? this.amount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $ManualEntryRequestsTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (action.present) {
+      map['action'] = Variable<String>(action.value);
+    }
+    if (entryId.present) {
+      map['entry_id'] = Variable<String>(entryId.value);
+    }
+    if (entryDate.present) {
+      map['entry_date'] = Variable<DateTime>(entryDate.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (debitAccountId.present) {
+      map['debit_account_id'] = Variable<String>(debitAccountId.value);
+    }
+    if (creditAccountId.present) {
+      map['credit_account_id'] = Variable<String>(creditAccountId.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ManualEntryRequestsCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('action: $action, ')
+          ..write('entryId: $entryId, ')
+          ..write('entryDate: $entryDate, ')
+          ..write('label: $label, ')
+          ..write('debitAccountId: $debitAccountId, ')
+          ..write('creditAccountId: $creditAccountId, ')
+          ..write('amount: $amount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PayablesTable extends Payables with TableInfo<$PayablesTable, Payable> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -44420,6 +45112,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PurchaseOrdersTable purchaseOrders = $PurchaseOrdersTable(this);
   late final $PurchaseOrderLinesTable purchaseOrderLines =
       $PurchaseOrderLinesTable(this);
+  late final $ManualEntryRequestsTable manualEntryRequests =
+      $ManualEntryRequestsTable(this);
   late final $PayablesTable payables = $PayablesTable(this);
   late final $EmployeesTable employees = $EmployeesTable(this);
   late final $InternshipsTable internships = $InternshipsTable(this);
@@ -44538,6 +45232,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
+    manualEntryRequests,
     payables,
     employees,
     internships,
@@ -49359,6 +50054,344 @@ typedef $$PurchaseOrderLinesTableProcessedTableManager =
         >,
       ),
       PurchaseOrderLine,
+      PrefetchHooks Function()
+    >;
+typedef $$ManualEntryRequestsTableCreateCompanionBuilder =
+    ManualEntryRequestsCompanion Function({
+      required String id,
+      required String deviceId,
+      Value<SyncStatus> syncStatus,
+      required DateTime updatedAt,
+      required String action,
+      Value<String?> entryId,
+      Value<DateTime?> entryDate,
+      Value<String?> label,
+      Value<String?> debitAccountId,
+      Value<String?> creditAccountId,
+      Value<double?> amount,
+      Value<int> rowid,
+    });
+typedef $$ManualEntryRequestsTableUpdateCompanionBuilder =
+    ManualEntryRequestsCompanion Function({
+      Value<String> id,
+      Value<String> deviceId,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime> updatedAt,
+      Value<String> action,
+      Value<String?> entryId,
+      Value<DateTime?> entryDate,
+      Value<String?> label,
+      Value<String?> debitAccountId,
+      Value<String?> creditAccountId,
+      Value<double?> amount,
+      Value<int> rowid,
+    });
+
+class $$ManualEntryRequestsTableFilterComposer
+    extends Composer<_$AppDatabase, $ManualEntryRequestsTable> {
+  $$ManualEntryRequestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get debitAccountId => $composableBuilder(
+    column: $table.debitAccountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get creditAccountId => $composableBuilder(
+    column: $table.creditAccountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ManualEntryRequestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ManualEntryRequestsTable> {
+  $$ManualEntryRequestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get entryDate => $composableBuilder(
+    column: $table.entryDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get debitAccountId => $composableBuilder(
+    column: $table.debitAccountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get creditAccountId => $composableBuilder(
+    column: $table.creditAccountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ManualEntryRequestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ManualEntryRequestsTable> {
+  $$ManualEntryRequestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get action =>
+      $composableBuilder(column: $table.action, builder: (column) => column);
+
+  GeneratedColumn<String> get entryId =>
+      $composableBuilder(column: $table.entryId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get entryDate =>
+      $composableBuilder(column: $table.entryDate, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get debitAccountId => $composableBuilder(
+    column: $table.debitAccountId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get creditAccountId => $composableBuilder(
+    column: $table.creditAccountId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+}
+
+class $$ManualEntryRequestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ManualEntryRequestsTable,
+          ManualEntryRequest,
+          $$ManualEntryRequestsTableFilterComposer,
+          $$ManualEntryRequestsTableOrderingComposer,
+          $$ManualEntryRequestsTableAnnotationComposer,
+          $$ManualEntryRequestsTableCreateCompanionBuilder,
+          $$ManualEntryRequestsTableUpdateCompanionBuilder,
+          (
+            ManualEntryRequest,
+            BaseReferences<
+              _$AppDatabase,
+              $ManualEntryRequestsTable,
+              ManualEntryRequest
+            >,
+          ),
+          ManualEntryRequest,
+          PrefetchHooks Function()
+        > {
+  $$ManualEntryRequestsTableTableManager(
+    _$AppDatabase db,
+    $ManualEntryRequestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ManualEntryRequestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ManualEntryRequestsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ManualEntryRequestsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> action = const Value.absent(),
+                Value<String?> entryId = const Value.absent(),
+                Value<DateTime?> entryDate = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String?> debitAccountId = const Value.absent(),
+                Value<String?> creditAccountId = const Value.absent(),
+                Value<double?> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ManualEntryRequestsCompanion(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                action: action,
+                entryId: entryId,
+                entryDate: entryDate,
+                label: label,
+                debitAccountId: debitAccountId,
+                creditAccountId: creditAccountId,
+                amount: amount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String deviceId,
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                required DateTime updatedAt,
+                required String action,
+                Value<String?> entryId = const Value.absent(),
+                Value<DateTime?> entryDate = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String?> debitAccountId = const Value.absent(),
+                Value<String?> creditAccountId = const Value.absent(),
+                Value<double?> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ManualEntryRequestsCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                action: action,
+                entryId: entryId,
+                entryDate: entryDate,
+                label: label,
+                debitAccountId: debitAccountId,
+                creditAccountId: creditAccountId,
+                amount: amount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ManualEntryRequestsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ManualEntryRequestsTable,
+      ManualEntryRequest,
+      $$ManualEntryRequestsTableFilterComposer,
+      $$ManualEntryRequestsTableOrderingComposer,
+      $$ManualEntryRequestsTableAnnotationComposer,
+      $$ManualEntryRequestsTableCreateCompanionBuilder,
+      $$ManualEntryRequestsTableUpdateCompanionBuilder,
+      (
+        ManualEntryRequest,
+        BaseReferences<
+          _$AppDatabase,
+          $ManualEntryRequestsTable,
+          ManualEntryRequest
+        >,
+      ),
+      ManualEntryRequest,
       PrefetchHooks Function()
     >;
 typedef $$PayablesTableCreateCompanionBuilder =
@@ -66140,6 +67173,8 @@ class $AppDatabaseManager {
       $$PurchaseOrdersTableTableManager(_db, _db.purchaseOrders);
   $$PurchaseOrderLinesTableTableManager get purchaseOrderLines =>
       $$PurchaseOrderLinesTableTableManager(_db, _db.purchaseOrderLines);
+  $$ManualEntryRequestsTableTableManager get manualEntryRequests =>
+      $$ManualEntryRequestsTableTableManager(_db, _db.manualEntryRequests);
   $$PayablesTableTableManager get payables =>
       $$PayablesTableTableManager(_db, _db.payables);
   $$EmployeesTableTableManager get employees =>

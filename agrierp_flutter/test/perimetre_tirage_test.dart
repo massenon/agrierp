@@ -118,6 +118,8 @@ void main() {
     'receivable_payments',
     // Ticket AC-1 — lignes des bons de commande : elles descendent DANS l'entrée `purchase_orders` du tirage (pas de clé propre).
     'purchase_order_lines',
+    // Ticket CP-2 — demandes d'écriture manuelle (envoyées, jamais tirées : l'écriture redescend dans `accounting_entries`).
+    'manual_entry_requests',
     'sync_conflicts',
     'app_settings',
     'sync_state',

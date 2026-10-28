@@ -568,7 +568,6 @@ void main() {
     //    ce qui garantit qu'aucun mouvement ne pese sur les comptes sans
     //    avoir pese sur le stock ou la caisse. Une saisie manuelle au poste
     //    romprait ce lien.
-    "Saisie d'Écriture": 'ecriture generee par une operation, jamais saisie',
     "+ Saisie d'Écriture": 'ecriture generee par une operation, jamais saisie',
     "Date de l'écriture *": 'ecriture generee par une operation, jamais saisie',
     'Compte à débiter *': 'ecriture generee par une operation, jamais saisie',
@@ -1115,7 +1114,7 @@ void main() {
   /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
   /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
   /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
-  const plafondManquesMasques = 155;
+  const plafondManquesMasques = 154;
 
   for (final entree in portages.entries) {
     final page = entree.key;

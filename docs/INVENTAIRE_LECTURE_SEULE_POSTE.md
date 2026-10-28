@@ -11,7 +11,7 @@ Méthode : chaque méthode mutante d'un composant Livewire (`$this->authorize(`,
 | Écran web | Fonction d'écriture web | Poste | Table / synchro | Ticket |
 |---|---|---|---|---|
 | `Comptabilite\PlanComptable` | newAccount, editAccount, saveAccount, archiveAccount | **PRÉSENT depuis CP-1 (28/10/2026)** : `ComptabiliteRepository.creerCompte` / `modifierCompte` / `archiverCompte` ; serveur `PlanComptableService` | `chart_of_accounts` (v73, envoyée) | CP-1 ✅ |
-| `JournalComptable` | newEntry, editEntry, saveEntry, archiveEntry (écriture manuelle) | ABSENT : inerte l. 590, mention l. 605-613 | `accounting_entries` + lignes (refusé) | CP-2 |
+| `JournalComptable` | newEntry, editEntry, saveEntry, archiveEntry (écriture manuelle) | **PRÉSENT depuis CP-2 (28/10/2026)** : `ComptabiliteRepository.creerEcriture` / `modifierEcriture` / `archiverEcriture` (demandes) ; serveur `SaisieEcritureManuelleAction` | `manual_entry_requests` (v74, envoyée) | CP-2 ✅ |
 | `Immobilisations` | nouveau, editer, enregistrer, ouvrirCession, confirmerCession, passerDotation | ABSENT **sans mention** : l'enum `PageComptable` (l. 78-90) n'a pas de carte, le hub web en a une (`comptabilite-hub.blade.php:66`) | aucune | CP-3 |
 | `ClotureExercice` | cloturerPeriode, decloturerPeriode, rouvrirExercice, ouvrirExerciceSuivant, soldeComptesGestion, confirmCloture | ABSENT : page de texte seul (`motifs[cloture]` l. 110-114) | `fiscal_years` — « jamais synchronisée » (en-tête du `SyncController`) | CP-4 (en ligne, par API) |
 | `RapprochementBancaire` | importReleve | ABSENT : `motifs[rapprochement]` l. 123-125 | aucune | CP-5 |

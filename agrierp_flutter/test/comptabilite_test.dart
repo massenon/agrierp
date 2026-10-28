@@ -472,18 +472,16 @@ void main() {
       );
     });
 
-    /// ⚠️⚠️ Une écriture saisie à la main ne pèserait ni sur le stock ni sur
-    /// la caisse : la saisie reste sur le web.
-    testWidgets('⚠️⚠️ le journal dit pourquoi il ne se saisit pas ici', (
+    /// Ticket CP-2 — la saisie manuelle est PORTÉE (en demande, jouée par le serveur) : le bouton du Blade est là et l'ancienne
+    /// mention « la saisie reste sur le web » a disparu.
+    testWidgets('⚠️⚠️ le journal offre « Saisie d\'Écriture » et ne renvoie plus au web', (
       tester,
     ) async {
       await afficher(tester);
       await ouvrir(tester, PageComptable.journal);
 
-      expect(
-        find.textContaining("Une écriture naît d'une opération"),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('journal-saisie-ecriture')), findsOneWidget);
+      expect(find.textContaining("Une écriture naît d'une opération"), findsNothing);
     });
 
     testWidgets('le grand livre porte les six colonnes de la maquette', (

@@ -5208,6 +5208,11 @@ class SyncEngine {
       _db.chartOfAccounts,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket CP-2 — demandes d'écriture manuelle : créer, modifier, archiver (le serveur fait l'écriture et la numérote).
+    final demandesEcriture = await (_db.select(
+      _db.manualEntryRequests,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
     final bonsCommande = await (_db.select(
       _db.purchaseOrders,
@@ -5301,6 +5306,7 @@ class SyncEngine {
         encaissements.isEmpty &&
         relances.isEmpty &&
         bonsCommande.isEmpty &&
+        demandesEcriture.isEmpty &&
         comptes.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
@@ -5493,6 +5499,8 @@ class SyncEngine {
         'customer_reminders': relances.map(_relanceEnJson).toList(),
         // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
         'chart_of_accounts': comptes.map(_compteEnJson).toList(),
+        // Ticket CP-2 — après le plan comptable (une demande peut viser un compte créé dans le même envoi).
+        'manual_entry_requests': demandesEcriture.map(_demandeEcritureEnJson).toList(),
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
         'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
@@ -5899,6 +5907,17 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket CP-2 — acquittée quand le serveur a joué la demande : l'écriture (numérotée) descend au tirage de confirmation.
+    final demandesAcceptees = await _acquitter(
+      'manual_entry_requests',
+      corps['manual_entry_requests'],
+      (ids, statut) => (_db.update(_db.manualEntryRequests)..where((t) => t.id.isIn(ids)))
+          .write(ManualEntryRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += demandesAcceptees;
+
     // Ticket CP-1 — acquitté quand le serveur a créé, modifié ou archivé le compte (numéro unique, compte non utilisé).
     accepte += await _acquitter(
       'chart_of_accounts',
@@ -6226,7 +6245,8 @@ class SyncEngine {
         avancesAcceptees +
         imputationsAcceptees +
         retoursAcceptes +
-        remboursementsAcceptes;
+        remboursementsAcceptes +
+        demandesAcceptees;
 
     // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
     // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
@@ -6276,6 +6296,8 @@ class SyncEngine {
     'livestock_transfers',
     // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
     'chart_of_accounts',
+    // Ticket CP-2 — après le plan comptable, comme au serveur.
+    'manual_entry_requests',
     'expenses',
     // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
     'purchase_orders',
@@ -6972,6 +6994,14 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket CP-2 — une demande d'écriture refusée (mois clôturé, écriture verrouillée…) se relance une fois la cause levée.
+      'manual_entry_requests' =>
+        () =>
+            (_db.update(
+              _db.manualEntryRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ManualEntryRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
       // Ticket CP-1 — un compte refusé (numéro déjà pris, compte utilisé à l'archivage) se corrige puis se relance.
       'chart_of_accounts' =>
         () =>
@@ -7316,6 +7346,21 @@ class SyncEngine {
     if (i.saleId != null) 'sale_id': i.saleId,
     'amount': i.amount,
     'imputation_date': _jour(i.imputationDate),
+  };
+
+  /// Ticket CP-2 — demande d'écriture telle que `SyncController::pushManualEntryRequests` la valide : le geste, l'écriture visée
+  /// (modifier, archiver) et la saisie (date, libellé, comptes, montant). Aucun numéro ne part : le serveur l'attribue.
+  Map<String, dynamic> _demandeEcritureEnJson(ManualEntryRequest d) => {
+    'id': d.id,
+    'action': d.action,
+    if (d.entryId != null) 'entry_id': d.entryId,
+    if (d.action != 'archiver') ...{
+      'entry_date': d.entryDate == null ? null : _jour(d.entryDate!),
+      'label': d.label,
+      'debit_account_id': d.debitAccountId,
+      'credit_account_id': d.creditAccountId,
+      'amount': d.amount,
+    },
   };
 
   /// Ticket CP-1 — compte tel que `SyncController::pushChartOfAccounts` le valide : numéro, intitulé, classe, et `is_active`

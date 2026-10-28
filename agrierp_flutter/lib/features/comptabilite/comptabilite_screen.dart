@@ -524,12 +524,30 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _enTete(
         _titre('Journal Comptable', large),
-        _boutonExport(
-          'exporter-pdf-journal',
-          () => _exporter(
-            DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
-            'Aucune écriture à exporter.',
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _boutonExport(
+              'exporter-pdf-journal',
+              () => _exporter(
+                DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
+                'Aucune écriture à exporter.',
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            // Ticket CP-2 — « Saisie d'Écriture » (`newEntry` du web) : écrit la DEMANDE, le serveur écrit et numérote l'écriture.
+            ElevatedButton.icon(
+              key: const Key('journal-saisie-ecriture'),
+              onPressed: () => _ouvrirEcriture(d, null),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AgriColors.brandEmerald,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+              ),
+              label: const Text("Saisie d'Écriture", style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -572,6 +590,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      // Ticket CP-2 — les demandes pas encore jouées par le serveur : en attente d'envoi, ou refusées avec leur motif.
+      if (d.demandes.isNotEmpty) ...[
+        _demandesEnAttente(d),
+        const SizedBox(height: AgriSpacing.md),
+      ],
       _tableau(
         largeur: 1200,
         colonnes: const [
@@ -629,7 +652,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 2,
               ),
               (_montantEcriture(page[i]), 3),
-              (_actionInerte(), 2),
+              (_actionsEcriture(d, page[i], i), 2),
             ]),
         ],
       ),
@@ -641,20 +664,124 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           annee: etat.annee,
           onPage: (p) => setState(() => _pageDuJournal = p),
         ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ AUCUNE ÉCRITURE NE SE SAISIT AU POSTE, et ce n'est pas un manque.
-      // Une écriture naît d'une opération — vente, achat, dépense, ponte,
-      // écart d'inventaire — et le serveur la génère lui-même. C'est ce qui
-      // garantit qu'aucun mouvement ne pèse sur les comptes sans avoir pesé
-      // sur le stock ou la caisse.
-      _mentionPoste(
-        "Une écriture naît d'une opération — vente, achat, dépense, écart "
-        "d'inventaire — et le serveur la génère lui-même. La saisie manuelle "
-        "d'écriture reste sur la surface web : une écriture saisie à la main "
-        'ne pèserait ni sur le stock ni sur la caisse.',
-      ),
     ],
   );
+  }
+
+  // ── Écritures manuelles (ticket CP-2) ─────────────────────────────────────
+
+  Future<void> _ouvrirEcriture(DonneesComptabilite d, LigneJournal? existante) async {
+    final ecrit = await ouvrirEcriture(
+      context: context,
+      depot: widget.depot,
+      comptes: d.comptes,
+      aujourdhui: widget.maintenant(),
+      existante: existante,
+    );
+    if (!ecrit) return;
+    await _charger();
+    _annoncer(
+      existante == null
+          ? "Écriture enregistrée — elle sera numérotée et passée à la prochaine synchronisation."
+          : 'Modification enregistrée — elle sera appliquée à la prochaine synchronisation.',
+    );
+  }
+
+  Future<void> _archiverEcriture(LigneJournal e) async {
+    final ecrit = await confirmerArchivageEcriture(context: context, depot: widget.depot, ecriture: e);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer("Archivage enregistré — il sera appliqué à la prochaine synchronisation.");
+  }
+
+  /// Colonne « Actions » du Blade : cadenas pour une écriture verrouillée (exercice clôturé), sinon modifier + archiver ; une demande en
+  /// attente sur l'écriture le dit (le serveur n'a pas encore répondu).
+  Widget _actionsEcriture(DonneesComptabilite d, LigneJournal e, int i) {
+    if (e.ecriture.isLocked) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Tooltip(
+          message: 'Écriture verrouillée (exercice clôturé)',
+          child: Icon(SymbolesAgri.lock, size: 16, color: AgriColors.outline),
+        ),
+      );
+    }
+    final enAttente = d.demandes.where((x) => x.demande.entryId == e.ecriture.id).firstOrNull;
+    if (enAttente != null) {
+      return Text(
+        enAttente.refusee ? '${enAttente.geste} refusé(e)' : '${enAttente.geste} en attente',
+        key: Key('journal-attente-$i'),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: AgriTypography.gras,
+          color: enAttente.refusee ? AgriColors.errorDeep : AgriColors.outline,
+        ),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          key: Key('journal-modifier-$i'),
+          onTap: () => _ouvrirEcriture(d, e),
+          child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue)),
+        ),
+        InkWell(
+          key: Key('journal-archiver-$i'),
+          onTap: () => _archiverEcriture(e),
+          child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorDeep)),
+        ),
+      ],
+    );
+  }
+
+  /// Les demandes d'écriture pas encore jouées : ce que le poste a saisi et que le serveur n'a pas encore numéroté.
+  Widget _demandesEnAttente(DonneesComptabilite d) {
+    final comptes = {for (final c in d.comptes) c.id: c};
+    String code(String? id) => id == null ? '—' : comptes[id]?.code ?? '—';
+
+    return Container(
+      key: const Key('journal-demandes'),
+      padding: const EdgeInsets.all(AgriSpacing.sm),
+      decoration: BoxDecoration(
+        color: AgriColors.accentYellow.withValues(alpha: 0.10),
+        border: Border.all(color: AgriColors.accentYellow.withValues(alpha: 0.30)),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Demandes d'écriture en attente de synchronisation",
+            style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+          ),
+          for (final (i, x) in d.demandes.indexed)
+            Padding(
+              padding: const EdgeInsets.only(top: AgriSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    x.demande.action == 'archiver'
+                        ? 'Archivage d\'une écriture'
+                        : '${x.geste} · ${x.demande.entryDate == null ? '—' : _date(x.demande.entryDate!)} · ${x.demande.label ?? '—'} · '
+                              'D ${code(x.demande.debitAccountId)} / C ${code(x.demande.creditAccountId)} · ${_montant(x.demande.amount ?? 0)} F',
+                    key: Key('journal-demande-$i'),
+                    style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.brandForest),
+                  ),
+                  Text(
+                    x.refusee ? 'Refusée par le serveur' : "En attente d'envoi",
+                    key: Key('journal-demande-statut-$i'),
+                    style: TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: x.refusee ? AgriColors.errorDeep : AgriColors.outline),
+                  ),
+                  if (x.motifRefus != null)
+                    Text(x.motifRefus!, key: Key('journal-demande-motif-$i'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _montantEcriture(LigneJournal e) {
@@ -2007,14 +2134,6 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         for (final (contenu, flex) in cellules)
           Expanded(flex: flex, child: contenu),
       ],
-    ),
-  );
-
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 

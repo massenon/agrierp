@@ -984,6 +984,31 @@ class AccountingEntryLines extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket CP-2 — DEMANDE d'écriture manuelle (opération diverse) : « débiter tel compte, créditer tel compte, de tant, tel jour,
+/// avec ce libellé » — créer, modifier ou archiver une écriture existante.
+///
+/// ⚠️⚠️ **LE POSTE N'ÉCRIT JAMAIS UNE ÉCRITURE** : il écrit la DEMANDE (`pending`, puis envoyée). Le serveur
+/// (`SaisieEcritureManuelleAction`) la joue avec les refus du web, attribue le numéro `OD-AAAA-NNNN`, et l'écriture revient au
+/// tirage. Une demande refusée (`conflict`) garde le motif du serveur.
+class ManualEntryRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `creer` · `modifier` · `archiver`.
+  TextColumn get action => text()();
+
+  /// L'écriture visée (modifier, archiver) ; nul pour une création.
+  TextColumn get entryId => text().nullable()();
+  DateTimeColumn get entryDate => dateTime().nullable()();
+  TextColumn get label => text().nullable()();
+  TextColumn get debitAccountId => text().nullable()();
+  TextColumn get creditAccountId => text().nullable()();
+  RealColumn get amount => real().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Courrier reçu ou envoyé — saisi au poste, validé par le serveur (ticket F0.78).
 ///
 /// ⚠️ **LA RÉFÉRENCE `CR-AAAA-NNN` N'EST JAMAIS INVENTÉE PAR LE POSTE** : le serveur
@@ -2056,6 +2081,7 @@ class SyncState extends Table {
     Suppliers,
     PurchaseOrders,
     PurchaseOrderLines,
+    ManualEntryRequests,
     Payables,
     Employees,
     Internships,
@@ -2130,7 +2156,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 73;
+  int get schemaVersion => 74;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -2803,6 +2829,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 73) {
         await _planComptableMixte(m);
       }
+      // v74 — ticket CP-2 : demandes d'écriture manuelle saisies au poste.
+      if (from < 74) {
+        if (!await _tableExiste(m, manualEntryRequests)) await m.createTable(manualEntryRequests);
+      }
 
       // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
       // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
@@ -3177,6 +3207,8 @@ class AppDatabase extends _$AppDatabase {
     'livestock_reproduction_events',
     // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste (avant les dépenses et achats qui les citent).
     'chart_of_accounts',
+    // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
+    'manual_entry_requests',
     // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
     'purchase_orders',
     'purchases',
@@ -3268,6 +3300,7 @@ class AppDatabase extends _$AppDatabase {
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
     'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
+    'manual_entry_requests', // CP-2
     'corbeille_elements', 'corbeille_demandes', // ARC3
     'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
