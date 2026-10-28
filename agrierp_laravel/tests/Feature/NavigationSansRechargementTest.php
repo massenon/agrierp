@@ -50,4 +50,14 @@ class NavigationSansRechargementTest extends TestCase
         $this->assertStringContainsString('w-full sm:w-auto min-h-[44px]', $vue, 'boutons pleine largeur, cible de 44 px');
         $this->assertStringContainsString('w-11 h-11', $vue, 'croix de fermeture de 44 px');
     }
+
+    public function test_la_cloche_ne_releve_pas_pendant_le_verrou_et_arrete_sa_minuterie(): void
+    {
+        $vue = file_get_contents(resource_path('views/livewire/shared/notification-bell.blade.php'));
+
+        $this->assertStringNotContainsString('wire:poll', $vue, 'un wire:poll continuerait de frapper le serveur verrouillé (423)');
+        $this->assertStringContainsString('window.agrierpVerrou?.verrouille', $vue);
+        $this->assertStringContainsString('document.hidden', $vue);
+        $this->assertStringContainsString('window.clearInterval(this.minuterie)', $vue);
+    }
 }
