@@ -2,7 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+import '../demarrage/migration_dossier_donnees.dart';
 
 /// Ticket AUT-2 — LOGO ET FAVICON DE L'ENTREPRISE, gardés sur le poste (hors base, hors réseau).
 ///
@@ -24,7 +25,7 @@ class FichiersEntreprise {
   /// Formats que l'image du poste sait afficher (`image` du web, moins le SVG).
   static const extensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'];
 
-  static Future<Directory> _dossierParDefaut() async => Directory(p.join((await getApplicationSupportDirectory()).path, 'entreprise'));
+  static Future<Directory> _dossierParDefaut() async => Directory(p.join((await DossierDonnees.courant()).path, 'entreprise'));
 
   /// Refus AVANT d'écrire, mêmes mots que le serveur (`EntrepriseService::fichiersDepuisBase64`) ; `null` si le fichier convient.
   static String? valider(String genre, String nom, int octets) {

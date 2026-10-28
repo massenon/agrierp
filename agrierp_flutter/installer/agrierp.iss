@@ -3,7 +3,7 @@
 ; /DAppEnv=dev|recette|production /DNomInstallateur=... installer\agrierp.iss).
 ;
 ; La base locale (Drift/SQLite) vit dans le profil Windows de l'utilisateur
-; (path_provider : %APPDATA%\OLOUWACHEGOUN\agrierp, CompanyName et
+; (%APPDATA%\OLOUWACHEGOUN\donnees, DossierDonnees ; CompanyName et
 ; ProductName de Runner.rc), JAMAIS dans le dossier d'installation : une MISE A
 ; JOUR ne touche pas aux ventes et fiches non synchronisees.
 ;
@@ -89,6 +89,7 @@ Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags:
 ; bj.olouwachegoun avant DES-2 : les deux noms sont retires. Une SAUVEGARDE AUTOMATIQUE est proposee avant
 ; (Documents\AgriERP-Sauvegarde-AAAA-MM-JJ_HHMM, jamais supprimee par la desinstallation).
 [UninstallDelete]
+Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\donnees"
 Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\agrierp"
 Type: dirifempty; Name: "{userappdata}\OLOUWACHEGOUN"
 Type: filesandordirs; Name: "{userappdata}\bj.olouwachegoun\agrierp"
@@ -122,7 +123,8 @@ begin
 
   Dossier := ExpandConstant('{userdocs}\AgriERP-Sauvegarde-') + GetDateTimeString('yyyy/mm/dd_hhnn', '-', #0);
   Result := ForceDirectories(Dossier)
-    and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp'), Dossier + '\donnees-du-poste')
+    and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees'), Dossier + '\donnees-du-poste')
+    and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp'), Dossier + '\donnees-du-poste-premier-renommage')
     and CopierDossier(ExpandConstant('{userappdata}\bj.olouwachegoun\agrierp'), Dossier + '\donnees-du-poste-ancien-dossier')
     and CopierDossier(ExpandConstant('{userdocs}\AgriERP'), Dossier + '\archives-et-exports')
     and CopierDossier(ExpandConstant('{userdocs}\agrierp_justificatifs'), Dossier + '\justificatifs');
@@ -135,7 +137,7 @@ var
 begin
   Result := MsgBox(
     'ATTENTION - la desinstallation d''AgriERP supprime DEFINITIVEMENT, sur ce poste :' + #13#10#13#10 +
-    '  - la base locale et les journaux (' + ExpandConstant('{userappdata}\OLOUWACHEGOUN\agrierp') + ')' + #13#10 +
+    '  - la base locale et les journaux (' + ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees') + ')' + #13#10 +
     '  - les archives et documents exportes (' + ExpandConstant('{userdocs}\AgriERP') + ')' + #13#10 +
     '  - les justificatifs et recus (' + ExpandConstant('{userdocs}\agrierp_justificatifs') + ')' + #13#10#13#10 +
     'Les ventes, fiches, depenses et autres saisies faites HORS LIGNE et pas encore' + #13#10 +

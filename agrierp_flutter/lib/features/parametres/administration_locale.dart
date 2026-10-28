@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
+import '../../core/demarrage/migration_dossier_donnees.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -78,7 +79,7 @@ class AdministrationLocale {
   /// Nom du fichier posé à côté de la base : `appliquerRestaurationEnAttente` l'installe au prochain lancement.
   static const fichierRestauration = 'agrierp.restauration';
 
-  static Future<Directory> _dossierParDefaut() async => Directory(p.join((await getApplicationSupportDirectory()).path, 'sauvegardes'));
+  static Future<Directory> _dossierParDefaut() async => Directory(p.join((await DossierDonnees.courant()).path, 'sauvegardes'));
 
   static Future<Directory?> _copieParDefaut() async => (await getDownloadsDirectory()) ?? await getApplicationDocumentsDirectory();
 
@@ -198,7 +199,7 @@ class AdministrationLocale {
   /// À appeler AU LANCEMENT, avant d'ouvrir la base : installe la restauration programmée. Une panne laisse la base intacte.
   static Future<void> appliquerRestaurationEnAttente({Directory? dossierDonnees}) async {
     try {
-      final d = dossierDonnees ?? await getApplicationSupportDirectory();
+      final d = dossierDonnees ?? await DossierDonnees.courant();
       final restauration = File(p.join(d.path, fichierRestauration));
       if (!await restauration.exists()) return;
       final base = File(p.join(d.path, 'agrierp.sqlite'));

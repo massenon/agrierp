@@ -3,11 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../localisation/localisation_poste.dart';
 import '../theme/agri_tokens.dart';
 import '../temps/heure_benin.dart';
+import 'migration_dossier_donnees.dart';
 
 /// Démarrage du poste : une panne AU LANCEMENT se VOIT, elle ne laisse pas un processus fantôme.
 ///
@@ -58,7 +58,7 @@ class DemarragePoste {
   /// elle-même échoue — le journal ne doit jamais ajouter une panne à la panne.
   static Future<String?> ecrireJournal(String texte) async {
     try {
-      final dossier = await getApplicationSupportDirectory();
+      final dossier = await DossierDonnees.courant();
       final fichier = File(p.join(dossier.path, 'demarrage.log'));
       await fichier.writeAsString(
         '[${HeureBenin.maintenant().toIso8601String()}] $texte\n',

@@ -10,42 +10,61 @@ void main() {
   setUp(() async => racine = await Directory.systemTemp.createTemp('appdata_test'));
   tearDown(() async => racine.delete(recursive: true));
 
-  Directory ancien() => Directory('${racine.path}/bj.olouwachegoun/agrierp');
-  Directory nouveau() => Directory('${racine.path}/OLOUWACHEGOUN/agrierp');
+  Directory bj() => Directory('${racine.path}/bj.olouwachegoun/agrierp');
+  Directory intermediaire() => Directory('${racine.path}/OLOUWACHEGOUN/agrierp');
+  Directory donnees() => Directory('${racine.path}/OLOUWACHEGOUN/donnees');
+  Future<bool> migrer() => MigrationDossierDonnees.migrer(appData: racine);
 
-  test('⚠️ un poste en service retrouve sa base, ses sous-dossiers et ses journaux sous le nouveau nom', () async {
-    await Directory('${ancien().path}/sauvegardes').create(recursive: true);
-    await File('${ancien().path}/agrierp.sqlite').writeAsString('BASE');
-    await File('${ancien().path}/demarrage.log').writeAsString('journal');
-    await File('${ancien().path}/sauvegardes/b.sqlite').writeAsString('copie');
+  test('⚠️ le dossier des données est OLOUWACHEGOUN\\donnees', () {
+    expect(DossierDonnees.nomEditeur, 'OLOUWACHEGOUN');
+    expect(DossierDonnees.nom, 'donnees');
+  });
 
-    expect(await MigrationDossierDonnees.migrer(nouveau: nouveau()), isTrue);
+  test('⚠️ un poste en service (ancien nom bj.olouwachegoun) retrouve base, sous-dossiers et journaux sous OLOUWACHEGOUN\\donnees', () async {
+    await Directory('${bj().path}/sauvegardes').create(recursive: true);
+    await File('${bj().path}/agrierp.sqlite').writeAsString('BASE');
+    await File('${bj().path}/demarrage.log').writeAsString('journal');
+    await File('${bj().path}/sauvegardes/b.sqlite').writeAsString('copie');
 
-    expect(await File('${nouveau().path}/agrierp.sqlite').readAsString(), 'BASE');
-    expect(await File('${nouveau().path}/demarrage.log').readAsString(), 'journal');
-    expect(await File('${nouveau().path}/sauvegardes/b.sqlite').readAsString(), 'copie');
-    expect(await ancien().exists(), isFalse);
+    expect(await migrer(), isTrue);
+
+    expect(await File('${donnees().path}/agrierp.sqlite').readAsString(), 'BASE');
+    expect(await File('${donnees().path}/demarrage.log').readAsString(), 'journal');
+    expect(await File('${donnees().path}/sauvegardes/b.sqlite').readAsString(), 'copie');
+    expect(await bj().exists(), isFalse);
     expect(await Directory('${racine.path}/bj.olouwachegoun').exists(), isFalse, reason: 'le dossier éditeur vide disparaît');
   });
 
-  test('⚠️ un dossier courant qui porte déjà une base n\'est JAMAIS écrasé', () async {
-    await ancien().create(recursive: true);
-    await File('${ancien().path}/agrierp.sqlite').writeAsString('ANCIENNE');
-    await nouveau().create(recursive: true);
-    await File('${nouveau().path}/agrierp.sqlite').writeAsString('COURANTE');
+  test('le premier renommage (OLOUWACHEGOUN\\agrierp) est repris lui aussi, et son dossier vide ne reste pas', () async {
+    await intermediaire().create(recursive: true);
+    await File('${intermediaire().path}/agrierp.sqlite').writeAsString('BASE2');
 
-    expect(await MigrationDossierDonnees.migrer(nouveau: nouveau()), isFalse);
+    expect(await migrer(), isTrue);
 
-    expect(await File('${nouveau().path}/agrierp.sqlite').readAsString(), 'COURANTE');
-    expect(await File('${ancien().path}/agrierp.sqlite').readAsString(), 'ANCIENNE');
+    expect(await File('${donnees().path}/agrierp.sqlite').readAsString(), 'BASE2');
+    expect(await intermediaire().exists(), isFalse);
   });
 
-  test('un poste neuf (aucun ancien dossier) ne change rien et la migration ne se rejoue pas', () async {
-    expect(await MigrationDossierDonnees.migrer(nouveau: nouveau()), isFalse);
+  test('⚠️ un dossier courant qui porte déjà une base n\'est JAMAIS écrasé', () async {
+    await bj().create(recursive: true);
+    await File('${bj().path}/agrierp.sqlite').writeAsString('ANCIENNE');
+    await donnees().create(recursive: true);
+    await File('${donnees().path}/agrierp.sqlite').writeAsString('COURANTE');
 
-    await ancien().create(recursive: true);
-    await File('${ancien().path}/agrierp.sqlite').writeAsString('BASE');
-    expect(await MigrationDossierDonnees.migrer(nouveau: nouveau()), isTrue);
-    expect(await MigrationDossierDonnees.migrer(nouveau: nouveau()), isFalse);
+    expect(await migrer(), isFalse);
+
+    expect(await File('${donnees().path}/agrierp.sqlite').readAsString(), 'COURANTE');
+    expect(await File('${bj().path}/agrierp.sqlite').readAsString(), 'ANCIENNE');
+  });
+
+  test('un poste neuf ne change rien (le dossier vide laissé par path_provider disparaît) et la migration ne se rejoue pas', () async {
+    await intermediaire().create(recursive: true);
+    expect(await migrer(), isFalse);
+    expect(await intermediaire().exists(), isFalse);
+
+    await bj().create(recursive: true);
+    await File('${bj().path}/agrierp.sqlite').writeAsString('BASE');
+    expect(await migrer(), isTrue);
+    expect(await migrer(), isFalse);
   });
 }

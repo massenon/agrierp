@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../config/domaine_email.dart';
+import '../demarrage/migration_dossier_donnees.dart';
 import 'identifiant_ligne_depense.dart';
 import 'sync_columns.dart';
 
@@ -3540,7 +3540,8 @@ class AppDatabase extends _$AppDatabase {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    final dossier = await getApplicationSupportDirectory();
+    final dossier = await DossierDonnees.courant();
+    await dossier.create(recursive: true);
     final fichier = File(p.join(dossier.path, 'agrierp.sqlite'));
 
     // ⚠️ `NativeDatabase.createInBackground` SEUL sur Windows Desktop. Ne

@@ -3,38 +3,68 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// Ticket DES-2 — le dossier des données du poste passe de `%APPDATA%\\bj.olouwachegoun\\agrierp` à
-/// `%APPDATA%\\OLOUWACHEGOUN\\agrierp` (CompanyName de `Runner.rc`).
+/// Ticket DES-2 — LE DOSSIER DES DONNÉES DU POSTE : `%APPDATA%\OLOUWACHEGOUN\donnees`.
 ///
-/// ⚠️ Appelé AU LANCEMENT, avant d'ouvrir la base : un poste déjà en service retrouve ses données (base, journaux,
-/// logo, sauvegardes) sans rien faire. Le dossier est DÉPLACÉ (même disque : un renommage, instantané) ; à défaut, copié puis
-/// l'ancien est retiré. Une panne laisse l'ancien dossier intact et le poste démarre sur un dossier neuf plutôt que de bloquer.
+/// Point de passage UNIQUE : la base, `demarrage.log`, le logo, les sauvegardes et la restauration le lisent ici. Il se déduit du
+/// dossier d'éditeur de `path_provider` (`CompanyName` de `Runner.rc` = OLOUWACHEGOUN) ; le sous-dossier `donnees` est choisi
+/// par le client, plutôt que le nom du produit (`agrierp`).
+class DossierDonnees {
+  const DossierDonnees._();
+
+  static const nomEditeur = 'OLOUWACHEGOUN';
+  static const nom = 'donnees';
+
+  /// Le dossier des données (créé par l'appelant au besoin).
+  static Future<Directory> courant() async => Directory(p.join((await _racineEditeur()).path, nom));
+
+  static Future<Directory> _racineEditeur() async => (await getApplicationSupportDirectory()).parent;
+}
+
+/// Reprend les données d'un poste en service quand le dossier change de nom — au LANCEMENT, avant d'ouvrir la base.
+///
+/// Deux anciens emplacements : `%APPDATA%\bj.olouwachegoun\agrierp` (avant DES-2) et `%APPDATA%\OLOUWACHEGOUN\agrierp`
+/// (premier renommage). Le dossier est DÉPLACÉ (même disque : un renommage, instantané) ; à défaut, copié puis l'ancien retiré. Une
+/// base déjà présente dans le dossier courant n'est JAMAIS écrasée ; une panne laisse l'ancien dossier intact et le poste démarre
+/// sur un dossier neuf plutôt que de bloquer.
 class MigrationDossierDonnees {
   const MigrationDossierDonnees._();
 
   static const ancienNomEditeur = 'bj.olouwachegoun';
+  static const ancienNomProduit = 'agrierp';
 
-  /// Déplace l'ancien dossier vers [nouveau] (par défaut, le dossier de données courant). Rend `true` si une migration a eu lieu.
-  static Future<bool> migrer({Directory? nouveau}) async {
+  /// [appData] : `%APPDATA%` (par défaut, celui de `path_provider`). Rend `true` si une migration a eu lieu.
+  static Future<bool> migrer({Directory? appData}) async {
     try {
-      final cible = nouveau ?? await getApplicationSupportDirectory();
-      final ancien = Directory(p.join(cible.parent.parent.path, ancienNomEditeur, p.basename(cible.path)));
-      if (p.equals(ancien.path, cible.path) || !await ancien.exists()) return false;
-      // Un dossier courant qui porte déjà une base n'est JAMAIS écrasé.
-      if (await File(p.join(cible.path, 'agrierp.sqlite')).exists()) return false;
+      final racine = appData ?? (await getApplicationSupportDirectory()).parent.parent;
+      final cible = Directory(p.join(racine.path, DossierDonnees.nomEditeur, DossierDonnees.nom));
+      final sources = [
+        Directory(p.join(racine.path, DossierDonnees.nomEditeur, ancienNomProduit)),
+        Directory(p.join(racine.path, ancienNomEditeur, ancienNomProduit)),
+      ];
 
-      await cible.parent.create(recursive: true);
-      if (await cible.exists()) await cible.delete(recursive: true);
-      try {
-        await ancien.rename(cible.path);
-      } on FileSystemException {
-        await _copier(ancien, cible);
-        await ancien.delete(recursive: true);
+      var migre = false;
+      if (!await File(p.join(cible.path, 'agrierp.sqlite')).exists()) {
+        for (final source in sources) {
+          if (!await source.exists() || await source.list().isEmpty) continue;
+          await cible.parent.create(recursive: true);
+          if (await cible.exists()) await cible.delete(recursive: true);
+          try {
+            await source.rename(cible.path);
+          } on FileSystemException {
+            await _copier(source, cible);
+            await source.delete(recursive: true);
+          }
+          migre = true;
+          break;
+        }
       }
-      // L'éditeur n'a plus rien : son dossier vide disparaît (un dossier qui ne l'est pas reste).
-      final editeur = ancien.parent;
-      if (await editeur.exists() && await editeur.list().isEmpty) await editeur.delete();
-      return true;
+      // Dossiers vides laissés par les anciens noms : ils disparaissent (un dossier qui ne l'est pas reste).
+      for (final reste in [...sources, sources[0].parent, sources[1].parent]) {
+        if (await reste.exists() && await reste.list().isEmpty && !p.equals(reste.path, cible.path) && !p.equals(reste.path, cible.parent.path)) {
+          await reste.delete();
+        }
+      }
+      return migre;
     } catch (_) {
       return false;
     }
