@@ -30,12 +30,43 @@ class ModuleMecefDesactiveTest extends TestCase
         $this->assertStringContainsString("env('MECEF_ACTIF', false)", file_get_contents(config_path('mecef.php')));
     }
 
-    public function test_le_menu_et_la_page_disent_le_module_desactive(): void
+    public function test_la_facturation_reste_disponible_sans_mecef_et_sans_colonne_ni_geste_mecef(): void
     {
         config(['mecef.actif' => false]);
-        $this->assertStringContainsString('config(\'mecef.actif\')', file_get_contents(resource_path('views/layouts/app.blade.php')));
+        \App\Models\Permission::findOrCreate('view-facturation', 'web');
+        \App\Models\Permission::findOrCreate('manage-facturation', 'web');
+        $u = \App\Models\User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'a@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
+        $u->givePermissionTo(['view-facturation', 'manage-facturation']);
 
-        $html = view('livewire.facturation.module-desactive')->render();
-        $this->assertStringContainsString('Module MeCeF désactivé', $html);
+        $client = \App\Models\Customer::create(['name' => 'AMOUSSOU Régis', 'is_active' => true]);
+        $vente = Sale::create(['customer_id' => $client->id, 'payment_mode' => 'especes', 'subtotal' => 5000, 'discount' => 0, 'total' => 5000, 'status' => 'validee']);
+
+        \Livewire\Livewire::actingAs($u)->test(\App\Livewire\Facturation\Facturation::class)
+            ->assertSee('Registre des factures de vente')
+            ->assertSee('Montant facturé (mois)')
+            ->assertSee($vente->numero_facture)
+            ->assertDontSee('Statut MeCeF')
+            ->assertDontSee('Transmises MeCeF')
+            ->call('retryMecef', $vente->id)
+            ->assertDispatched('toast');
+
+        config(['mecef.actif' => true]);
+        \Livewire\Livewire::actingAs($u)->test(\App\Livewire\Facturation\Facturation::class)
+            ->assertSee('Statut MeCeF')
+            ->assertSee('Transmises MeCeF');
+    }
+
+    public function test_la_facture_pdf_se_rend_avec_ou_sans_certification(): void
+    {
+        $client = \App\Models\Customer::create(['name' => 'GBAGUIDI Solange', 'is_active' => true]);
+        $vente = Sale::create(['customer_id' => $client->id, 'payment_mode' => 'especes', 'subtotal' => 8000, 'discount' => 0, 'total' => 8000, 'status' => 'validee']);
+
+        $html = view('exports.facture-vente', ['sale' => $vente->load(['customer', 'lines.product'])])->render();
+        $this->assertStringContainsString($vente->numero_facture, $html);
+        $this->assertStringContainsString('Facture émise sans certification MeCeF.', $html);
+
+        $vente->update(['mecef_status' => 'transmise', 'mecef_qr_ref' => 'REF-123']);
+        $html = view('exports.facture-vente', ['sale' => $vente->fresh()->load(['customer', 'lines.product'])])->render();
+        $this->assertStringContainsString('référence : REF-123', $html);
     }
 }

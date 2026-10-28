@@ -52,12 +52,26 @@ class Facturation extends Component
 
     public ?string $viewingSaleId = null;
 
+    /** Ticket VC-5 : le module MeCeF (transmission DGI) est-il activé ? Sinon la page est un registre de factures simple. */
+    public function getMecefActifProperty(): bool
+    {
+        return (bool) config('mecef.actif');
+    }
+
     public function getKpisProperty(): array
     {
         // Ticket EX7 — le mois de référence de l'exercice affiché (le mois du jour, ou le dernier mois de 2026 lu en 2027).
         $mois = ExerciceChoisi::moisDeReference();
         $monthSales = Sale::where('status', 'validee')
             ->soldBetween($mois, $mois->copy()->endOfMonth());
+
+        if (! $this->mecefActif) {
+            return [
+                'factures_mois' => (clone $monthSales)->count(),
+                'montant_mois' => (float) (clone $monthSales)->sum('total'),
+                'clients_mois' => (clone $monthSales)->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id'),
+            ];
+        }
 
         return [
             'factures_mois' => (clone $monthSales)->count(),
@@ -112,9 +126,32 @@ class Facturation extends Component
         $this->dispatch('open-modal', name: 'modal-mecef');
     }
 
+    /** Facture d'une vente en PDF — avec ou sans certification MeCeF. */
+    public function imprimerFacture(string $id)
+    {
+        $this->authorize('view-facturation');
+
+        $sale = Sale::with(['customer', 'lines.product'])->findOrFail($id);
+        $pdf = app(\App\Services\PdfExportService::class)->render(
+            'exports.facture-vente',
+            ['sale' => $sale],
+            'Facture '.$sale->numero_facture,
+            'Du '.$sale->date_effective->format('d/m/Y'),
+            'portrait',
+        );
+
+        return response()->streamDownload(fn () => print ($pdf->output()), 'facture-'.$sale->numero_facture.'.pdf');
+    }
+
     public function retryMecef(string $id): void
     {
         $this->authorize('manage-facturation');
+
+        if (! $this->mecefActif) {
+            $this->dispatch('toast', message: "Le module MeCeF n'est pas activé : aucune transmission possible.", type: 'warning');
+
+            return;
+        }
 
         $sale = Sale::findOrFail($id);
 
@@ -134,11 +171,7 @@ class Facturation extends Component
 
     public function render()
     {
-        // Ticket VC-5 : module MeCeF désactivé — la page le dit au lieu d'offrir des gestes sans effet.
-        if (! config('mecef.actif')) {
-            return view('livewire.facturation.module-desactive', ['title' => 'Facturation & MeCeF']);
-        }
-
-        return view('livewire.facturation.facturation', ['title' => 'Facturation & MeCeF']);
+        // Ticket VC-5 : la facturation vit avec ou sans MeCeF ; le titre suit le module.
+        return view('livewire.facturation.facturation', ['title' => $this->mecefActif ? 'Facturation & MeCeF' : 'Facturation']);
     }
 }
