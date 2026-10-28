@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visibleForTesting;
 
+import '../config/fichiers_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
 import '../temps/heure_benin.dart';
@@ -2778,6 +2779,7 @@ class SyncEngine {
     if (brut is! Map) return 0;
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
+    await _tirerFichiersEntreprise(l);
 
     final delaiServi = l.containsKey('rappel_soins_jours');
     final delai = l['rappel_soins_jours'];
@@ -5656,7 +5658,7 @@ class SyncEngine {
         'fixed_assets': immobilisations.map(_immobilisationEnJson).toList(),
         'depreciation_requests': demandesDotation.map(_demandeDotationEnJson).toList(),
         // Tickets PA-* — AVANT les achats et les dépenses : un compte de trésorerie créé ici peut être cité plus bas.
-        'settings_requests': [for (final r in reglages) _reglageEnJson(r, secretsSms[r.id])],
+        'settings_requests': [for (final r in reglages) _reglageEnJson(r, secretsSms[r.id], await _fichiersEntreprise(r))],
         // Ticket CP-5 — après les réglages, avant les dépenses.
         'bank_statement_imports': [for (final r in releves) {'id': r.id, 'account_id': r.accountId, 'content': r.content}],
         // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
@@ -7625,11 +7627,41 @@ class SyncEngine {
 
   /// Tickets PA-* — demande de réglage telle que `SyncController::pushSettingsRequests` la lit : {id, kind, payload}. Le secret
   /// SMS (lu au coffre) rejoint le contenu au dernier moment.
-  Map<String, dynamic> _reglageEnJson(SettingsRequest r, Map<String, String>? secret) => {
+  Map<String, dynamic> _reglageEnJson(SettingsRequest r, Map<String, String>? secret, [Map<String, String> fichiers = const {}]) => {
     'id': r.id,
     'kind': r.kind,
-    'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...?secret},
+    'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...?secret, ...fichiers},
   };
+
+  /// Ticket AUT-2 — octets du logo / du favicon pour une demande « entreprise » qui en annonce un (`logoNom`, `faviconNom`) :
+  /// lus sur le poste au dernier moment, jamais stockés dans la demande.
+  Future<Map<String, String>> _fichiersEntreprise(SettingsRequest r) async {
+    if (r.kind != 'entreprise') return const {};
+    final contenu = jsonDecode(r.payload) as Map<String, dynamic>;
+    final sortie = <String, String>{};
+    for (final genre in FichiersEntreprise.genres) {
+      if (contenu['${genre}Nom'] == null) continue;
+      final octets = await FichiersEntreprise.courant.lire(genre);
+      if (octets != null) sortie['${genre}B64'] = base64Encode(octets);
+    }
+    return sortie;
+  }
+
+  /// Ticket AUT-2 — quand le logo ou le favicon posé au web change (le chemin servi diffère de celui retenu), le poste
+  /// télécharge le fichier. Jamais bloquant : une panne laisse l'ancien fichier, le prochain tirage réessaie.
+  Future<void> _tirerFichiersEntreprise(Map<String, Object?> l) async {
+    for (final genre in FichiersEntreprise.genres) {
+      final chemin = l['${genre}_path'];
+      if (chemin is! String || chemin.isEmpty) continue;
+      try {
+        if (await FichiersEntreprise.courant.sourceServeur(genre) == chemin) continue;
+        final r = await _client.get<List<int>>('/api/sync/company-file/$genre', options: Options(responseType: ResponseType.bytes));
+        final octets = r.data;
+        if (octets == null || octets.isEmpty) continue;
+        await FichiersEntreprise.courant.enregistrer(genre, Uint8List.fromList(octets), chemin, sourceServeur: chemin);
+      } catch (_) {}
+    }
+  }
 
   static String cleSecretSms(String idDemande) => 'agrierp.sms.secret.$idDemande';
 

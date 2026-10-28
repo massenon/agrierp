@@ -4,11 +4,15 @@ import 'package:drift/drift.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/config/fichiers_entreprise.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 
 /// Saisie refusée AVANT d'être écrite : un message par champ (les clés du Blade), ou `formulaire`.
+/// Un fichier image choisi (nom et octets) pour le logo ou le favicon.
+typedef FichierChoisi = ({String nom, Uint8List octets});
+
 class ReglageRefuse implements Exception {
   const ReglageRefuse(this.erreurs);
 
@@ -35,8 +39,9 @@ class TrancheSaisie {
 /// administrateur ; l'état redescend au tirage. Ce dépôt REPRODUIT les refus du web avant d'écrire, pour que la saisie soit
 /// refusée tout de suite, mais le serveur reste le juge. ⚠️ Un secret (jeton SMS) n'est JAMAIS en base : il attend au coffre.
 class ReglagesFermeRepository {
-  ReglagesFermeRepository({required this.database, this.deviceId = 'poste', Uuid? uuid, FlutterSecureStorage? coffre, this.horloge})
+  ReglagesFermeRepository({required this.database, this.deviceId = 'poste', Uuid? uuid, FlutterSecureStorage? coffre, this.horloge, FichiersEntreprise? fichiersEntreprise})
     : _uuid = uuid ?? const Uuid(),
+      fichiersEntreprise = fichiersEntreprise ?? FichiersEntreprise.courant,
       _coffre = coffre ?? const FlutterSecureStorage();
 
   final AppDatabase database;
@@ -44,6 +49,7 @@ class ReglagesFermeRepository {
   final Uuid _uuid;
   final FlutterSecureStorage _coffre;
   final DateTime Function()? horloge;
+  final FichiersEntreprise fichiersEntreprise;
 
   DateTime _maintenant() => (horloge ?? HeureBenin.maintenant)();
 
@@ -165,14 +171,28 @@ class ReglagesFermeRepository {
     required String cnssFamille,
     required String cnssRisque,
     required bool estAdmin,
+    FichierChoisi? logo,
+    FichierChoisi? favicon,
   }) async {
     final refus = await validerEntreprise(
       raisonSociale: raisonSociale, ifu: ifu, email: email, vps: vps, cnssSalarie: cnssSalarie,
       cnssPension: cnssPension, cnssFamille: cnssFamille, cnssRisque: cnssRisque, estAdmin: estAdmin,
     );
-    if (refus.isNotEmpty) throw ReglageRefuse(refus);
+    final refusFichiers = <String, String>{
+      for (final (champ, genre, f) in [('logoFile', 'logo', logo), ('faviconFile', 'favicon', favicon)])
+        if (f != null && FichiersEntreprise.valider(genre, f.nom, f.octets.length) != null) champ: FichiersEntreprise.valider(genre, f.nom, f.octets.length)!,
+    };
+    if (refus.isNotEmpty || refusFichiers.isNotEmpty) throw ReglageRefuse({...refus, ...refusFichiers});
+
+    // Ticket AUT-2 — le fichier est gardé tout de suite sur le poste (autonomie) ; la demande ne porte que le drapeau, les octets
+    // sont lus au moment d'envoyer.
+    for (final (genre, f) in [('logo', logo), ('favicon', favicon)]) {
+      if (f != null) await fichiersEntreprise.enregistrer(genre, f.octets, f.nom);
+    }
 
     await _ecrire('entreprise', {
+      if (logo != null) 'logoNom': logo.nom,
+      if (favicon != null) 'faviconNom': favicon.nom,
       'companyName': raisonSociale.trim(), 'promoterName': promoteur.trim(), 'address': adresse.trim(), 'phone': telephone.trim(),
       'email': email.trim(), 'ifu': ifu.trim(), 'rccm': rccm.trim(), 'tvaEnabled': tva,
       'vpsRate': _nombre(vps), 'cnssEmployeeRate': _nombre(cnssSalarie), 'cnssEmployerPensionRate': _nombre(cnssPension),

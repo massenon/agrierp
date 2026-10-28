@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart' show ChartOfAccount;
+import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -27,11 +28,14 @@ Future<ReleveChoisi?> choisirReleveCsv() async {
 /// Blade : import du relevé, compte et période, quatre cartes, bandeau d'équilibre, deux tableaux (livre / relevé), note du
 /// lettrage automatique. Le calcul est celui du serveur (parité exécutée) ; l'import est une DEMANDE.
 class RapprochementPage extends StatefulWidget {
-  const RapprochementPage({super.key, required this.depot, required this.maintenant, this.choisirReleve = choisirReleveCsv});
+  const RapprochementPage({super.key, required this.depot, required this.maintenant, this.choisirReleve = choisirReleveCsv, this.imprimer});
 
   final RapprochementRepository depot;
   final DateTime Function() maintenant;
   final Future<ReleveChoisi?> Function() choisirReleve;
+
+  /// Éditeur PDF du poste (injecté ; `null` : le bouton n'imprime rien, comme les autres pages de la comptabilité).
+  final Editeur? imprimer;
 
   @override
   State<RapprochementPage> createState() => _RapprochementPageState();
@@ -67,6 +71,25 @@ class _RapprochementPageState extends State<RapprochementPage> {
     });
   }
 
+  /// « Exporter PDF » (`exportRapprochementPdf` du web) : le document des lignes AFFICHÉES, produit au poste.
+  Future<void> _exporter() async {
+    final r = _resultat;
+    final editeur = widget.imprimer;
+    if (r == null || editeur == null) return;
+    final c = _comptes?.where((x) => x.id == _compte).firstOrNull;
+    String message;
+    try {
+      message = await editeur(
+            DocumentsComptabilite.rapprochement(r, compte: c == null ? '' : '${c.code} ${c.label}', debut: _debut, fin: _fin),
+            widget.maintenant(),
+          ) ??
+          'Document envoyé à l’impression.';
+    } catch (_) {
+      message = 'L’édition du document a échoué. Réessayez ou vérifiez l’imprimante.';
+    }
+    if (mounted) setState(() => _message = message);
+  }
+
   static String _m(double v) => DocumentsComptabilite.montant(v);
 
   Future<void> _lancer() async {
@@ -96,6 +119,14 @@ class _RapprochementPageState extends State<RapprochementPage> {
           const Icon(SymbolesAgri.sync_alt, size: 26, color: AgriColors.brandEmerald),
           const SizedBox(width: AgriSpacing.xs),
           Expanded(child: Text('Rapprochement Bancaire', style: TextStyle(fontSize: large ? AgriTypography.xxl : AgriTypography.xl, fontWeight: AgriTypography.gras, color: AgriColors.onSurface))),
+          OutlinedButton.icon(
+            key: const Key('rapprochement-exporter-pdf'),
+            onPressed: r == null ? null : _exporter,
+            icon: const Icon(SymbolesAgri.picture_as_pdf, size: 18),
+            style: OutlinedButton.styleFrom(foregroundColor: AgriColors.brandForest, side: const BorderSide(color: AgriColors.outlineVariant), shape: const StadiumBorder()),
+            label: const Text('Exporter PDF', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: AgriSpacing.xs),
           ElevatedButton.icon(
             key: const Key('rapprochement-importer'),
             onPressed: () async {

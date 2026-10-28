@@ -255,6 +255,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                           key: const Key('page-rapprochement'),
                           depot: widget.depotRapprochement!,
                           maintenant: widget.maintenant,
+                          imprimer: widget.imprimer,
                         ),
                         PageComptable.immobilisations => ImmobilisationsPage(
                           key: const Key('page-immobilisations'),

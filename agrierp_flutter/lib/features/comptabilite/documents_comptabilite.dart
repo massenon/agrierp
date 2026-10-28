@@ -1,6 +1,7 @@
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'mention_anouveaux.dart';
+import 'rapprochement_repository.dart';
 
 /// Documents officiels (PDF) des quatre pages comptables du poste — ticket F0.87 (item 9, T4).
 ///
@@ -248,6 +249,47 @@ class DocumentsComptabilite {
       noteDePied: g.journalIncomplet && mouvements.isNotEmpty
           ? '$motifJournalIncomplet.'
           : null,
+    );
+  }
+
+  // ── Rapprochement bancaire ────────────────────────────────────────────────
+
+  /// Ticket AUT-1 — `exports.rapprochement-bancaire` du web : les trois soldes, le GRAND LIVRE du compte, le RELEVÉ
+  /// importé, puis le verdict d'équilibre. Le document se construit au poste, sans réseau.
+  static DocumentOfficiel rapprochement(
+    Rapprochement r, {
+    required String compte,
+    required DateTime debut,
+    required DateTime fin,
+  }) {
+    const entetes = ['Date', 'Libellé', 'Montant', 'Statut'];
+    return DocumentOfficiel(
+      titre: 'Rapprochement Bancaire${compte.isEmpty ? '' : ' — Compte $compte'}',
+      sousTitre: 'Période du ${jour(debut)} au ${jour(fin)}',
+      fichier: 'rapprochement-bancaire-{jour}.pdf',
+      entetes: entetes,
+      lignes: [
+        BandeDocument(
+          'Solde Livre : ${montant(r.soldeLivre)} FCFA — Solde Relevé : ${montant(r.soldeReleve)} FCFA — '
+          'Opérations en instance : ${montant(r.enInstance.abs())} FCFA',
+        ),
+        BandeDocument('GRAND LIVRE${compte.isEmpty ? '' : ' — Compte $compte'}'),
+        if (r.livre.isEmpty)
+          const DonneesDocument(['Aucune écriture sur la période.', '', '', ''])
+        else
+          for (final l in r.livre)
+            DonneesDocument([jour(l.date), l.libelle, montant(l.montant), l.pointee ? 'Pointé' : 'En instance']),
+        const BandeDocument('RELEVÉ BANCAIRE IMPORTÉ'),
+        const EnteteDocument(entetes),
+        if (r.releve.isEmpty)
+          const DonneesDocument(['Aucun relevé importé sur la période.', '', '', ''])
+        else
+          for (final l in r.releve)
+            DonneesDocument([jour(l.date), l.libelle, montant(l.montant), l.pointee ? 'Pointé' : 'Nouveau — à saisir']),
+      ],
+      noteDePied: r.equilibre
+          ? 'Rapprochement équilibré — écart nul.'
+          : 'Rapprochement déséquilibré — écart de ${montant(r.ecart)} FCFA à justifier avant clôture.',
     );
   }
 

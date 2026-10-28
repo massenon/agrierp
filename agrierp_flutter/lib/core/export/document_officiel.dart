@@ -4,6 +4,8 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../config/fichiers_entreprise.dart';
+
 /// Une ligne du corps d'un document officiel.
 ///
 /// ⚠️ **QUATRE FORMES, PARCE QUE LA MAQUETTE EN EMPLOIE QUATRE.** Les exports
@@ -241,8 +243,14 @@ class ExportOfficiel {
 
   /// Charge le logo officiel embarqué. Rendu séparément pour qu'un test
   /// puisse construire un document sans dépendre du chargeur d'actifs.
-  static Future<Uint8List> chargerLogo() async =>
-      (await rootBundle.load(cheminLogo)).buffer.asUint8List();
+  static Future<Uint8List> chargerLogo() async {
+    // Ticket AUT-2 — le logo choisi par la ferme (Paramètres > Données de l'Entreprise) passe avant celui de l'installation.
+    try {
+      final choisi = await FichiersEntreprise.courant.logoPourPdf();
+      if (choisi != null) return choisi;
+    } catch (_) {}
+    return (await rootBundle.load(cheminLogo)).buffer.asUint8List();
+  }
 
   static const cheminPoliceNormale = 'assets/fonts/Roboto-Regular.ttf';
   static const cheminPoliceGrasse = 'assets/fonts/Roboto-Bold.ttf';

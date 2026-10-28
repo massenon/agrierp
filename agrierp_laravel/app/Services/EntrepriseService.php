@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -30,6 +32,50 @@ class EntrepriseService
             'cnssEmployerFamilyRate' => ['required', 'numeric', 'min:0', 'max:20'],
             'cnssEmployerRiskRate' => ['required', 'numeric', 'min:1', 'max:4'],
         ];
+    }
+
+    /** Taille maximale décodée, en octets : celles de `DonneesEntreprise` (logo 2 048 Ko, favicon 500 Ko). */
+    public const TAILLES_FICHIERS = ['logo' => 2048 * 1024, 'favicon' => 500 * 1024];
+
+    private const EXTENSIONS = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif', 'image/bmp' => 'bmp', 'image/webp' => 'webp'];
+
+    /**
+     * Ticket AUT-2 — logo et favicon ENVOYÉS PAR LE POSTE (`logoB64`, `faviconB64`) : mêmes limites que le web, rangés au même
+     * endroit (`company`, disque public). Retourne les colonnes `logo_path` / `favicon_path` à passer à `enregistrer`.
+     *
+     * @param array<string, mixed> $p
+     * @return array<string, string>
+     *
+     * @throws ValidationException fichier illisible, trop gros ou qui n'est pas une image
+     */
+    public function fichiersDepuisBase64(array $p): array
+    {
+        $fichiers = [];
+
+        foreach (['logo' => 'logoFile', 'favicon' => 'faviconFile'] as $genre => $champ) {
+            $b64 = $p[$genre.'B64'] ?? null;
+
+            if (! is_string($b64) || $b64 === '') {
+                continue;
+            }
+
+            $octets = base64_decode($b64, true);
+            $info = $octets === false ? false : @getimagesizefromstring($octets);
+
+            if ($octets === false || $info === false || ! isset(self::EXTENSIONS[$info['mime'] ?? ''])) {
+                throw ValidationException::withMessages([$champ => 'Le '.$genre.' doit être une image (png, jpg, gif, bmp ou webp).']);
+            }
+
+            if (strlen($octets) > self::TAILLES_FICHIERS[$genre]) {
+                throw ValidationException::withMessages([$champ => 'Le '.$genre.' ne doit pas dépasser '.(self::TAILLES_FICHIERS[$genre] / 1024).' Ko.']);
+            }
+
+            $chemin = 'company/'.Str::uuid().'.'.self::EXTENSIONS[$info['mime']];
+            Storage::disk('public')->put($chemin, $octets);
+            $fichiers[$genre.'_path'] = $chemin;
+        }
+
+        return $fichiers;
     }
 
     public const MESSAGES = ['ifu.regex' => "L'IFU doit contenir uniquement des chiffres."];

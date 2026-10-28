@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\TreasuryAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -87,6 +88,39 @@ class SyncReglagesTest extends TestCase
         [$id, $r] = $this->envoyer($this->admin, 'entreprise', $this->entreprise(['vpsRate' => 2]));
         $r->assertJsonPath('settings_requests.accepted.0', $id);
         $this->assertEquals(2, CompanySetting::current()->vps_rate);
+    }
+
+    public function test_le_logo_et_le_favicon_du_poste_sont_ranges_comme_au_web_et_servis_au_poste(): void
+    {
+        Storage::fake('public');
+        $png = base64_encode(base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+        [$id, $r] = $this->envoyer($this->gestionnaire, 'entreprise', $this->entreprise(['logoB64' => $png, 'faviconB64' => $png]));
+        $r->assertOk()->assertJsonPath('settings_requests.accepted.0', $id);
+
+        $e = CompanySetting::current();
+        $this->assertStringStartsWith('company/', $e->logo_path);
+        $this->assertStringEndsWith('.png', $e->favicon_path);
+        Storage::disk('public')->assertExists($e->logo_path);
+
+        // Le tirage porte les chemins ; le fichier se télécharge ensuite.
+        $tirage = $this->actingAs($this->gestionnaire, 'sanctum')->getJson('/api/sync/pull')->assertOk();
+        $this->assertSame($e->logo_path, $tirage->json('company_settings.logo_path'));
+        $this->actingAs($this->gestionnaire, 'sanctum')->get('/api/sync/company-file/logo')->assertOk();
+        $this->actingAs($this->gestionnaire, 'sanctum')->get('/api/sync/company-file/autre')->assertNotFound();
+    }
+
+    public function test_un_logo_qui_n_est_pas_une_image_ou_trop_gros_est_refuse(): void
+    {
+        Storage::fake('public');
+
+        [, $r] = $this->envoyer($this->gestionnaire, 'entreprise', $this->entreprise(['logoB64' => base64_encode('pas une image')]));
+        $this->assertStringContainsString('doit être une image', $r->json('settings_requests.rejected.0.reason'));
+        $this->assertNull(CompanySetting::query()->first()?->logo_path);
+
+        $gros = base64_encode(base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==').str_repeat("\0", 600 * 1024));
+        [, $r] = $this->envoyer($this->gestionnaire, 'entreprise', $this->entreprise(['faviconB64' => $gros]));
+        $this->assertStringContainsString('500 Ko', $r->json('settings_requests.rejected.0.reason'));
     }
 
     public function test_les_regles_de_l_entreprise_sont_celles_du_web(): void

@@ -1259,6 +1259,9 @@ class SyncController extends Controller
                     // Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté ? (seul un administrateur le modifie alors)
                     'payroll_locked' => $entreprise->payrollSettingsLocked(),
                     'payroll_edited_at' => $entreprise->payroll_settings_edited_at?->format('d/m/Y à H:i'),
+                    // Ticket AUT-2 — chemins du logo et du favicon : le poste télécharge le fichier quand le chemin change.
+                    'logo_path' => $entreprise->logo_path,
+                    'favicon_path' => $entreprise->favicon_path,
                 ] + ($request->user()?->can('manage-parametres') ? [
                     // Ticket PA-8 — configuration SMS SANS SECRET (le jeton et le secret ne quittent jamais le serveur).
                     'sms_provider' => $entreprise->sms_provider,
@@ -3740,6 +3743,17 @@ class SyncController extends Controller
      * (`JustificatifService`). ⚠️ Idempotent : renvoyer le fichier REMPLACE le précédent. 404 : l'enregistrement n'est pas (encore)
      * connu du serveur — le poste réessaiera après son prochain envoi.
      */
+    /** Ticket AUT-2 — le fichier du logo ou du favicon de l'entreprise, tiré par le poste quand son chemin a changé. */
+    public function fichierEntreprise(string $genre)
+    {
+        abort_unless(in_array($genre, ['logo', 'favicon'], true), 404);
+
+        $chemin = CompanySetting::query()->first()?->{$genre.'_path'};
+        abort_unless($chemin && \Illuminate\Support\Facades\Storage::disk('public')->exists($chemin), 404, 'Aucun fichier.');
+
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($chemin));
+    }
+
     public function receipt(Request $request): JsonResponse
     {
         abort_unless($request->user()?->can('manage-achats'), 403, 'Votre rôle ne permet pas de joindre un justificatif.');
@@ -3881,7 +3895,7 @@ class SyncController extends Controller
             'entreprise' => (function () use ($p, $utilisateur, $attributs) {
                 $service = app(\App\Services\EntrepriseService::class);
                 $v = validator($p, $service->regles(), \App\Services\EntrepriseService::MESSAGES + MotifsRefusPush::messages(), $attributs)->validate();
-                $service->enregistrer($p + $v, $utilisateur);
+                $service->enregistrer($p + $v, $utilisateur, $service->fichiersDepuisBase64($p));
             })(),
             'bareme_its' => app(\App\Services\BaremeItsService::class)->remplacer(array_values($p['tranches'] ?? []), $utilisateur),
             'mode_paiement' => $this->jouerModePaiement($id, $p),

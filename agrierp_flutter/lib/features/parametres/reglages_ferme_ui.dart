@@ -1,5 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/config/fichiers_entreprise.dart';
 import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -58,17 +63,32 @@ Widget _formulaire(Map<String, String> erreurs, String prefixe, List<Widget> cha
 
 // ── PA-3 · Données de l'entreprise ─────────────────────────────────────────
 
-Future<bool> ouvrirEntreprise({required BuildContext context, required ReglagesFermeRepository depot, required CompanySetting? existante, required bool estAdmin}) async {
+/// Sélecteur de fichier image du poste (logo, favicon), injectable.
+Future<FichierChoisi?> choisirImage() async {
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensions, dialogTitle: 'Choisir une image');
+  if (r == null || r.files.isEmpty || r.files.first.path == null) return null;
+  final f = r.files.first;
+  return (nom: f.name, octets: await File(f.path!).readAsBytes());
+}
+
+Future<bool> ouvrirEntreprise({
+  required BuildContext context,
+  required ReglagesFermeRepository depot,
+  required CompanySetting? existante,
+  required bool estAdmin,
+  Future<FichierChoisi?> Function() choisirFichier = choisirImage,
+}) async {
   final ok = await afficherModale<bool>(
     context: context,
-    constructeur: (_) => _ModaleEntreprise(depot: depot, e: existante, estAdmin: estAdmin),
+    constructeur: (_) => _ModaleEntreprise(depot: depot, e: existante, estAdmin: estAdmin, choisirFichier: choisirFichier),
   );
   return ok == true;
 }
 
 class _ModaleEntreprise extends StatefulWidget {
-  const _ModaleEntreprise({required this.depot, required this.e, required this.estAdmin});
+  const _ModaleEntreprise({required this.depot, required this.e, required this.estAdmin, required this.choisirFichier});
 
+  final Future<FichierChoisi?> Function() choisirFichier;
   final ReglagesFermeRepository depot;
   final CompanySetting? e;
   final bool estAdmin;
@@ -94,6 +114,57 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   late final _risque = TextEditingController(text: _n(widget.e?.cnssEmployerRiskRate, 2));
   late bool _tva = widget.e?.tvaEnabled ?? true;
   Map<String, String> _erreurs = const {};
+  FichierChoisi? _logo;
+  FichierChoisi? _favicon;
+  Uint8List? _logoActuel;
+  Uint8List? _faviconActuel;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerActuels();
+  }
+
+  Future<void> _chargerActuels() async {
+    final l = await widget.depot.fichiersEntreprise.lire('logo');
+    final f = await widget.depot.fichiersEntreprise.lire('favicon');
+    if (mounted) setState(() { _logoActuel = l; _faviconActuel = f; });
+  }
+
+  Future<void> _choisir(String genre) async {
+    final f = await widget.choisirFichier();
+    if (f == null || !mounted) return;
+    setState(() {
+      if (genre == 'logo') { _logo = f; } else { _favicon = f; }
+      _erreurs = {..._erreurs}..remove(genre == 'logo' ? 'logoFile' : 'faviconFile');
+    });
+  }
+
+  Widget _depotFichier(String genre, String titre, String invite, FichierChoisi? choisi, Uint8List? actuel, double hauteur) {
+    final erreur = _erreurs[genre == 'logo' ? 'logoFile' : 'faviconFile'];
+    final image = choisi?.octets ?? actuel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(titre.toUpperCase(), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+        const SizedBox(height: AgriSpacing.xs),
+        InkWell(
+          key: Key('entreprise-$genre'),
+          onTap: () => _choisir(genre),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(border: Border.all(color: AgriColors.outlineVariant), borderRadius: BorderRadius.circular(AgriRadius.lg)),
+            child: Column(children: [
+              if (image != null) Image.memory(image, height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+              Text(choisi?.nom ?? invite, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
+            ]),
+          ),
+        ),
+        if (erreur != null) Text(erreur, key: Key('entreprise-$genre-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+      ],
+    );
+  }
 
   Future<void> _enregistrer() async {
     try {
@@ -101,6 +172,7 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
         raisonSociale: _raison.text, promoteur: _promoteur.text, adresse: _adresse.text, telephone: _tel.text, email: _email.text,
         ifu: _ifu.text, rccm: _rccm.text, tva: _tva, vps: _vps.text, cnssSalarie: _salarie.text, cnssPension: _pension.text,
         cnssFamille: _famille.text, cnssRisque: _risque.text, estAdmin: widget.estAdmin,
+        logo: _logo, favicon: _favicon,
       );
     } on ReglageRefuse catch (r) {
       setState(() => _erreurs = r.erreurs);
@@ -137,6 +209,10 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
           champReglage(p, 'cnssEmployerPensionRate', 'CNSS patronale — pensions (%)', _pension, _erreurs, nombre: true),
           champReglage(p, 'cnssEmployerFamilyRate', 'CNSS patronale — prestations familiales (%)', _famille, _erreurs, nombre: true),
           champReglage(p, 'cnssEmployerRiskRate', 'CNSS patronale — risques professionnels (%)', _risque, _erreurs, nombre: true),
+          const SizedBox(height: AgriSpacing.sm),
+          _depotFichier('logo', "Logo de l'Entreprise", 'Cliquer pour choisir un logo', _logo, _logoActuel, 48),
+          const SizedBox(height: AgriSpacing.sm),
+          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Cliquer pour choisir un favicon', _favicon, _faviconActuel, 32),
         ]),
       ),
       actions: [

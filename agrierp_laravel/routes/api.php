@@ -73,6 +73,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
     // Ticket AC-3 — le FICHIER d'un justificatif (achat ou dépense), envoyé par le poste APRÈS que l'enregistrement a été
     // accepté par `/sync/push` : le contrat de push ne transporte aucun fichier.
+    Route::get('/sync/company-file/{genre}', [SyncController::class, 'fichierEntreprise'])->middleware('throttle:60,1');
     Route::post('/sync/receipts', [SyncController::class, 'receipt'])->middleware('throttle:60,1');
 
     // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du

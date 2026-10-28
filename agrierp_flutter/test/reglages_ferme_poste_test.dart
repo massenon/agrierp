@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:agrierp/core/config/fichiers_entreprise.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
@@ -246,6 +249,83 @@ void main() {
     test('un fournisseur inconnu est refusé avant d\'écrire', () async {
       expect((await refus(() => depot.enregistrerSms(fournisseur: 'autre')))['smsProvider'], isNotNull);
       expect(await demandes(), isEmpty);
+    });
+  });
+
+  group('AUT-2 · logo et favicon', () {
+    late Directory dossier;
+    final png = Uint8List.fromList(base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+    setUp(() async {
+      dossier = await Directory.systemTemp.createTemp('entreprise_test');
+      FichiersEntreprise.courant = FichiersEntreprise(dossier: () async => dossier);
+      depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', coffre: coffre, horloge: () => DateTime(2026, 10, 28, 10));
+    });
+    tearDown(() async {
+      FichiersEntreprise.courant = FichiersEntreprise();
+      await dossier.delete(recursive: true);
+    });
+
+    Future<void> enregistrer({FichierChoisi? logo, FichierChoisi? favicon}) => depot.enregistrerEntreprise(
+      raisonSociale: 'Ferme École', promoteur: 'Dr M', adresse: 'Ikpinlè', telephone: '0197', email: 'a@b.bj', ifu: '3201700000000', rccm: 'RB/1',
+      tva: true, vps: '4', cnssSalarie: '3.6', cnssPension: '6.4', cnssFamille: '9', cnssRisque: '2', estAdmin: true, logo: logo, favicon: favicon,
+    );
+
+    test('⚠️ le fichier est gardé tout de suite sur le poste ; la demande n\'emporte que son nom, les octets partent à l\'envoi', () async {
+      await enregistrer(logo: (nom: 'ferme.png', octets: png), favicon: (nom: 'f.png', octets: png));
+
+      expect(await FichiersEntreprise.courant.lire('logo'), png);
+      expect(await FichiersEntreprise.courant.logoPourPdf(), png);
+      final d = (await demandes()).single;
+      expect(d.payload, isNot(contains(base64Encode(png))));
+
+      await moteur.synchroniser();
+
+      final envoye = ((serveur.envois.single['settings_requests'] as List).single as Map)['payload'] as Map;
+      expect(envoye['logoB64'], base64Encode(png));
+      expect(envoye['faviconB64'], base64Encode(png));
+    });
+
+    test('⚠️ refus avant d\'écrire : format inconnu, favicon au-delà de 500 Ko ; rien n\'est gardé', () async {
+      final r = await refus(() => enregistrer(logo: (nom: 'x.pdf', octets: png), favicon: (nom: 'f.png', octets: Uint8List(600 * 1024))));
+
+      expect(r['logoFile'], 'Le logo doit être une image (png, jpg, gif, bmp ou webp).');
+      expect(r['faviconFile'], 'Le favicon ne doit pas dépasser 500 Ko.');
+      expect(await FichiersEntreprise.courant.fichier('logo'), isNull);
+      expect(await demandes(), isEmpty);
+    });
+
+    test('un logo GIF reste affiché mais les PDF gardent celui de l\'installation (le moteur PDF ne lit que PNG et JPEG)', () async {
+      await FichiersEntreprise.courant.enregistrer('logo', png, 'ferme.gif');
+
+      expect(await FichiersEntreprise.courant.fichier('logo'), isNotNull);
+      expect(await FichiersEntreprise.courant.logoPourPdf(), isNull);
+    });
+
+    test('un nouveau chemin servi par le web fait télécharger le fichier ; le même chemin ne le retélécharge pas', () async {
+      var telechargements = 0;
+      final client = Dio()
+        ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+          if (o.path.contains('company-file')) {
+            telechargements++;
+            h.resolve(Response<List<int>>(requestOptions: o, statusCode: 200, data: png));
+          } else if (o.path.contains('pull')) {
+            h.resolve(Response<Map<String, dynamic>>(requestOptions: o, statusCode: 200, data: {
+              'server_time': '2026-10-28T12:00:00Z',
+              'company_settings': {'company_name': 'Ferme', 'logo_path': 'company/abc.png'},
+            }));
+          } else {
+            h.resolve(Response<Map<String, dynamic>>(requestOptions: o, statusCode: 200, data: {}));
+          }
+        }));
+      final m = SyncEngine(database: db, client: client, deviceId: 'poste-test', connectivity: _Connectivite(), maintenant: () => DateTime(2026, 10, 28, 14), coffre: coffre);
+
+      await m.synchroniser();
+      await m.synchroniser();
+
+      expect(telechargements, 1);
+      expect(await FichiersEntreprise.courant.lire('logo'), png);
+      expect(await FichiersEntreprise.courant.sourceServeur('logo'), 'company/abc.png');
     });
   });
 
