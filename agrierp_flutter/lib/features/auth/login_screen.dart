@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
-import '../demarrage/premier_demarrage_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
@@ -35,15 +34,10 @@ class LoginScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.onConnecte,
-    this.demarrage,
   });
 
   final AuthService auth;
   final VoidCallback onConnecte;
-
-  /// Ticket F0.98 — sur un poste NEUF, l'adresse du serveur s'affiche et se change avant la connexion
-  /// (« Paramètres du poste », réservé à l'administrateur, n'est pas encore accessible).
-  final PremierDemarrageRepository? demarrage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -57,36 +51,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _seSouvenir = false;
   bool _enCours = false;
   String? _erreur;
-
-  /// Ticket F0.98 — adresse affichée seulement sur un poste neuf (null sinon).
-  String? _adresseServeur;
-
-  @override
-  void initState() {
-    super.initState();
-    _lireServeur();
-  }
-
-  Future<void> _lireServeur() async {
-    final depot = widget.demarrage;
-    if (depot == null || !await depot.posteNeuf()) return;
-    final adresse = await depot.adresse();
-    if (mounted) setState(() => _adresseServeur = adresse);
-  }
-
-  Future<void> _changerServeur() async {
-    final nouvelle = await afficherModale<String>(
-      context: context,
-      constructeur: (_) => _DialogueServeur(adresse: _adresseServeur ?? ''),
-    );
-    if (nouvelle == null || nouvelle.trim().isEmpty) return;
-    try {
-      final enregistree = await widget.demarrage!.changerAdresse(nouvelle);
-      if (mounted) setState(() => _adresseServeur = enregistree);
-    } on StateError catch (e) {
-      if (mounted) setState(() => _erreur = e.message);
-    }
-  }
 
   @override
   void dispose() {
@@ -170,31 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _ligneOptions(),
       const SizedBox(height: AgriSpacing.md),
       _boutonConnexion(),
-      if (_adresseServeur != null) ...[
-        const SizedBox(height: AgriSpacing.md),
-        Row(
-          key: const Key('login-serveur'),
-          children: [
-            Expanded(
-              child: Text(
-                'Serveur : $_adresseServeur',
-                style: const TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.outline,
-                ),
-              ),
-            ),
-            TextButton(
-              key: const Key('login-modifier-serveur'),
-              onPressed: _changerServeur,
-              child: const Text(
-                'Modifier',
-                style: TextStyle(fontSize: AgriTypography.xs),
-              ),
-            ),
-          ],
-        ),
-      ],
       ],
     );
   }
@@ -802,50 +741,6 @@ class _BandeauErreur extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Ticket F0.98 — saisie de l'adresse du serveur. ⚠️ StatefulWidget : le contrôleur vit avec la modale ;
-/// le libérer au retour de `afficherModale` le faisait servir pendant l'animation de fermeture.
-class _DialogueServeur extends StatefulWidget {
-  const _DialogueServeur({required this.adresse});
-
-  final String adresse;
-
-  @override
-  State<_DialogueServeur> createState() => _DialogueServeurState();
-}
-
-class _DialogueServeurState extends State<_DialogueServeur> {
-  late final _saisie = TextEditingController(text: widget.adresse);
-
-  @override
-  void dispose() {
-    _saisie.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ModaleAgri(
-      titre: 'Adresse du serveur',
-      largeur: LargeurModale.sm,
-      contenu: TextField(
-        key: const Key('login-adresse-serveur'),
-        controller: _saisie,
-        style: const TextStyle(fontSize: AgriTypography.xs),
-      ),
-      actions: [
-        BoutonModaleSecondaire(
-          libelle: 'Annuler',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        BoutonModalePrimaire(
-          libelle: 'Enregistrer',
-          onPressed: () => Navigator.of(context).pop(_saisie.text),
-        ),
-      ],
     );
   }
 }

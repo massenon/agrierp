@@ -177,32 +177,13 @@ void main() {
   });
 
   group('écran de connexion', () {
-    LoginScreen connexion() => LoginScreen(
-      auth: AuthService(client: client, deviceName: 'poste-test'),
-      onConnecte: () {},
-      demarrage: depot,
-    );
-
-    testWidgets('poste neuf : le serveur est affiché et se change avant la connexion', (tester) async {
-      await afficher(tester, connexion());
-
-      expect(find.byKey(const Key('login-serveur')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('login-modifier-serveur')));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('login-adresse-serveur')), 'http://10.0.0.5:8002');
-      await tester.tap(find.text('Enregistrer'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Serveur : http://10.0.0.5:8002'), findsOneWidget);
-      expect(client.options.baseUrl, 'http://10.0.0.5:8002');
-    });
-
-    testWidgets('poste en service : aucune adresse ni bouton « Modifier »', (tester) async {
-      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
-
-      await afficher(tester, connexion());
+    testWidgets('⚠️ l\'adresse du serveur ne s\'affiche ni ne se change à la connexion : elle se règle dans Paramètres > Appairage', (tester) async {
+      await afficher(tester, LoginScreen(auth: AuthService(client: client, deviceName: 'poste-test'), onConnecte: () {}));
 
       expect(find.byKey(const Key('login-serveur')), findsNothing);
+      expect(find.byKey(const Key('login-modifier-serveur')), findsNothing);
+      expect(find.textContaining('Serveur :'), findsNothing);
+      expect(find.text('Modifier'), findsNothing);
     });
   });
 }

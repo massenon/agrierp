@@ -514,7 +514,6 @@ class _AgriErpAppState extends State<AgriErpApp> {
         surOuverture: _ouvrirRappelsDuJour,
         ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
-          demarrage: _demarrage,
           onConnecte: onConnecte,
         ),
         application: (verrouiller, onDeconnecte) => _premierDemarrage
