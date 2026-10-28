@@ -102,12 +102,15 @@
             </div>
             @endhasanyrole
 
+            {{-- Ticket VC-5 : module MeCeF désactivé jusqu'à sa configuration (`config/mecef.php`). --}}
+            @if(config('mecef.actif'))
             @hasanyrole(['admin', 'caissier'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">FACTURATION</p>
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/facturation" icon="receipt_long" label="Facturation & MeCeF" />
             </div>
             @endhasanyrole
+            @endif
 
             @hasanyrole(['admin'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">RESSOURCES HUMAINES</p>

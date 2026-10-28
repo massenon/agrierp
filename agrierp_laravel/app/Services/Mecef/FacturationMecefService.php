@@ -31,10 +31,15 @@ use Throwable;
 class FacturationMecefService
 {
     /**
-     * @return array{transmise: bool, deja: bool, message: string}
+     * @return array{transmise: bool, deja: bool, message: string, inactif?: bool}
      */
     public function facturer(Sale|string $vente): array
     {
+        // Ticket VC-5 : module désactivé — rien n'est transmis, la vente reste « en attente », aucun appelant ne lève d'alerte.
+        if (! config('mecef.actif')) {
+            return ['transmise' => false, 'deja' => false, 'inactif' => true, 'message' => 'module MeCeF désactivé'];
+        }
+
         $id = $vente instanceof Sale ? $vente->getKey() : $vente;
         $transmise = false;
 

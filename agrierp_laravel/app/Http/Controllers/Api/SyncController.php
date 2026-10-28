@@ -2108,7 +2108,7 @@ class SyncController extends Controller
             // 🔴→✅ Ticket U14 — l'échec de la facture d'une vente reçue redevient une ligne du journal d'audit, comme
             // avant S-T13 (qui avait sorti l'appel de la transaction et perdu cette trace) : la vente est gardée, en
             // « Erreur MeCeF », et le journal dit qu'elle vient d'un poste. Libellé dans `AuditLog::ACTION_LABELS`.
-            if (! $facture['transmise'] && ! $facture['deja']) {
+            if (! $facture['transmise'] && ! $facture['deja'] && ! ($facture['inactif'] ?? false)) {
                 AuditLog::record('sale.mecef_failed_on_sync', 'facturation');
             }
         }

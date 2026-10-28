@@ -255,7 +255,7 @@ class Devis extends Component
 
         $this->dispatch('toast', message: 'Devis converti en facture '.$vente->numero_facture.' avec succès.', type: 'success');
 
-        if (! $facture['transmise']) {
+        if (! $facture['transmise'] && ! ($facture['inactif'] ?? false)) {
             $this->dispatch('toast', message: 'Facture '.$vente->numero_facture.' créée — ATTENTION : facture normalisée MeCeF non transmise ('.$facture['message'].'). La facture reste à transmettre : retransmettez-la depuis Facturation & MeCeF.', type: 'warning');
         }
     }

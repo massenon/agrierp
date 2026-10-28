@@ -570,7 +570,7 @@ class PosInterface extends Component
             $this->dispatch('toast', message: 'Vente enregistree avec succes - total '.number_format($this->total, 0, ',', ' ').' FCFA.', type: 'success');
         }
 
-        if (! $facture['transmise']) {
+        if (! $facture['transmise'] && ! ($facture['inactif'] ?? false)) {
             $this->dispatch('toast', message: 'Vente enregistrée — ATTENTION : facture normalisée MeCeF non transmise ('.$facture['message'].'). La vente reste à facturer : retransmettez-la depuis Facturation & MeCeF.', type: 'warning');
         }
 

@@ -134,6 +134,11 @@ class Facturation extends Component
 
     public function render()
     {
+        // Ticket VC-5 : module MeCeF désactivé — la page le dit au lieu d'offrir des gestes sans effet.
+        if (! config('mecef.actif')) {
+            return view('livewire.facturation.module-desactive', ['title' => 'Facturation & MeCeF']);
+        }
+
         return view('livewire.facturation.facturation', ['title' => 'Facturation & MeCeF']);
     }
 }
