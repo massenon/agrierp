@@ -176,6 +176,11 @@ class ParametresGenerauxRepository {
   /// Ticket UT-1 — message du web quand on archive son propre compte.
   static const messagePropreCompte = 'Vous ne pouvez pas archiver votre propre compte.';
 
+  /// Ticket MDP-1 — messages du web (`SaisieUtilisateurAction::MESSAGE_PROPRE_REINITIALISATION` / `…_COMPTE_ARCHIVE_…`),
+  /// lus dans le PHP par `test/reinitialisation_mot_de_passe_test.dart`.
+  static const messagePropreReinitialisation = 'Vous ne pouvez pas réinitialiser votre propre mot de passe : utilisez Mon Profil.';
+  static const messageCompteArchiveReinitialisation = 'Ce compte est archivé : réactivez-le avant de réinitialiser son mot de passe.';
+
   /// Clé du coffre du mot de passe en attente d'un compte (la même que celle lue par le moteur à l'envoi).
   static String cleMotDePasse(String idUtilisateur) => 'agrierp.utilisateur.mdp.$idUtilisateur';
 
@@ -260,8 +265,41 @@ class ParametresGenerauxRepository {
     });
     if (motDePasse.isNotEmpty) {
       await _coffre.write(key: cleMotDePasse(identifiantLigne), value: motDePasse);
+      // MDP-1 : un mot de passe saisi par la modification ordinaire n'est pas un temporaire — il remplace une
+      // réinitialisation encore en attente, qui ne doit pas le marquer à tort.
+      await _coffre.delete(key: cleMotDePasseTemporaire(identifiantLigne));
     }
     return identifiantLigne;
+  }
+
+  /// Ticket MDP-1 — clé du coffre qui marque le mot de passe en attente comme TEMPORAIRE (la même que celle lue par le moteur).
+  static String cleMotDePasseTemporaire(String idUtilisateur) => 'agrierp.utilisateur.reinit.$idUtilisateur';
+
+  /// Ticket MDP-1 — RÉINITIALISATION PAR UN ADMINISTRATEUR, mêmes règles que `SaisieUtilisateurAction::
+  /// reinitialiserMotDePasse` : jamais son propre compte, jamais un compte archivé, mot de passe temporaire selon
+  /// `Password::defaults()` (obligatoire). Le temporaire attend au COFFRE (comme UT-1, jamais en base) avec le marqueur
+  /// de réinitialisation ; la ligne repasse `pending` et porte le drapeau `must_change_password` (affichage immédiat de
+  /// la liste, confirmé au prochain tirage). Le serveur ferme jetons et sessions, trace `user.password_reset` et
+  /// rejette (`conflict`, motif du web) ce que le poste n'aurait pas su refuser.
+  Future<void> reinitialiserMotDePasseUtilisateur(String id, String motDePasseTemporaire, {required String? idConnecte}) async {
+    if (idConnecte != null && id == idConnecte) throw const RefusSaisieUtilisateur({'': messagePropreReinitialisation});
+
+    final u = await (database.select(database.utilisateurs)..where((t) => t.id.equals(id))).getSingle();
+    if (!u.isActive) throw const RefusSaisieUtilisateur({'': messageCompteArchiveReinitialisation});
+
+    final defaut = motDePasseTemporaire.isEmpty ? 'Le champ mot de passe temporaire est obligatoire.' : motDePasseRefuse(motDePasseTemporaire)?.replaceFirst('champ mot de passe', 'champ mot de passe temporaire');
+    if (defaut != null) throw RefusSaisieUtilisateur({'motDePasse': defaut});
+
+    await _coffre.write(key: cleMotDePasse(id), value: motDePasseTemporaire);
+    await _coffre.write(key: cleMotDePasseTemporaire(id), value: '1');
+    await (database.update(database.utilisateurs)..where((t) => t.id.equals(id))).write(
+      UtilisateursCompanion(
+        mustChangePassword: const Value(true),
+        deviceId: Value(identifiantPoste),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.versInstant(_maintenant())),
+      ),
+    );
   }
 
   /// `Password::defaults()` du web (14.65) : `min(8)->letters()->numbers()->symbols()`, messages de `lang/fr`.

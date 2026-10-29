@@ -24798,6 +24798,20 @@ class $UtilisateursTable extends Utilisateurs
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _mustChangePasswordMeta =
+      const VerificationMeta('mustChangePassword');
+  @override
+  late final GeneratedColumn<bool> mustChangePassword = GeneratedColumn<bool>(
+    'must_change_password',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("must_change_password" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -24809,6 +24823,7 @@ class $UtilisateursTable extends Utilisateurs
     email,
     role,
     isActive,
+    mustChangePassword,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -24875,6 +24890,15 @@ class $UtilisateursTable extends Utilisateurs
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('must_change_password')) {
+      context.handle(
+        _mustChangePasswordMeta,
+        mustChangePassword.isAcceptableOrUnknown(
+          data['must_change_password']!,
+          _mustChangePasswordMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -24922,6 +24946,10 @@ class $UtilisateursTable extends Utilisateurs
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      mustChangePassword: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}must_change_password'],
+      )!,
     );
   }
 
@@ -24944,6 +24972,10 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
   final String? email;
   final String? role;
   final bool isActive;
+
+  /// Ticket MDP-1 — mot de passe TEMPORAIRE posé par un administrateur : le compte devra le changer à sa première
+  /// connexion. Le DRAPEAU descend du serveur (affichage de la liste) ; ⚠️ le mot de passe, lui, n'est jamais en base.
+  final bool mustChangePassword;
   const Utilisateur({
     required this.id,
     required this.deviceId,
@@ -24954,6 +24986,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     this.email,
     this.role,
     required this.isActive,
+    required this.mustChangePassword,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -24977,6 +25010,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
       map['role'] = Variable<String>(role);
     }
     map['is_active'] = Variable<bool>(isActive);
+    map['must_change_password'] = Variable<bool>(mustChangePassword);
     return map;
   }
 
@@ -24995,6 +25029,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
           : Value(email),
       role: role == null && nullToAbsent ? const Value.absent() : Value(role),
       isActive: Value(isActive),
+      mustChangePassword: Value(mustChangePassword),
     );
   }
 
@@ -25015,6 +25050,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
       email: serializer.fromJson<String?>(json['email']),
       role: serializer.fromJson<String?>(json['role']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      mustChangePassword: serializer.fromJson<bool>(json['mustChangePassword']),
     );
   }
   @override
@@ -25032,6 +25068,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
       'email': serializer.toJson<String?>(email),
       'role': serializer.toJson<String?>(role),
       'isActive': serializer.toJson<bool>(isActive),
+      'mustChangePassword': serializer.toJson<bool>(mustChangePassword),
     };
   }
 
@@ -25045,6 +25082,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     Value<String?> email = const Value.absent(),
     Value<String?> role = const Value.absent(),
     bool? isActive,
+    bool? mustChangePassword,
   }) => Utilisateur(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -25055,6 +25093,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     email: email.present ? email.value : this.email,
     role: role.present ? role.value : this.role,
     isActive: isActive ?? this.isActive,
+    mustChangePassword: mustChangePassword ?? this.mustChangePassword,
   );
   Utilisateur copyWithCompanion(UtilisateursCompanion data) {
     return Utilisateur(
@@ -25069,6 +25108,9 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
       email: data.email.present ? data.email.value : this.email,
       role: data.role.present ? data.role.value : this.role,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      mustChangePassword: data.mustChangePassword.present
+          ? data.mustChangePassword.value
+          : this.mustChangePassword,
     );
   }
 
@@ -25083,7 +25125,8 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
           ..write('username: $username, ')
           ..write('email: $email, ')
           ..write('role: $role, ')
-          ..write('isActive: $isActive')
+          ..write('isActive: $isActive, ')
+          ..write('mustChangePassword: $mustChangePassword')
           ..write(')'))
         .toString();
   }
@@ -25099,6 +25142,7 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
     email,
     role,
     isActive,
+    mustChangePassword,
   );
   @override
   bool operator ==(Object other) =>
@@ -25112,7 +25156,8 @@ class Utilisateur extends DataClass implements Insertable<Utilisateur> {
           other.username == this.username &&
           other.email == this.email &&
           other.role == this.role &&
-          other.isActive == this.isActive);
+          other.isActive == this.isActive &&
+          other.mustChangePassword == this.mustChangePassword);
 }
 
 class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
@@ -25125,6 +25170,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
   final Value<String?> email;
   final Value<String?> role;
   final Value<bool> isActive;
+  final Value<bool> mustChangePassword;
   final Value<int> rowid;
   const UtilisateursCompanion({
     this.id = const Value.absent(),
@@ -25136,6 +25182,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     this.email = const Value.absent(),
     this.role = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.mustChangePassword = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UtilisateursCompanion.insert({
@@ -25148,6 +25195,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     this.email = const Value.absent(),
     this.role = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.mustChangePassword = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -25163,6 +25211,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     Expression<String>? email,
     Expression<String>? role,
     Expression<bool>? isActive,
+    Expression<bool>? mustChangePassword,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -25175,6 +25224,8 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
       if (email != null) 'email': email,
       if (role != null) 'role': role,
       if (isActive != null) 'is_active': isActive,
+      if (mustChangePassword != null)
+        'must_change_password': mustChangePassword,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -25189,6 +25240,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     Value<String?>? email,
     Value<String?>? role,
     Value<bool>? isActive,
+    Value<bool>? mustChangePassword,
     Value<int>? rowid,
   }) {
     return UtilisateursCompanion(
@@ -25201,6 +25253,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
       email: email ?? this.email,
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -25237,6 +25290,9 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (mustChangePassword.present) {
+      map['must_change_password'] = Variable<bool>(mustChangePassword.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -25255,6 +25311,7 @@ class UtilisateursCompanion extends UpdateCompanion<Utilisateur> {
           ..write('email: $email, ')
           ..write('role: $role, ')
           ..write('isActive: $isActive, ')
+          ..write('mustChangePassword: $mustChangePassword, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -62802,6 +62859,7 @@ typedef $$UtilisateursTableCreateCompanionBuilder =
       Value<String?> email,
       Value<String?> role,
       Value<bool> isActive,
+      Value<bool> mustChangePassword,
       Value<int> rowid,
     });
 typedef $$UtilisateursTableUpdateCompanionBuilder =
@@ -62815,6 +62873,7 @@ typedef $$UtilisateursTableUpdateCompanionBuilder =
       Value<String?> email,
       Value<String?> role,
       Value<bool> isActive,
+      Value<bool> mustChangePassword,
       Value<int> rowid,
     });
 
@@ -62872,6 +62931,11 @@ class $$UtilisateursTableFilterComposer
     column: $table.isActive,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$UtilisateursTableOrderingComposer
@@ -62927,6 +62991,11 @@ class $$UtilisateursTableOrderingComposer
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UtilisateursTableAnnotationComposer
@@ -62967,6 +63036,11 @@ class $$UtilisateursTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<bool> get mustChangePassword => $composableBuilder(
+    column: $table.mustChangePassword,
+    builder: (column) => column,
+  );
 }
 
 class $$UtilisateursTableTableManager
@@ -63009,6 +63083,7 @@ class $$UtilisateursTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> role = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> mustChangePassword = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UtilisateursCompanion(
                 id: id,
@@ -63020,6 +63095,7 @@ class $$UtilisateursTableTableManager
                 email: email,
                 role: role,
                 isActive: isActive,
+                mustChangePassword: mustChangePassword,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -63033,6 +63109,7 @@ class $$UtilisateursTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> role = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> mustChangePassword = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UtilisateursCompanion.insert(
                 id: id,
@@ -63044,6 +63121,7 @@ class $$UtilisateursTableTableManager
                 email: email,
                 role: role,
                 isActive: isActive,
+                mustChangePassword: mustChangePassword,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

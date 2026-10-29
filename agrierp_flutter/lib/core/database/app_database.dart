@@ -728,6 +728,9 @@ class Utilisateurs extends Table with SyncColumns {
   TextColumn get email => text().nullable()();
   TextColumn get role => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  /// Ticket MDP-1 — mot de passe TEMPORAIRE posé par un administrateur : le compte devra le changer à sa première
+  /// connexion. Le DRAPEAU descend du serveur (affichage de la liste) ; ⚠️ le mot de passe, lui, n'est jamais en base.
+  BoolColumn get mustChangePassword => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -2362,7 +2365,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 80;
+  int get schemaVersion => 81;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3043,6 +3046,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v81 — ticket MDP-1 : `utilisateurs.must_change_password` (mot de passe temporaire à changer), tiré du serveur.
+      if (from < 81) {
+        await _ajouterColonneSiAbsente(m, utilisateurs, utilisateurs.mustChangePassword);
       }
       // v80 — ticket CP-4 : demandes de clôture, clôtures de mois tirées, étape 1 et date de clôture de l'exercice.
       if (from < 80) {

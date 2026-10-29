@@ -115,6 +115,7 @@ abstract final class SymbolesAgri {
   static const IconData lock_clock = IconData(0xef57, fontFamily: famille);
   static const IconData lock_open = IconData(0xe898, fontFamily: famille);
   static const IconData lock_outline = IconData(0xe88d, fontFamily: famille);
+  static const IconData lock_reset = IconData(0xeade, fontFamily: famille);
   static const IconData logout = IconData(0xe9ba, fontFamily: famille);
   static const IconData mail = IconData(0xe0be, fontFamily: famille);
   static const IconData male = IconData(0xe58e, fontFamily: famille);
@@ -176,7 +177,6 @@ abstract final class SymbolesAgri {
   static const IconData show_chart = IconData(0xe6e1, fontFamily: famille);
   static const IconData skull = IconData(0xf89a, fontFamily: famille);
   static const IconData smartphone = IconData(0xe0d4, fontFamily: famille);
-  static const IconData sms = IconData(0xe0d8, fontFamily: famille);
   static const IconData ssid_chart = IconData(0xeb66, fontFamily: famille);
   static const IconData star = IconData(0xe838, fontFamily: famille);
   static const IconData support_agent = IconData(0xf0e2, fontFamily: famille);

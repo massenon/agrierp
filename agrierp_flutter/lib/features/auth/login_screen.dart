@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
-import '../../core/widgets/modale_agri.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
@@ -15,8 +14,8 @@ import '../../core/theme/symboles_agri.dart';
 ///     « Bienvenue ! », bandeau de blocage, formulaire, pied de page.
 ///
 /// ⚠️ LIBELLÉS REPRIS AU MOT : « NOM D'UTILISATEUR OU EMAIL », « MOT DE
-/// PASSE », « Se souvenir de moi », « Mot de passe oublié ? », « SE
-/// CONNECTER », et le titre « Bienvenue ! » avec son point d'exclamation.
+/// PASSE », « Se souvenir de moi », « Contactez l'administrateur » (MDP-1 : texte
+/// non cliquable qui remplace l'ancien lien de réinitialisation par e-mail), « SE CONNECTER », et le titre « Bienvenue ! » avec son point d'exclamation.
 ///
 /// ÉCARTS ASSUMÉS PAR RAPPORT À LA MAQUETTE :
 /// 1. Le sélecteur de langue et le bouton « Mode sombre » sont affichés mais
@@ -185,23 +184,16 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        Flexible(
-          child: TextButton(
-            // ⚠️ La réinitialisation passe par un lien envoyé par E-MAIL : elle
-            // exige donc le réseau ET une adresse. Ouvrir une saisie hors ligne
-            // laisserait croire à un envoi qui n'aura pas lieu — l'écran renvoie
-            // vers la surface web, qui porte ce parcours en entier.
-            onPressed: () => afficherModale<void>(
-              context: context,
-              constructeur: (_) => const _DialogueMotDePasseOublie(),
-            ),
-            child: const Text(
-              'Mot de passe oublié ?',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.w600,
-                color: AgriColors.brandEmerald,
-              ),
+        // MDP-1 : plus de réinitialisation par e-mail. Un administrateur choisit un mot de passe temporaire ; le
+        // texte, NON cliquable, remplace le lien au même emplacement (même mots que le Blade `login.blade.php`).
+        const Flexible(
+          child: Text(
+            "Contactez l'administrateur",
+            key: Key('login-contacter-administrateur'),
+            style: TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: FontWeight.w600,
+              color: AgriColors.outline,
             ),
           ),
         ),
@@ -420,12 +412,16 @@ class BoutonConnexion extends StatelessWidget {
             else
               const Icon(SymbolesAgri.lock_open, size: 16),
             const SizedBox(width: AgriSpacing.sm),
-            Text(
-              libelle,
-              style: const TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
+            // Flexible : un libellé long (« ENREGISTRER LE MOT DE PASSE ») ne déborde pas du bouton de 44 px.
+            Flexible(
+              child: Text(
+                libelle,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
               ),
             ),
           ],
@@ -741,33 +737,6 @@ class _BandeauErreur extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _DialogueMotDePasseOublie extends StatelessWidget {
-  const _DialogueMotDePasseOublie();
-
-  @override
-  Widget build(BuildContext context) {
-    // ⚠️ Gabarit `max-w-sm` des modales d'information : le prototype n'a pas
-    // d'écran de mot de passe oublié au poste, la réinitialisation se faisant
-    // sur la surface web.
-    return ModaleAgri(
-      titre: 'Mot de passe oublié',
-      largeur: LargeurModale.sm,
-      contenu: const Text(
-        "La réinitialisation se fait par un lien envoyé sur votre adresse "
-        "e-mail professionnelle, depuis l'espace web LogiAgriERP. Ce poste ne "
-        "peut pas l'envoyer lui-même.",
-        style: TextStyle(fontSize: AgriTypography.xs),
-      ),
-      actions: [
-        BoutonModaleSecondaire(
-          libelle: 'Fermer',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     );
   }
 }

@@ -4,6 +4,7 @@ import '../../core/auth/auth_service.dart';
 import '../../core/auth/verrou_inactivite.dart';
 import '../../core/auth/verrou_local.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../auth/ecran_changement_mot_de_passe.dart';
 import 'ecran_definir_pin.dart';
 import 'ecran_verrou.dart';
 
@@ -68,7 +69,7 @@ class PorteSession extends StatefulWidget {
   State<PorteSession> createState() => _PorteSessionState();
 }
 
-enum _Phase { chargement, connexion, definition, verrouille, ouverte }
+enum _Phase { chargement, connexion, changementMotDePasse, definition, verrouille, ouverte }
 
 class _PorteSessionState extends State<PorteSession> {
   _Phase _phase = _Phase.chargement;
@@ -95,14 +96,20 @@ class _PorteSessionState extends State<PorteSession> {
     if (mounted) _aller(defini ? _Phase.verrouille : _Phase.definition);
   }
 
+  /// MDP-1 — mot de passe TEMPORAIRE posé par un administrateur : le changement obligatoire passe AVANT le PIN et
+  /// l'accueil, à la connexion comme à la reprise d'une session restaurée.
+  bool get _changementRequis => widget.auth.utilisateur?.doitChangerMotDePasse ?? false;
+
   Future<void> _connecte() async {
     _sessionNeuve = true;
+    if (_changementRequis) return _aller(_Phase.changementMotDePasse);
     final defini = await widget.verrou.estDefini(_id);
     if (defini) return _ouvrir();
     if (mounted) _aller(_Phase.definition);
   }
 
   Future<void> _ouvrir() async {
+    if (_changementRequis) return _aller(_Phase.changementMotDePasse);
     await widget.avantOuverture?.call();
     if (!mounted) return;
     setState(() => _phase = _Phase.ouverte);
@@ -171,6 +178,14 @@ class _PorteSessionState extends State<PorteSession> {
         body: Center(child: CircularProgressIndicator()),
       ),
       _Phase.connexion => widget.ecranConnexion(_connecte),
+      _Phase.changementMotDePasse => EcranChangementMotDePasseObligatoire(
+        auth: widget.auth,
+        onChange: _connecte,
+        onDeconnecte: () {
+          widget.surFinDeSession?.call();
+          _aller(_Phase.connexion);
+        },
+      ),
       _Phase.definition => EcranDefinirPin(
         verrou: widget.verrou,
         idUtilisateur: _id,

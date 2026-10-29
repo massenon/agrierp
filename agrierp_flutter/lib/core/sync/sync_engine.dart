@@ -3086,6 +3086,8 @@ class SyncEngine {
           email: Value(l['email'] as String?),
           role: Value(l['role'] as String?),
           isActive: Value(_bool(l['is_active'])),
+          // MDP-1 : le drapeau seul (affichage de la liste) ; absent d'un serveur ancien = faux. Jamais le mot de passe.
+          mustChangePassword: Value(_bool(l['must_change_password'])),
         ),
       );
     }
@@ -5373,6 +5375,11 @@ class SyncEngine {
       for (final u in utilisateurs)
         if (await _coffre.read(key: cleMotDePasse(u.id)) case final String mdp) u.id: mdp,
     };
+    // Ticket MDP-1 — les comptes dont le mot de passe en attente est un mot de passe TEMPORAIRE (réinitialisation).
+    final reinitialisations = <String>{
+      for (final u in utilisateurs)
+        if (motsDePasse.containsKey(u.id) && await _coffre.read(key: cleMotDePasseTemporaire(u.id)) == '1') u.id,
+    };
 
     final produits = await (_db.select(
       _db.products,
@@ -5717,7 +5724,7 @@ class SyncEngine {
         // traite AVANT les pointages et la paie du même envoi. Une clé VIDE n'est pas envoyée (postes anciens côté serveur).
         if (employes.isNotEmpty) 'employees': employes.map(_employeEnJson).toList(),
         // Ticket UT-1 — `pushUsers` (manage-users), après les employés ; le mot de passe part UNE fois, s'il a été saisi.
-        if (utilisateurs.isNotEmpty) 'users': [for (final u in utilisateurs) _utilisateurEnJson(u, motsDePasse[u.id])],
+        if (utilisateurs.isNotEmpty) 'users': [for (final u in utilisateurs) _utilisateurEnJson(u, motsDePasse[u.id], reinitialisation: reinitialisations.contains(u.id))],
         if (stagiaires.isNotEmpty) 'internships': stagiaires.map(_stagiaireEnJson).toList(),
         if (absencesStagiaires.isNotEmpty) 'internship_absences': absencesStagiaires.map(_absenceStagiaireEnJson).toList(),
         // Ticket RH-4 — la DEMANDE seule (`pushPayslipRequests`, après les pointages) : jamais un montant.
@@ -6138,7 +6145,10 @@ class SyncEngine {
       (n) => rejete += n,
     );
     for (final u in utilisateurs) {
-      if (_acquittes(corps['users']).contains(u.id)) await _coffre.delete(key: cleMotDePasse(u.id));
+      if (_acquittes(corps['users']).contains(u.id)) {
+        await _coffre.delete(key: cleMotDePasse(u.id));
+        await _coffre.delete(key: cleMotDePasseTemporaire(u.id));
+      }
     }
     accepte += await _acquitter(
       'internships',
@@ -8051,9 +8061,13 @@ class SyncEngine {
   /// Ticket UT-1 — clé du coffre où attend le mot de passe d'un compte saisi au poste.
   static String cleMotDePasse(String idUtilisateur) => 'agrierp.utilisateur.mdp.$idUtilisateur';
 
+  /// Ticket MDP-1 — clé du coffre qui marque le mot de passe en attente comme TEMPORAIRE (réinitialisation par un
+  /// administrateur) : l'envoi porte alors `reset_password: true`. Effacée avec le mot de passe, à l'acquit.
+  static String cleMotDePasseTemporaire(String idUtilisateur) => 'agrierp.utilisateur.reinit.$idUtilisateur';
+
   /// Ticket UT-1 — compte tel que `pushUsers` le valide (règles de `SaisieUtilisateurAction`) ; `password` seulement
   /// s'il a été saisi (création, ou changement) : absent, le serveur conserve l'actuel.
-  Map<String, dynamic> _utilisateurEnJson(Utilisateur u, String? motDePasse) => {
+  Map<String, dynamic> _utilisateurEnJson(Utilisateur u, String? motDePasse, {bool reinitialisation = false}) => {
     'id': u.id,
     'name': u.name,
     'username': u.username,
@@ -8061,6 +8075,9 @@ class SyncEngine {
     'role': u.role,
     'is_active': u.isActive,
     'password': ?motDePasse,
+    // MDP-1 : réinitialisation — `password` est le mot de passe TEMPORAIRE ; le serveur pose le drapeau, ferme jetons
+    // et sessions, refuse le propre compte de l'auteur (même motif que le web).
+    if (reinitialisation) 'reset_password': true,
     'device_id': u.deviceId,
   };
 

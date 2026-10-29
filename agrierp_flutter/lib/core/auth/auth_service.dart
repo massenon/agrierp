@@ -14,6 +14,7 @@ class SessionUtilisateur {
     required this.email,
     required this.role,
     required this.roleLibelle,
+    this.doitChangerMotDePasse = false,
   });
 
   factory SessionUtilisateur.depuisJson(Map<String, dynamic> j) =>
@@ -25,6 +26,8 @@ class SessionUtilisateur {
         email: convertirDomaineEmail((j['email'] ?? '') as String),
         role: (j['role'] ?? '') as String,
         roleLibelle: (j['role_label'] ?? '') as String,
+        // MDP-1 : absent d'un serveur ou d'une session ancienne = faux.
+        doitChangerMotDePasse: j['must_change_password'] == true,
       );
 
   final String id;
@@ -34,6 +37,19 @@ class SessionUtilisateur {
   final String role;
   final String roleLibelle;
 
+  /// Ticket MDP-1 — un administrateur a posé un mot de passe TEMPORAIRE : le poste affiche le changement obligatoire
+  /// avant l'accueil, et le serveur refuse tout le reste de l'API (403) tant qu'il n'est pas fait.
+  final bool doitChangerMotDePasse;
+
+  SessionUtilisateur avecChangementFait() => SessionUtilisateur(
+    id: id,
+    nom: nom,
+    identifiant: identifiant,
+    email: email,
+    role: role,
+    roleLibelle: roleLibelle,
+  );
+
   Map<String, dynamic> versJson() => {
     'id': id,
     'name': nom,
@@ -41,6 +57,7 @@ class SessionUtilisateur {
     'email': email,
     'role': role,
     'role_label': roleLibelle,
+    'must_change_password': doitChangerMotDePasse,
   };
 }
 
@@ -152,7 +169,11 @@ class AuthService {
         throw const EchecConnexion('Réponse inattendue du serveur.');
       }
 
-      _utilisateur = SessionUtilisateur.depuisJson(utilisateur);
+      // MDP-1 : `must_change_password` est au niveau de la réponse (le bloc `user` reste celui d'avant).
+      _utilisateur = SessionUtilisateur.depuisJson({
+        ...utilisateur,
+        'must_change_password': corps['must_change_password'] == true,
+      });
       _appliquerJeton(jeton);
 
       await _coffre.write(key: _cleJeton, value: jeton);
@@ -194,6 +215,13 @@ class AuthService {
           'new_password_confirmation': confirmation,
         },
       );
+      // MDP-1 : le changement lève le drapeau, y compris dans la session conservée au coffre (une reprise de
+      // session ne doit pas réafficher l'écran obligatoire).
+      final session = _utilisateur;
+      if (session != null && session.doitChangerMotDePasse) {
+        _utilisateur = session.avecChangementFait();
+        await _coffre.write(key: _cleUtilisateur, value: jsonEncode(_utilisateur!.versJson()));
+      }
     } on DioException catch (e) {
       final donnees = e.response?.data;
       final champs = <String, String>{};

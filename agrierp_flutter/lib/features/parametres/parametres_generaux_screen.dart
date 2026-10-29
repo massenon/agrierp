@@ -1035,6 +1035,10 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               // pas « Inactif ». Un compte désactivé n'est jamais supprimé :
               // l'archivage logique est la règle du projet.
               (
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1055,6 +1059,18 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                     ],
                   ],
                 ),
+                // MDP-1 : comme le Blade — sous la pastille « Actif » d'un compte au mot de passe temporaire.
+                if (d.utilisateurs[i].isActive && d.utilisateurs[i].mustChangePassword)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AgriSpacing.xs),
+                    child: Text(
+                      'Mot de passe à changer',
+                      key: Key('utilisateur-mdp-a-changer-$i'),
+                      style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+                    ),
+                  ),
+                  ],
+                ),
                 3,
               ),
               (
@@ -1068,6 +1084,15 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                     ),
+                    if (d.utilisateurs[i].isActive)
+                      IconButton(
+                        key: Key('utilisateur-reinitialiser-$i'),
+                        tooltip: 'Réinitialiser le mot de passe',
+                        onPressed: () => _ouvrirReinitialisation(d.utilisateurs[i]),
+                        icon: const Icon(SymbolesAgri.lock_reset, size: 18, color: AgriColors.brandForest),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
                     if (d.utilisateurs[i].isActive)
                       IconButton(
                         key: Key('utilisateur-archiver-$i'),
@@ -1154,6 +1179,77 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  /// Ticket MDP-1 — la fenêtre « Réinitialiser le mot de passe » de `gestion-utilisateurs.blade.php` (mêmes mots) : le propre
+  /// compte est refusé dès l'ouverture, comme au web (toast d'erreur) ; l'administrateur choisit un mot de passe TEMPORAIRE.
+  void _ouvrirReinitialisation(Utilisateur u) {
+    if (u.id == widget.idUtilisateurConnecte) {
+      ToastAgri.afficher(context, ParametresGenerauxRepository.messagePropreReinitialisation);
+      return;
+    }
+    final temporaire = TextEditingController();
+    var erreur = <String, String>{};
+
+    afficherModale<void>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, majModale) => ModaleAgri(
+          titre: 'Réinitialiser le mot de passe',
+          largeur: LargeurModale.sm,
+          contenu: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (erreur[''] != null) ...[
+                Text(erreur['']!, key: const Key('reinitialisation-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorRed)),
+                const SizedBox(height: AgriSpacing.sm),
+              ],
+              const Text(
+                "Choisissez un mot de passe temporaire et communiquez-le à la personne. Elle devra le changer à sa première connexion ; ses sessions et ses postes seront déconnectés. L'action est journalisée (jamais le mot de passe).",
+                style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('Mot de passe temporaire *'.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+              ),
+              TextField(
+                key: const Key('reinitialisation-mot-de-passe'),
+                controller: temporaire,
+                obscureText: true,
+                decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), errorText: erreur['motDePasse']),
+                style: const TextStyle(fontSize: AgriTypography.sm),
+              ),
+            ],
+          ),
+          actions: [
+            BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+            BoutonModalePrimaire(
+              libelle: 'Réinitialiser',
+              onPressed: () async {
+                try {
+                  await widget.depot.reinitialiserMotDePasseUtilisateur(
+                    u.id,
+                    temporaire.text,
+                    idConnecte: widget.idUtilisateurConnecte,
+                  );
+                } on RefusSaisieUtilisateur catch (e) {
+                  majModale(() => erreur = e.champs);
+                  return;
+                }
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (mounted) {
+                  ToastAgri.afficher(this.context, 'Mot de passe réinitialisé : le compte devra le changer à sa prochaine connexion.');
+                }
+                await _charger();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
