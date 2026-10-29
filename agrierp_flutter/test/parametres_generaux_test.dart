@@ -432,7 +432,7 @@ void main() {
       }
       expect(find.text('FUTUR'), findsOne);
       expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(3));
-      expect(find.byIcon(SymbolesAgri.toggle_off), findsOne);
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(2), reason: "héliciculture et assistant de démarrage (éteint par défaut)");
     });
 
     testWidgets('un utilisateur désactivé porte le mot de la maquette', (
