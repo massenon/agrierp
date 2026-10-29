@@ -852,3 +852,15 @@ Décision du client : abandon de la réinitialisation automatique par e-mail («
 Tests : Laravel `ReinitialisationMotDePasseAdminTest`, `ChangementMotDePasseObligatoireTest`, `SyncReinitialisationMotDePasseTest`, `CodeSecoursAdminTest`, `ConnexionSansReinitialisationParEmailTest` ; Flutter `reinitialisation_mot_de_passe_test.dart`, `migration_toutes_versions_test.dart` (palier 81).
 **Limites assumées** : un compte créé hors ligne puis réinitialisé avant son premier envoi reçoit le temporaire à la création ; le geste de l'administrateur du poste est SANS effet immédiat côté serveur (jetons et sessions du compte tombent au prochain envoi) ; le premier code de secours n'est pas généré automatiquement (à faire à l'installation) ; la modification ordinaire d'un compte avec un mot de passe saisi (UT-1) ne pose pas le drapeau. Le manuel d'utilisation (`manuel/src`) est mis à jour en texte seulement (captures à refaire).
 
+
+## AIDE-1 ✅ (29/10/2026) Bouton flottant d'aide, aide par écran, assistant relançable, visite guidée (web + poste)
+
+Décision du client : seulement quand le module « Assistant de démarrage » est ALLUMÉ (éteint par défaut), un bouton `help` à droite de tous les écrans (au-dessus d'« Accès rapide », 12 px d'écart) ouvre un panneau : « Aide de cet écran », « Relancer l'assistant de démarrage », « Visite guidée ».
+
+- **Source unique des textes** : `agrierp_laravel/lang/fr/aide_ecrans.php` (clé = chemin de la route ; 55 écrans web, repli générique pour une route non listée, visite en 4 étapes, libellés du panneau, `poste_seul` pour Synchronisation et Paramètres du poste). Le poste est produit par `php agrierp_flutter/outils/generer_aide_ecrans.php` (`lib/core/aide/aide_ecrans.dart`) ; garde exécutée `test/aide_ecrans_parite_test.dart`.
+- **Choix** : le repli générique ne masque pas un oubli : `AideFlottanteTest` EXIGE une entrée par route authentifiée (et aucune entrée orpheline).
+- **Relance au web** : `Parametres\AssistantDemarrage` est monté par le layout (plus par le seul tableau de bord ; `auto` vrai seulement sur le tableau de bord) et écoute `relancer-assistant` ; rien n'est écrit (`onboarding_completed_at` jamais remis à vide). « Terminer » après relance ne réécrit plus la date de fin. Ligne réservée à `manage-parametres`.
+- **Relance au poste** : `PremierDemarrageScreen(relance: true)` poussé par-dessus le socle (titre « Assistant de démarrage », bouton « Fermer ») — le dépôt le permet sur un poste en service, aucune modale parallèle.
+- **Visite** : Alpine maison (`resources/js/aide.js`, logique pure `aide-logique.js`), repères `data-aide="aide|topbar|contenu|menu"` ; au poste, VRAI voile percé sur les éléments du socle par `GlobalKey` (`PlacementVisite`, transposition de la logique JS). Élément absent ou hors champ (menu replié, tiroir mobile fermé) : étape sans trou.
+- **Poste** : le module est relu après chaque tirage et quand la carte de Paramètres bascule (`surAssistantBascule`).
+- **Non vérifié** : rendu navigateur réel (placement du trou, tiroir, focus), rendu Windows réel.

@@ -75,9 +75,13 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.reglages,
     this.estAdmin = false,
     this.admin,
+    this.surAssistantBascule,
   });
 
   final ParametresGenerauxRepository depot;
+
+  /// Ticket AIDE-1 — appelé après le basculement de la carte « Assistant de démarrage » : le socle relit le module.
+  final VoidCallback? surAssistantBascule;
 
   /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles) écrits en
   /// DEMANDES ; `null` : les onglets restent en consultation (vues du châssis sans session).
@@ -760,6 +764,8 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     try {
       await widget.depot.definirAssistant(actif: actif);
       await _charger();
+      // Ticket AIDE-1 : le socle relit le module (bouton d'aide) tout de suite, sans attendre un tirage.
+      widget.surAssistantBascule?.call();
       if (mounted) ToastAgri.afficher(context, messageModuleBascule);
     } finally {
       _basculeAssistantEnCours = false;

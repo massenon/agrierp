@@ -26,7 +26,7 @@ void main() {
   test('les 13 entrées et leurs 3 groupes sont ceux du Blade, dans l ordre', () {
     final blade = File('$dossierLaravel/resources/views/layouts/app.blade.php').readAsStringSync();
     final debut = blade.indexOf('Accès Rapide</span>');
-    final fin = blade.indexOf('Visite guidée', debut);
+    final fin = blade.indexOf('Ticket AIDE-1', debut);
     expect(debut, greaterThan(0), reason: 'panneau « Accès Rapide » introuvable dans le Blade');
     final panneau = blade.substring(debut, fin);
 

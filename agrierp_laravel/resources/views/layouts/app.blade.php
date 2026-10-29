@@ -47,7 +47,7 @@
     id="app-racine"
     class="flex h-screen w-full overflow-hidden">
 
-    <aside id="sidebar"
+    <aside id="sidebar" data-aide="menu"
         class="sidebar-gradient w-72 h-full flex-shrink-0 flex flex-col transition-all duration-300 overflow-hidden fixed lg:static inset-y-0 left-0 z-50"
         :class="sidebarMobileOpen ? '' : '-translate-x-full lg:translate-x-0'"
         x-show="!sidebarDesktopHidden || sidebarMobileOpen"
@@ -166,7 +166,7 @@
     </div>
 
     <div class="flex-1 flex flex-col min-w-0">
-        <header class="h-16 bg-white border-b border-outline-variant px-md lg:px-lg flex items-center justify-between sticky top-0 z-30 flex-shrink-0">
+        <header data-aide="topbar" class="h-16 bg-white border-b border-outline-variant px-md lg:px-lg flex items-center justify-between sticky top-0 z-30 flex-shrink-0">
             <div class="flex items-center gap-md min-w-0">
                 <button @click="sidebarMobileOpen = true" class="lg:hidden text-brand-forest"><span class="material-symbols-outlined" style="font-size:26px;">menu</span></button>
                 <button @click="sidebarDesktopHidden = !sidebarDesktopHidden; localStorage.setItem('agrierp_sidebar_hidden', sidebarDesktopHidden ? '1' : '0')" title="Afficher/Masquer la barre latérale" class="hidden lg:flex text-outline hover:text-brand-emerald"><span class="material-symbols-outlined" style="font-size:22px;">menu_open</span></button>
@@ -208,7 +208,7 @@
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-md lg:p-lg pb-56 lg:pb-lg bg-surface-bg">
+        <div data-aide="contenu" class="flex-1 overflow-y-auto p-md lg:p-lg pb-56 lg:pb-lg bg-surface-bg">
             {{-- Ticket EX7 (EF10) — bandeau de lecture seule d'un exercice clos, en haut du contenu. --}}
             <livewire:shared.bandeau-exercice />
             {{ $slot }}
@@ -264,7 +264,20 @@
         </div>
     </div>
 
-    {{-- Visite guidée désactivée (client, 26/10/2026) --}}
+    {{--
+        Ticket AIDE-1 — bouton flottant d'aide (icône `help`, à droite, au-dessus de « Accès rapide ») : aide de l'écran,
+        relance de l'assistant de démarrage, visite guidée. SEULEMENT quand le module « Assistant de démarrage » est allumé
+        (Paramètres > Modules Actifs, éteint par défaut) : éteint, rien n'est rendu (comme depuis le 26/10/2026, où l'ancien
+        bouton « Visite guidée » inerte avait été retiré). Les éléments expliqués par la visite portent `data-aide`.
+    --}}
+    @if(\App\Support\AideEcrans::actif())
+        <x-aide-flottante />
+        {{-- L'assistant vit ici, et non plus sur le seul tableau de bord : « Relancer l'assistant » doit le rouvrir de n'importe
+             quel écran. Il ne s'ouvre de lui-même que sur le tableau de bord, comme avant. --}}
+        @can('manage-parametres')
+            <livewire:parametres.assistant-demarrage :auto="request()->routeIs('dashboard.index')" />
+        @endcan
+    @endif
 
     <x-pwa-install />
     {{-- Ticket POP1 — fenêtre « Rappels du jour » à l'ouverture, pour qui voit Soins et vaccins (view-elevage). --}}

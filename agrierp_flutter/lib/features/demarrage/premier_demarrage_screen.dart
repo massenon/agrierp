@@ -20,6 +20,7 @@ class PremierDemarrageScreen extends StatefulWidget {
     required this.onTermine,
     this.depotCloture,
     this.peutOuvrirExercice = false,
+    this.relance = false,
   });
 
   final PremierDemarrageRepository depot;
@@ -33,6 +34,11 @@ class PremierDemarrageScreen extends StatefulWidget {
 
   /// `manage-comptabilite` : sans lui, pas de bouton (le web le masque par `@can`).
   final bool peutOuvrirExercice;
+
+  /// Ticket AIDE-1 — « Relancer l'assistant de démarrage » du bouton d'aide : le même écran, rouvert depuis le socle d'un poste
+  /// EN SERVICE (module « Assistant de démarrage » allumé, droit `manage-parametres`). Seuls changent le titre, l'introduction
+  /// et le pied (« Fermer ») : les étapes sont les mêmes, toujours constatées, et rien n'est écrit en l'ouvrant.
+  final bool relance;
 
   @override
   State<PremierDemarrageScreen> createState() => _PremierDemarrageScreenState();
@@ -196,8 +202,8 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Premier démarrage du poste',
+                Text(
+                  widget.relance ? 'Assistant de démarrage' : 'Premier démarrage du poste',
                   style: TextStyle(
                     fontSize: AgriTypography.xl,
                     fontWeight: FontWeight.bold,
@@ -205,9 +211,11 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
                   ),
                 ),
                 const SizedBox(height: AgriSpacing.xs),
-                const Text(
-                  "Ce poste n'a encore rien reçu du serveur : bandes, produits, exercice et comptes "
-                  "n'y existent qu'après une première synchronisation.",
+                Text(
+                  widget.relance
+                      ? "Ce qu'il faut en place avant la première saisie — constaté sur ce poste, pas à cocher."
+                      : "Ce poste n'a encore rien reçu du serveur : bandes, produits, exercice et comptes "
+                            "n'y existent qu'après une première synchronisation.",
                   style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
                 ),
                 const SizedBox(height: AgriSpacing.md),
@@ -247,12 +255,19 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
                   spacing: AgriSpacing.sm,
                   runSpacing: AgriSpacing.xs,
                   children: [
-                    TextButton(
-                      key: const Key('premier-plus-tard'),
-                      onPressed: widget.onTermine,
-                      child: const Text('Plus tard'),
-                    ),
-                    if (_synchronise)
+                    if (!widget.relance)
+                      TextButton(
+                        key: const Key('premier-plus-tard'),
+                        onPressed: widget.onTermine,
+                        child: const Text('Plus tard'),
+                      ),
+                    if (widget.relance)
+                      TextButton(
+                        key: const Key('premier-fermer'),
+                        onPressed: widget.onTermine,
+                        child: const Text('Fermer'),
+                      ),
+                    if (_synchronise && !widget.relance)
                       FilledButton(
                         key: const Key('premier-continuer'),
                         onPressed: widget.onTermine,

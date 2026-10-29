@@ -22,6 +22,7 @@ import 'core/widgets/navigation_poste.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
 import 'core/widgets/acces_rapide.dart';
+import 'core/widgets/aide_flottante.dart';
 import 'features/recherche/recherche_globale_champ.dart';
 import 'features/recherche/recherche_globale_repository.dart';
 import 'core/widgets/modale_agri.dart';
@@ -545,6 +546,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
                 }),
               )
             : SocleAccueil(
+          demarrage: _demarrage,
           database: _db,
           engine: _engine,
           auth: _auth,
@@ -669,7 +671,11 @@ class SocleAccueil extends StatefulWidget {
     this.changementsReseau,
     this.gestes,
     this.synchroniserALOuverture = true,
+    this.demarrage,
   });
+
+  /// Ticket AIDE-1 — dépôt du premier démarrage, pour « Relancer l'assistant de démarrage » ; `null` : un dépôt local est bâti.
+  final PremierDemarrageRepository? demarrage;
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
   final VoidCallback? onDeconnecte;
@@ -845,6 +851,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     reglages: _reglages,
     admin: widget.adminLocale,
     estAdmin: widget.auth.utilisateur?.role == 'admin',
+    surAssistantBascule: _lireAssistant,
   );
 
   /// Ticket EX7 (EF8) — l'exercice AFFICHÉ, un seul pour la session, diffusé par [PorteeExerciceChoisi] : sélecteur de
@@ -862,6 +869,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
   void _apresTirage() {
     if (!mounted) return;
     _lireMecef();
+    _lireAssistant();
     setState(() => _versionTirage++);
     _exercice.charger();
   }
@@ -874,10 +882,44 @@ class _SocleAccueilState extends State<SocleAccueil> {
     if (mounted && actif != _mecefActif) setState(() => _mecefActif = actif);
   }
 
+  /// Ticket AIDE-1 — le module « Assistant de démarrage » est-il allumé ? (copie locale de `modules_config`, éteint par
+  /// défaut) : seul module allumé, le bouton d'aide existe. Relu après chaque tirage et quand la carte de Paramètres bascule
+  /// (même motif que [_lireMecef]).
+  bool _assistantActif = false;
+
+  /// Les quatre éléments expliqués par la visite guidée (`data-aide` du web).
+  final CiblesVisite _cibles = CiblesVisite();
+
+  Future<void> _lireAssistant() async {
+    final actif = await widget.parametresGeneraux.assistantActif();
+    if (mounted && actif != _assistantActif) setState(() => _assistantActif = actif);
+  }
+
+  /// Ticket AIDE-1 — « Relancer l'assistant de démarrage » : rouvre l'écran du premier démarrage par-dessus le socle, même
+  /// s'il a été fermé (« Plus tard ») — rien n'est écrit. Réservé à `manage-parametres`, comme au web.
+  void _relancerAssistant() {
+    final depot = widget.demarrage ??
+        PremierDemarrageRepository(database: widget.database, parametres: widget.parametres, client: Dio());
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (contexte) => PremierDemarrageScreen(
+          depot: depot,
+          engine: widget.engine,
+          utilisateur: widget.auth.utilisateur?.nom ?? '—',
+          depotCloture: widget.cloture,
+          peutOuvrirExercice: PermissionsPoste.peut(_role, 'manage-comptabilite'),
+          relance: true,
+          onTermine: () => Navigator.of(contexte).pop(),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _lireMecef();
+    _lireAssistant();
 
     // ⚠️ ON N'OUVRE PAS SUR UN ÉCRAN INTERDIT. Démarrer sur la fiche d'élevage
     // quel que soit le rôle accueillerait le caissier par un « accès refusé »
@@ -998,12 +1040,15 @@ class _SocleAccueilState extends State<SocleAccueil> {
           // ⚠️ La bascule de la barre supérieure replie la barre latérale,
           // comme `menu` / `menu_open` dans la maquette.
           if (_menuOuvert)
-            _BarreLaterale(
+            KeyedSubtree(
+              key: _cibles.menu,
+              child: _BarreLaterale(
               auth: widget.auth,
               actif: _ecran,
               ecrans: PermissionsPoste.ecransDe(_role),
               mecefActif: _mecefActif,
               onNaviguer: (e) => setState(() => _ecran = e),
+            ),
             ),
           Expanded(
             child: Column(
@@ -1013,7 +1058,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 // qu'une journée vient d'être saisie.
                 // 🔴→✅ Ticket U14 — et relu toutes les 30 s, comme `wire:poll.30s` de la cloche du web : non lues,
                 // quatre dernières, « il y a … » recalculé (la minuterie s'arrête avec le socle).
-                RafraichissementPeriodique(
+                KeyedSubtree(
+                  key: _cibles.topbar,
+                  child: RafraichissementPeriodique(
                   intervalle: BarreSuperieure.rafraichissementCloche,
                   builder: (context) => FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
                   future: _etatDeLaBarre(),
@@ -1081,6 +1128,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     selecteurExercice: const SelecteurExercice(),
                   ),
                   ),
+                  ),
                 ),
                 // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
                 Expanded(
@@ -1089,7 +1137,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
                       // Ticket EX7 (EF10) — bandeau de lecture seule d'un exercice clos en haut du contenu, puis
                       // l'écran, RECONSTRUIT quand l'exercice affiché ou son statut change (bornes, listes, boutons).
                       Positioned.fill(
-                        child: Column(
+                        child: KeyedSubtree(
+                          key: _cibles.contenu,
+                          child: Column(
                           children: [
                             const BandeauExercice(),
                             Expanded(
@@ -1100,8 +1150,16 @@ class _SocleAccueilState extends State<SocleAccueil> {
                             ),
                           ],
                         ),
+                        ),
                       ),
                       BoutonAccesRapide(onNaviguer: (e) => setState(() => _ecran = e)),
+                      // Ticket AIDE-1 — bouton d'aide AU-DESSUS d'« Accès rapide », module allumé seulement.
+                      if (_assistantActif)
+                        BoutonAide(
+                          ecran: _ecran,
+                          cibles: _cibles,
+                          surRelancer: PermissionsPoste.peut(_role, 'manage-parametres') ? _relancerAssistant : null,
+                        ),
                     ],
                   ),
                 ),

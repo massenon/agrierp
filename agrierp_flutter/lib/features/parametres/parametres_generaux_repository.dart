@@ -346,6 +346,14 @@ class ParametresGenerauxRepository {
   /// module » : le web n'impose rien, le poste non plus.
   Future<void> definirModule(ModuleEspece module, {required bool actif}) => _definirCode(module.code, actif);
 
+  /// Ticket AIDE-1 — le module « Assistant de démarrage » est-il allumé ? Lu dans la copie locale de `modules_config` (tirée
+  /// du serveur), ÉTEINT par défaut : sans ligne, pas de bouton d'aide. Même règle que
+  /// [DonneesParametresGeneraux.assistantActif] et `PremierDemarrageRepository.moduleActif`.
+  Future<bool> assistantActif() async {
+    final ligne = await (database.select(database.modulesConfig)..where((t) => t.speciesCode.equals('assistant_demarrage'))).getSingleOrNull();
+    return ligne?.isEnabled ?? false;
+  }
+
   /// `ModulesActifs::toggleAssistant()` — même écriture (`modules_config`, `pending`), même envoi au serveur.
   Future<void> definirAssistant({required bool actif}) => _definirCode('assistant_demarrage', actif);
 

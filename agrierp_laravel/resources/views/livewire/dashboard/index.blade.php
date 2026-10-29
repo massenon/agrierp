@@ -1,6 +1,6 @@
 <div>
-    {{-- Ticket 15.51 — assistant de démarrage (administrateur, tant qu'il n'est pas marqué terminé). --}}
-    <livewire:parametres.assistant-demarrage />
+    {{-- Ticket 15.51 / AIDE-1 — l'assistant de démarrage est monté par `layouts/app.blade.php` (module allumé, `manage-parametres`) :
+         il s'ouvre ici de lui-même, et de n'importe quel écran par « Relancer l'assistant » du bouton d'aide. --}}
 
     <div class="flex flex-col gap-md border-b border-outline-variant pb-md mb-lg">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
