@@ -41,8 +41,8 @@ class ContactEditorMail extends Mailable
     public function envelope(): Envelope
     {
         $subject = $this->payload['type'] === 'bug'
-            ? 'AgriERP — Signalement de bug : '.($this->payload['module'] ?? 'Non précisé')
-            : 'AgriERP — Message : '.($this->payload['subject'] ?? 'Sans objet');
+            ? 'LogiAgriERP — Signalement de bug : '.($this->payload['module'] ?? 'Non précisé')
+            : 'LogiAgriERP — Message : '.($this->payload['subject'] ?? 'Sans objet');
 
         return new Envelope(
             subject: $subject,

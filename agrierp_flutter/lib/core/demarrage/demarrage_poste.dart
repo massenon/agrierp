@@ -40,7 +40,7 @@ class DemarragePoste {
 
       return EcranDemarrageImpossible(
         cause:
-            "La base locale ne s'est pas ouverte en ${delai.inSeconds} secondes. Une autre fenêtre AgriERP est peut-être "
+            "La base locale ne s'est pas ouverte en ${delai.inSeconds} secondes. Une autre fenêtre LogiAgriERP est peut-être "
             "encore ouverte en arrière-plan.",
         journal: chemin,
       );
@@ -106,7 +106,7 @@ class EcranDemarrageImpossible extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'AgriERP ne peut pas démarrer',
+                    'LogiAgriERP ne peut pas démarrer',
                     key: Key('demarrage-titre'),
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF052E16)),
                   ),
@@ -114,7 +114,7 @@ class EcranDemarrageImpossible extends StatelessWidget {
                   Text(cause, key: const Key('demarrage-cause'), style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 12),
                   const Text(
-                    "Que faire : fermez toute autre fenêtre AgriERP (Gestionnaire des tâches, processus « agrierp.exe »), "
+                    "Que faire : fermez toute autre fenêtre LogiAgriERP (Gestionnaire des tâches, processus « agrierp.exe »), "
                     "puis relancez le logiciel. Vos données ne sont pas touchées. Si le message revient, transmettez le "
                     "fichier ci-dessous à l'Éditeur.",
                     style: TextStyle(fontSize: AgriTypography.xs),

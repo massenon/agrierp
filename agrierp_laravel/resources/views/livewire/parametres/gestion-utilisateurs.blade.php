@@ -4,7 +4,7 @@
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
                 <span class="material-symbols-outlined text-brand-emerald text-[26px]">manage_accounts</span>Gestion des Utilisateurs
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Administration des comptes d'accès à AgriERP.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">Administration des comptes d'accès à LogiAgriERP.</p>
         </div>
         <div class="flex items-center gap-xs">
             <button type="button" wire:click="exportUtilisateursPdf" wire:loading.attr="disabled" wire:target="exportUtilisateursPdf" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all disabled:opacity-50">

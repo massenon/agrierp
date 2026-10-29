@@ -17,7 +17,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgriERP | @yield('title')</title>
+    <title>LogiAgriERP | @yield('title')</title>
     <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png">
     <style>
         @font-face {
@@ -75,7 +75,7 @@
 </head>
 <body>
     <main class="carte">
-        <img src="/assets/icons/icon-192.png" alt="AgriERP">
+        <img src="/assets/icons/icon-192.png" alt="LogiAgriERP">
         <p class="code">@yield('code')</p>
         <h1>@yield('title')</h1>
         <p>@yield('message')</p>
@@ -87,7 +87,7 @@
                 <a class="bouton" href="{{ url('/') }}">Retour à l'accueil</a>
             @endif
         </div>
-        <p class="pied">AgriERP — Ferme École Olouwachegoun</p>
+        <p class="pied">LogiAgriERP — Ferme École Olouwachegoun</p>
     </main>
 </body>
 </html>

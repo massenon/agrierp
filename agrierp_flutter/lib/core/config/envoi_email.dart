@@ -33,7 +33,7 @@ class EnvoiEmail {
     }
 
     final message = Message()
-      ..from = Address(expediteur, 'AgriERP')
+      ..from = Address(expediteur, 'LogiAgriERP')
       ..recipients.add(dest)
       ..subject = sujet
       ..text = corps;

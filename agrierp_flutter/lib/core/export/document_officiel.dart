@@ -171,7 +171,7 @@ class ExportOfficiel {
   /// règle métier, l'implémentation Laravel l'emporte sur la maquette. La
   /// ligne est donc celle du pied de page de l'application, au mot près.
   static const creditsProjet =
-      'AgriERP — Projet d’Appui à l’Entrepreneuriat au Bénin (PAEB) '
+      'LogiAgriERP — Projet d’Appui à l’Entrepreneuriat au Bénin (PAEB) '
       '— Accompagnement : Cabinet FAGUEZ SARL '
       '— Édité par Dr MASSENON Rhodes';
 
@@ -196,7 +196,7 @@ class ExportOfficiel {
     Uint8List? logo,
     PolicesDocument? polices,
   }) async {
-    final document = pw.Document(title: 'AgriERP - ${doc.titre}');
+    final document = pw.Document(title: 'LogiAgriERP - ${doc.titre}');
     final image = logo == null ? null : pw.MemoryImage(logo);
     final theme = polices == null
         ? null

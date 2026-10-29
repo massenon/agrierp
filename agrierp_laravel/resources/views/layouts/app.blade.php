@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgriERP | {{ $title ?? 'Ferme École Olouwachegoun' }}</title>
+    <title>LogiAgriERP | {{ $title ?? 'Ferme École Olouwachegoun' }}</title>
     <meta name="author" content="Dr Rhodes MASSENON, Contact: +2290151335040">
     <link rel="icon" type="image/png" href="{{ asset('assets/images/logo_favicon.webp') }}">
     <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/Inter-latin.woff2" crossorigin>
@@ -13,7 +13,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AgriERP">
+    <meta name="apple-mobile-web-app-title" content="LogiAgriERP">
     <link rel="apple-touch-icon" href="{{ asset('assets/icons/apple-touch-icon.png') }}">
     <script>
         window.agrierpInviteInstallation = null;
@@ -55,7 +55,7 @@
         <div class="px-md py-lg border-b border-white/10">
             <div class="flex items-center gap-xs">
                 <span class="material-symbols-outlined text-accent-yellow" style="font-size:26px;">agriculture</span>
-                <h1 class="text-white font-extrabold text-lg">Agri<span class="text-accent-yellow">ERP</span></h1>
+                <h1 class="text-white font-extrabold text-lg">LogiAgri<span class="text-accent-yellow">ERP</span></h1>
             </div>
             <p class="text-[10px] text-white/50 uppercase tracking-wider mt-xs">Ferme École Olouwachegoun</p>
         </div>

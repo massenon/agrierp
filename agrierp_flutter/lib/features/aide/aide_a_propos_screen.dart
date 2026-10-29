@@ -198,7 +198,7 @@ class _AideAProposScreenState extends State<AideAProposScreen> {
           const TextSpan(
             children: [
               TextSpan(
-                text: 'AgriERP ',
+                text: 'LogiAgriERP ',
                 style: TextStyle(
                   fontSize: AgriTypography.lg,
                   fontWeight: FontWeight.w900,

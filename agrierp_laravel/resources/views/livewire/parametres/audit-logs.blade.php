@@ -4,7 +4,7 @@
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
                 <span class="material-symbols-outlined text-brand-emerald text-[26px]">security</span>Audit Logs &amp; Sécurité
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Historique horodaté des actions sensibles effectuées dans AgriERP.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">Historique horodaté des actions sensibles effectuées dans LogiAgriERP.</p>
         </div>
         <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-create-audit-logs' })" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
             <span class="material-symbols-outlined text-[18px]">file_download</span>Exporter le Journal

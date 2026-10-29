@@ -506,7 +506,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AgriERP — Ferme École OLOUWACHEGOUN',
+      title: 'LogiAgriERP — Ferme École OLOUWACHEGOUN',
       debugShowCheckedModeBanner: false,
       theme: AgriTheme.light,
       // Ticket U5 (D-U5) : composants Material en français (sélecteurs de date,
@@ -1462,7 +1462,7 @@ class EtatDuSocle extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'AgriERP Desktop',
+                    'LogiAgriERP Desktop',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -1746,7 +1746,7 @@ class _BarreLaterale extends StatelessWidget {
                       text: const TextSpan(
                         style: TextStyle(fontSize: AgriTypography.lg, fontWeight: FontWeight.w800, color: Colors.white),
                         children: [
-                          TextSpan(text: 'Agri'),
+                          TextSpan(text: 'LogiAgri'),
                           TextSpan(text: 'ERP', style: TextStyle(color: AgriColors.accentYellow)),
                         ],
                       ),

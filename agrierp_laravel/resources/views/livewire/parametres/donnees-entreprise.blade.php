@@ -47,7 +47,7 @@
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Registre du Commerce (RCCM)</label>
                     <input wire:model="rccm" type="text" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                 </div>
-                <div class="bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm text-[10px] text-brand-forest">Ces informations apparaissent sur toutes les factures normalisées MeCeF et les documents officiels générés par AgriERP.</div>
+                <div class="bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm text-[10px] text-brand-forest">Ces informations apparaissent sur toutes les factures normalisées MeCeF et les documents officiels générés par LogiAgriERP.</div>
             </div>
 
             {{-- Ticket CFG-1 — la configuration SMTP a UNE seule saisie : l'onglet « Email (SMTP) » de ce hub. --}}

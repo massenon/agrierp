@@ -13,7 +13,7 @@ body{font-family:'Inter',sans-serif;}
 
 <div class="welcome-bg min-h-screen w-full flex flex-col text-white">
 <header class="flex items-center justify-between px-4 md:px-10 py-4">
-    <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[#a6f2d1] text-[22px]">agriculture</span><span class="font-bold text-sm">Agri<span class="text-[#FFD55F]">ERP</span></span></div>
+    <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[#a6f2d1] text-[22px]">agriculture</span><span class="font-bold text-sm">LogiAgri<span class="text-[#FFD55F]">ERP</span></span></div>
     <div class="flex items-center gap-3 text-xs text-white/70">
         <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">translate</span>Français</span>
         <span class="font-bold tracking-wider">v1.0.0</span>

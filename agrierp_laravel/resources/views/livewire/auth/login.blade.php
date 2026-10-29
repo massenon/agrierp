@@ -3,7 +3,7 @@
     <aside class="relative hidden lg:flex lg:w-[50%] flex-col justify-between p-8 overflow-hidden" style="background: linear-gradient(180deg, rgba(5,46,22,0.10) 0%, rgba(0,33,13,0.55) 100%), url('{{ asset('assets/images/image_login.png') }}'); background-size: cover; background-position: center;">
         <div class="relative z-10 flex items-center gap-2">
             <span class="material-symbols-outlined text-accent-yellow" style="font-size:26px;">agriculture</span>
-            <h1 class="text-white font-extrabold text-lg">Agri<span class="text-brand-maize">ERP</span></h1>
+            <h1 class="text-white font-extrabold text-lg">LogiAgri<span class="text-brand-maize">ERP</span></h1>
         </div>
         <div class="relative z-10 flex-1"></div>
         <div class="relative z-10 text-center space-y-1 border-t border-white/10 pt-4">
@@ -27,7 +27,7 @@
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-brand-emerald" style="font-size:38px;">agriculture</span>
                     <div class="flex flex-col items-start leading-none">
-                        <span class="text-[22px] font-black text-brand-forest tracking-tight">Agri<span class="text-brand-maize-ink">ERP</span></span>
+                        <span class="text-[22px] font-black text-brand-forest tracking-tight">LogiAgri<span class="text-brand-maize-ink">ERP</span></span>
                         <span class="text-[9px] uppercase tracking-widest text-brand-emerald font-extrabold mt-0.5">Ferme Olouwachegoun</span>
                     </div>
                 </div>
@@ -46,7 +46,7 @@
 
             <div>
                 <h2 class="text-brand-forest text-xl font-bold leading-tight">Bienvenue !</h2>
-                <p class="text-outline text-xs">Connectez-vous à votre espace d'administration AgriERP.</p>
+                <p class="text-outline text-xs">Connectez-vous à votre espace d'administration LogiAgriERP.</p>
             </div>
 
             @if($lockedSecondsRemaining !== null)
@@ -98,7 +98,7 @@
         </div>
 
         <div class="border-t border-outline-variant/40 pt-4 flex items-center justify-center text-[10px] text-outline">
-            <span>© {{ now()->year }} AgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — Accompagnement : Cabinet FAGUEZ SARL — Édité par Dr&nbsp;MASSENON&nbsp;Rhodes</span>
+            <span>© {{ now()->year }} LogiAgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — Accompagnement : Cabinet FAGUEZ SARL — Édité par Dr&nbsp;MASSENON&nbsp;Rhodes</span>
         </div>
     </main>
 

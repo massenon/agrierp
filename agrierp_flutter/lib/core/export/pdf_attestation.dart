@@ -149,7 +149,7 @@ class ExportAttestation {
 
   static Future<Uint8List> construire(DonneesAttestation d, {RessourcesAttestation? ressources}) async {
     final r = ressources ?? await RessourcesAttestation.charger();
-    final doc = pw.Document(title: d.titre, author: nom, creator: 'AgriERP');
+    final doc = pw.Document(title: d.titre, author: nom, creator: 'LogiAgriERP');
 
     // A4 paysage : 842 × 595 pt, aucune marge — tout est positionné au point près, comme au serveur.
     doc.addPage(

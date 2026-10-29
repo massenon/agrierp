@@ -44,14 +44,14 @@
 [Setup]
 ; Meme AppId pour tous les environnements : un seul AgriERP par poste Windows.
 AppId={{69B3D13F-4283-4B8E-ABD1-456845FC5182}
-AppName=AgriERP
+AppName=LogiAgriERP
 AppVersion={#AppVersion}
-AppVerName=AgriERP {#AppVersion}{#LibelleEnv}
+AppVerName=LogiAgriERP {#AppVersion}{#LibelleEnv}
 VersionInfoVersion={#AppVersionNum}
 AppPublisher=Dr MASSENON Rhodes - Ferme Ecole OLOUWACHEGOUN
 AppPublisherURL=https://agrierp.fermeolouwachegoun.com
 DefaultDirName={autopf}\AgriERP
-DefaultGroupName=AgriERP
+DefaultGroupName=LogiAgriERP
 DisableProgramGroupPage=yes
 OutputDir=Output
 OutputBaseFilename={#NomInstallateur}
@@ -76,12 +76,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"
-Name: "{group}\{cm:UninstallProgram,AgriERP}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\AgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"; Tasks: desktopicon
+Name: "{group}\LogiAgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"
+Name: "{group}\{cm:UninstallProgram,LogiAgriERP}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\LogiAgriERP"; Filename: "{app}\agrierp.exe"; IconFilename: "{app}\agrierp.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,AgriERP}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,LogiAgriERP}"; Flags: nowait postinstall skipifsilent
 
 ; Tickets DES-1 / DES-2 : la desinstallation retire TOUT ce que le poste a pose hors du dossier d'installation :
 ; la base locale, demarrage.log, le logo, les sauvegardes (dossier des donnees), les archives et exports PDF/Excel
@@ -130,7 +130,7 @@ var
   Dossier: String;
 begin
   Result := MsgBox(
-    'ATTENTION - la desinstallation d''AgriERP supprime DEFINITIVEMENT, sur ce poste :' + #13#10#13#10 +
+    'ATTENTION - la desinstallation d''LogiAgriERP supprime DEFINITIVEMENT, sur ce poste :' + #13#10#13#10 +
     '  - la base locale et les journaux (' + ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees') + ')' + #13#10 +
     '  - les archives et documents exportes (' + ExpandConstant('{userdocs}\AgriERP') + ')' + #13#10 +
     '  - les justificatifs et recus (' + ExpandConstant('{userdocs}\agrierp_justificatifs') + ')' + #13#10#13#10 +

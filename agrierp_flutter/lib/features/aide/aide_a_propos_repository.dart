@@ -69,7 +69,7 @@ class AideAProposRepository {
       'Docteur en Génie Logiciel et IA.';
 
   static const couvertureLogiciel =
-      "AgriERP couvre l'ensemble du cycle d'exploitation : élevage "
+      "LogiAgriERP couvre l'ensemble du cycle d'exploitation : élevage "
       '(cuniculture, aviculture, porciculture), ventes et POS, stocks, '
       'comptabilité SYSCOHADA, ressources humaines et facturation normalisée '
       'MeCeF.';

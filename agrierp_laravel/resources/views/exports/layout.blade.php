@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>{{ $reportTitle }} — AgriERP</title>
+    <title>{{ $reportTitle }} — LogiAgriERP</title>
     <style>
         /**
          * En-tête institutionnel — nuancier RÉSERVÉ aux documents imprimés

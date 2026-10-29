@@ -82,7 +82,7 @@
         x-on:click="agrandir()"
         x-transition.opacity
         type="button"
-        title="Installer AgriERP sur cet appareil"
+        title="Installer LogiAgriERP sur cet appareil"
         class="flex items-center gap-xs bg-brand-forest hover:bg-brand-emerald text-white rounded-full shadow-lg pl-sm pr-md py-sm transition-colors"
     >
         <span class="material-symbols-outlined text-accent-yellow text-[20px]">install_mobile</span>
@@ -98,14 +98,14 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         role="dialog"
-        aria-label="Installer AgriERP"
+        aria-label="Installer LogiAgriERP"
         class="w-[21.5rem] max-w-[calc(100vw-2rem)] bg-white border border-outline-variant rounded-xl shadow-2xl overflow-hidden"
     >
         <div class="flex items-center gap-sm bg-brand-forest px-md py-sm">
             <img src="{{ asset('assets/icons/icon-192.png') }}" alt=""
                  class="w-8 h-8 rounded-lg bg-white object-contain flex-shrink-0">
             <div class="flex-1 min-w-0">
-                <p class="text-white text-xs font-bold leading-tight">Installer AgriERP</p>
+                <p class="text-white text-xs font-bold leading-tight">Installer LogiAgriERP</p>
                 <p class="text-white/60 text-[10px] leading-tight">Ferme École Olouwachegoun</p>
             </div>
             <button type="button" x-on:click="reduire()" title="Réduire"
@@ -116,7 +116,7 @@
 
         <div class="px-md py-md">
             <p class="text-xs text-outline leading-relaxed">
-                Installez AgriERP sur cet appareil pour l'ouvrir <strong class="text-brand-forest">directement
+                Installez LogiAgriERP sur cet appareil pour l'ouvrir <strong class="text-brand-forest">directement
                 depuis l'écran d'accueil</strong>, en plein écran, sans passer par le navigateur.
             </p>
 

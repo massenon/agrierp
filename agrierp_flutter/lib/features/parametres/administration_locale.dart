@@ -193,7 +193,7 @@ class AdministrationLocale {
       throw const RefusAdministration('Seule une sauvegarde complète peut être restaurée.');
     }
     await source.copy(p.join((await _dossier()).parent.path, fichierRestauration));
-    return 'Restauration programmée : fermez puis rouvrez AgriERP pour l\'appliquer. La base actuelle est conservée sous le nom agrierp.avant-restauration.sqlite.';
+    return 'Restauration programmée : fermez puis rouvrez LogiAgriERP pour l\'appliquer. La base actuelle est conservée sous le nom agrierp.avant-restauration.sqlite.';
   }
 
   /// À appeler AU LANCEMENT, avant d'ouvrir la base : installe la restauration programmée. Une panne laisse la base intacte.

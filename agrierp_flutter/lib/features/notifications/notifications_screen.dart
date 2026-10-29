@@ -206,7 +206,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         const SizedBox(height: AgriSpacing.xs),
         const Text(
-          "Toutes les alertes et notifications système d'AgriERP.",
+          "Toutes les alertes et notifications système d'LogiAgriERP.",
           style: TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,

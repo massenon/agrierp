@@ -15,7 +15,7 @@ body{font-family:'Inter',sans-serif;}
     <div class="max-w-7xl mx-auto flex items-center justify-between px-4 md:px-8 py-3">
         <div class="flex items-center gap-2">
             <span class="material-symbols-outlined text-[#065f46]" style="font-size:26px;">agriculture</span>
-            <span class="font-black text-lg text-[#052e16]">Agri<span class="text-[#FFD55F]">ERP</span></span>
+            <span class="font-black text-lg text-[#052e16]">LogiAgri<span class="text-[#FFD55F]">ERP</span></span>
         </div>
         <nav class="hidden md:flex items-center gap-6 text-xs font-semibold text-[#6f7973]">
             <a href="#modules" class="hover:text-[#065f46]">Modules</a>
@@ -32,7 +32,7 @@ body{font-family:'Inter',sans-serif;}
 <!-- HERO -->
 <section class="hero-bg text-white">
     <div class="max-w-5xl mx-auto text-center px-4 py-20 md:py-28">
-        <span class="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-6">AgriERP · Votre logiciel de gestion intégrée</span>
+        <span class="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-6">LogiAgriERP · Votre logiciel de gestion intégrée</span>
         <h1 class="text-3xl md:text-5xl font-extrabold leading-tight">Une plateforme unique pour piloter <span class="text-[#FFD55F]">toute votre exploitation agricole</span>.</h1>
         <p class="text-white/70 text-sm md:text-base mt-6 max-w-2xl mx-auto leading-relaxed">
             Centralisez vos ventes, votre comptabilité, vos stocks, votre élevage, vos finances et votre administration dans une seule solution, pensée pour les exploitations agro-pastorales africaines.
@@ -197,7 +197,7 @@ body{font-family:'Inter',sans-serif;}
 <!-- CTA FINAL -->
 <section class="py-16 text-center px-4">
     <h2 class="text-xl md:text-2xl font-extrabold text-[#052e16]">Prêt à moderniser la gestion de votre ferme ?</h2>
-    <a wire:navigate href="{{ route('login') }}" class="inline-block mt-6 px-8 py-3 rounded-full bg-[#065f46] hover:bg-[#052e16] text-white font-bold text-sm transition-colors">Se connecter à AgriERP</a>
+    <a wire:navigate href="{{ route('login') }}" class="inline-block mt-6 px-8 py-3 rounded-full bg-[#065f46] hover:bg-[#052e16] text-white font-bold text-sm transition-colors">Se connecter à LogiAgriERP</a>
 </section>
 
 <footer class="border-t border-[#bec9c2]/40 py-8 text-center text-[10px] text-[#6f7973]">

@@ -526,7 +526,7 @@ class BarreSuperieure extends StatelessWidget {
       context: context,
       constructeur: (contexte) => ModaleAgri(
         key: const Key('modale-fermeture'),
-        titre: 'Quitter AgriERP ?',
+        titre: 'Quitter LogiAgriERP ?',
         largeur: LargeurModale.sm,
         contenu: Text(
           '$restants enregistrement(s) attendent encore d\'être transmis. '

@@ -528,7 +528,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
             pied:
                 'Ces informations apparaissent sur toutes les factures '
                 'normalisées MeCeF et les documents officiels générés par '
-                'AgriERP.',
+                'LogiAgriERP.',
           ),
         ],
         const SizedBox(height: AgriSpacing.md),
@@ -937,7 +937,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     children: [
       _entete(
         'Gestion des Utilisateurs',
-        "Administration des comptes d'accès à AgriERP.",
+        "Administration des comptes d'accès à LogiAgriERP.",
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -1452,7 +1452,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     children: [
       _entete(
         'Audit Logs & Sécurité',
-        'Historique horodaté des actions sensibles effectuées dans AgriERP.',
+        'Historique horodaté des actions sensibles effectuées dans LogiAgriERP.',
         large,
       ),
       const SizedBox(height: AgriSpacing.md),

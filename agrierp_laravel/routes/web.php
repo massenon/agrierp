@@ -44,7 +44,7 @@ use Illuminate\Support\Facades\Route;
  */
 
 Route::get('/up', function () {
-    return response()->json(['status' => 'ok', 'app' => 'AgriERP', 'sprint' => 0]);
+    return response()->json(['status' => 'ok', 'app' => 'LogiAgriERP', 'sprint' => 0]);
 })->name('health-check');
 
 // Ticket 1.1 (Sprint 1) — login.html → Livewire\Auth\Login

@@ -262,7 +262,7 @@ class SauvegardeService
     {
         $pdo = DB::connection()->getPdo();
         $lignes = [
-            '-- Sauvegarde AgriERP — '.now()->toDateTimeString(),
+            '-- Sauvegarde LogiAgriERP — '.now()->toDateTimeString(),
             '-- Export de données uniquement : ce fichier ne contient PAS le schéma.',
             'SET FOREIGN_KEY_CHECKS=0;',
             '',

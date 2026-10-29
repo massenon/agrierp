@@ -1,5 +1,5 @@
 name: agrierp
-description: "AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin). Client Windows offline-first, synchronisé avec la surface web Laravel."
+description: "LogiAgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin). Client Windows offline-first, synchronisé avec la surface web Laravel."
 publish_to: 'none'
 version: 1.0.0+1
 

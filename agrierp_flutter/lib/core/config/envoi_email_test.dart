@@ -47,9 +47,9 @@ class EnvoiEmailTest {
   /// Délai d'un envoi : au-delà, l'échec est annoncé plutôt que d'attendre indéfiniment.
   static const delai = Duration(seconds: 30);
 
-  static const sujet = 'AgriERP — Test de configuration SMTP';
+  static const sujet = 'LogiAgriERP — Test de configuration SMTP';
   static const corps =
-      'Ceci est un e-mail de test envoyé depuis un poste AgriERP (Paramètres > Email (SMTP)) — configuration '
+      'Ceci est un e-mail de test envoyé depuis un poste LogiAgriERP (Paramètres > Email (SMTP)) — configuration '
       'SMTP validée avec succès.';
 
   static Future<void> envoyerReellement(Message message, SmtpServer serveur) =>
@@ -108,7 +108,7 @@ class EnvoiEmailTest {
     }
 
     final message = Message()
-      ..from = Address(expediteur, 'AgriERP')
+      ..from = Address(expediteur, 'LogiAgriERP')
       ..recipients.add(dest)
       ..subject = sujet
       ..text = corps;

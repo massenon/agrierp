@@ -3,7 +3,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">support_agent</span>Contactez l'Éditeur
         </h2>
-        <p class="text-xs text-outline mt-xs">Assistance technique, suggestions et signalement d'anomalies pour AgriERP.</p>
+        <p class="text-xs text-outline mt-xs">Assistance technique, suggestions et signalement d'anomalies pour LogiAgriERP.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-md">

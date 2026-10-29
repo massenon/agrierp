@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return CadreConnexion(
       titre: 'Bienvenue !',
-      sousTitre: "Connectez-vous à votre espace d'administration AgriERP.",
+      sousTitre: "Connectez-vous à votre espace d'administration LogiAgriERP.",
       enfants: [
       if (_erreur != null) ...[
         _BandeauErreur(message: _erreur!),
@@ -530,7 +530,7 @@ class _ContenuPanneauFerme extends StatelessWidget {
                   color: Colors.white,
                 ),
                 children: [
-                  TextSpan(text: 'Agri'),
+                  TextSpan(text: 'LogiAgri'),
                   TextSpan(
                     text: 'ERP',
                     style: TextStyle(color: AgriColors.accentYellow),
@@ -635,7 +635,7 @@ class _EnTeteMarque extends StatelessWidget {
                       color: AgriColors.brandForest,
                     ),
                     children: [
-                      TextSpan(text: 'Agri'),
+                      TextSpan(text: 'LogiAgri'),
                       TextSpan(
                         text: 'ERP',
                         style: TextStyle(color: AgriColors.accentYellow),
@@ -758,7 +758,7 @@ class _DialogueMotDePasseOublie extends StatelessWidget {
       largeur: LargeurModale.sm,
       contenu: const Text(
         "La réinitialisation se fait par un lien envoyé sur votre adresse "
-        "e-mail professionnelle, depuis l'espace web AgriERP. Ce poste ne "
+        "e-mail professionnelle, depuis l'espace web LogiAgriERP. Ce poste ne "
         "peut pas l'envoyer lui-même.",
         style: TextStyle(fontSize: AgriTypography.xs),
       ),
@@ -780,7 +780,7 @@ class _PiedDePage extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(top: AgriSpacing.md),
       child: Text(
-        "© 2026 AgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — FAGUEZ SARL",
+        "© 2026 LogiAgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — FAGUEZ SARL",
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 10, color: AgriColors.outline),
       ),

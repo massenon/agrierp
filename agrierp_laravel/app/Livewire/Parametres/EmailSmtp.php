@@ -144,8 +144,8 @@ class EmailSmtp extends Component
 
         try {
             Mail::raw(
-                'Ceci est un e-mail de test envoyé depuis AgriERP (Paramètres > Email (SMTP)) — configuration SMTP validée avec succès.',
-                fn ($message) => $message->to($this->testEmailTo)->subject('AgriERP — Test de configuration SMTP')
+                'Ceci est un e-mail de test envoyé depuis LogiAgriERP (Paramètres > Email (SMTP)) — configuration SMTP validée avec succès.',
+                fn ($message) => $message->to($this->testEmailTo)->subject('LogiAgriERP — Test de configuration SMTP')
             );
 
             AuditLog::record('company_settings.smtp_tested', 'parametres');

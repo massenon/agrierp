@@ -3,7 +3,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">notifications</span>Centre de Notifications
         </h2>
-        <p class="text-xs text-outline mt-xs">Toutes les alertes et notifications système d'AgriERP.</p>
+        <p class="text-xs text-outline mt-xs">Toutes les alertes et notifications système d'LogiAgriERP.</p>
     </div>
 
     <x-kpi-accordion title="Résumé des alertes">
