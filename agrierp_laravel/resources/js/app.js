@@ -55,7 +55,7 @@ document.addEventListener('alpine:init', () => {
  */
 document.addEventListener('livewire:init', () => {
     /**
-     * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) EN FRANÇAIS.
+     * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) SANS BOÎTE DU NAVIGATEUR.
      *
      * Sur un jeton CSRF expiré, Livewire 3 ouvre une boîte de confirmation ANGLAISE codée en dur
      * dans son JavaScript (« This page has expired. Would you like to refresh the page? »), qu'aucun
@@ -69,9 +69,9 @@ document.addEventListener('livewire:init', () => {
                 return;
             }
             preventDefault();
-            if (window.confirm('Cette page a expiré.\nVoulez-vous la recharger ?')) {
-                window.location.reload();
-            }
+            // Plus de boîte de confirmation du navigateur : la session a expiré, on recharge (le serveur renvoie
+            // alors à la connexion, ou rouvre la page si le jeton seul était périmé).
+            window.location.reload();
         });
     });
 });

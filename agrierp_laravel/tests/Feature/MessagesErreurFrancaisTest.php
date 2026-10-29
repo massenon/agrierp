@@ -301,12 +301,13 @@ class MessagesErreurFrancaisTest extends TestCase
     }
 
     /** La boîte « page expirée » de Livewire (anglaise, codée en dur dans son JS) est remplacée. */
-    public function test_la_confirmation_de_page_expiree_de_livewire_est_en_francais(): void
+    public function test_la_page_expiree_recharge_sans_boite_du_navigateur(): void
     {
         $js = file_get_contents(resource_path('js/app.js'));
 
         $this->assertStringContainsString("Livewire.hook('request'", $js);
         $this->assertStringContainsString('status !== 419', $js);
-        $this->assertStringContainsString('Cette page a expiré.', $js);
+        $this->assertStringNotContainsString('window.confirm', $js, 'plus de boîte du navigateur sur une page expirée');
+        $this->assertStringContainsString('window.location.reload()', $js);
     }
 }
