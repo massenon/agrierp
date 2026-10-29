@@ -31,7 +31,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
 
 // Ticket S3 — `CompteActif` : un compte désactivé sur le web perd aussitôt l'accès de ses postes.
-Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class, \App\Http\Middleware\ChangementMotDePasseObligatoireApi::class])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // Ticket 15.9 : changement de mot de passe depuis le poste. Même limiteur
     // que la connexion : il vérifie lui aussi un mot de passe.

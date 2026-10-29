@@ -115,6 +115,12 @@ class AuditLog extends Model
         'session.deverrouillage_echec' => 'Échec de déverrouillage de la session',
         'session.deconnexion_apres_echecs' => "Déconnexion après trop d'échecs de déverrouillage",
         'password.updated' => 'Mot de passe modifié',
+        // MDP-1 — réinitialisation par un administrateur, ou par la commande de secours (jamais le mot de passe).
+        'user.password_reset' => 'Mot de passe réinitialisé par un administrateur',
+        'user.password_reset_secours' => 'Mot de passe de l\'administrateur réinitialisé par le code de secours',
+        'user.password_reset_secours_echec' => 'Échec du code de secours de l\'administrateur',
+        'user.password_reset_secours_bloque' => 'Code de secours de l\'administrateur bloqué (trop d\'échecs)',
+        'recovery_code.generated' => 'Code de secours de l\'administrateur généré',
         'user.created' => 'Utilisateur créé',
         'user.updated' => 'Utilisateur modifié',
         'user.archived' => 'Utilisateur archivé',

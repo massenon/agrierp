@@ -5,7 +5,10 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
@@ -27,11 +30,20 @@ use Illuminate\Validation\ValidationException;
  *    aucun effet, ni trace ;
  *  - réactivation : `is_active = true` ; une seconde réactivation n'a aucun effet, ni trace.
  *
+ *  - MDP-1, réinitialisation : un administrateur choisit un mot de passe TEMPORAIRE (`Password::defaults()`), le compte
+ *    est marqué `must_change_password`, ses jetons sont révoqués, ses sessions web fermées, une ligne d'audit
+ *    `user.password_reset` (qui a réinitialisé quel compte) est écrite ; ⚠️ JAMAIS son propre compte.
+ *
  * ⚠️ Le mot de passe n'est JAMAIS journalisé ni renvoyé : il n'existe qu'haché.
  */
 class SaisieUtilisateurAction
 {
     public const MESSAGE_PROPRE_COMPTE = 'Vous ne pouvez pas archiver votre propre compte.';
+
+    /** MDP-1 : même texte au web, au poste et à l'envoi (parité lue par les tests). */
+    public const MESSAGE_PROPRE_REINITIALISATION = 'Vous ne pouvez pas réinitialiser votre propre mot de passe : utilisez Mon Profil.';
+
+    public const MESSAGE_COMPTE_ARCHIVE_REINITIALISATION = "Ce compte est archivé : réactivez-le avant de réinitialiser son mot de passe.";
 
     /** Règles de validation du web (`GestionUtilisateurs::saveUser`), sous les clés de la table. */
     public static function regles(?string $id = null, bool $creation = true): array
@@ -149,5 +161,61 @@ class SaisieUtilisateurAction
         AuditLog::record('user.reactivated', 'parametres');
 
         return true;
+    }
+
+    /** MDP-1 — règles du mot de passe TEMPORAIRE : celles d'une création (`Password::defaults()`), obligatoire. */
+    public static function reglesMotDePasseTemporaire(): array
+    {
+        return ['password' => ['required', 'string', PasswordRule::defaults()]];
+    }
+
+    /**
+     * MDP-1 — RÉINITIALISATION PAR UN ADMINISTRATEUR : mot de passe temporaire + changement obligatoire à la première
+     * connexion. Le droit `manage-users` est vérifié par l'appelant (composant Livewire, `SyncController`).
+     *
+     * @return bool Vrai si la réinitialisation a eu lieu ; faux si ce même mot de passe temporaire était DÉJÀ posé par
+     *              un envoi précédent (renvoi du poste après une réponse perdue : rien n'est réécrit ni retracé).
+     *
+     * @throws ValidationException compte propre à l'auteur, ou compte archivé (messages communs au web et au poste).
+     */
+    public function reinitialiserMotDePasse(string $id, string $motDePasseTemporaire, ?string $auteurId): bool
+    {
+        if ($auteurId !== null && $id === $auteurId) {
+            throw ValidationException::withMessages(['id' => self::MESSAGE_PROPRE_REINITIALISATION]);
+        }
+
+        $utilisateur = User::findOrFail($id);
+        if (! $utilisateur->is_active) {
+            throw ValidationException::withMessages(['id' => self::MESSAGE_COMPTE_ARCHIVE_REINITIALISATION]);
+        }
+        if ($utilisateur->must_change_password && Hash::check($motDePasseTemporaire, $utilisateur->password)) {
+            return false;
+        }
+
+        $this->poserMotDePasseTemporaire($utilisateur, $motDePasseTemporaire);
+        // ⚠️ Qui a réinitialisé quel compte — JAMAIS le mot de passe.
+        AuditLog::record('user.password_reset', 'parametres', $auteurId, $utilisateur);
+
+        return true;
+    }
+
+    /**
+     * MDP-1 — effets communs d'une réinitialisation (geste de l'administrateur ET commande de secours) : mot de
+     * passe haché, drapeau, jetons des postes révoqués, sessions web fermées, cookie « se souvenir de moi » périmé.
+     */
+    public function poserMotDePasseTemporaire(User $utilisateur, string $motDePasseTemporaire): void
+    {
+        DB::transaction(function () use ($utilisateur, $motDePasseTemporaire) {
+            $utilisateur->forceFill([
+                'password' => Hash::make($motDePasseTemporaire),
+                'must_change_password' => true,
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            $utilisateur->tokens()->delete();
+            if (Schema::hasTable('sessions')) {
+                DB::table('sessions')->where('user_id', $utilisateur->getKey())->delete();
+            }
+        });
     }
 }

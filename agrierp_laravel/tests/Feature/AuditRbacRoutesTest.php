@@ -183,6 +183,8 @@ class AuditRbacRoutesTest extends TestCase
             'notifications.index', 'public.welcome', 'public.presentation',
             // Sprint VW : l'écran de verrouillage protège la session de tout compte connecté, sans permission dédiée.
             'session.verrou',
+            // MDP-1 : la page de changement obligatoire sert tout compte connecté dont le mot de passe est temporaire.
+            'mot-de-passe.obligatoire',
         ];
 
         $sansPermission = [];

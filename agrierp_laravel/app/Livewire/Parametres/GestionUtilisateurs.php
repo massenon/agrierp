@@ -70,6 +70,11 @@ class GestionUtilisateurs extends Component
 
     public string $password = '';
 
+    /** MDP-1 — compte dont l'administrateur réinitialise le mot de passe, et le mot de passe TEMPORAIRE choisi. */
+    public ?string $resetUserId = null;
+
+    public string $motDePasseTemporaire = '';
+
     public function getKpisProperty(): array
     {
         return [
@@ -172,6 +177,51 @@ class GestionUtilisateurs extends Component
             return;
         }
         $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
+    }
+
+    /** MDP-1 — ouvre la fenêtre « Réinitialiser le mot de passe » ; le propre compte de l'administrateur est refusé d'emblée. */
+    public function resetPasswordUser(string $id): void
+    {
+        $this->authorize('manage-users');
+
+        if ($id === Auth::id()) {
+            $this->dispatch('toast', message: \App\Actions\SaisieUtilisateurAction::MESSAGE_PROPRE_REINITIALISATION, type: 'error');
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->resetUserId = User::findOrFail($id)->id;
+        $this->motDePasseTemporaire = '';
+        $this->dispatch('open-modal', name: 'modal-reinitialiser-mot-de-passe');
+    }
+
+    /**
+     * MDP-1 — l'administrateur choisit un mot de passe TEMPORAIRE (`Password::defaults()`, comme à la création) : le
+     * compte devra le changer à sa première connexion, ses jetons et sessions sont fermés. Règles et effets dans
+     * `SaisieUtilisateurAction::reinitialiserMotDePasse`, partagée avec l'envoi des postes.
+     */
+    public function reinitialiserMotDePasse(): void
+    {
+        $this->authorize('manage-users');
+
+        $this->validate([
+            'motDePasseTemporaire' => \App\Actions\SaisieUtilisateurAction::reglesMotDePasseTemporaire()['password'],
+        ]);
+
+        try {
+            app(\App\Actions\SaisieUtilisateurAction::class)->reinitialiserMotDePasse((string) $this->resetUserId, $this->motDePasseTemporaire, Auth::id());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('close-modal', name: 'modal-reinitialiser-mot-de-passe');
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+            $this->reset(['resetUserId', 'motDePasseTemporaire']);
+
+            return;
+        }
+
+        $this->reset(['resetUserId', 'motDePasseTemporaire']);
+        $this->dispatch('close-modal', name: 'modal-reinitialiser-mot-de-passe');
+        $this->dispatch('toast', message: 'Mot de passe réinitialisé : le compte devra le changer à sa prochaine connexion.', type: 'success');
     }
 
     public function reactivateUser(string $id): void

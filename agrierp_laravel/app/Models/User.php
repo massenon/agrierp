@@ -55,6 +55,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'verrouillage_minutes' => 'integer',
+            // MDP-1 : mot de passe temporaire posé par un administrateur ; hors `$fillable`.
+            'must_change_password' => 'boolean',
         ];
     }
 

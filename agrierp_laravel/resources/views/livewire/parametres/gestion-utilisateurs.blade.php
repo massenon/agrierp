@@ -64,6 +64,9 @@
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($user->is_active)
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
+                                    @if($user->must_change_password)
+                                        <span class="block text-[10px] text-outline mt-xs">Mot de passe à changer</span>
+                                    @endif
                                 @else
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Désactivé</span>
                                 @endif
@@ -72,6 +75,7 @@
                                 @can('manage-users')
                                 <button type="button" wire:click="editUser('{{ $user->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 @if($user->is_active)
+                                    <button type="button" wire:click="resetPasswordUser('{{ $user->id }}')" class="text-brand-forest hover:text-brand-emerald p-1" title="Réinitialiser le mot de passe"><span class="material-symbols-outlined text-[18px]">lock_reset</span></button>
                                     <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-user-{{ $user->id }}' })" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
                                 @else
                                     <button type="button" wire:click="reactivateUser('{{ $user->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Réactiver"><span class="material-symbols-outlined text-[18px]">restart_alt</span></button>
@@ -100,6 +104,25 @@
                 <button type="button" wire:click="viderSessions" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold">Déconnecter</button>
             </div>
         </div>
+    </x-modal>
+
+    <x-modal name="modal-reinitialiser-mot-de-passe" max-width="sm">
+        <div class="flex items-center justify-between mb-md">
+            <h3 class="font-bold text-lg text-brand-forest">Réinitialiser le mot de passe</h3>
+            <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-reinitialiser-mot-de-passe' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <form wire:submit="reinitialiserMotDePasse" class="space-y-md">
+            <p class="text-xs text-outline">Choisissez un mot de passe temporaire et communiquez-le à la personne. Elle devra le changer à sa première connexion ; ses sessions et ses postes seront déconnectés. L'action est journalisée (jamais le mot de passe).</p>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mot de passe temporaire *</label>
+                <input wire:model="motDePasseTemporaire" type="password" autocomplete="new-password" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('motDePasseTemporaire') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('motDePasseTemporaire') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-reinitialiser-mot-de-passe' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Réinitialiser</button>
+            </div>
+        </form>
     </x-modal>
 
     <x-modal name="modal-create-gestion-utilisateurs" max-width="lg">

@@ -199,6 +199,8 @@ class ReinitialisationDonneesService
             // ATT-3 — numéros d'attestation FIGÉS (un par émission du poste ou du web) : le rang d'un numéro se compte sur
             // `audit_logs`, préservé ; vider ceci laisserait un poste rejouer une émission et recevoir un AUTRE numéro.
             'attestation_emissions',
+            // MDP-1 — code de secours de l'administrateur (empreinte seule) : doit survivre à une réinitialisation.
+            'recovery_codes',
         ];
     }
 

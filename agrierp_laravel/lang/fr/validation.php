@@ -260,7 +260,6 @@ return [
         'table' => 'table',
         'first_name' => 'prénom',
         'firstName' => 'prénom',
-        'forgotEmail' => 'adresse e-mail',
         'fromEmail' => 'adresse d\'expédition',
         // Ticket CFG-1 — onglet « Email (SMTP) » de Paramètres.
         'fromAddress' => 'adresse d\'expédition',
@@ -320,6 +319,8 @@ return [
         'origine' => 'origine',
         'page' => 'page',
         'password' => 'mot de passe',
+        // MDP-1 — fenêtre « Réinitialiser le mot de passe » de Gestion des Utilisateurs.
+        'motDePasseTemporaire' => 'mot de passe temporaire',
         'password_confirmation' => 'confirmation du mot de passe',
         'payment_mode' => 'mode de règlement',
         'paymentAmount' => 'montant du règlement',

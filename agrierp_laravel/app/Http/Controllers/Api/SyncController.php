@@ -1321,13 +1321,15 @@ class SyncController extends Controller
             // Ticket UT-1 — `updated_at` (ISO 8601) : le poste n'écrase jamais un compte qu'il a en attente.
             'users' => fn () => User::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'username', 'email', 'is_active', 'updated_at'])
+                ->get(['id', 'name', 'username', 'email', 'is_active', 'must_change_password', 'updated_at'])
                 ->map(fn (User $u) => [
                     'id' => $u->id,
                     'name' => $u->name,
                     'username' => $u->username,
                     'email' => $u->email,
                     'is_active' => $u->is_active,
+                    // MDP-1 : le drapeau seul (affichage de la liste) — jamais le mot de passe.
+                    'must_change_password' => (bool) $u->must_change_password,
                     'role' => $u->getRoleNames()->first(),
                     'updated_at' => $u->updated_at?->toIso8601String(),
                 ]),
@@ -5646,7 +5648,9 @@ class SyncController extends Controller
      * Ticket UT-1 — COMPTES UTILISATEURS CRÉÉS, MODIFIÉS, ARCHIVÉS OU RÉACTIVÉS AU POSTE, rejoués par
      * `SaisieUtilisateurAction` (`GestionUtilisateurs`). Le mot de passe voyage une fois (TLS), n'est ni journalisé ni
      * renvoyé ; à la modification il est facultatif. Un compte connu et identique est acquitté sans écriture. Le propre
-     * compte de l'auteur ne s'archive pas (message du web).
+     * compte de l'auteur ne s'archive pas (message du web). MDP-1 : `reset_password` vrai = RÉINITIALISATION par
+     * l'administrateur (`password` = mot de passe temporaire, drapeau `must_change_password`, jetons et sessions fermés,
+     * audit `user.password_reset`) ; refusée sur son propre compte et sur un compte archivé, même motif que le web.
      *
      * @param  array<int, mixed>  $comptes
      * @return array{accepted: array<int, string>, rejected: array<int, array{id: string|null, reason: string}>}
@@ -5663,16 +5667,30 @@ class SyncController extends Controller
             try {
                 $id = is_string($data['id'] ?? null) ? $data['id'] : null;
                 $existant = $id === null ? null : User::with('roles')->find($id);
-                $valides = validator($data, \App\Actions\SaisieUtilisateurAction::regles($existant?->id, $existant === null) + [
+                // MDP-1 : `reset_password` vrai = RÉINITIALISATION par l'administrateur du poste ; `password` est alors le mot
+                // de passe TEMPORAIRE (obligatoire, mêmes règles que la création), jamais un changement ordinaire.
+                $reinitialiser = filter_var($data['reset_password'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $regles = \App\Actions\SaisieUtilisateurAction::regles($existant?->id, $existant === null || $reinitialiser) + [
                     'id' => ['required', 'uuid'],
                     'is_active' => ['sometimes', 'boolean'],
-                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+                    'reset_password' => ['sometimes', 'boolean'],
+                ];
+                $valides = validator($data, $regles, MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 $actif = ! array_key_exists('is_active', $valides) || filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
 
-                DB::transaction(function () use ($saisie, $valides, $actif, $existant, $auteur) {
+                DB::transaction(function () use ($saisie, $valides, $actif, $existant, $auteur, $reinitialiser) {
+                    $temporaire = $reinitialiser ? $valides['password'] : null;
+                    if ($reinitialiser) {
+                        $valides['password'] = null; // posé par `reinitialiserMotDePasse`, pas par `creer` / `modifier`
+                    }
+
                     if ($existant === null) {
-                        $saisie->creer($valides, $valides['id']);
+                        // Création : le mot de passe de création est le temporaire (haché une seule fois, par la réinitialisation).
+                        $saisie->creer($reinitialiser ? array_merge($valides, ['password' => Str::random(40)]) : $valides, $valides['id']);
+                        if ($reinitialiser && $actif) {
+                            $saisie->reinitialiserMotDePasse($valides['id'], $temporaire, $auteur?->id);
+                        }
                         if (! $actif) {
                             $saisie->archiver($valides['id'], $auteur?->id);
                         }
@@ -5684,6 +5702,9 @@ class SyncController extends Controller
                     }
                     if ($actif) {
                         $saisie->reactiver($existant->id);
+                        if ($reinitialiser) {
+                            $saisie->reinitialiserMotDePasse($existant->id, $temporaire, $auteur?->id);
+                        }
                     } else {
                         $saisie->archiver($existant->id, $auteur?->id);
                     }

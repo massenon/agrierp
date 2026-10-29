@@ -90,6 +90,12 @@ Route::post('/logout', \App\Http\Controllers\Auth\LogoutController::class)
     ->name('logout')
     ->middleware('auth');
 
+// MDP-1 — changement de mot de passe OBLIGATOIRE (mot de passe temporaire posé par un administrateur). `auth` seul :
+// `ChangementMotDePasseObligatoire` (groupe web) ne laisse passer que cette page tant que le drapeau est vrai.
+Route::get('/changer-mot-de-passe', \App\Livewire\Auth\ChangementMotDePasseObligatoire::class)
+    ->name('mot-de-passe.obligatoire')
+    ->middleware('auth');
+
 // Sprint VW — verrou de session web (PRD docs/prd/verrou-web.md). Routes `auth` seul, comme /mon-profil : le verrou
 // protège la session de tout compte connecté. `SessionVerrouillee` (groupe web) les laisse passer verrouillées.
 Route::post('/verrouiller', [\App\Http\Controllers\Auth\VerrouSessionController::class, 'verrouiller'])

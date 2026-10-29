@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // fichiers). Dans le groupe `web` et nulle part ailleurs : l'API du poste (jetons Sanctum) n'a pas de session.
         $middleware->web(append: [
             \App\Http\Middleware\SessionVerrouillee::class,
+            // MDP-1 : après le verrou (un compte verrouillé voit d'abord l'écran de verrouillage).
+            \App\Http\Middleware\ChangementMotDePasseObligatoire::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -97,6 +97,9 @@ class AuthController extends Controller
                 'role' => $user->roles->first()?->name,
                 'role_label' => $user->role_label,
             ],
+            // MDP-1 : mot de passe temporaire posé par un administrateur — le poste affiche le changement
+            // obligatoire AVANT l'accueil ; tout le reste de l'API est refusé (403) tant qu'il est vrai.
+            'must_change_password' => (bool) $user->must_change_password,
         ]);
     }
 
@@ -140,9 +143,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->forceFill(['password' => Hash::make($validated['new_password'])])->save();
-
-        AuditLog::record('password.updated', 'auth', $user->id);
+        // MDP-1 : point de passage unique (remet `must_change_password` à faux, refuse le mot de passe temporaire).
+        app(\App\Actions\ChangerMotDePasseAction::class)->executer($user, $validated['new_password']);
 
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
     }
@@ -160,6 +162,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->roles->first()?->name,
             'role_label' => $user->role_label,
+            'must_change_password' => (bool) $user->must_change_password,
             // Module « Assistant de démarrage » : un poste neuf, qui n'a encore rien tiré, le lit ici (éteint par défaut).
             'assistant_demarrage_actif' => \App\Models\ModuleConfig::isEnabled(\App\Models\ModuleConfig::ASSISTANT_DEMARRAGE),
         ]);
