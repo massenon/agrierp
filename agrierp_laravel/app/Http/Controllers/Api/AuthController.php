@@ -160,6 +160,8 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->roles->first()?->name,
             'role_label' => $user->role_label,
+            // Module « Assistant de démarrage » : un poste neuf, qui n'a encore rien tiré, le lit ici (éteint par défaut).
+            'assistant_demarrage_actif' => \App\Models\ModuleConfig::isEnabled(\App\Models\ModuleConfig::ASSISTANT_DEMARRAGE),
         ]);
     }
 }

@@ -175,4 +175,14 @@ class AssistantDemarrageTest extends TestCase
         $this->assertSame(['assistant_demarrage'], $r['accepted']);
         $this->assertTrue(ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE));
     }
+
+    public function test_un_poste_neuf_lit_le_module_a_la_connexion(): void
+    {
+        \Laravel\Sanctum\Sanctum::actingAs($this->admin);
+
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('assistant_demarrage_actif', true);
+
+        ModuleConfig::definir(ModuleConfig::ASSISTANT_DEMARRAGE, false, null);
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('assistant_demarrage_actif', false);
+    }
 }

@@ -37,7 +37,20 @@ class PremierDemarrageRepository {
   }
 
   /// Un poste neuf ne montre l'assistant que si le module est allumé.
-  Future<bool> afficherAssistant() async => await posteNeuf() && await moduleActif();
+  ///
+  /// Un poste neuf n'a encore tiré aucun réglage : il LIT le module au serveur, à la connexion (`GET /api/auth/me`,
+  /// clé `assistant_demarrage_actif`). Hors ligne ou en erreur, il retombe sur sa copie locale (éteint par défaut).
+  Future<bool> afficherAssistant() async {
+    if (!await posteNeuf()) return false;
+    try {
+      final reponse = await _http.get<Map<String, dynamic>>('/api/auth/me');
+      final cle = reponse.data?['assistant_demarrage_actif'];
+      if (cle is bool) return cle;
+    } on DioException {
+      // Hors ligne : la copie locale décide.
+    }
+    return moduleActif();
+  }
 
   Future<bool> posteNeuf() async =>
       (await _db.etatDeSynchronisation())?.lastPulledAt == null &&

@@ -33,13 +33,18 @@ class _Connectivite implements Connectivity {
 }
 
 class _Serveur extends Interceptor {
+  /// Réponse de `GET /api/auth/me` (clé `assistant_demarrage_actif`) ; `null` = clé absente (serveur ancien).
+  static bool? assistantServeur;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
         statusCode: 200,
-        data: options.path.contains('push')
+        data: options.path.contains('auth/me')
+            ? <String, dynamic>{if (assistantServeur != null) 'assistant_demarrage_actif': assistantServeur}
+            : options.path.contains('push')
             ? <String, dynamic>{}
             : {'server_time': '2026-10-17T12:00:00Z'},
       ),
@@ -53,6 +58,7 @@ void main() {
   late PremierDemarrageRepository depot;
 
   setUp(() {
+    _Serveur.assistantServeur = null;
     db = AppDatabase.forTesting(NativeDatabase.memory());
     client = Dio(BaseOptions(baseUrl: ParametresPoste.adresseParDefaut))..interceptors.add(_Serveur());
     depot = PremierDemarrageRepository(
@@ -98,6 +104,16 @@ void main() {
 
       await reglages.definirAssistant(actif: false);
       expect((await reglages.charger()).assistantActif, isFalse);
+    });
+
+    test('poste vraiment neuf : le module est LU au serveur à la connexion, sans tirage préalable', () async {
+      _Serveur.assistantServeur = true;
+      expect(await depot.afficherAssistant(), isTrue);
+      _Serveur.assistantServeur = false;
+      expect(await depot.afficherAssistant(), isFalse);
+      _Serveur.assistantServeur = true;
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+      expect(await depot.afficherAssistant(), isFalse, reason: 'un poste qui a déjà synchronisé n\'est plus neuf');
     });
 
     test('une saisie en attente suffit à ne plus être neuf', () async {
