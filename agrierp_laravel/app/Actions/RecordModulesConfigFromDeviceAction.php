@@ -35,7 +35,7 @@ class RecordModulesConfigFromDeviceAction
                     'is_enabled' => ['required', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
-                if (! LivestockSpecies::query()->where('code', $v['species_code'])->exists()) {
+                if ($v['species_code'] !== ModuleConfig::ASSISTANT_DEMARRAGE && ! LivestockSpecies::query()->where('code', $v['species_code'])->exists()) {
                     throw ValidationException::withMessages(['species_code' => 'Espèce inconnue : '.$v['species_code'].'.']);
                 }
 

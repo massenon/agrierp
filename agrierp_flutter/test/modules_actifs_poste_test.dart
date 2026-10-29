@@ -158,7 +158,7 @@ void main() {
       expect((await etat())['porciculture'], (false, SyncStatus.pending));
       expect((await etat())['cuniculture'], (true, SyncStatus.synced), reason: 'indépendamment des autres espèces');
       expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(2));
-      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(2));
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(3), reason: 'porciculture, héliciculture et l\'assistant (éteint par défaut)');
       expect(find.text('Modification appliquée avec succès.'), findsOne);
       await tester.pump(ToastAgri.duree + const Duration(seconds: 1));
     });

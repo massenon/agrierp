@@ -46,11 +46,25 @@ class ModulesActifs extends Component
         });
     }
 
+    public function getAssistantActifProperty(): bool
+    {
+        return ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE);
+    }
+
     public function toggleModule(string $speciesCode): void
     {
         $this->authorize('manage-modules');
 
         ModuleConfig::definir($speciesCode, ! ModuleConfig::isEnabled($speciesCode), Auth::id());
+        $this->dispatch('toast', message: 'Modification appliquée avec succès.', type: 'success');
+    }
+
+    /** Module « Assistant de démarrage » : éteint par défaut, même point d'écriture que les espèces. */
+    public function toggleAssistant(): void
+    {
+        $this->authorize('manage-modules');
+
+        ModuleConfig::definir(ModuleConfig::ASSISTANT_DEMARRAGE, ! ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE), Auth::id());
         $this->dispatch('toast', message: 'Modification appliquée avec succès.', type: 'success');
     }
 

@@ -751,6 +751,68 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     ModuleEspece.helico: SymbolesAgri.bug_report,
   };
 
+  bool _basculeAssistantEnCours = false;
+
+  /// `wire:click="toggleAssistant"` — module éteint par défaut, même toast que les espèces.
+  Future<void> _basculerAssistant(bool actif) async {
+    if (_basculeAssistantEnCours) return;
+    _basculeAssistantEnCours = true;
+    try {
+      await widget.depot.definirAssistant(actif: actif);
+      await _charger();
+      if (mounted) ToastAgri.afficher(context, messageModuleBascule);
+    } finally {
+      _basculeAssistantEnCours = false;
+    }
+  }
+
+  Widget _carteAssistant(DonneesParametresGeneraux d) => Container(
+    padding: const EdgeInsets.all(AgriSpacing.md),
+    decoration: BoxDecoration(
+      color: AgriColors.surfaceCard,
+      border: Border.all(color: AgriColors.outlineVariant),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+      boxShadow: AgriShadows.sm,
+    ),
+    child: Row(
+      children: [
+        Icon(SymbolesAgri.checklist, size: 24, color: d.assistantActif ? AgriColors.brandEmerald : AgriColors.outline),
+        const SizedBox(width: AgriSpacing.md),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assistant de démarrage',
+                style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Guide la mise en route de la ferme — désactivé par défaut',
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AgriSpacing.sm),
+        InkWell(
+          key: const Key('bascule-module-assistant_demarrage'),
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => _basculerAssistant(!d.assistantActif),
+          child: Semantics(
+            toggled: d.assistantActif,
+            label: 'Activer ou désactiver Assistant de démarrage',
+            child: Icon(
+              d.assistantActif ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
+              size: 28,
+              color: d.assistantActif ? AgriColors.brandEmerald : AgriColors.outline,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _ongletModules(DonneesParametresGeneraux d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -846,6 +908,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
             ),
           ),
         ),
+      _carteAssistant(d),
       const SizedBox(height: AgriSpacing.sm),
       // ⚠️⚠️ CE RÉGLAGE PILOTE CE QUE LE POSTE MONTRE. Une espèce éteinte
       // disparaît des cartes de « Gestion Élevage » et des onglets de « Suivi

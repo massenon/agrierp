@@ -27,6 +27,12 @@ class ModuleConfig extends Model
         return ['is_enabled' => 'boolean'];
     }
 
+    /**
+     * Module « Assistant de démarrage » : une ligne de `modules_config` comme les espèces (même écran, même envoi du poste),
+     * DÉSACTIVÉ par défaut (absence de ligne = éteint). Ce n'est pas une espèce : jamais dans `livestock_species`.
+     */
+    public const ASSISTANT_DEMARRAGE = 'assistant_demarrage';
+
     public static function isEnabled(string $speciesCode): bool
     {
         return (bool) static::where('species_code', $speciesCode)->value('is_enabled');

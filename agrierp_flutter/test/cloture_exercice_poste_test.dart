@@ -214,6 +214,11 @@ void main() {
       expect(await refus(() => depot.ouvrirExerciceSuivant(2027)), contains('déjà en attente'));
       expect(await refus(() => depot.ouvrirExerciceSuivant(2026)), "L'exercice 2026 existe déjà.");
       expect(await refus(() => depot.ouvrirExerciceSuivant(2029)), "L'exercice 2029 ne peut s'ouvrir qu'à la suite de l'exercice 2028, qui n'existe pas.");
+
+      await db.delete(db.fiscalYears).go();
+      maintenant = DateTime(2026, 5, 1);
+      expect(await depot.ouvrirPremierExercice(), 2026);
+      expect(await refus(depot.ouvrirPremierExercice), contains('déjà en attente'));
     });
 
     test('abandonner une demande refusée la retire avec son conflit', () async {

@@ -33,6 +33,8 @@ import 'core/widgets/selecteur_exercice.dart';
 import 'core/widgets/rafraichissement_periodique.dart';
 import 'core/widgets/toast_agri.dart';
 import 'core/theme/agri_tokens.dart';
+import 'features/demarrage/premier_demarrage_repository.dart';
+import 'features/demarrage/premier_demarrage_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/elevage/fiche_journaliere_repository.dart';
 import 'features/achats/achats_commandes_screen.dart';
@@ -205,6 +207,13 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
     // ATT-3 : les attestations produites hors ligne sont déclarées au serveur (numéro, trace) à la synchronisation.
     apresSynchronisation: () => AttestationsRepository.viderLaFile(_db, ClientAttestations(_client)),
+  );
+
+  /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).
+  late final PremierDemarrageRepository _demarrage = PremierDemarrageRepository(
+    database: _db,
+    parametres: widget.parametres,
+    client: _client,
   );
 
   late final AuthService _auth = AuthService(
@@ -465,6 +474,25 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// verrouillage démonte le socle, pas ce brouillon. Vidé à la fin de la session (déconnexion, « PIN oublié »).
   final _brouillonContact = BrouillonContact();
 
+  /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
+  /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
+  bool _premierDemarrage = false;
+
+  /// Ticket S-T3 — l'accueil synchronise à son ouverture, sauf juste après l'écran de premier démarrage, qui
+  /// vient de proposer (et le plus souvent de faire) cette synchronisation.
+  bool _synchroniserALOuverture = true;
+
+  /// Juste avant d'ouvrir l'application (connexion, déverrouillage) : le poste est-il neuf ? (écran F0.98).
+  Future<void> _preparerOuverture() async {
+    final neuf = await _demarrage.afficherAssistant();
+    if (mounted) {
+      setState(() {
+        _premierDemarrage = neuf;
+        _synchroniserALOuverture = true;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _gestes.dispose();
@@ -498,12 +526,25 @@ class _AgriErpAppState extends State<AgriErpApp> {
         },
         auth: _auth,
         verrou: _verrou,
+        avantOuverture: _preparerOuverture,
         surOuverture: _ouvrirRappelsDuJour,
         ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
           onConnecte: onConnecte,
         ),
-        application: (verrouiller, onDeconnecte) => SocleAccueil(
+        application: (verrouiller, onDeconnecte) => _premierDemarrage
+            ? PremierDemarrageScreen(
+                depot: _demarrage,
+                engine: _engine,
+                utilisateur: _auth.utilisateur?.nom ?? '—',
+                depotCloture: _cloture,
+                peutOuvrirExercice: PermissionsPoste.peut(_auth.utilisateur?.role ?? '', 'manage-comptabilite'),
+                onTermine: () => setState(() {
+                  _premierDemarrage = false;
+                  _synchroniserALOuverture = false;
+                }),
+              )
+            : SocleAccueil(
           database: _db,
           engine: _engine,
           auth: _auth,
@@ -557,7 +598,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
           onVerrouiller: verrouiller,
           changementsReseau: Connectivity().onConnectivityChanged,
           gestes: _gestes,
-                  ),
+          synchroniserALOuverture: _synchroniserALOuverture,
+        ),
       ),
     );
   }

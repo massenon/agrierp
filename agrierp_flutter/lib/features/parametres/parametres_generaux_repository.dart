@@ -52,6 +52,10 @@ class DonneesParametresGeneraux {
       // module que le serveur a explicitement éteint.
       true;
 
+  /// Module « Assistant de démarrage » : ÉTEINT par défaut (contrairement aux espèces) — sans ligne, il n'est pas actif.
+  bool get assistantActif =>
+      modules.where((m) => m.speciesCode == 'assistant_demarrage').map((m) => m.isEnabled).firstOrNull ?? false;
+
   /// Codes des espèces que la ferme exploite réellement.
   Set<String> get especesActives => {
     for (final module in ModuleEspece.values)
@@ -302,11 +306,16 @@ class ParametresGenerauxRepository {
   ///
   /// ⚠️ Ne touche QUE `modules_config` : ni les données déjà saisies de l'espèce, ni la comptabilité. Aucun « au moins un
   /// module » : le web n'impose rien, le poste non plus.
-  Future<void> definirModule(ModuleEspece module, {required bool actif}) async {
+  Future<void> definirModule(ModuleEspece module, {required bool actif}) => _definirCode(module.code, actif);
+
+  /// `ModulesActifs::toggleAssistant()` — même écriture (`modules_config`, `pending`), même envoi au serveur.
+  Future<void> definirAssistant({required bool actif}) => _definirCode('assistant_demarrage', actif);
+
+  Future<void> _definirCode(String code, bool actif) async {
     final instant = HeureBenin.versInstant(_maintenant());
     final existante = await (database.select(
       database.modulesConfig,
-    )..where((t) => t.speciesCode.equals(module.code))).getSingleOrNull();
+    )..where((t) => t.speciesCode.equals(code))).getSingleOrNull();
 
     if (existante == null) {
       await database
@@ -314,7 +323,7 @@ class ParametresGenerauxRepository {
           .insert(
             ModulesConfigCompanion.insert(
               id: _uuid.v4(),
-              speciesCode: module.code,
+              speciesCode: code,
               isEnabled: Value(actif),
               syncStatus: const Value(SyncStatus.pending),
               updatedAt: Value(instant),
