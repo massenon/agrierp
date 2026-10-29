@@ -33,8 +33,6 @@ import 'core/widgets/selecteur_exercice.dart';
 import 'core/widgets/rafraichissement_periodique.dart';
 import 'core/widgets/toast_agri.dart';
 import 'core/theme/agri_tokens.dart';
-import 'features/demarrage/premier_demarrage_repository.dart';
-import 'features/demarrage/premier_demarrage_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/elevage/fiche_journaliere_repository.dart';
 import 'features/achats/achats_commandes_screen.dart';
@@ -207,13 +205,6 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
     // ATT-3 : les attestations produites hors ligne sont déclarées au serveur (numéro, trace) à la synchronisation.
     apresSynchronisation: () => AttestationsRepository.viderLaFile(_db, ClientAttestations(_client)),
-  );
-
-  /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).
-  late final PremierDemarrageRepository _demarrage = PremierDemarrageRepository(
-    database: _db,
-    parametres: widget.parametres,
-    client: _client,
   );
 
   late final AuthService _auth = AuthService(
@@ -474,25 +465,6 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// verrouillage démonte le socle, pas ce brouillon. Vidé à la fin de la session (déconnexion, « PIN oublié »).
   final _brouillonContact = BrouillonContact();
 
-  /// Ticket F0.98 — vrai si la session s'ouvre sur un poste neuf : l'écran de premier démarrage passe
-  /// avant l'accueil, jusqu'à « Continuer » ou « Plus tard ».
-  bool _premierDemarrage = false;
-
-  /// Ticket S-T3 — l'accueil synchronise à son ouverture, sauf juste après l'écran de premier démarrage, qui
-  /// vient de proposer (et le plus souvent de faire) cette synchronisation.
-  bool _synchroniserALOuverture = true;
-
-  /// Juste avant d'ouvrir l'application (connexion, déverrouillage) : le poste est-il neuf ? (écran F0.98).
-  Future<void> _preparerOuverture() async {
-    final neuf = await _demarrage.posteNeuf();
-    if (mounted) {
-      setState(() {
-        _premierDemarrage = neuf;
-        _synchroniserALOuverture = true;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _gestes.dispose();
@@ -526,25 +498,12 @@ class _AgriErpAppState extends State<AgriErpApp> {
         },
         auth: _auth,
         verrou: _verrou,
-        avantOuverture: _preparerOuverture,
         surOuverture: _ouvrirRappelsDuJour,
         ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
           onConnecte: onConnecte,
         ),
-        application: (verrouiller, onDeconnecte) => _premierDemarrage
-            ? PremierDemarrageScreen(
-                depot: _demarrage,
-                engine: _engine,
-                utilisateur: _auth.utilisateur?.nom ?? '—',
-                depotCloture: _cloture,
-                peutOuvrirExercice: PermissionsPoste.peut(_auth.utilisateur?.role ?? '', 'manage-comptabilite'),
-                onTermine: () => setState(() {
-                  _premierDemarrage = false;
-                  _synchroniserALOuverture = false;
-                }),
-              )
-            : SocleAccueil(
+        application: (verrouiller, onDeconnecte) => SocleAccueil(
           database: _db,
           engine: _engine,
           auth: _auth,
@@ -598,8 +557,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           onVerrouiller: verrouiller,
           changementsReseau: Connectivity().onConnectivityChanged,
           gestes: _gestes,
-          synchroniserALOuverture: _synchroniserALOuverture,
-        ),
+                  ),
       ),
     );
   }
@@ -861,13 +819,23 @@ class _SocleAccueilState extends State<SocleAccueil> {
   /// Après un tirage : les notifications et la file (`_versionTirage`), et les exercices (statut, N+1 ouvert).
   void _apresTirage() {
     if (!mounted) return;
+    _lireMecef();
     setState(() => _versionTirage++);
     _exercice.charger();
+  }
+
+  /// VC-5 — le module MeCeF est-il activé ? (titre de la barre et libellé du menu : « Facturation » sinon).
+  bool _mecefActif = false;
+
+  Future<void> _lireMecef() async {
+    final actif = await widget.facturation.mecefActif();
+    if (mounted && actif != _mecefActif) setState(() => _mecefActif = actif);
   }
 
   @override
   void initState() {
     super.initState();
+    _lireMecef();
 
     // ⚠️ ON N'OUVRE PAS SUR UN ÉCRAN INTERDIT. Démarrer sur la fiche d'élevage
     // quel que soit le rôle accueillerait le caissier par un « accès refusé »
@@ -934,7 +902,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
   }
 
   /// Titre de la barre supérieure (groupe vide : `BarreSuperieure` affiche alors le seul titre).
-  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran));
+  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran, mecefActif: _mecefActif));
 
   @override
   void dispose() {
@@ -992,6 +960,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
               auth: widget.auth,
               actif: _ecran,
               ecrans: PermissionsPoste.ecransDe(_role),
+              mecefActif: _mecefActif,
               onNaviguer: (e) => setState(() => _ecran = e),
             ),
           Expanded(
@@ -1521,12 +1490,14 @@ class _BarreLaterale extends StatelessWidget {
     required this.auth,
     required this.actif,
     required this.ecrans,
+    this.mecefActif = false,
     required this.onNaviguer,
   });
 
   final AuthService auth;
   final EcranPoste actif;
   final List<EcranPoste> ecrans;
+  final bool mecefActif;
   final void Function(EcranPoste) onNaviguer;
 
   /// Arborescence **complète** de la barre latérale (`layouts/app.blade.php`, et avant lui
@@ -1767,7 +1738,7 @@ class _BarreLaterale extends StatelessWidget {
                     if (entrees.any((e) => e.$3 != null && ecrans.contains(e.$3))) ...[
                       _titreGroupe(titre),
                       for (final (icone, libelle, ecran) in entrees)
-                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, libelle, ecran),
+                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, ecran == EcranPoste.facturation && !mecefActif ? 'Facturation' : libelle, ecran),
                       const SizedBox(height: AgriSpacing.sm),
                     ],
                 ],
@@ -1924,5 +1895,9 @@ class SocleAccueilTitres {
   };
 
   /// Titre affiché pour [ecran] ; le défaut du web (`$title ?? 'Ferme École Olouwachegoun'`) sinon.
-  static String titre(EcranPoste ecran) => titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
+  static String titre(EcranPoste ecran, {bool mecefActif = false}) {
+    // VC-5 : comme le web (`$this->mecefActif ? 'Facturation & MeCeF' : 'Facturation'`), le titre suit le module.
+    if (ecran == EcranPoste.facturation && !mecefActif) return 'Facturation';
+    return titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
+  }
 }

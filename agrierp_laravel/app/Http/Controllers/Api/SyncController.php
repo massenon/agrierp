@@ -4198,12 +4198,12 @@ class SyncController extends Controller
      * Ticket CP-4 — DEMANDES DE CLÔTURE saisies au poste (« le poste doit le faire », décision du client).
      *
      * Un envoi = {id, kind, payload}. Chaque geste passe par `ClotureExerciceService`, le point de passage du web
-     * (`ClotureExercice`, `AssistantDemarrage`) : mêmes gardes, mêmes écritures, mêmes messages, mêmes audits. Le droit est celui
+     * (`ClotureExercice`) : mêmes gardes, mêmes écritures, mêmes messages, mêmes audits. Le droit est celui
      * du geste au web :
      *  - `cloturer_periode`, `confirmer_etape1`, `solder_comptes_gestion`, `cloturer_exercice`, `ouvrir_exercice_suivant`
      *    → `close-fiscal-year` ;
      *  - `decloturer_periode`, `rouvrir_exercice` → `manage-modules` (l'administrateur) ;
-     *  - `ouvrir_exercice` (le premier, assistant de démarrage) → `manage-comptabilite`.
+     *  - `ouvrir_exercice` (le premier exercice) → `manage-comptabilite`.
      * Idempotence : l'UUID de la demande est consigné (`fiscal_closure_requests`) quand elle est ACCEPTÉE ; renvoyée, elle est
      * acquittée sans être rejouée (une clôture renvoyée après une réouverture faite entre-temps ne reclôture pas). « Rien à
      * solder » est un succès (l'état voulu est atteint). Une demande refusée n'écrit rien (transaction annulée).

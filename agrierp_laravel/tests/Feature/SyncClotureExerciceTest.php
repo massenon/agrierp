@@ -17,7 +17,7 @@ use Tests\TestCase;
  * Ticket CP-4 — LA CLÔTURE D'EXERCICE SE DEMANDE AU POSTE (décision du client : « oui, le poste doit le faire »).
  *
  * Le poste n'écrit que la DEMANDE (`fiscal_closure_requests`) ; `ClotureExerciceService` — le point de passage du web
- * (`ClotureExercice`, `AssistantDemarrage`) — la rejoue : mêmes gardes, mêmes écritures, mêmes motifs. Chiffres calculés à la main.
+ * (`ClotureExercice`) — la rejoue : mêmes gardes, mêmes écritures, mêmes motifs. Chiffres calculés à la main.
  */
 class SyncClotureExerciceTest extends TestCase
 {

@@ -70,6 +70,12 @@ void main() {
     expect(deconnexions, 1);
   });
 
+  test('la barre dit « Facturation » quand MeCeF est désactivé, comme le web', () {
+    expect(SocleAccueilTitres.titre(EcranPoste.facturation), 'Facturation');
+    expect(SocleAccueilTitres.titre(EcranPoste.facturation, mecefActif: true), 'Facturation & MeCeF');
+    expect(SocleAccueilTitres.titre(EcranPoste.comptabilite), 'Comptabilité');
+  });
+
   test('le titre de la barre est celui que le web affiche pour chaque écran', () {
     final routes = File('$dossierLaravel/routes/web.php').readAsStringSync();
     String titreWeb(String chemin) {
@@ -119,7 +125,7 @@ void main() {
     };
     final ecarts = <String>[
       for (final MapEntry(key: e, value: chemin) in chemins.entries)
-        if (SocleAccueilTitres.titre(e) != titreWeb(chemin)) '${e.name} : poste « ${SocleAccueilTitres.titre(e)} », web « ${titreWeb(chemin)} »',
+        if (SocleAccueilTitres.titre(e, mecefActif: true) != titreWeb(chemin)) '${e.name} : poste « ${SocleAccueilTitres.titre(e, mecefActif: true)} », web « ${titreWeb(chemin)} »',
     ];
     expect(ecarts, isEmpty);
   }, skip: sansLaravel);

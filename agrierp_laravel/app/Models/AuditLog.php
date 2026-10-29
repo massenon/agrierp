@@ -258,7 +258,7 @@ class AuditLog extends Model
         'fiscal_year.step1_confirmed' => "Travaux d'inventaire confirmés",
         'fiscal_year.gestion_accounts_closed' => 'Comptes de gestion soldés',
         'fiscal_year.closed' => 'Exercice clôturé',
-        // Ticket EX3 — ouverture de l'exercice N+1 (bouton de décembre ou assistant de démarrage, tâche du 1er janvier,
+        // Ticket EX3 — ouverture de l'exercice N+1 (bouton de décembre, tâche du 1er janvier,
         // première saisie de l'année quand la tâche n'a pas tourné). `reopened` (15.53) n'avait pas de libellé.
         'fiscal_year.opened' => 'Exercice ouvert',
         'fiscal_year.opened_auto' => 'Exercice ouvert automatiquement (1er janvier)',

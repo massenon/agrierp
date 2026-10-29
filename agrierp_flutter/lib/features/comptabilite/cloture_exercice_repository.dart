@@ -356,8 +356,7 @@ class DonneesCloture {
   }
 }
 
-/// Ticket CP-4 — LA CLÔTURE D'EXERCICE au poste (`Livewire\Comptabilite\ClotureExercice`, `Parametres\AssistantDemarrage::
-/// ouvrirExercice`). UN SEUL ÉCRIVAIN de `fiscal_closure_requests`.
+/// Ticket CP-4 — LA CLÔTURE D'EXERCICE au poste (`Livewire\Comptabilite\ClotureExercice`). UN SEUL ÉCRIVAIN de `fiscal_closure_requests`.
 ///
 /// ⚠️⚠️ **LE POSTE N'ÉCRIT JAMAIS `fiscal_years` NI `periodic_closures`.** Une clôture est destructive et se juge au serveur : chaque
 /// geste écrit une DEMANDE (`pending`) que le serveur rejoue par `ClotureExerciceService` (mêmes gardes, mêmes écritures, mêmes
@@ -548,21 +547,6 @@ class ClotureExerciceRepository {
     _refuserDoublon(d, 'ouvrir_exercice_suivant', "Une demande d'ouverture de l'exercice $annee est déjà en attente d'envoi.", annee: annee);
 
     await _demander('ouvrir_exercice_suivant', {'year': annee});
-  }
-
-  /// « Ouvrir l'exercice AAAA » de l'assistant de démarrage : le PREMIER exercice, l'année civile en cours
-  /// (`AssistantDemarrage::ouvrirExercice`).
-  Future<int> ouvrirPremierExercice() async {
-    final d = await charger();
-    final annee = d.maintenant.year;
-    final existant = d.exercice(annee);
-    if (existant != null) {
-      throw RefusCloture(existant.status == 'cloture' ? "L'exercice $annee est clôturé : une clôture est définitive." : "L'exercice $annee existe déjà.");
-    }
-    _refuserDoublon(d, 'ouvrir_exercice', "Une demande d'ouverture de l'exercice $annee est déjà en attente d'envoi.", annee: annee);
-
-    await _demander('ouvrir_exercice', {'year': annee});
-    return annee;
   }
 
   /// Abandonne une demande REFUSÉE (ou en attente) : elle ne part plus, son conflit est levé.

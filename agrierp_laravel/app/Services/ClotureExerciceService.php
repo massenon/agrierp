@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Ticket CP-4 — POINT DE PASSAGE UNIQUE DE LA CLÔTURE (périodes et exercice).
  *
- * Appelé par `Comptabilite\ClotureExercice` et `Parametres\AssistantDemarrage` (le web) ET par l'envoi du poste
+ * Appelé par `Comptabilite\ClotureExercice` (le web) ET par l'envoi du poste
  * (`SyncController::pushFiscalClosureRequests`) : mêmes gardes, mêmes écritures, mêmes messages, mêmes audits.
  * Le DROIT n'est pas jugé ici : il l'est par l'appelant (`close-fiscal-year`, `manage-modules`, `manage-comptabilite`).
  *
@@ -333,7 +333,7 @@ class ClotureExerciceService
     }
 
     /**
-     * Ticket 15.51 — le PREMIER exercice de la ferme (assistant de démarrage) : l'année civile en cours (règle de
+     * Ticket 15.51 — le PREMIER exercice de la ferme (sans écran d'assistant) : l'année civile en cours (règle de
      * `FiscalYearSeeder`). [$annee] n'est donné que par une demande du poste : ce ne peut être que l'année en cours.
      *
      * @throws \DomainException
