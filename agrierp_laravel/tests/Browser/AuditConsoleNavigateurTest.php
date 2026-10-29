@@ -31,7 +31,7 @@ class AuditConsoleNavigateurTest extends DuskTestCase
     /** Écrans à parcourir : toutes les routes GET nommées sans paramètre. */
     private function ecrans(): array
     {
-        $exclues = ['login', 'password.reset', 'logout', 'health-check'];
+        $exclues = ['login', 'logout', 'health-check'];
         $uris = [];
 
         foreach (Route::getRoutes() as $route) {

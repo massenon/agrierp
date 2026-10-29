@@ -5,7 +5,6 @@ namespace App\Livewire\Auth;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -91,8 +90,6 @@ class Login extends Component
 
     public bool $remember = false;
 
-    public string $forgotEmail = '';
-
     public ?int $lockedSecondsRemaining = null;
 
     public function mount(): void
@@ -175,22 +172,6 @@ class Login extends Component
         ]);
 
         $this->redirect(session()->pull('url.intended', route('dashboard.index')), navigate: false);
-    }
-
-    public function sendResetLink(): void
-    {
-        $this->validate([
-            'forgotEmail' => ['required', 'email'],
-        ], [], ['forgotEmail' => 'adresse e-mail']); // U5 : « Le champ adresse e-mail… », pas « Le champ l'adresse… »
-
-        // Le statut réel n'est jamais exposé à l'utilisateur (prévention
-        // d'énumération de comptes, Document 06 §12) — même message de
-        // succès que l'e-mail existe en base ou non.
-        Password::sendResetLink(['email' => $this->forgotEmail]);
-
-        $this->reset('forgotEmail');
-        $this->dispatch('close-modal', name: 'forgot-password');
-        $this->dispatch('toast', message: 'Lien de réinitialisation envoyé.', type: 'success');
     }
 
     /**

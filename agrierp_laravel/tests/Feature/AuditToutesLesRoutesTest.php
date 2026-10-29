@@ -36,7 +36,6 @@ class AuditToutesLesRoutesTest extends TestCase
     /** Routes exclues, avec le motif — jamais une exclusion silencieuse. */
     private const EXCLUES = [
         'login' => 'redirige un utilisateur déjà authentifié (middleware guest)',
-        'password.reset' => 'redirige un utilisateur déjà authentifié (middleware guest)',
         'logout' => 'POST uniquement',
         'health-check' => 'sonde JSON, pas un écran',
         'justificatifs.show' => 'flux d\'un fichier (404 sans pièce), pas un écran : couverte par JustificatifsSynchronisesTest (ticket AC-3)',

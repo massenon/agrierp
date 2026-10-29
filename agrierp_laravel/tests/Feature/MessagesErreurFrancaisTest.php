@@ -206,9 +206,6 @@ class MessagesErreurFrancaisTest extends TestCase
         $this->assertSame("Le nom d'utilisateur ou l'adresse e-mail est obligatoire.", $vide->errors()->first('identifiant'));
         $this->assertSame('Le mot de passe est obligatoire.', $vide->errors()->first('password'));
 
-        $oubli = Livewire::test(Login::class)->set('forgotEmail', 'pas-une-adresse')->call('sendResetLink');
-        $this->assertSame('Le champ adresse e-mail doit être une adresse e-mail valide.', $oubli->errors()->first('forgotEmail'));
-
         // Quatre échecs de plus : le cinquième déclenche le verrouillage (5 tentatives / 15 min).
         foreach (range(1, 4) as $_) {
             $bloque = $tentative();

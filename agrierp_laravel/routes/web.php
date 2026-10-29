@@ -50,7 +50,6 @@ Route::get('/up', function () {
 // Ticket 1.1 (Sprint 1) — login.html → Livewire\Auth\Login
 Route::middleware('guest')->group(function () {
     Route::get('/login', \App\Livewire\Auth\Login::class)->name('login');
-    Route::get('/reset-password/{token}', \App\Livewire\Auth\ResetPassword::class)->name('password.reset');
 });
 
 // Sprint 14, ticket 14.15 : welcome.html + landing-page.html → pages publiques

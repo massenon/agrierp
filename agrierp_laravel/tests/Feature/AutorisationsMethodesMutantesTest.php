@@ -22,7 +22,6 @@ class AutorisationsMethodesMutantesTest extends TestCase
      * avant authentification (même liste que le ticket 14.64).
      */
     private const EXCLUSIONS = [
-        'Auth/ResetPassword.php::submit',
         'Notifications/Index.php::markAsRead',
         'Notifications/Index.php::delete',
         'Profil/MonProfil.php::updatePassword',

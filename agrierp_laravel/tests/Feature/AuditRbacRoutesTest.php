@@ -42,7 +42,7 @@ class AuditRbacRoutesTest extends TestCase
     /** Les 4 rôles réellement implémentés (`RBAC_PAGE_MAP`, Document 00 §6). */
     private const ROLES = ['admin', 'comptable', 'caissier', 'animalier'];
 
-    private const EXCLUES = ['login', 'password.reset', 'logout', 'health-check'];
+    private const EXCLUES = ['login', 'logout', 'health-check'];
 
     private function estRouteDeFramework(?string $nom): bool
     {

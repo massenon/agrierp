@@ -7,7 +7,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password as PasswordBroker;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -92,33 +91,5 @@ class PolitiqueMotDePasseTest extends TestCase
             ->set('password', 'AgriERP@2026')
             ->call('saveUser')
             ->assertHasNoErrors('password');
-    }
-
-    /**
-     * ⚠️ LA RÉINITIALISATION APPLIQUE LA MÊME RÈGLE. Protéger la création sans
-     * protéger la réinitialisation laisserait la porte grande ouverte : c'est
-     * le chemin qu'emprunte un utilisateur qui a perdu son mot de passe.
-     */
-    public function test_the_reset_screen_applies_the_same_policy(): void
-    {
-        $utilisateur = User::create([
-            'name' => 'Caissier', 'username' => 'caisse',
-            'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
-        ]);
-
-        $jeton = PasswordBroker::createToken($utilisateur);
-
-        Livewire::test(\App\Livewire\Auth\ResetPassword::class, [
-            'token' => $jeton,
-        ])
-            ->set('email', $utilisateur->email)
-            ->set('password', '12345678')
-            ->set('password_confirmation', '12345678')
-            ->call('submit')
-            ->assertHasErrors('password');
-
-        $this->assertTrue(Hash::check('AgriERP@2026', $utilisateur->fresh()->password),
-            'le mot de passe ne doit pas avoir change');
     }
 }
