@@ -458,7 +458,7 @@ void main() {
 
         expect(find.text('Centre de Notifications'), findsOneWidget);
         expect(
-          find.text("Toutes les alertes et notifications système d'AgriERP."),
+          find.text("Toutes les alertes et notifications système d'LogiAgriERP."),
           findsOneWidget,
         );
         expect(

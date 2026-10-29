@@ -285,7 +285,7 @@ void main() {
       expect(
         find.text(
           "Assistance technique, suggestions et signalement d'anomalies pour "
-          'AgriERP.',
+          'LogiAgriERP.',
         ),
         findsOneWidget,
       );

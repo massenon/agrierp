@@ -82,7 +82,7 @@ class AssistantDemarrageTest extends TestCase
     public function test_l_assistant_s_ouvre_pour_l_administrateur_seulement_et_se_reporte(): void
     {
         $this->actingAs($this->admin);
-        Livewire::test(AssistantDemarrage::class)->assertSet('afficher', true)->assertSee('Bienvenue dans AgriERP')
+        Livewire::test(AssistantDemarrage::class)->assertSet('afficher', true)->assertSee('Bienvenue dans LogiAgriERP')
             ->call('reporter')->assertSet('afficher', false);
         Livewire::test(AssistantDemarrage::class)->assertSet('afficher', false);
 

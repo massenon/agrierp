@@ -117,7 +117,7 @@ void main() {
   });
 
   test("le titre de la fenêtre est celui de l'application", () {
-    expect(File('windows/runner/main.cpp').readAsStringSync(), contains('L"AgriERP - Ferme Ecole OLOUWACHEGOUN"'));
+    expect(File('windows/runner/main.cpp').readAsStringSync(), contains('L"LogiAgriERP - Ferme Ecole OLOUWACHEGOUN"'));
   });
 
   test("l'installateur utilise l'.ico : assistant, programme désinstallable et raccourcis", () {
@@ -125,7 +125,7 @@ void main() {
     expect(iss, contains(r'SetupIconFile=..\windows\runner\resources\app_icon.ico'));
     expect(iss, contains(r'UninstallDisplayIcon={app}\agrierp.exe'));
     // Chaque raccourci nomme l'icône explicitement (celle de l'exécutable) plutôt que de s'en remettre au défaut.
-    final raccourcis = RegExp(r'^Name: "\{(group|autodesktop)\}\\AgriERP".*$', multiLine: true).allMatches(iss).toList();
+    final raccourcis = RegExp(r'^Name: "\{(group|autodesktop)\}\\LogiAgriERP".*$', multiLine: true).allMatches(iss).toList();
     expect(raccourcis.length, 2);
     for (final r in raccourcis) {
       expect(r.group(0), contains(r'IconFilename: "{app}\agrierp.exe"'));

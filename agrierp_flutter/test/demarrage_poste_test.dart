@@ -64,7 +64,7 @@ void main() {
     expect(journal.single, contains('bloqué'));
 
     await tester.pumpWidget(w!);
-    expect(tester.widget<Text>(find.byKey(const Key('demarrage-cause'))).data, contains('autre fenêtre AgriERP'));
+    expect(tester.widget<Text>(find.byKey(const Key('demarrage-cause'))).data, contains('autre fenêtre LogiAgriERP'));
     // Journal illisible (disque, droits) : l'écran n'affiche pas de chemin et ne plante pas.
     expect(find.byKey(const Key('demarrage-journal')), findsNothing);
   });

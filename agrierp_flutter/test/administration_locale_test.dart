@@ -153,7 +153,7 @@ void main() {
 
       final m = await admin.programmerRestauration('backup_2026-10-28_1030_complete.sqlite');
 
-      expect(m, contains('fermez puis rouvrez AgriERP'));
+      expect(m, contains('fermez puis rouvrez LogiAgriERP'));
       expect(await File('${donnees.path}/agrierp.restauration').exists(), isTrue);
       expect(await File('${donnees.path}/agrierp.sqlite').readAsString(), 'BASE ACTUELLE', reason: 'rien ne change à chaud');
 
