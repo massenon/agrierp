@@ -864,3 +864,7 @@ Décision du client : seulement quand le module « Assistant de démarrage » es
 - **Visite** : Alpine maison (`resources/js/aide.js`, logique pure `aide-logique.js`), repères `data-aide="aide|topbar|contenu|menu"` ; au poste, VRAI voile percé sur les éléments du socle par `GlobalKey` (`PlacementVisite`, transposition de la logique JS). Élément absent ou hors champ (menu replié, tiroir mobile fermé) : étape sans trou.
 - **Poste** : le module est relu après chaque tirage et quand la carte de Paramètres bascule (`surAssistantBascule`).
 - **Non vérifié** : rendu navigateur réel (placement du trou, tiroir, focus), rendu Windows réel.
+
+## Attestations : signature du Directeur et date modifiable (29/10/2026)
+- Signataire UNIQUE (palier court) : signature et cachet du Directeur (`resources/attestation/images/signature-directeur.png`, copie `agrierp_flutter/assets/attestation/`), nom et fonction CENTRÉS en bas de page, au web (`exports/attestation.blade.php`) et au poste (`pdf_attestation.dart`, `_signataireUnique`). Trois signataires : disposition inchangée, sans signature imprimée.
+- « Date de l'attestation » (après « ATTAN - ÉWÉ, le ») : champ du web (`Livewire\RH\Attestations::$dateAttestation`, API `date_attestation`) et du poste (`att-date-attestation`) ; vide = date du jour. Le numéro et la durée restent ceux de la date réelle.

@@ -313,6 +313,7 @@ class AttestationService
         array $domaines = [],
         string $civilite = 'M.',
         array $signataires = [],
+        ?string $dateAttestation = null,
     ): array {
         $nom = $personne->last_name.' '.$personne->first_name;
         $numero = $this->prochainNumero();
@@ -331,13 +332,14 @@ class AttestationService
             )),
             'appreciation' => $this->appreciation($type, $personne, $note, $debut, $fin, $civilite),
             'numero'     => $numero,
-            'dateLieu'   => static::dateLongue(now()),
+            'dateLieu'   => static::dateLongue($dateAttestation ? Carbon::parse($dateAttestation) : now()),
             'signataires' => $this->signataires($type, $debut, $fin, $signataires),
             'entete'     => config('attestation'),
             'images'     => [
                 'logo'      => resource_path('attestation/images/logo-ferme.png'),
                 'filigrane' => resource_path('attestation/images/filigrane.png'),
                 'decor'     => resource_path('attestation/images/decor-floral.png'),
+                'signature' => resource_path('attestation/images/signature-directeur.png'),
             ],
             'polices'    => resource_path('attestation/fonts'),
         ])->setPaper('a4', 'landscape')

@@ -369,4 +369,29 @@ class ApiAttestationsTest extends TestCase
     {
         $this->postJson('/api/attestations/emissions', ['id' => self::EMISSION_1, 'type' => 'stagiaire'])->assertStatus(401);
     }
+
+    public function test_la_date_de_l_attestation_est_acceptee_et_controlee(): void
+    {
+        $this->avec('rh')->postJson('/api/attestations', [
+            'type' => 'stagiaire', 'person_id' => $this->stagiaire->id,
+            'start_date' => '2026-02-01', 'end_date' => '2026-05-31', 'date_attestation' => '2026-06-15',
+        ])->assertOk();
+
+        $this->avec('rh')->postJson('/api/attestations', [
+            'type' => 'stagiaire', 'person_id' => $this->stagiaire->id,
+            'date_attestation' => 'pas-une-date',
+        ])->assertStatus(422)->assertJsonValidationErrors('date_attestation');
+    }
+
+    public function test_la_date_de_l_attestation_se_lit_dans_le_gabarit_et_l_apercu_web(): void
+    {
+        $service = app(\App\Services\AttestationService::class);
+        $vue = file_get_contents(resource_path('views/exports/attestation.blade.php'));
+        $this->assertStringContainsString("{{ \$entete['lieu'] }}, le {{ \$dateLieu }}", $vue);
+        $this->assertSame('15 juin 2026', $service::dateLongue(\Carbon\Carbon::parse('2026-06-15')));
+
+        $page = file_get_contents(resource_path('views/livewire/rh/attestations.blade.php'));
+        $this->assertStringContainsString('wire:model.live="dateAttestation"', $page);
+        $this->assertStringContainsString("Date de l'attestation", $page);
+    }
 }

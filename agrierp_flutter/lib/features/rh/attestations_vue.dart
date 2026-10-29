@@ -103,6 +103,8 @@ class _AttestationsVueState extends State<AttestationsVue> {
 
   final _debut = TextEditingController();
   final _fin = TextEditingController();
+  // Date de l'attestation (imprimée après « ATTAN - ÉWÉ, le ») ; vide = la date du jour, comme au web.
+  final _dateAttestation = TextEditingController();
   final _note = TextEditingController();
   // ATT-1 — champs spécifiques au stagiaire.
   final _appreciation = TextEditingController();
@@ -152,6 +154,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
   void dispose() {
     _debut.dispose();
     _fin.dispose();
+    _dateAttestation.dispose();
     _note.dispose();
     _appreciation.dispose();
     _naissance.dispose();
@@ -264,6 +267,9 @@ class _AttestationsVueState extends State<AttestationsVue> {
     if (_fin.text.trim().isNotEmpty && _lire(_fin.text) == null) {
       erreurs['fin'] = 'Date invalide (jj/mm/aaaa).';
     }
+    if (_dateAttestation.text.trim().isNotEmpty && _lire(_dateAttestation.text) == null) {
+      erreurs['dateAttestation'] = 'Date invalide (jj/mm/aaaa).';
+    }
     if (erreurs.isNotEmpty) {
       setState(() {
         _erreurs = erreurs;
@@ -294,6 +300,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
         civilite: _civilite,
         surcharges: _surchargesSaisies(),
         aujourdhui: _aujourdhui,
+        dateAttestation: _lire(_dateAttestation.text),
       );
       final pdf = produite.pdf;
       final chemin = await widget.enregistrer(pdf);
@@ -696,6 +703,8 @@ class _AttestationsVueState extends State<AttestationsVue> {
               ),
             ],
           ),
+          const SizedBox(height: AgriSpacing.md),
+          _champDate("Date de l'attestation", _dateAttestation, 'att-date-attestation', 'dateAttestation'),
           // ATT-1 — civilité (M. / Mme).
           const SizedBox(height: AgriSpacing.md),
           Text('Civilité'.toUpperCase(), style: _etiquette),
@@ -1142,7 +1151,7 @@ class _AttestationsVueState extends State<AttestationsVue> {
               ),
               const SizedBox(height: AgriSpacing.xs),
               Text(
-                'ATTAN - ÉWÉ, le ${_dateLongue(_aujourdhui)}',
+                'ATTAN - ÉWÉ, le ${_dateLongue(_lire(_dateAttestation.text) ?? _aujourdhui)}',
                 key: const Key('att-apercu-lieu-date'),
                 textAlign: TextAlign.right,
                 style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),

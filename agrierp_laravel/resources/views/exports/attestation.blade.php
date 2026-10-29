@@ -97,6 +97,15 @@
         <p class="suite">En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.</p>
     </div>
 
+    @if(count($signataires) === 1 && ($signataires[0]['position'] ?? null) === 1)
+        {{-- Signataire UNIQUE (palier court) : nom, fonction ET signature (cachet et paraphe du Directeur) CENTRÉS en bas de page. --}}
+        @php $unique = $signataires[0]; @endphp
+        <div class="abs" style="left: 221pt; top: {{ $signatureHaut ?? 434 }}pt; width: 400pt; text-align: center;">
+            @if(! empty($images['signature']))<img src="{{ $images['signature'] }}" style="height: 74pt; margin: 0 0 -6pt;" alt="Signature">@endif
+            <p class="sig-nom" style="text-align: center; margin-top: 0;">{{ $unique['nom'] }}</p>
+            @if($unique['fonction'] !== '')<p class="sig-fonction" style="text-align: center;">{{ str_replace("'", '’', $unique['fonction']) }}</p>@endif
+        </div>
+    @else
     @foreach($signataires as $sig)
         @php
             // Position 2 = Examinateur (gauche), 3 = Président du Jury (centre), 1 = Directeur Général (droite) :
@@ -110,6 +119,7 @@
             @if($sig['fonction'] !== '')<p class="sig-fonction" style="padding-left: {{ $retrait }}pt;">{{ str_replace("'", '’', $sig['fonction']) }}</p>@endif
         </div>
     @endforeach
+    @endif
 
     <div class="abs pied" style="top: 559pt;"><strong>E-mail</strong> : <span class="lien">{{ $entete['emails'][0] }}</span><span class="sep"> / </span><span class="lien">{{ $entete['emails'][1] }}</span></div>
     <div class="abs pied" style="top: 571.4pt;"><strong>Site web</strong>:<span class="lien">{{ $entete['site'] }}</span></div>

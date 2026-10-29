@@ -47,6 +47,7 @@ class AttestationController extends Controller
             'birth_date'     => ['nullable', 'date'],
             'birth_place'    => ['nullable', 'string', 'max:100'],
             'civilite'       => ['nullable', 'in:M.,Mme'],
+            'date_attestation' => ['nullable', 'date'],
         ], $this->reglesSignataires()), [
             'person_id.required' => 'Ce champ est obligatoire.',
         ]);
@@ -71,6 +72,7 @@ class AttestationController extends Controller
             domaines: $v['domaines'] ?? [],
             civilite: $v['civilite'] ?? 'M.',
             signataires: $this->surcharges($v),
+            dateAttestation: $v['date_attestation'] ?? null,
         );
 
         return response($resultat['octets'], 200, [

@@ -82,6 +82,13 @@
                     </div>
                 </div>
 
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de l'attestation</label>
+                    <input wire:model.live="dateAttestation" type="date" dusk="date-attestation" max="{{ now()->format('Y-m-d') }}" class="w-full h-11 px-md border {{ $errors->has('dateAttestation') ? 'is-invalid' : 'border-outline-variant' }} rounded-lg text-sm">
+                    @error('dateAttestation') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                    <p class="text-[10px] text-outline mt-xs">Imprimée après « {{ config('attestation.lieu') }}, le ». Vide : la date du jour.</p>
+                </div>
+
                 @if($startDate)
                 <p class="text-[10px] text-outline -mt-sm">
                     Durée calculée :
@@ -162,7 +169,7 @@
                         </div>
                     </div>
 
-                    <p class="text-right font-bold italic text-[9px]">{{ config('attestation.lieu') }}, le {{ \App\Services\AttestationService::dateLongue(now()) }}</p>
+                    <p class="text-right font-bold italic text-[9px]">{{ config('attestation.lieu') }}, le {{ \App\Services\AttestationService::dateLongue($dateAttestation ? \Illuminate\Support\Carbon::parse($dateAttestation) : now()) }}</p>
                     <p class="font-bold text-[9px]">{{ app(\App\Services\AttestationService::class)->prochainNumero() }}</p>
 
                     <p class="text-center font-bold text-brand-forest uppercase underline text-sm pt-sm">{{ $personType === 'employe' ? 'Attestation de Travail' : 'Attestation de Formation' }}</p>

@@ -37,6 +37,9 @@ class Attestations extends Component
 
     public string $note = '';
 
+    /** Date imprimée après « ATTAN - ÉWÉ, le » : vide = date du jour (modifiable, comme au poste). */
+    public string $dateAttestation = '';
+
     /** Civilité de la personne — préremplie depuis la fiche, modifiable. */
     public string $civilite = 'M.';
 
@@ -157,7 +160,8 @@ class Attestations extends Component
     {
         $this->validate([
             'personId' => ['required'],
-        ]);
+            'dateAttestation' => ['nullable', 'date'],
+        ], [], ['dateAttestation' => "date de l'attestation"]);
 
         $resultat = app(AttestationService::class)->generer(
             type: $this->personType,
@@ -169,6 +173,7 @@ class Attestations extends Component
             domaines: $this->domaines,
             civilite: $this->civilite,
             signataires: $this->surcharges(),
+            dateAttestation: $this->dateAttestation ?: null,
         );
 
         return response()->streamDownload(

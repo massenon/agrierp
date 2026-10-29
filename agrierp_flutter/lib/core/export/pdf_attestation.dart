@@ -63,6 +63,7 @@ class RessourcesAttestation {
     required this.logo,
     required this.filigrane,
     required this.decor,
+    required this.signature,
   });
 
   final pw.Font corps;
@@ -76,6 +77,9 @@ class RessourcesAttestation {
   final pw.MemoryImage logo;
   final pw.MemoryImage filigrane;
   final pw.MemoryImage decor;
+
+  /// Signature et cachet du Directeur (transparents), imprimés quand il est le SEUL signataire.
+  final pw.MemoryImage signature;
 
   static Future<RessourcesAttestation> charger() async {
     Future<pw.Font> police(String nom) async => pw.Font.ttf(await rootBundle.load('assets/attestation/$nom'));
@@ -94,6 +98,7 @@ class RessourcesAttestation {
       logo: await image('assets/attestation/logo-ferme.png'),
       filigrane: await image('assets/attestation/filigrane.png'),
       decor: await image('assets/attestation/decor-floral.png'),
+      signature: await image('assets/attestation/signature-directeur.png'),
     );
   }
 }
@@ -308,7 +313,10 @@ class ExportAttestation {
         ),
 
         // Signataires, de gauche à droite.
-        for (final s in d.signataires) _signataire(s, r, corps),
+        if (d.signataires.length == 1 && d.signataires.first.position == 1)
+          _signataireUnique(d.signataires.first, r, corps)
+        else
+          for (final s in d.signataires) _signataire(s, r, corps),
 
         // Pied de page : e-mails et site, liens soulignés par une bordure.
         place(
@@ -370,6 +378,34 @@ class ExportAttestation {
     3: (316.0, 208.0, 0.0),
     1: (623.0, 190.0, 40.0),
   };
+
+  /// Signataire UNIQUE (palier court) : signature et cachet, nom et fonction CENTRÉS en bas de page (`attestation.blade.php`).
+  static pw.Widget _signataireUnique(
+    LigneSignataire s,
+    RessourcesAttestation r,
+    pw.TextStyle Function(double, {pw.Font? police, PdfColor? couleur, double? hauteur}) corps,
+  ) {
+    return pw.Positioned(
+      left: 221,
+      top: 434,
+      child: pw.SizedBox(
+        width: 400,
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.SizedBox(height: 74, child: pw.Image(r.signature)),
+            pw.SizedBox(height: 0),
+            pw.Text(s.nom, style: corps(13.7, police: r.corpsGras)),
+            if (s.fonction.isNotEmpty)
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 1.5),
+                child: pw.Text(apostrophes(s.fonction), textAlign: pw.TextAlign.center, style: corps(11.5, hauteur: 13 / 11.5)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   static pw.Widget _signataire(
     LigneSignataire s,

@@ -785,6 +785,8 @@ class AttestationsRepository {
     Map<int, Map<String, String>> surcharges = const {},
     DateTime? aujourdhui,
     RessourcesAttestation? ressources,
+    // Date imprimée après « ATTAN - ÉWÉ, le » (web : `dateAttestation`) ; absente = la date du jour.
+    DateTime? dateAttestation,
   }) async {
     final maintenant = aujourdhui ?? HeureBenin.maintenant();
     final reglage = await this.reglage(type) ?? ReglageSignature.defaut;
@@ -836,7 +838,7 @@ class AttestationsRepository {
         puces: [for (final e in domainesPuces.entries) if (domaines.contains(e.key)) e.value],
         appreciation: phrase,
         numero: numero ?? numeroVide(maintenant.year),
-        dateLieu: dateLongue(maintenant),
+        dateLieu: dateLongue(dateAttestation ?? maintenant),
         signataires: [
           for (final s in reglage.requis(debut: debut, fin: fin, aujourdhui: maintenant, surcharges: surcharges))
             LigneSignataire(position: s.position, titre: s.titre, nom: s.nom, fonction: s.fonction),

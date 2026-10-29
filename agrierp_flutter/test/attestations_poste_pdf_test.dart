@@ -85,6 +85,7 @@ void main() {
     DateTime? debut,
     DateTime? fin,
     List<String> domaines = const ['maraichage', 'gestion'],
+    DateTime? dateAttestation,
   }) => r.produire(
     type: 'stagiaire',
     personne: personne,
@@ -96,6 +97,7 @@ void main() {
     birthPlace: 'Pobè',
     civilite: 'Mme',
     aujourdhui: DateTime(2026, 10, 27),
+    dateAttestation: dateAttestation,
   );
 
   group('le PDF fabriqué au poste', () {
@@ -163,6 +165,31 @@ void main() {
         expect(texte, contains('Examinateur'));
         expect(texte, contains('Président du Jury'));
         expect(texte, contains('Hassimiyou O. OLOUKOUNLE'));
+      });
+    });
+
+    testWidgets('date de l\'attestation saisie : imprimée après « ATTAN - ÉWÉ, le » ; signataire unique : signature, nom et fonction centrés', (tester) async {
+      await tester.runAsync(() async {
+        final binaire = await Process.run('which', ['pdftotext']);
+        if (binaire.exitCode != 0) {
+          markTestSkipped('pdftotext absent : le texte du PDF ne peut pas être relu ici.');
+          return;
+        }
+
+        final r = await produire(
+          depot(_Emissions()),
+          debut: DateTime(2026, 2, 1),
+          fin: DateTime(2026, 5, 31),
+          dateAttestation: DateTime(2026, 6, 15),
+        );
+        final fichier = File('${Directory.systemTemp.path}/att_poste_date.pdf')..writeAsBytesSync(r.pdf.octets);
+        addTearDown(() => fichier.existsSync() ? fichier.deleteSync() : null);
+
+        final texte = (await Process.run('pdftotext', ['-layout', fichier.path, '-'])).stdout as String;
+        expect(texte, contains('le 15 juin 2026'));
+        expect(texte, isNot(contains('le 27 octobre 2026')));
+        expect(texte, contains('Hassimiyou O. OLOUKOUNLE'));
+        expect(texte, contains('Directeur de la Ferme'));
       });
     });
 
