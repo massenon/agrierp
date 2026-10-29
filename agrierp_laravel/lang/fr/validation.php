@@ -243,6 +243,7 @@ return [
         'employee_id' => 'employé',
         'employeeId' => 'employé',
         'end_date' => 'date de fin',
+        'dateAttestation' => "date de l'attestation",
         'endDate' => 'date de fin',
         'entry_date' => 'date d\'entrée',
         'entryDate' => 'date d\'entrée',
