@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Feature\Concerns\AvecDepartPondeuses;
 use Tests\TestCase;
 
 /**
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class EnregistrerSujetsActionsTest extends TestCase
 {
+    use AvecDepartPondeuses;
     use PreparationExercices;
     use RefreshDatabase;
 
@@ -33,6 +35,8 @@ class EnregistrerSujetsActionsTest extends TestCase
         $this->preparerDecor('2026-10-21 09:00:00');
         $this->exercice(2025, 'cloture');
         $this->exercice(2026);
+        // VOL-2 : une bande de pondeuses exige son départ par stade avant toute entrée de sujets.
+        $this->departPondeuses($this->pondeuses, '2026-10-01');
     }
 
     protected function tearDown(): void
@@ -182,7 +186,7 @@ class EnregistrerSujetsActionsTest extends TestCase
         $clos = "L'exercice 2025 est clôturé : aucune saisie ne peut être datée du 20/12/2025.";
 
         $this->assertErreurSousLeChamp($this->ajouter('Achat', 5, '2025-12-20'), 'entry_date', $clos);
-        $this->assertSame(0, LivestockDailyEntry::count());
+        $this->assertSame(1, LivestockDailyEntry::count());
 
         // Une entrée d'un exercice clos (posée directement : le décor), ni modifiable ni archivable.
         $ancienne = LivestockDailyEntry::create([
