@@ -37,6 +37,10 @@ class BandesSujetsPosteTest extends TestCase
         parent::setUp();
 
         $this->preparerDecor('2026-10-21 09:00:00');
+        // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade avant toute fiche. Ce test porte sur les bandes et les
+        // entrées de sujets (BS1, BS2), pas sur l'effectif par catégorie : la bande du décor passe en filière NEUTRE (sans
+        // catégories) plutôt que de contourner un refus. Les règles des volailles sont dans PondeusesSynchronisationTest.
+        \App\Models\LivestockSpecies::whereKey($this->pondeuses->species_id)->update(['code' => 'helico', 'label' => 'Escargots']);
         $this->exercice(2025, 'cloture');
         $this->exercice(2026);
     }

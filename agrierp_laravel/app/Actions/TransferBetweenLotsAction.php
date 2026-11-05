@@ -8,6 +8,7 @@ use App\Models\LivestockLot;
 use App\Models\LivestockTransfer;
 use App\Models\User;
 use App\Services\EffectifParCategorieService;
+use App\Support\StadePondeuse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -36,7 +37,8 @@ use Illuminate\Validation\ValidationException;
  */
 class TransferBetweenLotsAction
 {
-    public const CATEGORIES = ['repro', 'sevre', 'jeune'];
+    /** Ticket VOL-2 : `quatre` = Poussin ponte, réservé aux bandes de volailles pondeuses (`EffectifParCategorieService::emplacementsDe`). */
+    public const CATEGORIES = ['repro', 'sevre', 'jeune', 'quatre'];
 
     /**
      * @param  array{source_lot_id: string, target_lot_id: string, transfer_date: string, quantity: int|string,
@@ -131,9 +133,9 @@ class TransferBetweenLotsAction
             'transfert_entree' => (int) $entrees->sum('quantity'),
             'transfert_sortie' => (int) $sorties->sum('quantity'),
         ];
-        foreach (self::CATEGORIES as $cat) {
-            $colonnes["transfert_entree_{$cat}"] = (int) $entrees->where('categorie', $cat)->sum('quantity');
-            $colonnes["transfert_sortie_{$cat}"] = (int) $sorties->where('categorie', $cat)->sum('quantity');
+        foreach (EffectifParCategorieService::emplacementsDe(EffectifParCategorieService::especeDuLot($lot)) as $cat) {
+            $colonnes[EffectifParCategorieService::colonne('transfert_entree', $cat)] = (int) $entrees->where('categorie', $cat)->sum('quantity');
+            $colonnes[EffectifParCategorieService::colonne('transfert_sortie', $cat)] = (int) $sorties->where('categorie', $cat)->sum('quantity');
         }
 
         $fiche = LivestockDailyEntry::where('lot_id', $lot->id)->whereDate('entry_date', $date)->first();
@@ -160,7 +162,7 @@ class TransferBetweenLotsAction
                             'cat_depart_repro' => $depart['repro'],
                             'cat_depart_sevre' => $depart['sevre'],
                             'cat_depart_jeune' => $depart['jeune'],
-                        ]);
+                        ] + (isset($depart['quatre']) ? ['cat_depart_4' => $depart['quatre']] : []));
                     }
                 }
             }
@@ -203,9 +205,10 @@ class TransferBetweenLotsAction
             }
         }
 
-        $aCategories = EffectifParCategorieService::especeDuLot($source) !== null;
-        if ($aCategories && ! in_array($categorie, self::CATEGORIES, true)) {
-            $refus('Lapins, porcs et volailles reproductrices : précisez la catégorie des sujets transférés.');
+        $especeSource = EffectifParCategorieService::especeDuLot($source);
+        $aCategories = $especeSource !== null;
+        if ($aCategories && ! in_array($categorie, EffectifParCategorieService::emplacementsDe($especeSource), true)) {
+            $refus('Lapins, porcs et volailles : précisez la catégorie (le stade, pour les pondeuses) des sujets transférés.');
         }
         if (! $aCategories && $categorie !== null) {
             $refus("Cette espèce n'est pas suivie par catégorie : aucune catégorie ne doit être choisie.");
@@ -265,12 +268,17 @@ class TransferBetweenLotsAction
         }
 
         $libellesCategories = ['repro' => 'Reproducteur', 'sevre' => $this->libelleSevre($lot), 'jeune' => $this->libelleJeune($lot)];
+        if (EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::VOLAILLES_PONTE) {
+            // Ticket VOL-2 : les quatre stades portent les libellés du barème.
+            $libellesCategories = collect(EffectifParCategorieService::emplacementsDe(EffectifParCategorieService::VOLAILLES_PONTE))
+                ->mapWithKeys(fn ($e) => [$e => StadePondeuse::libelleDeLEmplacement($e)])->all();
+        }
         $parJour = [];
-        if ($duJour === null && $etat['veille'][$categorie] !== null) {
+        if ($duJour === null && ($etat['veille'][$categorie] ?? null) !== null) {
             $parJour[] = [$date, (int) $etat['veille'][$categorie]];
         }
         foreach ($fiches as $f) {
-            $valeur = $f->{"cat_eff_{$categorie}"};
+            $valeur = $f->{EffectifParCategorieService::colonne('cat_eff', $categorie)};
             if ($valeur !== null) {
                 $parJour[] = [$f->entry_date->format('Y-m-d'), (int) $valeur];
             }
@@ -290,7 +298,7 @@ class TransferBetweenLotsAction
     {
         return match (EffectifParCategorieService::especeDuLot($lot)) {
             EffectifParCategorieService::PORCS => 'Porcelet',
-            EffectifParCategorieService::VOLAILLES => 'Poussin',   // Ticket VOL-1
+            EffectifParCategorieService::VOLAILLES_REPRO => 'Poussin',   // Ticket VOL-1
             default => 'Sous-mères',
         };
     }

@@ -108,10 +108,11 @@ class SaisieTransformationAction
             $transformation->save();
 
             // 1. Élevage — sortie des sujets, comme une vente, dans la fiche du jour.
-            // Ticket VOL-1 : sur une bande de volailles reproductrices, les sujets abattus sortent des JEUNES (le poulet).
+            // Ticket VOL-1 : sur une bande de volailles reproductrices, les sujets abattus sortent des JEUNES (le poulet) ; VOL-2 : sur une
+            // bande de pondeuses, de la PONDEUSE (la poule de réforme).
             try {
                 app(RecordSaleOnFicheElevageAction::class)->execute(
-                    [['lot_id' => $lot->id, 'qty' => $sujets, 'categorie_effectif' => \App\Support\CategorieVolaille::JEUNE]],
+                    [['lot_id' => $lot->id, 'qty' => $sujets, 'categorie_effectif' => $this->categorieDesSujetsAbattus($lot)]],
                     $jour,
                 );
             } catch (ValidationException $e) {
@@ -131,5 +132,18 @@ class SaisieTransformationAction
         AuditLog::record('transformation.recorded', 'elevage', $operateurId);
 
         return $transformation;
+    }
+
+    /**
+     * Ticket VOL-1 / VOL-2 — catégorie d'effectif où la transformation (abattage) range ses sujets : les JEUNES pour une bande
+     * de volailles reproductrices ; la PONDEUSE par défaut pour une bande de pondeuses (la poule de réforme est la sortie
+     * naturelle d'une bande en ponte). Décision documentée : l'abattage d'une poulette ou de poussins se fait par une VENTE
+     * (le produit porte alors son stade), pas par la transformation.
+     */
+    private function categorieDesSujetsAbattus(\App\Models\LivestockLot $lot): string
+    {
+        return \App\Services\EffectifParCategorieService::especeDuLot($lot->loadMissing('species')) === \App\Services\EffectifParCategorieService::VOLAILLES_PONTE
+            ? \App\Support\StadePondeuse::PONDEUSE
+            : \App\Support\CategorieVolaille::JEUNE;
     }
 }

@@ -382,9 +382,11 @@ void main() {
         ).chaine,
         isFalse,
       );
-      // VOL-1 : l'aviculture hors « ponte » est suivie (volailles reproductrices) ; « ponte » (Pondeuses) ne l'est pas.
-      expect(EffectifParCategorie.especeDuCode('aviculture'), EffectifParCategorie.volailles);
-      expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'ponte'), isNull);
+      // VOL-1 / VOL-2 : l'aviculture hors « ponte » est la famille des volailles reproductrices ; « ponte » (Pondeuses) est
+      // l'autre famille de volailles, à quatre stades ; une filière sans catégories n'est pas suivie.
+      expect(EffectifParCategorie.especeDuCode('aviculture'), EffectifParCategorie.volaillesRepro);
+      expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'ponte'), EffectifParCategorie.volaillesPonte);
+      expect(EffectifParCategorie.especeDuCode('helico', stade: 'ponte'), isNull);
       expect(EffectifParCategorie.especeDuCode('cuniculture'), lap);
       expect(EffectifParCategorie.especeDuCode('porciculture'), por);
       expect(

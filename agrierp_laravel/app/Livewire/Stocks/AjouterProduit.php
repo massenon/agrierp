@@ -110,10 +110,16 @@ class AjouterProduit extends Component
         return $this->species_id !== '' && LivestockSpecies::whereKey($this->species_id)->where('code', 'aviculture')->exists();
     }
 
-    /** @return array<string, string> clé => libellé affiché (Reproducteur, Jeune, Poussin) */
+    /**
+     * @return array<string, array<string, string>> groupe => [clé => libellé affiché] : volailles reproductrices
+     *         (Reproducteur, Jeune, Poussin) et volailles pondeuses (les quatre libellés du barème, Ticket VOL-2)
+     */
     public function getCategoriesEffectifProperty(): array
     {
-        return \App\Support\CategorieVolaille::LIBELLES;
+        return [
+            'Volailles reproductrices' => \App\Support\CategorieVolaille::LIBELLES,
+            'Volailles pondeuses' => \App\Support\StadePondeuse::LIBELLES,
+        ];
     }
 
     public function save(): void

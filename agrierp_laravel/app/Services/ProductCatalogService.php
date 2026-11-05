@@ -8,6 +8,7 @@ use App\Models\LivestockSpecies;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Support\CategorieVolaille;
+use App\Support\StadePondeuse;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,7 +44,7 @@ class ProductCatalogService
             'tva_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'alert_threshold' => ['required', 'numeric', 'min:0'],
             // Ticket VOL-1 : catégorie d'effectif des produits de l'aviculture (Reproducteur / Jeune / Poussin).
-            'categorie_effectif' => ['nullable', 'in:'.implode(',', CategorieVolaille::CLES)],
+            'categorie_effectif' => ['nullable', 'in:'.implode(',', array_merge(CategorieVolaille::CLES, StadePondeuse::CLES))],
         ];
 
         if ($avecStock) {
@@ -66,7 +67,7 @@ class ProductCatalogService
     {
         return [
             'price_max.gte' => 'Le prix maximum doit être supérieur ou égal au prix minimum.',
-            'categorie_effectif.in' => "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.",
+            'categorie_effectif.in' => "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin (reproducteurs), ou l'un des quatre stades des pondeuses (Poussin ponte, Poussin en croissance, Poulette, Pondeuse).",
         ];
     }
 

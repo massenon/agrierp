@@ -412,7 +412,7 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
     _cible = r?.id;
     _jour = r?.createdDate ?? HeureBenin.aujourdhui();
     _quantite = TextEditingController(text: '${r?.initialQuantity ?? 1}');
-    _categorie = r == null ? null : TransfertsRepository.categorieDuStade(r.stage);
+    _categorie = r == null ? null : TransfertsRepository.categorieDuStade(r.stage, codeEspece: r.speciesCode);
   }
 
   @override

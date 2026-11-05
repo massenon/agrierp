@@ -591,7 +591,7 @@ class BandesRepository {
             quantite: quantite,
             // Lapins, porcs et volailles reproductrices : la catégorie du stade ; les autres espèces n'en ont pas.
             categorie: EffectifParCategorie.especeDuCode(espece.code, stade: f.stage) != null
-                ? EffectifParCategorie.categorieDuStade(f.stage)
+                ? EffectifParCategorie.categorieDeLaBande(espece.code, f.stage)
                 : null,
             constitution: true,
             motif: 'Constitution de la bande ${f.code.trim()}',

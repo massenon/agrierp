@@ -28,6 +28,15 @@
 /// « inconnue » pour les volailles (décision explicite du client, différence avec les lapins) : un mouvement absent
 /// vaut 0, la bande doit avoir son DÉPART saisi avant toute journée.
 ///
+/// 🔁 TICKET VOL-2 (décision client du 05/11/2026) — VOLAILLES PONDEUSES (aviculture, stade « ponte »), QUATRE stades, même
+/// règle que `calculerJourPondeuses` du serveur (PP = Poussin ponte, PC = Poussin en croissance, PL = Poulette, PO = Pondeuse ;
+/// p1, p2, p3 = passages PP → PC, PC → PL, PL → PO) :
+///   PP = max(0, PPv + éclosions − vente − mort − don − p1)       PC = max(0, PCv − vente − mort − don + p1 − p2)
+///   PL = max(0, PLv + achat − vente − mort − don + p2 − p3)      PO = max(0, POv − vente − mort − don + p3)
+/// Emplacements : `quatre` (colonnes `*_4`) = Poussin ponte, `sevre` = Poussin en croissance, `jeune` = Poulette, `repro` =
+/// Pondeuse. Les ACHATS vont à Poulette, les éclosions à Poussin ponte. Chaque passage est borné à son stade source APRÈS ses
+/// autres mouvements, passage entrant compris. Aucun stade inconnu, départ obligatoire.
+///
 /// Décisions client appliquées telles que le serveur les applique : D3 (passage = TRANSFERT, refusé
 /// au-delà de la catégorie source APRÈS ses autres mouvements du jour), D4 (départ = effectif au
 /// DÉBUT du jour, somme = effectif total de départ), D8 (somme ≠ total = avertissement, jamais un
@@ -43,13 +52,17 @@ library;
 
 import 'dart:math' as math;
 
-/// Trois effectifs par catégorie (veille, départ ou résultat). `null` = inconnu.
+/// Trois effectifs par catégorie (veille, départ ou résultat), plus [quatre] (Poussin ponte) pour les volailles pondeuses
+/// (VOL-2). `null` = inconnu.
 class EffectifCategories {
-  const EffectifCategories({this.repro, this.sevre, this.jeune});
+  const EffectifCategories({this.repro, this.sevre, this.jeune, this.quatre});
 
   final int? repro;
   final int? sevre;
   final int? jeune;
+
+  /// Ticket VOL-2 — quatrième emplacement (Poussin ponte) ; `null` hors volailles pondeuses.
+  final int? quatre;
 
   /// Les trois catégories sont connues.
   bool get complet => repro != null && sevre != null && jeune != null;
@@ -59,13 +72,14 @@ class EffectifCategories {
       other is EffectifCategories &&
       other.repro == repro &&
       other.sevre == sevre &&
-      other.jeune == jeune;
+      other.jeune == jeune &&
+      other.quatre == quatre;
 
   @override
-  int get hashCode => Object.hash(repro, sevre, jeune);
+  int get hashCode => Object.hash(repro, sevre, jeune, quatre);
 
   @override
-  String toString() => 'EffectifCategories($repro, $sevre, $jeune)';
+  String toString() => 'EffectifCategories($repro, $sevre, $jeune${quatre == null ? '' : ', $quatre'})';
 }
 
 /// Mouvements d'UNE journée. `null` = inconnu (non ventilé), jamais 0.
@@ -84,12 +98,19 @@ class MouvementsJour {
     this.venteRepro,
     this.venteSevre,
     this.venteJeune,
+    this.mort4,
+    this.don4,
+    this.vente4,
+    this.passage4Sevre,
+    this.passageJeuneRepro,
     this.transfertEntreeRepro = 0,
     this.transfertEntreeSevre = 0,
     this.transfertEntreeJeune = 0,
     this.transfertSortieRepro = 0,
     this.transfertSortieSevre = 0,
     this.transfertSortieJeune = 0,
+    this.transfertEntree4 = 0,
+    this.transfertSortie4 = 0,
   });
 
   final int? achat;
@@ -109,6 +130,14 @@ class MouvementsJour {
   final int? venteSevre;
   final int? venteJeune;
 
+  /// Ticket VOL-2 — quatrième emplacement (Poussin ponte) et passages des volailles pondeuses : `passage4Sevre` = Poussin
+  /// ponte → Poussin en croissance, [passage] = Poussin en croissance → Poulette, `passageJeuneRepro` = Poulette → Pondeuse.
+  final int? mort4;
+  final int? don4;
+  final int? vente4;
+  final int? passage4Sevre;
+  final int? passageJeuneRepro;
+
   /// Ticket 15.46 — transferts entre bandes par catégorie : dérivés des transferts, donc toujours CONNUS
   /// (0 sans transfert, jamais « inconnu »). Miroir de `transfert_entree_*` / `transfert_sortie_*`.
   final int transfertEntreeRepro;
@@ -117,6 +146,8 @@ class MouvementsJour {
   final int transfertSortieRepro;
   final int transfertSortieSevre;
   final int transfertSortieJeune;
+  final int transfertEntree4;
+  final int transfertSortie4;
 }
 
 /// Résultat d'UNE journée — miroir de `App\Support\EffectifCategoriesJour`.
@@ -135,6 +166,8 @@ class EffectifCategoriesJour {
     required this.sommeDifferente,
     required this.refus,
     required this.passageApplique,
+    this.quatre,
+    this.passagesAppliques = const {},
   });
 
   final int? repro;
@@ -144,13 +177,19 @@ class EffectifCategoriesJour {
   final String? refus;
   final int? passageApplique;
 
-  EffectifCategories get categories =>
-      EffectifCategories(repro: repro, sevre: sevre, jeune: jeune);
+  /// Ticket VOL-2 — Poussin ponte (volailles pondeuses uniquement), `null` ailleurs.
+  final int? quatre;
 
-  /// Somme des trois catégories, null si l'une est inconnue.
+  /// Ticket VOL-2 — passages réellement appliqués, par colonne (`passage_4_sevre`, `passage_sevre_jeune`, `passage_jeune_repro`).
+  final Map<String, int> passagesAppliques;
+
+  EffectifCategories get categories =>
+      EffectifCategories(repro: repro, sevre: sevre, jeune: jeune, quatre: quatre);
+
+  /// Somme des catégories (quatre stades pour les pondeuses), null si l'une est inconnue.
   int? get somme => (repro == null || sevre == null || jeune == null)
       ? null
-      : repro! + sevre! + jeune!;
+      : repro! + sevre! + jeune! + (quatre ?? 0);
 
   bool get estComplet => somme != null;
 }
@@ -175,18 +214,27 @@ class FicheChaine {
     this.venteRepro,
     this.venteSevre,
     this.venteJeune,
+    this.mort4,
+    this.don4,
+    this.vente4,
+    this.passage4Sevre,
+    this.passageJeuneRepro,
     this.departRepro,
     this.departSevre,
     this.departJeune,
+    this.departQuatre,
     this.catEffRepro,
     this.catEffSevre,
     this.catEffJeune,
+    this.catEff4,
     this.transfertEntreeRepro = 0,
     this.transfertEntreeSevre = 0,
     this.transfertEntreeJeune = 0,
     this.transfertSortieRepro = 0,
     this.transfertSortieSevre = 0,
     this.transfertSortieJeune = 0,
+    this.transfertEntree4 = 0,
+    this.transfertSortie4 = 0,
   });
 
   final String id;
@@ -207,26 +255,41 @@ class FicheChaine {
   final int? venteRepro;
   final int? venteSevre;
   final int? venteJeune;
+
+  /// Ticket VOL-2 — quatrième emplacement (Poussin ponte) et passages des volailles pondeuses.
+  final int? mort4;
+  final int? don4;
+  final int? vente4;
+  final int? passage4Sevre;
+  final int? passageJeuneRepro;
   final int? departRepro;
   final int? departSevre;
   final int? departJeune;
+  final int? departQuatre;
   final int? catEffRepro;
   final int? catEffSevre;
   final int? catEffJeune;
+  final int? catEff4;
   final int transfertEntreeRepro;
   final int transfertEntreeSevre;
   final int transfertEntreeJeune;
   final int transfertSortieRepro;
   final int transfertSortieSevre;
   final int transfertSortieJeune;
+  final int transfertEntree4;
+  final int transfertSortie4;
 
-  /// Départ COMPLET (les trois catégories) : c'est ce qui fait une tête de chaîne.
-  bool get departComplet =>
-      departRepro != null && departSevre != null && departJeune != null;
+  /// Départ COMPLET (les trois catégories, QUATRE stades si [ponte]) : c'est ce qui fait une tête de chaîne.
+  bool departCompletPour({bool ponte = false}) =>
+      departRepro != null && departSevre != null && departJeune != null && (!ponte || departQuatre != null);
+
+  bool get departComplet => departCompletPour();
 
   /// Au moins une catégorie de départ renseignée.
-  bool get porteUnDepart =>
-      departRepro != null || departSevre != null || departJeune != null;
+  bool porteUnDepartPour({bool ponte = false}) =>
+      departRepro != null || departSevre != null || departJeune != null || (ponte && departQuatre != null);
+
+  bool get porteUnDepart => porteUnDepartPour();
 
   MouvementsJour get mouvements => MouvementsJour(
     achat: achat,
@@ -242,12 +305,19 @@ class FicheChaine {
     venteRepro: venteRepro,
     venteSevre: venteSevre,
     venteJeune: venteJeune,
+    mort4: mort4,
+    don4: don4,
+    vente4: vente4,
+    passage4Sevre: passage4Sevre,
+    passageJeuneRepro: passageJeuneRepro,
     transfertEntreeRepro: transfertEntreeRepro,
     transfertEntreeSevre: transfertEntreeSevre,
     transfertEntreeJeune: transfertEntreeJeune,
     transfertSortieRepro: transfertSortieRepro,
     transfertSortieSevre: transfertSortieSevre,
     transfertSortieJeune: transfertSortieJeune,
+    transfertEntree4: transfertEntree4,
+    transfertSortie4: transfertSortie4,
   );
 }
 
@@ -299,8 +369,21 @@ abstract final class EffectifParCategorie {
   static const lapins = 'lapins';
   static const porcs = 'porcs';
 
-  /// Ticket VOL-1 — volailles reproductrices (aviculture hors stade « ponte »).
-  static const volailles = 'volailles';
+  /// Ticket VOL-1 — volailles reproductrices (aviculture hors stade « ponte »). VOL-2 : renommé pour le distinguer des pondeuses.
+  static const volaillesRepro = 'volailles_repro';
+
+  /// Ticket VOL-2 — volailles pondeuses (aviculture, stade « ponte »), quatre stades.
+  static const volaillesPonte = 'volailles_ponte';
+
+  /// Vrai pour l'une des deux familles de volailles.
+  static bool estVolailles(String? espece) => espece == volaillesRepro || espece == volaillesPonte;
+
+  /// Emplacements d'une espèce : trois, quatre (`quatre` en dernier) pour les volailles pondeuses.
+  static List<String> emplacementsDe(String? espece) =>
+      espece == volaillesPonte ? const ['repro', 'sevre', 'jeune', 'quatre'] : const ['repro', 'sevre', 'jeune'];
+
+  /// Nom de colonne d'un mouvement pour un emplacement (`quatre` → `*_4`).
+  static String colonne(String prefixe, String emplacement) => '${prefixe}_${emplacement == 'quatre' ? '4' : emplacement}';
 
   /// Code d'espèce du serveur → espèce prise en charge (`ESPECES` du service PHP).
   static const especes = {'cuniculture': lapins, 'porciculture': porcs};
@@ -321,9 +404,19 @@ abstract final class EffectifParCategorie {
   /// morts, des dons et du passage, plus, pour les volailles, celle des ventes (`mouvementsConnusAZeroPour`).
   static Map<String, int> mouvementsConnusAZeroPour(String? espece) => {
     ...mouvementsConnusAZero,
-    if (espece == volailles) 'vente_repro': 0,
-    if (espece == volailles) 'vente_sevre': 0,
-    if (espece == volailles) 'vente_jeune': 0,
+    if (estVolailles(espece)) 'vente_repro': 0,
+    if (estVolailles(espece)) 'vente_sevre': 0,
+    if (estVolailles(espece)) 'vente_jeune': 0,
+    if (espece == volaillesPonte) ...mouvementsPonteConnusAZero,
+  };
+
+  /// Ticket VOL-2 — mouvements du quatrième emplacement et passages supplémentaires des pondeuses, « connus à zéro ».
+  static const mouvementsPonteConnusAZero = {
+    'mort_4': 0,
+    'don_4': 0,
+    'vente_4': 0,
+    'passage_4_sevre': 0,
+    'passage_jeune_repro': 0,
   };
 
   /// Espèce suivie pour un code d'espèce de bande, null sinon (`especeDuLot`).
@@ -333,8 +426,10 @@ abstract final class EffectifParCategorie {
   /// REQUIS pour reconnaître les volailles ; sans lui (`null`), une bande d'aviculture est lue comme non suivie
   /// seulement si son stade est « ponte » — un stade inconnu (`null`) compte comme volailles, comme le serveur
   /// (`$lot->stage === 'ponte' ? null : VOLAILLES`).
+  ///
+  /// 🔁 VOL-2 : le stade « ponte » est l'AUTRE famille de volailles (pondeuses, quatre stades), plus « non suivie ».
   static String? especeDuCode(String? code, {String? stade}) {
-    if (code == 'aviculture') return stade == 'ponte' ? null : volailles;
+    if (code == 'aviculture') return stade == 'ponte' ? volaillesPonte : volaillesRepro;
     return especes[code];
   }
 
@@ -346,6 +441,11 @@ abstract final class EffectifParCategorie {
     'engraissement': 'jeune',
   }[stade];
 
+  /// Ticket VOL-2 — catégorie proposée pour les sujets d'une bande (constitution, rattachement) : celle de son stade ; une
+  /// bande de volailles pondeuses (stade `ponte`) propose « Pondeuse » (`repro`) — `categorieDeLaBande` du serveur.
+  static String? categorieDeLaBande(String? codeEspece, String? stade) =>
+      especeDuCode(codeEspece, stade: stade) == volaillesPonte ? 'repro' : categorieDuStade(stade);
+
   /// Départ DÉDUIT du stade (`departDepuisStade`) : tout l'effectif du début de journée dans la
   /// catégorie du stade, 0 dans les deux autres ; null si l'espèce ou le stade n'a pas de catégorie.
   static EffectifCategories? departDepuisStade({
@@ -353,9 +453,13 @@ abstract final class EffectifParCategorie {
     required String? stade,
     required int totalDebutJour,
   }) {
+    final total = totalDebutJour < 0 ? 0 : totalDebutJour;
+    // VOL-2 : une bande de pondeuses propose « Pondeuse » pour tout l'effectif (une PROPOSITION que l'éleveur reprend).
+    if (especeDuCode(codeEspece, stade: stade) == volaillesPonte) {
+      return EffectifCategories(repro: total, sevre: 0, jeune: 0, quatre: 0);
+    }
     final cat = categorieDuStade(stade);
     if (especeDuCode(codeEspece, stade: stade) == null || cat == null) return null;
-    final total = totalDebutJour < 0 ? 0 : totalDebutJour;
     return EffectifCategories(
       repro: cat == 'repro' ? total : 0,
       sevre: cat == 'sevre' ? total : 0,
@@ -394,10 +498,11 @@ abstract final class EffectifParCategorie {
     MouvementsJour m, {
     int? totalFinal,
   }) {
-    if (espece != lapins && espece != porcs && espece != volailles) {
+    if (espece != lapins && espece != porcs && !estVolailles(espece)) {
       throw ArgumentError('Espèce non prise en charge : $espece.');
     }
-    if (espece == volailles) return _calculerJourVolailles(veille, m, totalFinal);
+    if (espece == volaillesRepro) return _calculerJourVolailles(veille, m, totalFinal);
+    if (espece == volaillesPonte) return _calculerJourPondeuses(veille, m, totalFinal);
     final estLapins = espece == lapins;
 
     // Reproducteur : ne change jamais de stade. Les achats de porcs lui reviennent (D11).
@@ -519,8 +624,90 @@ abstract final class EffectifParCategorie {
     );
   }
 
-  /// Contrôle du départ saisi (D4, `verifierDepart`) : motif du refus, ou null si valide.
-  static String? verifierDepart(EffectifCategories depart, int? totalDepart) {
+  /// Ticket VOL-2 — effectifs d'UNE journée de volailles pondeuses (`calculerJourPondeuses` du serveur). Aucun stade n'est
+  /// jamais inconnu ; les trois passages se traitent dans l'ordre de la chaîne, chacun borné à son stade source APRÈS ses
+  /// autres mouvements, passage entrant compris. Les messages de refus (joints par un espace) sont ceux du serveur.
+  static EffectifCategoriesJour _calculerJourPondeuses(
+    EffectifCategories veille,
+    MouvementsJour m,
+    int? totalFinal,
+  ) {
+    int v(int? x) => x ?? 0;
+    final refus = <String>[];
+    int borne(int demande, int avant, String source, String cible) {
+      final disponible = math.max(0, avant);
+      if (demande > disponible) {
+        refus.add(
+          'Passage de stade refusé ($source vers $cible) : $demande sujet(s) à faire passer, mais le stade '
+          "source n'en compte que $disponible.",
+        );
+        return disponible;
+      }
+      return demande;
+    }
+
+    const pp = 'Poussin ponte (0 à 2 mois)';
+    const pc = 'Poussin en croissance (2 à 4 mois)';
+    const pl = 'Poulette (4 à 5.5 mois)';
+    const po = 'Pondeuse (6 à 18 mois)';
+
+    final avantPP =
+        v(veille.quatre) + v(m.ne) + m.transfertEntree4 - v(m.vente4) - v(m.mort4) - v(m.don4) - m.transfertSortie4;
+    final p1 = borne(v(m.passage4Sevre), avantPP, pp, pc);
+    final poussinPonte = math.max(0, avantPP - p1);
+
+    final avantPC =
+        v(veille.sevre) + p1 + m.transfertEntreeSevre - v(m.venteSevre) - v(m.mortSevre) - v(m.donSevre) - m.transfertSortieSevre;
+    final p2 = borne(v(m.passage), avantPC, pc, pl);
+    final poussinCroissance = math.max(0, avantPC - p2);
+
+    final avantPL = v(veille.jeune) +
+        v(m.achat) +
+        p2 +
+        m.transfertEntreeJeune -
+        v(m.venteJeune) -
+        v(m.mortJeune) -
+        v(m.donJeune) -
+        m.transfertSortieJeune;
+    final p3 = borne(v(m.passageJeuneRepro), avantPL, pl, po);
+    final poulette = math.max(0, avantPL - p3);
+
+    final pondeuse = math.max(
+      0,
+      v(veille.repro) + p3 + m.transfertEntreeRepro - v(m.venteRepro) - v(m.mortRepro) - v(m.donRepro) - m.transfertSortieRepro,
+    );
+
+    return EffectifCategoriesJour(
+      repro: pondeuse,
+      sevre: poussinCroissance,
+      jeune: poulette,
+      quatre: poussinPonte,
+      sommeDifferente: totalFinal == null ? null : (poussinPonte + poussinCroissance + poulette + pondeuse) != totalFinal,
+      refus: refus.isEmpty ? null : refus.join(' '),
+      passageApplique: p2,
+      passagesAppliques: {'passage_4_sevre': p1, 'passage_sevre_jeune': p2, 'passage_jeune_repro': p3},
+    );
+  }
+
+  /// Contrôle du départ saisi (D4, `verifierDepart`) : motif du refus, ou null si valide. [quatreStades] : volailles
+  /// pondeuses (VOL-2) — quatre stades renseignés, somme = effectif total.
+  static String? verifierDepart(EffectifCategories depart, int? totalDepart, {bool quatreStades = false}) {
+    if (quatreStades) {
+      final valeurs = [depart.quatre, depart.sevre, depart.jeune, depart.repro];
+      if (valeurs.contains(null)) {
+        return 'Effectif de départ incomplet : les quatre stades doivent être renseignés (0 si le stade est vide).';
+      }
+      final somme = valeurs.fold<int>(0, (t, x) => t + x!);
+      if (totalDepart == null) {
+        return 'Effectif total de départ inconnu : la somme des stades (${valeurs[0]} + ${valeurs[1]} + ${valeurs[2]} + '
+            '${valeurs[3]}) ne peut pas être contrôlée.';
+      }
+      if (somme != totalDepart) {
+        return 'La somme des stades de départ ($somme) ne correspond pas à l\'effectif total au début du jour de départ '
+            '($totalDepart).';
+      }
+      return null;
+    }
     final r = depart.repro;
     final s = depart.sevre;
     final j = depart.jeune;
@@ -587,8 +774,9 @@ abstract final class EffectifParCategorie {
       );
     }
 
+    final ponte = espece == volaillesPonte;
     final triees = _trier(fiches);
-    final indexTete = triees.indexWhere((f) => f.departComplet);
+    final indexTete = triees.indexWhere((f) => f.departCompletPour(ponte: ponte));
     if (indexTete < 0) {
       return ResultatChaine(
         chaine: false,
@@ -606,12 +794,13 @@ abstract final class EffectifParCategorie {
       repro: tete.departRepro,
       sevre: tete.departSevre,
       jeune: tete.departJeune,
+      quatre: ponte ? tete.departQuatre : null,
     );
     final totalDepart = indexTete > 0
         ? triees[indexTete - 1].effectifFinal
         : initialQuantity;
 
-    final refus = verifierDepart(depart, totalDepart);
+    final refus = verifierDepart(depart, totalDepart, quatreStades: ponte);
     if (refus != null) {
       return ResultatChaine(
         chaine: true,
@@ -630,7 +819,7 @@ abstract final class EffectifParCategorie {
     final suite = triees.sublist(indexTete);
     for (var i = 0; i < suite.length; i++) {
       final f = suite[i];
-      if (i > 0 && f.porteUnDepart) {
+      if (i > 0 && f.porteUnDepartPour(ponte: ponte)) {
         avertissements.add(
           'Fiche du ${_jourFr(f.jour)} : un départ y est saisi alors que la chaîne démarre '
           'déjà le ${_jourFr(tete.jour)} ; il est ignoré.',
@@ -675,8 +864,9 @@ abstract final class EffectifParCategorie {
   }) {
     if (espece == null) return const EtatJour(mode: 'sans_chaine');
 
+    final ponte = espece == volaillesPonte;
     final triees = _trier(fiches);
-    final indexTete = triees.indexWhere((f) => f.departComplet);
+    final indexTete = triees.indexWhere((f) => f.departCompletPour(ponte: ponte));
     if (indexTete < 0) return const EtatJour(mode: 'sans_chaine');
 
     final tete = triees[indexTete];
@@ -684,6 +874,7 @@ abstract final class EffectifParCategorie {
       repro: tete.departRepro,
       sevre: tete.departSevre,
       jeune: tete.departJeune,
+      quatre: ponte ? tete.departQuatre : null,
     );
     final j = DateTime(jour.year, jour.month, jour.day);
 
@@ -698,7 +889,7 @@ abstract final class EffectifParCategorie {
     final totalDepart = indexTete > 0
         ? triees[indexTete - 1].effectifFinal
         : initialQuantity;
-    final refus = verifierDepart(depart, totalDepart);
+    final refus = verifierDepart(depart, totalDepart, quatreStades: ponte);
     if (refus != null) {
       return EtatJour(
         mode: 'refus',
@@ -729,6 +920,7 @@ abstract final class EffectifParCategorie {
         repro: precedente?.catEffRepro,
         sevre: precedente?.catEffSevre,
         jeune: precedente?.catEffJeune,
+        quatre: ponte ? precedente?.catEff4 : null,
       ),
     );
   }
@@ -744,12 +936,13 @@ abstract final class EffectifParCategorie {
   }) {
     if (espece == null) return null;
 
+    final ponte = espece == volaillesPonte;
     final triees = _trier([
       for (final f in autres)
         if (f.id != proposee.id) f,
       proposee,
     ]);
-    final indexTete = triees.indexWhere((f) => f.departComplet);
+    final indexTete = triees.indexWhere((f) => f.departCompletPour(ponte: ponte));
     if (indexTete < 0) return null;
 
     final tete = triees[indexTete];
@@ -757,6 +950,7 @@ abstract final class EffectifParCategorie {
       repro: tete.departRepro,
       sevre: tete.departSevre,
       jeune: tete.departJeune,
+      quatre: ponte ? tete.departQuatre : null,
     );
     for (final f in triees.sublist(indexTete)) {
       final r = calculerJour(espece, veille, f.mouvements);

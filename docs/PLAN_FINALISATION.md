@@ -888,7 +888,29 @@ Décision du client (04/11/2026) : même principe que les lapins et les porcs (1
 
 **Écart assumé avec la maquette** : `fiche-volailles-reproducteurs.html` dit « Repro » / « Poulet » et un rationnement « par stade » ; le client a décidé « Jeune » et un rationnement par catégorie. Gardé par `test/volailles_effectif_test.dart` (saut si la maquette est absente).
 
-**Ticket suivant « Pondeuses par stade » — à reprendre** : (1) la fiche Pondeuses garde `RationVolaille` (une seule ligne par sous-chaîne « pondeuse », les trois lignes VOL-1 filtrées) ; (2) le stade `ponte` est exclu de `VOLAILLES` : décider s'il a sa propre chaîne/départ et ses emplacements ; (3) barème « Poussin ponte / Poussin en croissance / Poulette / Pondeuse » intact, à confronter aux nouveaux libellés ; (4) `stadesPourEspece('aviculture')` (Reproducteur/Poussin/Jeune/Ponte) et la création de bande (pas encore de demande de départ à la création) ; (5) le refus « départ requis » de la transformation au poste ; (6) rapport à blanc / commande de migration des bandes existantes (non faite) ; (7) valeurs de ration provisoires.
+**Ticket « Pondeuses par stade »** : fait par VOL-2 (ci-dessous). Restes de VOL-1 reportés : demande du départ à la création d'une bande (non faite, voir VOL-2) ; refus « départ requis » de la transformation au poste ; valeurs de ration provisoires.
 
 **Non vérifié** : rendu navigateur et Windows réels ; mise en service sur une VRAIE base (migration des produits par le nom : relire la liste, un produit non reconnu reste sans catégorie) ; suites complètes Laravel et Flutter (seuls des tests ciblés ont été lancés).
 
+
+## VOL-2 ✅ (05/11/2026) Volailles Pondeuses — effectif par STADE CALCULÉ (web d'abord, puis poste, Drift v83)
+
+Décision du client (05/11/2026) : même principe que VOL-1 pour la fiche Pondeuses. Détail technique : `agrierp_laravel/CLAUDE.md` et `agrierp_flutter/CLAUDE.md` (sections VOL-2).
+
+| Point | Décision / livraison |
+|---|---|
+| Stades | **Poussin ponte / Poussin en croissance / Poulette / Pondeuse**, libellés EXACTS du barème (avec leur tranche d'âge), partout : morts, dons, ventes, départ, passages, rationnement. |
+| Chaîne de passage | Poussin ponte → Poussin en croissance → Poulette → Pondeuse : trois passages saisissables (`passage_4_sevre`, `passage_sevre_jeune`, `passage_jeune_repro`), refusés au-delà de leur stade source (D3). |
+| Formules | PP = PPv + éclosions − v − m − d − p1 ; PC = PCv − v − m − d + p1 − p2 ; PL = PLv + **achat** − v − m − d + p2 − p3 ; PO = POv − v − m − d + p3 ; chaque stade borné à 0, jamais « inconnu ». Achats → Poulette, éclosions → Poussin ponte. |
+| Emplacements génériques | Pondeuse `repro`, Poulette `jeune`, Poussin en croissance `sevre`, **Poussin ponte `quatre` = colonnes `*_4`** (`cat_eff_4` existait déjà). Aucun nom de clé existant renommé : des colonnes AJOUTÉES (palier Drift 83). |
+| Départ | Obligatoire par stade (somme = effectif au début du jour), demandé à la première ouverture de la fiche d'une bande sans départ, proposition « tout en Pondeuse » reprise d'un geste ; push refusé sans départ. Aucune réécriture des bandes existantes. |
+| Ventes par stade | `vente_repro/sevre/jeune/4`, stade = celui du PRODUIT (`products.categorie_effectif`, 7 valeurs au total, défaut d'après le nom) ; produit sans stade (ou d'une autre famille) refusé avec motif. Transformation : sujets sortis de la Pondeuse par défaut. |
+| Œufs | Récolte, casse, stock, vente d'œufs : inchangés. |
+| Rationnement | 4 lignes (effectif calculé × ration du barème, 30 / 60 / 80 / 110 g/j), total arrondi comme PHP, alerte d'autonomie sur la somme. `RationVolaille` (web et poste) retiré. |
+| Mise en service | Serveur ET poste ensemble : un ancien poste voit les fiches de sa bande de pondeuses refusées (« départ requis », « ventilation incomplète »). |
+
+**Glossaire des volailles — les DEUX fiches** : *Reproducteurs* (stades de bande Reproducteur `reproduction`, Poussin `croissance`, Jeune `engraissement`) : Reproducteur (`repro`) · Jeune (`jeune`) · Poussin (`sevre`) ; *Pondeuses* (stade de bande Ponte `ponte`) : Pondeuse (`repro`, 110 g/j) · Poulette (`jeune`, 80 g/j) · Poussin en croissance (`sevre`, 60 g/j) · Poussin ponte (`quatre`, 30 g/j). Une catégorie ou un stade n'existe que dans SA famille (`volailles_repro` / `volailles_ponte`).
+
+**Restes** : (1) demande du départ à la création d'une bande, pour les deux fiches (non faite : le départ est demandé à l'ouverture de la fiche) ; (2) refus « départ requis » de la transformation au poste ; (3) rapport à blanc / commande de migration des bandes existantes ; (4) rations de la fiche Reproducteurs encore PROVISOIRES (130 / 80 / 30) ; (5) une bande de poulettes ou de poussins de ponte est de stade `ponte` : sa proposition de départ dit « tout en Pondeuse », l'éleveur la corrige ; (6) un produit « Poussin d'un jour » reste une catégorie de reproducteurs : créer un produit distinct pour la fiche Pondeuses.
+
+**Non vérifié** : rendu navigateur et Windows réels ; mise en service sur une VRAIE base (la migration `…000005` change l'énumération `livestock_transfers.categorie` : essayée sous SQLite seulement, pas sous MySQL/MariaDB) ; suites complètes Laravel et Flutter (seuls des tests ciblés ont été lancés).

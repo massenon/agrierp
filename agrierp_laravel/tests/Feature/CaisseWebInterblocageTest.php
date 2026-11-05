@@ -76,7 +76,9 @@ class CaisseWebInterblocageTest extends TestCase
         }
         TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse Principale', 'account_code' => '531', 'balance' => 0, 'is_active' => true]);
 
-        $espece = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
+        // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade ; ces tests portent sur la caisse et les envois (interblocage,
+        // plusieurs postes), pas sur l'effectif par catégorie — filière NEUTRE (sans chaîne), pas de contournement d'un refus.
+        $espece = LivestockSpecies::create(['label' => 'Héliciculture', 'code' => 'helico', 'is_active' => true]);
         $categorie = ProductCategory::create(['label' => 'Volailles', 'is_active' => true]);
         $this->poulet = Product::create([
             'sku' => 'AVI-001', 'name' => 'Poulet goliath', 'category_id' => $categorie->id,

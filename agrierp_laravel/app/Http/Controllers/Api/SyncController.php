@@ -2888,6 +2888,8 @@ class SyncController extends Controller
         'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
         // Ticket VOL-1 : ventes par catégorie (volailles reproductrices). Même règle : `null` = clé absente.
         'vente_repro', 'vente_sevre', 'vente_jeune',
+        // Ticket VOL-2 : quatrième emplacement (Poussin ponte des pondeuses) et deux passages de plus. Même règle.
+        'mort_4', 'don_4', 'vente_4', 'cat_depart_4', 'passage_4_sevre', 'passage_jeune_repro',
     ];
 
     /** Ticket 15.40 — effectifs par catégorie DÉRIVÉS (comme `effectif_final`) : jamais saisis sur une bande à chaîne. */
@@ -2905,6 +2907,7 @@ class SyncController extends Controller
         'achat', 'ne', 'mort', 'vente', 'don', 'mort_repro', 'mort_sevre', 'mort_jeune',
         'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
         'vente_repro', 'vente_sevre', 'vente_jeune',
+        'mort_4', 'don_4', 'vente_4', 'cat_depart_4', 'passage_4_sevre', 'passage_jeune_repro',
     ];
 
     /**
@@ -2924,7 +2927,7 @@ class SyncController extends Controller
      */
     private function modifieAutreChoseQueLaVente(array $fiche, ?LivestockDailyEntry $existant): bool
     {
-        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant', 'vente_repro', 'vente_sevre', 'vente_jeune'];
+        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant', 'vente_repro', 'vente_sevre', 'vente_jeune', 'vente_4'];
         $aZeroParDefaut = array_merge(self::FICHE_COLONNES_NOT_NULL, ['don'], self::FICHE_COLONNES_VENTILATION);
 
         foreach (array_diff_key($fiche, array_flip($libres)) as $colonne => $valeur) {
@@ -2972,7 +2975,12 @@ class SyncController extends Controller
         $service = app(EffectifParCategorieService::class);
         $lot = $fiche->lot;
         $jour = $fiche->entry_date->format('Y-m-d');
-        $colonnesDepart = ['cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune'];
+        // Ticket VOL-2 : une bande de pondeuses a QUATRE emplacements (le quatrième : colonnes `*_4`).
+        $espece = EffectifParCategorieService::especeDuLot($lot);
+        $pondeuses = $espece === EffectifParCategorieService::VOLAILLES_PONTE;
+        $emplacements = EffectifParCategorieService::emplacementsDe($espece);
+        $col = fn (string $prefixe) => array_map(fn ($e) => EffectifParCategorieService::colonne($prefixe, $e), $emplacements);
+        $colonnesDepart = $col('cat_depart');
         $tete = $service->teteDeChaine($fiche->lot_id);
 
         // (a) DÉPART (D4) : une seule fois par bande, sur une espèce suivie, somme = effectif au début du jour.
@@ -2991,7 +2999,7 @@ class SyncController extends Controller
 
                 $refus = EffectifParCategorieService::verifierDepart([
                     'repro' => $fiche->cat_depart_repro, 'sevre' => $fiche->cat_depart_sevre, 'jeune' => $fiche->cat_depart_jeune,
-                ], $fiche->previousEffectif());
+                ] + ($pondeuses ? ['quatre' => $fiche->cat_depart_4] : []), $fiche->previousEffectif());
                 if ($refus !== null) {
                     $this->refuserFiche($refus);
                 }
@@ -3000,16 +3008,17 @@ class SyncController extends Controller
 
         // Chaîne « en jeu » pour CETTE fiche : un départ complet existe (en base ou posé par cette fiche) à une date
         // antérieure ou égale, sur une espèce suivie. Une fiche antérieure au départ n'est pas dans la chaîne.
-        $departCompletIci = $fiche->cat_depart_repro !== null && $fiche->cat_depart_sevre !== null && $fiche->cat_depart_jeune !== null;
+        $departCompletIci = ! in_array(null, array_map(fn ($c) => $fiche->{$c}, $colonnesDepart), true);
         $dateTete = $tete?->entry_date->format('Y-m-d') ?? ($departCompletIci ? $jour : null);
         $dansLaChaine = $dateTete !== null && $jour >= $dateTete && EffectifParCategorieService::especeDuLot($lot) !== null;
 
         // 🔁 TICKET VOL-1 — VOLAILLES REPRODUCTRICES : la bande DOIT avoir son départ avant toute journée (aucune catégorie
         // « inconnue » sur cette fiche, décision du client), les ventes sont ventilées comme les morts et les dons.
-        $volailles = EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::VOLAILLES;
+        // 🔁 TICKET VOL-2 — PONDEUSES : mêmes règles, avec quatre stades (le départ, les ventes, les morts et les dons).
+        $volailles = EffectifParCategorieService::estVolailles($espece);
         if ($volailles && ($existant === null || $this->porteUneColonneDeSaisie($entry))) {
             if ($dateTete === null) {
-                $this->refuserFiche(MotifsRefusPush::departRequisVolailles($lot->code));
+                $this->refuserFiche($pondeuses ? MotifsRefusPush::departRequisPondeuses($lot->code) : MotifsRefusPush::departRequisVolailles($lot->code));
             }
             if ($jour < $dateTete) {
                 $this->refuserFiche(MotifsRefusPush::jourAvantLeDepart(Carbon::parse($dateTete)->format('d/m/Y')));
@@ -3021,9 +3030,9 @@ class SyncController extends Controller
 
         // (b) clés de ventilation : les trois ou aucune.
         foreach ($groupes as $total => $libelle) {
-            $presentes = array_filter(["{$total}_repro", "{$total}_sevre", "{$total}_jeune"], fn ($c) => array_key_exists($c, $entry));
-            if ($presentes !== [] && count($presentes) < 3) {
-                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle, $volailles);
+            $presentes = array_filter($col($total), fn ($c) => array_key_exists($c, $entry));
+            if ($presentes !== [] && count($presentes) < count($emplacements)) {
+                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle, $volailles, $pondeuses);
             }
         }
         if ($erreurs !== []) {
@@ -3032,7 +3041,7 @@ class SyncController extends Controller
 
         if ($dansLaChaine) {
             // Les catégories sont DÉRIVÉES ici : ce que le client envoie n'est pas écrit (la cascade les recalcule).
-            foreach (self::FICHE_CATEGORIES_DERIVEES as $colonne) {
+            foreach (array_merge(self::FICHE_CATEGORIES_DERIVEES, $pondeuses ? ['cat_eff_4'] : []) as $colonne) {
                 $fiche->setAttribute($colonne, $fiche->getOriginal($colonne));
             }
 
@@ -3041,7 +3050,7 @@ class SyncController extends Controller
             // (c) D7 : des morts/dons non ventilés ne se calculent pas par catégorie. Un total à zéro, lui, est
             // « connu à zéro » dans chaque catégorie (rien d'inventé : trois entiers positifs de somme 0 sont 0).
             foreach ($groupes as $total => $libelle) {
-                $colonnes = ["{$total}_repro", "{$total}_sevre", "{$total}_jeune"];
+                $colonnes = $col($total);
                 if (collect($colonnes)->contains(fn ($c) => $fiche->{$c} === null)) {
                     if (array_key_exists($total, $entry) && (int) $fiche->{$total} > 0) {
                         $erreurs[] = MotifsRefusPush::ficheNonVentilee($libelle);
@@ -3057,16 +3066,18 @@ class SyncController extends Controller
             }
 
             // Un passage absent est « connu à zéro » (un ancien poste ne sait pas faire de passage).
-            if ($fiche->passage_sevre_jeune === null && $aSaisie) {
-                $fiche->passage_sevre_jeune = 0;
+            foreach ($pondeuses ? ['passage_sevre_jeune', 'passage_4_sevre', 'passage_jeune_repro'] : ['passage_sevre_jeune'] as $passage) {
+                if ($fiche->{$passage} === null && $aSaisie) {
+                    $fiche->{$passage} = 0;
+                }
             }
         }
 
         // (d) COHÉRENCE : total = somme des trois catégories, dès que la ventilation est complète (envoyée ou stockée).
         foreach ($groupes as $total => $libelle) {
-            $valeurs = array_map(fn ($c) => $fiche->{$c}, ["{$total}_repro", "{$total}_sevre", "{$total}_jeune"]);
+            $valeurs = array_map(fn ($c) => $fiche->{$c}, $col($total));
             if (! in_array(null, $valeurs, true) && (int) $fiche->{$total} !== array_sum($valeurs)) {
-                $erreurs[] = MotifsRefusPush::ventilationIncoherente($libelle, (int) $fiche->{$total}, array_sum($valeurs));
+                $erreurs[] = MotifsRefusPush::ventilationIncoherente($libelle, (int) $fiche->{$total}, array_sum($valeurs), $pondeuses);
             }
         }
         if ($erreurs !== []) {
@@ -3170,6 +3181,13 @@ class SyncController extends Controller
                     'vente_repro' => ['nullable', 'integer', 'min:0'],
                     'vente_sevre' => ['nullable', 'integer', 'min:0'],
                     'vente_jeune' => ['nullable', 'integer', 'min:0'],
+                    // Ticket VOL-2 — quatrième emplacement et passages des volailles pondeuses, même règle.
+                    'mort_4' => ['nullable', 'integer', 'min:0'],
+                    'don_4' => ['nullable', 'integer', 'min:0'],
+                    'vente_4' => ['nullable', 'integer', 'min:0'],
+                    'cat_depart_4' => ['nullable', 'integer', 'min:0'],
+                    'passage_4_sevre' => ['nullable', 'integer', 'min:0'],
+                    'passage_jeune_repro' => ['nullable', 'integer', 'min:0'],
                     // 🔴→✅ TICKET S1 — colonnes que `fill()` écrivait SANS contrôle : effectifs négatifs, produit
                     // inexistant (violation de clé étrangère, donc erreur 500 pour tout l'envoi), sexe hors liste.
                     'effectif_m' => ['nullable', 'integer', 'min:0'],
@@ -3287,8 +3305,8 @@ class SyncController extends Controller
                 $porteLesVentes = $existant === null && $fusionnee === null;
                 if ($existant !== null || $fusionnee !== null) {
                     // Ticket VOL-1 : la vente ventilée appartient au serveur au même titre que `vente` (dont elle est la somme).
-                    unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'],
-                        $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune']);
+                    unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'], $entry['vente_4'],
+                        $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune'], $validated['vente_4']);
                 }
 
                 if ($fusionnee !== null) {
@@ -3467,8 +3485,8 @@ class SyncController extends Controller
      */
     private function fusionnerFiche(array $entry, array $validated, LivestockDailyEntry $occupante, array &$cascades): array
     {
-        unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'],
-            $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune']);
+        unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'], $entry['vente_4'],
+            $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune'], $validated['vente_4']);
         $sansSaisie = ! $this->modifieAutreChoseQueLaVente($validated, null)
             || ! $this->modifieAutreChoseQueLaVente($validated, $occupante);
         $etatAvant = ['ne' => (int) $occupante->ne, 'mort' => (int) $occupante->mort, 'don' => (int) ($occupante->don ?? 0)];
@@ -6761,12 +6779,13 @@ class SyncController extends Controller
             // reçue n'est pas touchée (`vente` et `vente_*` restent la somme l'un de l'autre), la vente refusée est signalée.
             $lotDeLaLigne = LivestockLot::with('species')->find($lot);
             $emplacement = app(RecordSaleOnFicheElevageAction::class)->emplacementDeLaLigne($lotDeLaLigne, $ligne);
-            if ($lotDeLaLigne !== null && EffectifParCategorieService::especeDuLot($lotDeLaLigne) === EffectifParCategorieService::VOLAILLES && $emplacement === null) {
+            if ($lotDeLaLigne !== null && EffectifParCategorieService::estVolailles(EffectifParCategorieService::especeDuLot($lotDeLaLigne)) && $emplacement === null) {
                 continue;
             }
             $fiche->vente = max(0, (int) $fiche->vente - $qte);
-            if ($emplacement !== null && $fiche->{"vente_{$emplacement}"} !== null) {
-                $fiche->{"vente_{$emplacement}"} = max(0, (int) $fiche->{"vente_{$emplacement}"} - $qte);
+            $colonneVente = $emplacement === null ? null : EffectifParCategorieService::colonne('vente', $emplacement);
+            if ($colonneVente !== null && $fiche->{$colonneVente} !== null) {
+                $fiche->{$colonneVente} = max(0, (int) $fiche->{$colonneVente} - $qte);
             }
             $fiche->effectif_final = $fiche->effectifFinalDepuis($fiche->previousEffectif());
             $fiche->save();

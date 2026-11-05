@@ -172,6 +172,7 @@ class EggProductionStockTest extends TestCase
                 'ponte_total' => 435,
                 'ponte_casses' => 15,
                 'effectif_final' => 200,
+                'cat_depart_repro' => 200, 'cat_depart_sevre' => 0, 'cat_depart_jeune' => 0, 'cat_depart_4' => 0,   // VOL-2 : départ par stade (200 « Pondeuse »)
             ]],
         ]);
 
@@ -201,6 +202,7 @@ class EggProductionStockTest extends TestCase
             'lot_id' => $lot->id,
             'entry_date' => now()->toDateString(),
             'ponte_total' => 435, 'ponte_casses' => 15, 'effectif_final' => 200,
+            'cat_depart_repro' => 200, 'cat_depart_sevre' => 0, 'cat_depart_jeune' => 0, 'cat_depart_4' => 0,   // VOL-2 : départ par stade
         ]]];
 
         $this->actingAs($utilisateur, 'sanctum')->postJson('/api/sync/push', $charge)->assertOk();
@@ -230,6 +232,7 @@ class EggProductionStockTest extends TestCase
 
         \Livewire\Livewire::actingAs($utilisateur)
             ->test(\App\Livewire\Elevage\FichePondeuses::class)
+            ->set('departPondeuse', 200)->set('departPoulette', 0)->set('departPoussinCroissance', 0)->set('departPoussinPonte', 0)   // VOL-2
             ->set('oeufsRecoltes', 435)
             ->set('oeufsCasses', 15)
             ->call('saveDay');

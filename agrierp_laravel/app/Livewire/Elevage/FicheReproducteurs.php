@@ -61,7 +61,7 @@ use Livewire\Component;
  *   R = max(0, Rv − vente_R − mort_R − don_R)
  *   J = max(0, Jv + achat − vente_J − mort_J − don_J + p)      (les achats vont aux Jeunes)
  *   P = max(0, Pv + éclosions − vente_P − mort_P − don_P − p)  (p = passage Poussin → Jeune, refusé au-delà du stock source)
- * Calcul : `EffectifParCategorieService::calculerJour(VOLAILLES, …)` — aucune formule recopiée ici. ⚠️ AUCUNE catégorie
+ * Calcul : `EffectifParCategorieService::calculerJour(VOLAILLES_REPRO, …)` — aucune formule recopiée ici. ⚠️ AUCUNE catégorie
  * « inconnue » sur cette fiche (contrairement aux lapins) : le DÉPART de la bande (effectif de chaque catégorie au début
  * du jour de départ, somme = effectif total) est exigé avant toute saisie ; sans lui la fiche affiche la demande de
  * départ au lieu de l'effectif et refuse d'enregistrer ; les jours antérieurs au départ ne sont pas saisissables. Les
@@ -502,7 +502,7 @@ class FicheReproducteurs extends Component
         }
 
         $ventes = $this->ventesDuJour;
-        $resultat = EffectifParCategorieService::calculerJour(EffectifParCategorieService::VOLAILLES, $veille, [
+        $resultat = EffectifParCategorieService::calculerJour(EffectifParCategorieService::VOLAILLES_REPRO, $veille, [
             'achat' => $this->achat, 'ne' => $this->poussinsNes,
             'vente_repro' => $ventes['repro'], 'vente_sevre' => $ventes['sevre'], 'vente_jeune' => $ventes['jeune'],
             // Emplacements : `sevre` = Poussin ; `jeune` = Jeune (propriétés internes `*Poulet`).

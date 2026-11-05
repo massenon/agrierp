@@ -298,7 +298,7 @@ class VolaillesSynchronisationTest extends TestCase
         $this->assertSame([$coq['id'], $lapin['id']], $r->json('products.accepted'));
         $this->assertSame('reproducteur', Product::find($coq['id'])->categorie_effectif);
         $this->assertNull(Product::find($lapin['id'])->categorie_effectif, 'hors aviculture : toujours vide');
-        $this->assertSame("La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.", $r->json('products.rejected.0.reason'));
+        $this->assertSame("La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin (reproducteurs), ou l'un des quatre stades des pondeuses (Poussin ponte, Poussin en croissance, Poulette, Pondeuse).", $r->json('products.rejected.0.reason'));
     }
 
     public function test_un_poste_ancien_sans_la_cle_ne_touche_pas_la_categorie_du_produit(): void

@@ -374,6 +374,18 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   78: [(d.customerReminders, d.customerReminders.alreadySent)],
   // v81 — ticket MDP-1 : le drapeau « mot de passe temporaire à changer » des comptes, tiré du serveur.
   81: [(d.utilisateurs, d.utilisateurs.mustChangePassword)],
+  // VOL-2 : quatrième emplacement (Poussin ponte), passages supplémentaires et transferts du quatrième emplacement des
+  // fiches de volailles pondeuses.
+  83: [
+    (d.livestockDailyEntries, d.livestockDailyEntries.mort4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.don4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.vente4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.catDepart4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.passage4Sevre),
+    (d.livestockDailyEntries, d.livestockDailyEntries.passageJeuneRepro),
+    (d.livestockDailyEntries, d.livestockDailyEntries.transfertEntree4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.transfertSortie4),
+  ],
   // VOL-1 : ventes ventilées des fiches de volailles reproductrices et catégorie d'effectif des produits.
   82: [
     (d.livestockDailyEntries, d.livestockDailyEntries.venteRepro),
@@ -497,7 +509,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 82, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1');
+    expect(d.schemaVersion, 83, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

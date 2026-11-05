@@ -1471,7 +1471,8 @@ class LivestockTransfers extends Table with SyncColumns {
   DateTimeColumn get transferDate => dateTime()();
   IntColumn get quantity => integer()();
 
-  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  /// `repro` | `sevre` | `jeune` pour lapins, porcs et volailles reproductrices ; plus `quatre` (Poussin ponte) pour les
+  /// volailles pondeuses (VOL-2) ; null pour les autres espèces.
   TextColumn get categorie => text().nullable()();
   BoolColumn get constitution => boolean().withDefault(const Constant(false))();
   TextColumn get motif => text().nullable()();
@@ -1548,6 +1549,18 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get venteSevre => integer().nullable()();
   IntColumn get venteJeune => integer().nullable()();
 
+  /// Ticket VOL-2 (schéma v83) — QUATRIÈME EMPLACEMENT et deux passages de plus, pour les volailles PONDEUSES (quatre stades :
+  /// Poussin ponte = `4`, Poussin en croissance = `sevre`, Poulette = `jeune`, Pondeuse = `repro`). Nullables, sans défaut :
+  /// `null` = non ventilé (autres espèces, fiche d'avant le ticket), jamais 0. `passage_4_sevre` = Poussin ponte → Poussin en
+  /// croissance ; `passage_sevre_jeune` (existant) = Poussin en croissance → Poulette ; `passage_jeune_repro` = Poulette →
+  /// Pondeuse. ⚠️ Noms explicites : la conversion automatique de `mort4` donnerait `mort4`, pas `mort_4`.
+  IntColumn get mort4 => integer().named('mort_4').nullable()();
+  IntColumn get don4 => integer().named('don_4').nullable()();
+  IntColumn get vente4 => integer().named('vente_4').nullable()();
+  IntColumn get catDepart4 => integer().named('cat_depart_4').nullable()();
+  IntColumn get passage4Sevre => integer().named('passage_4_sevre').nullable()();
+  IntColumn get passageJeuneRepro => integer().named('passage_jeune_repro').nullable()();
+
   /// Effectifs par catégorie DÉRIVÉS (fin de journée), comme `effectif_final` : le serveur les
   /// recalcule sur une bande à chaîne, le poste ne les ENVOIE JAMAIS.
   IntColumn get catEffRepro => integer().nullable()();
@@ -1600,6 +1613,12 @@ class LivestockDailyEntries extends Table with SyncColumns {
       integer().withDefault(const Constant(0))();
   IntColumn get transfertSortieJeune =>
       integer().withDefault(const Constant(0))();
+
+  /// Ticket VOL-2 (schéma v83) — transferts du quatrième emplacement (Poussin ponte des pondeuses), dérivés comme les autres.
+  IntColumn get transfertEntree4 =>
+      integer().named('transfert_entree_4').withDefault(const Constant(0))();
+  IntColumn get transfertSortie4 =>
+      integer().named('transfert_sortie_4').withDefault(const Constant(0))();
 
   @override
   List<String> get customConstraints => ['UNIQUE (lot_id, entry_date)'];
@@ -2378,7 +2397,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 82;
+  int get schemaVersion => 83;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3059,6 +3078,21 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v83 — ticket VOL-2 : quatrième emplacement (Poussin ponte) et passages des fiches de volailles pondeuses.
+      if (from < 83) {
+        for (final colonne in <GeneratedColumn>[
+          livestockDailyEntries.mort4,
+          livestockDailyEntries.don4,
+          livestockDailyEntries.vente4,
+          livestockDailyEntries.catDepart4,
+          livestockDailyEntries.passage4Sevre,
+          livestockDailyEntries.passageJeuneRepro,
+          livestockDailyEntries.transfertEntree4,
+          livestockDailyEntries.transfertSortie4,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
+        }
       }
       // v82 — ticket VOL-1 : ventes par catégorie des fiches (volailles reproductrices) et catégorie d'effectif des produits.
       if (from < 82) {

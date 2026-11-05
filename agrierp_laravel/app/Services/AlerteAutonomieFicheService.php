@@ -9,6 +9,7 @@ use App\Models\Notification;
 use App\Support\CategorieRationLapin;
 use App\Support\CategorieRationPorc;
 use App\Support\CategorieVolaille;
+use App\Support\StadePondeuse;
 
 /**
  * 🔴→✅ Ticket U13 — L'ALERTE D'AUTONOMIE ALIMENTAIRE EST LEVÉE AUSSI POUR UNE FICHE REÇUE D'UN POSTE.
@@ -38,23 +39,33 @@ use App\Support\CategorieVolaille;
  */
 class AlerteAutonomieFicheService
 {
-    /** Espèce → [classe des rations, clé de ration par emplacement de catégorie (`repro`, `sevre`, `jeune`)]. */
+    /**
+     * Espèce de la chaîne (`EffectifParCategorieService::especeDuLot`) → [classe des rations, clé de ration par emplacement
+     * de catégorie (`repro`, `sevre`, `jeune`, plus `quatre` pour les pondeuses)].
+     */
     private const FICHES = [
-        'cuniculture' => [CategorieRationLapin::class, [
+        EffectifParCategorieService::LAPINS => [CategorieRationLapin::class, [
             'repro' => CategorieRationLapin::REPRODUCTEUR,
             'sevre' => CategorieRationLapin::SOUS_MERES,
             'jeune' => CategorieRationLapin::CHAIR,
         ]],
-        'porciculture' => [CategorieRationPorc::class, [
+        EffectifParCategorieService::PORCS => [CategorieRationPorc::class, [
             'repro' => CategorieRationPorc::REPRODUCTEUR,
             'sevre' => CategorieRationPorc::PORCELET,
             'jeune' => CategorieRationPorc::MARCHAND,
         ]],
-        // Ticket VOL-1 : fiche Volailles Reproducteurs (les bandes « ponte » n'ont pas de chaîne : `etatPourJour` les écarte).
-        'aviculture' => [CategorieVolaille::class, [
+        // Ticket VOL-1 : fiche Volailles Reproducteurs (bandes d'aviculture hors stade « ponte »).
+        EffectifParCategorieService::VOLAILLES_REPRO => [CategorieVolaille::class, [
             'repro' => CategorieVolaille::REPRODUCTEUR,
             'sevre' => CategorieVolaille::POUSSIN,
             'jeune' => CategorieVolaille::JEUNE,
+        ]],
+        // Ticket VOL-2 : fiche Pondeuses (stade « ponte »), quatre stades.
+        EffectifParCategorieService::VOLAILLES_PONTE => [StadePondeuse::class, [
+            'repro' => StadePondeuse::PONDEUSE,
+            'sevre' => StadePondeuse::POUSSIN_CROISSANCE,
+            'jeune' => StadePondeuse::POULETTE,
+            'quatre' => StadePondeuse::POUSSIN_PONTE,
         ]],
     ];
 
@@ -65,8 +76,9 @@ class AlerteAutonomieFicheService
     {
         $lot = $fiche->lot()->with('species')->first();
         $code = $lot?->species?->code;
+        $espece = $lot === null ? null : EffectifParCategorieService::especeDuLot($lot);
 
-        if ($lot === null || ! isset(self::FICHES[$code]) || $lot->status !== 'actif' || ! $lot->is_active) {
+        if ($lot === null || ! isset(self::FICHES[$espece]) || $lot->status !== 'actif' || ! $lot->is_active) {
             return null;
         }
 
@@ -75,12 +87,12 @@ class AlerteAutonomieFicheService
             return null;
         }
 
-        [$classe, $cles] = self::FICHES[$code];
+        [$classe, $cles] = self::FICHES[$espece];
         $rations = FeedRationStandard::where('species_code', $code)->get();
         $fraiche = $fiche->fresh();
         $total = 0;
         foreach ($cles as $emplacement => $cle) {
-            $effectif = $fraiche->{'cat_eff_'.$emplacement};
+            $effectif = $fraiche->{EffectifParCategorieService::colonne('cat_eff', $emplacement)};
             if ($effectif === null) {
                 return null;
             }

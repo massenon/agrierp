@@ -5,6 +5,7 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import 'effectif_par_categorie.dart';
+import 'stade_pondeuse.dart';
 import 'fiche_journaliere_repository.dart';
 
 /// Refus d'un transfert, avec son motif tel que l'écran l'affiche (mêmes phrases que le serveur).
@@ -44,11 +45,12 @@ class TransfertsRepository {
   final FicheJournaliereRepository _fiches;
   static const _uuid = Uuid();
 
-  static const categories = ['repro', 'sevre', 'jeune'];
+  /// Ticket VOL-2 : `quatre` = Poussin ponte, réservé aux bandes de volailles pondeuses (`EffectifParCategorie.emplacementsDe`).
+  static const categories = ['repro', 'sevre', 'jeune', 'quatre'];
 
   /// Stade de bande → catégorie (`EffectifParCategorieService::categorieDuStade`).
-  static String? categorieDuStade(String? stade) =>
-      EffectifParCategorie.categorieDuStade(stade);
+  static String? categorieDuStade(String? stade, {String? codeEspece}) =>
+      EffectifParCategorie.categorieDeLaBande(codeEspece, stade);
 
   /// Libellés des catégories d'une espèce (glossaire du 17/10/2026 pour les lapins).
   static Map<String, String> libellesCategories(String? codeEspece, {String? stade}) =>
@@ -64,10 +66,17 @@ class TransfertsRepository {
           'jeune': 'Porc Marchand',
         },
         // Ticket VOL-1 : volailles reproductrices — Reproducteur / Poussin / Jeune.
-        EffectifParCategorie.volailles => const {
+        EffectifParCategorie.volaillesRepro => const {
           'repro': 'Reproducteur',
           'sevre': 'Poussin',
           'jeune': 'Jeune',
+        },
+        // Ticket VOL-2 : volailles pondeuses — les quatre libellés du barème, dans l'ordre de la chaîne.
+        EffectifParCategorie.volaillesPonte => {
+          'quatre': StadePondeuse.libelle(StadePondeuse.poussinPonte),
+          'sevre': StadePondeuse.libelle(StadePondeuse.poussinCroissance),
+          'jeune': StadePondeuse.libelle(StadePondeuse.poulette),
+          'repro': StadePondeuse.libelle(StadePondeuse.pondeuse),
         },
         _ => const {},
       };
@@ -225,6 +234,8 @@ class TransfertsRepository {
       transfertSortieRepro: Value(somme(sorties, 'repro')),
       transfertSortieSevre: Value(somme(sorties, 'sevre')),
       transfertSortieJeune: Value(somme(sorties, 'jeune')),
+      transfertEntree4: Value(somme(entrees, 'quatre')),
+      transfertSortie4: Value(somme(sorties, 'quatre')),
     );
 
     // Ticket S-T7 — la fiche n'est écrite QUE par son dépôt (un seul écrivain par table) : création si besoin,
@@ -275,10 +286,10 @@ class TransfertsRepository {
       }
     }
 
-    final aCategories =
-        EffectifParCategorie.especeDuCode(source.speciesCode, stade: source.stage) != null;
-    if (aCategories && !categories.contains(categorie)) {
-      refus('Lapins, porcs et volailles reproductrices : précisez la catégorie des sujets transférés.');
+    final especeSource = EffectifParCategorie.especeDuCode(source.speciesCode, stade: source.stage);
+    final aCategories = especeSource != null;
+    if (aCategories && !EffectifParCategorie.emplacementsDe(especeSource).contains(categorie)) {
+      refus('Lapins, porcs et volailles : précisez la catégorie (le stade, pour les pondeuses) des sujets transférés.');
     }
     if (!aCategories && categorie != null) {
       refus(
@@ -355,6 +366,7 @@ class TransfertsRepository {
     int? cat(LivestockDailyEntry f) => switch (categorie) {
       'repro' => f.catEffRepro,
       'sevre' => f.catEffSevre,
+      'quatre' => f.catEff4,
       _ => f.catEffJeune,
     };
 

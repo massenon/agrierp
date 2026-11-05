@@ -8,6 +8,7 @@ import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
 import 'categorie_volaille.dart';
 import 'effectif_par_categorie.dart';
+import 'stade_pondeuse.dart';
 
 /// Ticket F0.95 — compte rendu de [FicheJournaliereRepository.recalculerEnCascade].
 class RapportCascade {
@@ -42,6 +43,10 @@ class VentilationJour {
     this.donSevre = 0,
     this.donJeune = 0,
     this.passage = 0,
+    this.mort4 = 0,
+    this.don4 = 0,
+    this.passage4Sevre = 0,
+    this.passageJeuneRepro = 0,
     this.departSaisi,
   });
 
@@ -56,11 +61,21 @@ class VentilationJour {
   final int donSevre;
   final int donJeune;
 
-  /// Passage de stade du jour (Sous-mères → Jeune, Porcelet → Porc Marchand) : un FAIT saisi.
+  /// Passage de stade du jour (Sous-mères → Jeune, Porcelet → Porc Marchand) : un FAIT saisi. Volailles pondeuses
+  /// (VOL-2) : Poussin en croissance → Poulette.
   final int passage;
 
-  int get totalMorts => mortRepro + mortSevre + mortJeune;
-  int get totalDons => donRepro + donSevre + donJeune;
+  /// Ticket VOL-2 — volailles pondeuses : morts et dons du quatrième emplacement (Poussin ponte) et les deux autres
+  /// passages (`passage4Sevre` = Poussin ponte → Poussin en croissance, `passageJeuneRepro` = Poulette → Pondeuse).
+  final int mort4;
+  final int don4;
+  final int passage4Sevre;
+  final int passageJeuneRepro;
+
+  int get totalMorts => mortRepro + mortSevre + mortJeune + mort4;
+  int get totalDons => donRepro + donSevre + donJeune + don4;
+
+  bool get aUnPassage => passage != 0 || passage4Sevre != 0 || passageJeuneRepro != 0;
 }
 
 /// 🔁 15.57 — effectifs SAISIS de la fiche (`effectif_m`, `effectif_f`, `effectif_sevres`, `effectif_smeres`),
@@ -236,24 +251,32 @@ class FicheJournaliereRepository {
 
     final existante = await chargerJour(lotId, date);
 
-    // 🔁 TICKET VOL-1 — VOLAILLES REPRODUCTRICES : départ obligatoire avant toute journée, saisie toujours ventilée,
-    // ventes ventilées (lues de la fiche, posées par la caisse). Contrôles AVANT toute écriture, motifs du web.
+    // 🔁 TICKET VOL-1 / VOL-2 — VOLAILLES (reproductrices : trois catégories ; pondeuses : quatre stades) : départ
+    // obligatoire avant toute journée, saisie toujours ventilée, ventes ventilées (lues de la fiche, posées par la caisse).
+    // Contrôles AVANT toute écriture, motifs du web.
     final lot = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
-    final volailles =
-        EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage) == EffectifParCategorie.volailles;
+    final espece = EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage);
+    final volailles = EffectifParCategorie.estVolailles(espece);
+    final ponte = espece == EffectifParCategorie.volaillesPonte;
     EffectifCategories? departVolailles;
     if (volailles) {
       if (ventilation == null) {
-        throw const FicheRefusee(
-          'Pour une bande de volailles reproductrices, la journée se saisit sur la fiche Volailles Reproducteurs, '
-          'ventilée par catégorie (Reproducteur, Jeune, Poussin).',
+        throw FicheRefusee(
+          ponte
+              ? 'Pour une bande de pondeuses, la journée se saisit sur la fiche Pondeuses, ventilée par stade (Poussin '
+                    'ponte, Poussin en croissance, Poulette, Pondeuse).'
+              : 'Pour une bande de volailles reproductrices, la journée se saisit sur la fiche Volailles Reproducteurs, '
+                    'ventilée par catégorie (Reproducteur, Jeune, Poussin).',
         );
       }
-      departVolailles = await _departVolailles(lotId, date, ventilation);
+      departVolailles = await _departVolailles(lotId, date, ventilation, ponte: ponte);
       if (existante != null && existante.vente > 0 && existante.venteRepro == null) {
-        throw const FicheRefusee(
-          "Cette journée porte des ventes d'avant la mise en place des catégories, non ventilées : elle ne peut pas "
-          "être ré-enregistrée. Saisissez le départ de la bande un autre jour.",
+        throw FicheRefusee(
+          ponte
+              ? "Cette journée porte des ventes d'avant la mise en place des stades, non ventilées : elle ne peut pas "
+                    "être ré-enregistrée. Saisissez le départ de la bande un autre jour."
+              : "Cette journée porte des ventes d'avant la mise en place des catégories, non ventilées : elle ne peut pas "
+                    "être ré-enregistrée. Saisissez le départ de la bande un autre jour.",
         );
       }
     }
@@ -348,6 +371,13 @@ class FicheJournaliereRepository {
             venteRepro: volailles ? Value(existante?.venteRepro ?? 0) : const Value.absent(),
             venteSevre: volailles ? Value(existante?.venteSevre ?? 0) : const Value.absent(),
             venteJeune: volailles ? Value(existante?.venteJeune ?? 0) : const Value.absent(),
+            // VOL-2 : quatrième emplacement (Poussin ponte) et passages supplémentaires des pondeuses.
+            mort4: ponte ? Value(ventilation.mort4) : const Value.absent(),
+            don4: ponte ? Value(ventilation.don4) : const Value.absent(),
+            vente4: ponte ? Value(existante?.vente4 ?? 0) : const Value.absent(),
+            passage4Sevre: ponte ? Value(ventilation.passage4Sevre) : const Value.absent(),
+            passageJeuneRepro: ponte ? Value(ventilation.passageJeuneRepro) : const Value.absent(),
+            catDepart4: ponte && departDeduit != null ? Value(departDeduit.quatre) : const Value.absent(),
             catDepartRepro: departDeduit == null
                 ? const Value.absent()
                 : Value(departDeduit.repro),
@@ -444,20 +474,27 @@ class FicheJournaliereRepository {
     final existante = await chargerJour(lotId, jour);
     final lot = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
     VentilationJour? ventilation;
-    if (EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage) == EffectifParCategorie.volailles) {
-      // Ticket VOL-1 (`SaisieSujetAction::refuserSiVolaillesSansDepart`) : un don est une sortie qui doit être RANGÉE
-      // dans une catégorie (il se saisit sur la fiche) ; la bande doit avoir son départ, et l'entrée ne peut pas le précéder.
+    final espece = EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage);
+    if (EffectifParCategorie.estVolailles(espece)) {
+      // Ticket VOL-1 / VOL-2 (`SaisieSujetAction::refuserSiVolaillesSansDepart`) : un don est une sortie qui doit être RANGÉE
+      // dans une catégorie ou un stade (il se saisit sur la fiche) ; la bande doit avoir son départ, et l'entrée ne peut pas
+      // le précéder.
+      final ponte = espece == EffectifParCategorie.volaillesPonte;
+      final fiche = ponte ? 'Pondeuses' : 'Volailles Reproducteurs';
       if (don != (existante?.don ?? 0)) {
-        throw const FicheRefusee(
-          'Pour une bande de volailles reproductrices, les dons se saisissent sur la fiche Volailles Reproducteurs, '
-          'ventilés par catégorie (Reproducteur, Jeune, Poussin).',
+        throw FicheRefusee(
+          ponte
+              ? 'Pour une bande de pondeuses, les dons se saisissent sur la fiche Pondeuses, ventilés par stade (Poussin '
+                    'ponte, Poussin en croissance, Poulette, Pondeuse).'
+              : 'Pour une bande de volailles reproductrices, les dons se saisissent sur la fiche Volailles Reproducteurs, '
+                    'ventilés par catégorie (Reproducteur, Jeune, Poussin).',
         );
       }
       final etat = await etatCategories(lotId, jour);
       if (etat == null || etat.mode == 'sans_chaine') {
         throw FicheRefusee(
-          "L'effectif de départ par catégorie de la bande ${lot!.code} n'est pas saisi : ouvrez la fiche Volailles "
-          'Reproducteurs et saisissez-le avant toute entrée.',
+          "L'effectif de départ ${ponte ? 'par stade' : 'par catégorie'} de la bande ${lot!.code} n'est pas saisi : "
+          'ouvrez la fiche $fiche et saisissez-le avant toute entrée.',
         );
       }
       if (etat.mode == 'avant_depart') {
@@ -468,9 +505,9 @@ class FicheJournaliereRepository {
       }
       if (existante != null &&
           ((existante.mort > 0 && existante.mortRepro == null) || (existante.don > 0 && existante.donRepro == null))) {
-        throw const FicheRefusee(
-          'Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les sur la fiche Volailles '
-          'Reproducteurs avant de modifier ses entrées.',
+        throw FicheRefusee(
+          'Cette fiche porte des morts ou des dons non ventilés ${ponte ? 'par stade' : 'par catégorie'} : ventilez-les sur '
+          'la fiche $fiche avant de modifier ses entrées.',
         );
       }
       ventilation = VentilationJour(
@@ -481,6 +518,10 @@ class FicheJournaliereRepository {
         donSevre: existante?.donSevre ?? 0,
         donJeune: existante?.donJeune ?? 0,
         passage: existante?.passageSevreJeune ?? 0,
+        mort4: existante?.mort4 ?? 0,
+        don4: existante?.don4 ?? 0,
+        passage4Sevre: existante?.passage4Sevre ?? 0,
+        passageJeuneRepro: existante?.passageJeuneRepro ?? 0,
       );
     }
     return enregistrer(
@@ -498,11 +539,11 @@ class FicheJournaliereRepository {
     );
   }
 
-  /// Ticket VOL-1 — contrôles du DÉPART d'une bande de volailles reproductrices (`saveDay` de la fiche web) : un jour
-  /// antérieur au départ n'est pas saisissable ; un départ stocké incohérent refuse la chaîne ; sans chaîne, le départ
-  /// SAISI (jamais déduit) est exigé, complet et égal à l'effectif au début du jour (D4). Rend le départ À ÉCRIRE sur
-  /// cette fiche, ou null quand la chaîne existe déjà. Lève [FicheRefusee] avec les motifs du web.
-  Future<EffectifCategories?> _departVolailles(String lotId, DateTime jour, VentilationJour v) async {
+  /// Ticket VOL-1 / VOL-2 — contrôles du DÉPART d'une bande de volailles (`saveDay` de la fiche web) : un jour antérieur au
+  /// départ n'est pas saisissable ; un départ stocké incohérent refuse la chaîne ; sans chaîne, le départ SAISI (jamais
+  /// déduit) est exigé, complet (QUATRE stades pour les pondeuses) et égal à l'effectif au début du jour (D4). Rend le départ
+  /// À ÉCRIRE sur cette fiche, ou null quand la chaîne existe déjà. Lève [FicheRefusee] avec les motifs du web.
+  Future<EffectifCategories?> _departVolailles(String lotId, DateTime jour, VentilationJour v, {bool ponte = false}) async {
     final etat = await etatCategories(lotId, jour);
     if (etat == null) return null;
     switch (etat.mode) {
@@ -514,11 +555,14 @@ class FicheJournaliereRepository {
         throw FicheRefusee(etat.refus!);
       case 'sans_chaine':
         final saisi = v.departSaisi ?? const EffectifCategories();
-        final aucun = saisi.repro == null && saisi.sevre == null && saisi.jeune == null;
+        final aucun = saisi.repro == null && saisi.sevre == null && saisi.jeune == null && (!ponte || saisi.quatre == null);
         final refus = aucun
-            ? "Saisissez d'abord l'effectif de départ de la bande par catégorie (Reproducteur, Jeune, Poussin) : la "
-                  'journée ne peut pas être enregistrée sans lui.'
-            : EffectifParCategorie.verifierDepart(saisi, await effectifPrecedent(lotId, jour));
+            ? (ponte
+                  ? "Saisissez d'abord l'effectif de départ de la bande par stade (Poussin ponte, Poussin en croissance, "
+                        'Poulette, Pondeuse) : la journée ne peut pas être enregistrée sans lui.'
+                  : "Saisissez d'abord l'effectif de départ de la bande par catégorie (Reproducteur, Jeune, Poussin) : la "
+                        'journée ne peut pas être enregistrée sans lui.')
+            : EffectifParCategorie.verifierDepart(saisi, await effectifPrecedent(lotId, jour), quatreStades: ponte);
         if (refus != null) throw FicheRefusee(refus);
         return saisi;
       default:
@@ -537,7 +581,7 @@ class FicheJournaliereRepository {
     )..where((t) => t.id.equals(lotId))).getSingleOrNull();
     if (bande == null || await aUneChaine(lotId)) return null;
     // VOL-1 : le départ des volailles reproductrices est SAISI, jamais déduit du stade.
-    if (EffectifParCategorie.especeDuCode(bande.speciesCode, stade: bande.stage) == EffectifParCategorie.volailles) {
+    if (EffectifParCategorie.estVolailles(EffectifParCategorie.especeDuCode(bande.speciesCode, stade: bande.stage))) {
       return null;
     }
     return EffectifParCategorie.departDepuisStade(
@@ -558,7 +602,7 @@ class FicheJournaliereRepository {
     required int achat,
     required int ne,
   }) async {
-    if (v.passage == 0) return;
+    if (!v.aUnPassage) return;
     final bande = await (_db.select(
       _db.livestockLots,
     )..where((t) => t.id.equals(lotId))).getSingleOrNull();
@@ -582,15 +626,23 @@ class FicheJournaliereRepository {
       donSevre: v.donSevre,
       donJeune: v.donJeune,
       passage: v.passage,
+      mort4: v.mort4,
+      don4: v.don4,
+      vente4: existante?.vente4,
+      passage4Sevre: v.passage4Sevre,
+      passageJeuneRepro: v.passageJeuneRepro,
       departRepro: departDeduit?.repro ?? existante?.catDepartRepro,
       departSevre: departDeduit?.sevre ?? existante?.catDepartSevre,
       departJeune: departDeduit?.jeune ?? existante?.catDepartJeune,
+      departQuatre: departDeduit?.quatre ?? existante?.catDepart4,
       transfertEntreeRepro: existante?.transfertEntreeRepro ?? 0,
       transfertEntreeSevre: existante?.transfertEntreeSevre ?? 0,
       transfertEntreeJeune: existante?.transfertEntreeJeune ?? 0,
       transfertSortieRepro: existante?.transfertSortieRepro ?? 0,
       transfertSortieSevre: existante?.transfertSortieSevre ?? 0,
       transfertSortieJeune: existante?.transfertSortieJeune ?? 0,
+      transfertEntree4: existante?.transfertEntree4 ?? 0,
+      transfertSortie4: existante?.transfertSortie4 ?? 0,
     );
     final refus = EffectifParCategorie.refusDuPassage(
       espece: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage),
@@ -662,18 +714,27 @@ class FicheJournaliereRepository {
     venteRepro: f.venteRepro,
     venteSevre: f.venteSevre,
     venteJeune: f.venteJeune,
+    mort4: f.mort4,
+    don4: f.don4,
+    vente4: f.vente4,
+    passage4Sevre: f.passage4Sevre,
+    passageJeuneRepro: f.passageJeuneRepro,
     departRepro: f.catDepartRepro,
     departSevre: f.catDepartSevre,
     departJeune: f.catDepartJeune,
+    departQuatre: f.catDepart4,
     catEffRepro: f.catEffRepro,
     catEffSevre: f.catEffSevre,
     catEffJeune: f.catEffJeune,
+    catEff4: f.catEff4,
     transfertEntreeRepro: f.transfertEntreeRepro,
     transfertEntreeSevre: f.transfertEntreeSevre,
     transfertEntreeJeune: f.transfertEntreeJeune,
     transfertSortieRepro: f.transfertSortieRepro,
     transfertSortieSevre: f.transfertSortieSevre,
     transfertSortieJeune: f.transfertSortieJeune,
+    transfertEntree4: f.transfertEntree4,
+    transfertSortie4: f.transfertSortie4,
   );
 
   /// Une bande a une chaîne exploitable : espèce suivie (lapins, porcs) ET une de ses fiches porte
@@ -686,6 +747,7 @@ class FicheJournaliereRepository {
         EffectifParCategorie.especeDuCode(bande.speciesCode, stade: bande.stage) == null) {
       return false;
     }
+    final ponte = EffectifParCategorie.especeDuCode(bande.speciesCode, stade: bande.stage) == EffectifParCategorie.volaillesPonte;
     final tete =
         await (_db.select(_db.livestockDailyEntries)
               ..where(
@@ -694,6 +756,7 @@ class FicheJournaliereRepository {
                   t.catDepartRepro.isNotNull(),
                   t.catDepartSevre.isNotNull(),
                   t.catDepartJeune.isNotNull(),
+                  if (ponte) t.catDepart4.isNotNull(),
                 ]),
               )
               ..limit(1))
@@ -786,7 +849,8 @@ class FicheJournaliereRepository {
         if (r == null) continue;
         if (r.repro != f.catEffRepro ||
             r.sevre != f.catEffSevre ||
-            r.jeune != f.catEffJeune) {
+            r.jeune != f.catEffJeune ||
+            (r.quatre != null && r.quatre != f.catEff4)) {
           await (_db.update(
             _db.livestockDailyEntries,
           )..where((t) => t.id.equals(f.id))).write(
@@ -794,6 +858,8 @@ class FicheJournaliereRepository {
               catEffRepro: Value(r.repro),
               catEffSevre: Value(r.sevre),
               catEffJeune: Value(r.jeune),
+              // VOL-2 : `cat_eff_4` n'est dérivé que pour les volailles pondeuses.
+              catEff4: r.quatre == null ? const Value.absent() : Value(r.quatre),
             ),
           );
           categoriesModifiees++;
@@ -818,23 +884,30 @@ class FicheJournaliereRepository {
 
   /// Ticket VOL-1 — première fiche de la bande portant un départ COMPLET (la tête de la chaîne), ou null
   /// (`EffectifParCategorieService::teteDeChaine`).
-  Future<LivestockDailyEntry?> teteDeChaine(String lotId) =>
-      (_db.select(_db.livestockDailyEntries)
-            ..where(
-              (t) => Expression.and([
-                t.lotId.equals(lotId),
-                t.catDepartRepro.isNotNull(),
-                t.catDepartSevre.isNotNull(),
-                t.catDepartJeune.isNotNull(),
-              ]),
-            )
-            ..orderBy([(t) => OrderingTerm(expression: t.entryDate)])
-            ..limit(1))
-          .getSingleOrNull();
+  ///
+  /// 🔁 VOL-2 : pour les volailles pondeuses, le départ COMPLET compte aussi le quatrième stade (`cat_depart_4`).
+  Future<LivestockDailyEntry?> teteDeChaine(String lotId) async {
+    final lot = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
+    final ponte = EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage) == EffectifParCategorie.volaillesPonte;
+    return (_db.select(_db.livestockDailyEntries)
+          ..where(
+            (t) => Expression.and([
+              t.lotId.equals(lotId),
+              t.catDepartRepro.isNotNull(),
+              t.catDepartSevre.isNotNull(),
+              t.catDepartJeune.isNotNull(),
+              if (ponte) t.catDepart4.isNotNull(),
+            ]),
+          )
+          ..orderBy([(t) => OrderingTerm(expression: t.entryDate)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
 
-  /// Ticket VOL-1 — motif français du refus d'une ligne de vente (`RecordSaleOnFicheElevageAction::refusDesLignes`,
-  /// MÊMES textes que `MotifsRefusPush`), ou null. Aucune écriture. Sur une bande de volailles reproductrices :
-  /// (a) départ par catégorie non saisi ; (b) vente datée AVANT le départ ; (c) produit sans catégorie d'effectif valide.
+  /// Ticket VOL-1 / VOL-2 — motif français du refus d'une ligne de vente (`RecordSaleOnFicheElevageAction::refusDesLignes`,
+  /// MÊMES textes que `MotifsRefusPush`), ou null. Aucune écriture. Sur une bande de volailles : (a) départ non saisi ;
+  /// (b) vente datée AVANT le départ ; (c) produit sans catégorie d'effectif valide pour la FAMILLE de la bande (une
+  /// catégorie de reproducteurs ne se vend pas sur une bande de pondeuses, ni l'inverse).
   Future<String?> refusDeVenteVolailles({
     required String lotId,
     required String? categorieEffectif,
@@ -842,20 +915,27 @@ class FicheJournaliereRepository {
     required DateTime jour,
   }) async {
     final lot = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
-    if (lot == null ||
-        EffectifParCategorie.especeDuCode(lot.speciesCode, stade: lot.stage) != EffectifParCategorie.volailles) {
-      return null;
-    }
+    final espece = lot == null ? null : EffectifParCategorie.especeDuCode(lot.speciesCode, stade: lot.stage);
+    if (lot == null || !EffectifParCategorie.estVolailles(espece)) return null;
+    final ponte = espece == EffectifParCategorie.volaillesPonte;
     final tete = await teteDeChaine(lotId);
     if (tete == null) {
-      return "Vente refusée : l'effectif de départ par catégorie de la bande ${lot.code} n'est pas saisi. "
-          'Ouvrez la fiche Volailles Reproducteurs et saisissez-le avant toute vente de cette bande.';
+      return ponte
+          ? "Vente refusée : l'effectif de départ par stade de la bande ${lot.code} n'est pas saisi. "
+                'Ouvrez la fiche Pondeuses et saisissez-le avant toute vente de cette bande.'
+          : "Vente refusée : l'effectif de départ par catégorie de la bande ${lot.code} n'est pas saisi. "
+                'Ouvrez la fiche Volailles Reproducteurs et saisissez-le avant toute vente de cette bande.';
     }
     if (_minuit(jour).isBefore(_minuit(tete.entryDate))) {
       return 'Vente refusée : la date de la vente (${_fr(jour)}) précède l\'effectif de départ de la bande '
           '(fixé le ${_fr(tete.entryDate)}).';
     }
-    if (!CategorieVolaille.estValide(categorieEffectif)) {
+    if (ponte && !StadePondeuse.estValide(categorieEffectif)) {
+      return "Vente refusée : le produit « $nomProduit » n'a pas de stade d'effectif de pondeuses (Poussin ponte, Poussin "
+          'en croissance, Poulette ou Pondeuse). Renseignez-le dans « Modifier un produit » avant de le vendre sur une '
+          'bande de pondeuses.';
+    }
+    if (!ponte && !CategorieVolaille.estValide(categorieEffectif)) {
       return "Vente refusée : le produit « $nomProduit » n'a pas de catégorie d'effectif (Reproducteur, Jeune ou "
           'Poussin). Renseignez-la dans « Modifier un produit » avant de le vendre sur une bande de volailles '
           'reproductrices.';
@@ -889,9 +969,12 @@ class FicheJournaliereRepository {
               ..where((t) => t.lotId.equals(lotId) & t.entryDate.equals(jour)))
             .getSingleOrNull();
     final lot = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lotId))).getSingleOrNull();
-    final volailles =
-        EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage) == EffectifParCategorie.volailles;
-    final emplacement = volailles ? CategorieVolaille.emplacement(categorieEffectif) : null;
+    final espece = EffectifParCategorie.especeDuCode(lot?.speciesCode, stade: lot?.stage);
+    final volailles = EffectifParCategorie.estVolailles(espece);
+    final ponte = espece == EffectifParCategorie.volaillesPonte;
+    final emplacement = !volailles
+        ? null
+        : (ponte ? StadePondeuse.emplacement(categorieEffectif) : CategorieVolaille.emplacement(categorieEffectif));
     int venteDe(String e, int? stockee) => (stockee ?? 0) + (e == emplacement ? quantite : 0);
 
     // ⚠️ F0.95 — même formule que le serveur (`computeEffectifFinal`, bornée à 0, 14.63).
@@ -959,6 +1042,12 @@ class FicheJournaliereRepository {
             venteRepro: volailles ? Value(venteDe('repro', existante?.venteRepro)) : const Value.absent(),
             venteSevre: volailles ? Value(venteDe('sevre', existante?.venteSevre)) : const Value.absent(),
             venteJeune: volailles ? Value(venteDe('jeune', existante?.venteJeune)) : const Value.absent(),
+            // VOL-2 : quatrième emplacement (Poussin ponte) et ses mouvements « connus à zéro » sur une fiche neuve.
+            vente4: ponte ? Value(venteDe('quatre', existante?.vente4)) : const Value.absent(),
+            mort4: ponte ? zeros : const Value.absent(),
+            don4: ponte ? zeros : const Value.absent(),
+            passage4Sevre: ponte ? zeros : const Value.absent(),
+            passageJeuneRepro: ponte ? zeros : const Value.absent(),
           ),
         );
 
@@ -1005,18 +1094,48 @@ class FicheJournaliereRepository {
           donSevre: const Value(0),
           donJeune: const Value(0),
           passageSevreJeune: const Value(0),
-          // Ticket VOL-1 : pour les volailles, les ventes ventilées naissent connues à zéro elles aussi.
-          venteRepro: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volailles
+          // Ticket VOL-1 / VOL-2 : pour les volailles, les ventes ventilées naissent connues à zéro elles aussi, et, pour les
+          // pondeuses, le quatrième emplacement et les deux passages de plus.
+          venteRepro: EffectifParCategorie.estVolailles(EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage))
               ? const Value(0)
               : const Value.absent(),
-          venteSevre: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volailles
+          venteSevre: EffectifParCategorie.estVolailles(EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage))
               ? const Value(0)
               : const Value.absent(),
-          venteJeune: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volailles
+          venteJeune: EffectifParCategorie.estVolailles(EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage))
+              ? const Value(0)
+              : const Value.absent(),
+          mort4: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volaillesPonte
+              ? const Value(0)
+              : const Value.absent(),
+          don4: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volaillesPonte
+              ? const Value(0)
+              : const Value.absent(),
+          vente4: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volaillesPonte
+              ? const Value(0)
+              : const Value.absent(),
+          passage4Sevre: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volaillesPonte
+              ? const Value(0)
+              : const Value.absent(),
+          passageJeuneRepro: EffectifParCategorie.especeDuCode(bande?.speciesCode, stade: bande?.stage) == EffectifParCategorie.volaillesPonte
               ? const Value(0)
               : const Value.absent(),
         );
         // Première fiche d'une bande à catégories : départ DÉDUIT du stade (`departDepuisStade`).
+        final proposition = EffectifParCategorie.departDepuisStade(
+          codeEspece: bande?.speciesCode,
+          stade: bande?.stage,
+          totalDebutJour: precedent,
+        );
+        if (proposition?.quatre != null && !await aUneChaine(lotId)) {
+          // VOL-2 : bande de pondeuses — départ déduit du stade (tout l'effectif « Pondeuse »), comme `TransferBetweenLotsAction`.
+          nouvelle = nouvelle.copyWith(
+            catDepartRepro: Value(proposition!.repro),
+            catDepartSevre: Value(proposition.sevre),
+            catDepartJeune: Value(proposition.jeune),
+            catDepart4: Value(proposition.quatre),
+          );
+        }
         final cat = EffectifParCategorie.categorieDuStade(bande?.stage);
         if (cat != null && !await aUneChaine(lotId)) {
           nouvelle = nouvelle.copyWith(

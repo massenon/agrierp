@@ -33,7 +33,7 @@ import 'php_laravel.dart';
 ///   J2 (06/10) ventes R1 + J2 + P4, mort J1, don P2, passage 5               → R18  J32  P46   total 96    6 280 g
 ///   J3 (07/10) vente P50                                                     → R18  J32  P0    total 46    somme 50
 void main() {
-  const volailles = EffectifParCategorie.volailles;
+  const volailles = EffectifParCategorie.volaillesRepro;
 
   EffectifCategories e(int? r, int? s, int? j) => EffectifCategories(repro: r, sevre: s, jeune: j);
   List<int?> trio(EffectifCategoriesJour r) => [r.repro, r.sevre, r.jeune];
@@ -103,9 +103,10 @@ void main() {
       expect(EffectifParCategorie.verifierDepart(e(20, 50, 30), 100), isNull);
     });
 
-    test('l aviculture « ponte » (Pondeuses) n est pas une volaille reproductrice', () {
+    test('l aviculture « ponte » (Pondeuses) n est pas une volaille reproductrice : c est l autre famille', () {
       expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'reproduction'), volailles);
-      expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'ponte'), isNull);
+      expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'ponte'), EffectifParCategorie.volaillesPonte);
+      expect(EffectifParCategorie.estVolailles(EffectifParCategorie.volaillesPonte), isTrue);
       expect(EffectifParCategorie.especeDuCode('cuniculture'), EffectifParCategorie.lapins);
     });
 
@@ -167,7 +168,7 @@ require 'vendor/autoload.php';
 $e = json_decode(file_get_contents($argv[1]), true);
 $s = [];
 foreach ($e as $c) {
-    $r = App\Services\EffectifParCategorieService::calculerJour('volailles', $c[0], $c[1], $c[2]);
+    $r = App\Services\EffectifParCategorieService::calculerJour('volailles_repro', $c[0], $c[1], $c[2]);
     $s[] = [$r->repro, $r->sevre, $r->jeune, $r->sommeDifferente, $r->refus, $r->passageApplique];
 }
 echo json_encode($s);
@@ -597,7 +598,7 @@ echo json_encode([
           const FormulaireProduit(nom: 'X', categorieId: 'c', unite: 'u', mode: 'quote', categorieEffectif: 'canard'),
           creation: true,
         )['categorieEffectif'],
-        "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.",
+        "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin (reproducteurs), ou l'un des quatre stades des pondeuses (Poussin ponte, Poussin en croissance, Poulette, Pondeuse).",
       );
       final modifie = await depotProduits.modifier(
         coq.id,

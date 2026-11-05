@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../elevage/categorie_volaille.dart';
+import '../elevage/stade_pondeuse.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'produits_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -253,15 +254,18 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
                       if (_estAviculture)
                         // Ticket VOL-1 : la caisse range la vente de sujets vivants dans la catégorie d'effectif du produit.
                         _liste(
-                          "Catégorie d'effectif (volailles reproductrices)",
+                          "Catégorie d'effectif (volailles)",
                           'categorieEffectif',
                           _categorieEffectif,
                           '-- Aucune --',
-                          CategorieVolaille.libelles,
+                          // VOL-2 : les trois catégories des reproducteurs ET les quatre stades des pondeuses (le Blade les
+                          // groupe en deux `optgroup`).
+                          {...CategorieVolaille.libelles, ...StadePondeuse.libelles},
                           (v) => setState(() => _categorieEffectif = v),
                           aide:
-                              'La vente de ce produit sort de cette catégorie de la fiche Volailles Reproducteurs. '
-                              'Sans catégorie, la vente sur une bande de volailles reproductrices est refusée.',
+                              'La vente de ce produit sort de cette catégorie (fiche Volailles Reproducteurs) ou de ce stade (fiche '
+                              'Pondeuses) : une catégorie de reproducteurs ne se vend que sur une bande de reproducteurs, un stade de '
+                              'pondeuses que sur une bande de pondeuses. Sans elle, la vente sur une bande de volailles est refusée.',
                         ),
                       _champ(
                         'Unité de comptage *',

@@ -7,10 +7,26 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/tableau_mensuel.dart';
 import '../../core/widgets/toast_agri.dart';
 import '../../core/export/document_officiel.dart';
-import 'elements_fiche.dart' show FormulaireFiche, LectureSeuleDuJour, EnTeteSaisieFiche, MoisDeFiche, ouvrirBandes;
+import 'autonomie_alimentaire_carte.dart';
+import 'effectif_par_categorie.dart';
+import 'elements_fiche.dart'
+    show
+        BlocCategoriesFiche,
+        ChampLectureFiche,
+        ChampSaisieFiche,
+        EncadreFiche,
+        EnTeteSaisieFiche,
+        FormulaireFiche,
+        GrilleFiche,
+        LectureSeuleDuJour,
+        MoisDeFiche,
+        RationPondeusesFiche,
+        TitreSectionFiche,
+        ouvrirBandes;
 import 'fiche_journaliere_repository.dart';
+import 'jour_categories.dart';
 import 'mois_pondeuses.dart';
-import 'ration_volaille.dart';
+import 'stade_pondeuse.dart';
 import 'production_oeufs_service.dart';
 import 'soins_repository.dart';
 import '../stocks/journal_stocks.dart';
@@ -29,7 +45,8 @@ import '../../core/comptabilite/exercice_de_saisie.dart';
 ///   4. carte « Saisie Journalière Ponte & Cheptel », avec « Bande : » (plusieurs bandes) et « Date : » ;
 ///   5. transferts entre bandes du jour (s'il y en a) ; Achats / Entrées · Nés / Transferts · Ventes (POS, réel) ;
 ///   6. **Workflow Récolte & Stock d'Œufs** ; 7. Morts par catégorie ; 8. Dons par catégorie ;
-///   9. Effectif Final du Jour + Taux de Mortalité du Jour ; 10. Rationnement ; 11. Pesée ;
+///   9. Effectif Final du Jour + Taux de Mortalité du Jour ; 10. Rationnement PAR STADE (VOL-2) et autonomie
+///      alimentaire ; 11. Pesée ;
 ///  12. Stock Œufs & Plateaux (30) — Jour Sélectionné ; 13. **Traitements & Rappels** (protocole du jour,
 ///      « Observations ») ; 14. « Enregistrer ce Jour » ;
 ///  15. le tableau du mois : TOUS les jours du mois, « Traitements & Rappels » rempli ([MoisPondeuses]).
@@ -39,6 +56,12 @@ import '../../core/comptabilite/exercice_de_saisie.dart';
 /// Effectif Final) » de la pesée, l'invite « Touchez un jour… » et le « Jour N » des lignes du tableau.
 ///
 /// ⚠️ **« VENTES » EST EN LECTURE SEULE**, comme au web : la valeur vient de la CAISSE.
+///
+/// 🔁 **TICKET VOL-2 (décision client du 05/11/2026) — EFFECTIF PAR STADE CALCULÉ**, comme la fiche Reproducteurs (VOL-1) :
+/// QUATRE stades aux libellés EXACTS du barème (Poussin ponte, Poussin en croissance, Poulette, Pondeuse) ; calcul =
+/// [EffectifParCategorie] (miroir du service PHP, parité exécutée). Départ OBLIGATOIRE avant toute journée (la fiche le
+/// demande au lieu de l'effectif et refuse d'enregistrer), TROIS passages de stade saisissables, ventes par stade posées par
+/// la caisse (en lecture seule), rationnement [StadePondeuse.tableau]. Les ŒUFS (récolte, casse, stock) ne changent pas.
 class FichePondeusesScreen extends StatefulWidget {
   const FichePondeusesScreen({
     super.key,
@@ -70,9 +93,15 @@ class FichePondeusesScreen extends StatefulWidget {
 }
 
 class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
-  /// 🔁 F0.99 — catégories des MORTS du web (`fiche-pondeuses.blade.php`), libellés et ordre exacts ; les dons
-  /// (15.56) ont les mêmes.
-  static const _stades = ['Pondeuse / Repro', 'Poulette', 'Poussin'];
+  /// 🔁 VOL-2 — les QUATRE stades des morts, des dons, du départ et des ventes, dans l'ordre de la chaîne, aux libellés
+  /// du barème. Clés = emplacements génériques de synchronisation : `quatre` = Poussin ponte, `sevre` = Poussin en
+  /// croissance, `jeune` = Poulette, `repro` = Pondeuse.
+  static final _stades = [
+    ('quatre', StadePondeuse.libelle(StadePondeuse.poussinPonte)),
+    ('sevre', StadePondeuse.libelle(StadePondeuse.poussinCroissance)),
+    ('jeune', StadePondeuse.libelle(StadePondeuse.poulette)),
+    ('repro', StadePondeuse.libelle(StadePondeuse.pondeuse)),
+  ];
 
   static const _amber500 = Color(0xFFF59E0B);
   static const _amber700 = Color(0xFFB45309);
@@ -87,6 +116,22 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   int _ne = 0;
   int _vente = 0;
 
+  /// Ticket VOL-2 — la fiche du jour (ventes par stade, transferts par stade) et l'état de la chaîne par stade.
+  LivestockDailyEntry? _fiche;
+  EtatJour? _etat;
+
+  /// Passages du jour : 1 = Poussin ponte → Poussin en croissance, 2 = → Poulette, 3 = → Pondeuse.
+  int _passage1 = 0;
+  int _passage2 = 0;
+  int _passage3 = 0;
+
+  /// Départ saisi (début du jour de départ), par emplacement ; `null` = pas encore saisi.
+  final _depart = <String, int?>{'quatre': null, 'sevre': null, 'jeune': null, 'repro': null};
+
+  /// Produit de provende et son stock (carte d'autonomie alimentaire, VOL-2).
+  Product? _produitProvende;
+  double? _stockProvendeKg;
+
   /// Ticket 15.46 — transferts entre bandes du jour (dérivés, jamais saisis ici) : comptés dans l'effectif.
   int _transfertEntree = 0;
   int _transfertSortie = 0;
@@ -95,10 +140,10 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   int _oeufsRecoltes = 0;
   int _oeufsCasses = 0;
 
-  final _morts = <String, int>{for (final s in _stades) s: 0};
+  final _morts = <String, int>{for (final (c, _) in _stades) c: 0};
 
   /// 🔁 15.56 — dons par catégorie (mêmes catégories que les morts), comme le web.
-  final _dons = <String, int>{for (final s in _stades) s: 0};
+  final _dons = <String, int>{for (final (c, _) in _stades) c: 0};
 
   /// 🔁 F0.99 — morts déjà enregistrés pour le jour rechargé (web 15.47 / 15.55) : la répartition n'est pas
   /// stockée, seul le total l'est. Sans lui, ré-enregistrer le jour remettait ses morts à zéro.
@@ -159,6 +204,11 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         )
         .toList();
     final rations = await widget.depot.rations('aviculture');
+    final db = widget.depot.database;
+    final tousProduits = await db.select(db.products).get();
+    final especes = await db.select(db.livestockSpecies).get();
+    final types = await db.select(db.feedTypes).get();
+    final produit = AutonomieAlimentaire.produitProvende('aviculture', tousProduits, especes);
 
     if (!mounted) return;
 
@@ -166,6 +216,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       _bandes = bandes;
       _bande = bandes.isEmpty ? null : bandes.first;
       _rations = rations;
+      _produitProvende = produit;
+      _stockProvendeKg = produit == null ? null : AutonomieAlimentaire.stockEnKg(produit, types);
     });
 
     await _chargerJour();
@@ -201,6 +253,7 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
 
     final precedent = await widget.depot.effectifPrecedent(bande.id, _jour);
     final fiche = await widget.depot.chargerJour(bande.id, _jour);
+    final etat = await widget.depot.etatCategories(bande.id, _jour);
     final protocole = await widget.soins.protocoleDuJour(
       bande: bande,
       codeEspece: 'aviculture',
@@ -211,6 +264,8 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
 
     setState(() {
       _effectifPrecedent = precedent;
+      _fiche = fiche;
+      _etat = etat;
       _mois = mois;
       _lectureSeule = lectureSeule;
       _journal = grandLivre.journal;
@@ -232,13 +287,38 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
       _protocole = protocole;
       // Les cases repartent vides à chaque changement de jour ou de bande (`traitementsCoches = []`).
       _traitementsCoches.clear();
-      // ⚠️ Les morts et dons enregistrés ne sont pas ventilés par stade en base : la fiche ne porte qu'un total.
-      for (final cle in _stades) {
+      // VOL-2 : la ventilation STOCKÉE recharge le jour ; une fiche d'AVANT le ticket (colonnes à null) garde son total, qui
+      // doit être ventilé avant d'enregistrer. Le départ saisi (aperçu) ne survit pas à un changement de jour.
+      for (final (cle, _) in _stades) {
         _morts[cle] = 0;
         _dons[cle] = 0;
+        _depart[cle] = null;
       }
-      _mortEnregistre = (fiche?.mort ?? 0) > 0 ? fiche!.mort : null;
-      _donEnregistre = (fiche?.don ?? 0) > 0 ? fiche!.don : null;
+      _mortEnregistre = null;
+      _donEnregistre = null;
+      _passage1 = fiche?.passage4Sevre ?? 0;
+      _passage2 = fiche?.passageSevreJeune ?? 0;
+      _passage3 = fiche?.passageJeuneRepro ?? 0;
+      if (fiche != null) {
+        if (fiche.mortRepro != null && fiche.mortSevre != null && fiche.mortJeune != null && fiche.mort4 != null) {
+          _morts
+            ..['repro'] = fiche.mortRepro!
+            ..['sevre'] = fiche.mortSevre!
+            ..['jeune'] = fiche.mortJeune!
+            ..['quatre'] = fiche.mort4!;
+        } else {
+          _mortEnregistre = fiche.mort > 0 ? fiche.mort : null;
+        }
+        if (fiche.donRepro != null && fiche.donSevre != null && fiche.donJeune != null && fiche.don4 != null) {
+          _dons
+            ..['repro'] = fiche.donRepro!
+            ..['sevre'] = fiche.donSevre!
+            ..['jeune'] = fiche.donJeune!
+            ..['quatre'] = fiche.don4!;
+        } else {
+          _donEnregistre = fiche.don > 0 ? fiche.don : null;
+        }
+      }
       _chargement = false;
     });
   }
@@ -296,9 +376,215 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   /// `number_format($x, 1, ',', ' ').' %'`.
   static String _pourcent(double x) => '${PmpService.nombre(x, 1)} %';
 
-  /// 🔁 15.57 — lignes du rationnement, règle commune au web (`RationVolaille`).
-  List<LigneRationVolaille> get _lignesRation =>
-      RationVolaille.lignes(_rations, RationVolaille.pondeuse, _effectifFinal);
+  EffectifCategories get _departSaisi => EffectifCategories(
+    repro: _depart['repro'],
+    sevre: _depart['sevre'],
+    jeune: _depart['jeune'],
+    quatre: _depart['quatre'],
+  );
+
+  /// Ventes du jour par stade (colonnes `vente_*` posées par la caisse) ; 0 sans fiche.
+  int get _venteRepro => _fiche?.venteRepro ?? 0;
+  int get _venteSevre => _fiche?.venteSevre ?? 0;
+  int get _venteJeune => _fiche?.venteJeune ?? 0;
+  int get _vente4 => _fiche?.vente4 ?? 0;
+
+  /// Vente d'AVANT le ticket : le total existe, sa répartition par stade non.
+  bool get _venteNonVentilee => _fiche != null && _fiche!.vente > 0 && _fiche!.venteRepro == null;
+
+  /// `getCategoriesJourProperty()` du web : effectifs par stade CALCULÉS (jamais saisis), départ, refus, avertissements.
+  CategoriesJour get _categoriesJour {
+    final bande = _bande;
+    final f = _fiche;
+    return CategoriesJour.calculerPondeuses(
+      etat: bande == null ? null : _etat,
+      departSaisi: _departSaisi,
+      effectifPrecedent: _effectifPrecedent,
+      mouvements: MouvementsJour(
+        achat: _achat,
+        ne: _ne,
+        venteRepro: _venteRepro,
+        venteSevre: _venteSevre,
+        venteJeune: _venteJeune,
+        vente4: _vente4,
+        mortRepro: _morts['repro'],
+        mortSevre: _morts['sevre'],
+        mortJeune: _morts['jeune'],
+        mort4: _morts['quatre'],
+        donRepro: _dons['repro'],
+        donSevre: _dons['sevre'],
+        donJeune: _dons['jeune'],
+        don4: _dons['quatre'],
+        passage4Sevre: _passage1,
+        passage: _passage2,
+        passageJeuneRepro: _passage3,
+        transfertEntreeRepro: f?.transfertEntreeRepro ?? 0,
+        transfertEntreeSevre: f?.transfertEntreeSevre ?? 0,
+        transfertEntreeJeune: f?.transfertEntreeJeune ?? 0,
+        transfertEntree4: f?.transfertEntree4 ?? 0,
+        transfertSortieRepro: f?.transfertSortieRepro ?? 0,
+        transfertSortieSevre: f?.transfertSortieSevre ?? 0,
+        transfertSortieJeune: f?.transfertSortieJeune ?? 0,
+        transfertSortie4: f?.transfertSortie4 ?? 0,
+      ),
+      effectifFinal: _effectifFinal,
+      jour: _jour,
+      proposition: bande == null
+          ? null
+          : EffectifParCategorie.departDepuisStade(
+              codeEspece: bande.speciesCode,
+              stade: bande.stage,
+              totalDebutJour: _effectifPrecedent,
+            ),
+    );
+  }
+
+  /// `getAvertissementMortsProperty()` (D9) : le plancher à 0 s'applique et l'écran le dit.
+  String? get _avertissementMorts => _totalMorts > _effectifPrecedent
+      ? "Morts du jour ($_totalMorts) supérieurs à l'effectif de la veille ($_effectifPrecedent) : l'effectif est ramené "
+            'à 0, vérifiez la saisie.'
+      : null;
+
+  /// `appliquerPropositionDepart()` : reprend la proposition d'après le stade, sur demande de l'éleveur seulement.
+  void _appliquerProposition(EffectifCategories p) => setState(() {
+    _depart
+      ..['repro'] = p.repro
+      ..['sevre'] = p.sevre
+      ..['jeune'] = p.jeune
+      ..['quatre'] = p.quatre;
+  });
+
+
+  /// Départ obligatoire (saisi UNE fois par bande, verrouillé ensuite), motifs, refus de passage, avertissements — les blocs
+  /// du Blade entre les passages et l'effectif final.
+  List<Widget> _departEtAvertissements() {
+    final cat = _categoriesJour;
+    return [
+      if (cat.departRequis)
+        _departModifiable(cat)
+      else if (cat.depart != null)
+        _departVerrouille(cat),
+      if (cat.motif != null) EncadreFiche(key: const Key('motif-categories'), cat.motif!, erreur: true),
+      if (cat.refusPassage != null) EncadreFiche(key: const Key('refus-passage'), cat.refusPassage!, erreur: true),
+      if (_avertissementMorts != null) EncadreFiche(key: const Key('avertissement-morts'), _avertissementMorts!),
+      for (final a in cat.avertissements) EncadreFiche(a),
+      if (_venteNonVentilee)
+        const EncadreFiche(
+          key: Key('ventes-non-ventilees'),
+          "Cette journée porte des ventes d'avant la mise en place des stades, non ventilées : elle ne peut pas être ré-enregistrée.",
+        ),
+      const SizedBox(height: AgriSpacing.md),
+    ];
+  }
+
+  /// Bloc « Effectif de départ par stade (obligatoire) » du Blade : saisi UNE fois par bande, verrouillé ensuite.
+  Widget _departModifiable(CategoriesJour cat) => Container(
+    key: const Key('depart-requis'),
+    padding: const EdgeInsets.all(AgriSpacing.sm),
+    decoration: BoxDecoration(
+      color: AgriColors.brandEmerald.withValues(alpha: 0.05),
+      border: Border.all(color: AgriColors.brandEmerald.withValues(alpha: 0.2)),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const TitreSectionFiche(
+          'Effectif de départ par stade (obligatoire)',
+          icone: SymbolesAgri.edit_note,
+          couleurIcone: AgriColors.brandEmerald,
+          couleur: AgriColors.brandEmerald,
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        Text(
+          "Cette bande n'a pas encore d'effectif de départ : saisissez l'effectif de chaque stade au DÉBUT de ce jour, "
+          "avant les mouvements du jour. La somme des quatre stades doit égaler l'effectif total au début du jour "
+          "($_effectifPrecedent). Il est verrouillé au premier enregistrement ; la journée ne s'enregistre pas sans lui.",
+          style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        GrilleFiche(
+          colonnes: 4,
+          ecart: AgriSpacing.sm,
+          enfants: [
+            for (final (cle, libelle) in _stades)
+              ChampSaisieFiche(
+                libelle: libelle,
+                cle: 'depart-$cle',
+                valeur: _depart[cle],
+                petite: true,
+                onChange: (v) => setState(() => _depart[cle] = v?.toInt()),
+              ),
+          ],
+        ),
+        if (cat.proposition != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const Key('depart-proposition'),
+              onPressed: () => _appliquerProposition(cat.proposition!),
+              child: Text(
+                "Reprendre la proposition d'après le stade de la bande "
+                '(${StadePondeuse.libelle(StadePondeuse.pondeuse)} ${cat.proposition!.repro} · '
+                '${StadePondeuse.libelle(StadePondeuse.poulette)} ${cat.proposition!.jeune} · '
+                '${StadePondeuse.libelle(StadePondeuse.poussinCroissance)} ${cat.proposition!.sevre} · '
+                '${StadePondeuse.libelle(StadePondeuse.poussinPonte)} ${cat.proposition!.quatre})',
+                style: const TextStyle(fontSize: 11, fontWeight: AgriTypography.gras, color: AgriColors.brandEmerald),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  Widget _departVerrouille(CategoriesJour cat) => Container(
+    key: const Key('depart-verrouille'),
+    padding: const EdgeInsets.all(AgriSpacing.sm),
+    decoration: BoxDecoration(
+      color: AgriColors.surfaceZebra,
+      border: Border.all(color: AgriColors.outlineVariant),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const TitreSectionFiche('Effectif de départ par stade (verrouillé)', icone: SymbolesAgri.lock),
+        const SizedBox(height: AgriSpacing.xs),
+        Text(
+          'Effectif de départ fixé le ${EnTeteSaisieFiche.dateLongue(cat.departDate!)} (au début de ce jour).',
+          style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        GrilleFiche(
+          colonnes: 4,
+          ecart: AgriSpacing.sm,
+          enfants: [
+            for (final (cle, libelle) in _stades)
+              ChampLectureFiche(
+                libelle: libelle,
+                valeur: '${switch (cle) {
+                  'repro' => cat.depart!.repro,
+                  'sevre' => cat.depart!.sevre,
+                  'jeune' => cat.depart!.jeune,
+                  _ => cat.depart!.quatre,
+                }}',
+                cle: 'depart-verrouille-$cle',
+                petite: true,
+              ),
+          ],
+        ),
+        if (cat.mode == 'avant_depart')
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.xs),
+            child: Text(
+              "Jour antérieur à l'effectif de départ fixé le ${EnTeteSaisieFiche.dateLongue(cat.departDate!)} : il n'est pas saisissable.",
+              key: const Key('avant-depart'),
+              style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.errorDeep),
+            ),
+          ),
+      ],
+    ),
+  );
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -548,34 +834,48 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         const SizedBox(height: AgriSpacing.md),
         _workflowOeufs(),
         const SizedBox(height: AgriSpacing.md),
-        _blocCategories(
-          titre: 'Morts par catégorie',
-          icone: SymbolesAgri.skull,
-          couleur: AgriColors.errorDeep,
-          fond: AgriColors.errorBg.withValues(alpha: 0.3),
-          bord: AgriColors.errorRed.withValues(alpha: 0.2),
+        BlocCategoriesFiche.morts(
+          categories: _stades,
           valeurs: _morts,
-          dejaEnregistre: _mortEnregistre,
-          cleMention: 'morts-enregistres',
-          mention: (n) =>
-              '$n mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
-              "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+          dejaEnregistres: _mortEnregistre,
+          finMention: "ventilez-les ci-dessous (Poussin ponte / Poussin en croissance / Poulette / Pondeuse) avant d'enregistrer.",
+          onChange: (c, v) => setState(() => _morts[c] = v),
         ),
         const SizedBox(height: AgriSpacing.md),
-        _blocCategories(
-          titre: 'Dons par catégorie',
-          icone: SymbolesAgri.redeem,
-          couleur: AgriColors.brandEmerald,
-          fond: AgriColors.brandEmerald.withValues(alpha: 0.05),
-          bord: AgriColors.brandEmerald.withValues(alpha: 0.2),
+        BlocCategoriesFiche.dons(
+          categories: _stades,
           valeurs: _dons,
-          dejaEnregistre: _donEnregistre,
-          cleMention: 'dons-enregistres',
-          mention: (n) =>
-              '$n don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
-              "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+          dejaEnregistres: _donEnregistre,
+          finMention: "ventilez-les ci-dessous (Poussin ponte / Poussin en croissance / Poulette / Pondeuse) avant d'enregistrer.",
+          onChange: (c, v) => setState(() => _dons[c] = v),
         ),
         const SizedBox(height: AgriSpacing.md),
+        // VOL-2 — les TROIS passages de stade du jour (Poussin ponte → Poussin en croissance → Poulette → Pondeuse).
+        GrilleFiche(
+          colonnes: 3,
+          enfants: [
+            ChampSaisieFiche(
+              libelle: 'Passage du jour (Poussin ponte → Poussin en croissance)',
+              cle: 'passage-1',
+              valeur: _passage1,
+              onChange: (v) => setState(() => _passage1 = (v ?? 0).toInt()),
+            ),
+            ChampSaisieFiche(
+              libelle: 'Passage du jour (Poussin en croissance → Poulette)',
+              cle: 'passage-2',
+              valeur: _passage2,
+              onChange: (v) => setState(() => _passage2 = (v ?? 0).toInt()),
+            ),
+            ChampSaisieFiche(
+              libelle: 'Passage du jour (Poulette → Pondeuse)',
+              cle: 'passage-3',
+              valeur: _passage3,
+              onChange: (v) => setState(() => _passage3 = (v ?? 0).toInt()),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        ..._departEtAvertissements(),
         _effectif(),
         const SizedBox(height: AgriSpacing.md),
         _rationnement(),
@@ -706,11 +1006,33 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         ),
         const SizedBox(width: AgriSpacing.md),
         Expanded(
-          child: _champLecture(
-            libelle: 'Ventes',
-            suffixe: '(POS, réel)',
-            valeur: '$_vente',
-            cle: 'champ-ventes',
+          // VOL-2 : la caisse range chaque vente dans le stade du PRODUIT vendu (lecture seule).
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _champLecture(
+                libelle: 'Ventes',
+                suffixe: '(POS, réel)',
+                valeur: '$_vente',
+                cle: 'champ-ventes',
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  [
+                    for (final (cle, libelle) in _stades)
+                      '$libelle ${switch (cle) {
+                        'repro' => _venteRepro,
+                        'sevre' => _venteSevre,
+                        'jeune' => _venteJeune,
+                        _ => _vente4,
+                      }}',
+                  ].join(' · '),
+                  key: const Key('ventes-par-stade'),
+                  style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -953,151 +1275,6 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     );
   }
 
-  /// Morts (ou dons) par catégorie : le bloc du Blade, la mention des morts / dons déjà enregistrés DEDANS, sous le
-  /// titre.
-  Widget _blocCategories({
-    required String titre,
-    required IconData icone,
-    required Color couleur,
-    required Color fond,
-    required Color bord,
-    required Map<String, int> valeurs,
-    required int? dejaEnregistre,
-    required String cleMention,
-    required String Function(int) mention,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(AgriSpacing.sm),
-      decoration: BoxDecoration(
-        color: fond,
-        border: Border.all(color: bord),
-        borderRadius: BorderRadius.circular(AgriRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(icone, size: 16, color: couleur),
-              const SizedBox(width: AgriSpacing.xs),
-              Text(
-                titre.toUpperCase(),
-                style: TextStyle(
-                  fontSize: AgriTypography.xs,
-                  fontWeight: FontWeight.bold,
-                  color: couleur,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AgriSpacing.xs),
-          if (dejaEnregistre != null) ...[
-            Container(
-              key: Key(cleMention),
-              padding: const EdgeInsets.all(AgriSpacing.xs),
-              decoration: BoxDecoration(
-                color: AgriColors.accentYellow.withValues(alpha: 0.2),
-                border: Border.all(color: AgriColors.accentYellow),
-                borderRadius: BorderRadius.circular(AgriRadius.lg),
-              ),
-              child: Text(
-                mention(dejaEnregistre),
-                style: const TextStyle(fontSize: 11, color: AgriColors.brandForest),
-              ),
-            ),
-            const SizedBox(height: AgriSpacing.xs),
-          ],
-          Row(
-            children: [
-              for (final stade in _stades) ...[
-                Expanded(child: _compteur(stade, valeurs)),
-                if (stade != _stades.last)
-                  const SizedBox(width: AgriSpacing.sm),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _compteur(String categorie, Map<String, int> valeurs) {
-    final valeur = valeurs[categorie] ?? 0;
-
-    return Column(
-      children: [
-        Text(
-          categorie.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: AgriColors.outline,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 36,
-          decoration: BoxDecoration(
-            color: AgriColors.surfaceCard,
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: Row(
-            children: [
-              _pas(categorie, valeurs, -1, '−'),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    '$valeur',
-                    key: Key(
-                      'compteur-${valeurs == _morts ? 'mort' : 'don'}-$categorie',
-                    ),
-                    style: const TextStyle(
-                      fontSize: AgriTypography.sm,
-                      fontWeight: FontWeight.bold,
-                      color: AgriColors.onSurface,
-                    ),
-                  ),
-                ),
-              ),
-              _pas(categorie, valeurs, 1, '+'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _pas(
-    String categorie,
-    Map<String, int> valeurs,
-    int pas,
-    String signe,
-  ) {
-    return InkWell(
-      key: Key('pas-${valeurs == _morts ? 'mort' : 'don'}-$categorie-$pas'),
-      onTap: () => setState(() {
-        final actuel = valeurs[categorie] ?? 0;
-        // `max(0, … - 1)` du Blade : jamais en dessous de zéro.
-        valeurs[categorie] = (actuel + pas).clamp(0, 1 << 30);
-      }),
-      child: Container(
-        width: 32,
-        height: 34,
-        alignment: Alignment.center,
-        color: AgriColors.surfaceZebra,
-        child: Text(
-          signe,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AgriColors.brandForest,
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Le bloc du Blade : fond zébré, deux colonnes (libellé, formule, valeur dans un encadré blanc).
   Widget _effectif() {
     Widget colonne(String titre, String formule, String valeur, Color couleur, Key cle) => Column(
@@ -1169,136 +1346,29 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     );
   }
 
-  /// `components/ration-volaille.blade.php` (ticket 15.57) — même tableau que le web, « — » sans ligne du barème.
+  /// VOL-2 — rationnement PAR STADE (`fiche-pondeuses.blade.php`, qui remplace `components/ration-volaille.blade.php`) :
+  /// effectif calculé de chaque stade × la ration de sa ligne du barème ([StadePondeuse.tableau]) ; la demande de départ
+  /// tient lieu d'effectif tant qu'elle n'est pas valide.
   Widget _rationnement() {
-    final lignes = _lignesRation;
-    const titre = Row(
-      children: [
-        Icon(SymbolesAgri.restaurant, size: 16, color: AgriColors.brandEmerald),
-        SizedBox(width: AgriSpacing.xs),
-        Expanded(
-          child: Text(
-            'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)',
-            style: TextStyle(
-              fontSize: AgriTypography.xs,
-              fontWeight: FontWeight.bold,
-              color: AgriColors.brandForest,
-            ),
-          ),
-        ),
-      ],
-    );
-
-    if (lignes.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          titre,
-          const SizedBox(height: AgriSpacing.xs),
-          Container(
-            padding: const EdgeInsets.all(AgriSpacing.md),
-            decoration: BoxDecoration(
-              color: AgriColors.surfaceZebra,
-              border: Border.all(color: AgriColors.outlineVariant),
-              borderRadius: BorderRadius.circular(AgriRadius.lg),
-            ),
-            child: const Text(
-              "Aucune ration normative pour l'aviculture : renseignez le barème dans Paramètres Élevage > "
-              'Rationnement.',
-              style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
-            ),
-          ),
-        ],
-      );
-    }
-
+    final cat = _categoriesJour;
+    final tableau = cat.repro == null
+        ? null
+        : StadePondeuse.tableau(_rations, {
+            'repro': cat.repro,
+            'sevre': cat.sevre,
+            'jeune': cat.jeune,
+            'quatre': cat.quatre,
+          });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        titre,
-        const SizedBox(height: AgriSpacing.xs),
-        Container(
-          decoration: BoxDecoration(
-            color: AgriColors.surfaceCard,
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-            boxShadow: AgriShadows.sm,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Table(
-            columnWidths: const {
-              0: FlexColumnWidth(3),
-              1: FlexColumnWidth(1.2),
-              2: FlexColumnWidth(1.5),
-              3: FlexColumnWidth(1.8),
-            },
-            children: [
-              const TableRow(
-                decoration: BoxDecoration(
-                  color: AgriColors.surfaceZebra,
-                  border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
-                ),
-                children: [
-                  _Cellule("Stade / Tranche d'Âge", couleur: AgriColors.outline),
-                  _Cellule('Effectif', centre: true, couleur: AgriColors.outline),
-                  _Cellule('Ration Normative', centre: true, couleur: AgriColors.outline),
-                  _Cellule('Provende Servie (g)', droite: true, couleur: AgriColors.outline),
-                ],
-              ),
-              for (final l in lignes)
-                TableRow(
-                  children: [
-                    _Cellule(l.libelle, gras: true, couleur: AgriColors.brandForest),
-                    _Cellule(l.effectif == null ? '—' : '${l.effectif}', centre: true, gras: true),
-                    _Cellule('${l.ration.round()} g/j', centre: true),
-                    _Cellule(
-                      l.totalG == null ? '—' : '${l.totalG!.round()} g',
-                      droite: true,
-                      gras: true,
-                      couleur: AgriColors.brandEmerald,
-                    ),
-                  ],
-                ),
-              TableRow(
-                decoration: BoxDecoration(
-                  color: AgriColors.brandEmerald.withValues(alpha: 0.10),
-                ),
-                children: [
-                  const _Cellule(
-                    'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)',
-                    gras: true,
-                    taille: 10,
-                    couleur: AgriColors.brandForest,
-                  ),
-                  const _Cellule(''),
-                  const _Cellule(''),
-                  _Cellule(
-                    RationVolaille.totalAffiche(RationVolaille.totalG(lignes)),
-                    key: const Key('total-provende'),
-                    droite: true,
-                    gras: true,
-                    taille: AgriTypography.sm,
-                    couleur: AgriColors.brandEmerald,
-                  ),
-                ],
-              ),
-            ],
-          ),
+        RationPondeusesFiche(tableau: tableau),
+        const SizedBox(height: AgriSpacing.md),
+        // Autonomie alimentaire sur la provende du jour : SOMME des quatre stades (information, jamais un blocage).
+        CarteAutonomieAlimentaire(
+          autonomie: AutonomieAlimentaire.evaluer(_produitProvende, _stockProvendeKg, tableau?.totalKg),
+          filiere: 'aviculture',
         ),
-        const SizedBox(height: AgriSpacing.xs),
-        if (RationVolaille.rattachee(lignes))
-          const Text(
-            "L'effectif n'est pas encore ventilé par stade : la fiche du jour n'en porte que le total. La ligne du "
-            'stade de la bande (Pondeuse) le reçoit entièrement.',
-            style: TextStyle(fontSize: 10, color: AgriColors.outline),
-          )
-        else
-          const Text(
-            'Aucune ligne du barème ne correspond du stade de la bande (Pondeuse) : ajoutez-la dans '
-            'Paramètres Élevage > Rationnement pour calculer la provende.',
-            key: Key('ration-non-rattachee'),
-            style: TextStyle(fontSize: 10, color: AgriColors.errorDeep),
-          ),
       ],
     );
   }
@@ -1862,6 +1932,25 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
     // ⚠️ La création se détermine AVANT l'écriture : après, la fiche existe toujours, et l'incrément se ferait à
     // chaque correction du même jour.
     final creation = await widget.depot.chargerJour(bande.id, _jour) == null;
+    if (!mounted) return;
+
+    // 🔁 VOL-2 — `saveDay()` : fiche d'AVANT le ticket (morts / dons / ventes non ventilés) : on ne devine pas le stade, on
+    // le dit. (Les autres refus — jour avant le départ, départ absent ou incohérent, passage > source — sont levés par le
+    // dépôt, avec les motifs du web.)
+    final cat = _categoriesJour;
+    if ((_mortEnregistre != null && _morts.values.fold(0, (a, b) => a + b) == 0) ||
+        (_donEnregistre != null && _dons.values.fold(0, (a, b) => a + b) == 0)) {
+      ToastAgri.afficher(
+        context,
+        "Cette fiche porte des morts ou des dons non ventilés par stade : ventilez-les (Poussin ponte / Poussin en croissance / Poulette / Pondeuse) avant d'enregistrer.",
+        type: TypeToast.erreur,
+      );
+      return;
+    }
+    if (cat.refusPassage != null) {
+      ToastAgri.afficher(context, cat.refusPassage!, type: TypeToast.erreur);
+      return;
+    }
 
     try {
       await widget.depot.enregistrer(
@@ -1869,18 +1958,37 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
         jour: _jour,
         achat: _achat,
         ne: _ne,
-        mort: _totalMorts,
-        don: _totalDons,
+        mort: _morts.values.fold(0, (a, b) => a + b),
+        don: _dons.values.fold(0, (a, b) => a + b),
         ponteTotal: _oeufsRecoltes,
         ponteCasses: _oeufsCasses,
         poidsMoyen: FicheJournaliereRepository.poidsMoyen(
           poidsTotalG: _poidsTotalPese,
           tailleEchantillon: _effectifFinal,
         ),
+        ventilation: VentilationJour(
+          mortRepro: _morts['repro']!,
+          mortSevre: _morts['sevre']!,
+          mortJeune: _morts['jeune']!,
+          mort4: _morts['quatre']!,
+          donRepro: _dons['repro']!,
+          donSevre: _dons['sevre']!,
+          donJeune: _dons['jeune']!,
+          don4: _dons['quatre']!,
+          passage4Sevre: _passage1,
+          passage: _passage2,
+          passageJeuneRepro: _passage3,
+          departSaisi: cat.departRequis ? _departSaisi : null,
+        ),
       );
     } on RefusExercice catch (e) {
       // Ticket EX6 (EF7, Q3) — `saveDay()` : fiche d'un exercice clos, motif R4 en toast d'erreur ; les plateaux
       // n'entrent pas au stock (rien n'a été écrit).
+      if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    } on FicheRefusee catch (e) {
+      // VOL-2 : départ, jour antérieur au départ, ventes non ventilées… — le motif du web, tel quel ; rien n'est écrit
+      // et aucun œuf n'entre au stock.
       if (mounted) ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
       return;
     }
@@ -2018,44 +2126,5 @@ class _FichePondeusesScreenState extends State<FichePondeusesScreen> {
   Future<void> _ouvrirJour(DateTime jour) async {
     setState(() => _jour = DateTime(jour.year, jour.month, jour.day));
     await _chargerJour();
-  }
-}
-
-class _Cellule extends StatelessWidget {
-  const _Cellule(
-    this.texte, {
-    super.key,
-    this.centre = false,
-    this.droite = false,
-    this.gras = false,
-    this.taille = AgriTypography.xs,
-    this.couleur = AgriColors.onSurface,
-  });
-
-  final String texte;
-  final bool centre;
-  final bool droite;
-  final bool gras;
-  final double taille;
-  final Color couleur;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
-      child: Text(
-        texte,
-        textAlign: centre
-            ? TextAlign.center
-            : droite
-            ? TextAlign.right
-            : TextAlign.start,
-        style: TextStyle(
-          fontSize: taille,
-          fontWeight: gras ? FontWeight.bold : FontWeight.normal,
-          color: couleur,
-        ),
-      ),
-    );
   }
 }

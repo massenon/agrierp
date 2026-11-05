@@ -39,6 +39,7 @@ class CategoriesJour {
     this.repro,
     this.sevre,
     this.jeune,
+    this.quatre,
     this.motif,
     this.refusPassage,
     this.avertissements = const [],
@@ -53,6 +54,9 @@ class CategoriesJour {
   final int? repro;
   final int? sevre;
   final int? jeune;
+
+  /// Ticket VOL-2 — Poussin ponte (volailles pondeuses), `null` ailleurs.
+  final int? quatre;
   final String? motif;
   final String? refusPassage;
   final List<String> avertissements;
@@ -112,7 +116,7 @@ class CategoriesJour {
     if (veille == null) return sortie(m: etat.refus); // avant le départ ou départ stocké refusé
 
     final r = EffectifParCategorie.calculerJour(
-      EffectifParCategorie.volailles,
+      EffectifParCategorie.volaillesRepro,
       veille,
       mouvements,
       totalFinal: effectifFinal,
@@ -129,6 +133,75 @@ class CategoriesJour {
         if (r.sommeDifferente == true)
           'Avertissement — fiche du ${_date(jour)} : la somme des catégories (${r.somme}) diffère '
               "de l'effectif total ($effectifFinal). Un effectif de catégorie ne descend jamais sous 0 : vérifiez "
+              'les ventes, morts et dons saisis.',
+      ],
+      departRequis: sansChaine,
+      departDate: etat.departDate,
+      depart: etat.depart,
+      proposition: sansChaine ? proposition : null,
+    );
+  }
+
+  /// Ticket VOL-2 — `getCategoriesJourProperty()` de la fiche Pondeuses du web, instruction pour instruction : QUATRE stades
+  /// (`quatre` = Poussin ponte), départ obligatoire, aucun stade « inconnu ». Mêmes modes que [calculerVolailles].
+  static CategoriesJour calculerPondeuses({
+    required EtatJour? etat,
+    required EffectifCategories departSaisi,
+    required int effectifPrecedent,
+    required MouvementsJour mouvements,
+    required int effectifFinal,
+    required DateTime jour,
+    required EffectifCategories? proposition,
+  }) {
+    if (etat == null) return const CategoriesJour(mode: 'depart_requis', departRequis: true);
+    var veille = etat.veille;
+    final sansChaine = etat.mode == 'sans_chaine';
+    final mode = sansChaine ? 'depart_requis' : etat.mode;
+
+    CategoriesJour sortie({String? m}) => CategoriesJour(
+      mode: mode,
+      motif: m,
+      departRequis: sansChaine,
+      departDate: etat.departDate,
+      depart: etat.depart,
+      proposition: sansChaine ? proposition : null,
+    );
+
+    if (sansChaine) {
+      final saisis = [departSaisi.repro, departSaisi.sevre, departSaisi.jeune, departSaisi.quatre];
+      if (saisis.contains(null)) {
+        return sortie(
+          m: saisis.any((v) => v != null)
+              ? EffectifParCategorie.verifierDepart(departSaisi, effectifPrecedent, quatreStades: true)
+              : etat.refus,
+        );
+      }
+      final motif = EffectifParCategorie.verifierDepart(departSaisi, effectifPrecedent, quatreStades: true);
+      if (motif != null) return sortie(m: motif);
+      veille = departSaisi; // aperçu : le départ saisi est l'effectif au DÉBUT du jour (D4)
+    }
+
+    if (veille == null) return sortie(m: etat.refus); // avant le départ ou départ stocké refusé
+
+    final r = EffectifParCategorie.calculerJour(
+      EffectifParCategorie.volaillesPonte,
+      veille,
+      mouvements,
+      totalFinal: effectifFinal,
+    );
+    return CategoriesJour(
+      mode: mode,
+      repro: r.repro,
+      sevre: r.sevre,
+      jeune: r.jeune,
+      quatre: r.quatre,
+      motif: etat.refus,
+      refusPassage: r.refus,
+      avertissements: [
+        // D8 : avertissement DATÉ, jamais un blocage.
+        if (r.sommeDifferente == true)
+          'Avertissement — fiche du ${_date(jour)} : la somme des stades (${r.somme}) diffère '
+              "de l'effectif total ($effectifFinal). Un effectif de stade ne descend jamais sous 0 : vérifiez "
               'les ventes, morts et dons saisis.',
       ],
       departRequis: sansChaine,

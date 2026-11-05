@@ -143,7 +143,10 @@ class ProductsSeeder extends Seeder
                     : (isset($categorySpecies[$p['cat']]) ? ($speciesIds[$categorySpecies[$p['cat']]] ?? null) : null),
                 // Ticket VOL-1 : catégorie d'effectif par défaut des produits de l'aviculture (poussin d'un jour → poussin,
                 // poulet → jeune) ; null pour les autres (œufs, aliments…), jamais rangé au hasard.
-                'categorie_effectif' => $especeDuProduit === 'aviculture' ? \App\Support\CategorieVolaille::devinerDepuisLeNom($p['name']) : null,
+                // VOL-2 : un nom sans ambiguïté « pondeuse » (poulette, poule de réforme…) reçoit son stade de pondeuse.
+                'categorie_effectif' => $especeDuProduit === 'aviculture'
+                    ? (\App\Support\StadePondeuse::devinerDepuisLeNom($p['name']) ?? \App\Support\CategorieVolaille::devinerDepuisLeNom($p['name']))
+                    : null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

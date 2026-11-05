@@ -39,14 +39,18 @@
             @if($this->estAviculture)
                 {{-- Ticket VOL-1 : la caisse range la vente de sujets vivants dans la catégorie d'effectif du produit. --}}
                 <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Catégorie d'effectif <span class="text-outline normal-case font-normal">(volailles reproductrices)</span></label>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Catégorie d'effectif <span class="text-outline normal-case font-normal">(volailles)</span></label>
                     <select wire:model="categorie_effectif" class="w-full sm:max-w-[260px] h-11 px-md border rounded-lg bg-white text-sm focus:ring-2 focus:ring-brand-emerald outline-none {{ $errors->has('categorie_effectif') ? 'is-invalid' : 'border-outline-variant' }}">
                         <option value="">-- Aucune --</option>
-                        @foreach($this->categoriesEffectif as $cle => $libelle)
-                            <option value="{{ $cle }}">{{ $libelle }}</option>
+                        @foreach($this->categoriesEffectif as $groupe => $categories)
+                            <optgroup label="{{ $groupe }}">
+                                @foreach($categories as $cle => $libelle)
+                                    <option value="{{ $cle }}">{{ $libelle }}</option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
-                    <p class="text-[10px] text-outline mt-xs">La vente de ce produit sort de cette catégorie de la fiche Volailles Reproducteurs. Sans catégorie, la vente sur une bande de volailles reproductrices est refusée.</p>
+                    <p class="text-[10px] text-outline mt-xs">La vente de ce produit sort de cette catégorie (fiche Volailles Reproducteurs) ou de ce stade (fiche Pondeuses) : une catégorie de reproducteurs ne se vend que sur une bande de reproducteurs, un stade de pondeuses que sur une bande de pondeuses. Sans elle, la vente sur une bande de volailles est refusée.</p>
                     @error('categorie_effectif') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
             @endif

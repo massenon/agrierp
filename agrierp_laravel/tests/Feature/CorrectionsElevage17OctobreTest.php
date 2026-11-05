@@ -29,6 +29,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Feature\Concerns\AvecDepartPondeuses;
 use Tests\TestCase;
 
 /**
@@ -39,6 +40,7 @@ use Tests\TestCase;
 class CorrectionsElevage17OctobreTest extends TestCase
 {
     use RefreshDatabase;
+    use AvecDepartPondeuses;
 
     private const JOUR = '2026-10-10';
 
@@ -207,7 +209,8 @@ class CorrectionsElevage17OctobreTest extends TestCase
      */
     public function test_une_transformation_est_une_vente_de_la_fiche_et_survit_a_la_sauvegarde_suivante(): void
     {
-        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'ponte', 40);   // VOL-1 : « ponte » = hors chaîne des reproducteurs
+        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'ponte', 40);
+        $this->departPondeuses($lot, self::JOUR);   // VOL-2 : le départ par stade (40 « Pondeuse ») précède toute journée ; les sujets abattus en sortent
         LivestockDailyEntry::create(['lot_id' => $lot->id, 'entry_date' => '2026-10-12', 'achat' => 0, 'ne' => 0, 'mort' => 2, 'vente' => 0, 'don' => 0, 'effectif_final' => 38]);
         $lot->update(['current_quantity' => 38]);
         $produit = Product::create(['sku' => 'AVI-005', 'name' => 'Poulet fumé', 'category_id' => ProductCategory::create(['label' => 'Transformés', 'is_active' => true])->id,
@@ -236,7 +239,9 @@ class CorrectionsElevage17OctobreTest extends TestCase
      */
     public function test_un_don_enregistre_est_une_sortie_soustraite_de_l_effectif(): void
     {
-        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'ponte', 30);   // VOL-1 : « ponte » = hors chaîne des reproducteurs
+        // VOL-2 : sur une bande de volailles les dons se saisissent sur la fiche (ventilés par catégorie ou par stade) ; le journal
+        // des sujets, lui, saisit le don d'une filière sans catégories (escargots) : c'est la règle générale de cette sortie.
+        $lot = $this->bande('LOT-ESC-1', 'helico', 'engraissement', 30);
 
         Livewire::test(EnregistrerSujets::class)
             ->set('species_id', $lot->species_id)->set('lot_id', $lot->id)->set('origine', 'Don')->set('quantite', 4)->set('entry_date', self::JOUR)

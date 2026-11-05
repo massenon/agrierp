@@ -22,7 +22,7 @@ use App\Actions\SaisieTransformationAction;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-$espece = (new App\Models\LivestockSpecies())->forceFill(['id' => $in['espece'], 'code' => 'aviculture', 'label' => 'Aviculture', 'is_enabled' => true]);
+$espece = (new App\Models\LivestockSpecies())->forceFill(['id' => $in['espece'], 'code' => 'helico', 'label' => 'Escargots', 'is_enabled' => true]);   // VOL-2 : filière neutre (une bande d'aviculture exige un départ par stade)
 $espece->save();
 (new App\Models\LivestockLot())->forceFill([
     'id' => $in['lot'], 'code' => 'AVI-ENG-1', 'species_id' => $in['espece'], 'stage' => 'ponte', 'initial_quantity' => 40,

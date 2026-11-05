@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Tests\Feature\Concerns\AvecDepartPondeuses;
 use Tests\TestCase;
 
 /**
@@ -31,6 +32,7 @@ use Tests\TestCase;
 class SyncTransformationsTest extends TestCase
 {
     use RefreshDatabase;
+    use AvecDepartPondeuses;
 
     private const JOUR = '2026-10-10';
 
@@ -57,6 +59,7 @@ class SyncTransformationsTest extends TestCase
             'code' => 'AVI-ENG-1', 'species_id' => $espece->id, 'stage' => 'ponte', 'initial_quantity' => 40,
             'current_quantity' => 40, 'created_date' => '2026-09-01', 'status' => 'actif', 'is_active' => true,
         ]);
+        $this->departPondeuses($this->bande, '2026-09-01');   // VOL-2 : départ par stade (tous « Pondeuse ») avant toute journée
         $this->produit = Product::create([
             'sku' => 'AVI-005', 'name' => 'Poulet fumé', 'category_id' => ProductCategory::create(['label' => 'Transformés', 'is_active' => true])->id,
             'unit' => 'pièce', 'pricing_mode' => 'fourchette', 'price_min' => 5000, 'price_max' => 6000, 'tva_rate' => 0, 'stock_qty' => 0, 'is_active' => true,

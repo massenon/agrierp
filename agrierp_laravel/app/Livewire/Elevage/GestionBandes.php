@@ -360,7 +360,7 @@ class GestionBandes extends Component
                 'transfer_date' => $lot->created_date->format('Y-m-d'),
                 'quantity' => $lot->initial_quantity,
                 'categorie' => EffectifParCategorieService::especeDuLot($lot->load('species')) !== null
-                    ? EffectifParCategorieService::categorieDuStade($lot->stage)
+                    ? EffectifParCategorieService::categorieDeLaBande($lot)
                     : null,
                 'constitution' => true,
                 'motif' => 'Constitution de la bande '.$lot->code,

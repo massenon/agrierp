@@ -15,9 +15,12 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Ticket 15.57 — RATIONNEMENT ET PESÉE DES FICHES AVICOLES : sections du poste désormais présentes au web, même règle
- * (`RationVolaille`). Barème de l'aviculture semé : Pondeuse 110 g, Poulette 80 g, Poussins 30 et 60 g ; aucune ligne
- * « reproducteur ». Chiffres calculés à la main sur une bande de 60.
+ * Ticket 15.57 → VOL-1 → VOL-2 — RATIONNEMENT ET PESÉE DES FICHES AVICOLES. Depuis VOL-2, les deux fiches calculent leur
+ * rationnement PAR CATÉGORIE (Reproducteurs : Reproducteur / Jeune / Poussin) ou PAR STADE (Pondeuses : les quatre libellés du
+ * barème) : effectif CALCULÉ × ration de la ligne (`CategorieVolaille::tableauReproducteurs`, `StadePondeuse::tableau`).
+ * `App\Support\RationVolaille` (une seule ligne par sous-chaîne « pondeuse ») et le composant `x-ration-volaille` n'existent plus.
+ * Barème de l'aviculture semé : Pondeuse 110 g, Poulette 80 g, Poussin en croissance 60 g, Poussin ponte 30 g. Chiffres calculés à
+ * la main sur une bande de 60.
  */
 class RationVolailleTest extends TestCase
 {
@@ -46,32 +49,54 @@ class RationVolailleTest extends TestCase
         ]);
     }
 
-    public function test_pondeuses_l_effectif_va_a_la_ligne_pondeuse_seulement(): void
+    /** Départ 10 / 10 / 10 / 30 sur 60 (Poussin ponte / Poussin en croissance / Poulette / Pondeuse). */
+    public function test_pondeuses_rationnement_par_stade_calcule_a_la_main(): void
     {
         $this->bande('ponte');
 
         $tableau = Livewire::test(FichePondeuses::class)
+            ->set('departPoussinPonte', 10)->set('departPoussinCroissance', 10)->set('departPoulette', 10)->set('departPondeuse', 30)
             ->assertSee('Rationnement &amp; Provende Servie par Stade (en Grammes g/j)', false)
-            ->assertSee('6600 g (6.6 Kg)')
+            ->assertSee('5000 g (5 Kg)')
             ->instance()->rationnement;
 
-        $parLigne = collect($tableau['lignes'])->pluck('effectif', 'libelle')->all();
-        $this->assertSame(60, $parLigne['Pondeuse (6 à 18 mois)']);
-        $this->assertSame(0, $parLigne['Poulette (4 à 5.5 mois)']);
-        $this->assertSame(60 * 110.0, $tableau['total_g']);
+        // 10 × 30 + 10 × 60 + 10 × 80 + 30 × 110 = 300 + 600 + 800 + 3 300 = 5 000 g.
+        $this->assertSame([10, 10, 10, 30], array_column($tableau['lignes'], 'effectif'));
+        $this->assertSame([300, 600, 800, 3300], array_column($tableau['lignes'], 'total_g'));
+        $this->assertSame(5000, $tableau['total_g']);
+        $this->assertSame(5.0, $tableau['total_kg']);
     }
 
     /**
-     * VOL-1 — les trois lignes du barème (Reproducteur 130, Jeune 80, Poussin 30 g/j : valeurs PROVISOIRES) ne figurent
-     * jamais au tableau de la fiche Pondeuses, dont le comportement est inchangé (6 600 g ci-dessus).
+     * Les lignes du barème des reproducteurs (Reproducteur 130, Jeune 80, Poussin 30 g/j : valeurs PROVISOIRES) ne figurent
+     * jamais au tableau de la fiche Pondeuses, et réciproquement : les quatre libellés du barème, dans l'ordre de la chaîne.
      */
-    public function test_pondeuses_ne_voient_pas_les_lignes_des_reproducteurs(): void
+    public function test_pondeuses_ne_voient_pas_les_lignes_des_reproducteurs_et_inversement(): void
     {
         $this->bande('ponte');
 
         $libelles = collect(Livewire::test(FichePondeuses::class)->instance()->rationnement['lignes'])->pluck('libelle')->all();
 
-        $this->assertSame(['Pondeuse (6 à 18 mois)', 'Poulette (4 à 5.5 mois)', 'Poussin en croissance (2 à 4 mois)', 'Poussin ponte (0 à 2 mois)'], $libelles);
+        $this->assertSame(['Poussin ponte (0 à 2 mois)', 'Poussin en croissance (2 à 4 mois)', 'Poulette (4 à 5.5 mois)', 'Pondeuse (6 à 18 mois)'], $libelles);
+
+        $repro = Livewire::test(FicheReproducteurs::class);
+        $this->assertSame(['Reproducteur', 'Jeune', 'Poussin'], array_column($repro->instance()->rationnement['lignes'], 'libelle'));
+    }
+
+    public function test_pondeuses_sans_depart_aucun_total_jamais_0_g(): void
+    {
+        $this->bande('ponte');
+
+        $tableau = Livewire::test(FichePondeuses::class)->instance()->rationnement;
+
+        $this->assertNull($tableau['total_g']);
+        $this->assertSame([null], array_values(array_unique(array_column($tableau['lignes'], 'effectif'))));
+    }
+
+    public function test_l_ancienne_regle_rationvolaille_n_existe_plus(): void
+    {
+        $this->assertFalse(class_exists(\App\Support\RationVolaille::class), 'plus aucun appel : la classe est retirée');
+        $this->assertFileDoesNotExist(resource_path('views/components/ration-volaille.blade.php'));
     }
 
     /** VOL-1 — reproducteurs : effectif calculé de chaque catégorie × sa ration. Départ 30 / 20 / 10 sur 60. */
@@ -106,7 +131,8 @@ class RationVolailleTest extends TestCase
     {
         $lot = $this->bande('ponte');
 
-        Livewire::test(FichePondeuses::class)->set('peseeTotal', 1800)->assertSee('30 g')->call('saveDay');
+        $depart = fn ($c) => $c->set('departPondeuse', 60)->set('departPoulette', 0)->set('departPoussinCroissance', 0)->set('departPoussinPonte', 0);   // VOL-2
+        $depart(Livewire::test(FichePondeuses::class))->set('peseeTotal', 1800)->assertSee('30 g')->call('saveDay');
 
         // 1 800 g ÷ 60 sujets = 30 g.
         $this->assertSame(30, (int) LivestockDailyEntry::where('lot_id', $lot->id)->sole()->weight_sample_avg_g);

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../elevage/categorie_volaille.dart';
+import '../elevage/stade_pondeuse.dart';
 
 /// Ce que l'utilisateur saisit dans « Ajouter un Produit » / « Modifier le Produit ».
 class FormulaireProduit {
@@ -110,8 +111,12 @@ class ProduitsRepository {
     if (f.description.length > 2000) {
       e['description'] = '2000 caractères au plus.';
     }
-    if (f.categorieEffectif.isNotEmpty && !CategorieVolaille.estValide(f.categorieEffectif)) {
-      e['categorieEffectif'] = "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.";
+    if (f.categorieEffectif.isNotEmpty &&
+        !CategorieVolaille.estValide(f.categorieEffectif) &&
+        !StadePondeuse.estValide(f.categorieEffectif)) {
+      e['categorieEffectif'] =
+          "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin (reproducteurs), ou l'un des quatre stades des "
+          'pondeuses (Poussin ponte, Poussin en croissance, Poulette, Pondeuse).';
     }
     if (f.tva < 0 || f.tva > 100) e['tva'] = 'Entre 0 et 100.';
     if (f.seuil < 0) e['seuil'] = 'Ne peut pas être négatif.';

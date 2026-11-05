@@ -173,7 +173,8 @@ class BandesSaisieWebTest extends TestCase
 
         app(TransferBetweenLotsAction::class)->execute([
             'source_lot_id' => $this->pondeuses->id, 'target_lot_id' => $autre->id,
-            'transfer_date' => '2026-10-21', 'quantity' => 200, 'categorie' => null, 'constitution' => false, 'motif' => 'Vidage',
+            // VOL-2 : le transfert d'une bande de pondeuses précise le stade des sujets (« repro » = Pondeuse).
+            'transfer_date' => '2026-10-21', 'quantity' => 200, 'categorie' => 'repro', 'constitution' => false, 'motif' => 'Vidage',
         ], $this->admin);
 
         $this->assertSame([0, 210], [(int) $this->pondeuses->fresh()->current_quantity, (int) $autre->fresh()->current_quantity]);

@@ -556,14 +556,14 @@ class SyncFichesVentilationTest extends TestCase
 
     public function test_depart_refuse_sur_une_espece_non_prise_en_charge(): void
     {
-        $avi = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
-        $poulets = $this->creerBande($avi, 'AVI-2026-01', 60);
-        $poulets->update(['stage' => 'ponte']);   // VOL-1 : seules les bandes « ponte » (Pondeuses) restent hors chaîne
-        $f = $this->fiche('2026-10-10', ['cat_depart_repro' => 10, 'cat_depart_sevre' => 20, 'cat_depart_jeune' => 30], $poulets, 1);
+        // VOL-2 : l'aviculture (reproductrices ET pondeuses) est désormais prise en charge ; une filière sans catégories ne l'est pas.
+        $escargots = LivestockSpecies::create(['label' => 'Héliciculture', 'code' => 'helico', 'is_active' => true]);
+        $bande = $this->creerBande($escargots, 'ESC-2026-01', 60);
+        $f = $this->fiche('2026-10-10', ['cat_depart_repro' => 10, 'cat_depart_sevre' => 20, 'cat_depart_jeune' => 30], $bande, 1);
         $reponse = $this->pousser([$f])->assertOk();
 
         $this->assertSame([], $reponse->json('livestock_daily_entries.accepted'));
-        $this->assertStringContainsString('lapins, les porcs et les volailles reproductrices', $this->motif($reponse));
+        $this->assertStringContainsString('lapins, les porcs et les volailles', $this->motif($reponse));
     }
 
     public function test_depart_des_porcs_est_accepte_et_calcule(): void

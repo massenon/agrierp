@@ -485,6 +485,18 @@ class SyncEngine {
   /// `2026_11_05_000001`).
   static const colonnesVentesParCategorie = ['vente_repro', 'vente_sevre', 'vente_jeune'];
 
+  /// Ticket VOL-2 — les colonnes du QUATRIÈME EMPLACEMENT (Poussin ponte) et des deux passages de plus des volailles
+  /// pondeuses (migrations `2026_11_05_000004`) ; `cat_eff_4` (dérivé) et `transfert_*_4` (dérivés) les complètent au tirage.
+  /// ⚠️ Volontairement HORS de [colonnesVentilation] : un serveur de VOL-1 ne les sert pas et n'est pas « antérieur à 15.39 ».
+  static const colonnesStadesPondeuses = [
+    'mort_4',
+    'don_4',
+    'vente_4',
+    'cat_depart_4',
+    'passage_4_sevre',
+    'passage_jeune_repro',
+  ];
+
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
@@ -1585,6 +1597,13 @@ class SyncEngine {
           venteRepro: optionnel(l, 'vente_repro', id),
           venteSevre: optionnel(l, 'vente_sevre', id),
           venteJeune: optionnel(l, 'vente_jeune', id),
+          // Ticket VOL-2 — quatrième emplacement (Poussin ponte) et passages des pondeuses, mêmes règles.
+          mort4: optionnel(l, 'mort_4', id),
+          don4: optionnel(l, 'don_4', id),
+          vente4: optionnel(l, 'vente_4', id),
+          catDepart4: optionnel(l, 'cat_depart_4', id),
+          passage4Sevre: optionnel(l, 'passage_4_sevre', id),
+          passageJeuneRepro: optionnel(l, 'passage_jeune_repro', id),
           catEffRepro: optionnel(l, 'cat_eff_repro', id),
           catEffSevre: optionnel(l, 'cat_eff_sevre', id),
           catEffJeune: optionnel(l, 'cat_eff_jeune', id),
@@ -1620,6 +1639,8 @@ class SyncEngine {
           transfertSortieRepro: derive(l, 'transfert_sortie_repro', id),
           transfertSortieSevre: derive(l, 'transfert_sortie_sevre', id),
           transfertSortieJeune: derive(l, 'transfert_sortie_jeune', id),
+          transfertEntree4: derive(l, 'transfert_entree_4', id),
+          transfertSortie4: derive(l, 'transfert_sortie_4', id),
         ),
       );
       // F0.95 — un serveur antérieur à 15.39 ne sert pas la ventilation : la resynchronisation
@@ -5646,6 +5667,9 @@ class SyncEngine {
     // de départ déjà fixé »).
     final tetes = <String>{};
     for (final lot in {for (final f in fiches) f.lotId}) {
+      // Ticket VOL-2 : le départ COMPLET d'une bande de volailles pondeuses compte aussi le quatrième stade.
+      final bandeTete = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lot))).getSingleOrNull();
+      final pondeuses = bandeTete?.speciesCode == 'aviculture' && bandeTete?.stage == 'ponte';
       final tete =
           await (_db.select(_db.livestockDailyEntries)
                 ..where(
@@ -5654,6 +5678,7 @@ class SyncEngine {
                     t.catDepartRepro.isNotNull(),
                     t.catDepartSevre.isNotNull(),
                     t.catDepartJeune.isNotNull(),
+                    if (pondeuses) t.catDepart4.isNotNull(),
                   ]),
                 )
                 ..orderBy([(t) => OrderingTerm(expression: t.entryDate)])
@@ -7957,8 +7982,9 @@ class SyncEngine {
     LivestockDailyEntry f, {
     required bool tete,
   }) {
-    int? somme(int? a, int? b, int? c) =>
-        (a == null || b == null || c == null) ? null : a + b + c;
+    // Ticket VOL-2 : quatre stades (le quatrième `mort_4` / `don_4` n'existe que pour les volailles pondeuses).
+    int? somme(int? a, int? b, int? c, [int? d]) =>
+        (a == null || b == null || c == null) ? null : a + b + c + (d ?? 0);
     final connus = <String, int?>{
       'mort_repro': f.mortRepro,
       'mort_sevre': f.mortSevre,
@@ -7971,10 +7997,17 @@ class SyncEngine {
       'vente_repro': f.venteRepro,
       'vente_sevre': f.venteSevre,
       'vente_jeune': f.venteJeune,
+      // Ticket VOL-2 : quatrième emplacement (Poussin ponte) et passages supplémentaires, connus seulement.
+      'mort_4': f.mort4,
+      'don_4': f.don4,
+      'vente_4': f.vente4,
+      'passage_4_sevre': f.passage4Sevre,
+      'passage_jeune_repro': f.passageJeuneRepro,
       if (tete) ...{
         'cat_depart_repro': f.catDepartRepro,
         'cat_depart_sevre': f.catDepartSevre,
         'cat_depart_jeune': f.catDepartJeune,
+        'cat_depart_4': f.catDepart4,
       },
       'effectif_m': f.effectifM,
       'effectif_f': f.effectifF,
@@ -7987,9 +8020,9 @@ class SyncEngine {
       'entry_date': _jour(f.entryDate),
       'achat': f.achat,
       'ne': f.ne,
-      'mort': somme(f.mortRepro, f.mortSevre, f.mortJeune) ?? f.mort,
+      'mort': somme(f.mortRepro, f.mortSevre, f.mortJeune, f.mort4) ?? f.mort,
       'vente': f.vente,
-      'don': somme(f.donRepro, f.donSevre, f.donJeune) ?? f.don,
+      'don': somme(f.donRepro, f.donSevre, f.donJeune, f.don4) ?? f.don,
       'ponte_total': f.ponteTotal,
       'ponte_casses': f.ponteCasses,
       'feed_qty_kg': f.feedQtyKg,
@@ -8004,7 +8037,7 @@ class SyncEngine {
   /// Ticket S-T9 — la SAISIE d'une fiche telle qu'elle part, sans la vente (que les ventes inscrivent au serveur) ni
   /// l'horodatage et le poste : deux versions de même saisie ont la même empreinte.
   String _saisieDeFiche(LivestockDailyEntry f, {required bool tete}) => jsonEncode(
-    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'vente_repro', 'vente_sevre', 'vente_jeune', 'updated_at', 'device_id'}.contains(cle)),
+    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'vente_repro', 'vente_sevre', 'vente_jeune', 'vente_4', 'updated_at', 'device_id'}.contains(cle)),
   );
 
   /// F0.90 — fiche réduite à son IDENTITÉ (voir [_fichesDIdentite]). `lot_id` et `entry_date`

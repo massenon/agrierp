@@ -34166,6 +34166,66 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _mort4Meta = const VerificationMeta('mort4');
+  @override
+  late final GeneratedColumn<int> mort4 = GeneratedColumn<int>(
+    'mort_4',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _don4Meta = const VerificationMeta('don4');
+  @override
+  late final GeneratedColumn<int> don4 = GeneratedColumn<int>(
+    'don_4',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _vente4Meta = const VerificationMeta('vente4');
+  @override
+  late final GeneratedColumn<int> vente4 = GeneratedColumn<int>(
+    'vente_4',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _catDepart4Meta = const VerificationMeta(
+    'catDepart4',
+  );
+  @override
+  late final GeneratedColumn<int> catDepart4 = GeneratedColumn<int>(
+    'cat_depart_4',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _passage4SevreMeta = const VerificationMeta(
+    'passage4Sevre',
+  );
+  @override
+  late final GeneratedColumn<int> passage4Sevre = GeneratedColumn<int>(
+    'passage_4_sevre',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _passageJeuneReproMeta = const VerificationMeta(
+    'passageJeuneRepro',
+  );
+  @override
+  late final GeneratedColumn<int> passageJeuneRepro = GeneratedColumn<int>(
+    'passage_jeune_repro',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _catEffReproMeta = const VerificationMeta(
     'catEffRepro',
   );
@@ -34399,6 +34459,30 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _transfertEntree4Meta = const VerificationMeta(
+    'transfertEntree4',
+  );
+  @override
+  late final GeneratedColumn<int> transfertEntree4 = GeneratedColumn<int>(
+    'transfert_entree_4',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transfertSortie4Meta = const VerificationMeta(
+    'transfertSortie4',
+  );
+  @override
+  late final GeneratedColumn<int> transfertSortie4 = GeneratedColumn<int>(
+    'transfert_sortie_4',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -34430,6 +34514,12 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     venteRepro,
     venteSevre,
     venteJeune,
+    mort4,
+    don4,
+    vente4,
+    catDepart4,
+    passage4Sevre,
+    passageJeuneRepro,
     catEffRepro,
     catEffSevre,
     catEffJeune,
@@ -34451,6 +34541,8 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     transfertSortieRepro,
     transfertSortieSevre,
     transfertSortieJeune,
+    transfertEntree4,
+    transfertSortie4,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -34657,6 +34749,51 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         venteJeune.isAcceptableOrUnknown(data['vente_jeune']!, _venteJeuneMeta),
       );
     }
+    if (data.containsKey('mort_4')) {
+      context.handle(
+        _mort4Meta,
+        mort4.isAcceptableOrUnknown(data['mort_4']!, _mort4Meta),
+      );
+    }
+    if (data.containsKey('don_4')) {
+      context.handle(
+        _don4Meta,
+        don4.isAcceptableOrUnknown(data['don_4']!, _don4Meta),
+      );
+    }
+    if (data.containsKey('vente_4')) {
+      context.handle(
+        _vente4Meta,
+        vente4.isAcceptableOrUnknown(data['vente_4']!, _vente4Meta),
+      );
+    }
+    if (data.containsKey('cat_depart_4')) {
+      context.handle(
+        _catDepart4Meta,
+        catDepart4.isAcceptableOrUnknown(
+          data['cat_depart_4']!,
+          _catDepart4Meta,
+        ),
+      );
+    }
+    if (data.containsKey('passage_4_sevre')) {
+      context.handle(
+        _passage4SevreMeta,
+        passage4Sevre.isAcceptableOrUnknown(
+          data['passage_4_sevre']!,
+          _passage4SevreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('passage_jeune_repro')) {
+      context.handle(
+        _passageJeuneReproMeta,
+        passageJeuneRepro.isAcceptableOrUnknown(
+          data['passage_jeune_repro']!,
+          _passageJeuneReproMeta,
+        ),
+      );
+    }
     if (data.containsKey('cat_eff_repro')) {
       context.handle(
         _catEffReproMeta,
@@ -34831,6 +34968,24 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         ),
       );
     }
+    if (data.containsKey('transfert_entree_4')) {
+      context.handle(
+        _transfertEntree4Meta,
+        transfertEntree4.isAcceptableOrUnknown(
+          data['transfert_entree_4']!,
+          _transfertEntree4Meta,
+        ),
+      );
+    }
+    if (data.containsKey('transfert_sortie_4')) {
+      context.handle(
+        _transfertSortie4Meta,
+        transfertSortie4.isAcceptableOrUnknown(
+          data['transfert_sortie_4']!,
+          _transfertSortie4Meta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -34958,6 +35113,30 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         DriftSqlType.int,
         data['${effectivePrefix}vente_jeune'],
       ),
+      mort4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}mort_4'],
+      ),
+      don4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}don_4'],
+      ),
+      vente4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}vente_4'],
+      ),
+      catDepart4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cat_depart_4'],
+      ),
+      passage4Sevre: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}passage_4_sevre'],
+      ),
+      passageJeuneRepro: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}passage_jeune_repro'],
+      ),
       catEffRepro: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}cat_eff_repro'],
@@ -35042,6 +35221,14 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         DriftSqlType.int,
         data['${effectivePrefix}transfert_sortie_jeune'],
       )!,
+      transfertEntree4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_entree_4'],
+      )!,
+      transfertSortie4: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transfert_sortie_4'],
+      )!,
     );
   }
 
@@ -35097,6 +35284,18 @@ class LivestockDailyEntry extends DataClass
   final int? venteSevre;
   final int? venteJeune;
 
+  /// Ticket VOL-2 (schéma v83) — QUATRIÈME EMPLACEMENT et deux passages de plus, pour les volailles PONDEUSES (quatre stades :
+  /// Poussin ponte = `4`, Poussin en croissance = `sevre`, Poulette = `jeune`, Pondeuse = `repro`). Nullables, sans défaut :
+  /// `null` = non ventilé (autres espèces, fiche d'avant le ticket), jamais 0. `passage_4_sevre` = Poussin ponte → Poussin en
+  /// croissance ; `passage_sevre_jeune` (existant) = Poussin en croissance → Poulette ; `passage_jeune_repro` = Poulette →
+  /// Pondeuse. ⚠️ Noms explicites : la conversion automatique de `mort4` donnerait `mort4`, pas `mort_4`.
+  final int? mort4;
+  final int? don4;
+  final int? vente4;
+  final int? catDepart4;
+  final int? passage4Sevre;
+  final int? passageJeuneRepro;
+
   /// Effectifs par catégorie DÉRIVÉS (fin de journée), comme `effectif_final` : le serveur les
   /// recalcule sur une bande à chaîne, le poste ne les ENVOIE JAMAIS.
   final int? catEffRepro;
@@ -35131,6 +35330,10 @@ class LivestockDailyEntry extends DataClass
   final int transfertSortieRepro;
   final int transfertSortieSevre;
   final int transfertSortieJeune;
+
+  /// Ticket VOL-2 (schéma v83) — transferts du quatrième emplacement (Poussin ponte des pondeuses), dérivés comme les autres.
+  final int transfertEntree4;
+  final int transfertSortie4;
   const LivestockDailyEntry({
     required this.id,
     required this.deviceId,
@@ -35161,6 +35364,12 @@ class LivestockDailyEntry extends DataClass
     this.venteRepro,
     this.venteSevre,
     this.venteJeune,
+    this.mort4,
+    this.don4,
+    this.vente4,
+    this.catDepart4,
+    this.passage4Sevre,
+    this.passageJeuneRepro,
     this.catEffRepro,
     this.catEffSevre,
     this.catEffJeune,
@@ -35182,6 +35391,8 @@ class LivestockDailyEntry extends DataClass
     required this.transfertSortieRepro,
     required this.transfertSortieSevre,
     required this.transfertSortieJeune,
+    required this.transfertEntree4,
+    required this.transfertSortie4,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -35253,6 +35464,24 @@ class LivestockDailyEntry extends DataClass
     if (!nullToAbsent || venteJeune != null) {
       map['vente_jeune'] = Variable<int>(venteJeune);
     }
+    if (!nullToAbsent || mort4 != null) {
+      map['mort_4'] = Variable<int>(mort4);
+    }
+    if (!nullToAbsent || don4 != null) {
+      map['don_4'] = Variable<int>(don4);
+    }
+    if (!nullToAbsent || vente4 != null) {
+      map['vente_4'] = Variable<int>(vente4);
+    }
+    if (!nullToAbsent || catDepart4 != null) {
+      map['cat_depart_4'] = Variable<int>(catDepart4);
+    }
+    if (!nullToAbsent || passage4Sevre != null) {
+      map['passage_4_sevre'] = Variable<int>(passage4Sevre);
+    }
+    if (!nullToAbsent || passageJeuneRepro != null) {
+      map['passage_jeune_repro'] = Variable<int>(passageJeuneRepro);
+    }
     if (!nullToAbsent || catEffRepro != null) {
       map['cat_eff_repro'] = Variable<int>(catEffRepro);
     }
@@ -35300,6 +35529,8 @@ class LivestockDailyEntry extends DataClass
     map['transfert_sortie_repro'] = Variable<int>(transfertSortieRepro);
     map['transfert_sortie_sevre'] = Variable<int>(transfertSortieSevre);
     map['transfert_sortie_jeune'] = Variable<int>(transfertSortieJeune);
+    map['transfert_entree_4'] = Variable<int>(transfertEntree4);
+    map['transfert_sortie_4'] = Variable<int>(transfertSortie4);
     return map;
   }
 
@@ -35368,6 +35599,22 @@ class LivestockDailyEntry extends DataClass
       venteJeune: venteJeune == null && nullToAbsent
           ? const Value.absent()
           : Value(venteJeune),
+      mort4: mort4 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mort4),
+      don4: don4 == null && nullToAbsent ? const Value.absent() : Value(don4),
+      vente4: vente4 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vente4),
+      catDepart4: catDepart4 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(catDepart4),
+      passage4Sevre: passage4Sevre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(passage4Sevre),
+      passageJeuneRepro: passageJeuneRepro == null && nullToAbsent
+          ? const Value.absent()
+          : Value(passageJeuneRepro),
       catEffRepro: catEffRepro == null && nullToAbsent
           ? const Value.absent()
           : Value(catEffRepro),
@@ -35415,6 +35662,8 @@ class LivestockDailyEntry extends DataClass
       transfertSortieRepro: Value(transfertSortieRepro),
       transfertSortieSevre: Value(transfertSortieSevre),
       transfertSortieJeune: Value(transfertSortieJeune),
+      transfertEntree4: Value(transfertEntree4),
+      transfertSortie4: Value(transfertSortie4),
     );
   }
 
@@ -35455,6 +35704,12 @@ class LivestockDailyEntry extends DataClass
       venteRepro: serializer.fromJson<int?>(json['venteRepro']),
       venteSevre: serializer.fromJson<int?>(json['venteSevre']),
       venteJeune: serializer.fromJson<int?>(json['venteJeune']),
+      mort4: serializer.fromJson<int?>(json['mort4']),
+      don4: serializer.fromJson<int?>(json['don4']),
+      vente4: serializer.fromJson<int?>(json['vente4']),
+      catDepart4: serializer.fromJson<int?>(json['catDepart4']),
+      passage4Sevre: serializer.fromJson<int?>(json['passage4Sevre']),
+      passageJeuneRepro: serializer.fromJson<int?>(json['passageJeuneRepro']),
       catEffRepro: serializer.fromJson<int?>(json['catEffRepro']),
       catEffSevre: serializer.fromJson<int?>(json['catEffSevre']),
       catEffJeune: serializer.fromJson<int?>(json['catEffJeune']),
@@ -35490,6 +35745,8 @@ class LivestockDailyEntry extends DataClass
       transfertSortieJeune: serializer.fromJson<int>(
         json['transfertSortieJeune'],
       ),
+      transfertEntree4: serializer.fromJson<int>(json['transfertEntree4']),
+      transfertSortie4: serializer.fromJson<int>(json['transfertSortie4']),
     );
   }
   @override
@@ -35527,6 +35784,12 @@ class LivestockDailyEntry extends DataClass
       'venteRepro': serializer.toJson<int?>(venteRepro),
       'venteSevre': serializer.toJson<int?>(venteSevre),
       'venteJeune': serializer.toJson<int?>(venteJeune),
+      'mort4': serializer.toJson<int?>(mort4),
+      'don4': serializer.toJson<int?>(don4),
+      'vente4': serializer.toJson<int?>(vente4),
+      'catDepart4': serializer.toJson<int?>(catDepart4),
+      'passage4Sevre': serializer.toJson<int?>(passage4Sevre),
+      'passageJeuneRepro': serializer.toJson<int?>(passageJeuneRepro),
       'catEffRepro': serializer.toJson<int?>(catEffRepro),
       'catEffSevre': serializer.toJson<int?>(catEffSevre),
       'catEffJeune': serializer.toJson<int?>(catEffJeune),
@@ -35548,6 +35811,8 @@ class LivestockDailyEntry extends DataClass
       'transfertSortieRepro': serializer.toJson<int>(transfertSortieRepro),
       'transfertSortieSevre': serializer.toJson<int>(transfertSortieSevre),
       'transfertSortieJeune': serializer.toJson<int>(transfertSortieJeune),
+      'transfertEntree4': serializer.toJson<int>(transfertEntree4),
+      'transfertSortie4': serializer.toJson<int>(transfertSortie4),
     };
   }
 
@@ -35581,6 +35846,12 @@ class LivestockDailyEntry extends DataClass
     Value<int?> venteRepro = const Value.absent(),
     Value<int?> venteSevre = const Value.absent(),
     Value<int?> venteJeune = const Value.absent(),
+    Value<int?> mort4 = const Value.absent(),
+    Value<int?> don4 = const Value.absent(),
+    Value<int?> vente4 = const Value.absent(),
+    Value<int?> catDepart4 = const Value.absent(),
+    Value<int?> passage4Sevre = const Value.absent(),
+    Value<int?> passageJeuneRepro = const Value.absent(),
     Value<int?> catEffRepro = const Value.absent(),
     Value<int?> catEffSevre = const Value.absent(),
     Value<int?> catEffJeune = const Value.absent(),
@@ -35602,6 +35873,8 @@ class LivestockDailyEntry extends DataClass
     int? transfertSortieRepro,
     int? transfertSortieSevre,
     int? transfertSortieJeune,
+    int? transfertEntree4,
+    int? transfertSortie4,
   }) => LivestockDailyEntry(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -35642,6 +35915,16 @@ class LivestockDailyEntry extends DataClass
     venteRepro: venteRepro.present ? venteRepro.value : this.venteRepro,
     venteSevre: venteSevre.present ? venteSevre.value : this.venteSevre,
     venteJeune: venteJeune.present ? venteJeune.value : this.venteJeune,
+    mort4: mort4.present ? mort4.value : this.mort4,
+    don4: don4.present ? don4.value : this.don4,
+    vente4: vente4.present ? vente4.value : this.vente4,
+    catDepart4: catDepart4.present ? catDepart4.value : this.catDepart4,
+    passage4Sevre: passage4Sevre.present
+        ? passage4Sevre.value
+        : this.passage4Sevre,
+    passageJeuneRepro: passageJeuneRepro.present
+        ? passageJeuneRepro.value
+        : this.passageJeuneRepro,
     catEffRepro: catEffRepro.present ? catEffRepro.value : this.catEffRepro,
     catEffSevre: catEffSevre.present ? catEffSevre.value : this.catEffSevre,
     catEffJeune: catEffJeune.present ? catEffJeune.value : this.catEffJeune,
@@ -35671,6 +35954,8 @@ class LivestockDailyEntry extends DataClass
     transfertSortieRepro: transfertSortieRepro ?? this.transfertSortieRepro,
     transfertSortieSevre: transfertSortieSevre ?? this.transfertSortieSevre,
     transfertSortieJeune: transfertSortieJeune ?? this.transfertSortieJeune,
+    transfertEntree4: transfertEntree4 ?? this.transfertEntree4,
+    transfertSortie4: transfertSortie4 ?? this.transfertSortie4,
   );
   LivestockDailyEntry copyWithCompanion(LivestockDailyEntriesCompanion data) {
     return LivestockDailyEntry(
@@ -35727,6 +36012,18 @@ class LivestockDailyEntry extends DataClass
       venteJeune: data.venteJeune.present
           ? data.venteJeune.value
           : this.venteJeune,
+      mort4: data.mort4.present ? data.mort4.value : this.mort4,
+      don4: data.don4.present ? data.don4.value : this.don4,
+      vente4: data.vente4.present ? data.vente4.value : this.vente4,
+      catDepart4: data.catDepart4.present
+          ? data.catDepart4.value
+          : this.catDepart4,
+      passage4Sevre: data.passage4Sevre.present
+          ? data.passage4Sevre.value
+          : this.passage4Sevre,
+      passageJeuneRepro: data.passageJeuneRepro.present
+          ? data.passageJeuneRepro.value
+          : this.passageJeuneRepro,
       catEffRepro: data.catEffRepro.present
           ? data.catEffRepro.value
           : this.catEffRepro,
@@ -35780,6 +36077,12 @@ class LivestockDailyEntry extends DataClass
       transfertSortieJeune: data.transfertSortieJeune.present
           ? data.transfertSortieJeune.value
           : this.transfertSortieJeune,
+      transfertEntree4: data.transfertEntree4.present
+          ? data.transfertEntree4.value
+          : this.transfertEntree4,
+      transfertSortie4: data.transfertSortie4.present
+          ? data.transfertSortie4.value
+          : this.transfertSortie4,
     );
   }
 
@@ -35815,6 +36118,12 @@ class LivestockDailyEntry extends DataClass
           ..write('venteRepro: $venteRepro, ')
           ..write('venteSevre: $venteSevre, ')
           ..write('venteJeune: $venteJeune, ')
+          ..write('mort4: $mort4, ')
+          ..write('don4: $don4, ')
+          ..write('vente4: $vente4, ')
+          ..write('catDepart4: $catDepart4, ')
+          ..write('passage4Sevre: $passage4Sevre, ')
+          ..write('passageJeuneRepro: $passageJeuneRepro, ')
           ..write('catEffRepro: $catEffRepro, ')
           ..write('catEffSevre: $catEffSevre, ')
           ..write('catEffJeune: $catEffJeune, ')
@@ -35835,7 +36144,9 @@ class LivestockDailyEntry extends DataClass
           ..write('transfertEntreeJeune: $transfertEntreeJeune, ')
           ..write('transfertSortieRepro: $transfertSortieRepro, ')
           ..write('transfertSortieSevre: $transfertSortieSevre, ')
-          ..write('transfertSortieJeune: $transfertSortieJeune')
+          ..write('transfertSortieJeune: $transfertSortieJeune, ')
+          ..write('transfertEntree4: $transfertEntree4, ')
+          ..write('transfertSortie4: $transfertSortie4')
           ..write(')'))
         .toString();
   }
@@ -35871,6 +36182,12 @@ class LivestockDailyEntry extends DataClass
     venteRepro,
     venteSevre,
     venteJeune,
+    mort4,
+    don4,
+    vente4,
+    catDepart4,
+    passage4Sevre,
+    passageJeuneRepro,
     catEffRepro,
     catEffSevre,
     catEffJeune,
@@ -35892,6 +36209,8 @@ class LivestockDailyEntry extends DataClass
     transfertSortieRepro,
     transfertSortieSevre,
     transfertSortieJeune,
+    transfertEntree4,
+    transfertSortie4,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -35926,6 +36245,12 @@ class LivestockDailyEntry extends DataClass
           other.venteRepro == this.venteRepro &&
           other.venteSevre == this.venteSevre &&
           other.venteJeune == this.venteJeune &&
+          other.mort4 == this.mort4 &&
+          other.don4 == this.don4 &&
+          other.vente4 == this.vente4 &&
+          other.catDepart4 == this.catDepart4 &&
+          other.passage4Sevre == this.passage4Sevre &&
+          other.passageJeuneRepro == this.passageJeuneRepro &&
           other.catEffRepro == this.catEffRepro &&
           other.catEffSevre == this.catEffSevre &&
           other.catEffJeune == this.catEffJeune &&
@@ -35946,7 +36271,9 @@ class LivestockDailyEntry extends DataClass
           other.transfertEntreeJeune == this.transfertEntreeJeune &&
           other.transfertSortieRepro == this.transfertSortieRepro &&
           other.transfertSortieSevre == this.transfertSortieSevre &&
-          other.transfertSortieJeune == this.transfertSortieJeune);
+          other.transfertSortieJeune == this.transfertSortieJeune &&
+          other.transfertEntree4 == this.transfertEntree4 &&
+          other.transfertSortie4 == this.transfertSortie4);
 }
 
 class LivestockDailyEntriesCompanion
@@ -35980,6 +36307,12 @@ class LivestockDailyEntriesCompanion
   final Value<int?> venteRepro;
   final Value<int?> venteSevre;
   final Value<int?> venteJeune;
+  final Value<int?> mort4;
+  final Value<int?> don4;
+  final Value<int?> vente4;
+  final Value<int?> catDepart4;
+  final Value<int?> passage4Sevre;
+  final Value<int?> passageJeuneRepro;
   final Value<int?> catEffRepro;
   final Value<int?> catEffSevre;
   final Value<int?> catEffJeune;
@@ -36001,6 +36334,8 @@ class LivestockDailyEntriesCompanion
   final Value<int> transfertSortieRepro;
   final Value<int> transfertSortieSevre;
   final Value<int> transfertSortieJeune;
+  final Value<int> transfertEntree4;
+  final Value<int> transfertSortie4;
   final Value<int> rowid;
   const LivestockDailyEntriesCompanion({
     this.id = const Value.absent(),
@@ -36032,6 +36367,12 @@ class LivestockDailyEntriesCompanion
     this.venteRepro = const Value.absent(),
     this.venteSevre = const Value.absent(),
     this.venteJeune = const Value.absent(),
+    this.mort4 = const Value.absent(),
+    this.don4 = const Value.absent(),
+    this.vente4 = const Value.absent(),
+    this.catDepart4 = const Value.absent(),
+    this.passage4Sevre = const Value.absent(),
+    this.passageJeuneRepro = const Value.absent(),
     this.catEffRepro = const Value.absent(),
     this.catEffSevre = const Value.absent(),
     this.catEffJeune = const Value.absent(),
@@ -36053,6 +36394,8 @@ class LivestockDailyEntriesCompanion
     this.transfertSortieRepro = const Value.absent(),
     this.transfertSortieSevre = const Value.absent(),
     this.transfertSortieJeune = const Value.absent(),
+    this.transfertEntree4 = const Value.absent(),
+    this.transfertSortie4 = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LivestockDailyEntriesCompanion.insert({
@@ -36085,6 +36428,12 @@ class LivestockDailyEntriesCompanion
     this.venteRepro = const Value.absent(),
     this.venteSevre = const Value.absent(),
     this.venteJeune = const Value.absent(),
+    this.mort4 = const Value.absent(),
+    this.don4 = const Value.absent(),
+    this.vente4 = const Value.absent(),
+    this.catDepart4 = const Value.absent(),
+    this.passage4Sevre = const Value.absent(),
+    this.passageJeuneRepro = const Value.absent(),
     this.catEffRepro = const Value.absent(),
     this.catEffSevre = const Value.absent(),
     this.catEffJeune = const Value.absent(),
@@ -36106,6 +36455,8 @@ class LivestockDailyEntriesCompanion
     this.transfertSortieRepro = const Value.absent(),
     this.transfertSortieSevre = const Value.absent(),
     this.transfertSortieJeune = const Value.absent(),
+    this.transfertEntree4 = const Value.absent(),
+    this.transfertSortie4 = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -36142,6 +36493,12 @@ class LivestockDailyEntriesCompanion
     Expression<int>? venteRepro,
     Expression<int>? venteSevre,
     Expression<int>? venteJeune,
+    Expression<int>? mort4,
+    Expression<int>? don4,
+    Expression<int>? vente4,
+    Expression<int>? catDepart4,
+    Expression<int>? passage4Sevre,
+    Expression<int>? passageJeuneRepro,
     Expression<int>? catEffRepro,
     Expression<int>? catEffSevre,
     Expression<int>? catEffJeune,
@@ -36163,6 +36520,8 @@ class LivestockDailyEntriesCompanion
     Expression<int>? transfertSortieRepro,
     Expression<int>? transfertSortieSevre,
     Expression<int>? transfertSortieJeune,
+    Expression<int>? transfertEntree4,
+    Expression<int>? transfertSortie4,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -36195,6 +36554,12 @@ class LivestockDailyEntriesCompanion
       if (venteRepro != null) 'vente_repro': venteRepro,
       if (venteSevre != null) 'vente_sevre': venteSevre,
       if (venteJeune != null) 'vente_jeune': venteJeune,
+      if (mort4 != null) 'mort_4': mort4,
+      if (don4 != null) 'don_4': don4,
+      if (vente4 != null) 'vente_4': vente4,
+      if (catDepart4 != null) 'cat_depart_4': catDepart4,
+      if (passage4Sevre != null) 'passage_4_sevre': passage4Sevre,
+      if (passageJeuneRepro != null) 'passage_jeune_repro': passageJeuneRepro,
       if (catEffRepro != null) 'cat_eff_repro': catEffRepro,
       if (catEffSevre != null) 'cat_eff_sevre': catEffSevre,
       if (catEffJeune != null) 'cat_eff_jeune': catEffJeune,
@@ -36223,6 +36588,8 @@ class LivestockDailyEntriesCompanion
         'transfert_sortie_sevre': transfertSortieSevre,
       if (transfertSortieJeune != null)
         'transfert_sortie_jeune': transfertSortieJeune,
+      if (transfertEntree4 != null) 'transfert_entree_4': transfertEntree4,
+      if (transfertSortie4 != null) 'transfert_sortie_4': transfertSortie4,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -36257,6 +36624,12 @@ class LivestockDailyEntriesCompanion
     Value<int?>? venteRepro,
     Value<int?>? venteSevre,
     Value<int?>? venteJeune,
+    Value<int?>? mort4,
+    Value<int?>? don4,
+    Value<int?>? vente4,
+    Value<int?>? catDepart4,
+    Value<int?>? passage4Sevre,
+    Value<int?>? passageJeuneRepro,
     Value<int?>? catEffRepro,
     Value<int?>? catEffSevre,
     Value<int?>? catEffJeune,
@@ -36278,6 +36651,8 @@ class LivestockDailyEntriesCompanion
     Value<int>? transfertSortieRepro,
     Value<int>? transfertSortieSevre,
     Value<int>? transfertSortieJeune,
+    Value<int>? transfertEntree4,
+    Value<int>? transfertSortie4,
     Value<int>? rowid,
   }) {
     return LivestockDailyEntriesCompanion(
@@ -36310,6 +36685,12 @@ class LivestockDailyEntriesCompanion
       venteRepro: venteRepro ?? this.venteRepro,
       venteSevre: venteSevre ?? this.venteSevre,
       venteJeune: venteJeune ?? this.venteJeune,
+      mort4: mort4 ?? this.mort4,
+      don4: don4 ?? this.don4,
+      vente4: vente4 ?? this.vente4,
+      catDepart4: catDepart4 ?? this.catDepart4,
+      passage4Sevre: passage4Sevre ?? this.passage4Sevre,
+      passageJeuneRepro: passageJeuneRepro ?? this.passageJeuneRepro,
       catEffRepro: catEffRepro ?? this.catEffRepro,
       catEffSevre: catEffSevre ?? this.catEffSevre,
       catEffJeune: catEffJeune ?? this.catEffJeune,
@@ -36331,6 +36712,8 @@ class LivestockDailyEntriesCompanion
       transfertSortieRepro: transfertSortieRepro ?? this.transfertSortieRepro,
       transfertSortieSevre: transfertSortieSevre ?? this.transfertSortieSevre,
       transfertSortieJeune: transfertSortieJeune ?? this.transfertSortieJeune,
+      transfertEntree4: transfertEntree4 ?? this.transfertEntree4,
+      transfertSortie4: transfertSortie4 ?? this.transfertSortie4,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -36429,6 +36812,24 @@ class LivestockDailyEntriesCompanion
     if (venteJeune.present) {
       map['vente_jeune'] = Variable<int>(venteJeune.value);
     }
+    if (mort4.present) {
+      map['mort_4'] = Variable<int>(mort4.value);
+    }
+    if (don4.present) {
+      map['don_4'] = Variable<int>(don4.value);
+    }
+    if (vente4.present) {
+      map['vente_4'] = Variable<int>(vente4.value);
+    }
+    if (catDepart4.present) {
+      map['cat_depart_4'] = Variable<int>(catDepart4.value);
+    }
+    if (passage4Sevre.present) {
+      map['passage_4_sevre'] = Variable<int>(passage4Sevre.value);
+    }
+    if (passageJeuneRepro.present) {
+      map['passage_jeune_repro'] = Variable<int>(passageJeuneRepro.value);
+    }
     if (catEffRepro.present) {
       map['cat_eff_repro'] = Variable<int>(catEffRepro.value);
     }
@@ -36492,6 +36893,12 @@ class LivestockDailyEntriesCompanion
     if (transfertSortieJeune.present) {
       map['transfert_sortie_jeune'] = Variable<int>(transfertSortieJeune.value);
     }
+    if (transfertEntree4.present) {
+      map['transfert_entree_4'] = Variable<int>(transfertEntree4.value);
+    }
+    if (transfertSortie4.present) {
+      map['transfert_sortie_4'] = Variable<int>(transfertSortie4.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -36530,6 +36937,12 @@ class LivestockDailyEntriesCompanion
           ..write('venteRepro: $venteRepro, ')
           ..write('venteSevre: $venteSevre, ')
           ..write('venteJeune: $venteJeune, ')
+          ..write('mort4: $mort4, ')
+          ..write('don4: $don4, ')
+          ..write('vente4: $vente4, ')
+          ..write('catDepart4: $catDepart4, ')
+          ..write('passage4Sevre: $passage4Sevre, ')
+          ..write('passageJeuneRepro: $passageJeuneRepro, ')
           ..write('catEffRepro: $catEffRepro, ')
           ..write('catEffSevre: $catEffSevre, ')
           ..write('catEffJeune: $catEffJeune, ')
@@ -36551,6 +36964,8 @@ class LivestockDailyEntriesCompanion
           ..write('transfertSortieRepro: $transfertSortieRepro, ')
           ..write('transfertSortieSevre: $transfertSortieSevre, ')
           ..write('transfertSortieJeune: $transfertSortieJeune, ')
+          ..write('transfertEntree4: $transfertEntree4, ')
+          ..write('transfertSortie4: $transfertSortie4, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -36914,7 +37329,8 @@ class LivestockTransfer extends DataClass
   final DateTime transferDate;
   final int quantity;
 
-  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  /// `repro` | `sevre` | `jeune` pour lapins, porcs et volailles reproductrices ; plus `quatre` (Poussin ponte) pour les
+  /// volailles pondeuses (VOL-2) ; null pour les autres espèces.
   final String? categorie;
   final bool constitution;
   final String? motif;
@@ -67563,6 +67979,12 @@ typedef $$LivestockDailyEntriesTableCreateCompanionBuilder =
       Value<int?> venteRepro,
       Value<int?> venteSevre,
       Value<int?> venteJeune,
+      Value<int?> mort4,
+      Value<int?> don4,
+      Value<int?> vente4,
+      Value<int?> catDepart4,
+      Value<int?> passage4Sevre,
+      Value<int?> passageJeuneRepro,
       Value<int?> catEffRepro,
       Value<int?> catEffSevre,
       Value<int?> catEffJeune,
@@ -67584,6 +68006,8 @@ typedef $$LivestockDailyEntriesTableCreateCompanionBuilder =
       Value<int> transfertSortieRepro,
       Value<int> transfertSortieSevre,
       Value<int> transfertSortieJeune,
+      Value<int> transfertEntree4,
+      Value<int> transfertSortie4,
       Value<int> rowid,
     });
 typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
@@ -67617,6 +68041,12 @@ typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
       Value<int?> venteRepro,
       Value<int?> venteSevre,
       Value<int?> venteJeune,
+      Value<int?> mort4,
+      Value<int?> don4,
+      Value<int?> vente4,
+      Value<int?> catDepart4,
+      Value<int?> passage4Sevre,
+      Value<int?> passageJeuneRepro,
       Value<int?> catEffRepro,
       Value<int?> catEffSevre,
       Value<int?> catEffJeune,
@@ -67638,6 +68068,8 @@ typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
       Value<int> transfertSortieRepro,
       Value<int> transfertSortieSevre,
       Value<int> transfertSortieJeune,
+      Value<int> transfertEntree4,
+      Value<int> transfertSortie4,
       Value<int> rowid,
     });
 
@@ -67796,6 +68228,36 @@ class $$LivestockDailyEntriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get mort4 => $composableBuilder(
+    column: $table.mort4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get don4 => $composableBuilder(
+    column: $table.don4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get vente4 => $composableBuilder(
+    column: $table.vente4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get catDepart4 => $composableBuilder(
+    column: $table.catDepart4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get passage4Sevre => $composableBuilder(
+    column: $table.passage4Sevre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get passageJeuneRepro => $composableBuilder(
+    column: $table.passageJeuneRepro,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get catEffRepro => $composableBuilder(
     column: $table.catEffRepro,
     builder: (column) => ColumnFilters(column),
@@ -67898,6 +68360,16 @@ class $$LivestockDailyEntriesTableFilterComposer
 
   ColumnFilters<int> get transfertSortieJeune => $composableBuilder(
     column: $table.transfertSortieJeune,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertEntree4 => $composableBuilder(
+    column: $table.transfertEntree4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transfertSortie4 => $composableBuilder(
+    column: $table.transfertSortie4,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -68056,6 +68528,36 @@ class $$LivestockDailyEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get mort4 => $composableBuilder(
+    column: $table.mort4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get don4 => $composableBuilder(
+    column: $table.don4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get vente4 => $composableBuilder(
+    column: $table.vente4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get catDepart4 => $composableBuilder(
+    column: $table.catDepart4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get passage4Sevre => $composableBuilder(
+    column: $table.passage4Sevre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get passageJeuneRepro => $composableBuilder(
+    column: $table.passageJeuneRepro,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get catEffRepro => $composableBuilder(
     column: $table.catEffRepro,
     builder: (column) => ColumnOrderings(column),
@@ -68158,6 +68660,16 @@ class $$LivestockDailyEntriesTableOrderingComposer
 
   ColumnOrderings<int> get transfertSortieJeune => $composableBuilder(
     column: $table.transfertSortieJeune,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertEntree4 => $composableBuilder(
+    column: $table.transfertEntree4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get transfertSortie4 => $composableBuilder(
+    column: $table.transfertSortie4,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -68283,6 +68795,30 @@ class $$LivestockDailyEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get mort4 =>
+      $composableBuilder(column: $table.mort4, builder: (column) => column);
+
+  GeneratedColumn<int> get don4 =>
+      $composableBuilder(column: $table.don4, builder: (column) => column);
+
+  GeneratedColumn<int> get vente4 =>
+      $composableBuilder(column: $table.vente4, builder: (column) => column);
+
+  GeneratedColumn<int> get catDepart4 => $composableBuilder(
+    column: $table.catDepart4,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get passage4Sevre => $composableBuilder(
+    column: $table.passage4Sevre,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get passageJeuneRepro => $composableBuilder(
+    column: $table.passageJeuneRepro,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get catEffRepro => $composableBuilder(
     column: $table.catEffRepro,
     builder: (column) => column,
@@ -68377,6 +68913,16 @@ class $$LivestockDailyEntriesTableAnnotationComposer
     column: $table.transfertSortieJeune,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get transfertEntree4 => $composableBuilder(
+    column: $table.transfertEntree4,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get transfertSortie4 => $composableBuilder(
+    column: $table.transfertSortie4,
+    builder: (column) => column,
+  );
 }
 
 class $$LivestockDailyEntriesTableTableManager
@@ -68454,6 +69000,12 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> venteRepro = const Value.absent(),
                 Value<int?> venteSevre = const Value.absent(),
                 Value<int?> venteJeune = const Value.absent(),
+                Value<int?> mort4 = const Value.absent(),
+                Value<int?> don4 = const Value.absent(),
+                Value<int?> vente4 = const Value.absent(),
+                Value<int?> catDepart4 = const Value.absent(),
+                Value<int?> passage4Sevre = const Value.absent(),
+                Value<int?> passageJeuneRepro = const Value.absent(),
                 Value<int?> catEffRepro = const Value.absent(),
                 Value<int?> catEffSevre = const Value.absent(),
                 Value<int?> catEffJeune = const Value.absent(),
@@ -68475,6 +69027,8 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int> transfertSortieRepro = const Value.absent(),
                 Value<int> transfertSortieSevre = const Value.absent(),
                 Value<int> transfertSortieJeune = const Value.absent(),
+                Value<int> transfertEntree4 = const Value.absent(),
+                Value<int> transfertSortie4 = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockDailyEntriesCompanion(
                 id: id,
@@ -68506,6 +69060,12 @@ class $$LivestockDailyEntriesTableTableManager
                 venteRepro: venteRepro,
                 venteSevre: venteSevre,
                 venteJeune: venteJeune,
+                mort4: mort4,
+                don4: don4,
+                vente4: vente4,
+                catDepart4: catDepart4,
+                passage4Sevre: passage4Sevre,
+                passageJeuneRepro: passageJeuneRepro,
                 catEffRepro: catEffRepro,
                 catEffSevre: catEffSevre,
                 catEffJeune: catEffJeune,
@@ -68527,6 +69087,8 @@ class $$LivestockDailyEntriesTableTableManager
                 transfertSortieRepro: transfertSortieRepro,
                 transfertSortieSevre: transfertSortieSevre,
                 transfertSortieJeune: transfertSortieJeune,
+                transfertEntree4: transfertEntree4,
+                transfertSortie4: transfertSortie4,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -68560,6 +69122,12 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> venteRepro = const Value.absent(),
                 Value<int?> venteSevre = const Value.absent(),
                 Value<int?> venteJeune = const Value.absent(),
+                Value<int?> mort4 = const Value.absent(),
+                Value<int?> don4 = const Value.absent(),
+                Value<int?> vente4 = const Value.absent(),
+                Value<int?> catDepart4 = const Value.absent(),
+                Value<int?> passage4Sevre = const Value.absent(),
+                Value<int?> passageJeuneRepro = const Value.absent(),
                 Value<int?> catEffRepro = const Value.absent(),
                 Value<int?> catEffSevre = const Value.absent(),
                 Value<int?> catEffJeune = const Value.absent(),
@@ -68581,6 +69149,8 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int> transfertSortieRepro = const Value.absent(),
                 Value<int> transfertSortieSevre = const Value.absent(),
                 Value<int> transfertSortieJeune = const Value.absent(),
+                Value<int> transfertEntree4 = const Value.absent(),
+                Value<int> transfertSortie4 = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LivestockDailyEntriesCompanion.insert(
                 id: id,
@@ -68612,6 +69182,12 @@ class $$LivestockDailyEntriesTableTableManager
                 venteRepro: venteRepro,
                 venteSevre: venteSevre,
                 venteJeune: venteJeune,
+                mort4: mort4,
+                don4: don4,
+                vente4: vente4,
+                catDepart4: catDepart4,
+                passage4Sevre: passage4Sevre,
+                passageJeuneRepro: passageJeuneRepro,
                 catEffRepro: catEffRepro,
                 catEffSevre: catEffSevre,
                 catEffJeune: catEffJeune,
@@ -68633,6 +69209,8 @@ class $$LivestockDailyEntriesTableTableManager
                 transfertSortieRepro: transfertSortieRepro,
                 transfertSortieSevre: transfertSortieSevre,
                 transfertSortieJeune: transfertSortieJeune,
+                transfertEntree4: transfertEntree4,
+                transfertSortie4: transfertSortie4,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

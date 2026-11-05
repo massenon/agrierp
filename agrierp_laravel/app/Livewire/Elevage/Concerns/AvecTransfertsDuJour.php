@@ -22,6 +22,8 @@ trait AvecTransfertsDuJour
             'transfert_entree', 'transfert_sortie',
             'transfert_entree_repro', 'transfert_entree_sevre', 'transfert_entree_jeune',
             'transfert_sortie_repro', 'transfert_sortie_sevre', 'transfert_sortie_jeune',
+            // Ticket VOL-2 : quatrième emplacement (Poussin ponte des pondeuses).
+            'transfert_entree_4', 'transfert_sortie_4',
         ];
 
         $bande = $this->bandeDeLaFiche();

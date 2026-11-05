@@ -172,28 +172,28 @@ class VolaillesEffectifParCategorieTest extends TestCase
 
     public function test_service_la_vente_reproducteur_sort_des_reproducteurs_seulement(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 5, 'sevre' => 7, 'jeune' => 9], ['vente_repro' => 2]);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 5, 'sevre' => 7, 'jeune' => 9], ['vente_repro' => 2]);
 
         $this->assertSame([3, 7, 9], [$r->repro, $r->sevre, $r->jeune]);
     }
 
     public function test_service_l_achat_entre_dans_les_jeunes(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 0, 'sevre' => 0, 'jeune' => 10], ['achat' => 4]);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 0, 'sevre' => 0, 'jeune' => 10], ['achat' => 4]);
 
         $this->assertSame([0, 0, 14], [$r->repro, $r->sevre, $r->jeune]);
     }
 
     public function test_service_l_eclosion_entre_dans_les_poussins(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 0, 'sevre' => 10, 'jeune' => 0], ['ne' => 6]);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 0, 'sevre' => 10, 'jeune' => 0], ['ne' => 6]);
 
         $this->assertSame([0, 16, 0], [$r->repro, $r->sevre, $r->jeune]);
     }
 
     public function test_service_le_passage_transfere_des_poussins_aux_jeunes_total_inchange(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 3, 'sevre' => 10, 'jeune' => 2], ['passage' => 4]);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 3, 'sevre' => 10, 'jeune' => 2], ['passage' => 4]);
 
         $this->assertSame([3, 6, 6], [$r->repro, $r->sevre, $r->jeune]);
         $this->assertSame(15, $r->somme());
@@ -202,7 +202,7 @@ class VolaillesEffectifParCategorieTest extends TestCase
 
     public function test_service_chaque_categorie_est_bornee_a_zero(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 2, 'sevre' => 2, 'jeune' => 2], [
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 2, 'sevre' => 2, 'jeune' => 2], [
             'mort_repro' => 5, 'vente_sevre' => 9, 'don_jeune' => 7,
         ]);
 
@@ -212,7 +212,7 @@ class VolaillesEffectifParCategorieTest extends TestCase
     public function test_service_un_passage_superieur_a_la_source_est_refuse_et_ramene_a_la_source(): void
     {
         // Source = 3 poussins − 1 mort = 2 ; passage demandé 3.
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => 0, 'sevre' => 3, 'jeune' => 0], ['mort_sevre' => 1, 'passage' => 3]);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => 0, 'sevre' => 3, 'jeune' => 0], ['mort_sevre' => 1, 'passage' => 3]);
 
         $this->assertSame("Passage de stade refusé : 3 sujet(s) à faire passer, mais la catégorie source n'en compte que 2.", $r->refus);
         $this->assertSame(2, $r->passageApplique);
@@ -221,7 +221,7 @@ class VolaillesEffectifParCategorieTest extends TestCase
 
     public function test_service_jamais_de_null_meme_sans_mouvement_ni_veille(): void
     {
-        $r = EffectifParCategorieService::calculerJour('volailles', ['repro' => null, 'sevre' => null, 'jeune' => null], []);
+        $r = EffectifParCategorieService::calculerJour('volailles_repro', ['repro' => null, 'sevre' => null, 'jeune' => null], []);
 
         $this->assertSame([0, 0, 0], [$r->repro, $r->sevre, $r->jeune]);
         $this->assertTrue($r->estComplet());
@@ -238,9 +238,10 @@ class VolaillesEffectifParCategorieTest extends TestCase
 
     public function test_les_bandes_ponte_et_les_autres_filieres_ne_sont_pas_des_volailles(): void
     {
-        $this->assertSame('volailles', EffectifParCategorieService::especeDuLot($this->lot->load('species')));
+        $this->assertSame('volailles_repro', EffectifParCategorieService::especeDuLot($this->lot->load('species')));
+        // VOL-2 : le stade « ponte » est l'AUTRE famille de volailles (pondeuses, quatre stades), distincte des reproducteurs.
         $this->lot->update(['stage' => 'ponte']);
-        $this->assertNull(EffectifParCategorieService::especeDuLot($this->lot->fresh()->load('species')));
+        $this->assertSame('volailles_ponte', EffectifParCategorieService::especeDuLot($this->lot->fresh()->load('species')));
     }
 
     // ===================================================================== (2) fiche Livewire

@@ -64,10 +64,10 @@ class DonsToutesFichesTest extends TestCase
     public static function fiches(): array
     {
         return [
-            'pondeuses' => [FichePondeuses::class, 'aviculture', 'ponte', ['donRepro', 'donPoulette', 'donPoussin']],
             'escargots' => [FicheEscargots::class, 'helico', 'engraissement', ['donBorde', 'donEngraissement', 'donNaissain']],
-            // VOL-1 : la fiche Reproducteurs a désormais un départ obligatoire et des dons ventilés rechargés par catégorie :
-            // ses dons sont couverts par `test_reproducteurs_*` ci-dessous et par VolaillesEffectifParCategorieTest.
+            // VOL-1 / VOL-2 : les fiches Reproducteurs et Pondeuses ont un départ obligatoire et des dons ventilés rechargés par
+            // catégorie ou par stade : leurs dons sont couverts par `test_reproducteurs_*` et `test_pondeuses_*` ci-dessous et par
+            // VolaillesEffectifParCategorieTest / PondeusesEffectifParStadeTest.
         ];
     }
 
@@ -92,6 +92,31 @@ class DonsToutesFichesTest extends TestCase
         Livewire::test(FicheReproducteurs::class)
             ->call('loadDay', now()->toDateString())
             ->assertSet('donRepro', 2)->assertSet('donPoussin', 1)->assertSet('donPoulet', 0)->assertSet('donEnregistre', null)
+            ->call('saveDay');
+        $this->assertSame(7.0, (float) $this->produit->fresh()->stock_qty, 'calcul par écart : rien ne sort deux fois');
+    }
+
+    /** VOL-2 — dons de la fiche Pondeuses : ventilés par stade, réduisent l'effectif et sortent du stock, une seule fois. */
+    public function test_pondeuses_les_dons_ventiles_reduisent_l_effectif_sortent_du_stock_et_se_rechargent(): void
+    {
+        $lot = $this->bande('aviculture', 'ponte');
+
+        Livewire::test(FichePondeuses::class)
+            ->set('departPondeuse', 40)->set('departPoulette', 10)->set('departPoussinCroissance', 6)->set('departPoussinPonte', 4)
+            ->set('donPondeuse', 2)->set('donPoussinPonte', 1)
+            ->assertSee('Dons par catégorie')
+            ->call('saveDay');
+
+        $fiche = LivestockDailyEntry::where('lot_id', $lot->id)->sole();
+        // 60 − 3 dons = 57 ; stock 10 − 3 = 7 ; stades PP 3 / PC 6 / PL 10 / PO 38.
+        $this->assertSame([3, 57], [(int) $fiche->don, (int) $fiche->effectif_final]);
+        $this->assertSame([2, 1, 0, 0], [(int) $fiche->don_repro, (int) $fiche->don_4, (int) $fiche->don_sevre, (int) $fiche->don_jeune]);
+        $this->assertSame([3, 6, 10, 38], [(int) $fiche->cat_eff_4, (int) $fiche->cat_eff_sevre, (int) $fiche->cat_eff_jeune, (int) $fiche->cat_eff_repro]);
+        $this->assertSame(7.0, (float) $this->produit->fresh()->stock_qty);
+
+        Livewire::test(FichePondeuses::class)
+            ->call('loadDay', now()->toDateString())
+            ->assertSet('donPondeuse', 2)->assertSet('donPoussinPonte', 1)->assertSet('donPoulette', 0)->assertSet('donEnregistre', null)
             ->call('saveDay');
         $this->assertSame(7.0, (float) $this->produit->fresh()->stock_qty, 'calcul par écart : rien ne sort deux fois');
     }
@@ -134,11 +159,16 @@ class DonsToutesFichesTest extends TestCase
     /** 🔴 Un don saisi au POSTE sort lui aussi du stock, une seule fois même si l'envoi est répété. */
     public function test_un_don_recu_du_poste_sort_du_stock_par_ecart(): void
     {
-        $lot = $this->bande('aviculture', 'ponte');   // VOL-1 : « ponte » = hors chaîne des reproducteurs
+        $lot = $this->bande('aviculture', 'ponte');
         Sanctum::actingAs(auth()->user());
+        // VOL-2 : la fiche d'une bande de pondeuses porte son départ par stade (tous « Pondeuse ») et sa ventilation ; le don
+        // (2 puis 4) est rangé dans les Pondeuses.
         $fiche = fn (int $don) => ['livestock_daily_entries' => [[
             'id' => '55555555-5555-4555-8555-555555555555', 'lot_id' => $lot->id,
             'entry_date' => now()->toDateString(), 'achat' => 0, 'ne' => 0, 'mort' => 1, 'vente' => 0, 'don' => $don,
+            'cat_depart_repro' => 60, 'cat_depart_sevre' => 0, 'cat_depart_jeune' => 0, 'cat_depart_4' => 0,
+            'mort_repro' => 1, 'mort_sevre' => 0, 'mort_jeune' => 0, 'mort_4' => 0,
+            'don_repro' => $don, 'don_sevre' => 0, 'don_jeune' => 0, 'don_4' => 0,
         ]]];
 
         $this->postJson('/api/sync/push', $fiche(2))->assertOk()->assertJsonPath('livestock_daily_entries.accepted.0', '55555555-5555-4555-8555-555555555555');

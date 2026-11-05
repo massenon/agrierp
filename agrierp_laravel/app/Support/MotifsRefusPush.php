@@ -122,6 +122,11 @@ class MotifsRefusPush
             'cat_depart_jeune' => 'effectif de départ jeunes lapins ou porcs marchands',
             // Ticket VOL-1 — ventes par catégorie des volailles reproductrices.
             'vente_repro' => 'ventes de reproducteurs', 'vente_sevre' => 'ventes de poussins', 'vente_jeune' => 'ventes de jeunes',
+            // Ticket VOL-2 — quatrième emplacement et passages des volailles pondeuses (libellés du barème).
+            'mort_4' => 'morts Poussin ponte', 'don_4' => 'dons Poussin ponte', 'vente_4' => 'ventes Poussin ponte',
+            'cat_depart_4' => 'effectif de départ Poussin ponte',
+            'passage_4_sevre' => 'passage Poussin ponte vers Poussin en croissance',
+            'passage_jeune_repro' => 'passage Poulette vers Pondeuse',
         ];
     }
 
@@ -166,8 +171,12 @@ class MotifsRefusPush
     // ====================================================================== Ticket 15.40 — ventilation par catégorie
 
     /** Les trois catégories d'une ventilation (morts ou dons) doivent être renseignées ensemble. */
-    public static function ventilationIncomplete(string $libelle, bool $volailles = false): string
+    public static function ventilationIncomplete(string $libelle, bool $volailles = false, bool $pondeuses = false): string
     {
+        if ($pondeuses) {
+            return "Ventilation incomplète : les quatre stades des {$libelle} (Poussin ponte, Poussin en croissance, Poulette, Pondeuse) "
+                .'doivent être renseignés ensemble (0 si le stade est vide).';
+        }
         if ($volailles) {
             return "Ventilation incomplète : les trois catégories des {$libelle} (Reproducteur, Jeune, Poussin) "
                 .'doivent être renseignées ensemble (0 si la catégorie est vide).';
@@ -178,10 +187,12 @@ class MotifsRefusPush
     }
 
     /** Le total de la fiche doit égaler la somme de sa ventilation. */
-    public static function ventilationIncoherente(string $libelle, int $total, int $somme): string
+    public static function ventilationIncoherente(string $libelle, int $total, int $somme, bool $pondeuses = false): string
     {
+        $parties = $pondeuses ? 'quatre stades' : 'trois catégories';
+
         return "Ventilation incohérente : les {$libelle} de la fiche ({$total}) ne correspondent pas à la somme "
-            ."des trois catégories ({$somme}).";
+            ."des {$parties} ({$somme}).";
     }
 
     /** D7 : un ancien poste envoie des morts/dons non ventilés sur une bande qui suit son effectif par catégorie. */
@@ -198,10 +209,10 @@ class MotifsRefusPush
         return "Effectif de départ refusé : effectif de départ déjà fixé le {$dateFr} pour cette bande.";
     }
 
-    /** L'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles reproductrices. */
+    /** L'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles (reproductrices et pondeuses). */
     public static function departEspeceNonPrise(): string
     {
-        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles reproductrices.";
+        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles.";
     }
 
     // ====================================================================== Ticket VOL-1 — volailles reproductrices
@@ -231,6 +242,29 @@ class MotifsRefusPush
     public static function venteAvantLeDepart(string $dateVente, string $dateDepart): string
     {
         return "Vente refusée : la date de la vente ({$dateVente}) précède l'effectif de départ de la bande (fixé le {$dateDepart}).";
+    }
+
+    // ====================================================================== Ticket VOL-2 — volailles pondeuses
+
+    /** VOL-2 : une bande de volailles pondeuses doit avoir son départ par stade AVANT toute journée. */
+    public static function departRequisPondeuses(string $bande): string
+    {
+        return "Fiche refusée : l'effectif de départ par stade (Poussin ponte, Poussin en croissance, Poulette, Pondeuse) de la bande {$bande} "
+            .'n\'est pas saisi. Saisissez-le d\'abord sur la fiche Pondeuses, puis renvoyez la fiche.';
+    }
+
+    /** VOL-2 : la vente d'un produit sans stade d'effectif sur une bande de volailles pondeuses. */
+    public static function venteSansStade(string $produit): string
+    {
+        return "Vente refusée : le produit « {$produit} » n'a pas de stade d'effectif de pondeuses (Poussin ponte, Poussin en croissance, Poulette ou Pondeuse). "
+            .'Renseignez-le dans « Modifier un produit » avant de le vendre sur une bande de pondeuses.';
+    }
+
+    /** VOL-2 : vente sur une bande de volailles pondeuses dont le départ n'est pas encore saisi. */
+    public static function venteSansDepartPondeuses(string $bande): string
+    {
+        return "Vente refusée : l'effectif de départ par stade de la bande {$bande} n'est pas saisi. "
+            .'Ouvrez la fiche Pondeuses et saisissez-le avant toute vente de cette bande.';
     }
 
     /** VOL-1 : vente sur une bande de volailles reproductrices dont le départ n'est pas encore saisi. */
