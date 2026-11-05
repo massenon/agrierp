@@ -81,6 +81,8 @@ class ProductsSeeder extends Seeder
             ['sku' => 'AVI-001', 'name' => 'Poulet goliath (sujet vif)', 'cat' => 'Aviculture', 'stock' => 64, 'threshold' => 15, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 8000],
             ['sku' => 'AVI-002', 'name' => 'Œufs de table (plateau)', 'cat' => 'Aviculture', 'stock' => 118, 'threshold' => 30, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 2000, 'max' => 2500],
             ['sku' => 'AVI-003', 'name' => "Poussin d'un jour", 'cat' => 'Aviculture', 'stock' => 210, 'threshold' => 50, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 500, 'max' => 700],
+            // VOL-2 : le « Poussin d'un jour » reste une catégorie de reproducteurs ; ce produit alimente le stade « Poussin ponte » de la fiche Pondeuses.
+            ['sku' => 'AVI-007', 'name' => "Poussin d'un jour (ponte)", 'cat' => 'Aviculture', 'stock' => 0, 'threshold' => 0, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 500, 'max' => 700],
             ['sku' => 'AVI-004', 'name' => 'Poulet abattu frais', 'cat' => 'Aviculture', 'stock' => 30, 'threshold' => 10, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 6000],
             ['sku' => 'AVI-005', 'name' => 'Poulet fumé', 'cat' => 'Aviculture', 'stock' => 15, 'threshold' => 5, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4500, 'max' => 5500],
             ['sku' => 'AVI-006', 'name' => 'Poulet braisé', 'cat' => 'Aviculture', 'stock' => 12, 'threshold' => 5, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 6000],
