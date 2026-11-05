@@ -39,6 +39,8 @@
             </div>
         </div>
 
+        @php $cat = $this->categoriesJour; $ventesJ = $this->ventesDuJour; @endphp
+
         <form wire:submit="saveDay" class="space-y-md">
             {{-- Ticket EX8 (EF12) : un jour d'un exercice clos se consulte, le formulaire est grisé (refus de saveDay : EX5).
                  Fusion EX7 + EX8 : le bandeau de lecture seule d'EX7 (même composant, même texte), pour l'exercice du jour. --}}
@@ -50,7 +52,7 @@
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande / Lot Concerné</label>
                     <select wire:model.live="selectedLotId" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
                         @foreach($this->lots as $lot)
-                            <option value="{{ $lot->id }}">{{ $lot->code }} ({{ ucfirst($lot->stage) }} — {{ $lot->current_quantity }} têtes)</option>
+                            <option value="{{ $lot->id }}">{{ $lot->code }} ({{ $lot->libelleStade() }} — {{ $lot->current_quantity }} têtes)</option>
                         @endforeach
                     </select>
                 </div>
@@ -61,6 +63,8 @@
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Ventes <span class="text-outline font-normal text-[9px]">(POS, réel)</span></label>
                     <input type="number" value="{{ $this->venteDuJour }}" readonly class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline cursor-not-allowed">
+                    {{-- Ticket VOL-1 : la caisse range chaque vente dans la catégorie du PRODUIT vendu (lecture seule). --}}
+                    <p id="ventes-par-categorie" class="text-[10px] text-outline mt-xs">Reproducteur {{ $ventesJ['repro'] }} · Jeune {{ $ventesJ['jeune'] }} · Poussin {{ $ventesJ['sevre'] }}</p>
                 </div>
             </div>
 
@@ -85,11 +89,11 @@
             <div class="bg-error-bg/30 border border-error-red/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-error-deep uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">skull</span>Morts par catégorie</p>
                 @if($mortEnregistre !== null)
-                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $mortEnregistre }} mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ventilez-les ci-dessous (Reproducteur / Jeune / Poussin) avant d'enregistrer.</p>
                 @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Repro</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('mortRepro', {{ max(0, $mortRepro - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="mortRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -97,7 +101,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poulet</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('mortPoulet', {{ max(0, $mortPoulet - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="mortPoulet" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -119,11 +123,11 @@
             <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
                 <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">redeem</span>Dons par catégorie</p>
                 @if($donEnregistre !== null)
-                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.</p>
+                    <p class="text-[11px] text-brand-forest bg-accent-yellow/20 border border-accent-yellow rounded-lg p-xs mb-xs" role="status">{{ $donEnregistre }} don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ventilez-les ci-dessous (Reproducteur / Jeune / Poussin) avant d'enregistrer.</p>
                 @endif
                 <div class="grid grid-cols-3 gap-sm">
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Repro</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('donRepro', {{ max(0, $donRepro - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="donRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -131,7 +135,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poulet</label>
+                        <label class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
                         <div class="flex items-center border border-outline-variant rounded-lg bg-white overflow-hidden">
                             <button type="button" wire:click="$set('donPoulet', {{ max(0, $donPoulet - 1) }})" class="w-8 h-9 bg-surface-zebra text-brand-forest font-bold">−</button>
                             <input wire:model.live="donPoulet" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border-0">
@@ -149,6 +153,78 @@
                 </div>
             </div>
 
+            {{-- Ticket VOL-1 — passage de stade du jour (Poussin → Jeune) : le seul mouvement qui fait passer les poussins nés dans
+                 la catégorie Jeune ; sans lui les effectifs par catégorie dériveraient. Hors maquette, assumé. --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Passage du jour (Poussin → Jeune)</label>
+                    <input wire:model.live="passage" type="number" min="0" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white">
+                </div>
+            </div>
+
+            @if($cat['depart_requis'])
+                {{-- Ticket VOL-1 : le DÉPART est exigé AVANT toute journée (aucune catégorie « inconnue » sur cette fiche). --}}
+                <div id="depart-requis" class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm">
+                    <p class="text-xs font-bold text-brand-emerald uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">edit_note</span>Effectif de départ par catégorie (obligatoire)</p>
+                    <p class="text-[10px] text-outline mb-xs">Cette bande n'a pas encore d'effectif de départ : saisissez l'effectif de chaque catégorie au DÉBUT de ce jour, avant les mouvements du jour. La somme des trois catégories doit égaler l'effectif total au début du jour ({{ $this->previousEffectif }}). Il est verrouillé au premier enregistrement ; la journée ne s'enregistre pas sans lui.</p>
+                    <div class="grid grid-cols-3 gap-sm">
+                        <div>
+                            <label for="depart-repro" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
+                            <input id="depart-repro" wire:model.live="departRepro" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
+                            <input id="depart-jeune" wire:model.live="departJeune" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poussin</label>
+                            <input id="depart-sevre" wire:model.live="departSevre" type="number" min="0" class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-white">
+                        </div>
+                    </div>
+                    @if($cat['proposition'])
+                        <button type="button" wire:click="appliquerPropositionDepart" class="mt-sm text-[11px] font-bold text-brand-emerald underline">Reprendre la proposition d'après le stade de la bande (Reproducteur {{ $cat['proposition']['repro'] }} · Jeune {{ $cat['proposition']['jeune'] }} · Poussin {{ $cat['proposition']['sevre'] }})</button>
+                    @endif
+                </div>
+            @elseif($cat['depart'])
+                <div class="bg-surface-zebra border border-outline-variant rounded-lg p-sm">
+                    <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">lock</span>Effectif de départ par catégorie (verrouillé)</p>
+                    <p class="text-[10px] text-outline mb-xs">Effectif de départ fixé le {{ \Carbon\Carbon::parse($cat['depart_date'])->format('d/m/Y') }} (au début de ce jour).</p>
+                    <div class="grid grid-cols-3 gap-sm">
+                        <div>
+                            <label for="depart-repro" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Reproducteur</label>
+                            <input id="depart-repro" type="number" value="{{ $cat['depart']['repro'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label for="depart-jeune" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Jeune</label>
+                            <input id="depart-jeune" type="number" value="{{ $cat['depart']['jeune'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label for="depart-sevre" class="block text-[9px] text-outline font-bold uppercase mb-xs text-center">Poussin</label>
+                            <input id="depart-sevre" type="number" value="{{ $cat['depart']['sevre'] }}" disabled class="w-full h-9 text-center text-sm font-bold border border-outline-variant rounded-lg bg-surface-zebra text-outline cursor-not-allowed">
+                        </div>
+                    </div>
+                    @if($cat['mode'] === 'avant_depart')
+                        <p id="avant-depart" class="text-[10px] text-error-deep font-bold mt-xs">Jour antérieur à l'effectif de départ fixé le {{ \Carbon\Carbon::parse($cat['depart_date'])->format('d/m/Y') }} : il n'est pas saisissable.</p>
+                    @endif
+                </div>
+            @endif
+
+            @if($cat['motif'])
+                <div class="bg-error-bg border border-error-deep/30 rounded-lg p-sm text-xs text-error-deep font-bold" role="alert">{{ $cat['motif'] }}</div>
+            @endif
+            @if($cat['refus_passage'])
+                <div class="bg-error-bg border border-error-deep/30 rounded-lg p-sm text-xs text-error-deep font-bold" role="alert">{{ $cat['refus_passage'] }}</div>
+            @endif
+            @if($this->avertissementMorts)
+                <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest" role="status">{{ $this->avertissementMorts }}</div>
+            @endif
+            @foreach($cat['avertissements'] as $avertissement)
+                <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest" role="status">{{ $avertissement }}</div>
+            @endforeach
+            @if($ventesJ['non_ventilee'])
+                <div class="bg-accent-yellow/20 border border-accent-yellow rounded-lg p-sm text-xs text-brand-forest" role="status">Cette journée porte des ventes d'avant la mise en place des catégories, non ventilées : elle ne peut pas être ré-enregistrée.</div>
+            @endif
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md bg-surface-zebra p-md rounded-lg border border-outline-variant">
                 <div>
                     <p class="text-[10px] text-brand-forest font-bold uppercase">Effectif Final</p>
@@ -162,8 +238,39 @@
                 </div>
             </div>
 
-            {{-- Ticket 15.57 — rationnement par stade : section du poste, désormais des deux côtés. --}}
-            <x-ration-volaille :tableau="$this->rationnement" ligne-cle="des reproducteurs" />
+            {{-- Ticket VOL-1 — rationnement PAR CATÉGORIE : effectif calculé × ration de la ligne du barème (Reproducteur, Jeune,
+                 Poussin). Tant que le départ n'est pas valide, la demande de départ ci-dessus tient lieu d'effectif. --}}
+            @php $ration = $this->rationnement; @endphp
+            <div>
+                <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[16px] text-brand-emerald">restaurant</span>Rationnement &amp; Provende Servie par Catégorie (en Grammes g/j)</p>
+                @if($cat['repro'] === null)
+                    <p id="ration-depart-requis" class="text-xs text-outline bg-surface-zebra border border-outline-variant rounded-lg p-md">Saisissez l'effectif de départ de la bande pour calculer les effectifs par catégorie et la provende servie.</p>
+                @else
+                    <div class="bg-white border border-outline-variant rounded-lg overflow-hidden shadow-sm">
+                        <table class="w-full text-xs">
+                            <thead class="bg-surface-zebra text-outline border-b border-outline-variant">
+                                <tr><th class="px-md py-xs text-left">Catégorie</th><th class="px-md py-xs text-center">Effectif</th><th class="px-md py-xs text-center">Ration Normative</th><th class="px-md py-xs text-right">Provende Servie (g)</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-outline-variant/60">
+                                @foreach($ration['lignes'] as $ligne)
+                                    <tr wire:key="ration-{{ $ligne['cle'] }}">
+                                        <td class="px-md py-xs font-bold text-brand-forest">{{ $ligne['libelle'] }}</td>
+                                        {{-- Effectifs CALCULÉS (jamais saisis) : disabled, donc non focalisables. --}}
+                                        <td class="px-md py-xs text-center"><input id="cat-eff-{{ $ligne['cle'] }}" type="text" inputmode="numeric" disabled value="{{ $ligne['effectif'] }}" title="Calculé automatiquement depuis le départ, les achats, éclosions, ventes, morts, dons et le passage du jour." class="w-16 h-8 text-center border border-outline-variant rounded text-xs font-bold bg-surface-zebra"></td>
+                                        <td class="px-md py-xs text-center font-mono">{{ $ligne['ration'] }} g/j</td>
+                                        <td id="cat-prov-{{ $ligne['cle'] }}-g" class="px-md py-xs text-right font-mono font-bold text-brand-emerald">{{ $ligne['total_g'] }} g</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="bg-brand-emerald/10 font-bold text-brand-forest border-t border-brand-emerald/20">
+                                <tr><td colspan="3" class="px-md py-xs uppercase text-[10px]">TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)</td><td id="day-total-provende-g" class="px-md py-xs text-right font-mono text-sm text-brand-emerald">{{ $ration['total_g'] }} g ({{ $ration['total_kg'] }} Kg)</td></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <x-autonomie-alimentaire :autonomie="$this->feedAutonomy" filiere="aviculture" />
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
@@ -222,7 +329,7 @@
                     <tr>
                         <th class="px-sm py-xs text-center text-[9px] text-outline font-bold border-r border-outline-variant">Couvés</th>
                         <th class="px-sm py-xs text-center text-[9px] text-outline font-bold border-r border-outline-variant">Nés</th>
-                        <th class="px-sm py-xs text-center text-[9px] text-outline font-bold border-r border-outline-variant">Repro+Poulet+Poussin</th>
+                        <th class="px-sm py-xs text-center text-[9px] text-outline font-bold border-r border-outline-variant">Reproducteur+Jeune+Poussin</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -244,7 +351,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="text-[10px] text-outline p-sm border-t border-outline-variant">La ventilation Repro/Poulet/Poussin des morts n'est pas conservée séparément après enregistrement (seul le total est persisté, conforme au schéma) — affichée en cumul dans l'historique.</p>
+        <p class="text-[10px] text-outline p-sm border-t border-outline-variant">La ventilation Reproducteur / Jeune / Poussin des morts, des dons et des ventes est conservée par catégorie (ticket VOL-1) — le tableau mensuel en affiche le cumul.</p>
     </div>
     @endif
 </div>

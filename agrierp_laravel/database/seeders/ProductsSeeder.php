@@ -122,6 +122,10 @@ class ProductsSeeder extends Seeder
         ];
 
         foreach ($products as $p) {
+            $especeDuProduit = isset($produitEspece[$p['sku']])
+                ? $produitEspece[$p['sku']]
+                : ($categorySpecies[$p['cat']] ?? null);
+
             DB::table('products')->insert([
                 'id' => (string) Str::uuid(),
                 'sku' => $p['sku'],
@@ -137,6 +141,9 @@ class ProductsSeeder extends Seeder
                 'species_id' => isset($produitEspece[$p['sku']])
                     ? ($speciesIds[$produitEspece[$p['sku']]] ?? null)
                     : (isset($categorySpecies[$p['cat']]) ? ($speciesIds[$categorySpecies[$p['cat']]] ?? null) : null),
+                // Ticket VOL-1 : catégorie d'effectif par défaut des produits de l'aviculture (poussin d'un jour → poussin,
+                // poulet → jeune) ; null pour les autres (œufs, aliments…), jamais rangé au hasard.
+                'categorie_effectif' => $especeDuProduit === 'aviculture' ? \App\Support\CategorieVolaille::devinerDepuisLeNom($p['name']) : null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

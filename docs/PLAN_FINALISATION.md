@@ -868,3 +868,27 @@ Décision du client : seulement quand le module « Assistant de démarrage » es
 ## Attestations : signature du Directeur et date modifiable (29/10/2026)
 - Signataire UNIQUE (palier court) : signature et cachet du Directeur (`resources/attestation/images/signature-directeur.png`, copie `agrierp_flutter/assets/attestation/`), nom et fonction CENTRÉS en bas de page, au web (`exports/attestation.blade.php`) et au poste (`pdf_attestation.dart`, `_signataireUnique`). Trois signataires : disposition inchangée, sans signature imprimée.
 - « Date de l'attestation » (après « ATTAN - ÉWÉ, le ») : champ du web (`Livewire\RH\Attestations::$dateAttestation`, API `date_attestation`) et du poste (`att-date-attestation`) ; vide = date du jour. Le numéro et la durée restent ceux de la date réelle.
+
+
+## VOL-1 ✅ (05/11/2026) Volailles Reproducteurs — effectif par catégorie CALCULÉ (web d'abord, puis poste, Drift v82)
+
+Décision du client (04/11/2026) : même principe que les lapins et les porcs (15.39 à 15.42). Détail technique : `agrierp_laravel/CLAUDE.md` et `agrierp_flutter/CLAUDE.md` (sections VOL-1).
+
+| Point | Décision / livraison |
+|---|---|
+| Catégories | **Reproducteur / Jeune / Poussin** — « Jeune » (ex-« Poulet ») partout : morts, dons, ventes, départ, rationnement, stade de la bande. Jamais « Jeune à maturité ». Emplacements de synchronisation inchangés : `*_repro`, `*_jeune`, `*_sevre` (= Poussin). |
+| Formules | R = Rv − vente − mort − don ; J = Jv + achat − vente − mort − don + p ; P = Pv + éclosions − vente − mort − don − p ; chaque catégorie bornée à 0 ; passage Poussin → Jeune refusé au-delà de la source. |
+| Aucune catégorie « inconnue » | Départ SAISI obligatoire avant toute journée (somme = effectif au début du jour). Sans départ : la fiche le demande et refuse d'enregistrer, la caisse et le push refusent avec un motif français. Jours antérieurs au départ non saisissables. |
+| Bandes existantes | Aucune réécriture : le départ se demande à la première ouverture de la fiche (proposition d'après le stade, reprise d'un geste). Une journée portant des ventes d'avant VOL-1 (non ventilées) ne peut pas porter le départ : le saisir un autre jour. |
+| Ventes par catégorie | `vente_repro/sevre/jeune` ; `vente` = somme ; catégorie = celle du PRODUIT (`products.categorie_effectif`, éditable dans « Ajouter/Modifier un produit », posée par défaut d'après le nom). Produit sans catégorie sur une bande à chaîne : vente refusée. |
+| Rationnement | Lignes « Reproducteur » 130, « Jeune » 80, « Poussin » 30 g/j au barème de l'aviculture. ❓ **VALEURS PROVISOIRES À CONFIRMER AVEC LE CLIENT** (modifiables dans Paramètres Élevage). Pondeuses non touchées. |
+| Mise en service | Serveur ET poste ensemble (comme 3.F4) : un ancien poste voit ses fiches de volailles refusées (« ventilation incomplète », « départ requis »). |
+
+**Glossaire des volailles** : Reproducteur (`repro`, 130 g/j) · Jeune (`jeune`, 80 g/j, ex-« Poulet ») · Poussin (`sevre`, 30 g/j). Stades de bande de l'aviculture : Reproducteur (`reproduction`) · Poussin (`croissance`) · Jeune (`engraissement`) · Ponte (`ponte`, Pondeuses).
+
+**Écart assumé avec la maquette** : `fiche-volailles-reproducteurs.html` dit « Repro » / « Poulet » et un rationnement « par stade » ; le client a décidé « Jeune » et un rationnement par catégorie. Gardé par `test/volailles_effectif_test.dart` (saut si la maquette est absente).
+
+**Ticket suivant « Pondeuses par stade » — à reprendre** : (1) la fiche Pondeuses garde `RationVolaille` (une seule ligne par sous-chaîne « pondeuse », les trois lignes VOL-1 filtrées) ; (2) le stade `ponte` est exclu de `VOLAILLES` : décider s'il a sa propre chaîne/départ et ses emplacements ; (3) barème « Poussin ponte / Poussin en croissance / Poulette / Pondeuse » intact, à confronter aux nouveaux libellés ; (4) `stadesPourEspece('aviculture')` (Reproducteur/Poussin/Jeune/Ponte) et la création de bande (pas encore de demande de départ à la création) ; (5) le refus « départ requis » de la transformation au poste ; (6) rapport à blanc / commande de migration des bandes existantes (non faite) ; (7) valeurs de ration provisoires.
+
+**Non vérifié** : rendu navigateur et Windows réels ; mise en service sur une VRAIE base (migration des produits par le nom : relire la liste, un produit non reconnu reste sans catégorie) ; suites complètes Laravel et Flutter (seuls des tests ciblés ont été lancés).
+
