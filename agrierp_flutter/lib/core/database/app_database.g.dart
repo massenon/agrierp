@@ -463,6 +463,18 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _categorieEffectifMeta = const VerificationMeta(
+    'categorieEffectif',
+  );
+  @override
+  late final GeneratedColumn<String> categorieEffectif =
+      GeneratedColumn<String>(
+        'categorie_effectif',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
       GeneratedColumn<String>(
@@ -514,6 +526,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     stockQty,
     alertThreshold,
     description,
+    categorieEffectif,
     syncStatus,
     isActive,
     updatedAt,
@@ -624,6 +637,15 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         ),
       );
     }
+    if (data.containsKey('categorie_effectif')) {
+      context.handle(
+        _categorieEffectifMeta,
+        categorieEffectif.isAcceptableOrUnknown(
+          data['categorie_effectif']!,
+          _categorieEffectifMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -697,6 +719,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      categorieEffectif: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categorie_effectif'],
+      ),
       syncStatus: $ProductsTable.$convertersyncStatus.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -749,6 +775,11 @@ class Product extends DataClass implements Insertable<Product> {
   /// Description libre, servie avec le produit (ticket F0.67). `null` : aucune.
   final String? description;
 
+  /// Ticket VOL-1 (schéma v82) — catégorie d'effectif d'un produit de l'aviculture : `reproducteur`, `jeune` ou
+  /// `poussin` (`null` pour tous les autres produits). La caisse range la vente de sujets vivants dans cette catégorie
+  /// de la fiche Volailles Reproducteurs ; une vente d'un produit SANS catégorie sur une bande à chaîne est refusée.
+  final String? categorieEffectif;
+
   /// ⚠️ **UN PRODUIT CRÉÉ OU MODIFIÉ AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT**
   /// (ticket F0.67). Défaut `synced` : tout ce qui descend du serveur l'est, et les
   /// lignes d'avant la migration aussi. Le tirage ne touche JAMAIS un produit qui
@@ -770,6 +801,7 @@ class Product extends DataClass implements Insertable<Product> {
     required this.stockQty,
     this.alertThreshold,
     this.description,
+    this.categorieEffectif,
     required this.syncStatus,
     required this.isActive,
     this.updatedAt,
@@ -801,6 +833,9 @@ class Product extends DataClass implements Insertable<Product> {
     }
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || categorieEffectif != null) {
+      map['categorie_effectif'] = Variable<String>(categorieEffectif);
     }
     {
       map['sync_status'] = Variable<String>(
@@ -841,6 +876,9 @@ class Product extends DataClass implements Insertable<Product> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      categorieEffectif: categorieEffectif == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categorieEffectif),
       syncStatus: Value(syncStatus),
       isActive: Value(isActive),
       updatedAt: updatedAt == null && nullToAbsent
@@ -868,6 +906,9 @@ class Product extends DataClass implements Insertable<Product> {
       stockQty: serializer.fromJson<double>(json['stockQty']),
       alertThreshold: serializer.fromJson<double?>(json['alertThreshold']),
       description: serializer.fromJson<String?>(json['description']),
+      categorieEffectif: serializer.fromJson<String?>(
+        json['categorieEffectif'],
+      ),
       syncStatus: $ProductsTable.$convertersyncStatus.fromJson(
         serializer.fromJson<String>(json['syncStatus']),
       ),
@@ -892,6 +933,7 @@ class Product extends DataClass implements Insertable<Product> {
       'stockQty': serializer.toJson<double>(stockQty),
       'alertThreshold': serializer.toJson<double?>(alertThreshold),
       'description': serializer.toJson<String?>(description),
+      'categorieEffectif': serializer.toJson<String?>(categorieEffectif),
       'syncStatus': serializer.toJson<String>(
         $ProductsTable.$convertersyncStatus.toJson(syncStatus),
       ),
@@ -914,6 +956,7 @@ class Product extends DataClass implements Insertable<Product> {
     double? stockQty,
     Value<double?> alertThreshold = const Value.absent(),
     Value<String?> description = const Value.absent(),
+    Value<String?> categorieEffectif = const Value.absent(),
     SyncStatus? syncStatus,
     bool? isActive,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -933,6 +976,9 @@ class Product extends DataClass implements Insertable<Product> {
         ? alertThreshold.value
         : this.alertThreshold,
     description: description.present ? description.value : this.description,
+    categorieEffectif: categorieEffectif.present
+        ? categorieEffectif.value
+        : this.categorieEffectif,
     syncStatus: syncStatus ?? this.syncStatus,
     isActive: isActive ?? this.isActive,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -960,6 +1006,9 @@ class Product extends DataClass implements Insertable<Product> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      categorieEffectif: data.categorieEffectif.present
+          ? data.categorieEffectif.value
+          : this.categorieEffectif,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
           : this.syncStatus,
@@ -984,6 +1033,7 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('stockQty: $stockQty, ')
           ..write('alertThreshold: $alertThreshold, ')
           ..write('description: $description, ')
+          ..write('categorieEffectif: $categorieEffectif, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt')
@@ -1006,6 +1056,7 @@ class Product extends DataClass implements Insertable<Product> {
     stockQty,
     alertThreshold,
     description,
+    categorieEffectif,
     syncStatus,
     isActive,
     updatedAt,
@@ -1027,6 +1078,7 @@ class Product extends DataClass implements Insertable<Product> {
           other.stockQty == this.stockQty &&
           other.alertThreshold == this.alertThreshold &&
           other.description == this.description &&
+          other.categorieEffectif == this.categorieEffectif &&
           other.syncStatus == this.syncStatus &&
           other.isActive == this.isActive &&
           other.updatedAt == this.updatedAt);
@@ -1046,6 +1098,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<double> stockQty;
   final Value<double?> alertThreshold;
   final Value<String?> description;
+  final Value<String?> categorieEffectif;
   final Value<SyncStatus> syncStatus;
   final Value<bool> isActive;
   final Value<DateTime?> updatedAt;
@@ -1064,6 +1117,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.stockQty = const Value.absent(),
     this.alertThreshold = const Value.absent(),
     this.description = const Value.absent(),
+    this.categorieEffectif = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1083,6 +1137,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.stockQty = const Value.absent(),
     this.alertThreshold = const Value.absent(),
     this.description = const Value.absent(),
+    this.categorieEffectif = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1106,6 +1161,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<double>? stockQty,
     Expression<double>? alertThreshold,
     Expression<String>? description,
+    Expression<String>? categorieEffectif,
     Expression<String>? syncStatus,
     Expression<bool>? isActive,
     Expression<DateTime>? updatedAt,
@@ -1125,6 +1181,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (stockQty != null) 'stock_qty': stockQty,
       if (alertThreshold != null) 'alert_threshold': alertThreshold,
       if (description != null) 'description': description,
+      if (categorieEffectif != null) 'categorie_effectif': categorieEffectif,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (isActive != null) 'is_active': isActive,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1146,6 +1203,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<double>? stockQty,
     Value<double?>? alertThreshold,
     Value<String?>? description,
+    Value<String?>? categorieEffectif,
     Value<SyncStatus>? syncStatus,
     Value<bool>? isActive,
     Value<DateTime?>? updatedAt,
@@ -1165,6 +1223,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       stockQty: stockQty ?? this.stockQty,
       alertThreshold: alertThreshold ?? this.alertThreshold,
       description: description ?? this.description,
+      categorieEffectif: categorieEffectif ?? this.categorieEffectif,
       syncStatus: syncStatus ?? this.syncStatus,
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1214,6 +1273,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (categorieEffectif.present) {
+      map['categorie_effectif'] = Variable<String>(categorieEffectif.value);
+    }
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(
         $ProductsTable.$convertersyncStatus.toSql(syncStatus.value),
@@ -1247,6 +1309,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('stockQty: $stockQty, ')
           ..write('alertThreshold: $alertThreshold, ')
           ..write('description: $description, ')
+          ..write('categorieEffectif: $categorieEffectif, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
@@ -34070,6 +34133,39 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _venteReproMeta = const VerificationMeta(
+    'venteRepro',
+  );
+  @override
+  late final GeneratedColumn<int> venteRepro = GeneratedColumn<int>(
+    'vente_repro',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _venteSevreMeta = const VerificationMeta(
+    'venteSevre',
+  );
+  @override
+  late final GeneratedColumn<int> venteSevre = GeneratedColumn<int>(
+    'vente_sevre',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _venteJeuneMeta = const VerificationMeta(
+    'venteJeune',
+  );
+  @override
+  late final GeneratedColumn<int> venteJeune = GeneratedColumn<int>(
+    'vente_jeune',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _catEffReproMeta = const VerificationMeta(
     'catEffRepro',
   );
@@ -34331,6 +34427,9 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
     catDepartRepro,
     catDepartSevre,
     catDepartJeune,
+    venteRepro,
+    venteSevre,
+    venteJeune,
     catEffRepro,
     catEffSevre,
     catEffJeune,
@@ -34538,6 +34637,24 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
           data['cat_depart_jeune']!,
           _catDepartJeuneMeta,
         ),
+      );
+    }
+    if (data.containsKey('vente_repro')) {
+      context.handle(
+        _venteReproMeta,
+        venteRepro.isAcceptableOrUnknown(data['vente_repro']!, _venteReproMeta),
+      );
+    }
+    if (data.containsKey('vente_sevre')) {
+      context.handle(
+        _venteSevreMeta,
+        venteSevre.isAcceptableOrUnknown(data['vente_sevre']!, _venteSevreMeta),
+      );
+    }
+    if (data.containsKey('vente_jeune')) {
+      context.handle(
+        _venteJeuneMeta,
+        venteJeune.isAcceptableOrUnknown(data['vente_jeune']!, _venteJeuneMeta),
       );
     }
     if (data.containsKey('cat_eff_repro')) {
@@ -34829,6 +34946,18 @@ class $LivestockDailyEntriesTable extends LivestockDailyEntries
         DriftSqlType.int,
         data['${effectivePrefix}cat_depart_jeune'],
       ),
+      venteRepro: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}vente_repro'],
+      ),
+      venteSevre: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}vente_sevre'],
+      ),
+      venteJeune: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}vente_jeune'],
+      ),
       catEffRepro: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}cat_eff_repro'],
@@ -34960,6 +35089,14 @@ class LivestockDailyEntry extends DataClass
   final int? catDepartSevre;
   final int? catDepartJeune;
 
+  /// Ticket VOL-1 (schéma v82) — VENTES PAR CATÉGORIE des volailles reproductrices : la catégorie du PRODUIT vendu
+  /// (`products.categorie_effectif`). `vente` en reste la SOMME. Emplacements : `repro` = Reproducteur ; `sevre` =
+  /// Poussin ; `jeune` = Jeune (ex-« Poulet »). Nullables, sans défaut : `null` = non ventilé (autres espèces, fiche
+  /// d'avant le ticket), jamais 0. Posées par la caisse (et reçues du serveur), jamais saisies à la fiche.
+  final int? venteRepro;
+  final int? venteSevre;
+  final int? venteJeune;
+
   /// Effectifs par catégorie DÉRIVÉS (fin de journée), comme `effectif_final` : le serveur les
   /// recalcule sur une bande à chaîne, le poste ne les ENVOIE JAMAIS.
   final int? catEffRepro;
@@ -35021,6 +35158,9 @@ class LivestockDailyEntry extends DataClass
     this.catDepartRepro,
     this.catDepartSevre,
     this.catDepartJeune,
+    this.venteRepro,
+    this.venteSevre,
+    this.venteJeune,
     this.catEffRepro,
     this.catEffSevre,
     this.catEffJeune,
@@ -35103,6 +35243,15 @@ class LivestockDailyEntry extends DataClass
     }
     if (!nullToAbsent || catDepartJeune != null) {
       map['cat_depart_jeune'] = Variable<int>(catDepartJeune);
+    }
+    if (!nullToAbsent || venteRepro != null) {
+      map['vente_repro'] = Variable<int>(venteRepro);
+    }
+    if (!nullToAbsent || venteSevre != null) {
+      map['vente_sevre'] = Variable<int>(venteSevre);
+    }
+    if (!nullToAbsent || venteJeune != null) {
+      map['vente_jeune'] = Variable<int>(venteJeune);
     }
     if (!nullToAbsent || catEffRepro != null) {
       map['cat_eff_repro'] = Variable<int>(catEffRepro);
@@ -35210,6 +35359,15 @@ class LivestockDailyEntry extends DataClass
       catDepartJeune: catDepartJeune == null && nullToAbsent
           ? const Value.absent()
           : Value(catDepartJeune),
+      venteRepro: venteRepro == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venteRepro),
+      venteSevre: venteSevre == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venteSevre),
+      venteJeune: venteJeune == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venteJeune),
       catEffRepro: catEffRepro == null && nullToAbsent
           ? const Value.absent()
           : Value(catEffRepro),
@@ -35294,6 +35452,9 @@ class LivestockDailyEntry extends DataClass
       catDepartRepro: serializer.fromJson<int?>(json['catDepartRepro']),
       catDepartSevre: serializer.fromJson<int?>(json['catDepartSevre']),
       catDepartJeune: serializer.fromJson<int?>(json['catDepartJeune']),
+      venteRepro: serializer.fromJson<int?>(json['venteRepro']),
+      venteSevre: serializer.fromJson<int?>(json['venteSevre']),
+      venteJeune: serializer.fromJson<int?>(json['venteJeune']),
       catEffRepro: serializer.fromJson<int?>(json['catEffRepro']),
       catEffSevre: serializer.fromJson<int?>(json['catEffSevre']),
       catEffJeune: serializer.fromJson<int?>(json['catEffJeune']),
@@ -35363,6 +35524,9 @@ class LivestockDailyEntry extends DataClass
       'catDepartRepro': serializer.toJson<int?>(catDepartRepro),
       'catDepartSevre': serializer.toJson<int?>(catDepartSevre),
       'catDepartJeune': serializer.toJson<int?>(catDepartJeune),
+      'venteRepro': serializer.toJson<int?>(venteRepro),
+      'venteSevre': serializer.toJson<int?>(venteSevre),
+      'venteJeune': serializer.toJson<int?>(venteJeune),
       'catEffRepro': serializer.toJson<int?>(catEffRepro),
       'catEffSevre': serializer.toJson<int?>(catEffSevre),
       'catEffJeune': serializer.toJson<int?>(catEffJeune),
@@ -35414,6 +35578,9 @@ class LivestockDailyEntry extends DataClass
     Value<int?> catDepartRepro = const Value.absent(),
     Value<int?> catDepartSevre = const Value.absent(),
     Value<int?> catDepartJeune = const Value.absent(),
+    Value<int?> venteRepro = const Value.absent(),
+    Value<int?> venteSevre = const Value.absent(),
+    Value<int?> venteJeune = const Value.absent(),
     Value<int?> catEffRepro = const Value.absent(),
     Value<int?> catEffSevre = const Value.absent(),
     Value<int?> catEffJeune = const Value.absent(),
@@ -35472,6 +35639,9 @@ class LivestockDailyEntry extends DataClass
     catDepartJeune: catDepartJeune.present
         ? catDepartJeune.value
         : this.catDepartJeune,
+    venteRepro: venteRepro.present ? venteRepro.value : this.venteRepro,
+    venteSevre: venteSevre.present ? venteSevre.value : this.venteSevre,
+    venteJeune: venteJeune.present ? venteJeune.value : this.venteJeune,
     catEffRepro: catEffRepro.present ? catEffRepro.value : this.catEffRepro,
     catEffSevre: catEffSevre.present ? catEffSevre.value : this.catEffSevre,
     catEffJeune: catEffJeune.present ? catEffJeune.value : this.catEffJeune,
@@ -35548,6 +35718,15 @@ class LivestockDailyEntry extends DataClass
       catDepartJeune: data.catDepartJeune.present
           ? data.catDepartJeune.value
           : this.catDepartJeune,
+      venteRepro: data.venteRepro.present
+          ? data.venteRepro.value
+          : this.venteRepro,
+      venteSevre: data.venteSevre.present
+          ? data.venteSevre.value
+          : this.venteSevre,
+      venteJeune: data.venteJeune.present
+          ? data.venteJeune.value
+          : this.venteJeune,
       catEffRepro: data.catEffRepro.present
           ? data.catEffRepro.value
           : this.catEffRepro,
@@ -35633,6 +35812,9 @@ class LivestockDailyEntry extends DataClass
           ..write('catDepartRepro: $catDepartRepro, ')
           ..write('catDepartSevre: $catDepartSevre, ')
           ..write('catDepartJeune: $catDepartJeune, ')
+          ..write('venteRepro: $venteRepro, ')
+          ..write('venteSevre: $venteSevre, ')
+          ..write('venteJeune: $venteJeune, ')
           ..write('catEffRepro: $catEffRepro, ')
           ..write('catEffSevre: $catEffSevre, ')
           ..write('catEffJeune: $catEffJeune, ')
@@ -35686,6 +35868,9 @@ class LivestockDailyEntry extends DataClass
     catDepartRepro,
     catDepartSevre,
     catDepartJeune,
+    venteRepro,
+    venteSevre,
+    venteJeune,
     catEffRepro,
     catEffSevre,
     catEffJeune,
@@ -35738,6 +35923,9 @@ class LivestockDailyEntry extends DataClass
           other.catDepartRepro == this.catDepartRepro &&
           other.catDepartSevre == this.catDepartSevre &&
           other.catDepartJeune == this.catDepartJeune &&
+          other.venteRepro == this.venteRepro &&
+          other.venteSevre == this.venteSevre &&
+          other.venteJeune == this.venteJeune &&
           other.catEffRepro == this.catEffRepro &&
           other.catEffSevre == this.catEffSevre &&
           other.catEffJeune == this.catEffJeune &&
@@ -35789,6 +35977,9 @@ class LivestockDailyEntriesCompanion
   final Value<int?> catDepartRepro;
   final Value<int?> catDepartSevre;
   final Value<int?> catDepartJeune;
+  final Value<int?> venteRepro;
+  final Value<int?> venteSevre;
+  final Value<int?> venteJeune;
   final Value<int?> catEffRepro;
   final Value<int?> catEffSevre;
   final Value<int?> catEffJeune;
@@ -35838,6 +36029,9 @@ class LivestockDailyEntriesCompanion
     this.catDepartRepro = const Value.absent(),
     this.catDepartSevre = const Value.absent(),
     this.catDepartJeune = const Value.absent(),
+    this.venteRepro = const Value.absent(),
+    this.venteSevre = const Value.absent(),
+    this.venteJeune = const Value.absent(),
     this.catEffRepro = const Value.absent(),
     this.catEffSevre = const Value.absent(),
     this.catEffJeune = const Value.absent(),
@@ -35888,6 +36082,9 @@ class LivestockDailyEntriesCompanion
     this.catDepartRepro = const Value.absent(),
     this.catDepartSevre = const Value.absent(),
     this.catDepartJeune = const Value.absent(),
+    this.venteRepro = const Value.absent(),
+    this.venteSevre = const Value.absent(),
+    this.venteJeune = const Value.absent(),
     this.catEffRepro = const Value.absent(),
     this.catEffSevre = const Value.absent(),
     this.catEffJeune = const Value.absent(),
@@ -35942,6 +36139,9 @@ class LivestockDailyEntriesCompanion
     Expression<int>? catDepartRepro,
     Expression<int>? catDepartSevre,
     Expression<int>? catDepartJeune,
+    Expression<int>? venteRepro,
+    Expression<int>? venteSevre,
+    Expression<int>? venteJeune,
     Expression<int>? catEffRepro,
     Expression<int>? catEffSevre,
     Expression<int>? catEffJeune,
@@ -35992,6 +36192,9 @@ class LivestockDailyEntriesCompanion
       if (catDepartRepro != null) 'cat_depart_repro': catDepartRepro,
       if (catDepartSevre != null) 'cat_depart_sevre': catDepartSevre,
       if (catDepartJeune != null) 'cat_depart_jeune': catDepartJeune,
+      if (venteRepro != null) 'vente_repro': venteRepro,
+      if (venteSevre != null) 'vente_sevre': venteSevre,
+      if (venteJeune != null) 'vente_jeune': venteJeune,
       if (catEffRepro != null) 'cat_eff_repro': catEffRepro,
       if (catEffSevre != null) 'cat_eff_sevre': catEffSevre,
       if (catEffJeune != null) 'cat_eff_jeune': catEffJeune,
@@ -36051,6 +36254,9 @@ class LivestockDailyEntriesCompanion
     Value<int?>? catDepartRepro,
     Value<int?>? catDepartSevre,
     Value<int?>? catDepartJeune,
+    Value<int?>? venteRepro,
+    Value<int?>? venteSevre,
+    Value<int?>? venteJeune,
     Value<int?>? catEffRepro,
     Value<int?>? catEffSevre,
     Value<int?>? catEffJeune,
@@ -36101,6 +36307,9 @@ class LivestockDailyEntriesCompanion
       catDepartRepro: catDepartRepro ?? this.catDepartRepro,
       catDepartSevre: catDepartSevre ?? this.catDepartSevre,
       catDepartJeune: catDepartJeune ?? this.catDepartJeune,
+      venteRepro: venteRepro ?? this.venteRepro,
+      venteSevre: venteSevre ?? this.venteSevre,
+      venteJeune: venteJeune ?? this.venteJeune,
       catEffRepro: catEffRepro ?? this.catEffRepro,
       catEffSevre: catEffSevre ?? this.catEffSevre,
       catEffJeune: catEffJeune ?? this.catEffJeune,
@@ -36211,6 +36420,15 @@ class LivestockDailyEntriesCompanion
     if (catDepartJeune.present) {
       map['cat_depart_jeune'] = Variable<int>(catDepartJeune.value);
     }
+    if (venteRepro.present) {
+      map['vente_repro'] = Variable<int>(venteRepro.value);
+    }
+    if (venteSevre.present) {
+      map['vente_sevre'] = Variable<int>(venteSevre.value);
+    }
+    if (venteJeune.present) {
+      map['vente_jeune'] = Variable<int>(venteJeune.value);
+    }
     if (catEffRepro.present) {
       map['cat_eff_repro'] = Variable<int>(catEffRepro.value);
     }
@@ -36309,6 +36527,9 @@ class LivestockDailyEntriesCompanion
           ..write('catDepartRepro: $catDepartRepro, ')
           ..write('catDepartSevre: $catDepartSevre, ')
           ..write('catDepartJeune: $catDepartJeune, ')
+          ..write('venteRepro: $venteRepro, ')
+          ..write('venteSevre: $venteSevre, ')
+          ..write('venteJeune: $venteJeune, ')
           ..write('catEffRepro: $catEffRepro, ')
           ..write('catEffSevre: $catEffSevre, ')
           ..write('catEffJeune: $catEffJeune, ')
@@ -50796,6 +51017,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<double> stockQty,
       Value<double?> alertThreshold,
       Value<String?> description,
+      Value<String?> categorieEffectif,
       Value<SyncStatus> syncStatus,
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
@@ -50816,6 +51038,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<double> stockQty,
       Value<double?> alertThreshold,
       Value<String?> description,
+      Value<String?> categorieEffectif,
       Value<SyncStatus> syncStatus,
       Value<bool> isActive,
       Value<DateTime?> updatedAt,
@@ -50893,6 +51116,11 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categorieEffectif => $composableBuilder(
+    column: $table.categorieEffectif,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -50987,6 +51215,11 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get categorieEffectif => $composableBuilder(
+    column: $table.categorieEffectif,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
     builder: (column) => ColumnOrderings(column),
@@ -51059,6 +51292,11 @@ class $$ProductsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get categorieEffectif => $composableBuilder(
+    column: $table.categorieEffectif,
+    builder: (column) => column,
+  );
+
   GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
       $composableBuilder(
         column: $table.syncStatus,
@@ -51113,6 +51351,7 @@ class $$ProductsTableTableManager
                 Value<double> stockQty = const Value.absent(),
                 Value<double?> alertThreshold = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> categorieEffectif = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -51131,6 +51370,7 @@ class $$ProductsTableTableManager
                 stockQty: stockQty,
                 alertThreshold: alertThreshold,
                 description: description,
+                categorieEffectif: categorieEffectif,
                 syncStatus: syncStatus,
                 isActive: isActive,
                 updatedAt: updatedAt,
@@ -51151,6 +51391,7 @@ class $$ProductsTableTableManager
                 Value<double> stockQty = const Value.absent(),
                 Value<double?> alertThreshold = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> categorieEffectif = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -51169,6 +51410,7 @@ class $$ProductsTableTableManager
                 stockQty: stockQty,
                 alertThreshold: alertThreshold,
                 description: description,
+                categorieEffectif: categorieEffectif,
                 syncStatus: syncStatus,
                 isActive: isActive,
                 updatedAt: updatedAt,
@@ -67318,6 +67560,9 @@ typedef $$LivestockDailyEntriesTableCreateCompanionBuilder =
       Value<int?> catDepartRepro,
       Value<int?> catDepartSevre,
       Value<int?> catDepartJeune,
+      Value<int?> venteRepro,
+      Value<int?> venteSevre,
+      Value<int?> venteJeune,
       Value<int?> catEffRepro,
       Value<int?> catEffSevre,
       Value<int?> catEffJeune,
@@ -67369,6 +67614,9 @@ typedef $$LivestockDailyEntriesTableUpdateCompanionBuilder =
       Value<int?> catDepartRepro,
       Value<int?> catDepartSevre,
       Value<int?> catDepartJeune,
+      Value<int?> venteRepro,
+      Value<int?> venteSevre,
+      Value<int?> venteJeune,
       Value<int?> catEffRepro,
       Value<int?> catEffSevre,
       Value<int?> catEffJeune,
@@ -67530,6 +67778,21 @@ class $$LivestockDailyEntriesTableFilterComposer
 
   ColumnFilters<int> get catDepartJeune => $composableBuilder(
     column: $table.catDepartJeune,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get venteRepro => $composableBuilder(
+    column: $table.venteRepro,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get venteSevre => $composableBuilder(
+    column: $table.venteSevre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get venteJeune => $composableBuilder(
+    column: $table.venteJeune,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -67778,6 +68041,21 @@ class $$LivestockDailyEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get venteRepro => $composableBuilder(
+    column: $table.venteRepro,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get venteSevre => $composableBuilder(
+    column: $table.venteSevre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get venteJeune => $composableBuilder(
+    column: $table.venteJeune,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get catEffRepro => $composableBuilder(
     column: $table.catEffRepro,
     builder: (column) => ColumnOrderings(column),
@@ -67990,6 +68268,21 @@ class $$LivestockDailyEntriesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get venteRepro => $composableBuilder(
+    column: $table.venteRepro,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get venteSevre => $composableBuilder(
+    column: $table.venteSevre,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get venteJeune => $composableBuilder(
+    column: $table.venteJeune,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get catEffRepro => $composableBuilder(
     column: $table.catEffRepro,
     builder: (column) => column,
@@ -68158,6 +68451,9 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> catDepartRepro = const Value.absent(),
                 Value<int?> catDepartSevre = const Value.absent(),
                 Value<int?> catDepartJeune = const Value.absent(),
+                Value<int?> venteRepro = const Value.absent(),
+                Value<int?> venteSevre = const Value.absent(),
+                Value<int?> venteJeune = const Value.absent(),
                 Value<int?> catEffRepro = const Value.absent(),
                 Value<int?> catEffSevre = const Value.absent(),
                 Value<int?> catEffJeune = const Value.absent(),
@@ -68207,6 +68503,9 @@ class $$LivestockDailyEntriesTableTableManager
                 catDepartRepro: catDepartRepro,
                 catDepartSevre: catDepartSevre,
                 catDepartJeune: catDepartJeune,
+                venteRepro: venteRepro,
+                venteSevre: venteSevre,
+                venteJeune: venteJeune,
                 catEffRepro: catEffRepro,
                 catEffSevre: catEffSevre,
                 catEffJeune: catEffJeune,
@@ -68258,6 +68557,9 @@ class $$LivestockDailyEntriesTableTableManager
                 Value<int?> catDepartRepro = const Value.absent(),
                 Value<int?> catDepartSevre = const Value.absent(),
                 Value<int?> catDepartJeune = const Value.absent(),
+                Value<int?> venteRepro = const Value.absent(),
+                Value<int?> venteSevre = const Value.absent(),
+                Value<int?> venteJeune = const Value.absent(),
                 Value<int?> catEffRepro = const Value.absent(),
                 Value<int?> catEffSevre = const Value.absent(),
                 Value<int?> catEffJeune = const Value.absent(),
@@ -68307,6 +68609,9 @@ class $$LivestockDailyEntriesTableTableManager
                 catDepartRepro: catDepartRepro,
                 catDepartSevre: catDepartSevre,
                 catDepartJeune: catDepartJeune,
+                venteRepro: venteRepro,
+                venteSevre: venteSevre,
+                venteJeune: venteJeune,
                 catEffRepro: catEffRepro,
                 catEffSevre: catEffSevre,
                 catEffJeune: catEffJeune,

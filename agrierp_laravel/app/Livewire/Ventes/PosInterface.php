@@ -523,6 +523,16 @@ class PosInterface extends Component
             return;
         }
 
+        // 🔴→✅ TICKET VOL-1 — BANDE DE VOLAILLES REPRODUCTRICES : la vente se range dans la catégorie du PRODUIT. Un produit
+        // sans catégorie d'effectif, une bande sans départ saisi ou une date antérieure au départ : refus motivé, AVANT
+        // toute écriture (le panier est conservé). Le même contrôle est refait dans `RecordSaleOnFicheElevageAction`.
+        $refusVolailles = app(RecordSaleOnFicheElevageAction::class)->refusDesLignes($this->lignesPourLaFiche(), $soldAt?->format('Y-m-d'));
+        if ($refusVolailles !== null) {
+            $this->dispatch('toast', message: $refusVolailles, type: 'error');
+
+            return;
+        }
+
         // 🔴→✅ TICKET S-T13 — LA VENTE EST REJOUÉE SUR UN INTERBLOCAGE, COMME L'ENVOI DES POSTES (S-T9).
         //
         // Sur MariaDB, quand des postes envoient au même instant des ventes de la même bande, la caisse du web et leur
@@ -774,11 +784,17 @@ class PosInterface extends Component
         // ligne sur le poste Desktop n'avait aucun effet sur la fiche. La
         // recopier là-bas aurait produit deux implémentations d'une même règle.
         app(RecordSaleOnFicheElevageAction::class)->execute(
-            array_map(
-                fn ($item) => ['lot_id' => $item['lot_id'] ?? null, 'qty' => (int) $item['qty']],
-                $this->cart,
-            ),
+            $this->lignesPourLaFiche(),
             $soldAt?->format('Y-m-d'),
+        );
+    }
+
+    /** Ticket VOL-1 — lignes du panier telles que la fiche les lit (le produit donne la catégorie d'effectif). */
+    private function lignesPourLaFiche(): array
+    {
+        return array_map(
+            fn ($item) => ['lot_id' => $item['lot_id'] ?? null, 'qty' => (int) $item['qty'], 'product_id' => $item['product_id'] ?? null],
+            $this->cart,
         );
     }
 

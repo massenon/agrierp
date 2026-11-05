@@ -61,6 +61,11 @@ class Products extends Table {
   /// Description libre, servie avec le produit (ticket F0.67). `null` : aucune.
   TextColumn get description => text().nullable()();
 
+  /// Ticket VOL-1 (schéma v82) — catégorie d'effectif d'un produit de l'aviculture : `reproducteur`, `jeune` ou
+  /// `poussin` (`null` pour tous les autres produits). La caisse range la vente de sujets vivants dans cette catégorie
+  /// de la fiche Volailles Reproducteurs ; une vente d'un produit SANS catégorie sur une bande à chaîne est refusée.
+  TextColumn get categorieEffectif => text().nullable()();
+
   /// ⚠️ **UN PRODUIT CRÉÉ OU MODIFIÉ AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT**
   /// (ticket F0.67). Défaut `synced` : tout ce qui descend du serveur l'est, et les
   /// lignes d'avant la migration aussi. Le tirage ne touche JAMAIS un produit qui
@@ -1535,6 +1540,14 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get catDepartSevre => integer().nullable()();
   IntColumn get catDepartJeune => integer().nullable()();
 
+  /// Ticket VOL-1 (schéma v82) — VENTES PAR CATÉGORIE des volailles reproductrices : la catégorie du PRODUIT vendu
+  /// (`products.categorie_effectif`). `vente` en reste la SOMME. Emplacements : `repro` = Reproducteur ; `sevre` =
+  /// Poussin ; `jeune` = Jeune (ex-« Poulet »). Nullables, sans défaut : `null` = non ventilé (autres espèces, fiche
+  /// d'avant le ticket), jamais 0. Posées par la caisse (et reçues du serveur), jamais saisies à la fiche.
+  IntColumn get venteRepro => integer().nullable()();
+  IntColumn get venteSevre => integer().nullable()();
+  IntColumn get venteJeune => integer().nullable()();
+
   /// Effectifs par catégorie DÉRIVÉS (fin de journée), comme `effectif_final` : le serveur les
   /// recalcule sur une bande à chaîne, le poste ne les ENVOIE JAMAIS.
   IntColumn get catEffRepro => integer().nullable()();
@@ -2365,7 +2378,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 81;
+  int get schemaVersion => 82;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3046,6 +3059,13 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v82 — ticket VOL-1 : ventes par catégorie des fiches (volailles reproductrices) et catégorie d'effectif des produits.
+      if (from < 82) {
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteRepro);
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteSevre);
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteJeune);
+        await _ajouterColonneSiAbsente(m, products, products.categorieEffectif);
       }
       // v81 — ticket MDP-1 : `utilisateurs.must_change_password` (mot de passe temporaire à changer), tiré du serveur.
       if (from < 81) {

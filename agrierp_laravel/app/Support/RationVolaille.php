@@ -30,7 +30,11 @@ class RationVolaille
      */
     public static function tableau(Collection $rations, string $cle, int $effectif): array
     {
-        $triees = $rations->sortBy('stage_label', SORT_STRING)->values();
+        // Ticket VOL-1 : les trois lignes « Reproducteur / Jeune / Poussin » appartiennent à la fiche Reproducteurs
+        // (`CategorieVolaille::tableauReproducteurs`) : elles ne figurent jamais au tableau de la fiche Pondeuses, dont
+        // le comportement reste celui d'avant. (Le ticket « Pondeuses par stade » les reprendra.)
+        $triees = $rations->reject(fn ($r) => CategorieVolaille::estUneLigneDeReproducteurs($r->stage_label))
+            ->sortBy('stage_label', SORT_STRING)->values();
         $rang = $triees->search(fn ($r) => str_contains(Str::lower(Str::ascii(trim((string) $r->stage_label))), $cle));
         $rattachee = $rang !== false;
 

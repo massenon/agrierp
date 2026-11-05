@@ -44,12 +44,26 @@ use InvalidArgumentException;
  * départ saisi n'a PAS de chaîne : rien n'est calculé ni écrit (comportement antérieur inchangé).
  *
  * Les fonctions de calcul (`calculerJour`, `verifierDepart`) sont PURES : aucun accès base.
+ *
+ * 🔁 TICKET VOL-1 (décision client du 04/11/2026) — VOLAILLES REPRODUCTRICES (aviculture, bandes hors stade « ponte »).
+ *   VOLAILLES  R = max(0, Rv − vente_R − mort_R − don_R)
+ *              J = max(0, Jv + achat − vente_J − mort_J − don_J + p)        (les ACHATS vont aux Jeunes)
+ *              P = max(0, Pv + éclosions − vente_P − mort_P − don_P − p)    (les poussins nés vont aux Poussins)
+ *   Emplacements : `repro` = Reproducteur ; `sevre` = Poussin ; `jeune` = Jeune (ex-« Poulet »). `p` = passage Poussin →
+ *   Jeune (`passage_sevre_jeune`), transfert total inchangé, refusé au-delà de la catégorie source (règle D3).
+ *   ⚠️ DIFFÉRENCE AVEC LES LAPINS ET LES PORCS, voulue par le client : AUCUNE catégorie « inconnue » (jamais de null) —
+ *   une mouvement absent y vaut 0, et la bande doit avoir son DÉPART saisi (par catégorie) AVANT toute journée : la fiche
+ *   le demande, l'envoi d'un poste sans départ est refusé. Les ventes sont ventilées (`vente_repro/sevre/jeune`, la
+ *   catégorie du PRODUIT vendu) ; `vente` en reste la somme.
  */
 class EffectifParCategorieService
 {
     public const LAPINS = 'lapins';
 
     public const PORCS = 'porcs';
+
+    /** Ticket VOL-1 — volailles reproductrices (aviculture hors stade « ponte »). */
+    public const VOLAILLES = 'volailles';
 
     /** Code d'espèce de la base → espèce prise en charge. */
     private const ESPECES = ['cuniculture' => self::LAPINS, 'porciculture' => self::PORCS];
@@ -60,6 +74,21 @@ class EffectifParCategorieService
         'don_repro' => 0, 'don_sevre' => 0, 'don_jeune' => 0,
         'passage_sevre_jeune' => 0,
     ];
+
+    /** Ticket VOL-1 — ventes ventilées « connues à zéro » (volailles uniquement). */
+    public const VENTES_CONNUES_A_ZERO = ['vente_repro' => 0, 'vente_sevre' => 0, 'vente_jeune' => 0];
+
+    /**
+     * Ticket VOL-1 — mouvements « connus à zéro » d'une fiche NOUVELLE sur une bande à chaîne : la ventilation des morts,
+     * des dons et du passage, plus, pour les volailles, celle des ventes.
+     *
+     * @return array<string, int>
+     */
+    public static function mouvementsConnusAZeroPour(LivestockLot $lot): array
+    {
+        return self::MOUVEMENTS_CONNUS_A_ZERO
+            + (self::especeDuLot($lot) === self::VOLAILLES ? self::VENTES_CONNUES_A_ZERO : []);
+    }
 
     // ====================================================================== FONCTIONS PURES
 
@@ -74,8 +103,11 @@ class EffectifParCategorieService
      */
     public static function calculerJour(string $espece, array $veille, array $mouvements, ?int $totalFinal = null): EffectifCategoriesJour
     {
-        if (! in_array($espece, [self::LAPINS, self::PORCS], true)) {
+        if (! in_array($espece, [self::LAPINS, self::PORCS, self::VOLAILLES], true)) {
             throw new InvalidArgumentException("Espèce non prise en charge : {$espece}.");
+        }
+        if ($espece === self::VOLAILLES) {
+            return self::calculerJourVolailles($veille, $mouvements, $totalFinal);
         }
         $lapins = $espece === self::LAPINS;
         $m = fn (string $cle): ?int => $mouvements[$cle] ?? null;
@@ -122,6 +154,47 @@ class EffectifParCategorieService
         }
 
         return new EffectifCategoriesJour($repro, $sevre, $jeune, $sommeDifferente, $refus, $passageApplique);
+    }
+
+    /**
+     * Ticket VOL-1 — effectifs par catégorie d'UNE journée de volailles reproductrices (formules en tête de classe).
+     *
+     * Aucune catégorie n'est jamais inconnue : une clé absente ou nulle vaut 0 (la bande a un départ saisi, et l'envoi d'un
+     * poste dont la ventilation est incomplète est refusé en amont). Une veille inconnue (`null`) reste lue comme 0 : la
+     * chaîne des volailles ne contient que des valeurs connues.
+     *
+     * @param  array{repro: ?int, sevre: ?int, jeune: ?int}  $veille
+     * @param  array<string, ?int>  $mouvements  achat, ne, vente_repro/sevre/jeune, mort_*, don_*, passage + transferts
+     */
+    private static function calculerJourVolailles(array $veille, array $mouvements, ?int $totalFinal): EffectifCategoriesJour
+    {
+        $m = fn (string $cle): int => (int) ($mouvements[$cle] ?? 0);
+        $v = fn (string $cle): int => (int) ($veille[$cle] ?? 0);
+
+        $repro = max(0, $v('repro') + $m('transfert_entree_repro')
+            - $m('vente_repro') - $m('mort_repro') - $m('don_repro') - $m('transfert_sortie_repro'));
+
+        // Poussins avant passage : les éclosions entrent, les ventes, morts et dons sortent.
+        $avant = $v('sevre') + $m('ne') + $m('transfert_entree_sevre')
+            - $m('vente_sevre') - $m('mort_sevre') - $m('don_sevre') - $m('transfert_sortie_sevre');
+
+        $passage = $m('passage');
+        $refus = null;
+        $passageApplique = $passage;
+        if ($passage > max(0, $avant)) {
+            $source = max(0, $avant);
+            $passageApplique = $source;
+            $refus = "Passage de stade refusé : {$passage} sujet(s) à faire passer, mais la catégorie source n'en compte que {$source}.";
+        }
+
+        $poussin = max(0, $avant - $passageApplique);
+        // Les ACHATS vont aux Jeunes.
+        $jeune = max(0, $v('jeune') + $m('achat') + $passageApplique + $m('transfert_entree_jeune')
+            - $m('vente_jeune') - $m('mort_jeune') - $m('don_jeune') - $m('transfert_sortie_jeune'));
+
+        $sommeDifferente = $totalFinal === null ? null : (($repro + $poussin + $jeune) !== $totalFinal);
+
+        return new EffectifCategoriesJour($repro, $poussin, $jeune, $sommeDifferente, $refus, $passageApplique);
     }
 
     /**
@@ -207,7 +280,15 @@ class EffectifParCategorieService
 
     public static function especeDuLot(LivestockLot $lot): ?string
     {
-        return self::ESPECES[$lot->species?->code] ?? null;
+        $code = $lot->species?->code;
+
+        // Ticket VOL-1 : l'aviculture se partage entre la fiche Pondeuses (stade « ponte », ticket suivant) et la fiche
+        // Reproducteurs (tous les autres stades) : seules ces dernières ont l'effectif par catégorie.
+        if ($code === 'aviculture') {
+            return $lot->stage === 'ponte' ? null : self::VOLAILLES;
+        }
+
+        return self::ESPECES[$code] ?? null;
     }
 
     /** Une bande a une chaîne exploitable si une de ses fiches porte un départ COMPLET (3 catégories). */

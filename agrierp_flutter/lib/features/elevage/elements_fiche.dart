@@ -11,6 +11,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/navigation_poste.dart';
 import '../../core/widgets/toast_agri.dart';
+import 'categorie_volaille.dart';
 import 'ration_volaille.dart';
 import 'soins_repository.dart';
 
@@ -855,6 +856,8 @@ class ChampLectureFiche extends StatelessWidget {
     this.couleur = AgriColors.outline,
     this.gras = false,
     this.petite = false,
+    this.note,
+    this.cleNote,
   });
 
   final String libelle;
@@ -864,6 +867,10 @@ class ChampLectureFiche extends StatelessWidget {
   final Color couleur;
   final bool gras;
   final bool petite;
+
+  /// Petite ligne sous le champ (`<p class="text-[10px] text-outline mt-xs">`) — ex. ventes PAR CATÉGORIE (VOL-1).
+  final String? note;
+  final Key? cleNote;
 
   @override
   Widget build(BuildContext context) {
@@ -890,6 +897,11 @@ class ChampLectureFiche extends StatelessWidget {
             ),
           ),
         ),
+        if (note != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.xs),
+            child: Text(note!, key: cleNote, style: const TextStyle(fontSize: 10, color: AgriColors.outline)),
+          ),
       ],
     );
   }
@@ -962,6 +974,7 @@ class BlocCategoriesFiche extends StatelessWidget {
     required Map<String, int> valeurs,
     required void Function(String, int) onChange,
     int? dejaEnregistres,
+    String? finMention,
   }) => BlocCategoriesFiche(
     titre: 'Morts par catégorie',
     icone: SymbolesAgri.skull,
@@ -975,8 +988,10 @@ class BlocCategoriesFiche extends StatelessWidget {
     cleMention: 'morts-enregistres',
     mention: dejaEnregistres == null
         ? null
-        : '$dejaEnregistres mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
-              "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+        : finMention == null
+              // Phrase du Blade, en UN SEUL littéral (lue telle quelle par les gardes de fidélité).
+              ? "$dejaEnregistres mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous."
+              : '$dejaEnregistres mort(s) déjà enregistré(s) ce jour, sans répartition par catégorie : $finMention',
   );
 
   static BlocCategoriesFiche dons({
@@ -984,6 +999,7 @@ class BlocCategoriesFiche extends StatelessWidget {
     required Map<String, int> valeurs,
     required void Function(String, int) onChange,
     int? dejaEnregistres,
+    String? finMention,
   }) => BlocCategoriesFiche(
     titre: 'Dons par catégorie',
     icone: SymbolesAgri.redeem,
@@ -997,8 +1013,10 @@ class BlocCategoriesFiche extends StatelessWidget {
     cleMention: 'dons-enregistres',
     mention: dejaEnregistres == null
         ? null
-        : '$dejaEnregistres don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : '
-              "ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous.",
+        : finMention == null
+              // Phrase du Blade, en UN SEUL littéral (lue telle quelle par les gardes de fidélité).
+              ? "$dejaEnregistres don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : ils sont conservés tant qu'aucune répartition n'est saisie ci-dessous."
+              : '$dejaEnregistres don(s) déjà enregistré(s) ce jour, sans répartition par catégorie : $finMention',
   );
 
   @override
@@ -1745,6 +1763,147 @@ class RationVolailleFiche extends StatelessWidget {
             key: const Key('ration-non-rattachee'),
             style: const TextStyle(fontSize: 10, color: AgriColors.errorDeep),
           ),
+      ],
+    );
+  }
+}
+
+/// Ticket VOL-1 — le tableau « Rationnement & Provende Servie par Catégorie (en Grammes g/j) » de la fiche Volailles
+/// Reproducteurs (bloc du Blade `fiche-reproducteurs.blade.php`) : trois lignes FIXES (Reproducteur, Jeune, Poussin),
+/// effectif CALCULÉ (champ grisé), ration du barème, provende. Tant que le départ n'est pas valide ([tableau] `null`),
+/// la demande de départ tient lieu d'effectif : le tableau n'affiche qu'un message, jamais « — » ni 0.
+class RationReproducteursFiche extends StatelessWidget {
+  const RationReproducteursFiche({super.key, required this.tableau});
+
+  final TableauRationReproducteurs? tableau;
+
+  static const infobulle =
+      'Calculé automatiquement depuis le départ, les achats, éclosions, ventes, morts, dons et le passage du jour.';
+
+  @override
+  Widget build(BuildContext context) {
+    const titre = TitreSectionFiche(
+      'Rationnement & Provende Servie par Catégorie (en Grammes g/j)',
+      icone: SymbolesAgri.restaurant,
+    );
+    final t = tableau;
+    if (t == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          titre,
+          const SizedBox(height: AgriSpacing.xs),
+          Container(
+            key: const Key('ration-depart-requis'),
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(
+              color: AgriColors.surfaceZebra,
+              border: Border.all(color: AgriColors.outlineVariant),
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: const Text(
+              "Saisissez l'effectif de départ de la bande pour calculer les effectifs par catégorie et la provende servie.",
+              style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        titre,
+        const SizedBox(height: AgriSpacing.xs),
+        Container(
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+            boxShadow: AgriShadows.sm,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Table(
+            columnWidths: const {0: FlexColumnWidth(3), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(1.8), 3: FlexColumnWidth(1.8)},
+            children: [
+              const TableRow(
+                decoration: BoxDecoration(
+                  color: AgriColors.surfaceZebra,
+                  border: Border(bottom: BorderSide(color: AgriColors.outlineVariant)),
+                ),
+                children: [
+                  CelluleFiche('Catégorie', couleur: AgriColors.outline),
+                  CelluleFiche('Effectif', centre: true, couleur: AgriColors.outline),
+                  CelluleFiche('Ration Normative', centre: true, couleur: AgriColors.outline),
+                  CelluleFiche('Provende Servie (g)', droite: true, couleur: AgriColors.outline),
+                ],
+              ),
+              for (final l in t.lignes)
+                TableRow(
+                  children: [
+                    CelluleFiche(l.libelle, cleTexte: Key('ration-libelle-${l.cle}'), gras: true, couleur: AgriColors.brandForest),
+                    // Le champ GRISÉ du Blade (`disabled`, `w-16 h-8 text-center`) et son info-bulle.
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
+                      child: Center(
+                        child: Tooltip(
+                          key: Key('ration-infobulle-${l.cle}'),
+                          message: infobulle,
+                          child: Container(
+                            width: 64,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AgriColors.surfaceZebra,
+                              border: Border.all(color: AgriColors.outlineVariant),
+                              borderRadius: BorderRadius.circular(AgriRadius.base),
+                            ),
+                            child: Text(
+                              '${l.effectif}',
+                              key: Key('ration-effectif-${l.cle}'),
+                              style: const TextStyle(
+                                fontSize: AgriTypography.xs,
+                                fontWeight: AgriTypography.gras,
+                                color: AgriColors.onSurface,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    CelluleFiche('${l.ration} g/j', cleTexte: Key('ration-normative-${l.cle}'), centre: true),
+                    CelluleFiche(
+                      '${l.totalG} g',
+                      cleTexte: Key('ration-provende-${l.cle}'),
+                      droite: true,
+                      gras: true,
+                      couleur: AgriColors.brandEmerald,
+                    ),
+                  ],
+                ),
+              TableRow(
+                decoration: BoxDecoration(color: AgriColors.brandEmerald.withValues(alpha: 0.10)),
+                children: [
+                  const CelluleFiche(
+                    'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)',
+                    gras: true,
+                    taille: 10,
+                    couleur: AgriColors.brandForest,
+                  ),
+                  const CelluleFiche(''),
+                  const CelluleFiche(''),
+                  CelluleFiche(
+                    t.totalAffiche,
+                    cleTexte: const Key('total-provende'),
+                    droite: true,
+                    gras: true,
+                    taille: AgriTypography.sm,
+                    couleur: AgriColors.brandEmerald,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

@@ -1,5 +1,6 @@
 import '../../core/database/app_database.dart';
 import 'categorie_ration_lapin.dart';
+import 'categorie_volaille.dart';
 
 /// Une ligne du rationnement avicole : `effectif` / `totalG` `null` = inconnus (« — »).
 class LigneRationVolaille {
@@ -29,10 +30,17 @@ abstract final class RationVolaille {
   static const reproducteur = 'reproducteur';
 
   static List<LigneRationVolaille> lignes(
-    List<FeedRationStandard> rations,
+    List<FeedRationStandard> toutes,
     String cle,
     int effectif,
   ) {
+    // Ticket VOL-1 : les trois lignes « Reproducteur / Jeune / Poussin » appartiennent à la fiche Reproducteurs
+    // (`CategorieVolaille.tableauReproducteurs`) : elles ne figurent jamais au tableau de la fiche Pondeuses, dont le
+    // comportement reste celui d'avant (`RationVolaille::tableau` du serveur).
+    final rations = [
+      for (final r in toutes)
+        if (!CategorieVolaille.estUneLigneDeReproducteurs(r.stageLabel)) r,
+    ];
     final rang = rations.indexWhere(
       (r) => CategorieRationLapin.normaliser(r.stageLabel).contains(cle),
     );

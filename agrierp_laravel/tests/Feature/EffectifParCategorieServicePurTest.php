@@ -313,7 +313,7 @@ class EffectifParCategorieServicePurTest extends TestCase
     public function test_espece_non_prise_en_charge_est_refusee(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        S::calculerJour('volailles', $this->etat(1, 1, 1), $this->mv(), 3);
+        S::calculerJour('escargots', $this->etat(1, 1, 1), $this->mv(), 3);   // VOL-1 : « volailles » est désormais prise en charge
     }
 
     public function test_les_colonnes_de_sortie_sont_celles_du_schema(): void

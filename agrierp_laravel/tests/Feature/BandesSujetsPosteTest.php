@@ -171,14 +171,15 @@ class BandesSujetsPosteTest extends TestCase
 
     public function test_une_bande_videe_par_une_fiche_du_poste_peut_ensuite_etre_archivee(): void
     {
-        $this->pousserBandes($this->bande())->assertOk();
+        // VOL-1 : bande « ponte » (hors chaîne des reproducteurs, qui exige un départ avant toute fiche).
+        $this->pousserBandes($this->bande(['stage' => 'ponte']))->assertOk();
         $this->envoyer(['livestock_daily_entries' => [[
             'id' => self::FICHE, 'lot_id' => self::LOT, 'entry_date' => '2026-10-20',
             'achat' => 0, 'ne' => 0, 'mort' => 10, 'vente' => 20, 'don' => 10, 'effectif_final' => 0,
         ]]])->assertJsonPath('livestock_daily_entries.accepted', [self::FICHE]);
         $this->assertSame(0, (int) LivestockLot::findOrFail(self::LOT)->current_quantity);
 
-        $this->pousserBandes($this->bande(['is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+        $this->pousserBandes($this->bande(['stage' => 'ponte', 'is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
 
         $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
     }
@@ -347,7 +348,7 @@ class BandesSujetsPosteTest extends TestCase
     public function test_la_bande_et_sa_fiche_du_meme_envoi_sont_acceptees_dans_l_ordre(): void
     {
         $paquet = [
-            'livestock_lots' => [$this->bande()],
+            'livestock_lots' => [$this->bande(['stage' => 'ponte'])],   // VOL-1 : hors chaîne des reproducteurs
             'livestock_daily_entries' => [[
                 'id' => self::FICHE, 'lot_id' => self::LOT, 'entry_date' => '2026-10-20',
                 'achat' => 0, 'ne' => 6, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 46,

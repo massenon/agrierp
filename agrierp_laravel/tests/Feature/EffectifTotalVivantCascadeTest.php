@@ -93,14 +93,19 @@ class EffectifTotalVivantCascadeTest extends TestCase
     {
         $lot = $this->bande('AVI-REP-01', 'reproduction', 60);
 
+        // VOL-1 : le départ par catégorie est exigé avant toute journée (J1) ; une fiche d'avant J1 n'est plus saisissable.
         $fiche = Livewire::test(FicheReproducteurs::class)
             ->set('selectedLotId', $lot->id)
+            ->call('loadDay', self::J1)
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
+            ->call('saveDay')
             ->call('loadDay', self::J2)
             ->set('poussinsNes', 10)
             ->call('saveDay');
 
         $this->assertSame(70, (int) $lot->fresh()->current_quantity);
 
+        // J1 corrigé APRÈS J2 : 5 morts de Reproducteur.
         $fiche->call('loadDay', self::J1)
             ->set('mortRepro', 5)
             ->call('saveDay');
@@ -140,7 +145,7 @@ class EffectifTotalVivantCascadeTest extends TestCase
      */
     public function test_enregistrer_sujets_une_entree_antidatee_recalcule_la_bande(): void
     {
-        $lot = $this->bande('AVI-REP-02', 'reproduction', 60);
+        $lot = $this->bande('AVI-REP-02', 'ponte', 60);   // VOL-1 : généralité de la cascade (une bande « reproduction » exige un départ)
 
         $saisie = fn (string $jour, int $quantite) => Livewire::test(EnregistrerSujets::class)
             ->set('species_id', $this->aviculture->id)
@@ -172,6 +177,9 @@ class EffectifTotalVivantCascadeTest extends TestCase
 
         Livewire::test(FicheReproducteurs::class)
             ->set('selectedLotId', $repro->id)
+            ->call('loadDay', self::J1)
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
+            ->call('saveDay')
             ->call('loadDay', self::J2)
             ->set('poussinsNes', 10)
             ->call('saveDay')

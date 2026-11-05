@@ -84,7 +84,7 @@ class CaisseWebInterblocageTest extends TestCase
             'price_min' => 3_000, 'price_max' => 4_000, 'tva_rate' => 0, 'stock_qty' => 50, 'is_active' => true,
         ]);
         $this->bande = LivestockLot::create([
-            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'engraissement',
+            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'ponte',
             'initial_quantity' => 300, 'current_quantity' => 300,
             'created_date' => '2026-10-01', 'status' => 'actif', 'is_active' => true,
         ]);

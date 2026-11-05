@@ -51,8 +51,8 @@ class TransfertsRepository {
       EffectifParCategorie.categorieDuStade(stade);
 
   /// Libellés des catégories d'une espèce (glossaire du 17/10/2026 pour les lapins).
-  static Map<String, String> libellesCategories(String? codeEspece) =>
-      switch (EffectifParCategorie.especeDuCode(codeEspece)) {
+  static Map<String, String> libellesCategories(String? codeEspece, {String? stade}) =>
+      switch (EffectifParCategorie.especeDuCode(codeEspece, stade: stade)) {
         EffectifParCategorie.lapins => const {
           'repro': 'Reproducteur',
           'sevre': 'Sous-mères',
@@ -62,6 +62,12 @@ class TransfertsRepository {
           'repro': 'Reproducteur',
           'sevre': 'Porcelet',
           'jeune': 'Porc Marchand',
+        },
+        // Ticket VOL-1 : volailles reproductrices — Reproducteur / Poussin / Jeune.
+        EffectifParCategorie.volailles => const {
+          'repro': 'Reproducteur',
+          'sevre': 'Poussin',
+          'jeune': 'Jeune',
         },
         _ => const {},
       };
@@ -270,9 +276,9 @@ class TransfertsRepository {
     }
 
     final aCategories =
-        EffectifParCategorie.especeDuCode(source.speciesCode) != null;
+        EffectifParCategorie.especeDuCode(source.speciesCode, stade: source.stage) != null;
     if (aCategories && !categories.contains(categorie)) {
-      refus('Lapins et porcs : précisez la catégorie des sujets transférés.');
+      refus('Lapins, porcs et volailles reproductrices : précisez la catégorie des sujets transférés.');
     }
     if (!aCategories && categorie != null) {
       refus(
@@ -345,7 +351,7 @@ class TransfertsRepository {
     }
 
     if (categorie == null) return;
-    final libelles = libellesCategories(lot.speciesCode);
+    final libelles = libellesCategories(lot.speciesCode, stade: lot.stage);
     int? cat(LivestockDailyEntry f) => switch (categorie) {
       'repro' => f.catEffRepro,
       'sevre' => f.catEffSevre,

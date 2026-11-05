@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Services\AccountingEntryService;
+use App\Services\EffectifParCategorieService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -43,6 +44,7 @@ class SaisieSujetAction
 
         return DB::transaction(function () use ($lotId, $origine, $quantite, $date) {
             $lot = LivestockLot::lockForUpdate()->findOrFail($lotId);
+            $this->refuserSiVolaillesSansDepart($lot, $origine, $date);
             $fiche = $this->ajouterSurLaFiche($lotId, $origine, $quantite, $date);
 
             $this->terminer($lot, [$date]);
@@ -66,6 +68,7 @@ class SaisieSujetAction
         return DB::transaction(function () use ($lotId, $dateAncienne, $origineAncienne, $origine, $quantite, $date) {
             $lot = LivestockLot::lockForUpdate()->findOrFail($lotId);
             $ancienne = $this->ficheAvecEntree($lotId, $dateAncienne, $origineAncienne);
+            $this->refuserSiVolaillesSansDepart($lot, $origine, $date);
 
             if ($dateAncienne === $date && $origineAncienne === $origine) {
                 // Même cellule : la quantité REMPLACE l'ancienne (ajouter la doublerait).
@@ -101,6 +104,32 @@ class SaisieSujetAction
             $this->terminer($lot, [$date]);
             AuditLog::record('livestock_entry.archived', 'elevage', null, $fiche);
         });
+    }
+
+    /**
+     * Ticket VOL-1 — BANDE DE VOLAILLES REPRODUCTRICES : l'effectif est suivi par catégorie, sans catégorie inconnue.
+     * (a) la bande doit avoir son départ (fiche Volailles Reproducteurs) avant toute entrée, et l'entrée ne peut pas
+     * précéder le départ ; (b) un don est une sortie qui doit être RANGÉE dans une catégorie : il se saisit sur la fiche
+     * (morts et dons ventilés), pas dans ce journal. Naissance (→ Poussin) et achat (→ Jeune) n'ont pas d'ambiguïté.
+     */
+    private function refuserSiVolaillesSansDepart(LivestockLot $lot, string $origine, string $date): void
+    {
+        $lot->loadMissing('species');
+        if (EffectifParCategorieService::especeDuLot($lot) !== EffectifParCategorieService::VOLAILLES) {
+            return;
+        }
+
+        if ($origine === 'Don') {
+            throw ValidationException::withMessages(['origine' => 'Pour une bande de volailles reproductrices, les dons se saisissent sur la fiche Volailles Reproducteurs, ventilés par catégorie (Reproducteur, Jeune, Poussin).']);
+        }
+
+        $tete = app(EffectifParCategorieService::class)->teteDeChaine($lot->id);
+        if ($tete === null) {
+            throw ValidationException::withMessages(['entry_date' => "L'effectif de départ par catégorie de la bande {$lot->code} n'est pas saisi : ouvrez la fiche Volailles Reproducteurs et saisissez-le avant toute entrée."]);
+        }
+        if ($date < $tete->entry_date->format('Y-m-d')) {
+            throw ValidationException::withMessages(['entry_date' => "Cette date précède l'effectif de départ de la bande {$lot->code} (fixé le {$tete->entry_date->format('d/m/Y')}) : elle n'est pas saisissable."]);
+        }
     }
 
     private function refuserSiExerciceClos(string $date): void

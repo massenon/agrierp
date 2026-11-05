@@ -120,6 +120,8 @@ class MotifsRefusPush
             'passage_sevre_jeune' => 'passage de stade',
             'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ sous-mères ou porcelets',
             'cat_depart_jeune' => 'effectif de départ jeunes lapins ou porcs marchands',
+            // Ticket VOL-1 — ventes par catégorie des volailles reproductrices.
+            'vente_repro' => 'ventes de reproducteurs', 'vente_sevre' => 'ventes de poussins', 'vente_jeune' => 'ventes de jeunes',
         ];
     }
 
@@ -164,8 +166,13 @@ class MotifsRefusPush
     // ====================================================================== Ticket 15.40 — ventilation par catégorie
 
     /** Les trois catégories d'une ventilation (morts ou dons) doivent être renseignées ensemble. */
-    public static function ventilationIncomplete(string $libelle): string
+    public static function ventilationIncomplete(string $libelle, bool $volailles = false): string
     {
+        if ($volailles) {
+            return "Ventilation incomplète : les trois catégories des {$libelle} (Reproducteur, Jeune, Poussin) "
+                .'doivent être renseignées ensemble (0 si la catégorie est vide).';
+        }
+
         return "Ventilation incomplète : les trois catégories des {$libelle} (reproducteurs, jeunes ou porcelets, "
             .'lapins de chair ou porcs marchands) doivent être renseignées ensemble (0 si la catégorie est vide).';
     }
@@ -191,10 +198,46 @@ class MotifsRefusPush
         return "Effectif de départ refusé : effectif de départ déjà fixé le {$dateFr} pour cette bande.";
     }
 
-    /** L'effectif par catégorie n'est suivi que pour les lapins et les porcs. */
+    /** L'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles reproductrices. */
     public static function departEspeceNonPrise(): string
     {
-        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins et les porcs.";
+        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles reproductrices.";
+    }
+
+    // ====================================================================== Ticket VOL-1 — volailles reproductrices
+
+    /** VOL-1 : une bande de volailles reproductrices doit avoir son départ par catégorie AVANT toute journée. */
+    public static function departRequisVolailles(string $bande): string
+    {
+        return "Fiche refusée : l'effectif de départ par catégorie (Reproducteur, Jeune, Poussin) de la bande {$bande} "
+            .'n\'est pas saisi. Saisissez-le d\'abord sur la fiche Volailles Reproducteurs, puis renvoyez la fiche.';
+    }
+
+    /** VOL-1 : un jour antérieur au départ n'est pas saisissable (jamais d'effectif inconnu affiché). */
+    public static function jourAvantLeDepart(string $dateFr): string
+    {
+        return "Fiche refusée : cette journée précède l'effectif de départ de la bande (fixé le {$dateFr}). "
+            .'Les jours antérieurs au départ ne sont pas saisissables.';
+    }
+
+    /** VOL-1 : la vente d'un produit sans catégorie d'effectif sur une bande de volailles reproductrices. */
+    public static function venteSansCategorie(string $produit): string
+    {
+        return "Vente refusée : le produit « {$produit} » n'a pas de catégorie d'effectif (Reproducteur, Jeune ou Poussin). "
+            .'Renseignez-la dans « Modifier un produit » avant de le vendre sur une bande de volailles reproductrices.';
+    }
+
+    /** VOL-1 : vente datée avant le départ d'une bande de volailles reproductrices. */
+    public static function venteAvantLeDepart(string $dateVente, string $dateDepart): string
+    {
+        return "Vente refusée : la date de la vente ({$dateVente}) précède l'effectif de départ de la bande (fixé le {$dateDepart}).";
+    }
+
+    /** VOL-1 : vente sur une bande de volailles reproductrices dont le départ n'est pas encore saisi. */
+    public static function venteSansDepart(string $bande): string
+    {
+        return "Vente refusée : l'effectif de départ par catégorie de la bande {$bande} n'est pas saisi. "
+            .'Ouvrez la fiche Volailles Reproducteurs et saisissez-le avant toute vente de cette bande.';
     }
 
     /** Ticket S1 : un compte de vente envoie une fiche qui contient des saisies d'élevage. */

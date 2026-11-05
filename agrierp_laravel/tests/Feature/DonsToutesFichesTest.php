@@ -66,8 +66,34 @@ class DonsToutesFichesTest extends TestCase
         return [
             'pondeuses' => [FichePondeuses::class, 'aviculture', 'ponte', ['donRepro', 'donPoulette', 'donPoussin']],
             'escargots' => [FicheEscargots::class, 'helico', 'engraissement', ['donBorde', 'donEngraissement', 'donNaissain']],
-            'reproducteurs' => [FicheReproducteurs::class, 'aviculture', 'reproduction', ['donRepro', 'donPoulet', 'donPoussin']],
+            // VOL-1 : la fiche Reproducteurs a désormais un départ obligatoire et des dons ventilés rechargés par catégorie :
+            // ses dons sont couverts par `test_reproducteurs_*` ci-dessous et par VolaillesEffectifParCategorieTest.
         ];
+    }
+
+    /** VOL-1 — dons de la fiche Reproducteurs : ventilés, réduisent l'effectif et sortent du stock, une seule fois. */
+    public function test_reproducteurs_les_dons_ventiles_reduisent_l_effectif_sortent_du_stock_et_se_rechargent(): void
+    {
+        $lot = $this->bande('aviculture', 'reproduction');
+
+        Livewire::test(FicheReproducteurs::class)
+            ->set('departRepro', 40)->set('departJeune', 15)->set('departSevre', 5)
+            ->set('donRepro', 2)->set('donPoussin', 1)
+            ->assertSee('Dons par catégorie')
+            ->call('saveDay');
+
+        $fiche = LivestockDailyEntry::where('lot_id', $lot->id)->sole();
+        // 60 − 3 dons = 57 ; stock 10 − 3 = 7 ; catégories 38 / 15 / 4.
+        $this->assertSame([3, 57], [(int) $fiche->don, (int) $fiche->effectif_final]);
+        $this->assertSame([2, 1, 0], [(int) $fiche->don_repro, (int) $fiche->don_sevre, (int) $fiche->don_jeune]);
+        $this->assertSame([38, 15, 4], [(int) $fiche->cat_eff_repro, (int) $fiche->cat_eff_jeune, (int) $fiche->cat_eff_sevre]);
+        $this->assertSame(7.0, (float) $this->produit->fresh()->stock_qty);
+
+        Livewire::test(FicheReproducteurs::class)
+            ->call('loadDay', now()->toDateString())
+            ->assertSet('donRepro', 2)->assertSet('donPoussin', 1)->assertSet('donPoulet', 0)->assertSet('donEnregistre', null)
+            ->call('saveDay');
+        $this->assertSame(7.0, (float) $this->produit->fresh()->stock_qty, 'calcul par écart : rien ne sort deux fois');
     }
 
     #[DataProvider('fiches')]
@@ -108,7 +134,7 @@ class DonsToutesFichesTest extends TestCase
     /** 🔴 Un don saisi au POSTE sort lui aussi du stock, une seule fois même si l'envoi est répété. */
     public function test_un_don_recu_du_poste_sort_du_stock_par_ecart(): void
     {
-        $lot = $this->bande('aviculture', 'reproduction');
+        $lot = $this->bande('aviculture', 'ponte');   // VOL-1 : « ponte » = hors chaîne des reproducteurs
         Sanctum::actingAs(auth()->user());
         $fiche = fn (int $don) => ['livestock_daily_entries' => [[
             'id' => '55555555-5555-4555-8555-555555555555', 'lot_id' => $lot->id,

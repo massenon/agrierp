@@ -2886,6 +2886,8 @@ class SyncController extends Controller
     private const FICHE_COLONNES_VENTILATION = [
         'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune',
         'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        // Ticket VOL-1 : ventes par catégorie (volailles reproductrices). Même règle : `null` = clé absente.
+        'vente_repro', 'vente_sevre', 'vente_jeune',
     ];
 
     /** Ticket 15.40 — effectifs par catégorie DÉRIVÉS (comme `effectif_final`) : jamais saisis sur une bande à chaîne. */
@@ -2902,6 +2904,7 @@ class SyncController extends Controller
     private const FICHE_COLONNES_MOUVEMENT = [
         'achat', 'ne', 'mort', 'vente', 'don', 'mort_repro', 'mort_sevre', 'mort_jeune',
         'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        'vente_repro', 'vente_sevre', 'vente_jeune',
     ];
 
     /**
@@ -2921,7 +2924,7 @@ class SyncController extends Controller
      */
     private function modifieAutreChoseQueLaVente(array $fiche, ?LivestockDailyEntry $existant): bool
     {
-        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant'];
+        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant', 'vente_repro', 'vente_sevre', 'vente_jeune'];
         $aZeroParDefaut = array_merge(self::FICHE_COLONNES_NOT_NULL, ['don'], self::FICHE_COLONNES_VENTILATION);
 
         foreach (array_diff_key($fiche, array_flip($libres)) as $colonne => $valeur) {
@@ -3001,14 +3004,26 @@ class SyncController extends Controller
         $dateTete = $tete?->entry_date->format('Y-m-d') ?? ($departCompletIci ? $jour : null);
         $dansLaChaine = $dateTete !== null && $jour >= $dateTete && EffectifParCategorieService::especeDuLot($lot) !== null;
 
-        $groupes = ['mort' => 'morts', 'don' => 'dons'];
+        // 🔁 TICKET VOL-1 — VOLAILLES REPRODUCTRICES : la bande DOIT avoir son départ avant toute journée (aucune catégorie
+        // « inconnue » sur cette fiche, décision du client), les ventes sont ventilées comme les morts et les dons.
+        $volailles = EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::VOLAILLES;
+        if ($volailles && ($existant === null || $this->porteUneColonneDeSaisie($entry))) {
+            if ($dateTete === null) {
+                $this->refuserFiche(MotifsRefusPush::departRequisVolailles($lot->code));
+            }
+            if ($jour < $dateTete) {
+                $this->refuserFiche(MotifsRefusPush::jourAvantLeDepart(Carbon::parse($dateTete)->format('d/m/Y')));
+            }
+        }
+
+        $groupes = ['mort' => 'morts', 'don' => 'dons'] + ($volailles ? ['vente' => 'ventes'] : []);
         $erreurs = [];
 
         // (b) clés de ventilation : les trois ou aucune.
         foreach ($groupes as $total => $libelle) {
             $presentes = array_filter(["{$total}_repro", "{$total}_sevre", "{$total}_jeune"], fn ($c) => array_key_exists($c, $entry));
             if ($presentes !== [] && count($presentes) < 3) {
-                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle);
+                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle, $volailles);
             }
         }
         if ($erreurs !== []) {
@@ -3151,6 +3166,10 @@ class SyncController extends Controller
                     'cat_depart_repro' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_sevre' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_jeune' => ['nullable', 'integer', 'min:0'],
+                    // Ticket VOL-1 — ventes par catégorie (volailles reproductrices), même règle.
+                    'vente_repro' => ['nullable', 'integer', 'min:0'],
+                    'vente_sevre' => ['nullable', 'integer', 'min:0'],
+                    'vente_jeune' => ['nullable', 'integer', 'min:0'],
                     // 🔴→✅ TICKET S1 — colonnes que `fill()` écrivait SANS contrôle : effectifs négatifs, produit
                     // inexistant (violation de clé étrangère, donc erreur 500 pour tout l'envoi), sexe hors liste.
                     'effectif_m' => ['nullable', 'integer', 'min:0'],
@@ -3267,7 +3286,9 @@ class SyncController extends Controller
                 // bien qu'une fiche réduite (F0.90) n'a plus de vente « déjà portée » à protéger.
                 $porteLesVentes = $existant === null && $fusionnee === null;
                 if ($existant !== null || $fusionnee !== null) {
-                    unset($entry['vente'], $validated['vente']);
+                    // Ticket VOL-1 : la vente ventilée appartient au serveur au même titre que `vente` (dont elle est la somme).
+                    unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'],
+                        $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune']);
                 }
 
                 if ($fusionnee !== null) {
@@ -3446,7 +3467,8 @@ class SyncController extends Controller
      */
     private function fusionnerFiche(array $entry, array $validated, LivestockDailyEntry $occupante, array &$cascades): array
     {
-        unset($entry['vente'], $validated['vente']);
+        unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'],
+            $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune']);
         $sansSaisie = ! $this->modifieAutreChoseQueLaVente($validated, null)
             || ! $this->modifieAutreChoseQueLaVente($validated, $occupante);
         $etatAvant = ['ne' => (int) $occupante->ne, 'mort' => (int) $occupante->mort, 'don' => (int) ($occupante->don ?? 0)];
@@ -6734,7 +6756,18 @@ class SyncController extends Controller
             if ($fiche === null) {
                 continue;
             }
+            // Ticket VOL-1 : la vente ventilée suit (volailles reproductrices : catégorie du produit de la ligne). Si la
+            // catégorie est INTROUVABLE (produit devenu sans catégorie depuis le tirage du poste), on ne devine pas : la fiche
+            // reçue n'est pas touchée (`vente` et `vente_*` restent la somme l'un de l'autre), la vente refusée est signalée.
+            $lotDeLaLigne = LivestockLot::with('species')->find($lot);
+            $emplacement = app(RecordSaleOnFicheElevageAction::class)->emplacementDeLaLigne($lotDeLaLigne, $ligne);
+            if ($lotDeLaLigne !== null && EffectifParCategorieService::especeDuLot($lotDeLaLigne) === EffectifParCategorieService::VOLAILLES && $emplacement === null) {
+                continue;
+            }
             $fiche->vente = max(0, (int) $fiche->vente - $qte);
+            if ($emplacement !== null && $fiche->{"vente_{$emplacement}"} !== null) {
+                $fiche->{"vente_{$emplacement}"} = max(0, (int) $fiche->{"vente_{$emplacement}"} - $qte);
+            }
             $fiche->effectif_final = $fiche->effectifFinalDepuis($fiche->previousEffectif());
             $fiche->save();
             app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot, $jour);

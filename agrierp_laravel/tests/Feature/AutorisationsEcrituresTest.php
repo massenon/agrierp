@@ -96,6 +96,9 @@ class AutorisationsEcrituresTest extends TestCase
      */
     public function test_a_reader_cannot_change_the_ration_referential(): void
     {
+        // Les trois lignes des volailles reproductrices (VOL-1) existent déjà : le lecteur n'en ajoute aucune.
+        $avant = \App\Models\FeedRationStandard::count();
+
         Livewire::actingAs($this->lecteur())
             ->test(\App\Livewire\Elevage\ParametresElevage::class)
             ->set('ration_species_code', 'cuniculture')
@@ -104,7 +107,7 @@ class AutorisationsEcrituresTest extends TestCase
             ->call('saveRation')
             ->assertForbidden();
 
-        $this->assertEquals(0, \App\Models\FeedRationStandard::count());
+        $this->assertEquals($avant, \App\Models\FeedRationStandard::count());
     }
 
     /** ⚠️ Les données de l'entreprise figurent sur toutes les pièces émises. */

@@ -23,6 +23,9 @@ class Product extends Model
         'sku', 'name', 'description', 'category_id', 'unit', 'pricing_mode',
         'price_min', 'price_max', 'tva_rate', 'stock_qty',
         'alert_threshold', 'species_id', 'is_active',
+        // Ticket VOL-1 : catégorie d'effectif (reproducteur / jeune / poussin) des produits de l'aviculture-reproducteurs ;
+        // la caisse range la vente dans cette catégorie. Null pour tous les autres produits.
+        'categorie_effectif',
     ];
 
     protected function casts(): array

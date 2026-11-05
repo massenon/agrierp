@@ -46,6 +46,7 @@ class CategoriesJour {
     this.departDate,
     this.depart,
     this.ancien,
+    this.proposition,
   });
 
   final String mode;
@@ -60,8 +61,82 @@ class CategoriesJour {
   final EffectifCategories? depart;
   final TeteImplicite? ancien;
 
+  /// Ticket VOL-1 — départ PROPOSÉ d'après le stade de la bande (volailles reproductrices) : jamais appliqué seul,
+  /// l'éleveur le reprend d'un geste explicite (`appliquerPropositionDepart` du web).
+  final EffectifCategories? proposition;
+
   static String _date(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  /// Ticket VOL-1 — `getCategoriesJourProperty()` de la fiche Volailles Reproducteurs du web, instruction pour
+  /// instruction. DIFFÉRENCE AVEC LES LAPINS (décision du client) : aucune catégorie « inconnue » — les effectifs ne
+  /// sont `null` QUE tant que le départ n'est pas valide, et la vue affiche alors la demande de départ. Modes :
+  /// `depart_requis` | `avant_depart` | `refus` | `chaine`.
+  static CategoriesJour calculerVolailles({
+    required EtatJour? etat,
+    required EffectifCategories departSaisi,
+    required int effectifPrecedent,
+    required MouvementsJour mouvements,
+    required int effectifFinal,
+    required DateTime jour,
+    required EffectifCategories? proposition,
+  }) {
+    if (etat == null) return const CategoriesJour(mode: 'depart_requis', departRequis: true);
+    var veille = etat.veille;
+    final sansChaine = etat.mode == 'sans_chaine';
+    final mode = sansChaine ? 'depart_requis' : etat.mode;
+
+    CategoriesJour sortie({String? m}) => CategoriesJour(
+      mode: mode,
+      motif: m,
+      departRequis: sansChaine,
+      departDate: etat.departDate,
+      depart: etat.depart,
+      proposition: sansChaine ? proposition : null,
+    );
+
+    if (sansChaine) {
+      final saisis = [departSaisi.repro, departSaisi.sevre, departSaisi.jeune];
+      if (saisis.contains(null)) {
+        return sortie(
+          m: saisis.any((v) => v != null)
+              ? EffectifParCategorie.verifierDepart(departSaisi, effectifPrecedent)
+              : etat.refus,
+        );
+      }
+      final motif = EffectifParCategorie.verifierDepart(departSaisi, effectifPrecedent);
+      if (motif != null) return sortie(m: motif);
+      veille = departSaisi; // aperçu : le départ saisi est l'effectif au DÉBUT du jour (D4)
+    }
+
+    if (veille == null) return sortie(m: etat.refus); // avant le départ ou départ stocké refusé
+
+    final r = EffectifParCategorie.calculerJour(
+      EffectifParCategorie.volailles,
+      veille,
+      mouvements,
+      totalFinal: effectifFinal,
+    );
+    return CategoriesJour(
+      mode: mode,
+      repro: r.repro,
+      sevre: r.sevre,
+      jeune: r.jeune,
+      motif: etat.refus,
+      refusPassage: r.refus,
+      avertissements: [
+        // D8 : avertissement DATÉ, jamais un blocage.
+        if (r.sommeDifferente == true)
+          'Avertissement — fiche du ${_date(jour)} : la somme des catégories (${r.somme}) diffère '
+              "de l'effectif total ($effectifFinal). Un effectif de catégorie ne descend jamais sous 0 : vérifiez "
+              'les ventes, morts et dons saisis.',
+      ],
+      departRequis: sansChaine,
+      departDate: etat.departDate,
+      depart: etat.depart,
+      proposition: sansChaine ? proposition : null,
+    );
+  }
 
   /// `calculerCategoriesJour()` du web, instruction pour instruction. [etat] : `etatPourJour` de la bande au jour
   /// choisi (`null` sans bande) ; [departSaisi] : les trois champs « Effectif de départ » (pré-remplis depuis le

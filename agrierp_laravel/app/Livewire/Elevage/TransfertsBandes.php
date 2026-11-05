@@ -80,6 +80,8 @@ class TransfertsBandes extends Component
         return match ($espece) {
             EffectifParCategorieService::LAPINS => ['repro' => 'Reproducteur', 'sevre' => 'Sous-mères', 'jeune' => 'Jeune'],
             EffectifParCategorieService::PORCS => ['repro' => 'Reproducteur', 'sevre' => 'Porcelet', 'jeune' => 'Porc Marchand'],
+            // Ticket VOL-1 : volailles reproductrices — Reproducteur / Poussin / Jeune.
+            EffectifParCategorieService::VOLAILLES => ['repro' => 'Reproducteur', 'sevre' => 'Poussin', 'jeune' => 'Jeune'],
             default => [],
         };
     }

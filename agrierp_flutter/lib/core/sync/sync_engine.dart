@@ -481,6 +481,10 @@ class SyncEngine {
     'cat_depart_jeune',
   ];
 
+  /// Ticket VOL-1 — les trois colonnes de VENTE PAR CATÉGORIE des volailles reproductrices (migration
+  /// `2026_11_05_000001`).
+  static const colonnesVentesParCategorie = ['vente_repro', 'vente_sevre', 'vente_jeune'];
+
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
@@ -1005,6 +1009,8 @@ class SyncEngine {
         stockQty: Value(_reel(l['stock_qty']) ?? 0),
         alertThreshold: Value(_reel(l['alert_threshold'])),
         description: Value(l['description'] as String?),
+        // Ticket VOL-1 : catégorie d'effectif (reproducteur / jeune / poussin) ; null pour les autres produits.
+        categorieEffectif: Value(l['categorie_effectif'] as String?),
         syncStatus: const Value(SyncStatus.synced),
         isActive: Value(_bool(l['is_active'])),
         updatedAt: Value(_instantTechnique(l['updated_at'])),
@@ -1575,6 +1581,10 @@ class SyncEngine {
           catDepartRepro: optionnel(l, 'cat_depart_repro', id),
           catDepartSevre: optionnel(l, 'cat_depart_sevre', id),
           catDepartJeune: optionnel(l, 'cat_depart_jeune', id),
+          // Ticket VOL-1 — ventes par catégorie (volailles), mêmes règles : clé absente = valeur locale gardée.
+          venteRepro: optionnel(l, 'vente_repro', id),
+          venteSevre: optionnel(l, 'vente_sevre', id),
+          venteJeune: optionnel(l, 'vente_jeune', id),
           catEffRepro: optionnel(l, 'cat_eff_repro', id),
           catEffSevre: optionnel(l, 'cat_eff_sevre', id),
           catEffJeune: optionnel(l, 'cat_eff_jeune', id),
@@ -7922,6 +7932,8 @@ class SyncEngine {
     'tva_rate': p.tvaRate,
     'stock_qty': p.stockQty,
     'alert_threshold': p.alertThreshold ?? 0,
+    // Ticket VOL-1 : catégorie d'effectif du produit (aviculture) ; `null` = aucune (le serveur l'efface hors aviculture).
+    'categorie_effectif': p.categorieEffectif,
     // Ticket ST-1 — `false` = archivage depuis le poste ; le serveur n'en déduit jamais une réactivation.
     'is_active': p.isActive,
     'updated_at': p.updatedAt?.toUtc().toIso8601String(),
@@ -7955,6 +7967,10 @@ class SyncEngine {
       'don_sevre': f.donSevre,
       'don_jeune': f.donJeune,
       'passage_sevre_jeune': f.passageSevreJeune,
+      // Ticket VOL-1 : ventes par catégorie (volailles), connues seulement ; `vente` en est la somme.
+      'vente_repro': f.venteRepro,
+      'vente_sevre': f.venteSevre,
+      'vente_jeune': f.venteJeune,
       if (tete) ...{
         'cat_depart_repro': f.catDepartRepro,
         'cat_depart_sevre': f.catDepartSevre,
@@ -7988,7 +8004,7 @@ class SyncEngine {
   /// Ticket S-T9 — la SAISIE d'une fiche telle qu'elle part, sans la vente (que les ventes inscrivent au serveur) ni
   /// l'horodatage et le poste : deux versions de même saisie ont la même empreinte.
   String _saisieDeFiche(LivestockDailyEntry f, {required bool tete}) => jsonEncode(
-    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'updated_at', 'device_id'}.contains(cle)),
+    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'vente_repro', 'vente_sevre', 'vente_jeune', 'updated_at', 'device_id'}.contains(cle)),
   );
 
   /// F0.90 — fiche réduite à son IDENTITÉ (voir [_fichesDIdentite]). `lot_id` et `entry_date`

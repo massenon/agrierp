@@ -479,6 +479,7 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
     final source = _bande(_source);
     final libelles = TransfertsRepository.libellesCategories(
       source?.speciesCode ?? _rattachee?.speciesCode,
+      stade: source?.stage ?? _rattachee?.stage,
     );
 
     return ModaleAgri(

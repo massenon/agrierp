@@ -54,7 +54,7 @@ class SyncTransformationsTest extends TestCase
 
         $espece = LivestockSpecies::firstOrCreate(['code' => 'aviculture'], ['label' => 'Aviculture', 'is_enabled' => true, 'is_active' => true]);
         $this->bande = LivestockLot::create([
-            'code' => 'AVI-ENG-1', 'species_id' => $espece->id, 'stage' => 'engraissement', 'initial_quantity' => 40,
+            'code' => 'AVI-ENG-1', 'species_id' => $espece->id, 'stage' => 'ponte', 'initial_quantity' => 40,
             'current_quantity' => 40, 'created_date' => '2026-09-01', 'status' => 'actif', 'is_active' => true,
         ]);
         $this->produit = Product::create([

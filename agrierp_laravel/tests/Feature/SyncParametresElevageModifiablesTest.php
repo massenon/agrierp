@@ -66,7 +66,8 @@ class SyncParametresElevageModifiablesTest extends TestCase
         $this->postJson('/api/sync/push', ['feed_ration_standards' => [[
             'id' => '78787878-7878-4878-8878-787878787878', 'species_code' => 'helico', 'stage_label' => 'Naissain', 'ration_g_per_day' => 0,
         ]]])->assertOk()->assertJsonCount(1, 'feed_ration_standards.rejected');
-        $this->assertSame(0, FeedRationStandard::count());
+        // Rien n'a été ajouté : seules restent les trois lignes de l'aviculture semées par la migration VOL-1.
+        $this->assertSame(0, FeedRationStandard::where('species_code', 'helico')->count());
     }
 
     public function test_prophylaxie_provende_numerotation_et_rappel_des_soins(): void

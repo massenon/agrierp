@@ -61,30 +61,45 @@ class RationVolailleTest extends TestCase
         $this->assertSame(60 * 110.0, $tableau['total_g']);
     }
 
-    public function test_reproducteurs_sans_ligne_du_bareme_affichent_un_tiret_jamais_0_g(): void
+    /**
+     * VOL-1 — les trois lignes du barème (Reproducteur 130, Jeune 80, Poussin 30 g/j : valeurs PROVISOIRES) ne figurent
+     * jamais au tableau de la fiche Pondeuses, dont le comportement est inchangé (6 600 g ci-dessus).
+     */
+    public function test_pondeuses_ne_voient_pas_les_lignes_des_reproducteurs(): void
+    {
+        $this->bande('ponte');
+
+        $libelles = collect(Livewire::test(FichePondeuses::class)->instance()->rationnement['lignes'])->pluck('libelle')->all();
+
+        $this->assertSame(['Pondeuse (6 à 18 mois)', 'Poulette (4 à 5.5 mois)', 'Poussin en croissance (2 à 4 mois)', 'Poussin ponte (0 à 2 mois)'], $libelles);
+    }
+
+    /** VOL-1 — reproducteurs : effectif calculé de chaque catégorie × sa ration. Départ 30 / 20 / 10 sur 60. */
+    public function test_reproducteurs_rationnement_par_categorie_calcule_a_la_main(): void
     {
         $this->bande('reproduction');
 
         $tableau = Livewire::test(FicheReproducteurs::class)
-            ->assertSee('Aucune ligne du barème ne correspond des reproducteurs')
+            ->set('departRepro', 30)->set('departJeune', 20)->set('departSevre', 10)
+            ->assertSee('Rationnement &amp; Provende Servie par Catégorie (en Grammes g/j)', false)
             ->instance()->rationnement;
 
-        $this->assertFalse($tableau['rattachee']);
-        $this->assertNull($tableau['total_g']);
-        $this->assertSame([null], array_values(array_unique(array_column($tableau['lignes'], 'effectif'))));
+        // 30 × 130 + 20 × 80 + 10 × 30 = 3 900 + 1 600 + 300 = 5 800 g.
+        $this->assertSame(['Reproducteur', 'Jeune', 'Poussin'], array_column($tableau['lignes'], 'libelle'));
+        $this->assertSame([30, 20, 10], array_column($tableau['lignes'], 'effectif'));
+        $this->assertSame([3900, 1600, 300], array_column($tableau['lignes'], 'total_g'));
+        $this->assertSame(5800, $tableau['total_g']);
+        $this->assertSame(5.8, $tableau['total_kg']);
     }
 
-    public function test_reproducteurs_avec_une_ligne_reproducteur_au_bareme(): void
+    public function test_reproducteurs_sans_depart_aucun_total_jamais_0_g(): void
     {
         $this->bande('reproduction');
-        DB::table('feed_ration_standards')->insert([
-            'id' => (string) Str::uuid(), 'species_code' => 'aviculture', 'stage_label' => 'Reproducteur', 'ration_g_per_day' => 150,
-        ]);
 
         $tableau = Livewire::test(FicheReproducteurs::class)->instance()->rationnement;
 
-        $this->assertSame(60 * 150.0, $tableau['total_g']);
-        $this->assertSame(9.0, $tableau['total_kg']);
+        $this->assertNull($tableau['total_g']);
+        $this->assertSame([null], array_values(array_unique(array_column($tableau['lignes'], 'effectif'))));
     }
 
     public function test_pondeuses_la_pesee_enregistre_la_moyenne_par_sujet(): void

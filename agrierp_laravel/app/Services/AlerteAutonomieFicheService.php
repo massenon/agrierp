@@ -8,6 +8,7 @@ use App\Models\LivestockDailyEntry;
 use App\Models\Notification;
 use App\Support\CategorieRationLapin;
 use App\Support\CategorieRationPorc;
+use App\Support\CategorieVolaille;
 
 /**
  * 🔴→✅ Ticket U13 — L'ALERTE D'AUTONOMIE ALIMENTAIRE EST LEVÉE AUSSI POUR UNE FICHE REÇUE D'UN POSTE.
@@ -48,6 +49,12 @@ class AlerteAutonomieFicheService
             'repro' => CategorieRationPorc::REPRODUCTEUR,
             'sevre' => CategorieRationPorc::PORCELET,
             'jeune' => CategorieRationPorc::MARCHAND,
+        ]],
+        // Ticket VOL-1 : fiche Volailles Reproducteurs (les bandes « ponte » n'ont pas de chaîne : `etatPourJour` les écarte).
+        'aviculture' => [CategorieVolaille::class, [
+            'repro' => CategorieVolaille::REPRODUCTEUR,
+            'sevre' => CategorieVolaille::POUSSIN,
+            'jeune' => CategorieVolaille::JEUNE,
         ]],
     ];
 

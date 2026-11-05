@@ -108,7 +108,15 @@ class SaisieTransformationAction
             $transformation->save();
 
             // 1. Élevage — sortie des sujets, comme une vente, dans la fiche du jour.
-            app(RecordSaleOnFicheElevageAction::class)->execute([['lot_id' => $lot->id, 'qty' => $sujets]], $jour);
+            // Ticket VOL-1 : sur une bande de volailles reproductrices, les sujets abattus sortent des JEUNES (le poulet).
+            try {
+                app(RecordSaleOnFicheElevageAction::class)->execute(
+                    [['lot_id' => $lot->id, 'qty' => $sujets, 'categorie_effectif' => \App\Support\CategorieVolaille::JEUNE]],
+                    $jour,
+                );
+            } catch (ValidationException $e) {
+                throw ValidationException::withMessages(['lotId' => collect($e->errors())->flatten()->first()]);
+            }
 
             // 2. Stock Produits Finis — incrémentation.
             try {

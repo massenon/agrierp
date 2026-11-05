@@ -149,7 +149,7 @@ class TransferBetweenLotsAction
 
             $service = app(EffectifParCategorieService::class);
             if (EffectifParCategorieService::especeDuLot($lot) !== null) {
-                $fiche->fill(EffectifParCategorieService::MOUVEMENTS_CONNUS_A_ZERO);
+                $fiche->fill(EffectifParCategorieService::mouvementsConnusAZeroPour($lot));
 
                 // Première fiche d'une bande à catégories : le départ est DÉDUIT du stade (même règle que les fiches
                 // Lapins et Porcs, `departDepuisStade`), pour que les catégories du transfert soient calculables.
@@ -205,7 +205,7 @@ class TransferBetweenLotsAction
 
         $aCategories = EffectifParCategorieService::especeDuLot($source) !== null;
         if ($aCategories && ! in_array($categorie, self::CATEGORIES, true)) {
-            $refus('Lapins et porcs : précisez la catégorie des sujets transférés.');
+            $refus('Lapins, porcs et volailles reproductrices : précisez la catégorie des sujets transférés.');
         }
         if (! $aCategories && $categorie !== null) {
             $refus("Cette espèce n'est pas suivie par catégorie : aucune catégorie ne doit être choisie.");
@@ -288,11 +288,15 @@ class TransferBetweenLotsAction
 
     private function libelleSevre(LivestockLot $lot): string
     {
-        return EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::PORCS ? 'Porcelet' : 'Sous-mères';
+        return match (EffectifParCategorieService::especeDuLot($lot)) {
+            EffectifParCategorieService::PORCS => 'Porcelet',
+            EffectifParCategorieService::VOLAILLES => 'Poussin',   // Ticket VOL-1
+            default => 'Sous-mères',
+        };
     }
 
     private function libelleJeune(LivestockLot $lot): string
     {
-        return EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::PORCS ? 'Porc Marchand' : 'Jeune';
+        return EffectifParCategorieService::especeDuLot($lot) === EffectifParCategorieService::PORCS ? 'Porc Marchand' : 'Jeune';   // volailles : « Jeune » (VOL-1)
     }
 }

@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Ticket F0.29 — TABLEAU MENSUEL DE LA FICHE REPRODUCTEURS, 🔁 F0.99 / U12a : celui du Blade
-/// (`fiche-reproducteurs.blade.php`) — Date | Couvoir (Couvés, Nés) | Morts (total) (Repro+Poulet+Poussin) | Effectif
+/// (`fiche-reproducteurs.blade.php`) — Date | Couvoir (Couvés, Nés) | Morts (total) (Reproducteur+Jeune+Poussin) | Effectif
 /// Final | Taux Mort % | Poids Général (g), TOUS les jours du mois, et la note du Blade sous le tableau.
 ///
 /// ⚠️⚠️ La ventilation Repro / Poulet / Poussin des morts n'est pas conservée : la colonne porte le TOTAL enregistré.
@@ -92,7 +92,7 @@ void main() {
     await journee(3, couves: 120, nes: 96);
     await afficher(tester);
 
-    for (final c in ['DATE', 'Couvés', 'Nés', 'Repro+Poulet+Poussin', 'EFFECTIF FINAL', 'TAUX MORT %', 'POIDS GÉNÉRAL (G)']) {
+    for (final c in ['DATE', 'Couvés', 'Nés', 'Reproducteur+Jeune+Poussin', 'EFFECTIF FINAL', 'TAUX MORT %', 'POIDS GÉNÉRAL (G)']) {
       expect(find.descendant(of: tableau, matching: find.text(c)), findsOneWidget, reason: c);
     }
   });

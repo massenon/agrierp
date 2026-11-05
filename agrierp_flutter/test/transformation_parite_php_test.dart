@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 $espece = (new App\Models\LivestockSpecies())->forceFill(['id' => $in['espece'], 'code' => 'aviculture', 'label' => 'Aviculture', 'is_enabled' => true]);
 $espece->save();
 (new App\Models\LivestockLot())->forceFill([
-    'id' => $in['lot'], 'code' => 'AVI-ENG-1', 'species_id' => $in['espece'], 'stage' => 'engraissement', 'initial_quantity' => 40,
+    'id' => $in['lot'], 'code' => 'AVI-ENG-1', 'species_id' => $in['espece'], 'stage' => 'ponte', 'initial_quantity' => 40,
     'current_quantity' => 40, 'created_date' => '2025-01-01', 'status' => 'actif', 'is_active' => true,
 ])->save();
 $categorie = App\Models\ProductCategory::create(['label' => 'Transformés', 'is_active' => true]);
@@ -94,7 +94,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await db.into(db.livestockLots).insert(
-      LivestockLotsCompanion.insert(id: _lot, code: 'AVI-ENG-1', speciesId: 'c0000000-0000-4000-8000-000000000001', status: const Value('actif'), currentQuantity: const Value(40)),
+      LivestockLotsCompanion.insert(id: _lot, code: 'AVI-ENG-1', speciesId: 'c0000000-0000-4000-8000-000000000001', stage: const Value('ponte'), status: const Value('actif'), currentQuantity: const Value(40)),
     );
     await db.into(db.products).insert(
       ProductsCompanion.insert(id: _produit, sku: 'AVI-005', name: 'Poulet fumé', unit: 'pièce', pricingMode: 'fourchette', stockQty: const Value(0)),

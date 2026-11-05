@@ -311,6 +311,7 @@ class EffectifParCategorieChaineTest extends TestCase
     {
         $avi = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
         $lot = $this->bande($avi, 'AVI-2026-01', 60);
+        $lot->update(['stage' => 'ponte']);   // VOL-1 : seules les bandes « ponte » (Pondeuses) restent hors chaîne
         $this->fiche($lot, '2026-10-01', $this->mv(['cat_depart_repro' => 10, 'cat_depart_sevre' => 20, 'cat_depart_jeune' => 30]));
 
         $rapport = $this->service()->recalculerChaine($lot->id);

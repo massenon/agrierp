@@ -90,6 +90,13 @@ class LivestockLot extends Model
             return ['reproduction' => 'Reproducteur', 'engraissement' => 'Jeune', 'croissance' => 'Sous-mères'];
         }
 
+        // Ticket VOL-1 (04/11/2026) — volailles reproductrices : les stades sont les trois catégories de la fiche
+        // (Reproducteur / Poussin / Jeune). « Ponte » reste celui des Pondeuses (ticket suivant). Le stade `engraissement`
+        // est la catégorie « Jeune » : JAMAIS « Jeune à maturité », jamais « Poulet ».
+        if ($speciesCode === 'aviculture') {
+            return ['reproduction' => 'Reproducteur', 'croissance' => 'Poussin', 'engraissement' => 'Jeune', 'ponte' => 'Ponte'];
+        }
+
         return ['reproduction' => 'Reproduction', 'croissance' => 'Croissance', 'ponte' => 'Ponte', 'engraissement' => 'Engraissement'];
     }
 

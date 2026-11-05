@@ -26,6 +26,9 @@ class LivestockDailyEntry extends Model
         // jamais 0). `cat_eff_*` en sont DÉRIVÉS par EffectifParCategorieService.
         'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune',
         'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        // Ticket VOL-1 — ventes PAR CATÉGORIE (volailles reproductrices : la catégorie du produit vendu). `vente` en
+        // reste la somme. null = non ventilé (autres espèces, fiche d'avant le ticket).
+        'vente_repro', 'vente_sevre', 'vente_jeune',
         'feed_qty_kg', 'feed_product_id', 'weight_sample_avg_g',
         'ponte_total', 'ponte_casses', 'treatment_product_id', 'treatment_dose',
         'symptomes', 'vente_sexe', 'vente_montant',
@@ -195,6 +198,9 @@ class LivestockDailyEntry extends Model
             'mort_repro' => $this->mort_repro, 'mort_sevre' => $this->mort_sevre, 'mort_jeune' => $this->mort_jeune,
             'don_repro' => $this->don_repro, 'don_sevre' => $this->don_sevre, 'don_jeune' => $this->don_jeune,
             'passage' => $this->passage_sevre_jeune,
+            // Ticket VOL-1 : ventes par catégorie (volailles). Ignorées par les lapins et les porcs (leur vente sort de
+            // la catégorie « jeune » via `vente`).
+            'vente_repro' => $this->vente_repro, 'vente_sevre' => $this->vente_sevre, 'vente_jeune' => $this->vente_jeune,
             'transfert_entree_repro' => (int) ($this->transfert_entree_repro ?? 0),
             'transfert_entree_sevre' => (int) ($this->transfert_entree_sevre ?? 0),
             'transfert_entree_jeune' => (int) ($this->transfert_entree_jeune ?? 0),

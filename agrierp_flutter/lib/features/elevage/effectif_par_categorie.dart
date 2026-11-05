@@ -19,6 +19,15 @@
 ///           P = max(0, Pv + né − mP − dP − p)
 ///           M = max(0, Mv − vente − mM − dM + p)           (vente → Marchand, QC2)
 ///
+/// 🔁 TICKET VOL-1 (décision client du 04/11/2026) — VOLAILLES REPRODUCTRICES (aviculture hors stade « ponte »),
+/// même règle que `calculerJourVolailles` du serveur :
+///   VOLAILLES  R = max(0, Rv − vente_R − mort_R − don_R)
+///              J = max(0, Jv + achat − vente_J − mort_J − don_J + p)      (les ACHATS vont aux Jeunes)
+///              P = max(0, Pv + éclosions − vente_P − mort_P − don_P − p)  (les poussins nés vont aux Poussins)
+/// Emplacements : `repro` = Reproducteur ; `sevre` = Poussin ; `jeune` = Jeune (ex-« Poulet »). ⚠️ AUCUNE catégorie
+/// « inconnue » pour les volailles (décision explicite du client, différence avec les lapins) : un mouvement absent
+/// vaut 0, la bande doit avoir son DÉPART saisi avant toute journée.
+///
 /// Décisions client appliquées telles que le serveur les applique : D3 (passage = TRANSFERT, refusé
 /// au-delà de la catégorie source APRÈS ses autres mouvements du jour), D4 (départ = effectif au
 /// DÉBUT du jour, somme = effectif total de départ), D8 (somme ≠ total = avertissement, jamais un
@@ -72,6 +81,9 @@ class MouvementsJour {
     this.donSevre,
     this.donJeune,
     this.passage,
+    this.venteRepro,
+    this.venteSevre,
+    this.venteJeune,
     this.transfertEntreeRepro = 0,
     this.transfertEntreeSevre = 0,
     this.transfertEntreeJeune = 0,
@@ -90,6 +102,12 @@ class MouvementsJour {
   final int? donSevre;
   final int? donJeune;
   final int? passage;
+
+  /// Ticket VOL-1 — ventes PAR CATÉGORIE (volailles : la catégorie du produit vendu, `vente_repro/sevre/jeune`) ;
+  /// ignorées par les lapins et les porcs (leur vente sort de la catégorie « jeune » via [vente]).
+  final int? venteRepro;
+  final int? venteSevre;
+  final int? venteJeune;
 
   /// Ticket 15.46 — transferts entre bandes par catégorie : dérivés des transferts, donc toujours CONNUS
   /// (0 sans transfert, jamais « inconnu »). Miroir de `transfert_entree_*` / `transfert_sortie_*`.
@@ -154,6 +172,9 @@ class FicheChaine {
     this.donSevre,
     this.donJeune,
     this.passage,
+    this.venteRepro,
+    this.venteSevre,
+    this.venteJeune,
     this.departRepro,
     this.departSevre,
     this.departJeune,
@@ -181,6 +202,11 @@ class FicheChaine {
   final int? donSevre;
   final int? donJeune;
   final int? passage;
+
+  /// Ticket VOL-1 — ventes par catégorie (volailles).
+  final int? venteRepro;
+  final int? venteSevre;
+  final int? venteJeune;
   final int? departRepro;
   final int? departSevre;
   final int? departJeune;
@@ -213,6 +239,9 @@ class FicheChaine {
     donSevre: donSevre,
     donJeune: donJeune,
     passage: passage,
+    venteRepro: venteRepro,
+    venteSevre: venteSevre,
+    venteJeune: venteJeune,
     transfertEntreeRepro: transfertEntreeRepro,
     transfertEntreeSevre: transfertEntreeSevre,
     transfertEntreeJeune: transfertEntreeJeune,
@@ -270,6 +299,9 @@ abstract final class EffectifParCategorie {
   static const lapins = 'lapins';
   static const porcs = 'porcs';
 
+  /// Ticket VOL-1 — volailles reproductrices (aviculture hors stade « ponte »).
+  static const volailles = 'volailles';
+
   /// Code d'espèce du serveur → espèce prise en charge (`ESPECES` du service PHP).
   static const especes = {'cuniculture': lapins, 'porciculture': porcs};
 
@@ -285,8 +317,26 @@ abstract final class EffectifParCategorie {
     'passage_sevre_jeune': 0,
   };
 
+  /// Ticket VOL-1 — mouvements « connus à zéro » d'une fiche NOUVELLE sur une bande à chaîne : la ventilation des
+  /// morts, des dons et du passage, plus, pour les volailles, celle des ventes (`mouvementsConnusAZeroPour`).
+  static Map<String, int> mouvementsConnusAZeroPour(String? espece) => {
+    ...mouvementsConnusAZero,
+    if (espece == volailles) 'vente_repro': 0,
+    if (espece == volailles) 'vente_sevre': 0,
+    if (espece == volailles) 'vente_jeune': 0,
+  };
+
   /// Espèce suivie pour un code d'espèce de bande, null sinon (`especeDuLot`).
-  static String? especeDuCode(String? code) => especes[code];
+  ///
+  /// 🔁 VOL-1 : l'aviculture se partage entre la fiche Pondeuses (stade « ponte », ticket suivant) et la fiche
+  /// Reproducteurs (tous les autres stades) : seules ces dernières ont l'effectif par catégorie. [stade] est donc
+  /// REQUIS pour reconnaître les volailles ; sans lui (`null`), une bande d'aviculture est lue comme non suivie
+  /// seulement si son stade est « ponte » — un stade inconnu (`null`) compte comme volailles, comme le serveur
+  /// (`$lot->stage === 'ponte' ? null : VOLAILLES`).
+  static String? especeDuCode(String? code, {String? stade}) {
+    if (code == 'aviculture') return stade == 'ponte' ? null : volailles;
+    return especes[code];
+  }
 
   /// Stade de bande → emplacement de catégorie (`STADE_VERS_CATEGORIE` du serveur, 17/10/2026) ;
   /// null pour `ponte` ou un stade inconnu.
@@ -304,7 +354,7 @@ abstract final class EffectifParCategorie {
     required int totalDebutJour,
   }) {
     final cat = categorieDuStade(stade);
-    if (especeDuCode(codeEspece) == null || cat == null) return null;
+    if (especeDuCode(codeEspece, stade: stade) == null || cat == null) return null;
     final total = totalDebutJour < 0 ? 0 : totalDebutJour;
     return EffectifCategories(
       repro: cat == 'repro' ? total : 0,
@@ -344,9 +394,10 @@ abstract final class EffectifParCategorie {
     MouvementsJour m, {
     int? totalFinal,
   }) {
-    if (espece != lapins && espece != porcs) {
+    if (espece != lapins && espece != porcs && espece != volailles) {
       throw ArgumentError('Espèce non prise en charge : $espece.');
     }
+    if (espece == volailles) return _calculerJourVolailles(veille, m, totalFinal);
     final estLapins = espece == lapins;
 
     // Reproducteur : ne change jamais de stade. Les achats de porcs lui reviennent (D11).
@@ -399,6 +450,70 @@ abstract final class EffectifParCategorie {
       sevre: sevre,
       jeune: jeune,
       sommeDifferente: sommeDifferente,
+      refus: refus,
+      passageApplique: passageApplique,
+    );
+  }
+
+  /// Ticket VOL-1 — effectifs d'UNE journée de volailles reproductrices (`calculerJourVolailles` du serveur). Aucune
+  /// catégorie n'est jamais inconnue : une clé absente ou nulle vaut 0.
+  static EffectifCategoriesJour _calculerJourVolailles(
+    EffectifCategories veille,
+    MouvementsJour m,
+    int? totalFinal,
+  ) {
+    int v(int? x) => x ?? 0;
+
+    final repro = math.max(
+      0,
+      v(veille.repro) +
+          m.transfertEntreeRepro -
+          v(m.venteRepro) -
+          v(m.mortRepro) -
+          v(m.donRepro) -
+          m.transfertSortieRepro,
+    );
+
+    // Poussins avant passage : les éclosions entrent ; les ventes, morts et dons sortent.
+    final avant =
+        v(veille.sevre) +
+        v(m.ne) +
+        m.transfertEntreeSevre -
+        v(m.venteSevre) -
+        v(m.mortSevre) -
+        v(m.donSevre) -
+        m.transfertSortieSevre;
+
+    final passage = v(m.passage);
+    String? refus;
+    var passageApplique = passage;
+    if (passage > math.max(0, avant)) {
+      final source = math.max(0, avant);
+      passageApplique = source;
+      refus =
+          'Passage de stade refusé : $passage sujet(s) à faire passer, mais la catégorie '
+          "source n'en compte que $source.";
+    }
+
+    final poussin = math.max(0, avant - passageApplique);
+    // Les ACHATS vont aux Jeunes.
+    final jeune = math.max(
+      0,
+      v(veille.jeune) +
+          v(m.achat) +
+          passageApplique +
+          m.transfertEntreeJeune -
+          v(m.venteJeune) -
+          v(m.mortJeune) -
+          v(m.donJeune) -
+          m.transfertSortieJeune,
+    );
+
+    return EffectifCategoriesJour(
+      repro: repro,
+      sevre: poussin,
+      jeune: jeune,
+      sommeDifferente: totalFinal == null ? null : (repro + poussin + jeune) != totalFinal,
       refus: refus,
       passageApplique: passageApplique,
     );

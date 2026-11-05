@@ -289,6 +289,21 @@ class CaisseRepository {
       }
     }
 
+    // 🔁 TICKET VOL-1 — BANDE DE VOLAILLES REPRODUCTRICES : la vente se range dans la catégorie du PRODUIT. Produit sans
+    // catégorie d'effectif, bande sans départ saisi ou date antérieure au départ : refus motivé (mêmes textes que
+    // `PosInterface::validateSale`), AVANT toute écriture.
+    final fiches = FicheJournaliereRepository(database: _db, deviceId: _deviceId, uuid: _uuid);
+    for (final ligne in panier) {
+      if (ligne.lotId == null) continue;
+      final refusVolailles = await fiches.refusDeVenteVolailles(
+        lotId: ligne.lotId!,
+        categorieEffectif: ligne.produit.categorieEffectif,
+        nomProduit: ligne.produit.name,
+        jour: jourVente,
+      );
+      if (refusVolailles != null) throw VenteRefusee(refusVolailles);
+    }
+
     final sousTotal = panier.fold<double>(0, (s, l) => s + l.montant);
     final total = sousTotal - remise;
     final venteId = _uuid.v4();
@@ -362,6 +377,7 @@ class CaisseRepository {
             ligne.quantite,
             jourVente,
             saisie,
+            categorieEffectif: ligne.produit.categorieEffectif,
           );
         }
       }
@@ -409,12 +425,13 @@ class CaisseRepository {
     String lotId,
     int quantite,
     DateTime jour,
-    DateTime saisie,
-  ) => FicheJournaliereRepository(
+    DateTime saisie, {
+    String? categorieEffectif,
+  }) => FicheJournaliereRepository(
     database: _db,
     deviceId: _deviceId,
     uuid: _uuid,
-  ).repercuterVente(lotId, quantite, jour, saisie);
+  ).repercuterVente(lotId, quantite, jour, saisie, categorieEffectif: categorieEffectif);
 
   static DateTime _minuit(DateTime d) => DateTime(d.year, d.month, d.day);
 

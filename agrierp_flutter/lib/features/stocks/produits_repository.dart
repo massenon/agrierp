@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../elevage/categorie_volaille.dart';
 
 /// Ce que l'utilisateur saisit dans « Ajouter un Produit » / « Modifier le Produit ».
 class FormulaireProduit {
@@ -18,6 +19,7 @@ class FormulaireProduit {
     this.seuil = 0,
     this.tva = 0,
     this.description = '',
+    this.categorieEffectif = '',
   });
 
   final String nom;
@@ -35,6 +37,10 @@ class FormulaireProduit {
   final double seuil;
   final double tva;
   final String description;
+
+  /// Ticket VOL-1 — catégorie d'effectif (`reproducteur` / `jeune` / `poussin`, '' = aucune) d'un produit de
+  /// l'aviculture ; ignorée (vide) pour tout autre produit, comme `ProductCatalogService::payload` du serveur.
+  final String categorieEffectif;
 
   bool get fourchette => mode == 'fourchette';
 }
@@ -104,6 +110,9 @@ class ProduitsRepository {
     if (f.description.length > 2000) {
       e['description'] = '2000 caractères au plus.';
     }
+    if (f.categorieEffectif.isNotEmpty && !CategorieVolaille.estValide(f.categorieEffectif)) {
+      e['categorieEffectif'] = "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.";
+    }
     if (f.tva < 0 || f.tva > 100) e['tva'] = 'Entre 0 et 100.';
     if (f.seuil < 0) e['seuil'] = 'Ne peut pas être négatif.';
     if (creation && f.stock < 0) e['stock'] = 'Ne peut pas être négatif.';
@@ -130,8 +139,17 @@ class ProduitsRepository {
     return e;
   }
 
+  /// Ticket VOL-1 — la catégorie d'effectif n'a de sens que pour un produit de l'AVICULTURE ; ailleurs elle est
+  /// toujours vide (`payload` du serveur).
+  Future<String?> _categorieEffectif(FormulaireProduit f) async {
+    if (f.categorieEffectif.isEmpty || f.especeId.isEmpty) return null;
+    final espece = await (database.select(database.livestockSpecies)..where((e) => e.id.equals(f.especeId))).getSingleOrNull();
+    return espece?.code == 'aviculture' ? f.categorieEffectif : null;
+  }
+
   Future<Product> creer(FormulaireProduit f) async {
     final id = _uuid.v4();
+    final categorieEffectif = await _categorieEffectif(f);
 
     await database
         .into(database.products)
@@ -152,6 +170,7 @@ class ProduitsRepository {
             description: Value(
               f.description.trim().isEmpty ? null : f.description.trim(),
             ),
+            categorieEffectif: Value(categorieEffectif),
             syncStatus: const Value(SyncStatus.pending),
             updatedAt: Value(DateTime.now()),
           ),
@@ -206,6 +225,7 @@ class ProduitsRepository {
 
   /// ⚠️ Ni le SKU ni la quantité ne changent ici.
   Future<Product> modifier(String id, FormulaireProduit f) async {
+    final categorieEffectif = await _categorieEffectif(f);
     await (database.update(
       database.products,
     )..where((p) => p.id.equals(id))).write(
@@ -222,6 +242,7 @@ class ProduitsRepository {
         description: Value(
           f.description.trim().isEmpty ? null : f.description.trim(),
         ),
+        categorieEffectif: Value(categorieEffectif),
         syncStatus: const Value(SyncStatus.pending),
         updatedAt: Value(DateTime.now()),
       ),

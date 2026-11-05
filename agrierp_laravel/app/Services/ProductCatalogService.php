@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Actions\AdjustStockAction;
 use App\Models\AuditLog;
+use App\Models\LivestockSpecies;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Support\CategorieVolaille;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,6 +42,8 @@ class ProductCatalogService
             'pricing_mode' => ['required', 'in:fourchette,quote'],
             'tva_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'alert_threshold' => ['required', 'numeric', 'min:0'],
+            // Ticket VOL-1 : catégorie d'effectif des produits de l'aviculture (Reproducteur / Jeune / Poussin).
+            'categorie_effectif' => ['nullable', 'in:'.implode(',', CategorieVolaille::CLES)],
         ];
 
         if ($avecStock) {
@@ -62,6 +66,7 @@ class ProductCatalogService
     {
         return [
             'price_max.gte' => 'Le prix maximum doit être supérieur ou égal au prix minimum.',
+            'categorie_effectif.in' => "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin.",
         ];
     }
 
@@ -88,6 +93,14 @@ class ProductCatalogService
 
         if ($avecStock) {
             $payload['stock_qty'] = $v['stock_qty'];
+        }
+
+        // Ticket VOL-1 : la catégorie d'effectif n'a de sens que pour un produit de l'aviculture ; ailleurs elle est
+        // toujours vide. Clé ABSENTE (poste ancien) : la valeur du serveur n'est pas touchée.
+        if (array_key_exists('categorie_effectif', $v)) {
+            $aviculture = ! empty($v['species_id'])
+                && LivestockSpecies::whereKey($v['species_id'])->where('code', 'aviculture')->exists();
+            $payload['categorie_effectif'] = $aviculture ? (($v['categorie_effectif'] ?? null) ?: null) : null;
         }
 
         return $payload;

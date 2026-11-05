@@ -1476,6 +1476,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           imprimer: EditeursRapports.imprimer,
           onOuvrirTransferts: () =>
               setState(() => _ecran = EcranPoste.transfertsBandes),
+          // Ticket VOL-1 : « Commander Stock » de la carte d'autonomie alimentaire (provende de l'aviculture).
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
         EcranPoste.fichePorcs => FichePorcsScreen(
           depot: widget.fiches,

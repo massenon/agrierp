@@ -207,7 +207,7 @@ class CorrectionsElevage17OctobreTest extends TestCase
      */
     public function test_une_transformation_est_une_vente_de_la_fiche_et_survit_a_la_sauvegarde_suivante(): void
     {
-        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'engraissement', 40);
+        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'ponte', 40);   // VOL-1 : « ponte » = hors chaîne des reproducteurs
         LivestockDailyEntry::create(['lot_id' => $lot->id, 'entry_date' => '2026-10-12', 'achat' => 0, 'ne' => 0, 'mort' => 2, 'vente' => 0, 'don' => 0, 'effectif_final' => 38]);
         $lot->update(['current_quantity' => 38]);
         $produit = Product::create(['sku' => 'AVI-005', 'name' => 'Poulet fumé', 'category_id' => ProductCategory::create(['label' => 'Transformés', 'is_active' => true])->id,
@@ -236,7 +236,7 @@ class CorrectionsElevage17OctobreTest extends TestCase
      */
     public function test_un_don_enregistre_est_une_sortie_soustraite_de_l_effectif(): void
     {
-        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'engraissement', 30);
+        $lot = $this->bande('AVI-ENG-1', 'aviculture', 'ponte', 30);   // VOL-1 : « ponte » = hors chaîne des reproducteurs
 
         Livewire::test(EnregistrerSujets::class)
             ->set('species_id', $lot->species_id)->set('lot_id', $lot->id)->set('origine', 'Don')->set('quantite', 4)->set('entry_date', self::JOUR)

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../elevage/categorie_volaille.dart';
 import '../../core/theme/agri_tokens.dart';
 import 'produits_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -57,6 +58,9 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
   String _espece = '';
   String _mode = 'fourchette';
 
+  /// Ticket VOL-1 — catégorie d'effectif (reproducteur / jeune / poussin) d'un produit de l'aviculture ; '' = aucune.
+  String _categorieEffectif = '';
+
   Map<String, String> _erreurs = const {};
   String? _echec;
   bool _charge = false;
@@ -111,6 +115,7 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
             : _texte(existant.alertThreshold);
         _tva.text = _texte(existant.tvaRate);
         _description.text = existant.description ?? '';
+        _categorieEffectif = existant.categorieEffectif ?? '';
       }
       _charge = true;
     });
@@ -135,7 +140,11 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
     seuil: _nombre(_seuil.text) ?? 0,
     tva: _nombre(_tva.text) ?? 0,
     description: _description.text,
+    categorieEffectif: _estAviculture ? _categorieEffectif : '',
   );
+
+  /// Ticket VOL-1 (`getEstAvicultureProperty`) — la catégorie d'effectif ne se propose que pour l'aviculture.
+  bool get _estAviculture => _especes.any((e) => e.id == _espece && e.code == 'aviculture');
 
   Future<void> _enregistrer() async {
     final saisie = _saisie();
@@ -241,6 +250,19 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
                         {for (final e in _especes) e.id: e.label},
                         (v) => setState(() => _espece = v),
                       ),
+                      if (_estAviculture)
+                        // Ticket VOL-1 : la caisse range la vente de sujets vivants dans la catégorie d'effectif du produit.
+                        _liste(
+                          "Catégorie d'effectif (volailles reproductrices)",
+                          'categorieEffectif',
+                          _categorieEffectif,
+                          '-- Aucune --',
+                          CategorieVolaille.libelles,
+                          (v) => setState(() => _categorieEffectif = v),
+                          aide:
+                              'La vente de ce produit sort de cette catégorie de la fiche Volailles Reproducteurs. '
+                              'Sans catégorie, la vente sur une bande de volailles reproductrices est refusée.',
+                        ),
                       _champ(
                         'Unité de comptage *',
                         'unite',
@@ -490,8 +512,9 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
     String valeur,
     String vide,
     Map<String, String> options,
-    void Function(String) auChoix,
-  ) => Padding(
+    void Function(String) auChoix, {
+    String? aide,
+  }) => Padding(
     padding: const EdgeInsets.only(bottom: AgriSpacing.md),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,6 +543,14 @@ class _AjouterProduitScreenState extends State<AjouterProduitScreen> {
           ],
           onChanged: (v) => auChoix(v ?? ''),
         ),
+        if (aide != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.xs),
+            child: Text(
+              aide,
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+          ),
       ],
     ),
   );
