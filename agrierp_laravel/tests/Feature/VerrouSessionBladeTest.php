@@ -72,7 +72,7 @@ class VerrouSessionBladeTest extends VerrouSessionBase
             ->assertSee('assets/images/image_login.png', false)
             ->assertSee('Ferme Olouwachegoun')
             ->assertSee('Application verrouillée')
-            ->assertSee('Session de M. Olouchègoun. Saisissez votre mot de passe pour reprendre votre travail.')
+            ->assertDontSee('pour reprendre votre travail')
             ->assertSee('value="admin"', false)
             ->assertSee('readonly', false)
             ->assertSee('DÉVERROUILLER');

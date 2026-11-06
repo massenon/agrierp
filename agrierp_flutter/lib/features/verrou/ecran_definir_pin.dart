@@ -76,7 +76,7 @@ class _EcranDefinirPinState extends State<EcranDefinirPin> {
       titre: confirmation ? 'Confirmez votre code PIN' : 'Définir votre code PIN',
       sousTitre: confirmation
           ? 'Saisissez le même code une seconde fois.'
-          : "De 4 à 6 chiffres. Il sera demandé à chaque lancement de l'application, même sans réseau.",
+          : null,
       enfants: [
         if (_erreur != null) ...[
           KeyedSubtree(

@@ -216,12 +216,13 @@ class CadreConnexion extends StatelessWidget {
   const CadreConnexion({
     super.key,
     required this.titre,
-    required this.sousTitre,
+    this.sousTitre,
     required this.enfants,
   });
 
   final String titre;
-  final String sousTitre;
+  /// Absent (`null`) : aucune phrase sous le titre (écran de verrouillage et définition du PIN, demande du client 06/11/2026).
+  final String? sousTitre;
   final List<Widget> enfants;
 
   @override
@@ -275,14 +276,16 @@ class CadreConnexion extends StatelessWidget {
                           color: AgriColors.brandForest,
                         ),
                       ),
-                      const SizedBox(height: AgriSpacing.xs),
-                      Text(
-                        sousTitre,
-                        style: const TextStyle(
-                          fontSize: AgriTypography.xs,
-                          color: AgriColors.outline,
+                      if (sousTitre != null) ...[
+                        const SizedBox(height: AgriSpacing.xs),
+                        Text(
+                          sousTitre!,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: AgriColors.outline,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: AgriSpacing.lg),
                       ...enfants,
                     ],

@@ -65,7 +65,6 @@
 
             <div class="space-y-2">
                 <h2 class="text-brand-forest text-xl font-bold leading-tight flex items-center gap-2"><span class="material-symbols-outlined text-brand-emerald">lock</span>Application verrouillée</h2>
-                <p class="text-outline text-xs leading-relaxed">Session de {{ $nom }}. Saisissez votre mot de passe pour reprendre votre travail.</p>
             </div>
 
             <div x-show="erreur" x-cloak dusk="verrou-message" role="alert"

@@ -37,13 +37,15 @@ void main() {
       }
     }, skip: sansLaravel);
 
-    test('le sous-titre est « Session de {nom}. Saisissez votre … pour reprendre votre travail. »', () {
+    test('aucune phrase d\'explication sous le titre, ni au web ni au poste (client, 06/11/2026)', () {
       final web = normaliser(blade.readAsStringSync());
       final ecran = normaliser(poste('lib/features/verrou/ecran_verrou.dart'));
+      final pin = normaliser(poste('lib/features/verrou/ecran_definir_pin.dart'));
 
-      expect(web, contains('Session de {{ \$nom }}. Saisissez votre mot de passe pour reprendre votre travail.'));
-      // Même phrase au poste, seul le secret change (code PIN).
-      expect(ecran, contains('Session de \${widget.nomUtilisateur}. Saisissez votre code PIN pour reprendre votre travail.'));
+      expect(web, isNot(contains('pour reprendre votre travail')));
+      expect(ecran, isNot(contains('pour reprendre votre travail')));
+      expect(ecran, isNot(contains('Aucune connexion au serveur')));
+      expect(pin, isNot(contains('De 4 à 6 chiffres')));
     }, skip: sansLaravel);
 
     test('le message du limiteur et sa mise en forme sont les mêmes', () {
