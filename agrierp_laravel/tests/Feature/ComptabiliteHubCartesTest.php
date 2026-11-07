@@ -11,7 +11,7 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Hub « Comptabilité » — la cible montrée par le client (07/11/2026) : NEUF cartes, dans cet ordre, textes exacts
+ * Hub « Comptabilité » — la cible montrée par le client (07/11/2026) : DOUZE cartes, dans cet ordre, textes exacts
  * (accents compris), puis une rangée « Autres états » qui garde les trois pages sans autre accès.
  * Le poste lit la même liste (`comptabilite_hub_cartes_test.dart`).
  */
@@ -20,7 +20,7 @@ class ComptabiliteHubCartesTest extends TestCase
     use RefreshDatabase;
 
     /** @var array<int, array{0: string, 1: string, 2: string}> titre, description, icône */
-    public const NEUF = [
+    public const DOUZE = [
         ['Plan Comptable', 'Comptes SYSCOHADA (Classes 1 à 7)', 'menu_book'],
         ['Journal Comptable', 'Écritures Débit/Crédit, saisie manuelle', 'account_balance'],
         ['Grand Livre', 'Écritures par compte, solde progressif', 'import_contacts'],
@@ -30,6 +30,9 @@ class ComptabiliteHubCartesTest extends TestCase
         ['Comptabilité Analytique', 'Marges réelles par filière (Cuniculture, Aviculture, Porciculture)', 'insights'],
         ['Déclaration TVA', 'TVA Collectée / Déductible, taux 18% ou exonéré', 'receipt_long'],
         ['Rapprochement Bancaire', 'Pointage Grand Livre / Relevé Banque et Mobile Money', 'sync_alt'],
+        ['Bilan de l\'Entreprise', 'Actif / Passif, équilibre comptable', 'account_balance'],
+        ['Immobilisations', 'Registre des biens, amortissement linéaire et dotation', 'domain'],
+        ['Balance Âgée', 'Encours clients et fournisseurs par ancienneté de retard', 'schedule'],
     ];
 
     private function html(): string
@@ -52,14 +55,12 @@ class ComptabiliteHubCartesTest extends TestCase
         return array_map(fn ($c) => [html_entity_decode($c[1], ENT_QUOTES), html_entity_decode($c[2], ENT_QUOTES)], $m);
     }
 
-    public function test_les_neuf_cartes_du_client_sont_dans_l_ordre_avec_leurs_textes_exacts(): void
+    public function test_la_grille_porte_douze_cartes_dans_l_ordre_avec_leurs_textes_exacts(): void
     {
-        $cartes = array_slice($this->cartes($this->html()), 0, 9);
+        $cartes = $this->cartes($this->html());
 
-        $this->assertSame(
-            array_map(fn ($c) => [$c[0], $c[1]], self::NEUF),
-            $cartes,
-        );
+        $this->assertCount(12, $cartes);
+        $this->assertSame(array_map(fn ($c) => [$c[0], $c[1]], self::DOUZE), $cartes);
     }
 
     public function test_les_icones_sont_celles_du_client(): void
@@ -67,17 +68,14 @@ class ComptabiliteHubCartesTest extends TestCase
         $html = $this->html();
         preg_match_all('#<span class="material-symbols-outlined text-brand-emerald text-\[24px\]">(.*?)</span>#su', $html, $m);
 
-        $this->assertSame(array_column(self::NEUF, 2), array_slice($m[1], 0, 9));
+        $this->assertSame(array_column(self::DOUZE, 2), $m[1]);
     }
 
-    public function test_les_trois_pages_sans_autre_acces_restent_apres_les_neuf(): void
+    public function test_il_n_y_a_plus_de_rangee_autres_etats(): void
     {
-        $cartes = $this->cartes($this->html());
+        $html = $this->html();
 
-        $this->assertCount(12, $cartes);
-        $this->assertSame(
-            ["Bilan de l'Entreprise", 'Immobilisations', 'Balance Âgée'],
-            array_column(array_slice($cartes, 9), 0),
-        );
+        $this->assertStringNotContainsString('Autres états', $html);
+        $this->assertSame(1, substr_count($html, 'grid-cols-1 sm:grid-cols-2 gap-md'));
     }
 }

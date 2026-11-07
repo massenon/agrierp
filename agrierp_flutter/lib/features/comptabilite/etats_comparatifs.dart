@@ -303,6 +303,58 @@ abstract final class EtatsComparatifs {
     ];
   }
 
+  /// « Actif (Emplois) » de la page « Bilan Simplifié de l'Entreprise » (`bilan.blade.php`, route `/rapport-bilan`) : mêmes
+  /// rubriques que l'onglet Bilan des États Financiers, mais « code - libellé » et les phrases d'état vide propres à ce Blade.
+  static List<LigneTableauEtat> tableauActifSimplifie(BilanComparatif c) {
+    final b1 = c.n1;
+    String ligne(LigneComparee l) => '${l.code} - ${l.libelle}';
+    List<LigneTableauEtat> section(String titre, List<LigneComparee> lignes, String vide, String sousTotal, double n, double? n1) => [
+      LigneTableauEtat.titre(titre),
+      if (lignes.isEmpty)
+        LigneTableauEtat(vide, '', '')
+      else
+        for (final l in lignes) LigneTableauEtat(ligne(l), montant(l.n), montant(l.n1), negatifN: l.n < 0),
+      LigneTableauEtat(sousTotal, montant(n), montant(n1), genre: GenreLigneEtat.sousTotal),
+    ];
+    return [
+      ...section('Actif Immobilisé (Classe 2)', c.lignes['immo']!, "Aucune écriture sur cette classe pour l'instant.",
+          'Sous-total Immobilisé', c.n.totalImmo, b1?.totalImmo),
+      ...section('Actif Circulant (Classes 3 & 4)', [...c.lignes['stocks']!, ...c.lignes['creances']!],
+          "Aucune écriture sur ces classes pour l'instant.", 'Sous-total Circulant', c.n.totalCirculant, b1?.totalCirculant),
+      ...section('Trésorerie Actif (Classe 5)', c.lignes['tresorerie']!, "Aucune écriture sur cette classe pour l'instant.",
+          'Sous-total Trésorerie', c.n.totalTresorerie, b1?.totalTresorerie),
+      LigneTableauEtat('Total Actif', montant(c.n.totalActif), montant(b1?.totalActif), genre: GenreLigneEtat.total),
+    ];
+  }
+
+  /// « Passif (Ressources) » de la page « Bilan Simplifié de l'Entreprise » — voir [tableauActifSimplifie].
+  static List<LigneTableauEtat> tableauPassifSimplifie(BilanComparatif c) {
+    final b1 = c.n1;
+    String ligne(LigneComparee l) => '${l.code} - ${l.libelle}';
+    const vide = "Aucune écriture sur cette classe pour l'instant.";
+    return [
+      const LigneTableauEtat.titre('Capitaux Propres (Classe 1)'),
+      if (c.lignes['capitaux']!.isEmpty)
+        const LigneTableauEtat(vide, '', '')
+      else
+        for (final l in c.lignes['capitaux']!) LigneTableauEtat(ligne(l), montant(-l.n), montant(_neg(l.n1))),
+      LigneTableauEtat("Résultat de l'exercice", montant(c.n.resultat), montant(b1?.resultat), gras: true),
+      LigneTableauEtat(
+        'Sous-total Capitaux Propres',
+        montant(c.n.totalCapitaux + c.n.resultat),
+        montant(b1 == null ? null : b1.totalCapitaux + b1.resultat),
+        genre: GenreLigneEtat.sousTotal,
+      ),
+      const LigneTableauEtat.titre('Dettes (Classe 4)'),
+      if (c.lignes['dettes']!.isEmpty)
+        const LigneTableauEtat(vide, '', '')
+      else
+        for (final l in c.lignes['dettes']!) LigneTableauEtat(ligne(l), montant(l.n), montant(l.n1)),
+      LigneTableauEtat('Sous-total Dettes', montant(c.n.totalDettes), montant(b1?.totalDettes), genre: GenreLigneEtat.sousTotal),
+      LigneTableauEtat('Total Passif', montant(c.n.totalPassif), montant(b1?.totalPassif), genre: GenreLigneEtat.total),
+    ];
+  }
+
   /// Le tableau « Compte de Résultat — Structure en Cascade SYSCOHADA », ligne pour ligne comme le Blade.
   static List<LigneTableauEtat> tableauResultat(CompteResultatComparatif c) {
     final n = c.n;

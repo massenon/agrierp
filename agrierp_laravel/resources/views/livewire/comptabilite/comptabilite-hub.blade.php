@@ -13,10 +13,11 @@
         <x-kpi-card label="Trésorerie Disponible" icon="account_balance" color="red" :value="number_format($this->kpis['tresorerie'], 0, ',', ' ').' FCFA'" />
     </div>
 
-    {{-- Les neuf cartes de la cible du client (07/11/2026), dans CET ordre, textes exacts. Le poste les reprend
-         (`PageComptable` : libellé + description) ; `ComptabiliteHubCartesTest` et `comptabilite_hub_cartes_test.dart` les gardent. --}}
+    {{-- Une SEULE grille de DOUZE cartes (décision du client, 07/11/2026) : les neuf de sa liste, dans cet ordre, puis les trois
+         pages réelles qui n'ont pas d'autre accès. Le poste les reprend à l'identique (`PageComptable` : libellé, description,
+         icône) ; `ComptabiliteHubCartesTest` et `comptabilite_hub_cartes_test.dart` les gardent. --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
-        <a wire:navigate href="{{ route('comptabilite.plan') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.plan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">menu_book</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Plan Comptable</p>
@@ -24,7 +25,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.journal') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.journal') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">account_balance</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Journal Comptable</p>
@@ -32,7 +33,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.grand-livre') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.grand-livre') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">import_contacts</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Grand Livre</p>
@@ -40,7 +41,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.balance') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.balance') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">balance</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Balance Générale</p>
@@ -48,7 +49,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.etats-financiers') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.etats-financiers') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">description</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">États Financiers</p>
@@ -56,7 +57,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.cloture') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.cloture') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">event_repeat</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Clôture Périodique &amp; Annuelle</p>
@@ -64,7 +65,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.analytique') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.analytique') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">insights</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Comptabilité Analytique</p>
@@ -72,7 +73,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.declaration-tva') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.declaration-tva') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">receipt_long</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Déclaration TVA</p>
@@ -80,7 +81,7 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.rapprochement') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.rapprochement') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">sync_alt</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Rapprochement Bancaire</p>
@@ -88,28 +89,23 @@
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-    </div>
-
-    {{-- Pages réelles qui n'ont pas d'autre accès et ne figurent pas dans la liste du client : conservées ici, après les neuf. --}}
-    <h3 class="text-xs font-bold text-outline uppercase tracking-wide mt-lg mb-sm">Autres états</h3>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-md" data-autres-etats>
-        <a wire:navigate href="{{ route('comptabilite.bilan') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
-            <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">account_balance_wallet</span></div>
+        <a wire:navigate href="{{ route('comptabilite.bilan') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+            <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">account_balance</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Bilan de l'Entreprise</p>
                 <p class="text-[11px] text-outline">Actif / Passif, équilibre comptable</p>
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.immobilisations') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.immobilisations') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">domain</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Immobilisations</p>
-                <p class="text-[11px] text-outline">Registre des biens, amortissement lineaire et dotation</p>
+                <p class="text-[11px] text-outline">Registre des biens, amortissement linéaire et dotation</p>
             </div>
             <span class="material-symbols-outlined text-outline group-hover:text-brand-emerald group-hover:translate-x-1 transition-all flex-shrink-0">chevron_right</span>
         </a>
-        <a wire:navigate href="{{ route('comptabilite.balance-agee') }}" data-carte-compta class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
+        <a wire:navigate href="{{ route('comptabilite.balance-agee') }}" class="group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all">
             <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand-emerald text-[24px]">schedule</span></div>
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-bold text-brand-forest">Balance Âgée</p>

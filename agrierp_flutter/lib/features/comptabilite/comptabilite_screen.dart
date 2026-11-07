@@ -11,6 +11,7 @@ import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
+import 'balance_agee.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
@@ -105,9 +106,9 @@ class ComptabiliteScreen extends StatefulWidget {
   State<ComptabiliteScreen> createState() => _ComptabiliteScreenState();
 }
 
-/// Les neuf cartes du hub, dans l'ordre de la cible du client (07/11/2026) : libellé, DESCRIPTION et icône sont ceux du
-/// web (`comptabilite-hub.blade.php`), gardés par `comptabilite_hub_cartes_test.dart`. `immobilisations` n'est pas dans
-/// la liste du client : page réelle sans autre accès, elle est posée dans la rangée « Autres états », après les neuf.
+/// Les DOUZE cartes du hub, dans l'ordre de la cible du client (07/11/2026) : les neuf de sa liste, puis les trois pages
+/// réelles sans autre accès (Bilan de l'Entreprise, Immobilisations, Balance Âgée). Libellé, DESCRIPTION et icône sont ceux
+/// du web (`comptabilite-hub.blade.php`), gardés par `comptabilite_hub_cartes_test.dart`.
 enum PageComptable {
   hub('Comptabilité', '', SymbolesAgri.account_balance),
   planComptable('Plan Comptable', 'Comptes SYSCOHADA (Classes 1 à 7)', SymbolesAgri.menu_book),
@@ -127,7 +128,13 @@ enum PageComptable {
     'Pointage Grand Livre / Relevé Banque et Mobile Money',
     SymbolesAgri.sync_alt,
   ),
-  immobilisations('Immobilisations', 'Registre des biens, amortissement lineaire et dotation', SymbolesAgri.domain);
+  bilan("Bilan de l'Entreprise", 'Actif / Passif, équilibre comptable', SymbolesAgri.account_balance),
+  immobilisations('Immobilisations', 'Registre des biens, amortissement linéaire et dotation', SymbolesAgri.domain),
+  balanceAgee(
+    'Balance Âgée',
+    'Encours clients et fournisseurs par ancienneté de retard',
+    SymbolesAgri.schedule,
+  );
 
   const PageComptable(this.libelle, this.description, this.icone);
 
@@ -135,10 +142,10 @@ enum PageComptable {
   final String description;
   final IconData icone;
 
-  /// Les neuf cartes de la liste du client, dans l'ordre (le hub et la rangée « Autres états » en sont exclus).
-  static List<PageComptable> get cartesDuClient => [
+  /// Les douze cartes du hub, dans l'ordre (le hub lui-même en est exclu).
+  static List<PageComptable> get cartes => [
     for (final p in values)
-      if (p != hub && p != immobilisations) p,
+      if (p != hub) p,
   ];
 }
 
@@ -162,6 +169,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         "La ventilation analytique s'appuie sur les centres de coût, qui ne "
         'descendent pas au poste : les lignes reçues portent leur identifiant, '
         'jamais leur libellé.',
+    PageComptable.immobilisations:
+        "Le registre des immobilisations s'ouvre depuis le menu Comptabilité, une fois "
+        'la session ouverte.',
     PageComptable.tva:
         "La déclaration de TVA est une pièce fiscale : elle s'établit et se "
         'télédéclare depuis la surface web, avec le régime et les taux en '
@@ -185,6 +195,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   PeriodeBalance _periodeBalance = PeriodeBalance.mois;
 
   DonneesComptabilite? _donnees;
+
+  /// Page « Bilan de l'Entreprise » : date d'arrêté (`asOfDate` du web), `null` = l'arrêté de l'exercice affiché.
+  DateTime? _arreteBilan;
+
+  /// Page « Balance Âgée » : volet (`creances` / `dettes`), date d'arrêté (aujourd'hui) et données lues à l'ouverture.
+  String _voletAgee = 'creances';
+  DateTime? _arreteAgee;
+  DonneesBalanceAgee? _agee;
 
   /// Ticket EX7 (EF9) — page affichée du Journal (25 écritures par page), dans l'exercice affiché.
   int _pageDuJournal = 1;
@@ -231,7 +249,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   Future<void> _charger() async {
     final donnees = await widget.depot.charger();
+    final agee = await DonneesBalanceAgee.charger(widget.depot.database);
     if (!mounted) return;
+    _agee = agee;
 
     final aujourdhui = widget.maintenant();
     // Ticket EX7 (EF9) — du 1er du mois à aujourd'hui quand l'exercice affiché contient le jour, l'exercice entier
@@ -287,7 +307,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                           maintenant: widget.maintenant,
                           imprimer: widget.imprimer,
                         ),
-                        PageComptable.immobilisations => ImmobilisationsPage(
+                        PageComptable.bilan => _pageBilan(d, large),
+                        PageComptable.balanceAgee => _pageBalanceAgee(large),
+                        PageComptable.immobilisations when widget.depotImmobilisations != null => ImmobilisationsPage(
                           key: const Key('page-immobilisations'),
                           depot: widget.depotImmobilisations!,
                           maintenant: widget.maintenant,
@@ -381,18 +403,8 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.lg),
-      _grilleCartes([for (final page in PageComptable.cartesDuClient) _carteNavigation(page)], large),
-      // Pages réelles sans autre accès, absentes de la liste du client : conservées après les neuf (comme le web).
-      if (widget.depotImmobilisations != null) ...[
-        const SizedBox(height: AgriSpacing.lg),
-        const Text(
-          'AUTRES ÉTATS',
-          key: Key('hub-autres-etats'),
-          style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline),
-        ),
-        const SizedBox(height: AgriSpacing.sm),
-        _grilleCartes([_carteNavigation(PageComptable.immobilisations)], large),
-      ],
+      // UNE grille de douze cartes (décision du client, 07/11/2026), comme le web.
+      _grilleCartes([for (final page in PageComptable.cartes) _carteNavigation(page)], large),
     ],
   );
 
@@ -408,7 +420,10 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   );
 
   Widget _carteNavigation(PageComptable page) {
-    final embarquee = !motifs.containsKey(page) || (page == PageComptable.cloture && widget.depotCloture != null);
+    final embarquee =
+        !motifs.containsKey(page) ||
+        (page == PageComptable.cloture && widget.depotCloture != null) ||
+        (page == PageComptable.immobilisations && widget.depotImmobilisations != null);
     final teinte = embarquee ? AgriColors.brandEmerald : AgriColors.outline;
 
     return InkWell(
@@ -1855,6 +1870,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     required (ColonneExercice, ColonneExercice?) entetes,
     required List<LigneTableauEtat> lignes,
     bool totalSombre = false,
+    String? pied,
   }) {
     const enTete = TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AgriColors.outline);
     Widget colonneEntete(String titre, String sousTitre) => Column(
@@ -1984,8 +2000,336 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
             ),
           ),
           for (var i = 0; i < lignes.length; i++) ligne(i, lignes[i]),
+          if (pied != null)
+            Container(
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: AgriColors.outlineVariant))),
+              child: Text(
+                pied,
+                style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AgriColors.outline),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  // ── Bilan de l'Entreprise (`/rapport-bilan`, `Livewire\Comptabilite\Bilan`) ─────────────────────────────────
+
+  /// « Bilan Simplifié de l'Entreprise » : en-tête avec la date d'arrêté (bornée à l'exercice affiché), bandeau
+  /// d'équilibre, cartes Actif / Passif en colonnes N et N-1 — calculés par `bilanComparatif` (parité exécutée EX8).
+  Widget _pageBilan(DonneesComptabilite d, bool large) {
+    final etat = _etat(d);
+    final arrete = etat.borner(_arreteBilan ?? d.arreteEtatsFinanciers(etat));
+    final c = d.bilanComparatif(arrete);
+    final motif = d.journal.isEmpty
+        ? 'Aucune écriture reçue au poste'
+        : d.ecrituresIncompletes > 0
+        ? _motifJournalIncomplet
+        : null;
+    final jj = '${arrete.day.toString().padLeft(2, '0')}/${arrete.month.toString().padLeft(2, '0')}/${arrete.year}';
+    final equilibre = c.n.equilibre;
+
+    final actif = _carteEtat(
+      cle: 'bilan-actif',
+      titre: 'Actif (Emplois)',
+      couleur: AgriColors.brandEmerald,
+      couleurTotal: AgriColors.brandEmerald,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauActifSimplifie(c),
+    );
+    final passif = _carteEtat(
+      cle: 'bilan-passif',
+      titre: 'Passif (Ressources)',
+      couleur: AgriColors.infoBlue,
+      couleurTotal: AgriColors.infoBlue,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauPassifSimplifie(c),
+      pied:
+          "Le passif reflète les ressources ayant financé les emplois inscrits à l'actif : capitaux propres de "
+          "l'exploitant et dettes envers les tiers. Calculé directement depuis le grand livre comptable.",
+    );
+    final couleurBandeau = equilibre ? AgriColors.brandEmerald : AgriColors.errorDeep;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(SymbolesAgri.balance, size: 26, color: AgriColors.brandEmerald),
+                      const SizedBox(width: AgriSpacing.xs),
+                      Flexible(child: _titre("Bilan Simplifié de l'Entreprise", large)),
+                    ],
+                  ),
+                  const SizedBox(height: AgriSpacing.xs),
+                  Text(
+                    'Situation patrimoniale de la Ferme École OLOUWACHEGOUN au $jj.',
+                    key: const Key('bilan-situation'),
+                    style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            ChampDateFiltre(
+              cle: const Key('bilan-arrete'),
+              valeur: arrete,
+              onTap: () async {
+                final choix = await showDatePicker(
+                  context: context,
+                  initialDate: arrete,
+                  firstDate: etat.bornes.debut,
+                  lastDate: etat.bornes.fin,
+                  locale: const Locale('fr'),
+                );
+                if (choix != null) setState(() => _arreteBilan = etat.borner(choix));
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        MentionAnouveauxProvisoires(ouverture: c.n.ouverture),
+        if (motif != null)
+          _mentionPoste('$motif : le Bilan ne peut pas être affirmé sur ce poste.')
+        else ...[
+          Container(
+            key: const Key('bilan-equilibre'),
+            margin: const EdgeInsets.only(bottom: AgriSpacing.lg),
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(
+              color: couleurBandeau.withValues(alpha: 0.10),
+              border: Border.all(color: couleurBandeau.withValues(alpha: 0.30)),
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: Row(
+              children: [
+                Icon(equilibre ? SymbolesAgri.check_circle : SymbolesAgri.error, size: 24, color: couleurBandeau),
+                const SizedBox(width: AgriSpacing.xs),
+                Expanded(
+                  child: Text(
+                    equilibre
+                        ? 'Bilan équilibré — Total Actif = Total Passif = ${EtatsComparatifs.montant(c.n.totalActif)} FCFA'
+                        : 'Déséquilibre détecté — Actif ${EtatsComparatifs.montant(c.n.totalActif)} FCFA ≠ Passif ${EtatsComparatifs.montant(c.n.totalPassif)} FCFA',
+                    style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: couleurBandeau),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (large)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: actif),
+                const SizedBox(width: AgriSpacing.md),
+                Expanded(child: passif),
+              ],
+            )
+          else ...[
+            actif,
+            const SizedBox(height: AgriSpacing.md),
+            passif,
+          ],
+        ],
+      ],
+    );
+  }
+
+  // ── Balance Âgée (`/balance-agee`, `Livewire\Comptabilite\BalanceAgee`) ──────────────────────────────────
+
+  Widget _pageBalanceAgee(bool large) {
+    final donnees = _agee ?? const DonneesBalanceAgee();
+    final arrete = _arreteAgee ?? DateTime(widget.maintenant().year, widget.maintenant().month, widget.maintenant().day);
+    final b = donnees.calculer(_voletAgee, arrete);
+    final tiers = _voletAgee == 'dettes' ? 'Fournisseur' : 'Client';
+    String f(double v) => DocumentsComptabilite.montant(v);
+    const etiquette = TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest);
+    const saisie = TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.onSurface);
+
+    Color lisere(String t) => t == 'Non échu'
+        ? AgriColors.brandEmerald
+        : t == 'Plus de 90 jours'
+        ? AgriColors.errorRed
+        : AgriColors.accentYellow;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(SymbolesAgri.schedule, size: 26, color: AgriColors.brandEmerald),
+            const SizedBox(width: AgriSpacing.xs),
+            Flexible(child: _titre('Balance Âgée', large)),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          'Encours par ancienneté de retard — qui relancer, et dans quel ordre.',
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        Container(
+          key: const Key('agee-info'),
+          padding: const EdgeInsets.all(AgriSpacing.sm),
+          decoration: BoxDecoration(
+            color: AgriColors.infoBlue.withValues(alpha: 0.10),
+            border: Border.all(color: AgriColors.infoBlue.withValues(alpha: 0.20)),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: const Text.rich(
+            TextSpan(
+              style: TextStyle(fontSize: 11, color: AgriColors.brandForest),
+              children: [
+                TextSpan(text: "Écran ajouté hors maquette, à la demande. L'âge se compte depuis l'"),
+                TextSpan(text: 'échéance', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: " — pas depuis l'émission — et seul le "),
+                TextSpan(text: 'reste dû', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: ' est ventilé.'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.lg),
+        Container(
+          padding: const EdgeInsets.all(AgriSpacing.md),
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Wrap(
+            spacing: AgriSpacing.md,
+            runSpacing: AgriSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('VOLET :', style: etiquette),
+                  const SizedBox(width: AgriSpacing.sm),
+                  DropdownButton<String>(
+                    key: const Key('agee-volet'),
+                    value: _voletAgee,
+                    style: saisie,
+                    items: const [
+                      DropdownMenuItem(value: 'creances', child: Text('Créances clients')),
+                      DropdownMenuItem(value: 'dettes', child: Text('Dettes fournisseurs')),
+                    ],
+                    onChanged: (v) => setState(() => _voletAgee = v ?? 'creances'),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('ARRÊTÉ AU :', style: etiquette),
+                  const SizedBox(width: AgriSpacing.sm),
+                  ChampDateFiltre(
+                    cle: const Key('agee-arrete'),
+                    valeur: arrete,
+                    onTap: () async {
+                      final choix = await showDatePicker(
+                        context: context,
+                        initialDate: arrete,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        locale: const Locale('fr'),
+                      );
+                      if (choix != null) setState(() => _arreteAgee = choix);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.lg),
+        _grilleKpis(large, [
+          for (final (t, _) in BalanceAgee.tranches)
+            CarteKpi(
+              key: Key('agee-kpi-$t'),
+              libelle: t,
+              valeur: '${f(b.totaux[t]!)} F',
+              couleurLisere: lisere(t),
+            ),
+        ]),
+        const SizedBox(height: AgriSpacing.lg),
+        _tableau(
+          largeur: 900,
+          colonnes: [(tiers, 3), for (final (t, _) in BalanceAgee.tranches) (t, 2), ('Total', 2)],
+          vide: 'Aucun encours à cette date — tout est soldé.',
+          lignes: [
+            for (var i = 0; i < b.tiers.length; i++)
+              _ligne(i, [
+                (
+                  Text(
+                    b.tiers[i].nom,
+                    style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+                  ),
+                  3,
+                ),
+                for (final (t, _) in BalanceAgee.tranches)
+                  (
+                    Text(
+                      b.tiers[i].tranches[t]! > 0 ? f(b.tiers[i].tranches[t]!) : '—',
+                      textAlign: TextAlign.right,
+                      style: _cellule,
+                    ),
+                    2,
+                  ),
+                (
+                  Text(
+                    f(b.tiers[i].total),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+                  ),
+                  2,
+                ),
+              ]),
+            if (b.tiers.isNotEmpty)
+              Container(
+                key: const Key('agee-total-general'),
+                color: AgriColors.brandEmerald.withValues(alpha: 0.10),
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 3,
+                      child: Text(
+                        'TOTAL GÉNÉRAL',
+                        style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w900, color: AgriColors.brandForest),
+                      ),
+                    ),
+                    for (final (t, _) in BalanceAgee.tranches)
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          f(b.totaux[t]!),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+                        ),
+                      ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        f(b.total),
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w900, color: AgriColors.brandForest),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 

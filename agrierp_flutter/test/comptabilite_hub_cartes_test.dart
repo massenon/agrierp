@@ -1,4 +1,5 @@
-// Garde-fou — le hub « Comptabilité » reprend la cible du client (07/11/2026) : NEUF cartes, dans cet ordre, titre et
+// Garde-fou — le hub « Comptabilité » reprend la cible du client (07/11/2026) : UNE grille de DOUZE cartes (les neuf de sa
+// liste puis Bilan, Immobilisations, Balance Âgée), dans cet ordre, titre et
 // description exacts, lus dans le Blade du web (maître) ET comparés à la liste ci-dessous ; mêmes textes au poste.
 import 'dart:io';
 
@@ -17,17 +18,21 @@ const _cible = <(String, String)>[
   ('Comptabilité Analytique', 'Marges réelles par filière (Cuniculture, Aviculture, Porciculture)'),
   ('Déclaration TVA', 'TVA Collectée / Déductible, taux 18% ou exonéré'),
   ('Rapprochement Bancaire', 'Pointage Grand Livre / Relevé Banque et Mobile Money'),
+  ("Bilan de l'Entreprise", 'Actif / Passif, équilibre comptable'),
+  ('Immobilisations', 'Registre des biens, amortissement linéaire et dotation'),
+  ('Balance Âgée', 'Encours clients et fournisseurs par ancienneté de retard'),
 ];
 
 void main() {
-  test('le poste porte les neuf cartes du client : titre et description, dans l ordre', () {
+  test('le poste porte DOUZE cartes : titre et description, dans l ordre', () {
+    expect(PageComptable.cartes, hasLength(12));
     expect(
-      [for (final p in PageComptable.cartesDuClient) (p.libelle, p.description)],
+      [for (final p in PageComptable.cartes) (p.libelle, p.description)],
       _cible,
     );
   });
 
-  test('le Blade du web (maître) porte les mêmes neuf cartes, dans le même ordre', () {
+  test('le Blade du web (maître) porte les mêmes douze cartes, dans le même ordre', () {
     final blade = File(
       '$dossierLaravel/resources/views/livewire/comptabilite/comptabilite-hub.blade.php',
     );
@@ -40,6 +45,7 @@ void main() {
       dotAll: true,
     ).allMatches(blade.readAsStringSync()).map((m) => (m.group(1)!.replaceAll('&amp;', '&'), m.group(2)!.replaceAll('&amp;', '&'))).toList();
 
-    expect(trouvees.take(9).toList(), _cible);
+    expect(trouvees, hasLength(12));
+    expect(trouvees, _cible);
   });
 }
