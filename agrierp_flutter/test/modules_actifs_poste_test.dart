@@ -415,7 +415,11 @@ if (isset($in['envoi'])) {
     $sortie['statut'] = $r->getStatusCode();
     $sortie['push'] = json_decode($r->getContent(), true);
     // Pendant ce temps, au WEB : l'aviculture est éteinte par le vrai composant Livewire.
-    Livewire\Livewire::actingAs($u)->test(App\Livewire\Parametres\ModulesActifs::class)->call('toggleModule', 'aviculture');
+    // CONF-1 : l'écran refuse désormais un compte sans `manage-modules` dès l'ouverture (403) ; pour ce compte le geste
+    // du web n'avait déjà aucun effet : seul l'administrateur éteint réellement l'aviculture.
+    if ($in['role'] === 'admin') {
+        Livewire\Livewire::actingAs($u)->test(App\Livewire\Parametres\ModulesActifs::class)->call('toggleModule', 'aviculture');
+    }
     $sortie['apres'] = $tirer();
 }
 echo json_encode($sortie);
